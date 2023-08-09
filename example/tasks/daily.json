@@ -1,0 +1,58 @@
+{
+  "tasks": [
+    {
+      "type": "StartUp",
+      "params": {
+        "client_type": "Official",
+        "start_game_enabled": true
+      }
+    },
+    {
+      "type": "Fight",
+      "variants": [
+        {
+          "condition": {
+            "type": "DateTime",
+            "start": "2023-08-01T16:00:00",
+            "end": "2023-08-21T03:59:59"
+          },
+          "params": {
+            "stage": ""
+          }
+        },
+        {
+          "condition": {
+            "type": "Weekday",
+            "weekdays": [
+              "Tue",
+              "Thu",
+              "Sat"
+            ]
+          },
+          "params": {
+            "stage": "CE-6"
+          }
+        },
+        {
+          "params": {
+            "stage": "1-7"
+          }
+        }
+      ]
+    },
+    {
+      "type": "Mall",
+      "variants": [
+        {
+          "condition": {
+            "type": "Time",
+            "start": "16:00:00"
+          }
+        }
+      ]
+    },
+    {
+      "type": "CloseDown"
+    }
+  ]
+}

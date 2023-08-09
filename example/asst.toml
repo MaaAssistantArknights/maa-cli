@@ -1,0 +1,8 @@
+[connection]
+type = "ADB"
+adb_path = "adb"
+device = "emulator-5554"
+config = "CompatMac"
+
+[instance_options]
+touch_mode = "Minitouch"
