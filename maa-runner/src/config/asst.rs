@@ -71,14 +71,12 @@ pub fn default_device() -> String {
     String::from("emulator-5554")
 }
 
-#[cfg(not(target_os = "macos"))]
 pub fn default_config() -> String {
-    String::from("General")
-}
-
-#[cfg(target_os = "macos")]
-pub fn default_config() -> String {
-    String::from("CompatMac")
+    if cfg!(target_os = "macos") {
+        String::from("CompatMac")
+    } else {
+        String::from("General")
+    }
 }
 
 impl super::FromFile for AsstConfig {}

@@ -1,25 +1,8 @@
 mod binding;
 
-use std::ffi::{CString, NulError};
 
-#[derive(Debug)]
-pub enum Error {
-    MaaError,
-    NulError(NulError),
-    Utf8Error(std::str::Utf8Error),
-}
-
-impl From<NulError> for Error {
-    fn from(err: NulError) -> Self {
-        Self::NulError(err)
-    }
-}
-
-impl From<std::str::Utf8Error> for Error {
-    fn from(err: std::str::Utf8Error) -> Self {
-        Self::Utf8Error(err)
-    }
-}
+use anyhow::{anyhow, Context, Result};
+use std::ffi::{CStr, CString, NulError};
 
 pub trait ToCString {
     fn to_cstring(self) -> Result<CString, NulError>;
@@ -49,10 +32,10 @@ impl ToCString for std::path::PathBuf {
     }
 }
 
-fn handle_error(code: binding::AsstBool) -> Result<(), Error> {
+fn handle_error(code: binding::AsstBool) -> Result<()> {
     return match code {
         1 => Ok(()),
-        _ => Err(Error::MaaError),
+        _ => Err(anyhow!("MaaCore Error: {}", code)),
     };
 }
 
@@ -77,13 +60,10 @@ pub struct Assistant {
 }
 
 impl Assistant {
-    pub fn new(
-        callback: Option<binding::AsstApiCallback>,
-        arg: Option<*mut std::os::raw::c_void>,
-    ) -> Self {
+    pub fn new(callback: binding::AsstApiCallback, arg: Option<*mut std::os::raw::c_void>) -> Self {
         return match callback {
             Some(cb) => unsafe {
-                let handle = binding::AsstCreateEx(cb, arg.unwrap_or(std::ptr::null_mut()));
+                let handle = binding::AsstCreateEx(Some(cb), arg.unwrap_or(std::ptr::null_mut()));
                 Self { handle }
             },
             None => unsafe {
@@ -94,18 +74,20 @@ impl Assistant {
     }
 
     /* Static Methods */
-    pub fn set_user_dir(path: impl ToCString) -> Result<(), Error> {
+    pub fn set_user_dir(path: impl ToCString) -> Result<()> {
         handle_error(unsafe { binding::AsstSetUserDir(path.to_cstring()?.as_ptr()) })
+            .context("set_user_dir failed")
     }
 
-    pub fn load_resource(path: impl ToCString) -> Result<(), Error> {
+    pub fn load_resource(path: impl ToCString) -> Result<()> {
         handle_error(unsafe { binding::AsstLoadResource(path.to_cstring()?.as_ptr()) })
+            .context("load_resource failed")
     }
 
-    pub fn get_version() -> Result<String, Error> {
+    pub fn get_version<'a>() -> Result<&'a str> {
         return unsafe {
             let c_str = binding::AsstGetVersion();
-            let verion = std::ffi::CStr::from_ptr(c_str).to_str()?.to_string();
+            let verion = CStr::from_ptr(c_str).to_str()?;
             Ok(verion)
         };
     }
@@ -115,17 +97,18 @@ impl Assistant {
         &self,
         key: impl Into<binding::AsstOptionKey>,
         value: impl ToCString,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         handle_error(unsafe {
             binding::AsstSetInstanceOption(self.handle, key.into(), value.to_cstring()?.as_ptr())
         })
+        .context("set_instance_option failed")
     }
 
     pub fn append_task(
         &self,
         task: impl ToCString,
         params: impl ToCString,
-    ) -> Result<binding::AsstTaskId, Error> {
+    ) -> Result<binding::AsstTaskId> {
         let ret = unsafe {
             binding::AsstAppendTask(
                 self.handle,
@@ -141,18 +124,19 @@ impl Assistant {
         &self,
         task_id: binding::AsstTaskId,
         params: impl ToCString,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         handle_error(unsafe {
             binding::AsstSetTaskParams(self.handle, task_id, params.to_cstring()?.as_ptr())
         })
+        .context("set_task_params failed")
     }
 
-    pub fn start(&self) -> Result<(), Error> {
-        handle_error(unsafe { binding::AsstStart(self.handle) })
+    pub fn start(&self) -> Result<()> {
+        handle_error(unsafe { binding::AsstStart(self.handle) }).context("start failed")
     }
 
-    pub fn stop(&self) -> Result<(), Error> {
-        handle_error(unsafe { binding::AsstStop(self.handle) })
+    pub fn stop(&self) -> Result<()> {
+        handle_error(unsafe { binding::AsstStop(self.handle) }).context("stop failed")
     }
 
     pub fn running(&self) -> bool {
@@ -164,7 +148,7 @@ impl Assistant {
         adb: impl ToCString,
         addr: impl ToCString,
         config: impl ToCString + std::fmt::Debug,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         handle_error(unsafe {
             binding::AsstConnect(
                 self.handle,
@@ -173,6 +157,7 @@ impl Assistant {
                 config.to_cstring()?.as_ptr(),
             )
         })
+        .context("connect failed")
     }
 }
 

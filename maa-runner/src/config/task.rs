@@ -136,9 +136,9 @@ pub enum TaskType {
     VideoRecognition,
 }
 
-impl crate::maacore::ToCString for &TaskType {
-    fn to_cstring(self) -> Result<std::ffi::CString, std::ffi::NulError> {
-        match self {
+impl From<&TaskType> for &str {
+    fn from(task_type: &TaskType) -> Self {
+        match task_type {
             TaskType::StartUp => "StartUp",
             TaskType::CloseDown => "CloseDown",
             TaskType::Fight => "Fight",
@@ -156,7 +156,20 @@ impl crate::maacore::ToCString for &TaskType {
             TaskType::SingleStep => "SingleStep",
             TaskType::VideoRecognition => "VideoRecognition",
         }
-        .to_cstring()
+    }
+}
+
+impl std::fmt::Display for TaskType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s: &str = self.into();
+        write!(f, "{}", s)
+    }
+}
+
+impl crate::maacore::ToCString for &TaskType {
+    fn to_cstring(self) -> Result<std::ffi::CString, std::ffi::NulError> {
+        let s: &str = self.into();
+        s.to_cstring()
     }
 }
 
