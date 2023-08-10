@@ -1,5 +1,7 @@
 mod binding;
 
+mod message;
+pub use message::default_callback;
 
 use anyhow::{anyhow, Context, Result};
 use std::ffi::{CStr, CString, NulError};
@@ -37,22 +39,6 @@ fn handle_error(code: binding::AsstBool) -> Result<()> {
         1 => Ok(()),
         _ => Err(anyhow!("MaaCore Error: {}", code)),
     };
-}
-
-#[allow(dead_code)]
-pub unsafe extern "C" fn default_callback(
-    msg: std::os::raw::c_int,
-    detail_json: *const ::std::os::raw::c_char,
-    _: *mut ::std::os::raw::c_void,
-) {
-    println!(
-        "msg:{}: {}",
-        msg,
-        std::ffi::CStr::from_ptr(detail_json)
-            .to_str()
-            .unwrap()
-            .to_string()
-    );
 }
 
 pub struct Assistant {
