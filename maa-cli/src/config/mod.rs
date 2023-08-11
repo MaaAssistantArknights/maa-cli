@@ -1,20 +1,46 @@
 use std::path::PathBuf;
-use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Debug)]
 pub enum Error {
-    #[error("Unknown filetype")]
     UnknownFiletype,
-    #[error("Unsupported filetype: {0}")]
     UnsupportedFiletype(String),
-    #[error("File not found: {0}")]
     FileNotFound(String),
-    #[error("IO error, {0}")]
-    Io(#[from] std::io::Error),
-    #[error("JSON parse error, {0}")]
-    Json(#[from] serde_json::Error),
-    #[error("TOML parse error, {0}")]
-    Toml(#[from] toml::de::Error),
+    Io(std::io::Error),
+    Json(serde_json::Error),
+    Toml(toml::de::Error),
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Error::UnknownFiletype => write!(f, "Unknown filetype"),
+            Error::UnsupportedFiletype(s) => write!(f, "Unsupported filetype: {}", s),
+            Error::FileNotFound(s) => write!(f, "File not found: {}", s),
+            Error::Io(e) => write!(f, "IO error, {}", e),
+            Error::Json(e) => write!(f, "JSON parse error, {}", e),
+            Error::Toml(e) => write!(f, "TOML parse error, {}", e),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Self {
+        Error::Io(e)
+    }
+}
+
+impl From<serde_json::Error> for Error {
+    fn from(e: serde_json::Error) -> Self {
+        Error::Json(e)
+    }
+}
+
+impl From<toml::de::Error> for Error {
+    fn from(e: toml::de::Error) -> Self {
+        Error::Toml(e)
+    }
 }
 
 pub const SUPPORTED_FILETYPES: [&str; 2] = ["json", "toml"];
@@ -55,3 +81,6 @@ pub trait FindFile: FromFile {
 }
 
 impl<T> FindFile for T where T: FromFile {}
+
+pub mod asst;
+pub mod task;

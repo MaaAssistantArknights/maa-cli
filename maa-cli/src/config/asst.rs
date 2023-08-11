@@ -1,4 +1,3 @@
-use crate::maacore::ToCString;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
@@ -16,12 +15,6 @@ pub struct InstanceOption {
     pub kill_adb_on_exit: Option<bool>,
 }
 
-impl ToCString for bool {
-    fn to_cstring(self) -> Result<std::ffi::CString, std::ffi::NulError> {
-        Ok(if self { "1" } else { "0" }.to_cstring()?)
-    }
-}
-
 #[derive(Deserialize, Debug)]
 pub enum TouchMode {
     Abd,
@@ -30,8 +23,8 @@ pub enum TouchMode {
     MacPlayTools,
 }
 
-impl ToCString for TouchMode {
-    fn to_cstring(self) -> Result<std::ffi::CString, std::ffi::NulError> {
+impl maa_sys::ToCString for TouchMode {
+    fn to_cstring(self) -> maa_sys::Result<std::ffi::CString> {
         Ok(match self {
             TouchMode::Abd => "adb",
             TouchMode::Minitouch => "minitouch",

@@ -1,7 +1,8 @@
 [package]
 name = "maa-runner"
+authors = ["Loong Wang <wangl-cc@outlook.com>"]
 version = "0.1.0"
-edition.workspace = true
+edition = "2021"
 license.workspace = true
 
 [[bin]]
@@ -9,16 +10,15 @@ name = "maa"
 path = "src/main.rs"
 
 [dependencies]
-maa-utils = { path = "../maa-utils" }
+maa-sys = { path = "../maa-sys" }
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.3", features = ["derive"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-anyhow = "1.0.72"
+serde = { version = "1", features = ["derive"] }
+directories = "5"
+serde_json = "1"
+anyhow = "1"
+toml = "0.7"
+paste = "1"
 
 [build-dependencies]
-clap_complete = "4.3.2"
-maa-utils = { path = "../maa-utils" }
-
-[dev-dependencies]
-toml = "0.7"
+directories = "5"

@@ -1,12 +1,9 @@
 [package]
-name = "maa-updater"
+name = "maa-sys"
 authors = ["Loong Wang <wangl-cc@outlook.com>"]
 version = "0.1.0"
 edition = "2021"
 license.workspace = true
 
-[dependencies]
+[build-dependencies]
 directories = "5"
-anyhow = "1"
-clap = { version = "4.3", features = ["derive"] }
-paste = "1"

@@ -166,8 +166,8 @@ impl std::fmt::Display for TaskType {
     }
 }
 
-impl crate::maacore::ToCString for &TaskType {
-    fn to_cstring(self) -> Result<std::ffi::CString, std::ffi::NulError> {
+impl maa_sys::ToCString for &TaskType {
+    fn to_cstring(self) -> maa_sys::Result<std::ffi::CString> {
         let s: &str = self.into();
         s.to_cstring()
     }
