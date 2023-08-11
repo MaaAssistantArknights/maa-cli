@@ -17,7 +17,7 @@ pub struct InstanceOption {
 
 #[derive(Deserialize, Debug)]
 pub enum TouchMode {
-    Abd,
+    Adb,
     Minitouch,
     Maatouch,
     MacPlayTools,
@@ -26,7 +26,7 @@ pub enum TouchMode {
 impl maa_sys::ToCString for TouchMode {
     fn to_cstring(self) -> maa_sys::Result<std::ffi::CString> {
         Ok(match self {
-            TouchMode::Abd => "adb",
+            TouchMode::Adb => "adb",
             TouchMode::Minitouch => "minitouch",
             TouchMode::Maatouch => "maatouch",
             TouchMode::MacPlayTools => "macplaytools",
