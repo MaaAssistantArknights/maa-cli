@@ -1,11 +1,13 @@
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
+#[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize)]
 pub struct AsstConfig {
     pub connection: Option<Connection>,
     pub instance_options: Option<InstanceOption>,
 }
 
+#[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize)]
 pub struct InstanceOption {
     #[serde(default)]
@@ -15,6 +17,7 @@ pub struct InstanceOption {
     pub kill_adb_on_exit: Option<bool>,
 }
 
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Deserialize, Debug)]
 pub enum TouchMode {
     ADB,
@@ -41,7 +44,8 @@ impl Default for TouchMode {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Deserialize)]
 #[serde(tag = "type")]
 #[serde(deny_unknown_fields)]
 pub enum Connection {
@@ -75,4 +79,28 @@ pub fn default_config() -> String {
 impl super::FromFile for AsstConfig {}
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deserialize_example() {
+        let config: AsstConfig =
+            toml::from_str(&std::fs::read_to_string("../example/asst.toml").unwrap()).unwrap();
+        assert_eq!(
+            config,
+            AsstConfig {
+                connection: Some(Connection::ADB {
+                    adb_path: String::from("adb"),
+                    device: String::from("emulator-5554"),
+                    config: String::from("CompatMac"),
+                }),
+                instance_options: Some(InstanceOption {
+                    touch_mode: TouchMode::MiniTouch,
+                    deployment_with_pause: Some(false),
+                    adb_lite_enabled: Some(false),
+                    kill_adb_on_exit: Some(false),
+                }),
+            }
+        );
+    }
+}

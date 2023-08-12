@@ -273,6 +273,7 @@ mod tests {
 
         #[test]
         fn state_dir() {
+            env::remove_var("XDG_STATE_HOME");
             let project = ProjectDirs::from("com", "loong", "maa");
             let home_dir = PathBuf::from(env::var_os("HOME").unwrap());
             let state_dir = get_state_dir(&project);
@@ -293,6 +294,7 @@ mod tests {
 
         #[test]
         fn config_dir() {
+            env::remove_var("XDG_CONFIG_HOME");
             let project = ProjectDirs::from("com", "loong", "maa");
             let home_dir = PathBuf::from(env::var_os("HOME").unwrap());
             let config_dir = get_config_dir(&project);
@@ -312,6 +314,7 @@ mod tests {
 
         #[test]
         fn data_dir() {
+            env::remove_var("XDG_DATA_HOME");
             let project = ProjectDirs::from("com", "loong", "maa");
             let home_dir = PathBuf::from(env::var_os("HOME").unwrap());
             let data_dir = get_data_dir(&project);

@@ -5,4 +5,7 @@ device = "emulator-5554"
 config = "CompatMac"
 
 [instance_options]
-touch_mode = "Minitouch"
+touch_mode = "MiniTouch"
+deployment_with_pause = false
+adb_lite_enabled = false
+kill_adb_on_exit = false
