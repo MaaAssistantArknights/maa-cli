@@ -5,6 +5,11 @@
 A simple CLI for [MaaAssistantArknights](https://github.com/MaaAssistantArknights/MaaAssistantArknights) by Rust..
 A alternative way use MAA on Linux (and other platform, windows not tested yet).
 
+## Feature
+
+- Define MAA tasks by TOML and JSON file, and run it by `maa run <task>`;
+- Callback based on GUI implementation (no complete yet) for better monitoring of MAA running status.
+
 ## Installation
 
 This is a CLI tool written in Rust, so you must [install rust](https://www.rust-lang.org/tools/install)
@@ -188,4 +193,7 @@ A complete example please see my [dotfiles](https://github.com/wangl-cc/dotfiles
 ## TODO
 
 - [ ] maa-updater
-- [ ] Better callback
+- [ ] Better message processing
+  - [ ] Rouge-like mode message processing
+  - [ ] Subtask extra info processing
+- [ ] PlayCover support

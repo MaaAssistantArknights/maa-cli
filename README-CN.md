@@ -2,6 +2,11 @@
 
 一个使用rust编写的简单[MAA](https://github.com/MaaAssistantArknights/MaaAssistantArknights)命令行工具。
 
+## 功能
+
+- 通过TOML和JSON文件定义MAA任务，并通过`maa run <task>`执行；
+- 基于GUI的Callback实现的消息处理(尚未完全实现)，更好的监测MAA运行状态。
+
 ## 安装
 
 这是一个使用Rust编写的命令行工具，所以你必须[安装Rust](https://www.rust-lang.org/tools/install)并确保`cargo`可用。
@@ -169,3 +174,11 @@ condition = { type = "Time", start = "18:00:00" }
 ```
 
 完整的例子请参考我的[dotfiles](https://github.com/wangl-cc/dotfiles/tree/master/.config/maa).
+
+## 未完成的功能
+
+- [ ] maa-updater
+- [ ] 更好的消息处理
+  - [ ] 肉鸽相关消息处理
+  - [ ] Subtask extra info消息处理
+- [ ] PlayCover支持
