@@ -1,21 +1,14 @@
 # maa-cli
 
-A simple CLI for [MaaAssistantArknights](https://github.com/MaaAssistantArknights/MaaAssistantArknights) by Rust.
-Works on Linux, macOS. Windows is not tested yet.
+[中文文档](./README-CN.md)
 
-## Project structure
-
-This project is consists of multiple crates:
-
-- `maa-sys`: A low level bind of Maa Core.
-- `maa-cli`: the CLI to run MaaAssistantArknights, provide executable `maa`.
-- `maa-updater`: the CLI to install and update Maa Core and resources (not implemented yet).
+A simple CLI for [MaaAssistantArknights](https://github.com/MaaAssistantArknights/MaaAssistantArknights) by Rust..
+A alternative way use MAA on Linux (and other platform, windows not tested yet).
 
 ## Installation
 
 This is a CLI tool written in Rust, so you must [install rust](https://www.rust-lang.org/tools/install)
 and make sure `cargo` is available.
-
 
 ### Install `MaaCore` and resources
 
@@ -24,7 +17,7 @@ So you must install `MaccCore` at current way before install this CLI.
 The easiest way should be `maa-updater`, however it not implemented yet.
 So you must do it yourself now.
 
-On macOS, if you have installed `MAA.app` at `/Applications/MAA.app`,
+For macOS user, if you have installed `MAA.app` at `/Applications/MAA.app`,
 the libraries can be found at `/Applications/Maa.app/Contents/Frameworks`
 and the resources can be found at `/Applications/Maa.app/Contents/Resources/resource`.
 Then you can link them to the correct location:
@@ -38,7 +31,7 @@ ln -s /Applications/Maa.app/Contents/Frameworks "$MAA_DATA_DIR/lib"
 ln -s /Applications/Maa.app/Contents/Resources/resource "$MAA_DATA_DIR/resource"
 ```
 
-On Linux, you should download the latest release of `MAA` from [here](https://maa.plus).
+For Linux user, you should download the latest release of `MAA` from [here](https://maa.plus).
 Then, if you have Downloaded the `MAA` at `~/Downloads`, then you can extract it to the correct location:
 ```bash
 MAA_DOWNLOAD_DIR="$HOME/Downloads"
@@ -54,6 +47,13 @@ mv $MAA_DATA_DIR/lib*.so* "$MAA_DATA_DIR/lib"
 rm -r "$MAA_DATA_DIR/Python" $MAA_DATA_DIR/*.h
 ```
 
+For windows user, I have no idea how to do it now, because I don't have a windows machine.
+If you want to use it on windows, try install `maa-updater`:
+```bash
+cargo install --git https://github.com/wangl-cc/maa-cli maa-updater --locked
+```
+and use `maa-updater package` to get correct location of libraries and resources.
+
 ### Install `maa-cli`
 
 Once the maa core is installed at correct location, you can install `maa-cli`:
@@ -63,10 +63,11 @@ cargo install --git https://github.com/wangl-cc/maa-cli maa-cli --locked
 
 ## Usage
 
-The `maa-cli` is used to run some predefined tasks (how to define a task will be introduced later):
+The `maa-cli` is used to run some you defined tasks (how to define a task will be introduced later):
 ```sh
-maa run example
+maa run <task> [options]
 ```
+More details can be found at `maa --help`.
 
 ### Config dir
 
@@ -90,13 +91,13 @@ The `connection` section is used to connect to the game:
 type = "ADB" # or "PlayCover" which is not implemented yet
 adb_path = "adb" # the path of adb executable
 device = "emulator-5554" # the serial of your android device
-config = "General" # the config of maa connect, default to `CompatMac` on macOS, `General` on other platforms
+config = "General" # the config of maa connect, default to `CompatMac` on macOS, `General` on other platforms, see resource/config.json in MAA repo for more details
 ```
 
 And the `instance_options` section is used to configure maa instance options:
 ```toml
 [instance_options]
-touch_mode = "MiniTouch" # touch mode to use, can be "ADB", "MiniTouch", "MaaTouch"  or "MacPlayTools"(not works now)
+touch_mode = "ADB" # touch mode to use, can be "ADB", "MiniTouch", "MaaTouch"  or "MacPlayTools"(not works now)
 deployment_with_pause = false # whether pause the game when deployment
 adb_lite_enabled = false # whether use adb-lite
 kill_adb_on_exit = false # whether kill adb when exit
