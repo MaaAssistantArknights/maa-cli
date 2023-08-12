@@ -75,14 +75,27 @@ MAA相关的设置和定义的任务都储存在配置文件夹里，
 MAA的设置储存在`$MAA_CONFIG_DIR/asst.json`或者`$MAA_CONFIG_DIR/asst.toml`中。
 这个文件包含两个部分：`[connection]`和`[instance_options]`。
 
-`[connection]`部分用于MAA连接游戏的设置：
+`[connection]`部分用于MAA连接游戏的设置，
+其包括两种方式：通过ADB连接和通过PlayCover连接。
+当你使用ADB连接时，你需要提供`adb`的路径和设备的序列号：
 ```toml
 [connection]
 type = "ADB" # or "PlayCover" 但是后者还没有实现
 adb_path = "adb" # adb可执行文件的路径
 device = "emulator-5554" # 你的android设备的序列号
-config = "General" # maa connect的配置，macOS上默认为`CompatMac`，其他平台默认为`General`，具体可选值请参考MAA仓库中resource/config.json文件
+config = "General" # maa connect的配置
 ```
+当你使用PlayCover连接时，你需要提供在PlayCover中设置的MacTools的地址：
+```toml
+[connection]
+type = "PlayCover"
+client_address = "localhost:1717" # MacTools的地址
+config = "CompatMac" # maa connect的配置
+```
+两者都需要提供`config`，这个值是`maa connect`的参数，
+它指定了MAA连接游戏时使用的配置，
+对于macOS上的MAA，它默认为`CompatMac`，对于其他平台的MAA，它默认为`General`，
+具体可选值请参考MAA仓库中resource/config.json文件。
 
 `[instance_options]`部分用于配置MAA实例的选项：
 ```toml
@@ -181,4 +194,3 @@ condition = { type = "Time", start = "18:00:00" }
 - [ ] 更好的消息处理
   - [ ] 肉鸽相关消息处理
   - [ ] Subtask extra info消息处理
-- [ ] PlayCover支持

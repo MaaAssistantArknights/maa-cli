@@ -32,7 +32,7 @@ impl maa_sys::ToCString for TouchMode {
             TouchMode::ADB => "adb",
             TouchMode::MiniTouch => "minitouch",
             TouchMode::MAATouch => "maatouch",
-            TouchMode::MacPlayTools => "macplaytools",
+            TouchMode::MacPlayTools => "MacPlayTools",
         }
         .to_cstring()?)
     }
@@ -57,7 +57,12 @@ pub enum Connection {
         #[serde(default = "default_config")]
         config: String,
     },
-    Playcover {},
+    PlayCover {
+        #[serde(default = "default_playcover_address")]
+        address: String,
+        #[serde(default = "default_config")]
+        config: String,
+    },
 }
 
 pub fn default_adb_path() -> String {
@@ -66,6 +71,10 @@ pub fn default_adb_path() -> String {
 
 pub fn default_device() -> String {
     String::from("emulator-5554")
+}
+
+pub fn default_playcover_address() -> String {
+    String::from("localhost:1717")
 }
 
 pub fn default_config() -> String {

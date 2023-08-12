@@ -1,6 +1,6 @@
 # maa-cli
 
-[中文文档](./README-CN.md)
+[中文文档](./README-ZH.md)
 
 A simple CLI for [MaaAssistantArknights](https://github.com/MaaAssistantArknights/MaaAssistantArknights) by Rust..
 A alternative way use MAA on Linux (and other platform, windows not tested yet).
@@ -90,14 +90,30 @@ The maa options should be defined with a TOML or JSON file,
 the located in `$MAA_CONFIG_DIR/asst.toml` or `$MAA_CONFIG_DIR/asst.json`.
 The maa options contains two sections: `connection` and `instance_options`.
 
-The `connection` section is used to connect to the game:
+The `connection` section is used to connect to the game,
+the `type` field can be `ADB` or `PlayCover`.
+If you use `ADB`, you should set `adb_path` and `device` fields:
 ```toml
 [connection]
-type = "ADB" # or "PlayCover" which is not implemented yet
+type = "ADB"
 adb_path = "adb" # the path of adb executable
 device = "emulator-5554" # the serial of your android device
-config = "General" # the config of maa connect, default to `CompatMac` on macOS, `General` on other platforms, see resource/config.json in MAA repo for more details
+config = "General" # the config of maa
 ```
+and if you use `PlayCover`, you should set `address`
+which is the address of MaaTools set in PlayCover,
+more details can be found at [here](https://maa.plus/docs/1.4-Mac模拟器支持.html#✅-playcover-原生运行最流畅🚀):
+```toml
+[connection]
+type = "PlayCover"
+address = "localhost:1717" # the address of MaaTools
+config = "CompatMac" # the same as above
+```
+Both `ADB` and `PlayCover` can set `config` field,
+which is a parameter of `connect` function of maa.
+It's default value is `CompatMac` on macOS, `General` on other platforms.
+All available values can be found at `resource/config.json` in MAA repo.
+
 
 And the `instance_options` section is used to configure maa instance options:
 ```toml
@@ -196,4 +212,3 @@ A complete example please see my [dotfiles](https://github.com/wangl-cc/dotfiles
 - [ ] Better message processing
   - [ ] Rouge-like mode message processing
   - [ ] Subtask extra info processing
-- [ ] PlayCover support

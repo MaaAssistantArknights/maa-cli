@@ -31,13 +31,16 @@ use paste::paste;
 enum CLI {
     #[clap(about = "Run a task defined by a config file")]
     Run {
-        #[clap(help = "Task name")]
+        /// Name of the task to run
         task: String,
-        #[clap(short, long, help = "ADB serial number of the device")]
-        adb: Option<String>,
-        #[clap(short, long, action = clap::ArgAction::Count, help = "Increase verbosity")]
+        /// ADB serial number of device or MaaTools address set in PlayCover
+        #[clap(short, long)]
+        addr: Option<String>,
+        /// Output more information, repeat to increase verbosity
+        #[clap(short, long, action = clap::ArgAction::Count)]
         verbose: u8,
-        #[clap(short, long, action = clap::ArgAction::Count, help = "Decrease verbosity")]
+        /// Output less information, repeat to increase quietness
+        #[clap(short, long, action = clap::ArgAction::Count)]
         quiet: u8,
     },
     #[clap(about = "Show version information")]
@@ -115,7 +118,7 @@ fn main() -> Result<std::process::ExitCode> {
     match cli {
         CLI::Run {
             task,
-            adb,
+            addr,
             verbose,
             quiet,
         } => {
@@ -145,6 +148,87 @@ fn main() -> Result<std::process::ExitCode> {
             };
 
             let assistant = Assistant::new(Some(callback), None);
+
+            let mut task_typs: Vec<TaskType> = Vec::new();
+            let mut task_params: Vec<String> = Vec::new();
+            let mut start_app: u8 = 0;
+            let mut close_app: u8 = 0;
+            let mut app_name: &str = "";
+
+            match TaskList::find_file(&config_dir.join("tasks").join(&task)) {
+                Ok(task_list) => {
+                    for task in task_list.tasks {
+                        if task.is_active() {
+                            let task_type = task.get_type();
+                            let params = &mut task.get_params();
+
+                            match task_type {
+                                TaskType::StartUp => {
+                                    let enable = match params.get("enable") {
+                                        Some(enable) => enable
+                                            .as_bool()
+                                            .ok_or(anyhow!("key enable must be bool"))?,
+                                        None => true,
+                                    };
+                                    let client_type = match params.get("client_type") {
+                                        Some(client_type) => client_type
+                                            .as_str()
+                                            .ok_or(anyhow!("key client_type must be string"))?,
+                                        None => "",
+                                    };
+                                    let start_game = params
+                                        .get("start_game_enabled")
+                                        .unwrap_or(&Value::Bool(false))
+                                        .as_bool()
+                                        .ok_or(anyhow!("key enable must be bool"))?;
+                                    if enable && start_game {
+                                        start_app += 1;
+                                        app_name = match client_type {
+                                            "Official" | "Bilibili" | "txwy" | "default" => {
+                                                "明日方舟.app"
+                                            }
+                                            "YoStarEN" => "Arknights.app",
+                                            "YoStarJP" => "アークナイツ.app",
+                                            "YoStarKR" => "명일방주.app",
+                                            _ => "明日方舟.app",
+                                        };
+                                    }
+                                }
+                                TaskType::CloseDown => close_app += 1,
+                                TaskType::Infrast => {
+                                    if let Some(v) = params.get_mut("filename") {
+                                        assert!(v.is_string());
+                                        *v = Value::String(
+                                            config_dir
+                                                .join("infrast")
+                                                .join(
+                                                    v.as_str()
+                                                        .ok_or(anyhow!("Invalid filename!"))?,
+                                                )
+                                                .to_str()
+                                                .ok_or(anyhow!("Invalid filename!"))?
+                                                .to_string(),
+                                        );
+                                    }
+                                }
+                                _ => (),
+                            }
+
+                            logger.debug("Task:", || format!("{:?}", task_type));
+                            logger.debug("Params:", || {
+                                serde_json::to_string(&params)
+                                    .map_or_else(|_| "Unknown".to_string(), |s| s)
+                            });
+
+                            task_typs.push(task_type.clone());
+                            task_params.push(serde_json::to_string(&params)?);
+                        }
+                    }
+                }
+                Err(err) => {
+                    panic!("Failed to load task config: {}", err);
+                }
+            }
 
             let asst_config = AsstConfig::find_file(&config_dir.join("asst"));
             match asst_config {
@@ -181,11 +265,27 @@ fn main() -> Result<std::process::ExitCode> {
                                 logger.debug("Setting adb_path to", || &adb_path);
                                 logger.debug("Setting device to", || &device);
                                 logger.debug("Setting config to", || &config);
-                                let adb_device = adb.unwrap_or(device);
+                                let adb_device = addr.unwrap_or(device);
                                 assistant.async_connect(adb_path, adb_device, config, true)?;
                             }
-                            Connection::Playcover {} => {
-                                panic!("Playcover is not supported yet!");
+                            Connection::PlayCover { address, config } => {
+                                let address = addr.unwrap_or(address);
+                                logger.debug("Setting address to", || &address);
+                                logger.debug("Setting config to", || &config);
+
+                                if start_app > 0 {
+                                    logger.info("Starting game...", || "");
+                                    std::process::Command::new("open")
+                                        .arg("-a")
+                                        .arg(app_name)
+                                        .spawn()
+                                        .context("Failed to start game!")?
+                                        .wait()
+                                        .context("Failed to start game!")?;
+                                }
+                                close_app += 1;
+
+                                assistant.async_connect("", address, config, true)?;
                             }
                         }
                     }
@@ -202,7 +302,7 @@ fn main() -> Result<std::process::ExitCode> {
                     logger.debug("Set device to", || asst::default_device());
                     logger.debug("Set config to", || asst::default_config());
                     let adb_path = asst::default_adb_path();
-                    let adb_device = adb.unwrap_or(asst::default_device());
+                    let adb_device = addr.unwrap_or(asst::default_device());
                     let config = asst::default_config();
                     assistant.async_connect(adb_path, adb_device, config, true)?;
                 }
@@ -211,38 +311,8 @@ fn main() -> Result<std::process::ExitCode> {
                 }
             }
 
-            match TaskList::find_file(&config_dir.join("tasks").join(&task)) {
-                Ok(task_list) => {
-                    for task in task_list.tasks {
-                        if task.is_active() {
-                            let task_type = task.get_type();
-                            let params = &mut task.get_params();
-                            if *task_type == TaskType::Infrast {
-                                if let Some(v) = params.get_mut("filename") {
-                                    assert!(v.is_string());
-                                    *v = Value::String(
-                                        config_dir
-                                            .join("infrast")
-                                            .join(v.as_str().ok_or(anyhow!("Invalid filename!"))?)
-                                            .to_str()
-                                            .ok_or(anyhow!("Invalid filename!"))?
-                                            .to_string(),
-                                    );
-                                }
-                            }
-                            logger.debug("Task:", || format!("{:?}", task_type));
-                            logger.debug("Params:", || {
-                                serde_json::to_string(&params)
-                                    .map_or_else(|_| "Unknown".to_string(), |s| s)
-                            });
-                            assistant
-                                .append_task(task.get_type(), serde_json::to_string(&params)?)?;
-                        }
-                    }
-                }
-                Err(err) => {
-                    panic!("Failed to load task config: {}", err);
-                }
+            for (i, task_type) in task_typs.iter().enumerate() {
+                assistant.append_task(task_type, task_params[i].as_str())?;
             }
 
             assistant.start()?;
@@ -252,6 +322,17 @@ fn main() -> Result<std::process::ExitCode> {
             }
 
             assistant.stop()?;
+
+            if close_app > 1 {
+                logger.info("Closing game...", || "");
+                std::process::Command::new("osascript")
+                    .arg("-e")
+                    .arg("quit app \"明日方舟\"")
+                    .spawn()
+                    .context("Failed to close game!")?
+                    .wait()
+                    .context("Failed to close game!")?;
+            }
         }
         CLI::Version => {
             let cli_version = env!("CARGO_PKG_VERSION");

@@ -116,7 +116,7 @@ fn default_variants() -> Vec<TaskVariant> {
     vec![TaskVariant::default()]
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum TaskType {
     StartUp,
     CloseDown,
