@@ -101,7 +101,10 @@ fn update_package(
     println!("Mirror: {}", mirror);
     println!("Channel: {}", channel);
     println!("Download prebuilt packages to {}", cache_dir.display());
-    println!("Extract core and resources to {}", data_dir.display());
+    let resource_dir = data_dir.join("resource");
+    println!("Extract resource to {}", resource_dir.display());
+    let lib_dir = data_dir.join("lib");
+    println!("Extract shared library to {}", lib_dir.display());
 }
 
 fn update_core(mirror: &str, data_dir: &std::path::PathBuf) {
@@ -109,7 +112,8 @@ fn update_core(mirror: &str, data_dir: &std::path::PathBuf) {
     println!("Updating core by building from source...");
     println!("Mirror: {}", mirror);
     println!("Clone source code to {}", data_dir.display());
-    println!("Build core and install to {}", data_dir.display());
+    let lib_dir = data_dir.join("lib");
+    println!("Build shared library and install to {}", lib_dir.display());
 }
 
 fn update_resources(mirror: &str, data_dir: &std::path::PathBuf) {
@@ -117,7 +121,8 @@ fn update_resources(mirror: &str, data_dir: &std::path::PathBuf) {
     println!("Updating resources...");
     println!("Mirror: {}", mirror);
     println!("Clone resources to {}", data_dir.display());
-    println!("Build resources and install to {}", data_dir.display());
+    let resource_dir = data_dir.join("resource");
+    println!("Link resources to {}", resource_dir.display());
 }
 
 fn main() -> Result<ExitCode> {
