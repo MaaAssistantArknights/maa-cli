@@ -18,8 +18,10 @@ pub struct InstanceOption {
 }
 
 #[cfg_attr(test, derive(PartialEq))]
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum TouchMode {
+    #[default]
     ADB,
     MiniTouch,
     MAATouch,
@@ -28,19 +30,13 @@ pub enum TouchMode {
 
 impl maa_sys::ToCString for TouchMode {
     fn to_cstring(self) -> maa_sys::Result<std::ffi::CString> {
-        Ok(match self {
+        match self {
             TouchMode::ADB => "adb",
             TouchMode::MiniTouch => "minitouch",
             TouchMode::MAATouch => "maatouch",
             TouchMode::MacPlayTools => "MacPlayTools",
         }
-        .to_cstring()?)
-    }
-}
-
-impl Default for TouchMode {
-    fn default() -> Self {
-        TouchMode::ADB
+        .to_cstring()
     }
 }
 
@@ -48,6 +44,7 @@ impl Default for TouchMode {
 #[derive(Deserialize)]
 #[serde(tag = "type")]
 #[serde(deny_unknown_fields)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum Connection {
     ADB {
         #[serde(default = "default_adb_path")]

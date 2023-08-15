@@ -8,17 +8,12 @@ use anyhow::{anyhow, Result};
 use clap::ValueEnum;
 use serde::Deserialize;
 
-#[derive(ValueEnum, Clone)]
+#[derive(ValueEnum, Clone, Default)]
 pub enum Channel {
+    #[default]
     Stable,
     Beta,
     Alpha,
-}
-
-impl Default for Channel {
-    fn default() -> Self {
-        Channel::Stable
-    }
 }
 
 impl From<&Channel> for &str {
@@ -73,7 +68,7 @@ pub fn get_package(channel: &Channel) -> Result<Package> {
     let api_url = "https://ota.maa.plus/MaaAssistantArknights/api/version";
     let channel: &str = channel.into();
     let url = format!("{}/{}.json", api_url, channel);
-    let package: Package = reqwest::blocking::get(&url)?.json()?;
+    let package: Package = reqwest::blocking::get(url)?.json()?;
     Ok(package)
 }
 

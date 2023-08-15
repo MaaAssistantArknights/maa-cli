@@ -131,7 +131,7 @@ fn process_connection_info(logger: &Logger, message: &Map<String, Value>) -> Opt
         }
     }
 
-    return Some(());
+    Some(())
 }
 
 fn process_taskchain(logger: &Logger, code: AsstMsgId, message: &Map<String, Value>) -> Option<()> {
@@ -158,7 +158,7 @@ fn process_taskchain(logger: &Logger, code: AsstMsgId, message: &Map<String, Val
         _ => {}
     };
 
-    return Some(());
+    Some(())
 }
 
 fn process_subtask_error(logger: &Logger, message: &Map<String, Value>) -> Option<()> {
@@ -198,7 +198,7 @@ fn process_subtask_error(logger: &Logger, message: &Map<String, Value>) -> Optio
         _ => {}
     };
 
-    return Some(());
+    Some(())
 }
 fn process_subtask_start(logger: &Logger, message: &Map<String, Value>) -> Option<()> {
     let subtask = message.get("subtask")?.as_str()?;
@@ -240,10 +240,10 @@ fn process_subtask_start(logger: &Logger, message: &Map<String, Value>) -> Optio
         }
     }
 
-    return Some(());
+    Some(())
 }
 fn process_subtask_completed(_: &Logger, _: &Map<String, Value>) -> Option<()> {
-    return Some(());
+    Some(())
 }
 fn process_subtask_extra_info(logger: &Logger, message: &Map<String, Value>) -> Option<()> {
     let what = message.get("what")?.as_str()?;
@@ -317,5 +317,5 @@ fn process_subtask_extra_info(logger: &Logger, message: &Map<String, Value>) -> 
         _ => {}
     }
 
-    return Some(());
+    Some(())
 }

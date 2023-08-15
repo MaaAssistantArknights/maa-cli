@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 #[derive(Debug)]
 pub enum Error {
@@ -46,7 +46,7 @@ impl From<toml::de::Error> for Error {
 pub const SUPPORTED_FILETYPES: [&str; 2] = ["json", "toml"];
 
 pub trait FromFile: Sized + serde::de::DeserializeOwned {
-    fn from_file(path: &PathBuf) -> Result<Self, Error> {
+    fn from_file(path: &Path) -> Result<Self, Error> {
         if !path.exists() {
             return Err(Error::FileNotFound(path.to_str().unwrap().to_string()));
         }
@@ -59,17 +59,14 @@ pub trait FromFile: Sized + serde::de::DeserializeOwned {
             Ok(task_list)
         } else {
             Err(Error::UnsupportedFiletype(String::from(
-                match filetype.to_str() {
-                    Some(s) => s,
-                    None => "Unknown",
-                },
+                filetype.to_str().unwrap_or("Unknown"),
             )))
         }
     }
 }
 
 pub trait FindFile: FromFile {
-    fn find_file(path: &PathBuf) -> Result<Self, Error> {
+    fn find_file(path: &Path) -> Result<Self, Error> {
         for filetype in SUPPORTED_FILETYPES.iter() {
             let path = path.with_extension(filetype);
             if path.exists() {

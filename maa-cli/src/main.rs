@@ -28,6 +28,7 @@ use paste::paste;
 
 #[derive(Parser)]
 #[clap(author, about, version)]
+#[allow(clippy::upper_case_acronyms)]
 enum CLI {
     #[clap(about = "Run a task defined by a config file")]
     Run {
@@ -323,9 +324,9 @@ fn main() -> Result<std::process::ExitCode> {
                     });
                     assistant.set_instance_option(2, asst::TouchMode::default())?;
 
-                    logger.debug("Set adb_path to", || asst::default_adb_path());
-                    logger.debug("Set device to", || asst::default_device());
-                    logger.debug("Set config to", || asst::default_config());
+                    logger.debug("Set adb_path to", asst::default_adb_path);
+                    logger.debug("Set device to", asst::default_device);
+                    logger.debug("Set config to", asst::default_config);
                     let adb_path = asst::default_adb_path();
                     let adb_device = addr.unwrap_or(asst::default_device());
                     let config = asst::default_config();
@@ -373,7 +374,7 @@ fn main() -> Result<std::process::ExitCode> {
         }
     }
 
-    return Ok(ExitCode::SUCCESS);
+    Ok(ExitCode::SUCCESS)
 }
 
 #[cfg(test)]

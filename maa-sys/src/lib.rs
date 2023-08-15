@@ -27,7 +27,6 @@ impl std::fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-
 impl From<NulError> for Error {
     fn from(err: NulError) -> Self {
         Error::NulError(err)
@@ -73,7 +72,7 @@ impl ToCString for std::path::PathBuf {
 // Used in set_instance_option
 impl ToCString for bool {
     fn to_cstring(self) -> Result<CString> {
-        Ok(if self { "1" } else { "0" }.to_cstring()?)
+        if self { "1" } else { "0" }.to_cstring()
     }
 }
 
@@ -99,7 +98,7 @@ impl Drop for Assistant {
 
 impl Assistant {
     pub fn new(callback: binding::AsstApiCallback, arg: Option<*mut std::os::raw::c_void>) -> Self {
-        return match callback {
+        match callback {
             Some(cb) => unsafe {
                 let handle = binding::AsstCreateEx(Some(cb), arg.unwrap_or(std::ptr::null_mut()));
                 Self { handle }
@@ -108,7 +107,7 @@ impl Assistant {
                 let handle = binding::AsstCreate();
                 Self { handle }
             },
-        };
+        }
     }
 
     /* Static Methods */
@@ -225,7 +224,7 @@ impl Assistant {
         })
     }
     pub fn get_null_size() -> AsstSize {
-        return unsafe { binding::AsstGetNullSize() };
+        unsafe { binding::AsstGetNullSize() }
     }
 
     pub fn get_version<'a>() -> Result<&'a str> {
@@ -236,7 +235,8 @@ impl Assistant {
         }
     }
     pub fn log(level: impl ToCString, msg: impl ToCString) -> Result<()> {
-        Ok(unsafe { binding::AsstLog(level.to_cstring()?.as_ptr(), msg.to_cstring()?.as_ptr()) })
+        unsafe { binding::AsstLog(level.to_cstring()?.as_ptr(), msg.to_cstring()?.as_ptr()) };
+        Ok(())
     }
 }
 

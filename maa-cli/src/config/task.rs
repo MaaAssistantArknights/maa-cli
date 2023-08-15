@@ -5,7 +5,9 @@ use serde_json::{json, Value};
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Deserialize, Debug)]
 #[serde(tag = "type")]
+#[derive(Default)]
 pub enum Condition {
+    #[default]
     Always,
     Weekday {
         weekdays: Vec<Weekday>,
@@ -80,12 +82,6 @@ impl Condition {
                 true
             }
         }
-    }
-}
-
-impl Default for Condition {
-    fn default() -> Self {
-        Condition::Always
     }
 }
 
@@ -204,11 +200,11 @@ impl Task {
                 return true;
             }
         }
-        return false;
+        false
     }
 
     pub fn get_type(&self) -> &TaskType {
-        return &self.task_type;
+        &self.task_type
     }
 
     pub fn get_params(&self) -> Value {
@@ -220,7 +216,7 @@ impl Task {
                 break;
             }
         }
-        return params;
+        params
     }
 }
 
@@ -247,7 +243,7 @@ mod tests {
     }
 
     fn example_tasks() -> TaskList {
-        return TaskList {
+        TaskList {
             tasks: vec![
                 Task {
                     task_type: TaskType::StartUp,
@@ -303,7 +299,7 @@ mod tests {
                     variants: vec![TaskVariant::default()],
                 },
             ],
-        };
+        }
     }
 
     mod conditions {

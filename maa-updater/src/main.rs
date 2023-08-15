@@ -81,5 +81,5 @@ fn main() -> Result<ExitCode> {
         .download(&cache_dir, test_time)?
         .extract(&data_dir, !no_resource)?;
 
-    return Ok(ExitCode::SUCCESS);
+    Ok(ExitCode::SUCCESS)
 }
