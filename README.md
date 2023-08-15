@@ -19,45 +19,19 @@ and make sure `cargo` is available.
 
 The shared library `MaaCore` is required to build `maa-sys`.
 So you must install `MaccCore` at current way before install this CLI.
-The easiest way should be `maa-updater`, however it not implemented yet.
-So you must do it yourself now.
-
-For macOS user, if you have installed `MAA.app` at `/Applications/MAA.app`,
-the libraries can be found at `/Applications/Maa.app/Contents/Frameworks`
-and the resources can be found at `/Applications/Maa.app/Contents/Resources/resource`.
-Then you can link them to the correct location:
-```bash
-if [ -n "$XDG_DATA_HOME" ]; then # maa-cli respect XDG Base Directory Specification
-    MAA_DATA_DIR="$XDG_DATA_HOME/maa"
-else
-    MAA_DATA_DIR="$HOME/Library/Application\ Support/com.loong.maa"
-fi
-ln -s /Applications/Maa.app/Contents/Frameworks "$MAA_DATA_DIR/lib"
-ln -s /Applications/Maa.app/Contents/Resources/resource "$MAA_DATA_DIR/resource"
-```
-
-For Linux user, you should download the latest release of `MAA` from [here](https://maa.plus).
-Then, if you have Downloaded the `MAA` at `~/Downloads`, then you can extract it to the correct location:
-```bash
-MAA_DOWNLOAD_DIR="$HOME/Downloads"
-if [ -n "$XDG_DATA_HOME" ]; then # maa-cli respect XDG Base Directory Specification
-    MAA_DATA_DIR="$XDG_DATA_HOME/maa"
-else
-    MAA_DATA_DIR="$HOME/.local/share/maa"
-fi
-mkdir -p "$MAA_DATA_DIR"
-tar -xzf $MAA_DOWNLOAD_DIR/MAA*.tar.gz -C "$MAA_DATA_DIR"
-mkdir "$MAA_DATA_DIR/lib"
-mv $MAA_DATA_DIR/lib*.so* "$MAA_DATA_DIR/lib"
-rm -r "$MAA_DATA_DIR/Python" $MAA_DATA_DIR/*.h
-```
-
-For windows user, I have no idea how to do it now, because I don't have a windows machine.
-If you want to use it on windows, try install `maa-updater`:
+The easiest way to install `MaaCore` is using `maa-updater`,
+which is a CLI tool to download and install `MaaCore` and resources.
+You can install `maa-updater` by:
 ```bash
 cargo install --git https://github.com/wangl-cc/maa-cli maa-updater --locked
 ```
-and use `maa-updater package` to get correct location of libraries and resources.
+And then run `maa-updater` to install `MaaCore` and resources:
+```bash
+maa-updater
+```
+Then `maa-updater` will download latest prebuilt `MaaCore` and resources.
+
+**Note**: The `maa-updater` for windows is not available now.
 
 ### Install `maa-cli`
 

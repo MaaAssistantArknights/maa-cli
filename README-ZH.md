@@ -13,40 +13,18 @@
 
 ### 安装`MaaCore`及相关资源
 
-`MaaCore`是构建`maa-sys`所必需的共享库，所以你必须在安装这个CLI之前安装`MaaCore`。最简单的方法应该是`maa-updater`，但它还没有实现，所以你现在必须自己完成。
-
-对于macOS用户，如果你已经安装了`MAA.app`在`/Applications/MAA.app`，那么库可以在`/Applications/Maa.app/Contents/Frameworks`找到，资源可以在`/Applications/Maa.app/Contents/Resources/resource`找到。然后你可以将它们链接到需要的位置：
-```bash
-if [ -n "$XDG_DATA_HOME" ]; then # maa-cli respect XDG Base Directory Specification
-    MAA_DATA_DIR="$XDG_DATA_HOME/maa"
-else
-    MAA_DATA_DIR="$HOME/Library/Application\ Support/com.loong.maa"
-fi
-ln -s /Applications/Maa.app/Contents/Frameworks "$MAA_DATA_DIR/lib"
-ln -s /Applications/Maa.app/Contents/Resources/resource "$MAA_DATA_DIR/resource"
-```
-
-对于Linux，你应该从[这里](https://maa.plus)下载最新版本的`MAA`。然后，如果你已经将`MAA`下载到了`~/Downloads`，那么你可以将它解压到正确的位置：
-```bash
-MAA_DOWNLOAD_DIR="$HOME/Downloads"
-if [ -n "$XDG_DATA_HOME" ]; then # maa-cli respect XDG Base Directory Specification
-    MAA_DATA_DIR="$XDG_DATA_HOME/maa"
-else
-    MAA_DATA_DIR="$HOME/.local/share/maa"
-fi
-mkdir -p "$MAA_DATA_DIR"
-tar -xzf $MAA_DOWNLOAD_DIR/MAA*.tar.gz -C "$MAA_DATA_DIR"
-mkdir "$MAA_DATA_DIR/lib"
-mv $MAA_DATA_DIR/lib*.so* "$MAA_DATA_DIR/lib"
-rm -r "$MAA_DATA_DIR/Python" $MAA_DATA_DIR/*.h
-```
-
-对于Windows用户，我不知道该怎么做，因为我没有Windows机器。
-如果你想尝试可以先安装`maa-updater`：
+`MaaCore`是构建`maa-sys`所必需的共享库，所以你必须在安装这个CLI之前安装`MaaCore`。
+最简单的安装`MaaCore`的方法是使用`maa-updater`，这是一个用于下载和安装`MaaCore`及相关资源的CLI工具。
+你可以通过以下命令安装`maa-updater`：
 ```bash
 cargo install --git https://github.com/wangl-cc/maa-cli maa-updater --locked
 ```
-然后使用`maa-updater package`，他应该会告诉你库和资源应该安装的的位置。
+然后运行`maa-updater`来安装`MaaCore`及相关资源：
+```bash
+maa-updater
+```
+`maa-updater`会下载最新的预编译`MaaCore`及相关资源。
+**注意**：目前`maa-updater`不支持Windows。
 
 ### 安装`maa-cli`
 

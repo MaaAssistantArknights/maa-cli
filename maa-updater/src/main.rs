@@ -1,5 +1,8 @@
+mod package;
+use package::Channel;
+
 use std::env::var_os;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use anyhow::Result;
@@ -28,10 +31,8 @@ enum UpdateTarget {
     /// If `MAA_DATA_DIR` is set, it will be used as data directory,
     /// or if `XDG_DATA_HOME` is set, `$XDG_DATA_HOME/maa` will be used as data directory,
     Package {
-        #[arg(short, long, help = "Mirror to download packages")]
-        mirror: Option<String>,
         #[arg(short, long, help = "Update channel, it can be stable, beta or alpha")]
-        channel: Option<String>,
+        channel: Option<Channel>,
     },
     /// Update maa core by building from source
     ///
@@ -90,21 +91,22 @@ fn arg_env_or_default(arg: Option<String>, env: &str, default: &str) -> String {
 get_dir!(data);
 get_dir!(cache);
 
-fn update_package(
-    mirror: &str,
-    channel: &str,
-    cache_dir: &std::path::PathBuf,
-    data_dir: &std::path::PathBuf,
-) {
-    println!("Warning: this is not implemented yet!");
-    println!("Updating core and resources...");
-    println!("Mirror: {}", mirror);
-    println!("Channel: {}", channel);
-    println!("Download prebuilt packages to {}", cache_dir.display());
-    let resource_dir = data_dir.join("resource");
-    println!("Extract resource to {}", resource_dir.display());
-    let lib_dir = data_dir.join("lib");
-    println!("Extract shared library to {}", lib_dir.display());
+fn update_package(channel: Channel, cache_dir: &Path, data_dir: &Path) -> Result<()> {
+    println!("Updating package (channel: {})...", channel);
+
+    if !cache_dir.exists() {
+        std::fs::create_dir_all(cache_dir)?;
+    }
+    if !data_dir.exists() {
+        std::fs::create_dir_all(data_dir)?;
+    }
+
+    package::get_package(&channel, None)?
+        .get_asset()?
+        .download(cache_dir)?
+        .extract(data_dir)?;
+
+    Ok(())
 }
 
 fn update_core(mirror: &str, data_dir: &std::path::PathBuf) {
@@ -135,14 +137,8 @@ fn main() -> Result<ExitCode> {
 
     match cli.target {
         None => {
-            println!("No target specified, use default target: package");
-            let package_mirror = arg_env_or_default(
-                None,
-                "MAA_PACKAGE_MIRROR",
-                "https://github.com/MaaAssistantArknights/MaaAssistantArknights/releases",
-            );
-            let package_channel = arg_env_or_default(None, "MAA_PACKAGE_CHANNEL", "stable");
-            update_package(&package_mirror, &package_channel, &cache_dir, &data_dir);
+            println!("No target specified");
+            update_package(Channel::default(), &cache_dir, &data_dir)?;
         }
         Some(target) => match target {
             UpdateTarget::Core { mirror } => {
@@ -161,14 +157,9 @@ fn main() -> Result<ExitCode> {
                 );
                 update_resources(&repo_mirror, &data_dir);
             }
-            UpdateTarget::Package { mirror, channel } => {
-                let package_mirror = arg_env_or_default(
-                    mirror,
-                    "MAA_PACKAGE_MIRROR",
-                    "https:://github.com/MaaAssistantArknights/MaaAssistantArknights/releases",
-                );
-                let package_channel = arg_env_or_default(channel, "MAA_PACKAGE_CHANNEL", "stable");
-                update_package(&package_mirror, &package_channel, &cache_dir, &data_dir);
+            UpdateTarget::Package { channel } => {
+                let channel = channel.unwrap_or(Channel::Stable);
+                update_package(channel, &cache_dir, &data_dir)?;
             }
         },
     }
