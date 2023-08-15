@@ -184,17 +184,30 @@ fn main() -> Result<std::process::ExitCode> {
                                     if enable && start_game {
                                         start_app += 1;
                                         app_name = match client_type {
-                                            "Official" | "Bilibili" | "txwy" | "default" => {
-                                                "明日方舟.app"
+                                            "Official" | "Bilibili" | "txwy" | "" => "明日方舟",
+                                            "YoStarEN" => "Arknights",
+                                            "YoStarJP" => "アークナイツ",
+                                            "YoStarKR" => "명일방주",
+                                            _ => {
+                                                logger.error("Unknown client type:", || {
+                                                    client_type.to_string()
+                                                });
+                                                "明日方舟"
                                             }
-                                            "YoStarEN" => "Arknights.app",
-                                            "YoStarJP" => "アークナイツ.app",
-                                            "YoStarKR" => "명일방주.app",
-                                            _ => "明日方舟.app",
                                         };
                                     }
                                 }
-                                TaskType::CloseDown => close_app += 1,
+                                TaskType::CloseDown => {
+                                    let enable = match params.get("enable") {
+                                        Some(enable) => enable
+                                            .as_bool()
+                                            .ok_or(anyhow!("key enable must be bool"))?,
+                                        None => true,
+                                    };
+                                    if enable {
+                                        close_app += 1;
+                                    }
+                                }
                                 _ => {
                                     // For any task that has a filename parameter
                                     // and the filename parameter is not an absolute path,
@@ -279,6 +292,9 @@ fn main() -> Result<std::process::ExitCode> {
                                 logger.debug("Setting address to", || &address);
                                 logger.debug("Setting config to", || &config);
 
+                                // BUG: If game is started with this app,
+                                // it will not be able to connect to the server when finnish rogue stage
+                                // But if the game is started manually, it will be fine
                                 if start_app > 0 {
                                     logger.info("Starting game...", || "");
                                     std::process::Command::new("open")
@@ -290,6 +306,9 @@ fn main() -> Result<std::process::ExitCode> {
                                         .context("Failed to start game!")?;
                                 }
                                 close_app += 1;
+
+                                // Wait for the game to start
+                                std::thread::sleep(std::time::Duration::from_secs(5));
 
                                 assistant.async_connect("", address, config, true)?;
                             }
@@ -330,10 +349,17 @@ fn main() -> Result<std::process::ExitCode> {
             assistant.stop()?;
 
             if close_app > 1 {
+                let app_name = match app_name {
+                    "" => {
+                        logger.warning("No app name specified, using default name.", || "");
+                        "明日方舟"
+                    }
+                    _ => app_name,
+                };
                 logger.info("Closing game...", || "");
                 std::process::Command::new("osascript")
                     .arg("-e")
-                    .arg("quit app \"明日方舟\"")
+                    .arg(format!("quit app \"{}\"", app_name))
                     .spawn()
                     .context("Failed to close game!")?
                     .wait()
