@@ -44,17 +44,16 @@ pub struct Package {
 impl Package {
     pub fn get_asset(&self) -> Result<&Asset> {
         let version = &self.version;
-        let asset_name = match std::env::consts::OS {
-            "linux" => format!(
-                "MAA-{}-{}-{}.tar.gz",
-                version,
-                std::env::consts::OS,
-                std::env::consts::ARCH
-            ),
-            "macos" => format!("MAA-{}-macos-runtime-universal.zip", version),
-            "windows" => format!("MAA-{}-{}.zip", version, std::env::consts::ARCH),
-            _ => return Err(anyhow!("Unsupported OS")),
+        #[cfg(target_os = "macos")]
+        let asset_name = format!("MAA-{}-macos-runtime-universal.zip", version);
+        #[cfg(target_os = "windows")]
+        let asset_name = match std::env::consts::ARCH {
+            "x86_64" => format!("MAA-{}-win-x64.zip", version),
+            "aarch64" => format!("MAA-{}-win-arm64.zip", version),
+            _ => return Err(anyhow!("Unsupported architecture")),
         };
+        #[cfg(target_os = "linux")]
+        let asset_name = format!("MAA-{}-linux-{}.tar.gz", version, std::env::consts::ARCH);
 
         self.details
             .assets
