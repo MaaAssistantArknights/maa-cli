@@ -25,6 +25,8 @@ jobs:
       - name: Build maa-updater
         run: cargo build --bin maa-updater
       - name: Install MaaCore with maa-updater
+        env:
+          MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
         run: cargo run --bin maa-updater -- stable
       - name: Build maa-cli
         run: cargo build --bin maa

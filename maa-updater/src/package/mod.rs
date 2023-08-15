@@ -1,6 +1,7 @@
 mod download;
 use download::download_package;
 
+use std::env::var_os;
 use std::fs::{create_dir_all, File};
 use std::path::{Path, PathBuf};
 
@@ -65,7 +66,11 @@ impl Package {
 
 /// Get package information of the specified channel from API.
 pub fn get_package(channel: &Channel) -> Result<Package> {
-    let api_url = "https://ota.maa.plus/MaaAssistantArknights/api/version";
+    let api_url = if let Some(url) = var_os("MAA_API_URL") {
+        url.to_str().unwrap().to_owned()
+    } else {
+        "https://ota.maa.plus/MaaAssistantArknights/api/version".to_owned()
+    };
     let channel: &str = channel.into();
     let url = format!("{}/{}.json", api_url, channel);
     let package: Package = reqwest::blocking::get(url)?.json()?;

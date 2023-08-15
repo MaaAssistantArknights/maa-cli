@@ -90,6 +90,13 @@ async fn download(
     path: &Path,
     size: u64,
 ) -> Result<()> {
+    #[cfg(debug_assertions)]
+    if let Some(_) = std::env::var_os("CI") {
+        println!("Running in CI, skipping speed test...");
+        download_file(client, url, path, size).await?;
+        return Ok(());
+    }
+
     let duration = Duration::from_secs(3);
     let mut fast_link = url;
     let mut largest: u64 = 0;
