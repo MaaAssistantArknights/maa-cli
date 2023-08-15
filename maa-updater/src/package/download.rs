@@ -109,9 +109,15 @@ async fn download(
     Ok(())
 }
 
-pub fn download_package(url: &str, mirrors: Vec<String>, path: &Path, size: u64) -> Result<()> {
+pub fn download_package(
+    url: &str,
+    mirrors: Vec<String>,
+    path: &Path,
+    size: u64,
+    t: u64,
+) -> Result<()> {
     let client = reqwest::Client::builder()
-        .connect_timeout(Duration::from_secs(5))
+        .connect_timeout(Duration::from_secs(t))
         .build()?;
     Runtime::new()?.block_on(download(&client, url, mirrors, path, size))?;
 

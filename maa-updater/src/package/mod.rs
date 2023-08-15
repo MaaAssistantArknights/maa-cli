@@ -1,8 +1,6 @@
 mod download;
 use download::download_package;
 
-use super::arg_env_or_default;
-
 use std::fs::{create_dir_all, File};
 use std::path::{Path, PathBuf};
 
@@ -71,14 +69,10 @@ impl Package {
 }
 
 /// Get package information of the specified channel from API.
-pub fn get_package(channel: &Channel, mirror: Option<String>) -> Result<Package> {
-    let api_mirror = arg_env_or_default(
-        mirror,
-        "MAA_API_MIRROR",
-        "https://ota.maa.plus/MaaAssistantArknights/api/version",
-    );
+pub fn get_package(channel: &Channel) -> Result<Package> {
+    let api_url = "https://ota.maa.plus/MaaAssistantArknights/api/version";
     let channel: &str = channel.into();
-    let url = format!("{}/{}.json", api_mirror, channel);
+    let url = format!("{}/{}.json", api_url, channel);
     let package: Package = reqwest::blocking::get(&url)?.json()?;
     Ok(package)
 }
@@ -99,7 +93,7 @@ pub struct Asset {
 }
 
 impl Asset {
-    pub fn download(&self, dir: &Path) -> Result<Archive> {
+    pub fn download(&self, dir: &Path, t: u64) -> Result<ArchiveFile> {
         let path = dir.join(&self.name);
         let size = self.size;
 
@@ -107,57 +101,67 @@ impl Asset {
             let metadata = path.metadata()?;
             if metadata.len() == size {
                 println!("File {} already exists, skip download!", &self.name);
-                return Ok(Archive { file: path });
+                return Ok(ArchiveFile { file: path });
             }
         }
 
         let url = &self.browser_download_url;
         let mirrors = self.mirrors.clone();
-        download_package(url, mirrors, &path, size)?;
+        download_package(url, mirrors, &path, size, t)?;
 
-        Ok(Archive { file: path })
+        Ok(ArchiveFile { file: path })
     }
 }
 
-pub struct Archive {
+pub struct ArchiveFile {
     file: PathBuf,
 }
 
-impl Archive {
-    #[cfg(target_os = "macos")]
-    pub fn extract(&self, outdir: &Path) -> Result<()> {
+impl ArchiveFile {
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    pub fn extract(&self, outdir: &Path, resource: bool) -> Result<()> {
         let file = File::open(&self.file)?;
         let mut archive = zip::ZipArchive::new(file)?;
-        let re = regex::Regex::new(r"lib.*\.dylib\.?.*").unwrap();
+        let re_lib = if cfg!(target_os = "macos") {
+            regex::Regex::new(r"lib.*\.dylib\.?.*").unwrap()
+        } else {
+            regex::Regex::new(r".*\.dll").unwrap()
+        };
+        let re_resource = regex::Regex::new(r"resource/.*").unwrap();
         println!("Extracting files...");
 
         for i in 0..archive.len() {
             let mut file = archive.by_index(i).unwrap();
 
             let outpath = match file.enclosed_name() {
-                Some(path) if re.is_match(path.to_str().unwrap()) => outdir.join("lib").join(path),
-                Some(path) => outdir.join(path),
+                Some(path) if re_lib.is_match(path.to_str().unwrap()) => {
+                    outdir.join("lib").join(path)
+                }
+                Some(path) if resource && re_resource.is_match(path.to_str().unwrap()) => {
+                    outdir.join(path)
+                }
+                Some(_) => continue,
                 None => continue,
             };
 
-            if (*file.name()).ends_with('/') {
-                if !outpath.exists() {
-                    create_dir_all(&outpath)?;
-                }
-            } else {
-                if let Some(p) = outpath.parent() {
-                    if !p.exists() {
-                        create_dir_all(p)?;
-                    }
-                }
-                if outpath.exists() && file.size() == outpath.metadata()?.len() {
-                    continue;
-                } else {
-                    let mut outfile = File::create(&outpath)?;
-                    std::io::copy(&mut file, &mut outfile)?;
+            if outpath.is_dir() {
+                continue;
+            }
+
+            if let Some(p) = outpath.parent() {
+                if !p.exists() {
+                    create_dir_all(p)?;
                 }
             }
 
+            if outpath.exists() && file.size() == outpath.metadata()?.len() {
+                continue;
+            } else {
+                let mut outfile = File::create(&outpath)?;
+                std::io::copy(&mut file, &mut outfile)?;
+            }
+
+            #[cfg(target_os = "macos")]
             {
                 use std::fs::{set_permissions, Permissions};
                 use std::os::unix::fs::PermissionsExt;
@@ -173,55 +177,8 @@ impl Archive {
         Ok(())
     }
 
-    #[cfg(target_os = "windows")]
-    pub fn extract(&self, outdir: &Path) -> Result<()> {
-        let file = File::open(&self.file)?;
-        let mut archive = zip::ZipArchive::new(file)?;
-        let re_dll = regex::Regex::new(r".*\.dll").unwrap();
-        let re_resource = regex::Regex::new(r"resource/.*").unwrap();
-
-        println!("Extracting files...");
-
-        for i in 0..archive.len() {
-            let mut file = archive.by_index(i).unwrap();
-
-            let outpath = match file.enclosed_name() {
-                Some(path) if re_dll.is_match(path.to_str().unwrap()) => {
-                    outdir.join("lib").join(path)
-                }
-                Some(path) if re_resouce.is_match(path.to_str().unwrap()) => {
-                    outdir.join("resouce").join(path)
-                }
-                Some(_) => continue,
-                None => continue,
-            };
-
-            if (*file.name()).ends_with('/') {
-                if !outpath.exists() {
-                    create_dir_all(&outpath)?;
-                }
-            } else {
-                if let Some(p) = outpath.parent() {
-                    if !p.exists() {
-                        create_dir_all(p)?;
-                    }
-                }
-                if outpath.exists() && file.size() == outpath.metadata()?.len() {
-                    continue;
-                } else {
-                    let mut outfile = File::create(&outpath)?;
-                    std::io::copy(&mut file, &mut outfile)?;
-                }
-            }
-        }
-
-        println!("Done!");
-
-        Ok(())
-    }
-
     #[cfg(target_os = "linux")]
-    pub fn extract(&self, outdir: &Path) -> Result<()> {
+    pub fn extract(&self, outdir: &Path, resource: bool) -> Result<()> {
         let file = File::open(&self.file)?;
         let gz_decoder = flate2::read::GzDecoder::new(file);
         let mut archive = tar::Archive::new(gz_decoder);
@@ -234,7 +191,9 @@ impl Archive {
             let mut entry = entry?;
             let path = match entry.path() {
                 Ok(path) if re_so.is_match(path.to_str().unwrap()) => outdir.join("lib").join(path),
-                Ok(path) if re_resource.is_match(path.to_str().unwrap()) => outdir.join(path),
+                Ok(path) if resource && re_resource.is_match(path.to_str().unwrap()) => {
+                    outdir.join(path)
+                }
                 Ok(_) => continue,
                 Err(e) => return Err(e.into()),
             };
