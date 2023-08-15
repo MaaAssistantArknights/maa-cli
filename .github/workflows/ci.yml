@@ -39,4 +39,4 @@ jobs:
       - name: Test
         run: cargo test --all-targets --all-features
       - name: Try to run maa-cli
-        run: cargo run --bin maa-cli -- version
+        run: cargo run --bin maa -- version
