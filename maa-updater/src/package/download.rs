@@ -6,12 +6,12 @@ use std::path::Path;
 use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Client;
+use tokio::time::{timeout, Duration};
 
 #[derive(Debug)]
 pub enum Error {
     Reqwest(reqwest::Error),
     Io(std::io::Error),
-    Failed,
 }
 
 impl From<reqwest::Error> for Error {
@@ -31,7 +31,6 @@ impl std::fmt::Display for Error {
         match self {
             Error::Reqwest(e) => e.fmt(f),
             Error::Io(e) => e.fmt(f),
-            Error::Failed => write!(f, "Download failed"),
         }
     }
 }
@@ -40,27 +39,7 @@ impl std::error::Error for Error {}
 
 type Result<T> = std::result::Result<T, Error>;
 
-pub trait ResultExt {
-    fn is_timeout(self) -> Result<bool>;
-}
-
-impl ResultExt for Result<()> {
-    fn is_timeout(self) -> Result<bool> {
-        match self {
-            Ok(_) => Ok(false),
-            Err(Error::Reqwest(e)) => {
-                if e.is_timeout() {
-                    Ok(true)
-                } else {
-                    Err(Error::Reqwest(e))
-                }
-            }
-            Err(e) => Err(e),
-        }
-    }
-}
-
-pub async fn download(client: &Client, url: &str, path: &Path, size: u64) -> Result<()> {
+async fn download(client: &Client, url: &str, path: &Path, size: u64) -> Result<()> {
     let resp = client.get(url).send().await?;
 
     let progress_bar = ProgressBar::new(size);
@@ -92,22 +71,25 @@ pub async fn download_package(
     path: &Path,
     size: u64,
 ) -> Result<()> {
-    println!("Trying download from origin");
-    if download(client, url, path, size).await.is_timeout()? {
-        print!("Timeout, trying download from mirror!")
-    } else {
-        println!("Download succeed!");
-        return Ok(());
-    }
+    let duration = Duration::from_secs(5);
+    let mut fast_link = url;
+    let mut largest: u64 = 0;
 
-    for mirror in mirrors {
-        if download(client, &mirror, path, size).await.is_timeout()? {
-            print!("Timeout, try another mirror!")
-        } else {
-            println!("Download succeed!");
-            return Ok(());
+    println!("Speed test for mirrors...");
+    for link in mirrors.iter() {
+        let resp = timeout(duration, client.head(link).send()).await;
+
+        if let Ok(Ok(resp)) = resp {
+            let content_length = resp.content_length().unwrap_or(0);
+            if content_length > largest {
+                largest = content_length;
+                fast_link = link;
+            }
         }
     }
 
-    Err(Error::Failed)
+    println!("Downloading from fastest mirror...");
+    download(client, fast_link, path, size).await?;
+
+    Ok(())
 }

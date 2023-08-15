@@ -3,8 +3,7 @@ use download::download_package;
 
 use super::arg_env_or_default;
 
-use std::fs::{self, File, create_dir_all};
-use std::io::copy;
+use std::fs::{create_dir_all, File};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -129,14 +128,13 @@ pub struct Archive {
     file: PathBuf,
 }
 
-
 impl Archive {
     #[cfg(target_os = "macos")]
     pub fn extract(&self, outdir: &Path) -> Result<()> {
         let file = File::open(&self.file)?;
         let mut archive = zip::ZipArchive::new(file)?;
         let re = regex::Regex::new(r"lib.*\.dylib\.?.*").unwrap();
-        println!("Extracting {} to {}", self.file.display(), outdir.display());
+        println!("Extracting files...");
 
         for i in 0..archive.len() {
             let mut file = archive.by_index(i).unwrap();
@@ -161,18 +159,21 @@ impl Archive {
                     continue;
                 } else {
                     let mut outfile = File::create(&outpath)?;
-                    copy(&mut file, &mut outfile)?;
+                    std::io::copy(&mut file, &mut outfile)?;
                 }
             }
 
             {
+                use std::fs::{set_permissions, Permissions};
                 use std::os::unix::fs::PermissionsExt;
 
                 if let Some(mode) = file.unix_mode() {
-                    fs::set_permissions(&outpath, fs::Permissions::from_mode(mode))?;
+                    set_permissions(&outpath, Permissions::from_mode(mode))?;
                 }
             }
         }
+
+        println!("Done!");
 
         Ok(())
     }
@@ -184,12 +185,14 @@ impl Archive {
         let mut archive = tar::Archive::new(gz_decoder);
         let re = regex::Regex::new(r"lib.*\.so\..*").unwrap();
 
+        println!("Extracting files...");
+
         for entry in archive.entries()? {
             let mut entry = entry?;
             let path = match entry.path() {
                 Ok(path) if re.is_match(path.to_str().unwrap()) => outdir.join("lib").join(path),
                 Ok(path) => outdir.join(path),
-                Err(e) => return Err(e),
+                Err(e) => return Err(e.into()),
             };
 
             if let Some(p) = path.parent() {
@@ -199,6 +202,8 @@ impl Archive {
             }
             entry.unpack(path)?;
         }
+
+        println!("Done!");
 
         Ok(())
     }
