@@ -178,7 +178,9 @@ impl Archive {
         let file = File::open(&self.file)?;
         let gz_decoder = flate2::read::GzDecoder::new(file);
         let mut archive = tar::Archive::new(gz_decoder);
-        let re = regex::Regex::new(r"lib.*\.so\..*").unwrap();
+        let re_so = regex::Regex::new(r"lib.*\.so\.?.*").unwrap();
+        let re_h = regex::Regex::new(r"\.h$").unwrap();
+        let re_py = regex::Regex::new(r"^Python.*").unwrap();
 
         println!("Extracting files...");
 
@@ -186,6 +188,8 @@ impl Archive {
             let mut entry = entry?;
             let path = match entry.path() {
                 Ok(path) if re.is_match(path.to_str().unwrap()) => outdir.join("lib").join(path),
+                Ok(path) if re_h.is_match(path.to_str().unwrap()) => continue,
+                Ok(path) if re_py.is_match(path.to_str().unwrap()) => continue,
                 Ok(path) => outdir.join(path),
                 Err(e) => return Err(e.into()),
             };
