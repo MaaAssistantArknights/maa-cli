@@ -10,24 +10,11 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          components: rustfmt, clippy
-      - name: Lint (clippy)
-        run: cargo clippy --all-targets --all-features -- -D warnings
-      - name: Lint (rustfmt)
-        run: cargo fmt --all --check
-
   build:
     name: Build and test
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ ubuntu-latest, macos-latest, windows-latest ]
     steps:
@@ -40,9 +27,15 @@ jobs:
       - name: Install MaaCore with maa-updater
         run: cargo run --bin maa-updater -- stable
       - name: Build maa-cli
-        run: cargo build --bin maa-cli
+        run: cargo build --bin maa
       - name: Install cargo nextest
         run: cargo install cargo-nextest
+      - name: Lint (clippy)
+        if: matrix.os == 'ubuntu-latest'
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Lint (rustfmt)
+        if: matrix.os == 'ubuntu-latest'
+        run: cargo fmt --all --check
       - name: Test
         run: cargo nextest run --all-targets --all-features -- --nocapture
       - name: Try to run maa-cli
