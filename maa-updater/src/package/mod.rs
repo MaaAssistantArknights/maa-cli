@@ -187,7 +187,7 @@ impl Archive {
         for entry in archive.entries()? {
             let mut entry = entry?;
             let path = match entry.path() {
-                Ok(path) if re.is_match(path.to_str().unwrap()) => outdir.join("lib").join(path),
+                Ok(path) if re_so.is_match(path.to_str().unwrap()) => outdir.join("lib").join(path),
                 Ok(path) if re_h.is_match(path.to_str().unwrap()) => continue,
                 Ok(path) if re_py.is_match(path.to_str().unwrap()) => continue,
                 Ok(path) => outdir.join(path),
