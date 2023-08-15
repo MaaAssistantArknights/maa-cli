@@ -173,14 +173,60 @@ impl Archive {
         Ok(())
     }
 
+    #[cfg(target_os = "windows")]
+    pub fn extract(&self, outdir: &Path) -> Result<()> {
+        let file = File::open(&self.file)?;
+        let mut archive = zip::ZipArchive::new(file)?;
+        let re_dll = regex::Regex::new(r".*\.dll").unwrap();
+        let re_resource = regex::Regex::new(r"resource/.*").unwrap();
+
+        println!("Extracting files...");
+
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i).unwrap();
+
+            let outpath = match file.enclosed_name() {
+                Some(path) if re_dll.is_match(path.to_str().unwrap()) => {
+                    outdir.join("lib").join(path)
+                }
+                Some(path) if re_resouce.is_match(path.to_str().unwrap()) => {
+                    outdir.join("resouce").join(path)
+                }
+                Some(_) => continue,
+                None => continue,
+            };
+
+            if (*file.name()).ends_with('/') {
+                if !outpath.exists() {
+                    create_dir_all(&outpath)?;
+                }
+            } else {
+                if let Some(p) = outpath.parent() {
+                    if !p.exists() {
+                        create_dir_all(p)?;
+                    }
+                }
+                if outpath.exists() && file.size() == outpath.metadata()?.len() {
+                    continue;
+                } else {
+                    let mut outfile = File::create(&outpath)?;
+                    std::io::copy(&mut file, &mut outfile)?;
+                }
+            }
+        }
+
+        println!("Done!");
+
+        Ok(())
+    }
+
     #[cfg(target_os = "linux")]
     pub fn extract(&self, outdir: &Path) -> Result<()> {
         let file = File::open(&self.file)?;
         let gz_decoder = flate2::read::GzDecoder::new(file);
         let mut archive = tar::Archive::new(gz_decoder);
         let re_so = regex::Regex::new(r"lib.*\.so\.?.*").unwrap();
-        let re_h = regex::Regex::new(r"\.h$").unwrap();
-        let re_py = regex::Regex::new(r"Python/.*").unwrap();
+        let re_resource = regex::Regex::new(r"resource/.*").unwrap();
 
         println!("Extracting files...");
 
@@ -188,9 +234,8 @@ impl Archive {
             let mut entry = entry?;
             let path = match entry.path() {
                 Ok(path) if re_so.is_match(path.to_str().unwrap()) => outdir.join("lib").join(path),
-                Ok(path) if re_h.is_match(path.to_str().unwrap()) => continue,
-                Ok(path) if re_py.is_match(path.to_str().unwrap()) => continue,
-                Ok(path) => outdir.join(path),
+                Ok(path) if re_resource.is_match(path.to_str().unwrap()) => outdir.join(path),
+                Ok(_) => continue,
                 Err(e) => return Err(e.into()),
             };
 

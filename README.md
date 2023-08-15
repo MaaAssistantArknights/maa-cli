@@ -31,8 +31,6 @@ maa-updater
 ```
 Then `maa-updater` will download latest prebuilt `MaaCore` and resources.
 
-**Note**: The `maa-updater` for windows is not available now.
-
 ### Install `maa-cli`
 
 Once the maa core is installed at correct location, you can install `maa-cli`:
@@ -182,7 +180,6 @@ A complete example please see my [dotfiles](https://github.com/wangl-cc/dotfiles
 
 ## TODO
 
-- [ ] maa-updater
 - [ ] Better message processing
   - [ ] Rouge-like mode message processing
   - [ ] Subtask extra info processing

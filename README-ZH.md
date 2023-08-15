@@ -24,7 +24,6 @@ cargo install --git https://github.com/wangl-cc/maa-cli maa-updater --locked
 maa-updater
 ```
 `maa-updater`会下载最新的预编译`MaaCore`及相关资源。
-**注意**：目前`maa-updater`不支持Windows。
 
 ### 安装`maa-cli`
 
@@ -168,7 +167,6 @@ condition = { type = "Time", start = "18:00:00" }
 
 ## 未完成的功能
 
-- [ ] maa-updater
 - [ ] 更好的消息处理
   - [ ] 肉鸽相关消息处理
   - [ ] Subtask extra info消息处理
