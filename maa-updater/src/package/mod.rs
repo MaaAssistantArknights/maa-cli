@@ -5,7 +5,6 @@ use super::arg_env_or_default;
 
 use std::fs::{create_dir_all, File};
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
 use anyhow::{anyhow, Result};
 use clap::ValueEnum;
@@ -112,13 +111,9 @@ impl Asset {
             }
         }
 
-        let client = reqwest::Client::builder()
-            .connect_timeout(Duration::from_secs(10))
-            .build()?;
         let url = &self.browser_download_url;
         let mirrors = self.mirrors.clone();
-        tokio::runtime::Runtime::new()?
-            .block_on(download_package(&client, url, mirrors, &path, size))?;
+        download_package(url, mirrors, &path, size)?;
 
         Ok(Archive { file: path })
     }

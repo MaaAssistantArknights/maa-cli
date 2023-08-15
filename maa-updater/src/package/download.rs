@@ -2,11 +2,12 @@ use std::cmp::min;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
+use std::time::{Duration, Instant};
 
 use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Client;
-use tokio::time::{timeout, Duration};
+use tokio::runtime::Runtime;
 
 #[derive(Debug)]
 pub enum Error {
@@ -39,7 +40,7 @@ impl std::error::Error for Error {}
 
 type Result<T> = std::result::Result<T, Error>;
 
-async fn download(client: &Client, url: &str, path: &Path, size: u64) -> Result<()> {
+async fn download_file(client: &Client, url: &str, path: &Path, size: u64) -> Result<()> {
     let resp = client.get(url).send().await?;
 
     let progress_bar = ProgressBar::new(size);
@@ -64,32 +65,55 @@ async fn download(client: &Client, url: &str, path: &Path, size: u64) -> Result<
     Ok(())
 }
 
-pub async fn download_package(
+async fn try_download(client: &Client, url: &str, timeout: Duration) -> Result<u64> {
+    let resp = client.get(url).send().await?;
+
+    let mut stream = resp.bytes_stream();
+    let mut downloaded: u64 = 0;
+    let start = Instant::now();
+
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk?;
+        downloaded += chunk.len() as u64;
+        if start.elapsed() > timeout {
+            return Ok(downloaded);
+        }
+    }
+
+    Ok(downloaded)
+}
+
+async fn download(
     client: &Client,
     url: &str,
     mirrors: Vec<String>,
     path: &Path,
     size: u64,
 ) -> Result<()> {
-    let duration = Duration::from_secs(5);
+    let duration = Duration::from_secs(3);
     let mut fast_link = url;
     let mut largest: u64 = 0;
 
     println!("Speed test for mirrors...");
     for link in mirrors.iter() {
-        let resp = timeout(duration, client.head(link).send()).await;
-
-        if let Ok(Ok(resp)) = resp {
-            let content_length = resp.content_length().unwrap_or(0);
-            if content_length > largest {
-                largest = content_length;
-                fast_link = link;
-            }
+        let downloaded = try_download(client, link, duration).await?;
+        if downloaded > largest {
+            largest = downloaded;
+            fast_link = link;
         }
     }
 
     println!("Downloading from fastest mirror...");
-    download(client, fast_link, path, size).await?;
+    download_file(client, fast_link, path, size).await?;
+
+    Ok(())
+}
+
+pub fn download_package(url: &str, mirrors: Vec<String>, path: &Path, size: u64) -> Result<()> {
+    let client = reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(5))
+        .build()?;
+    Runtime::new()?.block_on(download(&client, url, mirrors, path, size))?;
 
     Ok(())
 }
