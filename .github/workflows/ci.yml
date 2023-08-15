@@ -28,8 +28,6 @@ jobs:
         run: cargo run --bin maa-updater -- stable
       - name: Build maa-cli
         run: cargo build --bin maa
-      - name: Install cargo nextest
-        run: cargo install cargo-nextest
       - name: Lint (clippy)
         if: matrix.os == 'ubuntu-latest'
         run: cargo clippy --all-targets --all-features -- -D warnings
@@ -37,6 +35,6 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: cargo fmt --all --check
       - name: Test
-        run: cargo nextest run --all-targets --all-features -- --nocapture
+        run: cargo test --all-targets --all-features
       - name: Try to run maa-cli
         run: cargo run --bin maa-cli -- version
