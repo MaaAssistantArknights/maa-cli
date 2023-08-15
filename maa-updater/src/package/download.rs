@@ -91,7 +91,7 @@ async fn download(
     size: u64,
 ) -> Result<()> {
     #[cfg(debug_assertions)]
-    if let Some(_) = std::env::var_os("CI") {
+    if std::env::var_os("CI").is_some() {
         println!("Running in CI, skipping speed test...");
         download_file(client, url, path, size).await?;
         return Ok(());

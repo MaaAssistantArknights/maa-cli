@@ -423,7 +423,7 @@ mod tests {
             assert_eq!(
                 cond,
                 Condition::DateTime {
-                    start: Some(naive_local_datetime(2021, 8, 01, 16, 0, 0)),
+                    start: Some(naive_local_datetime(2021, 8, 1, 16, 0, 0)),
                     end: Some(naive_local_datetime(2021, 8, 21, 4, 0, 0)),
                 }
             );
