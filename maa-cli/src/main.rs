@@ -195,23 +195,29 @@ fn main() -> Result<std::process::ExitCode> {
                                     }
                                 }
                                 TaskType::CloseDown => close_app += 1,
-                                TaskType::Infrast => {
+                                _ => {
+                                    // For any task that has a filename parameter
+                                    // and the filename parameter is not an absolute path,
+                                    // it will be treated as a relative path to the config directory
+                                    // and will be converted to an absolute path.
                                     if let Some(v) = params.get_mut("filename") {
-                                        assert!(v.is_string());
-                                        *v = Value::String(
-                                            config_dir
-                                                .join("infrast")
-                                                .join(
-                                                    v.as_str()
-                                                        .ok_or(anyhow!("Invalid filename!"))?,
-                                                )
-                                                .to_str()
-                                                .ok_or(anyhow!("Invalid filename!"))?
-                                                .to_string(),
-                                        );
+                                        let filename = v
+                                            .as_str()
+                                            .ok_or(anyhow!("Filename must be string!"))?;
+                                        let path = std::path::Path::new(filename);
+                                        if !path.is_absolute() {
+                                            let type_name: &str = task_type.into();
+                                            *v = Value::String(
+                                                config_dir
+                                                    .join(type_name.to_lowercase())
+                                                    .join(path)
+                                                    .to_str()
+                                                    .ok_or(anyhow!("Invalid Path!"))?
+                                                    .to_string(),
+                                            );
+                                        }
                                     }
                                 }
-                                _ => (),
                             }
 
                             logger.debug("Task:", || format!("{:?}", task_type));
