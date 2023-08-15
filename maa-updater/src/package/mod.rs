@@ -144,7 +144,7 @@ impl ArchiveFile {
                 None => continue,
             };
 
-            if outpath.is_dir() {
+            if file.is_dir() {
                 continue;
             }
 
