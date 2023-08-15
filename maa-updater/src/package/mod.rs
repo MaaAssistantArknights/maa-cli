@@ -180,7 +180,7 @@ impl Archive {
         let mut archive = tar::Archive::new(gz_decoder);
         let re_so = regex::Regex::new(r"lib.*\.so\.?.*").unwrap();
         let re_h = regex::Regex::new(r"\.h$").unwrap();
-        let re_py = regex::Regex::new(r"^Python.*").unwrap();
+        let re_py = regex::Regex::new(r"Python/.*").unwrap();
 
         println!("Extracting files...");
 
