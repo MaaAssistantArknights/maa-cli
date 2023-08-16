@@ -1,0 +1,49 @@
+name: Upload binaries to release
+on:
+  release:
+    types:
+      - created
+
+jobs:
+  build:
+    name: Build and upload binaries
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            triplet: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            triplet: x86_64-apple-darwin
+          - os: macos-latest
+            triplet: aarch64-apple-darwin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.triplet }}
+      - name: Build maa-helper
+        run: cargo build --bin maa
+      - name: Install MaaCore with maa-updater
+        env:
+          MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
+        run: cargo run --bin maa -- install stable
+      - name: Build maa-runner
+        run: cargo build --bins --release --target ${{ matrix.triplet }}
+      - name: Archive binaries
+        run: |
+          mkdir maa-cli
+          target_dir="target/${{ matrix.triplet }}/release"
+          cp "$target_dir/maa-run" "$target_dir/maa" maa-cli
+          tar -czvf maa-cli-${{ matrix.triplet }}.tar.gz maa-cli
+      - name: Upload to GitHub Releases
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: maa-cli-${{ matrix.triplet }}.tar.gz
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
