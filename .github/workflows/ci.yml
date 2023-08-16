@@ -33,12 +33,16 @@ jobs:
         include:
           - os: ubuntu-latest
             triplet: x86_64-unknown-linux-gnu
-          - os: ubuntu-latest
-            triplet: aarch64-unknown-linux-gnu
+          # - os: ubuntu-latest
+          #   triplet: aarch64-unknown-linux-gnu
           - os: macos-latest
             triplet: x86_64-apple-darwin
-          - os: macos-latest
-            triplet: aarch64-apple-darwin
+          # - os: macos-latest
+          #   triplet: aarch64-apple-darwin
+          # - os: windows-latest
+          #   triplet: x86_64-pc-windows-msvc
+          # - os: windows-latest
+          #   triplet: aarch64-pc-windows-msvc
     steps:
       - uses: actions/checkout@v3
       - name: Setup Rust
