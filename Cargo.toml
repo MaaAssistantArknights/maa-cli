@@ -1,5 +1,5 @@
 [workspace]
-members = ["maa-runner", "maa-helper", "maa-sys"]
+members = ["maa-cli", "maa-run", "maa-sys"]
 
 [workspace.package]
 license = "AGPL-3.0-or-later"

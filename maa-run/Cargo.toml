@@ -1,13 +1,9 @@
 [package]
-name = "maa-runner"
+name = "maa-run"
 authors = ["Loong Wang <wangl-cc@outlook.com>"]
 version = "0.1.0"
 edition = "2021"
 license.workspace = true
-
-[[bin]]
-name = "maa-run"
-path = "src/main.rs"
 
 [dependencies]
 maa-sys = { path = "../maa-sys" }
