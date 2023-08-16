@@ -1,5 +1,5 @@
 [package]
-name = "maa-updater"
+name = "maa-cli"
 authors = ["Loong Wang <wangl-cc@outlook.com>"]
 version = "0.1.0"
 edition = "2021"
