@@ -14,38 +14,38 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            triplet: x86_64-unknown-linux-gnu
+            triple: x86_64-unknown-linux-gnu
           # - os: ubuntu-latest
-          #   triplet: aarch64-unknown-linux-gnu
+          #   triple: aarch64-unknown-linux-gnu
           - os: macos-latest
-            triplet: x86_64-apple-darwin
+            triple: x86_64-apple-darwin
           - os: macos-latest
-            triplet: aarch64-apple-darwin
+            triple: aarch64-apple-darwin
           # - os: windows-latest
-          #   triplet: x86_64-pc-windows-msvc
+          #   triple: x86_64-pc-windows-msvc
           # - os: windows-latest
-          #   triplet: aarch64-pc-windows-msvc
+          #   triple: aarch64-pc-windows-msvc
     steps:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Setup Rust
         run: |
-          rustup target add ${{ matrix.triplet }}
+          rustup target add ${{ matrix.triple }}
       - name: Install MaaCore with maa-updater
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
         run: cargo run --locked --bin maa -- install stable
       - name: Build binaries
-        run: cargo build --target ${{ matrix.triplet }} --release --locked --bins
+        run: cargo build --target ${{ matrix.triple }} --release --locked --bins
       - name: Archive binaries
         run: |
           mkdir maa-cli
-          target_dir="target/${{ matrix.triplet }}/release"
+          target_dir="target/${{ matrix.triple }}/release"
           cp "$target_dir/maa-run" "$target_dir/maa" maa-cli
-          tar -czvf maa-cli-${{ matrix.triplet }}.tar.gz maa-cli
+          tar -czvf maa-cli-${{ matrix.triple }}.tar.gz maa-cli
       - name: Upload to GitHub Releases
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: maa-cli-${{ matrix.triplet }}.tar.gz
+          file: maa-cli-${{ matrix.triple }}.tar.gz
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
