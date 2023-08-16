@@ -26,7 +26,8 @@ fn main() {
         panic!("cannot find maa core, make sure you have installed maa core at correct path");
     }
     if cfg!(target_os = "windows") {
-        println!("cargo:rustc-link-arg=/LIBPATH:{}", lib_dir.display());
+        println!("cargo:rustc-link-arg=/LIB:{}", lib_dir.display());
+        // println!("cargo:rustc-link-arg=/LIBPATH:{}", lib_dir.display());
     } else {
         println!("cargo:rustc-link-arg=-Wl,-rpath,{}", lib_dir.display());
     }
