@@ -64,13 +64,9 @@ jobs:
         run: cargo fmt --all --check
       - name: Test
         run: cargo test --all-targets --all-features --locked
-      - name: Try to run maa-runner
-        run: |
-          pwd
-          ls
-          ls target
-          ./target/${{ matrix.triple }}/debug/maa-runner version
-      - name: Try to run relocated
+      - name: Try to run maa-run
+        run: ./target/${{ matrix.triple }}/debug/maa-run version
+      - name: Try to run relocated lib with maa
         run: |
           old_data_path="$(cargo run --bin maa -- dir data)"
           echo "Old lib path: $old_lib_path"
