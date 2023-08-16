@@ -3,8 +3,22 @@ name: CI
 on:
   push:
     branches: [ "main" ]
+    paths:
+      - "maa-helper/**"
+      - "maa-runner/**"
+      - "maa-sys/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/ci.yml"
   pull_request:
     branches: [ "main" ]
+    paths:
+      - "maa-helper/**"
+      - "maa-runner/**"
+      - "maa-sys/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/ci.yml"
 
 env:
   CARGO_TERM_COLOR: always
@@ -13,40 +27,49 @@ jobs:
   build:
     name: Build and test
     runs-on: ${{ matrix.os }}
+    env:
+      CARGO_BUILD_TARGET: ${{ matrix.triple }}
     strategy:
       fail-fast: false
       matrix:
-        os: 
-          - ubuntu-latest
-          - macos-latest
-          # - windows-latest
+        include:
+          - os: ubuntu-latest
+            triple: x86_64-unknown-linux-gnu
+          # - os: ubuntu-latest
+          #   triple: aarch64-unknown-linux-gnu
+          - os: macos-latest
+            triple: x86_64-apple-darwin
+          # - os: macos-latest
+          #   triple: aarch64-apple-darwin
+          # - os: windows-latest
+          #   triple: x86_64-pc-windows-msvc
+          # - os: windows-latest
+          #   triple: aarch64-pc-windows-msvc
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - name: Build maa-helper
-        run: cargo build --bin maa
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Rust
+        run: |
+          rustup target add ${{ matrix.triple }}
+          rustup component add clippy rustfmt
       - name: Install MaaCore with maa-updater
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
-        run: cargo run --bin maa -- install
-      - name: Build maa-runner
-        run: cargo build --bin maa-run
+        run: cargo run --locked --bin maa -- install stable
+      - name: Build
+        run: cargo build --workspace --locked
       - name: Lint (clippy)
-        if: matrix.os == 'ubuntu-latest'
         run: cargo clippy --all-targets --all-features -- -D warnings
       - name: Lint (rustfmt)
-        if: matrix.os == 'ubuntu-latest'
         run: cargo fmt --all --check
       - name: Test
-        run: cargo test --all-targets --all-features
-      - name: Try to run maa-runner
-        run: cargo run --bin maa-run -- version
-      - name: Try to run relocated
+        run: cargo test --all-targets --all-features --locked
+      - name: Try to run maa-run
+        run: ./target/${{ matrix.triple }}/debug/maa-run version
+      - name: Try to run relocated lib with maa
         run: |
           old_data_path="$(cargo run --bin maa -- dir data)"
           echo "Old lib path: $old_lib_path"
           new_data_path="$PWD/data"
           mv "$old_data_path" "$new_data_path"
-          MAA_DATA_DIR="$new_data_path" cargo run --bin maa -- version
+          MAA_DATA_DIR="$new_data_path" ./target/${{ matrix.triple }}/debug/maa version

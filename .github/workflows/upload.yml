@@ -1,0 +1,50 @@
+name: Upload binaries to release
+on:
+  release:
+    types:
+      - created
+
+jobs:
+  build:
+    name: Build and upload binaries
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            triple: x86_64-unknown-linux-gnu
+          # - os: ubuntu-latest
+          #   triple: aarch64-unknown-linux-gnu
+          - os: macos-latest
+            triple: x86_64-apple-darwin
+          - os: macos-latest
+            triple: aarch64-apple-darwin
+          # - os: windows-latest
+          #   triple: x86_64-pc-windows-msvc
+          # - os: windows-latest
+          #   triple: aarch64-pc-windows-msvc
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Rust
+        run: |
+          rustup target add ${{ matrix.triple }}
+      - name: Install MaaCore with maa-updater
+        env:
+          MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
+        run: cargo run --locked --bin maa -- install stable # Don't run on target platform, because it is impossible to run aarch64 on x86_64
+      - name: Build binaries
+        run: cargo build --target ${{ matrix.triple }} --release --locked --bins
+      - name: Archive binaries
+        run: |
+          mkdir maa-cli
+          target_dir="target/${{ matrix.triple }}/release"
+          cp "$target_dir/maa-run" "$target_dir/maa" maa-cli
+          tar -czvf maa-cli-${{ matrix.triple }}.tar.gz maa-cli
+      - name: Upload to GitHub Releases
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: maa-cli-${{ matrix.triple }}.tar.gz
