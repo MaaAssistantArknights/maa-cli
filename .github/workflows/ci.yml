@@ -63,7 +63,7 @@ jobs:
       - name: Test
         run: cargo test --target ${{ matrix.triple }} --all-targets --all-features --locked
       - name: Try to run maa-runner
-        run: cargo run --target ${{ matrix.triple }} --locked --bin maa-runner -- version
+        run: cargo run --target ${{ matrix.triple }} --locked --bin maa-run -- version
       - name: Try to run relocated
         run: |
           old_data_path="$(cargo run --bin maa -- dir data)"
