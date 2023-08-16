@@ -34,7 +34,7 @@ jobs:
       - name: Install MaaCore with maa-updater
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
-        run: cargo run --locked --bin maa -- install stable
+        run: cargo run --locked --bin maa -- install stable # Don't run on target platform, because it is impossible to run aarch64 on x86_64
       - name: Build binaries
         run: cargo build --target ${{ matrix.triple }} --release --locked --bins
       - name: Archive binaries
@@ -48,4 +48,3 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: maa-cli-${{ matrix.triple }}.tar.gz
-          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
