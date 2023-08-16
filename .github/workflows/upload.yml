@@ -39,12 +39,12 @@ jobs:
         run: cargo build --target ${{ matrix.triple }} --release --locked --bins
       - name: Archive binaries
         run: |
+          cd target/${{ matrix.triple }}/release
           mkdir maa-cli
-          target_dir="target/${{ matrix.triple }}/release"
-          cp "$target_dir/maa-run" "$target_dir/maa" maa-cli
+          cp maa-run maa maa-cli/
           tar -czvf maa-cli-${{ matrix.triple }}.tar.gz maa-cli
       - name: Upload to GitHub Releases
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: maa-cli-${{ matrix.triple }}.tar.gz
+          file: target/${{ matrix.triple }}/release/maa-cli-${{ matrix.triple }}.tar.gz
