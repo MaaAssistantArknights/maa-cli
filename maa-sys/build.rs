@@ -1,5 +1,8 @@
 use directories::ProjectDirs;
-use std::env::var_os;
+use std::env::{
+    consts::{DLL_PREFIX, DLL_SUFFIX},
+    var_os,
+};
 use std::path::PathBuf;
 
 fn get_data_dir(proj: Option<ProjectDirs>) -> PathBuf {
@@ -18,15 +21,7 @@ fn main() {
     let proj = ProjectDirs::from("com", "loong", "maa");
     let data_dir = get_data_dir(proj);
     let lib_dir = data_dir.join("lib");
-    let core_name = if cfg!(target_os = "linux") {
-        "libMaaCore.so"
-    } else if cfg!(target_os = "macos") {
-        "libMaaCore.dylib"
-    } else if cfg!(target_os = "windows") {
-        "MaaCore.dll"
-    } else {
-        panic!("Unsupported platform!");
-    };
+    let core_name = format!("{}MaaCore{}", DLL_PREFIX, DLL_SUFFIX);
     if !lib_dir.join(core_name).exists() {
         panic!("cannot find maa core, make sure you have installed maa core at correct path");
     }
