@@ -3,8 +3,22 @@ name: CI
 on:
   push:
     branches: [ "main" ]
+    paths:
+      - "maa-helper/**"
+      - "maa-runner/**"
+      - "maa-sys/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/ci.yml"
   pull_request:
     branches: [ "main" ]
+    paths:
+      - "maa-helper/**"
+      - "maa-runner/**"
+      - "maa-sys/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/ci.yml"
 
 env:
   CARGO_TERM_COLOR: always
@@ -16,15 +30,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: 
-          - ubuntu-latest
-          - macos-latest
-          # - windows-latest
+        include:
+          - os: ubuntu-latest
+            triplet: x86_64-unknown-linux-gnu
+          - os: ubuntu-latest
+            triplet: aarch64-unknown-linux-gnu
+          - os: macos-latest
+            triplet: x86_64-apple-darwin
+          - os: macos-latest
+            triplet: aarch64-apple-darwin
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+          target: ${{ matrix.triplet }}
       - name: Build maa-helper
         run: cargo build --bin maa
       - name: Install MaaCore with maa-updater
