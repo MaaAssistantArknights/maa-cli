@@ -12,6 +12,7 @@ use paste::paste;
 
 #[derive(Parser)]
 #[command(author, version)]
+#[allow(clippy::upper_case_acronyms)]
 struct CLI {
     #[clap(subcommand)]
     subcmd: SubCommand,
@@ -58,6 +59,7 @@ enum SubCommand {
 #[derive(ValueEnum, Clone)]
 enum Dir {
     Config,
+    Data,
     Library,
     Resource,
     Cache,
@@ -122,7 +124,7 @@ fn find_maa_run() -> String {
 #[cfg(target_os = "linux")]
 const LD_LIB_PATH_VAR: &'static str = "LD_LIBRARY_PATH";
 #[cfg(target_os = "macos")]
-const LD_LIB_PATH_VAR: &'static str = "DYLD_FALLBACK_LIBRARY_PATH";
+const LD_LIB_PATH_VAR: &str = "DYLD_FALLBACK_LIBRARY_PATH";
 #[cfg(target_os = "windows")]
 const LD_LIB_PATH_VAR: &'static str = "PATH";
 
@@ -138,9 +140,9 @@ where
         .status()
         .expect("failed to execute maa-run");
     if ret.success() {
-        return Ok(ExitCode::SUCCESS);
+        Ok(ExitCode::SUCCESS)
     } else {
-        return Ok(ExitCode::FAILURE);
+        Ok(ExitCode::FAILURE)
     }
 }
 
@@ -173,6 +175,7 @@ fn main() -> Result<ExitCode> {
         SubCommand::Dir { dir_type } => {
             let dir = match dir_type {
                 Dir::Config => get_config_dir(&dirs),
+                Dir::Data => get_data_dir(&dirs),
                 Dir::Library => get_data_dir(&dirs).join("lib"),
                 Dir::Resource => get_data_dir(&dirs).join("resource"),
                 Dir::Cache => get_cache_dir(&dirs),
@@ -181,10 +184,10 @@ fn main() -> Result<ExitCode> {
             println!("{}", dir.display());
         }
         SubCommand::Version => {
-            return run(&["version"], &dirs);
+            return run(["version"], &dirs);
         }
         SubCommand::Run { args } => {
-            return run(&args, &dirs);
+            return run(args, &dirs);
         }
     }
 
