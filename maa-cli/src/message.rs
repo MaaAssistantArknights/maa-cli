@@ -65,7 +65,7 @@ pub fn process_message(logger: &Logger, code: AsstMsgId, json: Value) {
         }
         code if code == AsstMsg::AsyncCallInfo as AsstMsgId => Some(()),
         code if (code >= AsstMsg::TaskChainError as AsstMsgId
-            && code <= AsstMsg::SubTaskStopped as AsstMsgId) =>
+            && code <= AsstMsg::TaskChainStopped as AsstMsgId) =>
         {
             process_taskchain(logger, code, message)
         }
@@ -81,6 +81,7 @@ pub fn process_message(logger: &Logger, code: AsstMsgId, json: Value) {
         code if code == AsstMsg::SubTaskExtraInfo as AsstMsgId => {
             process_subtask_extra_info(logger, message)
         }
+        code if code == AsstMsg::SubTaskStopped as AsstMsgId => Some(()),
         _ => Some(()),
     };
 

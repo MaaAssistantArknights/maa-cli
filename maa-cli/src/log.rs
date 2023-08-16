@@ -75,6 +75,20 @@ impl Logger {
             println!("\x1b[34m{}\x1b[0m {}", title, msg());
         }
     }
+
+    // This is used to debug the message processing
+    // and not be used in production
+    #[allow(dead_code)]
+    pub fn trace<F, T, M>(&self, title: T, msg: F)
+    where
+        F: FnOnce() -> M,
+        T: Display,
+        M: Display,
+    {
+        if self.level as u8 >= LogLevel::Trace as u8 {
+            println!("\x1b[35m{}\x1b[0m {}", title, msg());
+        }
+    }
 }
 
 impl<T: Into<LogLevel>> From<T> for Logger {
