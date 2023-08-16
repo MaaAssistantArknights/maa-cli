@@ -497,7 +497,7 @@ mod tests {
         #[test]
         fn json() {
             let tasks: TaskList = serde_json::from_reader(
-                std::fs::File::open("../example/tasks/daily.json").unwrap(),
+                std::fs::File::open("../config_examples/tasks/daily.json").unwrap(),
             )
             .unwrap();
             assert_eq!(tasks, example_tasks());
@@ -505,9 +505,10 @@ mod tests {
 
         #[test]
         fn toml() {
-            let tasks: TaskList =
-                toml::from_str(&std::fs::read_to_string("../example/tasks/daily.toml").unwrap())
-                    .unwrap();
+            let tasks: TaskList = toml::from_str(
+                &std::fs::read_to_string("../config_examples/tasks/daily.toml").unwrap(),
+            )
+            .unwrap();
             assert_eq!(tasks, example_tasks())
         }
     }

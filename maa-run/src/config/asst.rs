@@ -91,7 +91,8 @@ mod tests {
     #[test]
     fn deserialize_example() {
         let config: AsstConfig =
-            toml::from_str(&std::fs::read_to_string("../example/asst.toml").unwrap()).unwrap();
+            toml::from_str(&std::fs::read_to_string("../config_examples/asst.toml").unwrap())
+                .unwrap();
         assert_eq!(
             config,
             AsstConfig {
