@@ -5,6 +5,10 @@ version = "0.1.0"
 edition = "2021"
 license.workspace = true
 
+[[bin]]
+name = "maa"
+path = "src/main.rs"
+
 [dependencies]
 directories = "5"
 anyhow = "1"
