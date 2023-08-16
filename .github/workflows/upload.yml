@@ -34,7 +34,7 @@ jobs:
       - name: Install MaaCore with maa-updater
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
-        run: cargo run ${{ matrix.triplet }} --locked --bin maa -- install stable
+        run: cargo run --locked --bin maa -- install stable
       - name: Build binaries
         run: cargo build --target ${{ matrix.triplet }} --release --locked --bins
       - name: Archive binaries
