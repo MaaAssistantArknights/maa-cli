@@ -43,5 +43,10 @@ jobs:
         run: cargo test --all-targets --all-features
       - name: Try to run maa-runner
         run: cargo run --bin maa-run -- version
-      - name: Try to run maa
-        run: cargo run --bin maa -- version
+      - name: Try to run relocated
+        run: |
+          old_data_path="$(cargo run --bin maa -- dir data)"
+          echo "Old lib path: $old_lib_path"
+          new_data_path="$PWD/data"
+          mv "$old_data_path" "$new_data_path"
+          MAA_DATA_DIR="$new_data_path" cargo run --bin maa-run -- version
