@@ -272,40 +272,96 @@ fn process_subtask_extra_info(logger: &Logger, message: &Map<String, Value>) -> 
             }
         }
         // Infrast
-        "EnterFacility" => {
-            logger.info("EnterFacility", || {
-                let facility = details.get("facility").unwrap().as_str().unwrap();
-                let index = details.get("index").unwrap().as_i64().unwrap();
-                format!("{}{}", facility, index)
+        "EnterFacility" => logger.info("EnterFacility", || {
+            let facility = details.get("facility").unwrap().as_str().unwrap();
+            let index = details.get("index").unwrap().as_i64().unwrap();
+            format!("{}{}", facility, index)
+        }),
+        "ProductIncorrect" => logger.error("ProductIncorrect", || ""),
+        "ProductUnknown" => logger.error("ProductUnknown", || ""),
+        "ProductChanged" => logger.info("ProductChanged", || ""),
+        "NotEnoughStuff" => logger.error("NotEnoughStuff", || ""),
+        "CustomInfrastRoomOperators" => logger.info("CustomInfrastRoomOperators", || {
+            let names = details.get("names").unwrap().as_array().unwrap();
+            let names: Vec<&str> = names.iter().map(|x| x.as_str().unwrap_or("")).collect();
+            names.join(", ")
+        }),
+        // Recruit
+        "RecruitTagsDetected" => logger.info("RecruitResult:", || {
+            let tags = details.get("tags").unwrap().as_array().unwrap();
+            let tags: Vec<&str> = tags.iter().map(|x| x.as_str().unwrap_or("")).collect();
+            tags.join(", ")
+        }),
+        "RecruitSpecialTag" => {
+            logger.info("RecruitSpecialTag:", || {
+                details.get("tag").unwrap().as_str().unwrap()
             });
         }
-        "ProductIncorrect" => logger.error("ProductIncorrect", || ""),
-        "NotEnoughStuff" => logger.error("NotEnoughStuff", || ""),
-        // Recruit
-        "RecruitTagsDetected" => {
-            logger.info("RecruitTagsDetected:", || {
+        "RecruitResult" => {
+            logger.info("RecruitResult", || {
+                let level = details.get("level").unwrap().as_u64().unwrap();
+                "★".repeat(level as usize)
+            });
+        }
+        "RecruitTagsSelected" => {
+            logger.info("RecruitTagsSelected:", || {
                 let tags = details.get("tags").unwrap().as_array().unwrap();
                 let tags: Vec<&str> = tags.iter().map(|x| x.as_str().unwrap_or("")).collect();
                 tags.join(", ")
             });
         }
-        "RecruitSpecialTag" => {
-            logger.info("RecruitSpecialTag:", || {
-                let tags = details.get("tag").unwrap().as_array().unwrap();
-                let tags: Vec<&str> = tags.iter().map(|x| x.as_str().unwrap_or("")).collect();
-                tags.join(", ")
+        "RecruitTagsRefreshed" => {
+            logger.info("RecruitTagsRefreshed", || {
+                let count = details.get("count").unwrap().as_i64().unwrap();
+                format!("{} times", count)
             });
         }
-        "RecruitTagsRefreshed" => {
-            logger.info("RecruitTagsRefreshed", || "");
+        // RogueLike
+        "StageInfo" => {
+            logger.info("StartCombat", || {
+                details.get("name").unwrap().as_str().unwrap()
+            });
         }
-        "RecruitTagsSelect" => {
-            let tags = details.get("tags")?.as_array()?;
-            let tags: Vec<&str> = tags.iter().map(|x| x.as_str().unwrap_or("")).collect();
-            println!("Selected tags: {}", tags.join(", "));
+        "StageInfoError" => {
+            logger.error("StageInfoError", || "");
         }
-        "RecruitRobotTag" => {
-            logger.info("RecruitRobotTag", || "");
+        "BattleFormation" => {
+            logger.info("BattleFormation", || {
+                details.get("formation").unwrap().as_str().unwrap()
+            });
+        }
+        "BattleFormationSelected" => {
+            logger.info("BattleFormationSelected", || {
+                details.get("selected").unwrap().as_str().unwrap()
+            });
+        }
+        "CopilotAction" => {
+            logger.info("CopilotAction", || {
+                format!(
+                    "{} {} {}",
+                    details.get("doc").unwrap().as_str().unwrap(),
+                    details.get("action").unwrap().as_str().unwrap(),
+                    details.get("target").unwrap().as_str().unwrap(),
+                )
+            });
+        }
+        "SSSStage" => {
+            logger.info("CurrentStage", || {
+                details.get("stage").unwrap().as_str().unwrap()
+            });
+        }
+        "SSSSettlement" => {
+            logger.info("Settlement", || {
+                details.get("why").unwrap().as_str().unwrap()
+            });
+        }
+        "SSSGamePass" => {
+            logger.info("StageFailed", || {
+                details.get("why").unwrap().as_str().unwrap()
+            });
+        }
+        "UnsupportedLevel" => {
+            logger.error("UnsupportedLevel", || "");
         }
         // misc
         // TODO: process more instead of just printing
