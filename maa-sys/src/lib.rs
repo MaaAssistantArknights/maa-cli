@@ -1,5 +1,4 @@
 pub mod binding;
-pub mod types;
 
 use std::ffi::{CStr, CString, NulError};
 use std::str::Utf8Error;
