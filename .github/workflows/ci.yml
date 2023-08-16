@@ -32,42 +32,42 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            triplet: x86_64-unknown-linux-gnu
+            triple: x86_64-unknown-linux-gnu
           # - os: ubuntu-latest
-          #   triplet: aarch64-unknown-linux-gnu
+          #   triple: aarch64-unknown-linux-gnu
           - os: macos-latest
-            triplet: x86_64-apple-darwin
+            triple: x86_64-apple-darwin
           # - os: macos-latest
-          #   triplet: aarch64-apple-darwin
+          #   triple: aarch64-apple-darwin
           # - os: windows-latest
-          #   triplet: x86_64-pc-windows-msvc
+          #   triple: x86_64-pc-windows-msvc
           # - os: windows-latest
-          #   triplet: aarch64-pc-windows-msvc
+          #   triple: aarch64-pc-windows-msvc
     steps:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Setup Rust
         run: |
-          rustup target add ${{ matrix.triplet }}
+          rustup target add ${{ matrix.triple }}
           rustup component add clippy rustfmt
       - name: Install MaaCore with maa-updater
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
-        run: cargo run --target ${{ matrix.triplet }} --locked --bin maa -- install stable
+        run: cargo run --target ${{ matrix.triple }} --locked --bin maa -- install stable
       - name: Build
-        run: cargo build --target ${{ matrix.triplet }} --workspace --locked
+        run: cargo build --target ${{ matrix.triple }} --workspace --locked
       - name: Lint (clippy)
         run: cargo clippy --all-targets --all-features -- -D warnings
       - name: Lint (rustfmt)
         run: cargo fmt --all --check
       - name: Test
-        run: cargo test --all-targets --all-features
+        run: cargo test --target ${{ matrix.triple }} --all-targets --all-features --locked
       - name: Try to run maa-runner
-        run: cargo run --bin maa-run -- version
+        run: cargo run --target ${{ matrix.triple }} --locked --bin maa-runner -- version
       - name: Try to run relocated
         run: |
           old_data_path="$(cargo run --bin maa -- dir data)"
           echo "Old lib path: $old_lib_path"
           new_data_path="$PWD/data"
           mv "$old_data_path" "$new_data_path"
-          MAA_DATA_DIR="$new_data_path" cargo run --bin maa -- version
+          MAA_DATA_DIR="$new_data_path" cargo run --target ${{ matrix.triple }} --locked --bin maa -- version
