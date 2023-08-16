@@ -48,20 +48,16 @@ jobs:
       - name: Setup Rust
         run: |
           rustup target add ${{ matrix.triplet }}
+          rustup component add clippy rustfmt
       - name: Install MaaCore with maa-updater
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
         run: cargo run --target ${{ matrix.triplet }} --locked --bin maa -- install stable
       - name: Build
         run: cargo build --target ${{ matrix.triplet }} --workspace --locked
-      - name: Install clippy and rustfmt
-        if: matrix.os == 'ubuntu-latest'
-        run: rustup component add clippy rustfmt
       - name: Lint (clippy)
-        if: matrix.os == 'ubuntu-latest'
         run: cargo clippy --all-targets --all-features -- -D warnings
       - name: Lint (rustfmt)
-        if: matrix.os == 'ubuntu-latest'
         run: cargo fmt --all --check
       - name: Test
         run: cargo test --all-targets --all-features
