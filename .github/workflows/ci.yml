@@ -63,11 +63,11 @@ jobs:
       - name: Test
         run: cargo test --target ${{ matrix.triple }} --all-targets --all-features --locked
       - name: Try to run maa-runner
-        run: cargo run --target ${{ matrix.triple }} --locked --bin maa-run -- version
+        run: ./target/${{ matrix.triple }}/debug/maa-runner version
       - name: Try to run relocated
         run: |
           old_data_path="$(cargo run --bin maa -- dir data)"
           echo "Old lib path: $old_lib_path"
           new_data_path="$PWD/data"
           mv "$old_data_path" "$new_data_path"
-          MAA_DATA_DIR="$new_data_path" cargo run --target ${{ matrix.triple }} --locked --bin maa -- version
+          MAA_DATA_DIR="$new_data_path" ./target/${{ matrix.triple }}/debug/maa version
