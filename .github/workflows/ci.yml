@@ -4,8 +4,8 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - "maa-helper/**"
-      - "maa-runner/**"
+      - "maa-cli/**"
+      - "maa-run/**"
       - "maa-sys/**"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -13,8 +13,8 @@ on:
   pull_request:
     branches: [ "main" ]
     paths:
-      - "maa-helper/**"
-      - "maa-runner/**"
+      - "maa-cli/**"
+      - "maa-run/**"
       - "maa-sys/**"
       - "Cargo.toml"
       - "Cargo.lock"
