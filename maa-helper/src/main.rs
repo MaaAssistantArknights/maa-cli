@@ -122,19 +122,20 @@ fn find_maa_run() -> String {
 }
 
 #[cfg(target_os = "linux")]
-const LD_LIB_PATH_VAR: &'static str = "LD_LIBRARY_PATH";
+const LD_LIB_PATH_VAR: &str = "LD_LIBRARY_PATH";
 #[cfg(target_os = "macos")]
 const LD_LIB_PATH_VAR: &str = "DYLD_FALLBACK_LIBRARY_PATH";
 #[cfg(target_os = "windows")]
-const LD_LIB_PATH_VAR: &'static str = "PATH";
+const LD_LIB_PATH_VAR: &str = "PATH";
 
-fn run<S, I>(args: I, dirs: &Option<ProjectDirs>) -> Result<ExitCode>
+fn run<S, I>(cmd: &str, args: I, dirs: &Option<ProjectDirs>) -> Result<ExitCode>
 where
     S: AsRef<std::ffi::OsStr>,
     I: IntoIterator<Item = S>,
 {
     let maa_run = find_maa_run();
     let ret = Command::new(maa_run)
+        .arg(cmd)
         .args(args)
         .env(LD_LIB_PATH_VAR, get_data_dir(dirs).join("lib"))
         .status()
@@ -184,10 +185,11 @@ fn main() -> Result<ExitCode> {
             println!("{}", dir.display());
         }
         SubCommand::Version => {
-            return run(["version"], &dirs);
+            let args: [&str; 0] = [];
+            return run("version", args, &dirs);
         }
         SubCommand::Run { args } => {
-            return run(args, &dirs);
+            return run("run", args, &dirs);
         }
     }
 
