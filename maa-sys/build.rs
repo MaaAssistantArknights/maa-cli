@@ -28,8 +28,7 @@ fn main() {
         panic!("Unsupported platform!");
     };
     if !lib_dir.join(core_name).exists() {
-        panic!("maa core not exists, please install maa core with maa-installer firstly");
+        panic!("cannot find maa core, make sure you have installed maa core at correct path");
     }
     println!("cargo:rustc-link-search=native={}", lib_dir.display());
-    println!("cargo:rustc-link-arg=-Wl,-rpath,{}", lib_dir.display());
 }

@@ -1,5 +1,8 @@
 use directories::ProjectDirs;
-use std::env::var_os;
+use std::env::{
+    consts::{DLL_PREFIX, DLL_SUFFIX},
+    var_os,
+};
 use std::path::PathBuf;
 
 fn get_data_dir(proj: Option<ProjectDirs>) -> PathBuf {
@@ -18,18 +21,13 @@ fn main() {
     let proj = ProjectDirs::from("com", "loong", "maa");
     let data_dir = get_data_dir(proj);
     let lib_dir = data_dir.join("lib");
-    let core_name = if cfg!(target_os = "linux") {
-        "libMaaCore.so"
-    } else if cfg!(target_os = "macos") {
-        "libMaaCore.dylib"
-    } else if cfg!(target_os = "windows") {
-        "MaaCore.dll"
-    } else {
-        panic!("Unsupported platform!");
-    };
+    let core_name = format!("{}MaaCore{}", DLL_PREFIX, DLL_SUFFIX);
     if !lib_dir.join(core_name).exists() {
-        panic!("maa core not exists, please install maa core with maa-installer firstly");
+        panic!("cannot find maa core, make sure you have installed maa core at correct path");
     }
-    println!("cargo:rustc-link-search=native={}", lib_dir.display());
-    println!("cargo:rustc-link-arg=-Wl,-rpath,{}", lib_dir.display());
+    if cfg!(target_os = "windows") {
+        println!("cargo:rustc-link-arg=/LIBPATH:{}", lib_dir.display());
+    } else {
+        println!("cargo:rustc-link-arg=-Wl,-rpath,{}", lib_dir.display());
+    }
 }
