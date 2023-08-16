@@ -41,18 +41,18 @@ jobs:
             triplet: aarch64-apple-darwin
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: ${{ matrix.triplet }}
-      - name: Build maa-helper
-        run: cargo build --bin maa
+      - name: Setup Rust
+        run: |
+          rustup target add ${{ matrix.triplet }}
       - name: Install MaaCore with maa-updater
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
-        run: cargo run --bin maa -- install
-      - name: Build maa-runner
-        run: cargo build --bin maa-run
+        run: cargo run --target ${{ matrix.triplet }} --locked --bin maa -- install stable
+      - name: Build
+        run: cargo build --target ${{ matrix.triplet }} --workspace --locked
+      - name: Install clippy and rustfmt
+        if: matrix.os == 'ubuntu-latest'
+        run: rustup component add clippy rustfmt
       - name: Lint (clippy)
         if: matrix.os == 'ubuntu-latest'
         run: cargo clippy --all-targets --all-features -- -D warnings
