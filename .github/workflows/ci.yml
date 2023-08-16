@@ -27,6 +27,8 @@ jobs:
   build:
     name: Build and test
     runs-on: ${{ matrix.os }}
+    env:
+      CARGO_BUILD_TARGET: ${{ matrix.triple }}
     strategy:
       fail-fast: false
       matrix:
@@ -53,17 +55,21 @@ jobs:
       - name: Install MaaCore with maa-updater
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
-        run: cargo run --target ${{ matrix.triple }} --locked --bin maa -- install stable
+        run: cargo run --locked --bin maa -- install stable
       - name: Build
-        run: cargo build --target ${{ matrix.triple }} --workspace --locked
+        run: cargo build --workspace --locked
       - name: Lint (clippy)
         run: cargo clippy --all-targets --all-features -- -D warnings
       - name: Lint (rustfmt)
         run: cargo fmt --all --check
       - name: Test
-        run: cargo test --target ${{ matrix.triple }} --all-targets --all-features --locked
+        run: cargo test --all-targets --all-features --locked
       - name: Try to run maa-runner
-        run: ./target/${{ matrix.triple }}/debug/maa-runner version
+        run: |
+          pwd
+          ls
+          ls target
+          ./target/${{ matrix.triple }}/debug/maa-runner version
       - name: Try to run relocated
         run: |
           old_data_path="$(cargo run --bin maa -- dir data)"
