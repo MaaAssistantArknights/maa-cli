@@ -5,46 +5,70 @@ on:
       - created
 
 jobs:
-  build:
-    name: Build and upload binaries
-    runs-on: ${{ matrix.os }}
+  x86_64-linux-gun:
+    name: Build and upload x86_64-linux-gnu binaries
+    runs-on: ubuntu-latest
     permissions:
       contents: write
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            triple: x86_64-unknown-linux-gnu
-          # - os: ubuntu-latest
-          #   triple: aarch64-unknown-linux-gnu
-          - os: macos-latest
-            triple: x86_64-apple-darwin
-          - os: macos-latest
-            triple: aarch64-apple-darwin
-          # - os: windows-latest
-          #   triple: x86_64-pc-windows-msvc
-          # - os: windows-latest
-          #   triple: aarch64-pc-windows-msvc
+    env:
+      CARGO_BUILD_TARGET: x86_64-unknown-linux-gnu
     steps:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Setup Rust
         run: |
-          rustup target add ${{ matrix.triple }}
+          rustup target add x86_64-unknown-linux-gnu
       - name: Install MaaCore with maa-updater
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
-        run: cargo run --locked --bin maa -- install stable # Don't run on target platform, because it is impossible to run aarch64 on x86_64
+        run: cargo run --release --locked --bin maa -- install stable
       - name: Build binaries
-        run: cargo build --target ${{ matrix.triple }} --release --locked --bins
+        run: cargo build --release --locked --bins
       - name: Archive binaries
         run: |
-          cd target/${{ matrix.triple }}/release
+          cd target
           mkdir maa-cli
-          cp maa-run maa maa-cli/
-          tar -czvf maa-cli-${{ matrix.triple }}.tar.gz maa-cli
+          cp x86_64-unknown-linux-gnu/release/maa-run x86_64-unknown-linux-gnu/release/maa maa-cli/
+          tar -czvf maa-cli-x86_64-linux-gnu.tar.gz maa-cli
+          shasum -a 256 maa-cli-x86_64-linux-gnu.tar.gz > maa-cli-x86_64-linux-gnu.tar.gz.sha256sum
       - name: Upload to GitHub Releases
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/${{ matrix.triple }}/release/maa-cli-${{ matrix.triple }}.tar.gz
+          file: target/maa-cli-x86_64-linux-gnu.tar.gz target/maa-cli-x86_64-linux-gnu.tar.gz.sha256sum
+
+  macos-universal:
+    name: Build and upload universal binaries of macOS
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Rust
+        run: |
+          rustup target add x86_64-apple-darwin
+          rustup target add aarch64-apple-darwin
+      - name: Install MaaCore with maa-updater
+        env:
+          MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
+        run: cargo run --locked --bin maa -- install stable
+      - name: Build binaries
+        run: cargo build --target x86_64-apple-darwin --target aarch64-apple-darwin --release --locked --bins
+      - name: Create universal binaries
+        run: |
+          cd target
+          lipo -create -output maa-run x86_64-apple-darwin/release/maa-run aarch64-apple-darwin/release/maa-run
+          lipo -create -output maa x86_64-apple-darwin/release/maa aarch64-apple-darwin/release/maa
+      - name: Archive binaries
+        run: |
+          cd target
+          mkdir maa-cli
+          cp maa-run maa maa-cli/
+          tar -czvf maa-cli-macos-universal.tar.gz maa-cli
+          shasum -a 256 maa-cli-macos-universal.tar.gz > maa-cli-macos-universal.tar.gz.sha256sum
+      - name: Upload to GitHub Releases
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: target/maa-cli-macos-universal.tar.gz target/maa-cli-macos-universal.tar.gz.sha256sum
