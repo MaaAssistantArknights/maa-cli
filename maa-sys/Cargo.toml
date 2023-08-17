@@ -1,9 +1,0 @@
-[package]
-name = "maa-sys"
-authors = ["Loong Wang <wangl-cc@outlook.com>"]
-version = "0.1.0"
-edition = "2021"
-license.workspace = true
-
-[build-dependencies]
-directories = "5"
