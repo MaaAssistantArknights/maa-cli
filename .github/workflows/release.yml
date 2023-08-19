@@ -4,6 +4,7 @@ on:
     tags:
       - "maa_cli-v[0-9]+.[0-9]+.[0-9]+"
       - "maa_run-v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
 
 jobs:
   x86_64-unknown-linux-gnu:
@@ -126,9 +127,9 @@ jobs:
           cd target || exit 1
           if [[ -f x86_64-apple-darwin/release/maa && -f aarch64-apple-darwin/release/maa ]]; then
             version=$maa_cli_version
-            archive_name="maa_cli-v$version-$target.tar.gz"
+            archive_name="maa_cli-v$version-$target.zip"
             lipo -create -output maa x86_64-apple-darwin/release/maa aarch64-apple-darwin/release/maa &&
-              tar -czvf $archive_name maa &&
+              zip $archive_name maa &&
               checksum=$(shasum -a 256 $archive_name) &&
               echo "$checksum" > $archive_name.sha256sum &&
               yq -i -oj ".maa-cli.$target.version = \"$version\"" $version_file &&
@@ -141,9 +142,9 @@ jobs:
           fi
           if [[ -f x86_64-apple-darwin/release/maa-run && -f aarch64-apple-darwin/release/maa-run ]]; then
             version=$maa_run_version
-            archive_name="maa_run-v$version-$target.tar.gz"
+            archive_name="maa_run-v$version-$target.zip"
             lipo -create -output maa-run x86_64-apple-darwin/release/maa-run aarch64-apple-darwin/release/maa-run &&
-              tar -czvf $archive_name maa-run &&
+              zip $archive_name maa-run &&
               checksum=$(shasum -a 256 $archive_name) &&
               echo "$checksum" > $archive_name.sha256sum &&
               yq -i -oj ".maa-run.$target.version = \"$version\"" $version_file &&
