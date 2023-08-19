@@ -79,6 +79,7 @@ jobs:
           file_glob: true
           file: target/x86_64-unknown-linux-gnu/release/maa*.tar.gz*
           make_latest: contains(github.ref, 'refs/tags/maa_cli-v') # Only make latest for maa-cli
+          overwrite: true
       - name: Commit and push version.json
         run: |
           cd version || exit 1
@@ -164,6 +165,7 @@ jobs:
           file_glob: true
           file: target/maa*.tar.gz*
           make_latest: contains(github.ref, 'refs/tags/maa_cli-v') # Only make latest for maa-cli
+          overwrite: true
       - name: Commit and push version.json
         run: |
           cd version || exit 1
