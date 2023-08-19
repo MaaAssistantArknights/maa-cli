@@ -49,7 +49,7 @@ jobs:
               echo "$checksum" > $archive_name.sha256sum &&
               yq -i -oj ".maa-cli.$target.version = \"$version\"" $version_file &&
               yq -i -oj ".maa-cli.$target.name = \"$archive_name\"" $version_file &&
-              yq -i -oj ".maa-cli.$target.size = \"$(stat -c %s $archive_name)\"" $version_file &&
+              yq -i -oj ".maa-cli.$target.size = $(stat -c %s $archive_name)" $version_file &&
               yq -i -oj ".maa-cli.$target.sha256sum = \"$(echo $checksum | cut -d ' ' -f 1)\"" $version_file &&
               echo "name=maa-cli v$version" >> $GITHUB_OUTPUT &&
               exit 0
@@ -62,7 +62,7 @@ jobs:
               echo "$checksum" > $archive_name.sha256sum &&
               yq -i -oj ".maa-run.$target.version = \"$version\"" $version_file &&
               yq -i -oj ".maa-run.$target.name = \"$archive_name\"" $version_file &&
-              yq -i -oj ".maa-run.$target.size = \"$(stat -c %s $archive_name)\"" $version_file &&
+              yq -i -oj ".maa-run.$target.size = $(stat -c %s $archive_name)" $version_file &&
               yq -i -oj ".maa-run.$target.sha256sum = \"$(echo $checksum | cut -d ' ' -f 1)\"" $version_file &&
               echo "name=maa-run v$version" >> $GITHUB_OUTPUT &&
               exit 0
@@ -131,7 +131,7 @@ jobs:
               echo "$checksum" > $archive_name.sha256sum &&
               yq -i -oj ".maa-cli.$target.version = \"$version\"" $version_file &&
               yq -i -oj ".maa-cli.$target.name = \"$archive_name\"" $version_file &&
-              yq -i -oj ".maa-cli.$target.size = \"$(stat -f %z $archive_name)\"" $version_file &&
+              yq -i -oj ".maa-cli.$target.size = $(stat -f %z $archive_name)" $version_file &&
               yq -i -oj ".maa-cli.$target.sha256sum = \"$(echo $checksum | cut -d ' ' -f 1)\"" $version_file &&
               echo "name=maa-cli v$version" >> $GITHUB_OUTPUT &&
               exit 0
@@ -145,7 +145,7 @@ jobs:
               echo "$checksum" > $archive_name.sha256sum &&
               yq -i -oj ".maa-run.$target.version = \"$version\"" $version_file &&
               yq -i -oj ".maa-run.$target.name = \"$archive_name\"" $version_file &&
-              yq -i -oj ".maa-run.$target.size = \"$(stat -c %s $archive_name)\"" $version_file &&
+              yq -i -oj ".maa-run.$target.size = $(stat -c %s $archive_name)" $version_file &&
               yq -i -oj ".maa-run.$target.sha256sum = \"$(echo $checksum | cut -d ' ' -f 1)\"" $version_file &&
               echo "name=maa-run v$version" >> $GITHUB_OUTPUT &&
               exit 0
