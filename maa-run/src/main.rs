@@ -30,17 +30,49 @@ use paste::paste;
 #[clap(author, about, version)]
 #[allow(clippy::upper_case_acronyms)]
 enum CLI {
-    #[clap(about = "Run a task defined by a config file")]
+    /// Run a predefined task
     Run {
         /// Name of the task to run
+        ///
+        /// The task name is the name of the task file without the extension.
+        /// The task file must be in the `tasks` directory of the config directory.
+        /// The task file must be in the TOML or JSON format.
         task: String,
         /// ADB serial number of device or MaaTools address set in PlayCover
+        ///
+        /// By default, MaaCore connects to game with ADB,
+        /// and this parameter is the serial number of the device
+        /// (default to `emulator-5554` if not specified here and not set in config file).
+        /// And if you want to use PlayCover,
+        /// you need to set the connection type to PlayCover in the config file
+        /// and then you can specify the address of MaaTools here.
         #[clap(short, long)]
         addr: Option<String>,
         /// Output more information, repeat to increase verbosity
+        ///
+        /// This option is used to control the log level of this program and MaaCore.
+        /// There are 5 levels of log:
+        /// 0. Error
+        /// 1. Warning
+        /// 2. Info
+        /// 3. Debug
+        /// 4. Trace
+        ///
+        /// The default log level is 1.
+        /// If you want to see more information, you can use this option to increase the log level.
         #[clap(short, long, action = clap::ArgAction::Count)]
         verbose: u8,
         /// Output less information, repeat to increase quietness
+        ///
+        /// This option is used to control the log level of this program and MaaCore.
+        /// There are 5 levels of log:
+        /// 0. Error
+        /// 1. Warning
+        /// 2. Info
+        /// 3. Debug
+        /// 4. Trace
+        /// The default log level is 1.
+        /// If you want to see less information, you can use this option to decrease the log level.
         #[clap(short, long, action = clap::ArgAction::Count)]
         quiet: u8,
     },
@@ -127,15 +159,15 @@ fn main() -> Result<std::process::ExitCode> {
 
             let logger = Logger::from(loglevel);
 
-            let state_dir = get_state_dir(&project);
+            let state_dir = get_state_dir(&project).exist_or_create()?;
             logger.debug("State directory:", || state_dir.display().to_string());
             Assistant::set_user_dir(state_dir).context("Failed to set user directory!")?;
 
-            let data_dir = get_data_dir(&project);
+            let data_dir = get_data_dir(&project).exist_or_err()?;
             logger.debug("Data directory:", || data_dir.display().to_string());
             Assistant::load_resource(data_dir).context("Failed to load resource!")?;
 
-            let config_dir = get_config_dir(&project);
+            let config_dir = get_config_dir(&project).exist_or_err()?;
             logger.debug("Config directory:", || config_dir.display().to_string());
 
             // This is not a good way to create a C callback with outter variables.
@@ -361,16 +393,12 @@ fn main() -> Result<std::process::ExitCode> {
                 std::process::Command::new("osascript")
                     .arg("-e")
                     .arg(format!("quit app \"{}\"", app_name))
-                    .spawn()
-                    .context("Failed to close game!")?
-                    .wait()
+                    .status()
                     .context("Failed to close game!")?;
             }
         }
         CLI::Version => {
-            let cli_version = env!("CARGO_PKG_VERSION");
-            let core_version = Assistant::get_version()?;
-            println!("maa-cli v{}\nMaaCore {}", cli_version, core_version);
+            println!("MaaCore {}", Assistant::get_version()?);
         }
     }
 
