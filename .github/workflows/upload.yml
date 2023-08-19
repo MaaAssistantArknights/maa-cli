@@ -43,7 +43,7 @@ jobs:
           cd target/x86_64-unknown-linux-gnu/release || exit 1
           if [ -f maa ]; then
             archive_name="maa_cli-v$version-$target.tar.gz"
-            tar -czvf $archive_name maa &&
+            tar -czvf maa $archive_name &&
               checksum=$(shasum -a 256 $archive_name) &&
               echo "$checksum" > $archive_name.sha256sum &&
               yq -i -oj ".maa-cli.$target.version = \"$version\"" $version_file &&
@@ -54,7 +54,7 @@ jobs:
           fi
           if [ -f maa-run ]; then
             archive_name="maa_run-v$version-$target.tar.gz"
-            tar -czvf $archive_name maa-run &&
+            tar -czvf maa-run $archive_name &&
               checksum=$(shasum -a 256 $archive_name) &&
               echo "$checksum" > $archive_name.sha256sum &&
               yq -i -oj ".maa-run.$target.version = \"$version\"" $version_file &&
@@ -120,7 +120,7 @@ jobs:
           if [[ -f x86_64-apple-darwin/release/maa && -f aarch64-apple-darwin/release/maa ]]; then
             archive_name="maa_cli-v$version-$target.tar.gz"
             lipo -create -output maa x86_64-apple-darwin/release/maa aarch64-apple-darwin/release/maa &&
-              tar -czvf $archive_name maa &&
+              tar -czvf maa $archive_name &&
               checksum=$(shasum -a 256 $archive_name) &&
               echo "$checksum" > $archive_name.sha256sum &&
               yq -i -oj ".maa-cli.$target.version = \"$version\"" $version_file &&
@@ -132,7 +132,7 @@ jobs:
           if [[ -f x86_64-apple-darwin/release/maa-run && -f aarch64-apple-darwin/release/maa-run ]]; then
             archive_name="maa_run-v$version-$target.tar.gz"
             lipo -create -output maa-run x86_64-apple-darwin/release/maa-run aarch64-apple-darwin/release/maa-run &&
-              tar -czvf $archive_name maa-run &&
+              tar -czvf maa-run $archive_name &&
               checksum=$(shasum -a 256 $archive_name) &&
               echo "$checksum" > $archive_name.sha256sum &&
               yq -i -oj ".maa-run.$target.version = \"$version\"" $version_file &&
