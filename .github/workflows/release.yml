@@ -40,6 +40,12 @@ jobs:
           version=$(yq -oy ".package.version" $component/Cargo.toml)
           echo "name=$component $version" >> $GITHUB_ENV
           echo "tag_name=$tag_name-v$version" >> $GITHUB_ENV
+      - name: Create Tag
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git tag ${{ steps.vars.outputs.tag_name }}
+          git push origin ${{ steps.vars.outputs.tag_name }}
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -64,6 +70,12 @@ jobs:
           version=$(yq -oy ".package.version" $component/Cargo.toml)
           echo "name=$component $version" >> $GITHUB_ENV
           echo "tag_name=$tag_name-v$version" >> $GITHUB_ENV
+      - name: Create Tag
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git tag ${{ steps.vars.outputs.tag_name }}
+          git push origin ${{ steps.vars.outputs.tag_name }}
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
