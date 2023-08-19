@@ -1,1 +1,10 @@
-{}
+{
+  "maa-run": {
+    "x86_64-unknown-linux-gnu": {
+      "version": "0.2.0",
+      "name": "maa_run-v0.2.0-x86_64-unknown-linux-gnu.tar.gz",
+      "size": "1793595",
+      "sha256sum": "c62d896563367b23abf337fd1b9d2fb48410656a78a38487bec751ceb6ca5815"
+    }
+  }
+}
