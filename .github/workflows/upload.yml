@@ -39,11 +39,13 @@ jobs:
         run: |
           version_file="$PWD/version/version.json"
           target="$CARGO_BUILD_TARGET"
-          version=$(echo ${{ github.ref }} | sed -e 's/refs\/tags\/maa-.\{3\}-v//')
+          maa_cli_version=$(yq -oy ".package.version" maa-cli/Cargo.toml)
+          maa_run_version=$(yq -oy ".package.version" maa-run/Cargo.toml)
           cd target/x86_64-unknown-linux-gnu/release || exit 1
           if [ -f maa ]; then
+            version=$maa_cli_version
             archive_name="maa_cli-v$version-$target.tar.gz"
-            tar -czvf maa $archive_name &&
+            tar -czvf $archive_name maa &&
               checksum=$(shasum -a 256 $archive_name) &&
               echo "$checksum" > $archive_name.sha256sum &&
               yq -i -oj ".maa-cli.$target.version = \"$version\"" $version_file &&
@@ -53,8 +55,9 @@ jobs:
               echo "name=maa-cli v$version" >> $GITHUB_OUTPUT
           fi
           if [ -f maa-run ]; then
+            version=$maa_run_version
             archive_name="maa_run-v$version-$target.tar.gz"
-            tar -czvf maa-run $archive_name &&
+            tar -czvf $archive_name maa-run &&
               checksum=$(shasum -a 256 $archive_name) &&
               echo "$checksum" > $archive_name.sha256sum &&
               yq -i -oj ".maa-run.$target.version = \"$version\"" $version_file &&
@@ -114,13 +117,15 @@ jobs:
         id: archive
         run: |
           version_file="$PWD/version/version.json"
-          version=$(echo ${{ github.ref }} | sed -e 's/refs\/tags\/maa-.\{3\}-v//')
+          maa_cli_version=$(yq -oy ".package.version" maa-cli/Cargo.toml)
+          maa_run_version=$(yq -oy ".package.version" maa-run/Cargo.toml)
           target="universal-apple-darwin"
           cd target || exit 1
           if [[ -f x86_64-apple-darwin/release/maa && -f aarch64-apple-darwin/release/maa ]]; then
+            version=$maa_cli_version
             archive_name="maa_cli-v$version-$target.tar.gz"
             lipo -create -output maa x86_64-apple-darwin/release/maa aarch64-apple-darwin/release/maa &&
-              tar -czvf maa $archive_name &&
+              tar -czvf $archive_name maa &&
               checksum=$(shasum -a 256 $archive_name) &&
               echo "$checksum" > $archive_name.sha256sum &&
               yq -i -oj ".maa-cli.$target.version = \"$version\"" $version_file &&
@@ -130,9 +135,10 @@ jobs:
               echo "name=maa-cli v$version" >> $GITHUB_OUTPUT
           fi
           if [[ -f x86_64-apple-darwin/release/maa-run && -f aarch64-apple-darwin/release/maa-run ]]; then
+            version=$maa_run_version
             archive_name="maa_run-v$version-$target.tar.gz"
             lipo -create -output maa-run x86_64-apple-darwin/release/maa-run aarch64-apple-darwin/release/maa-run &&
-              tar -czvf maa-run $archive_name &&
+              tar -czvf $archive_name maa-run &&
               checksum=$(shasum -a 256 $archive_name) &&
               echo "$checksum" > $archive_name.sha256sum &&
               yq -i -oj ".maa-run.$target.version = \"$version\"" $version_file &&
