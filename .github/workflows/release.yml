@@ -15,11 +15,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Checkout version branch
-        uses: actions/checkout@v3
-        with:
-          ref: version
-          path: version
       - name: Setup Rust
         run: |
           rustup target add $CARGO_BUILD_TARGET
@@ -33,6 +28,11 @@ jobs:
         run: |
           cargo run --locked --bin maa -- install stable
           cargo build --release --locked --bin maa-run
+      - name: Checkout version branch
+        uses: actions/checkout@v3
+        with:
+          ref: version
+          path: version
       - name: Archive binaries, generate checksums and update version.json
         id: archive
         run: |
@@ -95,11 +95,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Checkout version branch
-        uses: actions/checkout@v3
-        with:
-          ref: version
-          path: version
       - name: Setup Rust
         run: |
           rustup target add x86_64-apple-darwin
@@ -114,6 +109,11 @@ jobs:
         run: |
           cargo run --locked --bin maa -- install stable
           cargo build --release --locked --bin maa-run --target x86_64-apple-darwin --target aarch64-apple-darwin
+      - name: Checkout version branch
+        uses: actions/checkout@v3
+        with:
+          ref: version
+          path: version
       - name: Create universal binaries, archive, generate checksums and update version.json
         id: archive
         run: |
