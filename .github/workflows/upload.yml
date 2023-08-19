@@ -22,22 +22,21 @@ jobs:
           ref: version
       - name: Setup Rust
         run: |
-          rustup target add x86_64-unknown-linux-gnu
+          rustup target add $CARGO_BUILD_TARGET
       - name: Build maa-cli
-        if: github.ref == 'refs/tags/maa_cli-v*'
+        if: contains(github.ref, 'refs/tags/maa_cli-v')
         run: cargo build --release --locked --bin maa
-      - name: Install MaaCore with maa-updater # used to build maa-run
-        if: github.ref == 'refs/tags/maa_run-v*'
+      - name: Build maa-run
+        if: contains(github.ref, 'refs/tags/maa_run-v')
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
-        run: cargo run --release --locked --bin maa -- install stable
-      - name: Build maa-run
-        if: github.ref == 'refs/tags/maa_run-v*'
-        run: cargo build --release --locked --bin maa-run
+        run: |
+          cargo run --release --locked --bin maa -- install stable
+          cargo build --release --locked --bin maa-run
       - name: Archive binaries, generate checksums and update version.json
         run: |
           version_file="$PWD/version/version.json"
-          target="x86_64-unknown-linux-gnu"
+          target="$CARGO_BUILD_TARGET"
           version=$(echo ${{ github.ref }} | sed -e 's/refs\/tags\/maa-.\{3\}-v//')
           cd target/x86_64-unknown-linux-gnu/release || exit 1
           if [ -f maa ]; then
@@ -94,16 +93,15 @@ jobs:
           rustup target add x86_64-apple-darwin
           rustup target add aarch64-apple-darwin
       - name: Build maa-cli
-        if: github.ref == 'refs/tags/maa_cli-v*'
-        run: cargo build --target x86_64-apple-darwin --target aarch64-apple-darwin --release --locked --bin maa
-      - name: Install MaaCore with maa-cli
-        if: github.ref == 'refs/tags/maa_run-v*'
+        if: contains(github.ref, 'refs/tags/maa_cli-v')
+        run: cargo build --release --locked --bin maa
+      - name: Build maa-run
+        if: contains(github.ref, 'refs/tags/maa_run-v')
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
-        run: cargo run --locked --bin maa -- install stable
-      - name: Build maa-run
-        if: github.ref == 'refs/tags/maa_run-v*'
-        run: cargo build --target x86_64-apple-darwin --target aarch64-apple-darwin --release --locked --bin maa-run
+        run: |
+          cargo run --release --locked --bin maa -- install stable
+          cargo build --release --locked --bin maa-run
       - name: Create universal binaries, archive, generate checksums and update version.json
         run: |
           version_file="$PWD/version/version.json"
