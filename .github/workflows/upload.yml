@@ -1,11 +1,12 @@
 name: Upload binaries to release
 on:
-  release:
-    types:
-      - created
+  push:
+    tags:
+      - "maa_cli-v[0-9]+.[0-9]+.[0-9]+"
+      - "maa_run-v[0-9]+.[0-9]+.[0-9]+"
 
 jobs:
-  x86_64-linux-gun:
+  x86_64-unknown-linux-gnu:
     name: Build and upload x86_64-linux-gnu binaries
     runs-on: ubuntu-latest
     permissions:
@@ -15,29 +16,68 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+      - name: Checkout version branch
+        uses: actions/checkout@v3
+        with:
+          ref: version
       - name: Setup Rust
         run: |
           rustup target add x86_64-unknown-linux-gnu
-      - name: Install MaaCore with maa-updater
+      - name: Build maa-cli
+        if: github.ref == 'refs/tags/maa_cli-v*'
+        run: cargo build --release --locked --bin maa
+      - name: Install MaaCore with maa-updater # used to build maa-run
+        if: github.ref == 'refs/tags/maa_run-v*'
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
         run: cargo run --release --locked --bin maa -- install stable
-      - name: Build binaries
-        run: cargo build --release --locked --bins
-      - name: Archive binaries
+      - name: Build maa-run
+        if: github.ref == 'refs/tags/maa_run-v*'
+        run: cargo build --release --locked --bin maa-run
+      - name: Archive binaries, generate checksums and update version.json
         run: |
-          cd target
-          mkdir maa-cli
-          cp x86_64-unknown-linux-gnu/release/maa-run x86_64-unknown-linux-gnu/release/maa maa-cli/
-          tar -czvf maa-cli-x86_64-linux-gnu.tar.gz maa-cli
-          shasum -a 256 maa-cli-x86_64-linux-gnu.tar.gz > maa-cli-x86_64-linux-gnu.tar.gz.sha256sum
+          version_file="$PWD/version/version.json"
+          target="x86_64-unknown-linux-gnu"
+          version=$(echo ${{ github.ref }} | sed -e 's/refs\/tags\/maa-.\{3\}-v//')
+          cd target/x86_64-unknown-linux-gnu/release || exit 1
+          if [ -f maa ]; then
+            tar -czvf maa_cli-$target.tar.gz maa &&
+              checksum=$(shasum -a 256 maa_cli-$target.tar.gz) &&
+              echo "$checksum" > maa_cli-$target.tar.gz.sha256sum &&
+              yq -i -oj ".maa-cli.$target.version = \"$version\"" $version_file &&
+              yq -i -oj ".maa-cli.$target.name = \"maa_cli-$target.tar.gz\"" $version_file &&
+              yq -i -oj ".maa-cli.$target.size = \"$(stat -c %s maa_cli-$target.tar.gz)\"" $version_file &&
+              yq -i -oj ".maa-cli.$target.sha256sum = \"$(echo $checksum | cut -d ' ' -f 1)\"" $version_file
+
+          fi
+          if [ -f maa-run ]; then
+            tar -czvf maa_run-$target.tar.gz maa-run &&
+              checksum=$(shasum -a 256 maa_run-$target.tar.gz) &&
+              echo "$checksum" > maa_run-$target.tar.gz.sha256sum &&
+              yq -i -oj ".maa-run.$target.version = \"$version\"" version.json &&
+              yq -i -oj ".maa-run.$target.name = \"maa_run-$target.tar.gz\"" version.json &&
+              yq -i -oj ".maa-run.$target.size = \"$(stat -c %s maa_run-$target.tar.gz)\"" version.json &&
+              yq -i -oj ".maa-run.$target.sha256sum = \"$(echo $checksum | cut -d ' ' -f 1)\"" version.json
+          fi
       - name: Upload to GitHub Releases
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/maa-cli-x86_64-linux-gnu.tar.gz target/maa-cli-x86_64-linux-gnu.tar.gz.sha256sum
+          file_glob: true
+          file: target/x86_64-unknown-linux-gnu/release/maa*.tar.gz*
+      - name: Commit and push version.json
+        run: |
+          cd version || exit 1
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -z "$(git diff version.json --exit-code)" ]; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit version.json -m "Update version.json" &&
+            git push
 
-  macos-universal:
+  universal-apple-darwin:
     name: Build and upload universal binaries of macOS
     runs-on: macos-latest
     permissions:
@@ -45,30 +85,64 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+      - name: Checkout version branch
+        uses: actions/checkout@v3
+        with:
+          ref: version
       - name: Setup Rust
         run: |
           rustup target add x86_64-apple-darwin
           rustup target add aarch64-apple-darwin
-      - name: Install MaaCore with maa-updater
+      - name: Build maa-cli
+        if: github.ref == 'refs/tags/maa_cli-v*'
+        run: cargo build --target x86_64-apple-darwin --target aarch64-apple-darwin --release --locked --bin maa
+      - name: Install MaaCore with maa-cli
+        if: github.ref == 'refs/tags/maa_run-v*'
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
         run: cargo run --locked --bin maa -- install stable
-      - name: Build binaries
-        run: cargo build --target x86_64-apple-darwin --target aarch64-apple-darwin --release --locked --bins
-      - name: Create universal binaries
+      - name: Build maa-run
+        if: github.ref == 'refs/tags/maa_run-v*'
+        run: cargo build --target x86_64-apple-darwin --target aarch64-apple-darwin --release --locked --bin maa-run
+      - name: Create universal binaries, archive, generate checksums and update version.json
         run: |
+          version_file="$PWD/version/version.json"
+          version=$(echo ${{ github.ref }} | sed -e 's/refs\/tags\/maa-.\{3\}-v//')
+          target="universal-apple-darwin"
           cd target
-          lipo -create -output maa-run x86_64-apple-darwin/release/maa-run aarch64-apple-darwin/release/maa-run
-          lipo -create -output maa x86_64-apple-darwin/release/maa aarch64-apple-darwin/release/maa
-      - name: Archive binaries
-        run: |
-          cd target
-          mkdir maa-cli
-          cp maa-run maa maa-cli/
-          tar -czvf maa-cli-macos-universal.tar.gz maa-cli
-          shasum -a 256 maa-cli-macos-universal.tar.gz > maa-cli-macos-universal.tar.gz.sha256sum
+          if [[ -f x86_64-apple-darwin/release/maa && -f aarch64-apple-darwin/release/maa ]]; then
+            lipo -create -output maa x86_64-apple-darwin/release/maa aarch64-apple-darwin/release/maa &&
+              tar -czvf maa_cli-$target.tar.gz maa &&
+              checksum=$(shasum -a 256 maa_cli-$target.tar.gz) &&
+              echo "$checksum" > maa_cli-$target.tar.gz.sha256sum &&
+              yq -i -oj ".maa-cli.$target.version = \"$version\"" $version_file &&
+              yq -i -oj ".maa-cli.$target.name = \"maa_cli-$target.tar.gz\"" $version_file &&
+              yq -i -oj ".maa-cli.$target.size = \"$(stat -c %s maa_cli-$target.tar.gz)\"" $version_file &&
+              yq -i -oj ".maa-cli.$target.sha256sum = \"$(echo $checksum | cut -d ' ' -f 1)\"" $version_file
+          fi
+          if [[ -f x86_64-apple-darwin/release/maa-run && -f aarch64-apple-darwin/release/maa-run ]]; then
+            lipo -create -output maa-run x86_64-apple-darwin/release/maa-run aarch64-apple-darwin/release/maa-run &&
+              tar -czvf maa_run-$target.tar.gz maa-run &&
+              checksum=$(shasum -a 256 maa_run-$target.tar.gz) &&
+              echo "$checksum" > maa_run-$target.tar.gz.sha256sum &&
+              yq -i -oj ".maa-run.$target.version = \"$version\"" $version_file &&
+              yq -i -oj ".maa-run.$target.name = \"maa_run-$target.tar.gz\"" $version_file &&
+              yq -i -oj ".maa-run.$target.size = \"$(stat -c %s maa_run-$target.tar.gz)\"" $version_file &&
+              yq -i -oj ".maa-run.$target.sha256sum = \"$(echo $checksum | cut -d ' ' -f 1)\"" $version_file
+          fi
       - name: Upload to GitHub Releases
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/maa-cli-macos-universal.tar.gz target/maa-cli-macos-universal.tar.gz.sha256sum
+          file_glob: true
+          file: target/maa*.tar.gz*
+      - name: Commit and push version.json
+        run: |
+          cd version || exit 1
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -z "$(git diff version.json --exit-code)" ]; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit version.json -m "Update version.json" && git push
