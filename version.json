@@ -4,8 +4,8 @@
       "version": "0.2.0",
       "tag": "maa_run-v0.2.0",
       "name": "maa_run-v0.2.0-x86_64-unknown-linux-gnu.tar.gz",
-      "size": 1793563,
-      "sha256sum": "73d549cbdfed2ee47d2b505ba864b415468e3675d1865968ec2bee633a3b3b12"
+      "size": 1793564,
+      "sha256sum": "afdad3a4e9a66d19707b66bafa6982ad7069e3782e27562a3bf8e0416e86d0bc"
     },
     "universal-apple-darwin": {
       "version": "0.2.0",
