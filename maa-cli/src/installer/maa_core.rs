@@ -37,8 +37,8 @@ impl MaaCore {
     }
 
     pub fn version(&self, dirs: &Dirs) -> Result<Version> {
-        let output = &command(&dirs)?
-            .set_ld_lib_path(&dirs)
+        let output = &command(dirs)?
+            .set_ld_lib_path(dirs)
             .arg("version")
             .output()
             .context("Failed to run maa-run version")?
@@ -80,20 +80,26 @@ impl MaaCore {
 
     pub fn update(&self, dirs: &Dirs, no_resource: bool, t: u64) -> Result<()> {
         let version_json = get_version_json(self.channel)?;
-        if &version_json.version() <= &self.version(dirs)? {
-            println!("MaaCore is already up to date!");
+        let current_version = self.version(dirs)?;
+        let new_version = version_json.version();
+        if current_version >= new_version {
+            println!("MaaCore is already up to date: v{}.", current_version);
             return Ok(());
         }
 
-        println!("Updating package (channel: {})...", self.channel);
+        println!(
+            "Found newer MaaCore version v{} current: v{}, updating...",
+            new_version, current_version
+        );
 
         let cache_dir = &dirs.cache().ensure()?;
+        let asset = version_json.asset()?;
+        let archive = asset.download(cache_dir, t)?;
+        let os_dll_extension = OsStr::new(DLL_EXTENSION);
+        // Clean dirs before extracting, but not before downloading
+        // because the download may be interrupted
         let lib_dir = &dirs.library().ensure_clean()?;
         let resource_dir = &dirs.resource().ensure_clean()?;
-
-        let asset = version_json.asset()?;
-        let archive = asset.download(&cache_dir, t)?;
-        let os_dll_extension = OsStr::new(DLL_EXTENSION);
         archive.extract(|path: &Path| {
             if path.starts_with("resource") {
                 if no_resource {
@@ -167,7 +173,7 @@ impl VersionJSON {
     pub fn name(&self) -> Result<String> {
         let version = self.version();
         if cfg!(target_os = "macos") {
-            Ok(format!("MAA-vv{}-macos-runtime-universal.zip", version))
+            Ok(format!("MAA-v{}-macos-runtime-universal.zip", version))
         } else if cfg!(target_os = "linux") {
             if cfg!(target_arch = "x86_64") {
                 Ok(format!("MAA-v{}-linux-x86_64.tar.gz", version))
@@ -197,7 +203,6 @@ impl VersionJSON {
 
     pub fn asset(&self) -> Result<&Asset> {
         let asset_name = self.name()?;
-        println!("Asset name: {}", asset_name);
         self.details
             .assets
             .iter()
@@ -233,7 +238,7 @@ impl Asset {
             };
             if file_size == size {
                 println!("File {} already exists, skip download!", &self.name);
-                return Ok(Archive::try_from(path)?);
+                return Archive::try_from(path);
             }
         }
 

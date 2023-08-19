@@ -41,8 +41,8 @@ impl CLIComponent {
                 Version::parse(MAA_CLI_VERSION).context("Failed to parse maa-cli version")
             }
             CLIComponent::MaaRun => {
-                let output = &command(&dirs)?
-                    .set_ld_lib_path(&dirs)
+                let output = &command(dirs)?
+                    .set_ld_lib_path(dirs)
                     .arg("--version")
                     .output()
                     .context("Failed to run maa-run")?
@@ -90,7 +90,7 @@ impl CLIComponent {
         let last_version = self.version(dirs)?;
         if *version > last_version {
             println!(
-                "Found newer {} version v{} (current: v{})",
+                "Found newer {} version v{} (current: v{}), updating...",
                 self.name(),
                 version,
                 last_version
@@ -109,7 +109,7 @@ impl CLIComponent {
                 }
             })?;
         } else {
-            println!("Up to date: {} v{}", self.name(), last_version);
+            println!("Up to date: {} v{}.", self.name(), last_version);
         }
 
         Ok(())
@@ -123,7 +123,7 @@ fn get_metadata() -> Result<VersionJSON> {
         String::from("https://github.com/wangl-cc/maa-cli/raw/version/version.json")
     };
     let metadata: VersionJSON = reqwest::blocking::get(metadata_url)?.json()?;
-    return Ok(metadata);
+    Ok(metadata)
 }
 
 #[derive(Deserialize)]

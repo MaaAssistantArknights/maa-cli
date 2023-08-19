@@ -37,7 +37,7 @@ impl TryFrom<PathBuf> for Archive {
             let archive_type = match extension.to_str() {
                 Some("zip") => ArchiveType::Zip,
                 Some("gz") => {
-                    let stem = file.file_stem().map(|s| PathBuf::from(s));
+                    let stem = file.file_stem().map(PathBuf::from);
                     if stem.is_some_and(|s| s.extension().is_some_and(|e| e == "tar")) {
                         ArchiveType::TarGz
                     } else {
@@ -81,7 +81,7 @@ impl Archive {
 }
 
 fn extract_zip(file: &Path, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Result<()> {
-    let mut archive = zip::ZipArchive::new(File::open(&file)?)?;
+    let mut archive = zip::ZipArchive::new(File::open(file)?)?;
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i).unwrap();
@@ -124,7 +124,7 @@ fn extract_zip(file: &Path, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Result
 }
 
 fn extract_tar_gz(file: &Path, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Result<()> {
-    let gz_decoder = flate2::read::GzDecoder::new(File::open(&file)?);
+    let gz_decoder = flate2::read::GzDecoder::new(File::open(file)?);
     let mut archive = tar::Archive::new(gz_decoder);
 
     for entry in archive.entries()? {
