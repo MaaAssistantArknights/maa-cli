@@ -41,7 +41,7 @@ jobs:
           echo "name=$component $version" >> $GITHUB_ENV
           echo "tag_name=$tag_name-v$version" >> $GITHUB_ENV
       - name: Create Release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v1
         with:
           name: ${{ steps.vars.outputs.name }}
           tag_name: ${{ steps.vars.outputs.tag_name }}
@@ -65,7 +65,7 @@ jobs:
           echo "name=$component $version" >> $GITHUB_ENV
           echo "tag_name=$tag_name-v$version" >> $GITHUB_ENV
       - name: Create Release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v1
         with:
           name: ${{ steps.vars.outputs.name }}
           tag_name: ${{ steps.vars.outputs.tag_name }}
