@@ -1,0 +1,72 @@
+name: Create a GitHub Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      component:
+        description: 'Component to release'
+        required: true
+        type:  choice
+        default: maa-cli
+        options:
+          - maa-cli
+          - maa-run
+          - maa-sys
+      commit:
+        description: 'Commit to release'
+        required: false
+        type: string
+        default: main
+
+jobs:
+  release-manual:
+    runs-on: ubuntu-latest
+    if: github.event == 'workflow_dispatch'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.commit }}
+      - name: Get name and version
+        id: vars
+        run: |
+          component=${{ github.event.inputs.component }}
+          tag_name=$(echo $component | sed -e 's/-/_/g')
+          version=$(yq -oy ".package.version" $component/Cargo.toml)
+          echo "name=$component $version" >> $GITHUB_ENV
+          echo "tag_name=$tag_name-v$version" >> $GITHUB_ENV
+      - name: Create Release
+        uses: actions/create-release@v1
+        with:
+          name: ${{ steps.vars.outputs.name }}
+          tag_name: ${{ steps.vars.outputs.tag_name }}
+          generate_release_notes: true
+
+  release-auto:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' &&
+        contains(github.event.head_commit.message, '[release ')
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Get name and version
+        id: vars
+        run: |
+          component=$(echo ${{ github.event.head_commit.message }} | sed -e 's/.*\[release \(.*\)\].*/\1/')
+          tag_name=$(echo $component | sed -e 's/-/_/g')
+          version=$(yq -oy ".package.version" $component/Cargo.toml)
+          echo "name=$component $version" >> $GITHUB_ENV
+          echo "tag_name=$tag_name-v$version" >> $GITHUB_ENV
+      - name: Create Release
+        uses: actions/create-release@v1
+        with:
+          name: ${{ steps.vars.outputs.name }}
+          tag_name: ${{ steps.vars.outputs.tag_name }}
+          generate_release_notes: true
