@@ -38,13 +38,13 @@ jobs:
           component=${{ github.event.inputs.component }}
           tag_name=$(echo $component | sed -e 's/-/_/g')
           version=$(yq -oy ".package.version" $component/Cargo.toml)
-          echo "name=$component $version" >> $GITHUB_ENV
-          echo "tag_name=$tag_name-v$version" >> $GITHUB_ENV
+          echo "name=$component $version" >> $GITHUB_OUTPUT
+          echo "tag_name=$tag_name-v$version" >> $GITHUB_OUTPUT
       - name: Create Tag
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git tag ${{ steps.vars.outputs.tag_name }}
+          git tag ${{ git.event.inputs.commit }} ${{ steps.vars.outputs.tag_name }}
           git push origin ${{ steps.vars.outputs.tag_name }}
       - name: Create Release
         uses: softprops/action-gh-release@v1
@@ -68,8 +68,8 @@ jobs:
           component=$(echo ${{ github.event.head_commit.message }} | sed -e 's/.*\[release \(.*\)\].*/\1/')
           tag_name=$(echo $component | sed -e 's/-/_/g')
           version=$(yq -oy ".package.version" $component/Cargo.toml)
-          echo "name=$component $version" >> $GITHUB_ENV
-          echo "tag_name=$tag_name-v$version" >> $GITHUB_ENV
+          echo "name=$component $version" >> $GITHUB_OUTPUT
+          echo "tag_name=$tag_name-v$version" >> $GITHUB_OUTPUT
       - name: Create Tag
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
