@@ -151,7 +151,7 @@ jobs:
               yq -i -oj ".maa-run.$target.version = \"$version\"" $version_file &&
               yq -i -oj ".maa-run.$target.tag = \"maa_run-v$version\"" $version_file &&
               yq -i -oj ".maa-run.$target.name = \"$archive_name\"" $version_file &&
-              yq -i -oj ".maa-run.$target.size = $(stat -c %s $archive_name)" $version_file &&
+              yq -i -oj ".maa-run.$target.size = $(stat -f %z $archive_name)" $version_file &&
               yq -i -oj ".maa-run.$target.sha256sum = \"$(echo $checksum | cut -d ' ' -f 1)\"" $version_file &&
               echo "name=maa-run v$version" >> $GITHUB_OUTPUT &&
               exit 0
