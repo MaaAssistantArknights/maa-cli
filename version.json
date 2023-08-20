@@ -14,5 +14,14 @@
       "size": 1751379,
       "sha256sum": "6496077f1e04ac8800e4bcb3e803bf34cdaa0d2276fd146fa93cc30177fc6597"
     }
+  },
+  "maa-cli": {
+    "x86_64-unknown-linux-gnu": {
+      "version": "0.2.0",
+      "tag": "maa_cli-v0.2.0",
+      "name": "maa_cli-v0.2.0-x86_64-unknown-linux-gnu.tar.gz",
+      "size": 3138548,
+      "sha256sum": "5cb3d47165bfa78235424bf050506637a6f33119772ea136f1b8c79e01c7e428"
+    }
   }
 }
