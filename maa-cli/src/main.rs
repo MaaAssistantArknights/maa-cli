@@ -1,197 +1,341 @@
-mod package;
-use package::Channel;
+mod dirs;
+mod installer;
+mod maa_run;
 
-use std::env::{current_exe, var_os};
-use std::path::PathBuf;
-use std::process::{Command, ExitCode};
+use crate::{
+    installer::{
+        maa_cli::CLIComponent,
+        maa_core::{Channel, MaaCore},
+    },
+    maa_run::SetLDLibPath,
+};
 
-use anyhow::Result;
+use std::process::{ExitCode, ExitStatus};
+
+use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use directories::ProjectDirs;
-use paste::paste;
+use maa_run::command;
 
 #[derive(Parser)]
 #[command(author, version)]
 #[allow(clippy::upper_case_acronyms)]
-struct CLI {
-    #[clap(subcommand)]
-    subcmd: SubCommand,
-}
-
-#[derive(Subcommand)]
-enum SubCommand {
-    /// Install or update maa core or resources
+enum CLI {
+    /// Install maa core or resources
     ///
-    /// This tool will download prebuilt packages of given channel (default is stable, can be beta or alpha)
-    /// and extract them to given data directory used by `maa-cli`.
-    /// The packages be extracted and installed to given data directory,
-    /// the default data directory see [directories.rs](https://github.com/dirs-dev/directories-rs).
-    /// If `MAA_DATA_DIR` is set, it will be used as data directory,
-    /// or if `XDG_DATA_HOME` is set, `$XDG_DATA_HOME/maa` will be used as data directory,
-    /// otherwise the default data directory will be used.
-    /// Once you change the data directory by setting `MAA_DATA_DIR` or `XDG_DATA_HOME`,
-    /// make sure you set them when using `maa-cli` too.
+    /// This command will install maa-core and resources
+    /// by downloading prebuilt packages.
+    /// Note: If the maa-core and resource are already installed,
+    /// please update them by `maa-cli update`.
+    /// Note: If you want to install maa-run, please use `maa-cli self install`.
     Install {
-        #[clap(default_value_t = Channel::default())]
+        #[arg(default_value_t = Channel::default())]
         /// Channel to download prebuilt package
+        ///
+        /// There are three channels of maa-core prebuilt packages,
+        /// stable, beta and alpha.
+        /// The default channel is stable, you can use this flag to change the channel.
+        /// If you want to use the latest features of maa-core,
+        /// you can use beta or alpha channel.
+        /// Note: the alpha channel is only available for windows.
         channel: Channel,
-        /// Do not extract resource files
-        #[clap(long)]
+        /// Time to test download speed
+        ///
+        /// There are several mirrors of maa-core prebuilt packages,
+        /// we will test the download speed of these mirrors,
+        /// and choose the fastest one to download.
+        /// This flag is used to set the time to test download speed.
+        /// If you want to increase the accuracy of the test,
+        /// please increase the value of this flag.
+        /// But if you think the test is too slow,
+        /// you can decrease the value of this flag.
+        #[arg(short, long, default_value_t = 3)]
+        test_time: u64,
+        /// Force to install even if the maa and resource already exists
+        ///
+        /// If the maa-core and resource already exists,
+        /// we will not install them again by default.
+        /// If you want to install them again, please use this flag.
+        /// This flag is useful when the installation is failed,
+        /// and you want to install them again.
+        /// If you want to update the maa-core or resource,
+        /// please use `maa-cli update` instead.
+        #[arg(short, long)]
+        force: bool,
+        /// Do not install resource
+        ///
+        /// By default, resources are shipped with maa-core,
+        /// and we will install them when installing maa-core.
+        /// If you do not want to install resource,
+        /// you can use this flag to disable it.
+        /// This is useful when you want to install maa-core only.
+        /// For my own, I will use this flag to install maa-core,
+        /// because I use the latest resource from github,
+        /// and this flag can avoid the resource being overwritten.
+        /// Note: if you use resources that too new or too old,
+        /// you may encounter some problems.
+        /// Use at your own risk.
+        #[arg(long)]
+        no_resource: bool,
+    },
+    /// Update maa core or resources
+    ///
+    /// This command will update maa-core and resources
+    /// by downloading prebuilt packages.
+    /// If the version of maa-core is not newer,
+    /// we will not update it.
+    /// Note: If the maa-core and resource are not installed,
+    /// please install them by `maa-cli install`.
+    Update {
+        #[arg(default_value_t = Channel::default())]
+        /// Channel to download prebuilt package
+        ///
+        /// There are three channels of maa-core prebuilt packages,
+        /// stable, beta and alpha.
+        /// The default channel is stable, you can use this flag to change the channel.
+        /// If you want to use the latest features of maa-core,
+        /// you can use beta or alpha channel.
+        /// Note: the alpha channel is only available for windows.
+        /// Note: if the maa-core is not installed, we will install it.
+        channel: Channel,
+        /// Do not update resource
+        ///
+        /// By default, resources are shipped with maa-core,
+        /// and we will update them when updating maa-core.
+        /// If you do not want to update resource,
+        /// you can use this flag to disable it.
+        /// This is useful when you want to update maa-core only.
+        /// For my own, I will use this flag to update maa-core,
+        /// because I use the latest resource from github,
+        /// and this flag can avoid the resource being overwritten.
+        /// Note: if you use resources that too new or too old,
+        /// you may encounter some problems.
+        /// Use at your own risk.
+        #[arg(long)]
         no_resource: bool,
         /// Time to test download speed
-        #[clap(short, long, default_value_t = 3)]
+        ///
+        /// There are several mirrors of maa-core prebuilt packages,
+        /// we will test the download speed of these mirrors,
+        /// and choose the fastest one to download.
+        /// This flag is used to set the time to test download speed.
+        /// If you want to increase the accuracy of the test,
+        /// please increase the value of this flag.
+        /// But if you think the test is too slow,
+        /// you can decrease the value of this flag.
+        #[arg(short, long, default_value_t = 3)]
         test_time: u64,
     },
+    /// Manage maa-cli self and maa-run
+    ///
+    /// This command is used to manage maa-cli self and maa-run.
+    /// Note: If you want to install or update maa-core and resource,
+    /// please use `maa-cli install` or `maa-cli update` instead.
+    #[command(subcommand, name = "self")]
+    SelfCommand(SelfCommand),
     /// Print path of maa directories
+    ///
+    /// This command will print the path used by maa-cli.
+    /// Some of these paths are used by maa-core and maa-run.
     Dir { dir_type: Dir },
-    /// Print version of maa-run and maa-core
-    Version,
-    /// Run a maa task
+    /// Print version of given component
+    ///
+    /// This command will print the version of given component.
+    /// If no component is given, it will print the version of all components.
+    Version { component: Component },
+    /// Run a predefined task
     ///
     /// All arguments will be passed to maa-run,
-    /// type -h or --help to see help message of maa-run.
+    /// type --help to get more information.
+    /// The task is defined in the config directory of maa-cli,
+    /// you can use `maa dir config` to get the path of config directory,
+    /// and then create a directory named `tasks` in it.
+    /// In the `tasks` directory, you can create a TOML or JSON file,
+    /// to define a task. More information can be found in the README.
+    /// You can also use `maa-cli list` to list all available tasks.
     Run {
         #[clap(name("ARGS"), trailing_var_arg(true))]
         args: Vec<String>,
     },
+    /// List all available tasks
+    List,
+}
+
+#[derive(Subcommand)]
+enum SelfCommand {
+    /// Install maa-run
+    ///
+    /// This command will download prebuilt binary of maa-run,
+    /// and install it to the binary directory of maa-cli.
+    /// Note: If the maa-run is already installed,
+    /// please update it by `maa-cli self update`.
+    Install,
+    /// Update maa-cli self and maa-run
+    ///
+    /// This command will download prebuilt binary of maa-cli and maa-run,
+    /// and install them to the binary directory of maa-cli.
+    /// Note: we will check the version of maa-cli and maa-run,
+    /// if the version is not newer, we will not update them.
+    /// And if the maa-run is not installed, please install it firstly
+    /// by `maa-cli self install`.
+    Update,
+}
+
+#[derive(ValueEnum, Clone, Default)]
+enum Component {
+    #[default]
+    All,
+    MaaCLI,
+    MaaRun,
+    MaaCore,
 }
 
 #[derive(ValueEnum, Clone)]
-enum Dir {
-    Config,
+pub enum Dir {
+    /// Directory to store maa data
+    ///
+    /// Parent of binary, library, resource directory,
+    /// On Windows, it is also parent of log directory.
+    /// On macOS, it is also parent of config and log directory.
     Data,
+    /// Directory to store maa-run binary
+    Binary,
+    /// Directory to store maa-core binary, alias of Binary
+    Bin,
+    /// Directory to store MaaCore's dynamic library
     Library,
-    Resource,
+    /// Directory to store MaaCore's dynamic library, alias of Library
+    Lib,
+    /// Config directory of maa-run
+    Config,
+    /// Cache directory to store downloaded files
     Cache,
+    /// Resource directory of MaaCore
+    Resource,
+    /// Log directory of MaaCore
     Log,
 }
 
-macro_rules! matct_loc {
-    (state, $dirs:ident) => {
-        $dirs
-            .state_dir()
-            .unwrap_or_else(|| $dirs.data_dir())
-            .to_path_buf()
-    };
-    (config, $dirs:ident) => {
-        if cfg!(target_os = "macos") {
-            $dirs.config_dir().join("config")
-        } else {
-            $dirs.config_dir().to_path_buf()
-        }
-    };
-    ($loc:ident, $dirs:ident) => {
-        paste! {
-            $dirs.[<$loc _dir>]().to_path_buf()
-        }
-    };
-}
-
-macro_rules! get_dir {
-    ($loc:ident) => {
-        paste! {
-            fn [<get_ $loc _dir>](proj: &Option<ProjectDirs>) -> PathBuf {
-                if let Some(dir) = var_os(stringify!([<MAA_ $loc:upper _DIR>])) {
-                    PathBuf::from(dir)
-                } else if let Some(dir) = var_os(stringify!([<XDG_ $loc:upper _HOME>])) {
-                    PathBuf::from(dir).join("maa")
-                } else if let Some(dirs) = proj {
-                    matct_loc!($loc, dirs)
-                } else {
-                    panic!("Failed to get {} directory!", stringify!($loc))
-                }
-            }
-        }
-    };
-}
-
-get_dir!(state);
-get_dir!(data);
-get_dir!(config);
-get_dir!(cache);
-
-fn find_maa_run() -> String {
-    if let Ok(exe_path) = current_exe() {
-        let exe_dir = exe_path.parent().unwrap();
-        let maa_run_path = exe_dir.join("maa-run");
-        if maa_run_path.exists() {
-            return maa_run_path.to_str().unwrap().to_string();
-        }
-    }
-    String::from("maa-run")
-}
-
-#[cfg(target_os = "linux")]
-const LD_LIB_PATH_VAR: &str = "LD_LIBRARY_PATH";
-#[cfg(target_os = "macos")]
-const LD_LIB_PATH_VAR: &str = "DYLD_FALLBACK_LIBRARY_PATH";
-#[cfg(target_os = "windows")]
-const LD_LIB_PATH_VAR: &str = "PATH";
-
-fn run<S, I>(cmd: &str, args: I, dirs: &Option<ProjectDirs>) -> Result<ExitCode>
-where
-    S: AsRef<std::ffi::OsStr>,
-    I: IntoIterator<Item = S>,
-{
-    let maa_run = find_maa_run();
-    let ret = Command::new(maa_run)
-        .arg(cmd)
-        .args(args)
-        .env(LD_LIB_PATH_VAR, get_data_dir(dirs).join("lib"))
-        .status()
-        .expect("failed to execute maa-run");
-    if ret.success() {
-        Ok(ExitCode::SUCCESS)
-    } else {
-        Ok(ExitCode::FAILURE)
-    }
-}
-
 fn main() -> Result<ExitCode> {
-    let dirs = ProjectDirs::from("com", "loong", "maa");
+    let proj = ProjectDirs::from("com", "loong", "maa");
+    let proj_dirs = dirs::Dirs::new(proj);
+
     let cli = CLI::parse();
 
-    match cli.subcmd {
-        SubCommand::Install {
+    match cli {
+        CLI::Install {
+            channel,
+            no_resource,
+            test_time,
+            force,
+        } => {
+            MaaCore::new(channel).install(&proj_dirs, force, no_resource, test_time)?;
+
+            Ok(ExitCode::SUCCESS)
+        }
+        CLI::Update {
             channel,
             no_resource,
             test_time,
         } => {
-            let data_dir = get_data_dir(&dirs);
-            let cache_dir = get_cache_dir(&dirs);
+            MaaCore::new(channel).update(&proj_dirs, no_resource, test_time)?;
 
-            if !cache_dir.exists() {
-                std::fs::create_dir_all(&cache_dir)?;
-            }
-            if !data_dir.exists() {
-                std::fs::create_dir_all(&data_dir)?;
-            }
-
-            println!("Installing package (channel: {})...", channel);
-            package::get_package(&channel)?
-                .get_asset()?
-                .download(&cache_dir, test_time)?
-                .extract(&data_dir, !no_resource)?;
+            Ok(ExitCode::SUCCESS)
         }
-        SubCommand::Dir { dir_type } => {
+        CLI::SelfCommand(self_command) => match self_command {
+            SelfCommand::Install => {
+                CLIComponent::MaaRun.install(&proj_dirs)?;
+                Ok(ExitCode::SUCCESS)
+            }
+            SelfCommand::Update => {
+                CLIComponent::MaaCLI.update(&proj_dirs)?;
+                CLIComponent::MaaRun.update(&proj_dirs)?;
+                Ok(ExitCode::SUCCESS)
+            }
+        },
+        CLI::Dir { dir_type } => {
             let dir = match dir_type {
-                Dir::Config => get_config_dir(&dirs),
-                Dir::Data => get_data_dir(&dirs),
-                Dir::Library => get_data_dir(&dirs).join("lib"),
-                Dir::Resource => get_data_dir(&dirs).join("resource"),
-                Dir::Cache => get_cache_dir(&dirs),
-                Dir::Log => get_state_dir(&dirs).join("debug"),
+                Dir::Data => proj_dirs.data(),
+                Dir::Binary | Dir::Bin => proj_dirs.binary(),
+                Dir::Library | Dir::Lib => proj_dirs.library(),
+                Dir::Config => proj_dirs.config(),
+                Dir::Cache => proj_dirs.cache(),
+                Dir::Resource => proj_dirs.resource(),
+                Dir::Log => proj_dirs.log(),
             };
             println!("{}", dir.display());
+
+            Ok(ExitCode::SUCCESS)
         }
-        SubCommand::Version => {
-            let args: [&str; 0] = [];
-            return run("version", args, &dirs);
-        }
-        SubCommand::Run { args } => {
-            return run("run", args, &dirs);
+        CLI::Version { component } => match component {
+            Component::All => {
+                println!("maa-cli {}", env!("CARGO_PKG_VERSION"));
+                command(&proj_dirs)?
+                    .set_ld_lib_path(&proj_dirs)
+                    .arg("--version")
+                    .status()?
+                    .to_code()?;
+                command(&proj_dirs)?
+                    .set_ld_lib_path(&proj_dirs)
+                    .arg("version")
+                    .status()?
+                    .to_code()?;
+                Ok(ExitCode::SUCCESS)
+            }
+            Component::MaaCLI => {
+                println!("maa-cli {}", env!("CARGO_PKG_VERSION"));
+                Ok(ExitCode::SUCCESS)
+            }
+            Component::MaaRun => command(&proj_dirs)?
+                .set_ld_lib_path(&proj_dirs)
+                .arg("--version")
+                .status()?
+                .to_code(),
+            Component::MaaCore => command(&proj_dirs)?
+                .set_ld_lib_path(&proj_dirs)
+                .arg("version")
+                .status()?
+                .to_code(),
+        },
+        CLI::Run { args } => command(&proj_dirs)?
+            .set_ld_lib_path(&proj_dirs)
+            .arg("run")
+            .args(&args)
+            .status()?
+            .to_code(),
+        CLI::List => {
+            let task_dir = proj_dirs.config().join("tasks");
+            if !task_dir.exists() {
+                println!("No tasks found");
+                Ok(ExitCode::SUCCESS)
+            } else {
+                for entry in task_dir.read_dir()? {
+                    let entry = entry?;
+                    let path = entry.path();
+                    if path.is_file() {
+                        println!("{}", path.file_stem().unwrap().to_str().unwrap());
+                    }
+                }
+                Ok(ExitCode::SUCCESS)
+            }
         }
     }
+}
 
-    Ok(ExitCode::SUCCESS)
+/// Convert `ExitStatus` to `ExitCode`
+///
+/// If the command is successful, return `ExitCode::SUCCESS`,
+/// otherwise return an error with the exit code.
+trait ToCode {
+    fn to_code(&self) -> Result<ExitCode>;
+}
+
+impl ToCode for ExitStatus {
+    fn to_code(&self) -> Result<ExitCode> {
+        if self.success() {
+            Ok(ExitCode::SUCCESS)
+        } else {
+            Err(anyhow!("Command failed with exit code {}", self))
+        }
+    }
 }
