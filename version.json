@@ -22,6 +22,13 @@
       "name": "maa_cli-v0.2.0-x86_64-unknown-linux-gnu.tar.gz",
       "size": 3138548,
       "sha256sum": "5cb3d47165bfa78235424bf050506637a6f33119772ea136f1b8c79e01c7e428"
+    },
+    "universal-apple-darwin": {
+      "version": "0.2.0",
+      "tag": "maa_cli-v0.2.0",
+      "name": "maa_cli-v0.2.0-universal-apple-darwin.zip",
+      "size": 4077391,
+      "sha256sum": "a507c796d39a25c1d1d65061554b56a4f15954d35da909f70d2f5988fec90dfe"
     }
   }
 }
