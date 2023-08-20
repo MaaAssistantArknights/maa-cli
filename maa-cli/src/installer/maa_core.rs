@@ -54,7 +54,7 @@ fn extract_mapper(
             _ => continue,
         }
     }
-    return None;
+    None
 }
 
 impl MaaCore {
