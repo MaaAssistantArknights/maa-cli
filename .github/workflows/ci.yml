@@ -55,7 +55,11 @@ jobs:
       - name: Install MaaCore with maa-updater
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
-        run: cargo run --locked --bin maa -- install stable
+        run: |
+          cargo build --locked --bin maa
+          cargo run --bin maa -- install stable
+          ls -l $(cargo run --bin maa -- dir library)
+          ls -l $(cargo run --bin maa -- dir resource)
       - name: Build
         run: cargo build --workspace --locked
       - name: Lint (clippy)
@@ -68,8 +72,9 @@ jobs:
         run: ./target/$CARGO_BUILD_TARGET/debug/maa-run version
       - name: Try to run relocated lib with maa
         run: |
-          old_lib_dir=$(cargo run --bin maa -- dir library)
-          old_data_path=$(dirname "$old_lib_path")
-          new_data_path="$PWD/data"
-          mv "$old_data_path" "$new_data_path"
-          MAA_DATA_DIR="$new_data_path" ./target/$CARGO_BUILD_TARGET/debug/maa version all
+          maa="./target/$CARGO_BUILD_TARGET/debug/maa"
+          old_lib_dir=$($maa dir library)
+          old_data_dir=$(dirname "$old_lib_dir")
+          new_data_dir="$PWD/data"
+          mv "$old_data_dir" "$new_data_dir"
+          MAA_DATA_DIR="$new_data_dir" $maa version all

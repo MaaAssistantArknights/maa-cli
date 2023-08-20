@@ -64,11 +64,10 @@ impl MaaCore {
         let version_json = get_version_json(self.channel)?;
         let asset = &version_json.asset()?;
         let archive = asset.download(cache_dir, t)?;
-        let os_dll_extension = OsStr::new(DLL_EXTENSION);
         archive.extract(|path: &Path| {
             if path.starts_with("resource") {
                 Some(resource_dir.join(path.strip_prefix("resource").unwrap()))
-            } else if path.extension() == Some(os_dll_extension) {
+            } else if path.extension().is_some_and(|ext| ext == DLL_EXTENSION) {
                 Some(lib_dir.join(path))
             } else {
                 None
