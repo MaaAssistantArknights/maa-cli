@@ -30,7 +30,7 @@ pub enum CLIComponent {
 impl CLIComponent {
     pub fn name(self) -> String {
         match self {
-            CLIComponent::MaaCLI => format!("maa-cli{}", EXE_SUFFIX),
+            CLIComponent::MaaCLI => format!("maa{}", EXE_SUFFIX),
             CLIComponent::MaaRun => format!("maa-run{}", EXE_SUFFIX),
         }
     }
