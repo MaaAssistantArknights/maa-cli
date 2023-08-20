@@ -160,8 +160,8 @@ struct VersionJSON {
 impl VersionJSON {
     pub fn get_asset(&self, compoment: CLIComponent) -> Result<&Asset> {
         let targets = match compoment {
-            CLIComponent::MaaCLI => &self.maa_run,
-            CLIComponent::MaaRun => &self.maa_cli,
+            CLIComponent::MaaCLI => &self.maa_cli,
+            CLIComponent::MaaRun => &self.maa_run,
         };
 
         if cfg!(target_os = "macos") {
