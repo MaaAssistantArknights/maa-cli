@@ -62,6 +62,21 @@ enum CLI {
         /// please use `maa-cli update` instead.
         #[arg(short, long)]
         force: bool,
+        /// Do not install resource
+        ///
+        /// By default, resources are shipped with maa-core,
+        /// and we will install them when installing maa-core.
+        /// If you do not want to install resource,
+        /// you can use this flag to disable it.
+        /// This is useful when you want to install maa-core only.
+        /// For my own, I will use this flag to install maa-core,
+        /// because I use the latest resource from github,
+        /// and this flag can avoid the resource being overwritten.
+        /// Note: if you use resources that too new or too old,
+        /// you may encounter some problems.
+        /// Use at your own risk.
+        #[arg(long)]
+        no_resource: bool,
     },
     /// Update maa core or resources
     ///
@@ -194,10 +209,11 @@ fn main() -> Result<ExitCode> {
     match cli {
         CLI::Install {
             channel,
+            no_resource,
             test_time,
             force,
         } => {
-            MaaCore::new(channel).install(&proj_dirs, force, test_time)?;
+            MaaCore::new(channel).install(&proj_dirs, force, no_resource, test_time)?;
 
             Ok(ExitCode::SUCCESS)
         }

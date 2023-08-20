@@ -7,7 +7,7 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 
 /// Supported archive types.
 ///
@@ -86,10 +86,6 @@ fn extract_zip(file: &Path, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Result
     for i in 0..archive.len() {
         let mut file = archive.by_index(i).unwrap();
 
-        if file.is_dir() {
-            continue;
-        }
-
         let outpath = match file.enclosed_name() {
             Some(path) => match mapper(path) {
                 Some(path) => path,
@@ -98,15 +94,15 @@ fn extract_zip(file: &Path, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Result
             None => continue,
         };
 
-        if let Some(p) = outpath.parent() {
-            p.ensure()?;
-        }
-
-        if outpath.exists() && metadata(&outpath).is_ok_and(|m| m.len() == file.size()) {
+        if file.is_dir() {
+            outpath.ensure()?;
+        } else if outpath.exists() && metadata(&outpath).is_ok_and(|m| m.len() == file.size()) {
             continue;
         } else {
-            let mut outfile = File::create(&outpath)?;
-            copy(&mut file, &mut outfile)?;
+            let mut outfile = File::create(&outpath)
+                .with_context(|| format!("Failed to create file: {}", outpath.display()))?;
+            copy(&mut file, &mut outfile)
+                .with_context(|| format!("Failed to extract file: {}", outpath.display()))?;
         }
 
         #[cfg(unix)]
@@ -115,7 +111,8 @@ fn extract_zip(file: &Path, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Result
             use std::os::unix::fs::PermissionsExt;
 
             if let Some(mode) = file.unix_mode() {
-                set_permissions(&outpath, Permissions::from_mode(mode))?;
+                set_permissions(&outpath, Permissions::from_mode(mode))
+                    .with_context(|| format!("Failed to set permissions: {}", outpath.display()))?;
             }
         }
     }

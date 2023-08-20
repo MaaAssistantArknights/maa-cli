@@ -58,8 +58,8 @@ jobs:
         run: |
           cargo build --locked --bin maa
           cargo run --bin maa -- install stable
-          ls -l $(cargo run --bin maa -- dir library)
-          ls -l $(cargo run --bin maa -- dir resource)
+          ls -l "$(cargo run --bin maa -- dir library)"
+          ls -l "$(cargo run --bin maa -- dir resource)"
       - name: Build
         run: cargo build --workspace --locked
       - name: Lint (clippy)

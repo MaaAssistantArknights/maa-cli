@@ -1,4 +1,5 @@
 use std::env::var_os;
+use std::fs::{create_dir, remove_dir_all};
 use std::path::{Path, PathBuf};
 
 use directories::ProjectDirs;
@@ -100,6 +101,7 @@ pub trait Ensure: Sized {
     /// Ensure the path exists, create it if not.
     ///
     /// Return the path itself if it exists or created successfully.
+    /// Otherwise, return an error.
     fn ensure(self) -> Result<Self, Self::Error>;
 
     /// Ensure the dir is empty, create it if not.
@@ -114,16 +116,21 @@ impl Ensure for &Path {
 
     fn ensure(self) -> Result<Self, Self::Error> {
         if !self.exists() {
-            std::fs::create_dir_all(self)?;
+            if let Some(parent) = self.parent() {
+                parent.ensure()?;
+            }
+            create_dir(self)?;
         }
         Ok(self)
     }
 
     fn ensure_clean(self) -> Result<Self, Self::Error> {
         if self.exists() {
-            std::fs::remove_dir_all(self)?;
+            remove_dir_all(self)?;
+        } else if let Some(parent) = self.parent() {
+            parent.ensure()?;
         }
-        std::fs::create_dir_all(self)?;
+        create_dir(self)?;
         Ok(self)
     }
 }

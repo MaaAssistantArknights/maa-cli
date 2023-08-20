@@ -6,10 +6,9 @@ use super::extract::Archive;
 use crate::dirs::{Dirs, Ensure};
 use crate::maa_run::{command, SetLDLibPath};
 
-use std::env::consts::DLL_EXTENSION;
+use std::env::consts::{DLL_PREFIX, DLL_SUFFIX};
 use std::env::var_os;
-use std::ffi::OsStr;
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 use std::str::from_utf8;
 use std::time::Duration;
 
@@ -31,6 +30,33 @@ pub const MAA_CORE_NAME: &str = if cfg!(target_os = "macos") {
     "libMaaCore.so"
 };
 
+fn extract_mapper(
+    path: &Path,
+    lib_dir: &Path,
+    resource_dir: &Path,
+    resource: bool,
+) -> Option<PathBuf> {
+    let mut components = path.components();
+    while let Some(c) = components.next() {
+        match c {
+            Component::Normal(c) => {
+                if resource && c == "resource" {
+                    return Some(resource_dir.join(components.as_path()));
+                } else if c
+                    .to_str() // The DLL suffix may not the last part of the file name
+                    .is_some_and(|s| s.starts_with(DLL_PREFIX) && s.contains(DLL_SUFFIX))
+                {
+                    return Some(lib_dir.join(c));
+                } else {
+                    continue;
+                }
+            }
+            _ => continue,
+        }
+    }
+    return None;
+}
+
 impl MaaCore {
     pub fn new(channel: Channel) -> Self {
         Self { channel }
@@ -49,7 +75,7 @@ impl MaaCore {
         Version::parse(ver_str).context("Failed to parse version")
     }
 
-    pub fn install(&self, dirs: &Dirs, force: bool, t: u64) -> Result<()> {
+    pub fn install(&self, dirs: &Dirs, force: bool, no_resource: bool, t: u64) -> Result<()> {
         let lib_dir = &dirs.library().ensure()?;
 
         if lib_dir.join(MAA_CORE_NAME).exists() && !force {
@@ -64,15 +90,7 @@ impl MaaCore {
         let version_json = get_version_json(self.channel)?;
         let asset = &version_json.asset()?;
         let archive = asset.download(cache_dir, t)?;
-        archive.extract(|path: &Path| {
-            if path.starts_with("resource") {
-                Some(resource_dir.join(path.strip_prefix("resource").unwrap()))
-            } else if path.extension().is_some_and(|ext| ext == DLL_EXTENSION) {
-                Some(lib_dir.join(path))
-            } else {
-                None
-            }
-        })?;
+        archive.extract(|path: &Path| extract_mapper(path, lib_dir, resource_dir, !no_resource))?;
 
         Ok(())
     }
@@ -94,24 +112,11 @@ impl MaaCore {
         let cache_dir = &dirs.cache().ensure()?;
         let asset = version_json.asset()?;
         let archive = asset.download(cache_dir, t)?;
-        let os_dll_extension = OsStr::new(DLL_EXTENSION);
         // Clean dirs before extracting, but not before downloading
         // because the download may be interrupted
         let lib_dir = &dirs.library().ensure_clean()?;
         let resource_dir = &dirs.resource().ensure_clean()?;
-        archive.extract(|path: &Path| {
-            if path.starts_with("resource") {
-                if no_resource {
-                    None
-                } else {
-                    Some(resource_dir.join(path.strip_prefix("resource").unwrap()))
-                }
-            } else if path.extension() == Some(os_dll_extension) {
-                Some(lib_dir.join(path))
-            } else {
-                None
-            }
-        })?;
+        archive.extract(|path: &Path| extract_mapper(path, lib_dir, resource_dir, !no_resource))?;
 
         Ok(())
     }
