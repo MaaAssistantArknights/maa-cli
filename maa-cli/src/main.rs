@@ -192,11 +192,27 @@ enum Component {
 
 #[derive(ValueEnum, Clone)]
 pub enum Dir {
+    /// Directory to store maa data
+    ///
+    /// Parent of binary, library, resource directory,
+    /// On Windows, it is also parent of log directory.
+    /// On macOS, it is also parent of config and log directory.
+    Data,
+    /// Directory to store maa-run binary
     Binary,
+    /// Directory to store maa-core binary, alias of Binary
+    Bin,
+    /// Directory to store MaaCore's dynamic library
     Library,
+    /// Directory to store MaaCore's dynamic library, alias of Library
+    Lib,
+    /// Config directory of maa-run
     Config,
+    /// Cache directory to store downloaded files
     Cache,
+    /// Resource directory of MaaCore
     Resource,
+    /// Log directory of MaaCore
     Log,
 }
 
@@ -239,8 +255,9 @@ fn main() -> Result<ExitCode> {
         },
         CLI::Dir { dir_type } => {
             let dir = match dir_type {
-                Dir::Binary => proj_dirs.binary(),
-                Dir::Library => proj_dirs.library(),
+                Dir::Data => proj_dirs.data(),
+                Dir::Binary | Dir::Bin => proj_dirs.binary(),
+                Dir::Library | Dir::Lib => proj_dirs.library(),
                 Dir::Config => proj_dirs.config(),
                 Dir::Cache => proj_dirs.cache(),
                 Dir::Resource => proj_dirs.resource(),

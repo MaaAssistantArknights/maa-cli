@@ -50,6 +50,7 @@ get_dir!(config);
 get_dir!(cache);
 
 pub struct Dirs {
+    data: PathBuf,
     binary: PathBuf,
     library: PathBuf,
     config: PathBuf,
@@ -60,14 +61,21 @@ pub struct Dirs {
 
 impl Dirs {
     pub fn new(proj: Option<ProjectDirs>) -> Self {
+        let data_dir = get_data_dir(&proj);
+
         Self {
-            binary: get_data_dir(&proj).join("bin"),
-            library: get_data_dir(&proj).join("lib"),
+            data: data_dir.clone(),
+            binary: data_dir.join("bin"),
+            library: data_dir.join("lib"),
             cache: get_cache_dir(&proj),
             config: get_config_dir(&proj),
-            resource: get_data_dir(&proj).join("resource"),
+            resource: data_dir.join("resource"),
             log: get_state_dir(&proj).join("debug"),
         }
+    }
+
+    pub fn data(&self) -> &Path {
+        &self.data
     }
 
     pub fn binary(&self) -> &Path {

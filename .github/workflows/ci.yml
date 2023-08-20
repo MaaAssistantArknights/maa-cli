@@ -72,9 +72,7 @@ jobs:
         run: ./target/$CARGO_BUILD_TARGET/debug/maa-run version
       - name: Try to run relocated lib with maa
         run: |
-          maa="./target/$CARGO_BUILD_TARGET/debug/maa"
-          old_lib_dir=$($maa dir library)
-          old_data_dir=$(dirname "$old_lib_dir")
+          old_data_dir=$($maa dir data)
           new_data_dir="$PWD/data"
           mv "$old_data_dir" "$new_data_dir"
           MAA_DATA_DIR="$new_data_dir" $maa version all
