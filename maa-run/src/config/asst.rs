@@ -21,8 +21,7 @@ pub struct InstanceOption {
     pub kill_adb_on_exit: Option<bool>,
 }
 
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Deserialize, Debug, Default)]
+#[derive(Deserialize, Debug, Default, PartialEq, Clone, Copy)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum TouchMode {
     #[default]
@@ -58,7 +57,8 @@ pub enum Connection {
         #[serde(default = "default_config")]
         config: String,
     },
-    PlayCover {
+    #[serde(alias = "PlayCover")]
+    PlayTools {
         #[serde(default = "default_playcover_address")]
         address: String,
         #[serde(default = "default_config")]

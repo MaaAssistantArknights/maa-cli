@@ -337,7 +337,7 @@ fn main() -> Result<std::process::ExitCode> {
                     let adb_device = addr.unwrap_or(device);
                     assistant.async_connect(adb_path, adb_device, config, true)?;
                 }
-                Connection::PlayCover { address, config } => {
+                Connection::PlayTools { address, config } => {
                     let address = addr.unwrap_or(address);
                     logger.debug("Setting address to", || &address);
                     logger.debug("Setting config to", || &config);
@@ -356,6 +356,14 @@ fn main() -> Result<std::process::ExitCode> {
                             .context("Failed to start game!")?;
                     }
                     close_app += 1;
+                    if options.touch_mode != asst::TouchMode::MacPlayTools {
+                        logger.warning("Wrong touch mode!", || {
+                            "Use PlayTools to connect to game, force set touch_mode to MacPlayTools"
+                        });
+                        assistant
+                            .set_instance_option(2, asst::TouchMode::MacPlayTools)
+                            .context("Failed to set touch mode!")?;
+                    }
 
                     // Wait for the game to start
                     std::thread::sleep(std::time::Duration::from_secs(5));
