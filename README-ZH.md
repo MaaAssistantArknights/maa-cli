@@ -1,51 +1,47 @@
 # maa-cli
 
+![CI](https://img.shields.io/github/actions/workflow/status/wangl-cc/maa-cli/ci.yml)
+![maa-cli latest release](https://img.shields.io/github/v/release/wangl-cc/maa-cli?label=CLI&filter=maa_cli-*)
+![maa-run latest release](https://img.shields.io/github/v/release/wangl-cc/maa-cli?label=Run&filter=maa_run-*)
+
 一个使用rust编写的简单[MAA](https://github.com/MaaAssistantArknights/MaaAssistantArknights)命令行工具。
+支持Linux和macOS，Windows暂不支持，因为我没有Windows机器，也不熟悉Windows开发，欢迎PR。
 
 ## 功能
 
-- 通过TOML和JSON文件定义MAA任务，并通过`maa run <task>`执行；
-- 基于GUI的Callback实现的消息处理(尚未完全实现)，更好的监测MAA运行状态。
+- 使用`maa install`和`maa update`安装和更新MaaCore共享库和资源；
+- 使用`maa self install`和`maa self update`安装和更新CLI自己；
+- 通过TOML，YAML或者JSON文件定义MAA任务，并通过`maa run <task>`执行；
+- 处理MAA的消息，用于监控MAA的运行状态。
 
 ## 安装
 
-这是一个使用Rust编写的命令行工具，所以你必须[安装Rust](https://www.rust-lang.org/tools/install)并确保`cargo`可用。
+这个CLI由两部分组成：`maa-cli`（提供`maa`命令）和`maa-run`。
+但是你只需要安装`maa-cli`就可以使用这个CLI。
+你可以从[release页面](https://github.com/wangl-cc/maa-cli/releases/latest),
+下载预编译的二进制文件，然后解压到你的`$PATH`中（例如`$HOME/.local/bin`）。
 
-### 安装`MaaCore`及相关资源
-
-`MaaCore`是构建`maa-sys`所必需的共享库，所以你必须在安装这个CLI之前安装`MaaCore`。
-最简单的安装`MaaCore`的方法是使用`maa-updater`，这是一个用于下载和安装`MaaCore`及相关资源的CLI工具。
-你可以通过以下命令安装`maa-updater`：
+一旦CLI安装完成，你可以通过`maa`安装`maa-run`和`MaaCore`：
 ```bash
-cargo install --git https://github.com/wangl-cc/maa-cli maa-updater --locked
-```
-然后运行`maa-updater`来安装`MaaCore`及相关资源：
-```bash
-maa-updater
-```
-`maa-updater`会下载最新的预编译`MaaCore`及相关资源。
-
-### 安装`maa-cli`
-
-如果你根据上面的步骤将MAA库和资源安装到了正确的位置，那么你可以使用`cargo`安装`maa-cli`：
-```bash
-cargo install --git https://github.com/wangl-cc/maa-cli maa-cli --locked
+maa install && maa self install
 ```
 
-## 使用
+## 使用和配置
 
-`maa-cli`可以运行你定义的任务（具体如何定义后面会讲到）：
+### 运行任务
+
+`maa`用于运行你定义的任务（如何定义任务稍后介绍）：
 ```bash
-maa-cli run <task> [options]
+maa run <task> [options]
 ```
-更多的命令可以通过`maa-cli --help`查看。
+更多关于`maa run`的细节可以通过`maa run -- --help`查看。
+`maa`其他可用命令可以通过`maa --help`查看。
 
-### 配置文件夹
+### 配置目录
 
-MAA相关的设置和定义的任务都储存在配置文件夹里，
-在Linux上，它应该在`~/.config/maa`，在macOS上，它应该在`~/Library/Application Support/com.loong.maa/config`。
-这个文件夹可以通过设置环境变量`MAA_CONFIG_DIR`来改变，或者通过设置`XDG_CONFIG_HOME`来改变`MAA_CONFIG_DIR`的默认值。
-在以下的文档中，我们将使用`$MAA_CONFIG_DIR`来表示配置文件夹。
+你的配置文件（maa选项，任务等）位于配置目录中。
+你可以通过`maa dir config`获取配置目录。
+在下面的例子中，我们假设配置目录是`$MAA_CONFIG_DIR`。
 
 ### MAA设置
 
@@ -77,11 +73,19 @@ config = "CompatMac" # maa connect的配置
 `[instance_options]`部分用于配置MAA实例的选项：
 ```toml
 [instance_options]
-touch_mode = "ADB" # 使用的触摸模式，可选值为"ADB", "MiniTouch", "MaaTouch"  或者 "MacPlayTools"(目前不可用)
+touch_mode = "ADB" # 使用的触摸模式，可选值为"ADB", "MiniTouch", "MaaTouch"  或者 "MacPlayTools"(仅适用于PlayCover)
 deployment_with_pause = false # 是否在部署时暂停游戏
 adb_lite_enabled = false # 是否使用adb-lite
 kill_adb_on_exit = false # 是否在退出时杀死adb
 ```
+注意，如果你使用`PlayTools`，`touch_mode`字段将被忽略并被设置为`MacPlayTools`。
+
+`resources`部分用于指定资源的路径，这是一个资源目录列表（路径应该相对于MAA仓库的`resource`目录）：
+```toml
+resources = ["platform_diff/macOS"]
+```
+这对于外服和平台特定游戏资源就很有用。
+
 ### 自定义任务
 
 每一个任务都是一个单独的文件，它们储存在`$MAA_CONFIG_DIR/tasks`中。
@@ -163,10 +167,5 @@ blacklist = ["碳", "家具", "加急许可"]
 condition = { type = "Time", start = "18:00:00" }
 ```
 
-完整的例子请参考我的[dotfiles](https://github.com/wangl-cc/dotfiles/tree/master/.config/maa).
-
-## 未完成的功能
-
-- [ ] 更好的消息处理
-  - [ ] 肉鸽相关消息处理
-  - [ ] Subtask extra info消息处理
+配置文件的例子可以在[`config_examples`目录](./config_examples)中找到。
+另一个例子是我自己的配置文件，你可以在[这里](https://github.com/wangl-cc/dotfiles/tree/master/.config/maa)找到。

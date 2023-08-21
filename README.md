@@ -1,69 +1,63 @@
 # maa-cli
 
-[中文文档](./README-ZH.md)
+![CI](https://img.shields.io/github/actions/workflow/status/wangl-cc/maa-cli/ci.yml)
+![maa-cli latest release](https://img.shields.io/github/v/release/wangl-cc/maa-cli?label=CLI&filter=maa_cli-*)
+![maa-run latest release](https://img.shields.io/github/v/release/wangl-cc/maa-cli?label=Run&filter=maa_run-*)
 
-A simple CLI for [MaaAssistantArknights](https://github.com/MaaAssistantArknights/MaaAssistantArknights) by Rust..
-A alternative way use MAA on Linux (and other platform, windows not tested yet).
+[中文](./README-ZH.md)
+
+A simple CLI for [MAA](https://github.com/MaaAssistantArknights/MaaAssistantArknights) by Rust.
+A alternative way use MAA on **Linux** and **macOS**.
+Windows is not supported now,
+because I don't have a Windows machine
+and I'm not familiar with Windows development. PR is welcome.
 
 ## Feature
 
-- Define MAA tasks by TOML and JSON file, and run it by `maa run <task>`;
-- Callback based on GUI implementation (no complete yet) for better monitoring of MAA running status.
+- Install and update MAA core and resources with `maa install` and `maa update`;
+- Install and update self with `maa self install` and `maa self update`;
+- Define tasks by TOML, YAML or JSON file, then run it by `maa run <task>`, see below for more details;
+- Handle MAA core message for monitoring of MAA running status.
 
 ## Installation
 
-This is a CLI tool written in Rust, so you must [install rust](https://www.rust-lang.org/tools/install)
-and make sure `cargo` is available.
+This CLI is consists of two parts:
+`maa-cli` (provide command `maa`) and `maa-run`.
+But you only need to install `maa-cli` to use this CLI.
+You can install CLI by download prebuilt binary from
+[release page](https://github.com/wangl-cc/maa-cli/releases/latest),
+and extract it to a directory in your `$PATH` (e.g. `$HOME/.local/bin`).
 
-### Install `MaaCore` and resources
-
-The shared library `MaaCore` is required to build `maa-sys`.
-So you must install `MaccCore` at current way before install this CLI.
-The easiest way to install `MaaCore` is using `maa-updater`,
-which is a CLI tool to download and install `MaaCore` and resources.
-You can install `maa-updater` by:
+Once the CLI is installed, you can install `maa-run` and `MaaCore` by `maa`:
 ```bash
-cargo install --git https://github.com/wangl-cc/maa-cli maa-updater --locked
-```
-And then run `maa-updater` to install `MaaCore` and resources:
-```bash
-maa-updater
-```
-Then `maa-updater` will download latest prebuilt `MaaCore` and resources.
-
-### Install `maa-cli`
-
-Once the maa core is installed at correct location, you can install `maa-cli`:
-```sh
-cargo install --git https://github.com/wangl-cc/maa-cli maa-cli --locked
+maa install && maa self install
 ```
 
-## Usage
+## Usage and configuration
 
-The `maa-cli` is used to run some you defined tasks (how to define a task will be introduced later):
+### Run a task
+
+The `maa` is used to run some you defined tasks
+(how to define a task will be introduced later):
 ```sh
 maa run <task> [options]
 ```
-More details can be found at `maa --help`.
+More details about `maa run` can be found by `maa run -- --help`.
+And Other commands can be found by `maa --help`.
 
 ### Config dir
 
-Your config files (maa options, tasks, etc.) are located in your config dir,
-see [directories-rs](https://crates.io/crates/directories) for more details.
-which is `$HOME/.config/maa` on Linux and `$HOME/Library/Application Support/com.loong.maa/config` on macOS by default.
-The path can be changeed by set environment variable `MAA_CONFIG_DIR`,
-or set `XDG_CONFIG_HOME` (the config dir of maa will be `$XDG_CONFIG_HOME/maa`).
-
+Your config files (maa options, tasks, etc.) are located in your config dir.
+You can get the config dir by `maa dir config`.
 In below examples, we assume the config dir is `$MAA_CONFIG_DIR`.
 
 ### Maa options
 
-The maa options should be defined with a TOML or JSON file,
-the located in `$MAA_CONFIG_DIR/asst.toml` or `$MAA_CONFIG_DIR/asst.json`.
-The maa options contains two sections: `connection` and `instance_options`.
+The maa options is a TOML, YAML or JSON file that contains the options of maa,
+The maa options contains three sections `connection`, `instance_options` and `resources`.
 
 The `connection` section is used to connect to the game,
-the `type` field can be `ADB` or `PlayCover`.
+the `type` field can be `ADB` or `PlayTools`.
 If you use `ADB`, you should set `adb_path` and `device` fields:
 ```toml
 [connection]
@@ -72,36 +66,46 @@ adb_path = "adb" # the path of adb executable
 device = "emulator-5554" # the serial of your android device
 config = "General" # the config of maa
 ```
-and if you use `PlayCover`, you should set `address`
+and if you use `PlayTools`, you should set `address`
 which is the address of MaaTools set in PlayCover,
-more details can be found at [here](https://maa.plus/docs/1.4-Mac模拟器支持.html#✅-playcover-原生运行最流畅🚀):
+more details can be found at
+[here](https://maa.plus/docs/en-us/1.4-EMULATOR_SUPPORTS_FOR_MAC.html#✅-playcover-the-software-runs-most-fluently-for-its-nativity-🚀):
 ```toml
 [connection]
-type = "PlayCover"
+type = "PlayTools"
 address = "localhost:1717" # the address of MaaTools
 config = "CompatMac" # the same as above
 ```
-Both `ADB` and `PlayCover` can set `config` field,
+Both `ADB` and `PlayTools` can set `config` field,
 which is a parameter of `connect` function of maa.
 It's default value is `CompatMac` on macOS, `General` on other platforms.
 All available values can be found at `resource/config.json` in MAA repo.
 
-
 And the `instance_options` section is used to configure maa instance options:
 ```toml
 [instance_options]
-touch_mode = "ADB" # touch mode to use, can be "ADB", "MiniTouch", "MaaTouch"  or "MacPlayTools"(not works now)
+touch_mode = "ADB" # touch mode to use, can be "ADB", "MiniTouch", "MaaTouch" or "MacPlayTools" (only for PlayCover)
 deployment_with_pause = false # whether pause the game when deployment
 adb_lite_enabled = false # whether use adb-lite
 kill_adb_on_exit = false # whether kill adb when exit
 ```
+Note: If you connect to the game with `PlayCover`, the `touch_mode` must be `MacPlayTools`.
+
+The `resources` section is used to configure additional resources of maa,
+which is a list of resource directories (relative to `resource` directory of MAA repo):
+```toml
+resources = ["platform_diff/macOS"]
+```
+This is useful for adding other server game resources and
+platform specific resource.
 
 ### Define tasks
 
 A task should be defined with a TOML or JSON file, the located in `$MAA_CONFIG_DIR/tasks`.
 
 A task is consists of multiple subtasks,
-each subtask is a [MAA task china](https://maa.plus/docs/3.1-集成文档.html#asstappendtask):
+available subtasks and params are defined by `type` and `params` fields,
+it will passed to MaaCore, see [here](https://maa.plus/docs/en-us/3.1-INTEGRATION.html#asstappendtask) for more details:
 ```toml
 [[tasks]]
 type = "StartUp" # the type of maa task
@@ -176,10 +180,5 @@ blacklist = ["碳", "家具", "加急许可"]
 condition = { type = "Time", start = "18:00:00" }
 ```
 
-A complete example please see my [dotfiles](https://github.com/wangl-cc/dotfiles/tree/master/.config/maa).
-
-## TODO
-
-- [ ] Better message processing
-  - [ ] Rouge-like mode message processing
-  - [ ] Subtask extra info processing
+Example of config file can be found at [`config_examples` directory](./config_examples).
+Anothor example can be found at my [dotfiles](https://github.com/wangl-cc/dotfiles/tree/master/.config/maa).
