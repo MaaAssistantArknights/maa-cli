@@ -62,7 +62,7 @@ impl ToCString for &std::path::Path {
     }
 }
 
-impl ToCString for std::path::PathBuf {
+impl ToCString for &std::path::PathBuf {
     fn to_cstring(self) -> Result<CString> {
         self.to_str().unwrap().to_cstring()
     }

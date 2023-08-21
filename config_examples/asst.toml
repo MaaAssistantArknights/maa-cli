@@ -1,3 +1,5 @@
+resources = ["platform_diff/macOS"]
+
 [connection]
 type = "ADB"
 adb_path = "adb"
