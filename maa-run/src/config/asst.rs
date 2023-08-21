@@ -1,14 +1,18 @@
 use serde::Deserialize;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 pub struct AsstConfig {
-    pub connection: Option<Connection>,
-    pub instance_options: Option<InstanceOption>,
+    #[serde(default)]
+    pub resources: Vec<String>,
+    #[serde(default)]
+    pub connection: Connection,
+    #[serde(default)]
+    pub instance_options: InstanceOption,
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 pub struct InstanceOption {
     #[serde(default)]
     pub touch_mode: TouchMode,
@@ -62,6 +66,16 @@ pub enum Connection {
     },
 }
 
+impl Default for Connection {
+    fn default() -> Self {
+        Connection::ADB {
+            adb_path: default_adb_path(),
+            device: default_device(),
+            config: default_config(),
+        }
+    }
+}
+
 pub fn default_adb_path() -> String {
     String::from("adb")
 }
@@ -96,17 +110,44 @@ mod tests {
         assert_eq!(
             config,
             AsstConfig {
-                connection: Some(Connection::ADB {
+                resources: vec![String::from("platform_diff/macOS")],
+                connection: Connection::ADB {
                     adb_path: String::from("adb"),
                     device: String::from("emulator-5554"),
                     config: String::from("CompatMac"),
-                }),
-                instance_options: Some(InstanceOption {
+                },
+                instance_options: InstanceOption {
                     touch_mode: TouchMode::MiniTouch,
                     deployment_with_pause: Some(false),
                     adb_lite_enabled: Some(false),
                     kill_adb_on_exit: Some(false),
-                }),
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn deserialize_empty() {
+        let config: AsstConfig = toml::from_str("").unwrap();
+        assert_eq!(
+            config,
+            AsstConfig {
+                resources: vec![],
+                connection: Connection::ADB {
+                    adb_path: String::from("adb"),
+                    device: String::from("emulator-5554"),
+                    config: if cfg!(target_os = "macos") {
+                        String::from("CompatMac")
+                    } else {
+                        String::from("General")
+                    },
+                },
+                instance_options: InstanceOption {
+                    touch_mode: TouchMode::ADB,
+                    deployment_with_pause: None,
+                    adb_lite_enabled: None,
+                    kill_adb_on_exit: None,
+                },
             }
         );
     }
