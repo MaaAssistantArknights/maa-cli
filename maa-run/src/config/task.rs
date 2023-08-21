@@ -511,5 +511,14 @@ mod tests {
             .unwrap();
             assert_eq!(tasks, example_tasks())
         }
+
+        #[test]
+        fn yaml() {
+            let tasks: TaskList = serde_yaml::from_reader(
+                std::fs::File::open("../config_examples/tasks/daily.yml").unwrap(),
+            )
+            .unwrap();
+            assert_eq!(tasks, example_tasks())
+        }
     }
 }
