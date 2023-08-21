@@ -244,8 +244,11 @@ fn main() -> Result<std::process::ExitCode> {
                                     "YoStarJP" => "アークナイツ",
                                     "YoStarKR" => "명일방주",
                                     _ => {
-                                        logger.error("Unknown client type:", || {
-                                            client_type.to_string()
+                                        logger.warning("Unknown client type", || {
+                                            format!(
+                                                "{}, using default name: {}",
+                                                client_type, "明日方舟"
+                                            )
                                         });
                                         "明日方舟"
                                     }
@@ -287,7 +290,7 @@ fn main() -> Result<std::process::ExitCode> {
                         }
                     }
 
-                    logger.debug("Task:", || format!("{:?}", task_type));
+                    logger.debug("Task:", || format!("{}", task_type));
                     logger.debug("Params:", || {
                         serde_json::to_string(&params).map_or_else(|_| "Unknown".to_string(), |s| s)
                     });
@@ -302,12 +305,12 @@ fn main() -> Result<std::process::ExitCode> {
 
             /* ----------------------- Setup Instance ----------------------*/
             let options = asst_config.instance_options;
-            logger.debug("Setting touch_mode to", || {
-                format!("{:?}", options.touch_mode)
-            });
-            assistant
-                .set_instance_option(2, options.touch_mode)
-                .context("Failed to set touch mode!")?;
+            if let Some(v) = options.touch_mode {
+                logger.debug("Setting touch_mode to", || format!("{}", v));
+                assistant
+                    .set_instance_option(2, v)
+                    .context("Failed to set touch mode!")?;
+            }
             if let Some(v) = options.deployment_with_pause {
                 logger.debug("Setting deployment_with_pause to", || v);
                 assistant
@@ -331,6 +334,15 @@ fn main() -> Result<std::process::ExitCode> {
                     device,
                     config,
                 } => {
+                    if options.touch_mode.is_none() {
+                        logger.warning("No touch mode specified, set to {}", || {
+                            asst::TouchMode::default()
+                        });
+                        assistant
+                            .set_instance_option(2, asst::TouchMode::default())
+                            .context("Failed to set touch mode!")?;
+                    }
+
                     logger.debug("Setting adb_path to", || &adb_path);
                     logger.debug("Setting device to", || &device);
                     logger.debug("Setting config to", || &config);
@@ -356,10 +368,17 @@ fn main() -> Result<std::process::ExitCode> {
                             .context("Failed to start game!")?;
                     }
                     close_app += 1;
-                    if options.touch_mode != asst::TouchMode::MacPlayTools {
-                        logger.warning("Wrong touch mode!", || {
-                            "Use PlayTools to connect to game, force set touch_mode to MacPlayTools"
-                        });
+
+                    if let Some(v) = options.touch_mode {
+                        if v != asst::TouchMode::MacPlayTools {
+                            logger.warning("Wrong touch mode,", || {
+                                "force set touch_mode to MacPlayTools when using PlayTools"
+                            });
+                            assistant
+                                .set_instance_option(2, asst::TouchMode::MacPlayTools)
+                                .context("Failed to set touch mode!")?;
+                        }
+                    } else {
                         assistant
                             .set_instance_option(2, asst::TouchMode::MacPlayTools)
                             .context("Failed to set touch mode!")?;

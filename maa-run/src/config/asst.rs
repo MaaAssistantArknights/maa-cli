@@ -15,7 +15,7 @@ pub struct AsstConfig {
 #[derive(Deserialize, Default)]
 pub struct InstanceOption {
     #[serde(default)]
-    pub touch_mode: TouchMode,
+    pub touch_mode: Option<TouchMode>,
     pub deployment_with_pause: Option<bool>,
     pub adb_lite_enabled: Option<bool>,
     pub kill_adb_on_exit: Option<bool>,
@@ -31,15 +31,26 @@ pub enum TouchMode {
     MacPlayTools,
 }
 
-impl maa_sys::ToCString for TouchMode {
-    fn to_cstring(self) -> maa_sys::Result<std::ffi::CString> {
-        match self {
+impl<'a> From<TouchMode> for &'a str {
+    fn from(mode: TouchMode) -> Self {
+        match mode {
             TouchMode::ADB => "adb",
             TouchMode::MiniTouch => "minitouch",
             TouchMode::MAATouch => "maatouch",
             TouchMode::MacPlayTools => "MacPlayTools",
         }
-        .to_cstring()
+    }
+}
+
+impl std::fmt::Display for TouchMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", <&str>::from(*self))
+    }
+}
+
+impl maa_sys::ToCString for TouchMode {
+    fn to_cstring(self) -> maa_sys::Result<std::ffi::CString> {
+        <&str>::from(self).to_cstring()
     }
 }
 
@@ -117,7 +128,7 @@ mod tests {
                     config: String::from("CompatMac"),
                 },
                 instance_options: InstanceOption {
-                    touch_mode: TouchMode::MiniTouch,
+                    touch_mode: Some(TouchMode::MiniTouch),
                     deployment_with_pause: Some(false),
                     adb_lite_enabled: Some(false),
                     kill_adb_on_exit: Some(false),
@@ -143,7 +154,7 @@ mod tests {
                     },
                 },
                 instance_options: InstanceOption {
-                    touch_mode: TouchMode::ADB,
+                    touch_mode: None,
                     deployment_with_pause: None,
                     adb_lite_enabled: None,
                     kill_adb_on_exit: None,
