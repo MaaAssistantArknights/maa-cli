@@ -354,9 +354,14 @@ fn main() -> Result<std::process::ExitCode> {
                     logger.debug("Setting address to", || &address);
                     logger.debug("Setting config to", || &config);
 
-                    // BUG: If game is started with this app,
-                    // it will not be able to connect to the server when finnish rogue stage
-                    // But if the game is started manually, it will be fine
+                    // NOTE:
+                    // If the game is launched from terminal,
+                    // there are some connection issues with server.
+                    // Even launching the game from another app
+                    // which can launch the game successfully,
+                    // the connection issues still exist.
+                    // I'm not sure if this is a bug of PlayCover or macOS.
+                    // But it seems not bug of maa-cli
                     if start_app > 0 {
                         logger.info("Starting game...", || "");
                         std::process::Command::new("open")
