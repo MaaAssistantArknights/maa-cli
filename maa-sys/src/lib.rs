@@ -1,6 +1,7 @@
 pub mod binding;
 
 use std::ffi::{CStr, CString, NulError};
+use std::path::{Path, PathBuf};
 use std::str::Utf8Error;
 
 use binding::{AsstAsyncCallId, AsstSize, AsstTaskId};
@@ -56,13 +57,19 @@ impl ToCString for String {
     }
 }
 
-impl ToCString for &std::path::Path {
+impl ToCString for &Path {
     fn to_cstring(self) -> Result<CString> {
         self.to_str().unwrap().to_cstring()
     }
 }
 
-impl ToCString for &std::path::PathBuf {
+impl ToCString for PathBuf {
+    fn to_cstring(self) -> Result<CString> {
+        self.to_str().unwrap().to_cstring()
+    }
+}
+
+impl ToCString for &PathBuf {
     fn to_cstring(self) -> Result<CString> {
         self.to_str().unwrap().to_cstring()
     }
