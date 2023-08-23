@@ -1,7 +1,39 @@
-use crate::log::Logger;
-use maa_sys::binding::AsstMsgId;
+use crate::{error, info, normal, trace, warning};
 
+use std::fmt::Write;
+
+use maa_sys::binding::AsstMsgId;
 use serde_json::{Map, Value};
+
+trait IterExt: Iterator {
+    fn join(&mut self, sep: &str) -> String
+    where
+        Self: Sized,
+        Self::Item: std::fmt::Display,
+    {
+        match self.next() {
+            None => String::new(),
+            Some(first_elt) => {
+                // estimate lower bound of capacity needed
+                let (lower, _) = self.size_hint();
+                let mut result = String::with_capacity(sep.len() * lower);
+                write!(&mut result, "{}", first_elt).unwrap();
+                self.for_each(|elt| {
+                    result.push_str(sep);
+                    write!(&mut result, "{}", elt).unwrap();
+                });
+                result
+            }
+        }
+    }
+}
+
+impl<B, I, F> IterExt for std::iter::Map<I, F>
+where
+    I: Iterator,
+    F: FnMut(I::Item) -> B,
+{
+}
 
 #[repr(i32)]
 enum AsstMsg {
@@ -27,115 +59,86 @@ enum AsstMsg {
     SubTaskStopped = 20004,
 }
 
-macro_rules! create_callback {
-    ($verbose:literal) => {{
-        unsafe extern "C" fn callback(
-            code: maa_sys::binding::AsstMsgId,
-            json_raw: *const ::std::os::raw::c_char,
-            _: *mut ::std::os::raw::c_void,
-        ) {
-            let logger = Logger::from($verbose);
-            let json_str = unsafe { std::ffi::CStr::from_ptr(json_raw).to_str().unwrap() };
-            let json: serde_json::Value = serde_json::from_str(json_str).unwrap();
-            crate::message::process_message(&logger, code, json);
-        }
-        callback
-    }};
+use AsstMsg::*;
+
+pub unsafe extern "C" fn callback(
+    code: maa_sys::binding::AsstMsgId,
+    json_raw: *const ::std::os::raw::c_char,
+    _: *mut ::std::os::raw::c_void,
+) {
+    let json_str = unsafe { std::ffi::CStr::from_ptr(json_raw).to_str().unwrap() };
+    let json: serde_json::Value = serde_json::from_str(json_str).unwrap();
+    process_message(code, json);
 }
 
-pub(crate) use create_callback;
-
-pub fn process_message(logger: &Logger, code: AsstMsgId, json: Value) {
+pub fn process_message(code: AsstMsgId, json: Value) {
     if !json.is_object() {
         return;
     }
     let message = json.as_object().unwrap();
     let ret = match code {
-        code if code == AsstMsg::InternalError as AsstMsgId => Some(()),
-        code if code == AsstMsg::InitFailed as AsstMsgId => {
-            logger.error("Error", || "init failed");
+        code if code == InternalError as AsstMsgId => Some(()),
+        code if code == InitFailed as AsstMsgId => {
+            error!("InitializationError");
             Some(())
         }
-        code if code == AsstMsg::ConnectionInfo as AsstMsgId => {
-            process_connection_info(logger, message)
-        }
-        code if code == AsstMsg::AllTasksCompleted as AsstMsgId => {
-            logger.info("AllTasksCompleted", || "");
+        code if code == ConnectionInfo as AsstMsgId => process_connection_info(message),
+        code if code == AllTasksCompleted as AsstMsgId => {
+            normal!("AllTasksCompleted");
             Some(())
         }
-        code if code == AsstMsg::AsyncCallInfo as AsstMsgId => Some(()),
-        code if (code >= AsstMsg::TaskChainError as AsstMsgId
-            && code <= AsstMsg::TaskChainStopped as AsstMsgId) =>
-        {
-            process_taskchain(logger, code, message)
+        code if code == AsyncCallInfo as AsstMsgId => Some(()),
+        code if (code >= TaskChainError as AsstMsgId && code <= TaskChainStopped as AsstMsgId) => {
+            process_taskchain(code, message)
         }
-        code if code == AsstMsg::SubTaskError as AsstMsgId => {
-            process_subtask_error(logger, message)
-        }
-        code if code == AsstMsg::SubTaskStart as AsstMsgId => {
-            process_subtask_start(logger, message)
-        }
-        code if code == AsstMsg::SubTaskCompleted as AsstMsgId => {
-            process_subtask_completed(logger, message)
-        }
+        code if code == SubTaskError as AsstMsgId => process_subtask_error(message),
+        code if code == SubTaskStart as AsstMsgId => process_subtask_start(message),
+        code if code == SubTaskCompleted as AsstMsgId => process_subtask_completed(message),
         code if code == AsstMsg::SubTaskExtraInfo as AsstMsgId => {
-            process_subtask_extra_info(logger, message)
+            process_subtask_extra_info(message)
         }
-        code if code == AsstMsg::SubTaskStopped as AsstMsgId => Some(()),
+        code if code == SubTaskStopped as AsstMsgId => Some(()),
         _ => Some(()),
     };
 
-    // if ret is None, some unwarp failed
+    // if ret is None, which means the message is not processed well
+    // we should print the message to trace the error
     if ret.is_none() {
-        logger.debug("Process Failed", || {
-            serde_json::to_string_pretty(message).unwrap()
-        });
+        trace!(
+            "Process Failed",
+            format!(
+                "code: {}, message: {}",
+                code,
+                serde_json::to_string_pretty(message).unwrap()
+            )
+        )
     }
 }
 
-fn process_connection_info(logger: &Logger, message: &Map<String, Value>) -> Option<()> {
+fn process_connection_info(message: &Map<String, Value>) -> Option<()> {
     let what = message.get("what")?.as_str()?;
 
     match what {
-        "Connected" => {
-            logger.info("Connected", || "");
-            logger.debug("Details", || {
-                serde_json::to_string_pretty(message.get("details").unwrap()).unwrap()
-            });
-        }
-        "UnsupportedResolution" => logger.error("UnsupportedResolution", || ""),
-        "ResolutionError" => {
-            logger.error("Error", || "ResolutionAcquisitionFailure");
-        }
-        "Reconnecting" => {
-            logger.warning("Reconnecting", || {
-                let times = message.get("times").unwrap().as_i64().unwrap();
-                format!("Reconnect {} times", times + 1)
-            });
-        }
-        "Reconnected" => {
-            logger.info("Reconnected", || "");
-        }
-        "Disconnect" => {
-            logger.error("Disconnected", || "");
-        }
-        "ScreencapFailed" => {
-            logger.error("ReconnectFailed", || "");
-        }
-        "TouchModeNotAvailable" => {
-            logger.error("TouchModeNotAvailable", || "");
-        }
+        "Connected" => info!("Connected"),
+        "UnsupportedResolution" => error!("UnsupportedResolution"),
+        "ResolutionError" => error!("ResolutionAcquisitionFailure"),
+        "Reconnecting" => error!("TryToReconnect", {
+            let times = message.get("times")?.as_i64()?;
+            format!("{} times", times + 1)
+        }),
+        "Reconnected" => normal!("ReconnectSuccess"),
+        "Disconnect" => error!("Disconnected"),
+        "ScreencapFailed" => error!("ScreencapFailed"),
+        "TouchModeNotAvailable" => error!("TouchModeNotAvailable"),
         _ => {
-            logger.debug(what, || {
-                serde_json::to_string_pretty(message.get("details").unwrap()).unwrap()
-            });
+            return None;
         }
     }
 
     Some(())
 }
 
-fn process_taskchain(logger: &Logger, code: AsstMsgId, message: &Map<String, Value>) -> Option<()> {
+fn process_taskchain(code: AsstMsgId, message: &Map<String, Value>) -> Option<()> {
     let taskchain = message.get("taskchain")?.as_str()?;
 
     if taskchain == "CloseDown" {
@@ -143,65 +146,44 @@ fn process_taskchain(logger: &Logger, code: AsstMsgId, message: &Map<String, Val
     }
 
     match code {
-        code if code == AsstMsg::TaskChainError as AsstMsgId => {
-            logger.error("TaskChainError", || taskchain);
-        }
-        code if code == AsstMsg::TaskChainStart as AsstMsgId => {
-            logger.info("TaskChainStart", || taskchain);
-        }
-        code if code == AsstMsg::TaskChainCompleted as AsstMsgId => {
-            logger.info("TaskChainCompleted", || taskchain);
-        }
-        code if code == AsstMsg::TaskChainStopped as AsstMsgId => {
-            logger.warning("TaskChainStopped", || taskchain);
-        }
-        code if code == AsstMsg::TaskChainExtraInfo as AsstMsgId => {}
+        code if code == TaskChainError as AsstMsgId => error!("TaskError", taskchain),
+        code if code == TaskChainStart as AsstMsgId => normal!("StartTask", taskchain),
+        code if code == TaskChainCompleted as AsstMsgId => normal!("CompleteTask", taskchain),
+        code if code == TaskChainStopped as AsstMsgId => warning!("TaskChainStopped", taskchain),
+        code if code == TaskChainExtraInfo as AsstMsgId => {}
         _ => {}
     };
 
     Some(())
 }
 
-fn process_subtask_error(logger: &Logger, message: &Map<String, Value>) -> Option<()> {
+fn process_subtask_error(message: &Map<String, Value>) -> Option<()> {
     let subtask = message.get("subtask")?.as_str()?;
 
     match subtask {
-        "StartGameTask" => {
-            logger.error("Failed to start game", || "");
+        "StartGameTask" => error!("FailedToOpenClient"),
+        "AutoRecruitTask" => error!(
+            message
+                .get("why")
+                .map_or_else(|| "Unknown", |v| v.as_str().unwrap_or("Unknown")),
+            "HasReturned"
+        ),
+        "RecognizeDrops" => error!("DropRecognitionError"),
+        "ReportToPenguinStats" => error!(
+            message
+                .get("why")
+                .map_or_else(|| "Unknown", |v| v.as_str().unwrap_or("Unknown")),
+            "GiveUpUploadingPenguins"
+        ),
+        "CheckStageValid" => error!("TheEX"),
+        _ => {
+            return None;
         }
-        "AutoRecruitTask" => {
-            logger.error("Failed to auto recruit,", || {
-                let why = message
-                    .get("why")
-                    .map_or_else(|| "Unknown", |v| v.as_str().unwrap_or("Unknown"));
-                why
-            });
-        }
-        "RecognizeDrops" => {
-            logger.error("Failed to recognize drops", || "");
-        }
-        "ReportToPenguinStats" => {
-            logger.error("Failed to report to penguin-stats,", || {
-                let why = message
-                    .get("why")
-                    .map_or_else(|| "Unknown", |v| v.as_str().unwrap_or("Unknown"));
-                why
-            });
-        }
-        "CheckStageValid" => {
-            logger.error("Invalid stage", || {
-                let why = message
-                    .get("why")
-                    .map_or_else(|| "Unknown", |v| v.as_str().unwrap_or("Unknown"));
-                why
-            });
-        }
-        _ => {}
     };
 
     Some(())
 }
-fn process_subtask_start(logger: &Logger, message: &Map<String, Value>) -> Option<()> {
+fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
     let subtask = message.get("subtask")?.as_str()?;
 
     if subtask == "ProcessTask" {
@@ -209,169 +191,156 @@ fn process_subtask_start(logger: &Logger, message: &Map<String, Value>) -> Optio
         let task = details.get("task")?.as_str()?;
 
         match task {
-            "StartButton2" => logger.info("MissionStart", || {
-                let times = details.get("exec_times").unwrap().as_i64().unwrap();
-                format!("{} times", times)
-            }),
-            "AnnihilationConfirm" => logger.info("Annihilation", || {
-                let times = details.get("exec_times").unwrap().as_i64().unwrap();
-                format!("{} times", times)
-            }),
-            "MedicineConfirm" => logger.info("Medicine Used", || {
-                let times = details.get("exec_times").unwrap().as_i64().unwrap();
-                format!("{} times", times)
-            }),
-            "StoneConfirm" => logger.info("Stone Used", || {
-                let times = details.get("exec_times").unwrap().as_i64().unwrap();
-                format!("{} times", times)
-            }),
-            "AbandonAction" => {
-                logger.error("ActingCommandError", || "");
+            "StartButton2" | "AnnihilationConfirm" => info!(
+                "MissionStart",
+                format!("{} times", details.get("exec_times")?.as_i64()?)
+            ),
+            "MedicineConfirm" => info!(
+                "MedicineUsed",
+                format!("{} times", details.get("exec_times")?.as_i64()?)
+            ),
+            "StoneConfirm" => info!(
+                "StoneUsed",
+                format!("{} times", details.get("exec_times")?.as_i64()?)
+            ),
+            "AbandonAction" => error!("ActingCommandError"),
+            "RecruitRefreshConfirm" => info!("LabelsRefreshed"),
+            "RecruitConfirm" => info!("RecruitConfirm"),
+            "InfrastDormDoubleConfirmButton" => error!("InfrastDormDoubleConfirmed"),
+            // RogueLike
+            "StartExplore" => info!(
+                "BegunToExplore",
+                format!("{} times", details.get("exec_times")?.as_i64()?)
+            ),
+            "StageTraderInvestConfirm" => info!(
+                "HasInvested",
+                format!("{} times", details.get("exec_times")?.as_i64()?)
+            ),
+            // TODO: process more instead of just printing
+            "ExitThenAbandon" => info!("ExplorationAbandoned"),
+            "MissionCompletedFlag" => info!("MissionCompleted"),
+            "MissionFailedFlag" => info!("MissionFailed"),
+            "StageTraderEnter" => info!("StageTraderEnter"),
+            "StageSafeHouseEnter" => info!("StageSafeHouseEnter"),
+            "StageCambatDpsEnter" => info!("CambatDpsEnter"),
+            "StageEmergencyDps" => info!("EmergencyDpsEnter"),
+            "StageDreadfulFoe" | "StageDreadfulFoe-5Enter" => info!("DreadfulFoe"),
+            "StageTraderInvestSystemFull" => warning!("TraderInvestSystemFull"),
+            "OfflineConfirm" => warning!("GameOffline"),
+            "GamePass" => info!("RoguelikeGamePass"),
+            "BattleStartAll" => info!("MissionStart"),
+            "StageTraderSpecialShoppingAfterRefresh" => {
+                info!("RoguelikeSpecialItemBought")
             }
-            "RecruitRefreshConfirm" => {
-                logger.info("RecruitRefreshConfirm", || "");
+            _ => {
+                return None;
             }
-            "RecruitConfirm" => {
-                logger.info("RecruitConfirm", || "");
-            }
-            "InfrastDormDoubleConfirmButton" => {
-                logger.info("InfrastDormDoubleConfirmButton", || "");
-            }
-            _ => {}
         }
     }
 
     Some(())
 }
-fn process_subtask_completed(_: &Logger, _: &Map<String, Value>) -> Option<()> {
+fn process_subtask_completed(_: &Map<String, Value>) -> Option<()> {
     Some(())
 }
-fn process_subtask_extra_info(logger: &Logger, message: &Map<String, Value>) -> Option<()> {
+fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
+    let taskchain = message.get("taskchain")?.as_str()?;
+    match taskchain {
+        "Depot" => info!("Depot", serde_json::to_string_pretty(message).unwrap()),
+        "OperBox" => info!("OperBox", serde_json::to_string_pretty(message).unwrap()),
+        _ => {}
+    }
+
     let what = message.get("what")?.as_str()?;
     let details = message.get("details")?;
 
     match what {
-        "StageDrops" => {
+        "StageDrops" => info!("Drops", {
             let statistics = details.get("stats")?.as_array()?;
             let mut all_drops: Vec<String> = Vec::new();
             for item in statistics {
                 let name = item.get("itemName")?.as_str()?;
                 let total = item.get("quantity")?.as_i64()?;
-                let addition = item.get("addition")?.as_i64()?;
-
-                let mut drop = format!("{}: {}", name, total);
-                if addition > 0 {
-                    drop.push_str(&format!(" (+{})", addition));
-                }
+                let addition = item.get("addQuantity")?.as_i64()?;
+                let drop = format!("{}: {} (+{})", name, total, addition);
                 all_drops.push(drop);
             }
             if !all_drops.is_empty() {
-                logger.info("Drops:", || all_drops.join(", "));
+                all_drops.join(", ")
             } else {
-                logger.info("Drops:", || "None");
+                String::from("none")
             }
-        }
+        }),
         // Infrast
-        "EnterFacility" => logger.info("EnterFacility", || {
-            let facility = details.get("facility").unwrap().as_str().unwrap();
-            let index = details.get("index").unwrap().as_i64().unwrap();
-            format!("{}{}", facility, index)
-        }),
-        "ProductIncorrect" => logger.error("ProductIncorrect", || ""),
-        "ProductUnknown" => logger.error("ProductUnknown", || ""),
-        "ProductChanged" => logger.info("ProductChanged", || ""),
-        "NotEnoughStuff" => logger.error("NotEnoughStuff", || ""),
-        "CustomInfrastRoomOperators" => logger.info("CustomInfrastRoomOperators", || {
-            let names = details.get("names").unwrap().as_array().unwrap();
-            let names: Vec<&str> = names.iter().map(|x| x.as_str().unwrap_or("")).collect();
-            names.join(", ")
-        }),
+        "EnterFacility" => info!(
+            "EnterFacility",
+            format!(
+                "{} #{}",
+                details.get("facility")?.as_str()?,
+                details.get("index")?.as_i64()?
+            )
+        ),
+        "ProductIncorrect" => error!("ProductIncorrect"),
+        "ProductUnknown" => error!("ProductUnknown"),
+        "ProductChanged" => info!("ProductChanged"),
+        "NotEnoughStaff" => error!("NotEnoughStaff"),
+        "CustomInfrastRoomOperators" => info!(
+            "CustomInfrastRoomOperators",
+            details
+                .get("names")?
+                .as_array()?
+                .iter()
+                .map(|x| x.as_str().unwrap_or(""))
+                .join(", ")
+        ),
         // Recruit
-        "RecruitTagsDetected" => logger.info("RecruitResult:", || {
-            let tags = details.get("tags").unwrap().as_array().unwrap();
+        "RecruitTagsDetected" => info!(
+            "RecruitResult:\n ",
+            details
+                .get("tags")?
+                .as_array()?
+                .iter()
+                .map(|tag| tag.as_str().unwrap_or("Unknown"))
+                .join("\n  ")
+        ),
+        "RecruitSpecialTag" => info!("RecruitingTips:", details.get("tag")?.as_str()?),
+        "RecruitRobotTag" => info!("RecruitingTips:", details.get("tag")?.as_str()?),
+        "RecruitResult" => info!("RecruitResult", {
+            let level = details.get("level")?.as_u64()?;
+            "★".repeat(level as usize)
+        }),
+        "RecruitTagsSelected" => info!("RecruitTagsSelected", {
+            let tags = details.get("tags")?.as_array()?;
             let tags: Vec<&str> = tags.iter().map(|x| x.as_str().unwrap_or("")).collect();
             tags.join(", ")
         }),
-        "RecruitSpecialTag" => {
-            logger.info("RecruitSpecialTag:", || {
-                details.get("tag").unwrap().as_str().unwrap()
-            });
-        }
-        "RecruitResult" => {
-            logger.info("RecruitResult", || {
-                let level = details.get("level").unwrap().as_u64().unwrap();
-                "★".repeat(level as usize)
-            });
-        }
-        "RecruitTagsSelected" => {
-            logger.info("RecruitTagsSelected:", || {
-                let tags = details.get("tags").unwrap().as_array().unwrap();
-                let tags: Vec<&str> = tags.iter().map(|x| x.as_str().unwrap_or("")).collect();
-                tags.join(", ")
-            });
-        }
-        "RecruitTagsRefreshed" => {
-            logger.info("RecruitTagsRefreshed", || {
-                let count = details.get("count").unwrap().as_i64().unwrap();
-                format!("{} times", count)
-            });
-        }
+        "RecruitTagsRefreshed" => info!("RecruitTagsRefreshed", {
+            let count = details.get("count")?.as_i64()?;
+            format!("{} times", count)
+        }),
         // RogueLike
-        "StageInfo" => {
-            logger.info("StartCombat", || {
-                details.get("name").unwrap().as_str().unwrap()
-            });
+        "StageInfo" => info!("StartCombat", details.get("name")?.as_str()?),
+        "StageInfoError" => error!("StageInfoError"),
+        "BattleFormation" => info!("BattleFormation", details.get("formation")?.as_str()?),
+        "BattleFormationSelected" => info!(
+            "BattleFormationSelected",
+            details.get("selected")?.as_str()?
+        ),
+        "CopilotAction" => info!("CurrentSteps", {
+            format!(
+                "{} {}",
+                details.get("action")?.as_str()?,
+                details.get("target")?.as_str()?,
+            )
+        }),
+        // SSS
+        "SSSStage" => info!("CurrentStage", details.get("stage")?.as_str()?),
+        "SSSSettlement" => info!("SSSSettlement", details.get("why")?.as_str()?),
+        "SSSGamePass" => info!("SSSGamePass"),
+        "UnsupportedLevel" => error!("UnsupportedLevel"),
+        _ => {
+            return None;
         }
-        "StageInfoError" => {
-            logger.error("StageInfoError", || "");
-        }
-        "BattleFormation" => {
-            logger.info("BattleFormation", || {
-                details.get("formation").unwrap().as_str().unwrap()
-            });
-        }
-        "BattleFormationSelected" => {
-            logger.info("BattleFormationSelected", || {
-                details.get("selected").unwrap().as_str().unwrap()
-            });
-        }
-        "CopilotAction" => {
-            logger.info("CopilotAction", || {
-                format!(
-                    "{} {} {}",
-                    details.get("doc").unwrap().as_str().unwrap(),
-                    details.get("action").unwrap().as_str().unwrap(),
-                    details.get("target").unwrap().as_str().unwrap(),
-                )
-            });
-        }
-        "SSSStage" => {
-            logger.info("CurrentStage", || {
-                details.get("stage").unwrap().as_str().unwrap()
-            });
-        }
-        "SSSSettlement" => {
-            logger.info("Settlement", || {
-                details.get("why").unwrap().as_str().unwrap()
-            });
-        }
-        "SSSGamePass" => {
-            logger.info("StageFailed", || {
-                details.get("why").unwrap().as_str().unwrap()
-            });
-        }
-        "UnsupportedLevel" => {
-            logger.error("UnsupportedLevel", || "");
-        }
-        // misc
-        // TODO: process more instead of just printing
-        "Depot" => {
-            logger.info("Depot", || serde_json::to_string_pretty(details).unwrap());
-        }
-        "OperBox" => {
-            logger.info("OperBox", || serde_json::to_string_pretty(details).unwrap());
-        }
-        _ => {}
     }
 
     Some(())

@@ -7,10 +7,9 @@ use task::{TaskList, TaskType};
 use maa_sys::Assistant;
 
 mod message;
-use message::create_callback;
+use message::callback;
 
 mod log;
-use log::Logger;
 
 use std::env::var_os;
 use std::path::PathBuf;
@@ -51,27 +50,29 @@ enum CLI {
         /// Output more information, repeat to increase verbosity
         ///
         /// This option is used to control the log level of this program and MaaCore.
-        /// There are 5 levels of log:
-        /// 0. Error
-        /// 1. Warning
-        /// 2. Info
-        /// 3. Debug
-        /// 4. Trace
+        /// There are 6 levels of log:
+        /// Error   // show only error messages
+        /// Warning // show all error and warning messages
+        /// normal  // show all above messages and basic information
+        /// Info    // show all above messages and more detailed information
+        /// Debug   // show all above messages and some information about configuration
+        /// Trace   // show all above messages and trace information
         ///
-        /// The default log level is 1.
+        /// The default log level is normal.
         /// If you want to see more information, you can use this option to increase the log level.
         #[clap(short, long, action = clap::ArgAction::Count)]
         verbose: u8,
         /// Output less information, repeat to increase quietness
         ///
         /// This option is used to control the log level of this program and MaaCore.
-        /// There are 5 levels of log:
-        /// 0. Error
-        /// 1. Warning
-        /// 2. Info
-        /// 3. Debug
-        /// 4. Trace
-        /// The default log level is 1.
+        /// There are 6 levels of log:
+        /// Error   // show only error messages
+        /// Warning // show all error and warning messages
+        /// normal  // show all above messages and basic information
+        /// Info    // show all above messages and more detailed information
+        /// Debug   // show all above messages and some information about configuration
+        /// Trace   // show all above messages and trace information
+        /// The default log level is normal.
         /// If you want to see less information, you can use this option to decrease the log level.
         #[clap(short, long, action = clap::ArgAction::Count)]
         quiet: u8,
@@ -155,40 +156,32 @@ fn main() -> Result<std::process::ExitCode> {
             verbose,
             quiet,
         } => {
-            /*------------------ Setup log level and logger ------------------*/
-            let loglevel = 1u8 + verbose - quiet;
-            let logger = Logger::from(loglevel);
-            // This is not a good way to create a C callback with outter variables.
-            // so we have to use a macro to create multiple callbacks.
-            let callback = match loglevel {
-                loglevel if loglevel == 0 => create_callback!(0),
-                loglevel if loglevel == 1 => create_callback!(1),
-                loglevel if loglevel == 2 => create_callback!(2),
-                loglevel if loglevel == 3 => create_callback!(3),
-                _ => create_callback!(4),
-            };
+            /*------------------- Setup global log level -------------------*/
+            unsafe {
+                log::set_level(log::level() as u8 + verbose - quiet);
+            }
 
-            /*--------------------- Setup MaaCore Dirs ----------------------*/
+            /*--------------------- Setup MaaCore Dirs ---------------------*/
             let state_dir = get_state_dir(&project).exist_or_create()?;
-            logger.debug("State directory:", || state_dir.display().to_string());
+            debug!("State directory:", state_dir.display());
             Assistant::set_user_dir(&state_dir).context("Failed to set user directory!")?;
 
             let data_dir = get_data_dir(&project).exist_or_err()?;
-            logger.debug("Data directory:", || data_dir.display().to_string());
+            debug!("Data directory:", data_dir.display());
             Assistant::load_resource(&data_dir).context("Failed to load resource!")?;
 
             /*--------------------- Load Config Files ---------------------*/
             let config_dir = get_config_dir(&project).exist_or_err()?;
-            logger.debug("Config directory:", || config_dir.display().to_string());
+            debug!("Config directory:", config_dir.display());
 
             // asst.toml
             let asst_config =
-                AsstConfig::find_file(&config_dir.join("asst")).unwrap_or_else(|err| {
-                    logger.warning("Failed to load asst config: {}", || err.to_string());
+                AsstConfig::find_file(&config_dir.join("asst")).unwrap_or_else(|_| {
+                    warning!("Failed to find asst config file, using default config!");
                     AsstConfig::default()
                 });
 
-            // tasks/*.toml
+            // tasks/<task>.toml
             let task_file = config_dir.join("tasks").join(&task);
             let task_list = TaskList::find_file(&task_file).with_context(|| {
                 format!(
@@ -200,7 +193,7 @@ fn main() -> Result<std::process::ExitCode> {
 
             /*------------------- Additional resource files ------------------*/
             for resource in asst_config.resources.iter() {
-                logger.info("Loading resource additional resource:", || resource);
+                info!("Loading additional resource:", resource);
                 Assistant::load_resource(&data_dir.join("resource").join(resource))
                     .context("Failed to load resource!")?;
             }
@@ -244,12 +237,10 @@ fn main() -> Result<std::process::ExitCode> {
                                     "YoStarJP" => "アークナイツ",
                                     "YoStarKR" => "명일방주",
                                     _ => {
-                                        logger.warning("Unknown client type", || {
-                                            format!(
-                                                "{}, using default name: {}",
-                                                client_type, "明日方舟"
-                                            )
-                                        });
+                                        warning!(
+                                            format!("Unknown client type: {}", client_type),
+                                            "using default name: 明日方舟"
+                                        );
                                         "明日方舟"
                                     }
                                 };
@@ -290,10 +281,12 @@ fn main() -> Result<std::process::ExitCode> {
                         }
                     }
 
-                    logger.debug("Task:", || format!("{}", task_type));
-                    logger.debug("Params:", || {
-                        serde_json::to_string(&params).map_or_else(|_| "Unknown".to_string(), |s| s)
-                    });
+                    debug!("Task:", task_type);
+                    debug!(
+                        "Params:",
+                        serde_json::to_string(&params)
+                            .map_or_else(|_| "Unknown".to_string(), |s| s)
+                    );
 
                     task_typs.push(task_type.clone());
                     task_params.push(serde_json::to_string(&params)?);
@@ -306,23 +299,23 @@ fn main() -> Result<std::process::ExitCode> {
             /* ----------------------- Setup Instance ----------------------*/
             let options = asst_config.instance_options;
             if let Some(v) = options.touch_mode {
-                logger.debug("Setting touch_mode to", || format!("{}", v));
+                debug!("Setting touch_mode to", v);
                 assistant
                     .set_instance_option(2, v)
                     .context("Failed to set touch mode!")?;
             }
             if let Some(v) = options.deployment_with_pause {
-                logger.debug("Setting deployment_with_pause to", || v);
+                debug!("Setting deployment_with_pause to", v);
                 assistant
                     .set_instance_option(3, v)
                     .context("Failed to set deployment with pause!")?;
             }
             if let Some(v) = options.adb_lite_enabled {
-                logger.debug("Setting adb_lite_enabled to", || v);
+                debug!("Setting adb_lite_enabled to", v);
                 assistant.set_instance_option(4, v)?;
             }
             if let Some(v) = options.kill_adb_on_exit {
-                logger.debug("Setting kill_adb_on_exit to", || v);
+                debug!("Setting kill_adb_on_exit to", v);
                 assistant.set_instance_option(5, v)?;
             }
 
@@ -335,24 +328,25 @@ fn main() -> Result<std::process::ExitCode> {
                     config,
                 } => {
                     if options.touch_mode.is_none() {
-                        logger.warning("No touch mode specified, set to {}", || {
+                        warning!(
+                            "No touch mode specified, set to",
                             asst::TouchMode::default()
-                        });
+                        );
                         assistant
                             .set_instance_option(2, asst::TouchMode::default())
                             .context("Failed to set touch mode!")?;
                     }
 
-                    logger.debug("Setting adb_path to", || &adb_path);
-                    logger.debug("Setting device to", || &device);
-                    logger.debug("Setting config to", || &config);
+                    debug!("Setting adb_path to", &adb_path);
+                    debug!("Setting device to", &device);
+                    debug!("Setting config to", &config);
                     let adb_device = addr.unwrap_or(device);
                     assistant.async_connect(adb_path, adb_device, config, true)?;
                 }
                 Connection::PlayTools { address, config } => {
                     let address = addr.unwrap_or(address);
-                    logger.debug("Setting address to", || &address);
-                    logger.debug("Setting config to", || &config);
+                    debug!("Setting address to", &address);
+                    debug!("Setting config to", &config);
 
                     // NOTE:
                     // If the game is launched from terminal,
@@ -363,7 +357,7 @@ fn main() -> Result<std::process::ExitCode> {
                     // I'm not sure if this is a bug of PlayCover or macOS.
                     // But it seems not bug of maa-cli
                     if start_app > 0 {
-                        logger.info("Starting game...", || "");
+                        normal!("Starting game...");
                         std::process::Command::new("open")
                             .arg("-a")
                             .arg(app_name)
@@ -376,9 +370,10 @@ fn main() -> Result<std::process::ExitCode> {
 
                     if let Some(v) = options.touch_mode {
                         if v != asst::TouchMode::MacPlayTools {
-                            logger.warning("Wrong touch mode,", || {
+                            warning!(
+                                "Wrong touch mode,",
                                 "force set touch_mode to MacPlayTools when using PlayTools"
-                            });
+                            );
                             assistant
                                 .set_instance_option(2, asst::TouchMode::MacPlayTools)
                                 .context("Failed to set touch mode!")?;
@@ -412,12 +407,15 @@ fn main() -> Result<std::process::ExitCode> {
             if close_app > 1 {
                 let app_name = match app_name {
                     "" => {
-                        logger.warning("No app name specified, using default name.", || "");
+                        warning!(
+                            "No app name specified",
+                            "using default name: 明日方舟, please specify app name in startup task"
+                        );
                         "明日方舟"
                     }
                     _ => app_name,
                 };
-                logger.info("Closing game...", || "");
+                normal!("Closing game...");
                 std::process::Command::new("osascript")
                     .arg("-e")
                     .arg(format!("quit app \"{}\"", app_name))
