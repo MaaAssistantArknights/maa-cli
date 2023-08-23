@@ -1,5 +1,5 @@
 mod config;
-use config::{asst, task, FindFile};
+use config::{asst, task, Error as ConfigError, FindFile};
 
 use asst::{AsstConfig, Connection};
 use task::{TaskList, TaskType};
@@ -175,11 +175,14 @@ fn main() -> Result<std::process::ExitCode> {
             debug!("Config directory:", config_dir.display());
 
             // asst.toml
-            let asst_config =
-                AsstConfig::find_file(&config_dir.join("asst")).unwrap_or_else(|_| {
+            let asst_config = match AsstConfig::find_file(&config_dir.join("asst")) {
+                Ok(config) => config,
+                Err(ConfigError::FileNotFound(_)) => {
                     warning!("Failed to find asst config file, using default config!");
                     AsstConfig::default()
-                });
+                }
+                Err(e) => return Err(e.into()),
+            };
 
             // tasks/<task>.toml
             let task_file = config_dir.join("tasks").join(&task);
