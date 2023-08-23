@@ -1,4 +1,4 @@
-use crate::{error, info, normal, trace, warning};
+use crate::{debug, error, info, normal, trace, warning};
 
 use std::fmt::Write;
 
@@ -104,7 +104,7 @@ pub fn process_message(code: AsstMsgId, json: Value) {
     // if ret is None, which means the message is not processed well
     // we should print the message to trace the error
     if ret.is_none() {
-        trace!(
+        debug!(
             "Process Failed",
             format!(
                 "code: {}, message: {}",
@@ -131,7 +131,14 @@ fn process_connection_info(message: &Map<String, Value>) -> Option<()> {
         "ScreencapFailed" => error!("ScreencapFailed"),
         "TouchModeNotAvailable" => error!("TouchModeNotAvailable"),
         _ => {
-            return None;
+            trace!(
+                "UnknownConnectionInfo",
+                format!(
+                    "what: {}, message: {}",
+                    what,
+                    serde_json::to_string_pretty(message).unwrap()
+                )
+            );
         }
     }
 
@@ -151,7 +158,16 @@ fn process_taskchain(code: AsstMsgId, message: &Map<String, Value>) -> Option<()
         code if code == TaskChainCompleted as AsstMsgId => normal!("CompleteTask", taskchain),
         code if code == TaskChainStopped as AsstMsgId => warning!("TaskChainStopped", taskchain),
         code if code == TaskChainExtraInfo as AsstMsgId => {}
-        _ => {}
+        _ => {
+            trace!(
+                "UnknownTaskChainInfo",
+                format!(
+                    "code: {}, message: {}",
+                    code,
+                    serde_json::to_string_pretty(message).unwrap()
+                )
+            );
+        }
     };
 
     Some(())
@@ -177,7 +193,14 @@ fn process_subtask_error(message: &Map<String, Value>) -> Option<()> {
         ),
         "CheckStageValid" => error!("TheEX"),
         _ => {
-            return None;
+            trace!(
+                "UnknownSubTaskError",
+                format!(
+                    "subtask: {}, message: {}",
+                    subtask,
+                    serde_json::to_string_pretty(message).unwrap()
+                )
+            )
         }
     };
 
@@ -232,9 +255,7 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
             "StageTraderSpecialShoppingAfterRefresh" => {
                 info!("RoguelikeSpecialItemBought")
             }
-            _ => {
-                return None;
-            }
+            _ => {} // There are too many tasks to process, so we just ignore them
         }
     }
 
@@ -339,7 +360,14 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
         "SSSGamePass" => info!("SSSGamePass"),
         "UnsupportedLevel" => error!("UnsupportedLevel"),
         _ => {
-            return None;
+            trace!(
+                "UnknownSubTaskExtraInfo",
+                format!(
+                    "what: {}, message: {}",
+                    what,
+                    serde_json::to_string_pretty(message).unwrap()
+                )
+            )
         }
     }
 
