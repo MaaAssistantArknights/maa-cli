@@ -8,11 +8,11 @@
       "sha256sum": "f1fabca5df2613ddcbffa8a90f6a8c9c002728bc11f68ad80136f047595de821"
     },
     "universal-apple-darwin": {
-      "version": "0.2.2",
-      "tag": "maa_run-v0.2.2",
-      "name": "maa_run-v0.2.2-universal-apple-darwin.zip",
-      "size": 1779086,
-      "sha256sum": "3b670da8e1946741cbd76017db487b67cb51ffc7fa914244609ee3b145ddd1d2"
+      "version": "0.2.3",
+      "tag": "maa_run-v0.2.3",
+      "name": "maa_run-v0.2.3-universal-apple-darwin.zip",
+      "size": 1798575,
+      "sha256sum": "cbb8cb2c1dcb4f24b18d1105d1935ed282246a239d73a45139a131a28e19a9ca"
     }
   },
   "maa-cli": {
