@@ -69,15 +69,15 @@ pub fn time() -> String {
 macro_rules! error {
     ($title:expr) => {
         unsafe {
-            if crate::log::level() >= crate::log::LogLevel::Error {
-                eprintln!("{} \x1b[31m{}\x1b[0m", crate::log::time(), $title);
+            if $crate::log::level() >= $crate::log::LogLevel::Error {
+                eprintln!("{} \x1b[31m{}\x1b[0m", $crate::log::time(), $title);
             }
         }
     };
     ($title:expr, $msg:expr) => {
         unsafe {
-            if crate::log::level() >= crate::log::LogLevel::Error {
-                eprintln!("{} \x1b[31m{}\x1b[0m {}", crate::log::time(), $title, $msg);
+            if $crate::log::level() >= $crate::log::LogLevel::Error {
+                eprintln!("{} \x1b[31m{}\x1b[0m {}", $crate::log::time(), $title, $msg);
             }
         }
     };
@@ -90,15 +90,15 @@ macro_rules! error {
 macro_rules! warning {
     ($title:expr) => {
         unsafe {
-            if crate::log::level() >= crate::log::LogLevel::Warning {
-                println!("{} \x1b[33m{}\x1b[0m", crate::log::time(), $title);
+            if $crate::log::level() >= $crate::log::LogLevel::Warning {
+                println!("{} \x1b[33m{}\x1b[0m", $crate::log::time(), $title);
             }
         }
     };
     ($title:expr, $msg:expr) => {
         unsafe {
-            if crate::log::level() >= crate::log::LogLevel::Warning {
-                println!("{} \x1b[33m{}\x1b[0m {}", crate::log::time(), $title, $msg);
+            if $crate::log::level() >= $crate::log::LogLevel::Warning {
+                println!("{} \x1b[33m{}\x1b[0m {}", $crate::log::time(), $title, $msg);
             }
         }
     };
@@ -111,15 +111,15 @@ macro_rules! warning {
 macro_rules! normal {
     ($title:expr) => {
         unsafe {
-            if crate::log::level() >= crate::log::LogLevel::Normal {
-                println!("{} {}", crate::log::time(), $title);
+            if $crate::log::level() >= $crate::log::LogLevel::Normal {
+                println!("{} {}", $crate::log::time(), $title);
             }
         }
     };
     ($title:expr, $msg:expr) => {
         unsafe {
-            if crate::log::level() >= crate::log::LogLevel::Normal {
-                println!("{} {} {}", crate::log::time(), $title, $msg);
+            if $crate::log::level() >= $crate::log::LogLevel::Normal {
+                println!("{} {} {}", $crate::log::time(), $title, $msg);
             }
         }
     };
@@ -132,15 +132,15 @@ macro_rules! normal {
 macro_rules! info {
     ($title:expr) => {
         unsafe {
-            if crate::log::level() >= crate::log::LogLevel::Info {
-                println!("{} \x1b[32m{}\x1b[0m", crate::log::time(), $title);
+            if $crate::log::level() >= $crate::log::LogLevel::Info {
+                println!("{} \x1b[32m{}\x1b[0m", $crate::log::time(), $title);
             }
         }
     };
     ($title:expr, $msg:expr) => {
         unsafe {
-            if crate::log::level() >= crate::log::LogLevel::Info {
-                println!("{} \x1b[32m{}\x1b[0m {}", crate::log::time(), $title, $msg);
+            if $crate::log::level() >= $crate::log::LogLevel::Info {
+                println!("{} \x1b[32m{}\x1b[0m {}", $crate::log::time(), $title, $msg);
             }
         }
     };
@@ -153,15 +153,15 @@ macro_rules! info {
 macro_rules! debug {
     ($title:expr) => {
         unsafe {
-            if crate::log::level() >= crate::log::LogLevel::Debug {
-                println!("{} \x1b[34m{}\x1b[0m", crate::log::time(), $title);
+            if $crate::log::level() >= $crate::log::LogLevel::Debug {
+                println!("{} \x1b[34m{}\x1b[0m", $crate::log::time(), $title);
             }
         }
     };
     ($title:expr, $msg:expr) => {
         unsafe {
-            if crate::log::level() >= crate::log::LogLevel::Debug {
-                println!("{} \x1b[34m{}\x1b[0m {}", crate::log::time(), $title, $msg);
+            if $crate::log::level() >= $crate::log::LogLevel::Debug {
+                println!("{} \x1b[34m{}\x1b[0m {}", $crate::log::time(), $title, $msg);
             }
         }
     };
@@ -174,15 +174,15 @@ macro_rules! debug {
 macro_rules! trace {
     ($title:expr) => {
         unsafe {
-            if crate::log::level() >= crate::log::LogLevel::Trace {
-                println!("{} \x1b[35m{}\x1b[0m", crate::log::time(), $title);
+            if $crate::log::level() >= $crate::log::LogLevel::Trace {
+                println!("{} \x1b[35m{}\x1b[0m", $crate::log::time(), $title);
             }
         }
     };
     ($title:expr, $msg:expr) => {
         unsafe {
-            if crate::log::level() >= crate::log::LogLevel::Trace {
-                println!("{} \x1b[35m{}\x1b[0m {}", crate::log::time(), $title, $msg);
+            if $crate::log::level() >= $crate::log::LogLevel::Trace {
+                println!("{} \x1b[35m{}\x1b[0m {}", $crate::log::time(), $title, $msg);
             }
         }
     };
