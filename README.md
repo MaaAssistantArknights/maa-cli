@@ -45,6 +45,7 @@ maa run <task> [options]
 More details about `maa run` can be found by `maa run -- --help`.
 And Other commands can be found by `maa --help`.
 
+
 ### Config dir
 
 Your config files (maa options, tasks, etc.) are located in your config dir.
@@ -182,3 +183,21 @@ condition = { type = "Time", start = "18:00:00" }
 
 Example of config file can be found at [`config_examples` directory](./config_examples).
 Anothor example can be found at my [dotfiles](https://github.com/wangl-cc/dotfiles/tree/master/.config/maa).
+
+### Handle MAA core message
+
+This CLI can handle MAA core message when running a task,
+but not all messages will be printed,
+the log level is used to control which message will be printed.
+There are 6 log level:
+- Error: something wrong, the program may exit or not work as expected;
+- Warning: something wrong, but the program can still work;
+- Normal: some important information, e.g. a task started and finished;
+- Info: more detailed information, e.g. stage drop info;
+- Debug: details about your configuration, e.g. the params of a task;
+  this is useful for you to debug your configuration;
+- Trace: any maa message from MAA core which is not handled by this CLI;
+  this is useful for developers to debug this CLI.
+
+The default log level is `Normal`, and it can be controlled by `-v` and `-q` options:
+`-v` will increase the log level, and `-q` will decrease the log level.
