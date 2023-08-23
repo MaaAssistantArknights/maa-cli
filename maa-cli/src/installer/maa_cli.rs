@@ -231,7 +231,7 @@ impl Asset {
 
 fn format_url(tag: &str, name: &str) -> String {
     if let Some(url) = var_os("MAA_CLI_DOWNLOAD") {
-        format!("{}/v{}/{}", url.into_string().unwrap(), tag, name)
+        format!("{}/{}/{}", url.into_string().unwrap(), tag, name)
     } else {
         format!(
             "https://github.com/wangl-cc/maa-cli/releases/download/{}/{}",
