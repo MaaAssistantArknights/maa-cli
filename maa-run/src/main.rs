@@ -201,7 +201,6 @@ fn main() -> Result<std::process::ExitCode> {
                     debug!("Loading additional resource:", resource);
                     data_dir.join("resource").join(resource)
                 };
-                debug!("Loading additional resource:", path.display());
                 Assistant::load_resource(&path).context("Failed to load resource!")?;
             }
 
