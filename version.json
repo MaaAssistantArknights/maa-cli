@@ -1,11 +1,11 @@
 {
   "maa-run": {
     "x86_64-unknown-linux-gnu": {
-      "version": "0.2.3",
-      "tag": "maa_run-v0.2.3",
-      "name": "maa_run-v0.2.3-x86_64-unknown-linux-gnu.tar.gz",
-      "size": 1818384,
-      "sha256sum": "f1fabca5df2613ddcbffa8a90f6a8c9c002728bc11f68ad80136f047595de821"
+      "version": "0.2.4",
+      "tag": "maa_run-v0.2.4",
+      "name": "maa_run-v0.2.4-x86_64-unknown-linux-gnu.tar.gz",
+      "size": 1819923,
+      "sha256sum": "c3d9a5c8326d6bd569dc8553dd9190143457685fe68695b59035ef6322dd48d9"
     },
     "universal-apple-darwin": {
       "version": "0.2.3",
