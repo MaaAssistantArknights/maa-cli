@@ -8,6 +8,7 @@ pub enum Error {
     Io(std::io::Error),
     Json(serde_json::Error),
     Toml(toml::de::Error),
+    Yaml(serde_yaml::Error),
 }
 
 impl std::fmt::Display for Error {
@@ -19,6 +20,7 @@ impl std::fmt::Display for Error {
             Error::Io(e) => write!(f, "IO error, {}", e),
             Error::Json(e) => write!(f, "JSON parse error, {}", e),
             Error::Toml(e) => write!(f, "TOML parse error, {}", e),
+            Error::Yaml(e) => write!(f, "YAML parse error, {}", e),
         }
     }
 }
@@ -43,7 +45,13 @@ impl From<toml::de::Error> for Error {
     }
 }
 
-pub const SUPPORTED_FILETYPES: [&str; 2] = ["json", "toml"];
+impl From<serde_yaml::Error> for Error {
+    fn from(e: serde_yaml::Error) -> Self {
+        Error::Yaml(e)
+    }
+}
+
+const SUPPORTED_EXTENSION: [&str; 4] = ["json", "yaml", "yml", "toml"];
 
 pub trait FromFile: Sized + serde::de::DeserializeOwned {
     fn from_file(path: &Path) -> Result<Self, Error> {
@@ -51,23 +59,31 @@ pub trait FromFile: Sized + serde::de::DeserializeOwned {
             return Err(Error::FileNotFound(path.to_str().unwrap().to_string()));
         }
         let filetype = path.extension().ok_or(Error::UnknownFiletype)?;
-        if filetype == "json" {
-            let task_list = serde_json::from_reader(std::fs::File::open(path)?)?;
-            Ok(task_list)
-        } else if filetype == "toml" {
-            let task_list = toml::from_str(&std::fs::read_to_string(path)?)?;
-            Ok(task_list)
-        } else {
-            Err(Error::UnsupportedFiletype(String::from(
-                filetype.to_str().unwrap_or("Unknown"),
-            )))
+        match filetype.to_str().unwrap() {
+            "json" => {
+                let task_list = serde_json::from_reader(std::fs::File::open(path)?)?;
+                Ok(task_list)
+            }
+            "toml" => {
+                let task_list = toml::from_str(&std::fs::read_to_string(path)?)?;
+                Ok(task_list)
+            }
+            "yml" | "yaml" => {
+                let task_list = serde_yaml::from_reader(std::fs::File::open(path)?)?;
+                Ok(task_list)
+            }
+            _ => {
+                return Err(Error::UnsupportedFiletype(String::from(
+                    filetype.to_str().unwrap_or("Unknown"),
+                )))
+            }
         }
     }
 }
 
 pub trait FindFile: FromFile {
     fn find_file(path: &Path) -> Result<Self, Error> {
-        for filetype in SUPPORTED_FILETYPES.iter() {
+        for filetype in SUPPORTED_EXTENSION.iter() {
             let path = path.with_extension(filetype);
             if path.exists() {
                 return Self::from_file(&path);
