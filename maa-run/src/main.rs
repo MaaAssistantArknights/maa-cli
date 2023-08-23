@@ -193,9 +193,16 @@ fn main() -> Result<std::process::ExitCode> {
 
             /*------------------- Additional resource files ------------------*/
             for resource in asst_config.resources.iter() {
-                info!("Loading additional resource:", resource);
-                Assistant::load_resource(&data_dir.join("resource").join(resource))
-                    .context("Failed to load resource!")?;
+                let path = PathBuf::from(resource);
+                let path = if path.is_absolute() {
+                    debug!("Loading additional resource:", path.display());
+                    path
+                } else {
+                    debug!("Loading additional resource:", resource);
+                    data_dir.join("resource").join(resource)
+                };
+                debug!("Loading additional resource:", path.display());
+                Assistant::load_resource(&path).context("Failed to load resource!")?;
             }
 
             /*----------------------- Process Task --------------------------*/
