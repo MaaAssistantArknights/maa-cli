@@ -35,7 +35,8 @@ enum CLI {
         ///
         /// The task name is the name of the task file without the extension.
         /// The task file must be in the `tasks` directory of the config directory.
-        /// The task file must be in the TOML or JSON format.
+        /// The task file must be in the TOML, YAML or JSON format.
+        #[arg(verbatim_doc_comment)]
         task: String,
         /// ADB serial number of device or MaaTools address set in PlayCover
         ///
@@ -45,8 +46,23 @@ enum CLI {
         /// And if you want to use PlayCover,
         /// you need to set the connection type to PlayCover in the config file
         /// and then you can specify the address of MaaTools here.
-        #[clap(short, long)]
+        #[clap(short, long, verbatim_doc_comment)]
         addr: Option<String>,
+        /// Load resources from the user config directory
+        ///
+        /// By default, MaaCore loads resources from the data directory,
+        /// which is shipped with the program.
+        /// If you want to load resources from the user config directory,
+        /// you can use this option.
+        /// The `resource` directory must be in the config directory
+        /// and the resources must be in the `resource` directory.
+        ///
+        /// Note: user resources will be loaded at the end,
+        /// so if there are resources with the same name,
+        /// the user resources will overwrite the default resources.
+        /// use at your own risk!
+        #[clap(long, verbatim_doc_comment)]
+        user_resource: bool,
         /// Output more information, repeat to increase verbosity
         ///
         /// This option is used to control the log level of this program and MaaCore.
@@ -60,7 +76,7 @@ enum CLI {
         ///
         /// The default log level is normal.
         /// If you want to see more information, you can use this option to increase the log level.
-        #[clap(short, long, action = clap::ArgAction::Count)]
+        #[clap(short, long, action = clap::ArgAction::Count, verbatim_doc_comment)]
         verbose: u8,
         /// Output less information, repeat to increase quietness
         ///
@@ -74,7 +90,7 @@ enum CLI {
         /// Trace   // show all above messages and trace information
         /// The default log level is normal.
         /// If you want to see less information, you can use this option to decrease the log level.
-        #[clap(short, long, action = clap::ArgAction::Count)]
+        #[clap(short, long, action = clap::ArgAction::Count, verbatim_doc_comment)]
         quiet: u8,
     },
     #[clap(about = "Show version information")]
@@ -153,6 +169,7 @@ fn main() -> Result<std::process::ExitCode> {
         CLI::Run {
             task,
             addr,
+            user_resource,
             verbose,
             quiet,
         } => {
@@ -194,7 +211,7 @@ fn main() -> Result<std::process::ExitCode> {
                 )
             })?;
 
-            /*------------------- Additional resource files ------------------*/
+            /*------------------ Additional resource files -----------------*/
             for resource in asst_config.resources.iter() {
                 let path = PathBuf::from(resource);
                 let path = if path.is_absolute() {
@@ -204,7 +221,19 @@ fn main() -> Result<std::process::ExitCode> {
                     debug!("Loading additional resource:", resource);
                     data_dir.join("resource").join(resource)
                 };
-                Assistant::load_resource(&path).context("Failed to load resource!")?;
+                Assistant::load_resource(&path).with_context(|| {
+                    format!("Failed to load additional resource {}!", path.display())
+                })?;
+            }
+
+            if user_resource {
+                if config_dir.join("resource").exists() {
+                    debug!("Loading user resource:", config_dir.display());
+                    Assistant::load_resource(&config_dir)
+                        .context("Failed to load user resource!")?;
+                } else {
+                    warning!("`--user-resource` is specified, but no user resource found!");
+                }
             }
 
             /*----------------------- Process Task --------------------------*/
