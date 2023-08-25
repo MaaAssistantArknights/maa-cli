@@ -51,7 +51,19 @@ And Other commands can be found by `maa --help`.
 ### Config dir
 
 Your config files (maa options, tasks, etc.) are located in your config dir.
-You can get the config dir by `maa dir config`.
+You can get the config dir by `maa dir config` and
+create it by `mkdir -p "$(maa dir config)"`.
+**Note**: the double quotes is necessary for macOS user with zsh and bash.
+Because the path may contains space and will be split into multiple arguments.
+
+*Tip*: For macOS user who prefer to XDG style config directory,
+you can set `XDG_CONFIG_HOME`, e.g. `export XDG_CONFIG_HOME="$HOME/.config"`.
+Alternatively, you can make a symlink from XDG style dir to Apple style dir:
+```sh
+mkdir -p "$HOME/.config/maa"
+ln -s "$HOME/.config/maa" "$(maa dir config)"
+```
+
 In below examples, we assume the config dir is `$MAA_CONFIG_DIR`.
 
 ### Maa options

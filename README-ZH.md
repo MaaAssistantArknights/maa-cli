@@ -42,7 +42,19 @@ maa run <task> [options]
 ### 配置目录
 
 你的配置文件（maa选项，任务等）位于配置目录中。
-你可以通过`maa dir config`获取配置目录。
+你可以通过`maa dir config`获取配置目录,
+并通过`mkdir -p "$(maa dir config)"`创建它。
+**注意**：对于macOS上使用zsh和bash的用户，双引号是必须的,
+因为路径可能包含空格，这会导致它被分割成多个参数。
+
+*提示*：对于macOS上喜欢XDG风格配置目录的用户，
+你可以设置`XDG_CONFIG_HOME`，例如`export XDG_CONFIG_HOME="$HOME/.config"`。
+或者，你可以创建一个从XDG风格目录到Apple风格目录的符号链接：
+```sh
+mkdir -p "$HOME/.config/maa"
+ln -s "$HOME/.config/maa" "$(maa dir config)"
+```
+
 在下面的例子中，我们假设配置目录是`$MAA_CONFIG_DIR`。
 
 ### MAA设置
