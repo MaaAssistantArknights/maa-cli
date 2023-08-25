@@ -26,6 +26,8 @@
 maa install && maa self install
 ```
 
+**注意**：本工具不包含`adb`，如果使用`adb`来连接游戏，请确保`adb`已正确安装。
+
 ## 使用和配置
 
 ### 运行任务
