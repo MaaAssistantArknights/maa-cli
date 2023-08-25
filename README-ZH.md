@@ -18,7 +18,8 @@
 
 这个CLI由两部分组成：`maa-cli`（提供`maa`命令）和`maa-run`。
 但是你只需要安装`maa-cli`就可以使用这个CLI。
-你可以从[release页面](https://github.com/wangl-cc/maa-cli/releases/latest),
+你可以从[release页面](https://github.com/wangl-cc/maa-cli/releases/latest)
+（macOS用户下载`universal-apple-darwin`，Linux用户下载`x86_64-unknown-linux-gnu`），
 下载预编译的二进制文件，然后解压到你的`$PATH`中（例如`$HOME/.local/bin`）。
 
 一旦CLI安装完成，你可以通过`maa`安装`maa-run`和`MaaCore`：

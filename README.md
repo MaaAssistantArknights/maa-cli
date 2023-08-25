@@ -25,7 +25,8 @@ This CLI is consists of two parts:
 `maa-cli` (provide command `maa`) and `maa-run`.
 But you only need to install `maa-cli` to use this CLI.
 You can install CLI by download prebuilt binary from
-[release page](https://github.com/wangl-cc/maa-cli/releases/latest),
+[release page](https://github.com/wangl-cc/maa-cli/releases/latest)
+(universal-apple-darwin is for macOS, x86_64-unknown-linux-gnu is for Linux),
 and extract it to a directory in your `$PATH` (e.g. `$HOME/.local/bin`).
 
 Once the CLI is installed, you can install `maa-run` and `MaaCore` by `maa`:
