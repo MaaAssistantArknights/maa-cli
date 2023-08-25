@@ -33,6 +33,8 @@ Once the CLI is installed, you can install `maa-run` and `MaaCore` by `maa`:
 maa install && maa self install
 ```
 
+**Note**: `adb` is not included in this CLI. Please make sure `adb` is installed, if you connect game with it.
+
 ## Usage and configuration
 
 ### Run a task
