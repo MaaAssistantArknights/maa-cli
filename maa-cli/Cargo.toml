@@ -12,7 +12,7 @@ path = "src/main.rs"
 [dependencies]
 directories = "5"
 anyhow = "1"
-clap = { version = "4.3", features = ["derive"] }
+clap = { version = "4.4", features = ["derive"] }
 paste = "1"
 serde = { version = "1", features = ["derive"] }
 reqwest = { version = "0.11", features = ["blocking", "stream", "json"] }
