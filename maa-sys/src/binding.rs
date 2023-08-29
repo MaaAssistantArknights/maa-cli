@@ -25,8 +25,7 @@ pub type AsstApiCallback = ::std::option::Option<
     ),
 >;
 
-#[link(name = "MaaCore")]
-extern "C" {
+crate::link! {
     pub fn AsstSetUserDir(path: *const ::std::os::raw::c_char) -> AsstBool;
     pub fn AsstLoadResource(path: *const ::std::os::raw::c_char) -> AsstBool;
     pub fn AsstSetStaticOption(
@@ -47,7 +46,6 @@ extern "C" {
         value: *const ::std::os::raw::c_char,
     ) -> AsstBool;
 
-    #[deprecated(note = "Use AsstAsyncConnect instead")]
     pub fn AsstConnect(
         handle: AsstHandle,
         adb_path: *const ::std::os::raw::c_char,

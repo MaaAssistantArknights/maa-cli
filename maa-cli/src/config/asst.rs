@@ -102,6 +102,8 @@ pub fn default_playcover_address() -> String {
 pub fn default_config() -> String {
     if cfg!(target_os = "macos") {
         String::from("CompatMac")
+    } else if cfg!(target_os = "linux") {
+        String::from("CompatPOSIXShell")
     } else {
         String::from("General")
     }

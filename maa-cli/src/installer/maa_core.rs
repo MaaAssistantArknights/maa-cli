@@ -4,12 +4,11 @@ use super::download::download_mirrors;
 use super::extract::Archive;
 
 use crate::dirs::{Dirs, Ensure};
-use crate::maa_run::{command, SetLDLibPath};
+use crate::run;
 
 use std::env::consts::{DLL_PREFIX, DLL_SUFFIX};
 use std::env::var_os;
 use std::path::{Component, Path, PathBuf};
-use std::str::from_utf8;
 use std::time::Duration;
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -63,16 +62,11 @@ impl MaaCore {
     }
 
     pub fn version(&self, dirs: &Dirs) -> Result<Version> {
-        let output = &command(dirs)?
-            .set_ld_lib_path(dirs)
-            .arg("version")
-            .output()
-            .context("Failed to run maa-run version")?
-            .stdout;
+        let ver_str = run::core_version(dirs)?;
 
-        // Remove "MaaCore v" prefix and "\n" suffix
-        let ver_str = from_utf8(&output[9..output.len() - 1]).context("Failed to parse output")?;
-        Version::parse(ver_str).context("Failed to parse version")
+        // Remove "\n" suffix
+        // Not works for nightly version
+        Version::parse(&ver_str[0..ver_str.len() - 1]).context("Failed to parse version")
     }
 
     pub fn install(&self, dirs: &Dirs, force: bool, no_resource: bool, t: u64) -> Result<()> {
@@ -114,9 +108,12 @@ impl MaaCore {
         let archive = asset.download(cache_dir, t)?;
         // Clean dirs before extracting, but not before downloading
         // because the download may be interrupted
-        let lib_dir = &dirs.library().ensure_clean()?;
-        let resource_dir = &dirs.resource().ensure_clean()?;
-        archive.extract(|path: &Path| extract_mapper(path, lib_dir, resource_dir, !no_resource))?;
+        let lib_dir = find_lib_dir(dirs).context("MaaCore not found")?;
+        let resource_dir = find_resource(dirs).context("Resource dir not found")?;
+        lib_dir.ensure_clean()?;
+        resource_dir.ensure_clean()?;
+        archive
+            .extract(|path: &Path| extract_mapper(path, &lib_dir, &resource_dir, !no_resource))?;
 
         Ok(())
     }
@@ -259,4 +256,54 @@ impl Asset {
 
         Archive::try_from(path)
     }
+}
+
+pub fn find_lib_dir(dirs: &Dirs) -> Option<PathBuf> {
+    let lib_dir = dirs.library();
+    if lib_dir.join(MAA_CORE_NAME).exists() {
+        return Some(lib_dir.to_path_buf());
+    }
+
+    if let Ok(path) = std::env::current_exe() {
+        let exe_dir = path.parent().unwrap();
+        if exe_dir.join(MAA_CORE_NAME).exists() {
+            return Some(exe_dir.to_path_buf());
+        }
+        if let Some(dir) = exe_dir.parent() {
+            let lib_dir = dir.join("lib");
+            if lib_dir.join(MAA_CORE_NAME).exists() {
+                return Some(lib_dir);
+            }
+        }
+    }
+
+    None
+}
+
+pub fn find_maa_core(dirs: &Dirs) -> Option<PathBuf> {
+    let lib_dir = find_lib_dir(dirs)?;
+    return Some(lib_dir.join(MAA_CORE_NAME));
+}
+
+pub fn find_resource(dirs: &Dirs) -> Option<PathBuf> {
+    let resource_dir = dirs.resource();
+    if resource_dir.exists() {
+        return Some(resource_dir.to_path_buf());
+    }
+
+    if let Ok(path) = std::env::current_exe() {
+        let exe_dir = path.parent().unwrap();
+        let resource_dir = exe_dir.join("resource");
+        if resource_dir.exists() {
+            return Some(resource_dir);
+        }
+        if let Some(dir) = exe_dir.parent() {
+            let resource_dir = dir.join("share/maa/resource");
+            if resource_dir.exists() {
+                return Some(resource_dir);
+            }
+        }
+    }
+
+    None
 }

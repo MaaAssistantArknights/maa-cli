@@ -2,8 +2,7 @@ name: Release
 on:
   push:
     tags:
-      - "maa_cli-v[0-9]+.[0-9]+.[0-9]+"
-      - "maa_run-v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+"
   workflow_dispatch:
 
 jobs:
@@ -19,16 +18,9 @@ jobs:
       - name: Setup Rust
         run: |
           rustup target add $CARGO_BUILD_TARGET
-      - name: Build maa-cli
-        if: contains(github.ref, 'refs/tags/maa_cli-v')
-        run: cargo build --release --locked --bin maa
-      - name: Build maa-run
-        if: contains(github.ref, 'refs/tags/maa_run-v')
-        env:
-          MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
+      - name: Build
         run: |
-          cargo run --locked --bin maa -- install stable
-          cargo build --release --locked --bin maa-run
+          cargo build --release --locked --bin maa
       - name: Checkout version branch
         uses: actions/checkout@v3
         with:
@@ -42,35 +34,18 @@ jobs:
           maa_cli_version=$(yq -oy ".package.version" maa-cli/Cargo.toml)
           maa_run_version=$(yq -oy ".package.version" maa-run/Cargo.toml)
           cd target/x86_64-unknown-linux-gnu/release || exit 1
-          if [ -f maa ]; then
             version=$maa_cli_version
             archive_name="maa_cli-v$version-$target.tar.gz"
             tar -czvf $archive_name maa &&
               checksum=$(shasum -a 256 $archive_name) &&
               echo "$checksum" > $archive_name.sha256sum &&
               yq -i -oj ".maa-cli.$target.version = \"$version\"" $version_file &&
-              yq -i -oj ".maa-cli.$target.tag = \"maa_cli-v$version\"" $version_file &&
+              yq -i -oj ".maa-cli.$target.tag = \"v$version\"" $version_file &&
               yq -i -oj ".maa-cli.$target.name = \"$archive_name\"" $version_file &&
               yq -i -oj ".maa-cli.$target.size = $(stat -c %s $archive_name)" $version_file &&
               yq -i -oj ".maa-cli.$target.sha256sum = \"$(echo $checksum | cut -d ' ' -f 1)\"" $version_file &&
-              echo "name=maa-cli v$version" >> $GITHUB_OUTPUT &&
+              echo "name=v$version" >> $GITHUB_OUTPUT &&
               exit 0
-          fi
-          if [ -f maa-run ]; then
-            version=$maa_run_version
-            archive_name="maa_run-v$version-$target.tar.gz"
-            tar -czvf $archive_name maa-run &&
-              checksum=$(shasum -a 256 $archive_name) &&
-              echo "$checksum" > $archive_name.sha256sum &&
-              yq -i -oj ".maa-run.$target.version = \"$version\"" $version_file &&
-              yq -i -oj ".maa-run.$target.tag= \"maa_run-v$version\"" $version_file &&
-              yq -i -oj ".maa-run.$target.name = \"$archive_name\"" $version_file &&
-              yq -i -oj ".maa-run.$target.size = $(stat -c %s $archive_name)" $version_file &&
-              yq -i -oj ".maa-run.$target.sha256sum = \"$(echo $checksum | cut -d ' ' -f 1)\"" $version_file &&
-              echo "name=maa-run v$version" >> $GITHUB_OUTPUT &&
-              exit 0
-          fi
-          exit 1
       - name: Upload to GitHub Releases
         uses: svenstaro/upload-release-action@v2
         with:
@@ -78,7 +53,6 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file_glob: true
           file: target/x86_64-unknown-linux-gnu/release/maa*.tar.gz*
-          make_latest: ${{ contains(github.ref, 'refs/tags/maa_cli-v') }} # Only make latest for maa-cli
           overwrite: true
       - name: Commit and push version.json
         run: |
@@ -103,16 +77,9 @@ jobs:
         run: |
           rustup target add x86_64-apple-darwin
           rustup target add aarch64-apple-darwin
-      - name: Build maa-cli
-        if: contains(github.ref, 'refs/tags/maa_cli-v')
-        run: cargo build --release --locked --bin maa --target x86_64-apple-darwin --target aarch64-apple-darwin
-      - name: Build maa-run
-        if: contains(github.ref, 'refs/tags/maa_run-v')
-        env:
-          MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
+      - name: Build
         run: |
-          cargo run --locked --bin maa -- install stable
-          cargo build --release --locked --bin maa-run --target x86_64-apple-darwin --target aarch64-apple-darwin
+          cargo build --release --locked --bin maa --target x86_64-apple-darwin --target aarch64-apple-darwin
       - name: Checkout version branch
         uses: actions/checkout@v3
         with:
@@ -126,45 +93,25 @@ jobs:
           maa_run_version=$(yq -oy ".package.version" maa-run/Cargo.toml)
           target="universal-apple-darwin"
           cd target || exit 1
-          if [[ -f x86_64-apple-darwin/release/maa && -f aarch64-apple-darwin/release/maa ]]; then
-            version=$maa_cli_version
-            archive_name="maa_cli-v$version-$target.zip"
-            lipo -create -output maa x86_64-apple-darwin/release/maa aarch64-apple-darwin/release/maa &&
-              zip $archive_name maa &&
-              checksum=$(shasum -a 256 $archive_name) &&
-              echo "$checksum" > $archive_name.sha256sum &&
-              yq -i -oj ".maa-cli.$target.version = \"$version\"" $version_file &&
-              yq -i -oj ".maa-cli.$target.tag = \"maa_cli-v$version\"" $version_file &&
-              yq -i -oj ".maa-cli.$target.name = \"$archive_name\"" $version_file &&
-              yq -i -oj ".maa-cli.$target.size = $(stat -f %z $archive_name)" $version_file &&
-              yq -i -oj ".maa-cli.$target.sha256sum = \"$(echo $checksum | cut -d ' ' -f 1)\"" $version_file &&
-              echo "name=maa-cli v$version" >> $GITHUB_OUTPUT &&
-              exit 0
-          fi
-          if [[ -f x86_64-apple-darwin/release/maa-run && -f aarch64-apple-darwin/release/maa-run ]]; then
-            version=$maa_run_version
-            archive_name="maa_run-v$version-$target.zip"
-            lipo -create -output maa-run x86_64-apple-darwin/release/maa-run aarch64-apple-darwin/release/maa-run &&
-              zip $archive_name maa-run &&
-              checksum=$(shasum -a 256 $archive_name) &&
-              echo "$checksum" > $archive_name.sha256sum &&
-              yq -i -oj ".maa-run.$target.version = \"$version\"" $version_file &&
-              yq -i -oj ".maa-run.$target.tag = \"maa_run-v$version\"" $version_file &&
-              yq -i -oj ".maa-run.$target.name = \"$archive_name\"" $version_file &&
-              yq -i -oj ".maa-run.$target.size = $(stat -f %z $archive_name)" $version_file &&
-              yq -i -oj ".maa-run.$target.sha256sum = \"$(echo $checksum | cut -d ' ' -f 1)\"" $version_file &&
-              echo "name=maa-run v$version" >> $GITHUB_OUTPUT &&
-              exit 0
-          fi
-          exit 1
+          version=$maa_cli_version
+          archive_name="maa_cli-v$version-$target.zip"
+          lipo -create -output maa x86_64-apple-darwin/release/maa aarch64-apple-darwin/release/maa &&
+            zip $archive_name maa &&
+            checksum=$(shasum -a 256 $archive_name) &&
+            echo "$checksum" > $archive_name.sha256sum &&
+            yq -i -oj ".maa-cli.$target.version = \"$version\"" $version_file &&
+            yq -i -oj ".maa-cli.$target.tag = \"v$version\"" $version_file &&
+            yq -i -oj ".maa-cli.$target.name = \"$archive_name\"" $version_file &&
+            yq -i -oj ".maa-cli.$target.size = $(stat -f %z $archive_name)" $version_file &&
+            yq -i -oj ".maa-cli.$target.sha256sum = \"$(echo $checksum | cut -d ' ' -f 1)\"" $version_file &&
+            echo "name=v$version" >> $GITHUB_OUTPUT &&
+            exit 0
       - name: Upload to GitHub Releases
         uses: svenstaro/upload-release-action@v2
         with:
-          release_name: ${{ steps.archive.outputs.name }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file_glob: true
           file: target/maa*.zip*
-          make_latest: ${{ contains(github.ref, 'refs/tags/maa_cli-v') }} # Only make latest for maa-cli
           overwrite: true
       - name: Commit and push version.json
         run: |

@@ -747,6 +747,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4668fb0ea861c1df094127ac5f1da3409a82116a4ba74fca2e58ef927159bb3"
 
 [[package]]
+name = "libloading"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d580318f95776505201b28cf98eb1fa5e4be3b689633ba6a3e6cd880ff22d8cb"
+dependencies = [
+ "cfg-if",
+ "windows-sys 0.48.0",
+]
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -760,39 +770,28 @@ checksum = "b5e6163cb8c49088c2c36f57875e58ccd8c87c7427f7fbd50ea6710b2f3f2e8f"
 
 [[package]]
 name = "maa-cli"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
  "digest",
  "directories",
  "flate2",
  "futures-util",
  "indicatif",
+ "maa-sys",
  "paste",
  "reqwest",
  "semver",
  "serde",
+ "serde_json",
+ "serde_yaml",
  "sha2",
  "tar",
  "tokio",
- "zip",
-]
-
-[[package]]
-name = "maa-run"
-version = "0.2.6"
-dependencies = [
- "anyhow",
- "chrono",
- "clap",
- "directories",
- "maa-sys",
- "paste",
- "serde",
- "serde_json",
- "serde_yaml",
  "toml",
+ "zip",
 ]
 
 [[package]]
@@ -800,6 +799,7 @@ name = "maa-sys"
 version = "0.1.1"
 dependencies = [
  "directories",
+ "libloading",
 ]
 
 [[package]]
@@ -1754,9 +1754,9 @@ checksum = "ed94fce61571a4006852b7389a063ab983c02eb1bb37b47f8272ce92d06d9538"
 
 [[package]]
 name = "winnow"
-version = "0.5.14"
+version = "0.5.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d09770118a7eb1ccaf4a594a221334119a44a814fcb0d31c5b85e83e97227a97"
+checksum = "7c2e3184b9c4e92ad5167ca73039d0c42476302ab603e2fec4487511f38ccefc"
 dependencies = [
  "memchr",
 ]
