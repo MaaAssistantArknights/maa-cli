@@ -5,7 +5,6 @@ on:
     branches: [ "main" ]
     paths:
       - "maa-cli/**"
-      - "maa-run/**"
       - "maa-sys/**"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -14,7 +13,6 @@ on:
     branches: [ "main" ]
     paths:
       - "maa-cli/**"
-      - "maa-run/**"
       - "maa-sys/**"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -58,15 +56,17 @@ jobs:
         run: cargo clippy --all-targets --all-features -- -D warnings
       - name: Lint (rustfmt)
         run: cargo fmt --all --check
-      - name: Test
-        run: cargo test --all-targets --all-features --locked
       - name: Install MaaCore
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
         run: |
           cargo run install beta
-          ls -l "$(cargo run --bin maa -- dir library)"
-          ls -l "$(cargo run --bin maa -- dir resource)"
+          ls -l "$(cargo run -- dir library)"
+          ls -l "$(cargo run -- dir resource)"
+      - name: Test
+        run:
+          export MAA_CORE_DIR="$(cargo run --bin maa -- dir library)"
+          cargo test --all-targets --all-features --locked
       - name: Try run
         run: |
           cargo run -- version
