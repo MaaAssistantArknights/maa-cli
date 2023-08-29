@@ -64,7 +64,7 @@ jobs:
           ls -l "$(cargo run -- dir library)"
           ls -l "$(cargo run -- dir resource)"
       - name: Test
-        run:
+        run: |
           export MAA_CORE_DIR="$(cargo run --bin maa -- dir library)"
           cargo test --all-targets --all-features --locked
       - name: Try run
