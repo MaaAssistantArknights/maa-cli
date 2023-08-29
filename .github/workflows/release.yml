@@ -32,7 +32,6 @@ jobs:
           version_file="$PWD/version/version.json"
           target="$CARGO_BUILD_TARGET"
           maa_cli_version=$(yq -oy ".package.version" maa-cli/Cargo.toml)
-          maa_run_version=$(yq -oy ".package.version" maa-run/Cargo.toml)
           cd target/x86_64-unknown-linux-gnu/release || exit 1
             version=$maa_cli_version
             archive_name="maa_cli-v$version-$target.tar.gz"
@@ -90,7 +89,6 @@ jobs:
         run: |
           version_file="$PWD/version/version.json"
           maa_cli_version=$(yq -oy ".package.version" maa-cli/Cargo.toml)
-          maa_run_version=$(yq -oy ".package.version" maa-run/Cargo.toml)
           target="universal-apple-darwin"
           cd target || exit 1
           version=$maa_cli_version
