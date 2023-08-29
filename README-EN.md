@@ -1,8 +1,7 @@
 # maa-cli
 
-![CI](https://img.shields.io/github/actions/workflow/status/wangl-cc/maa-cli/ci.yml)
-![maa-cli latest release](https://img.shields.io/github/v/release/wangl-cc/maa-cli?label=CLI&filter=maa_cli-*)
-![maa-run latest release](https://img.shields.io/github/v/release/wangl-cc/maa-cli?label=Run&filter=maa_run-*)
+![CI](https://img.shields.io/github/actions/workflow/status/MaaAssistantArknights/maa-cli/ci.yml)
+![maa-cli latest release](https://img.shields.io/github/v/release/MaaAssistantArknights/maa-cli?filter=v*)
 
 A simple CLI for [MAA](https://github.com/MaaAssistantArknights/MaaAssistantArknights) by Rust.
 A alternative way use MAA on **Linux** and **macOS**.
