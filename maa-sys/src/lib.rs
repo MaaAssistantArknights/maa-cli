@@ -1,5 +1,7 @@
 pub mod binding;
 
+mod link;
+
 use std::ffi::{CStr, CString, NulError};
 use std::path::{Path, PathBuf};
 use std::str::Utf8Error;
@@ -258,5 +260,24 @@ mod tests {
             Path::new("/tmp").to_cstring().unwrap(),
             CString::new("/tmp").unwrap()
         );
+    }
+
+    #[test]
+    fn get_version() {
+        #[cfg(feature = "runtime")]
+        {
+            use std::env::{
+                consts::{DLL_PREFIX, DLL_SUFFIX},
+                var_os,
+            };
+            use std::path::PathBuf;
+            let core_dir = var_os("MAA_CORE_DIR")
+                .map(PathBuf::from)
+                .expect("MAA_CORE_DIR not set");
+            let core_name = format!("{}MaaCore{}", DLL_PREFIX, DLL_SUFFIX);
+            binding::load(core_dir.join(core_name));
+        }
+
+        assert!(Assistant::get_version().is_ok());
     }
 }

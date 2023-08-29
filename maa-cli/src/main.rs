@@ -1,21 +1,17 @@
+mod config;
 mod dirs;
 mod installer;
-mod maa_run;
+mod log;
+mod run;
 
-use crate::{
-    installer::{
-        maa_cli::CLIComponent,
-        maa_core::{Channel, MaaCore},
-    },
-    maa_run::SetLDLibPath,
+use crate::installer::{
+    maa_cli,
+    maa_core::{self, Channel, MaaCore},
 };
 
-use std::process::{ExitCode, ExitStatus};
-
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
 use directories::ProjectDirs;
-use maa_run::command;
 
 #[derive(Parser)]
 #[command(author, version)]
@@ -142,7 +138,10 @@ enum CLI {
     ///
     /// This command will print the version of given component.
     /// If no component is given, it will print the version of all components.
-    Version { component: Component },
+    Version {
+        #[arg(default_value_t = Component::All)]
+        component: Component,
+    },
     /// Run a predefined task
     ///
     /// All arguments will be passed to maa-run,
@@ -154,8 +153,67 @@ enum CLI {
     /// to define a task. More information can be found in the README.
     /// You can also use `maa-cli list` to list all available tasks.
     Run {
-        #[clap(name("ARGS"), trailing_var_arg(true))]
-        args: Vec<String>,
+        /// Name of the task to run
+        ///
+        /// The task name is the name of the task file without the extension.
+        /// The task file must be in the `tasks` directory of the config directory.
+        /// The task file must be in the TOML, YAML or JSON format.
+        #[arg(verbatim_doc_comment)]
+        task: String,
+        /// ADB serial number of device or MaaTools address set in PlayCover
+        ///
+        /// By default, MaaCore connects to game with ADB,
+        /// and this parameter is the serial number of the device
+        /// (default to `emulator-5554` if not specified here and not set in config file).
+        /// And if you want to use PlayCover,
+        /// you need to set the connection type to PlayCover in the config file
+        /// and then you can specify the address of MaaTools here.
+        #[clap(short, long, verbatim_doc_comment)]
+        addr: Option<String>,
+        /// Load resources from the user config directory
+        ///
+        /// By default, MaaCore loads resources from the data directory,
+        /// which is shipped with the program.
+        /// If you want to load resources from the user config directory,
+        /// you can use this option.
+        /// The `resource` directory must be in the config directory
+        /// and the resources must be in the `resource` directory.
+        ///
+        /// Note: user resources will be loaded at the end,
+        /// so if there are resources with the same name,
+        /// the user resources will overwrite the default resources.
+        /// use at your own risk!
+        #[clap(long, verbatim_doc_comment)]
+        user_resource: bool,
+        /// Output more information, repeat to increase verbosity
+        ///
+        /// This option is used to control the log level of this program and MaaCore.
+        /// There are 6 levels of log:
+        /// Error   // show only error messages
+        /// Warning // show all error and warning messages
+        /// normal  // show all above messages and basic information
+        /// Info    // show all above messages and more detailed information
+        /// Debug   // show all above messages and some information about configuration
+        /// Trace   // show all above messages and trace information
+        ///
+        /// The default log level is normal.
+        /// If you want to see more information, you can use this option to increase the log level.
+        #[clap(short, long, action = clap::ArgAction::Count, verbatim_doc_comment)]
+        verbose: u8,
+        /// Output less information, repeat to increase quietness
+        ///
+        /// This option is used to control the log level of this program and MaaCore.
+        /// There are 6 levels of log:
+        /// Error   // show only error messages
+        /// Warning // show all error and warning messages
+        /// normal  // show all above messages and basic information
+        /// Info    // show all above messages and more detailed information
+        /// Debug   // show all above messages and some information about configuration
+        /// Trace   // show all above messages and trace information
+        /// The default log level is normal.
+        /// If you want to see less information, you can use this option to decrease the log level.
+        #[clap(short, long, action = clap::ArgAction::Count, verbatim_doc_comment)]
+        quiet: u8,
     },
     /// List all available tasks
     List,
@@ -163,21 +221,12 @@ enum CLI {
 
 #[derive(Subcommand)]
 enum SelfCommand {
-    /// Install maa-run
+    /// Update maa-cli self
     ///
-    /// This command will download prebuilt binary of maa-run,
-    /// and install it to the binary directory of maa-cli.
-    /// Note: If the maa-run is already installed,
-    /// please update it by `maa-cli self update`.
-    Install,
-    /// Update maa-cli self and maa-run
-    ///
-    /// This command will download prebuilt binary of maa-cli and maa-run,
-    /// and install them to the binary directory of maa-cli.
-    /// Note: we will check the version of maa-cli and maa-run,
+    /// This command will download prebuilt binary of maa-cli,
+    /// and install them to it current directory.
+    /// Note: we will check the version of maa-cli,
     /// if the version is not newer, we will not update them.
-    /// And if the maa-run is not installed, please install it firstly
-    /// by `maa-cli self install`.
     Update,
 }
 
@@ -186,37 +235,38 @@ enum Component {
     #[default]
     All,
     MaaCLI,
-    MaaRun,
     MaaCore,
+}
+
+impl std::fmt::Display for Component {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Component::All => write!(f, "all"),
+            Component::MaaCLI => write!(f, "maa-cli"),
+            Component::MaaCore => write!(f, "maa-core"),
+        }
+    }
 }
 
 #[derive(ValueEnum, Clone)]
 pub enum Dir {
-    /// Directory to store maa data
-    ///
-    /// Parent of binary, library, resource directory,
-    /// On Windows, it is also parent of log directory.
-    /// On macOS, it is also parent of config and log directory.
+    /// Directory of maa-cli's data
     Data,
-    /// Directory to store maa-run binary
-    Binary,
-    /// Directory to store maa-core binary, alias of Binary
-    Bin,
-    /// Directory to store MaaCore's dynamic library
+    /// Directory of maa-cli's dynamic library
     Library,
-    /// Directory to store MaaCore's dynamic library, alias of Library
+    /// Directory of maa-cli's dynamic library, alias of library
     Lib,
-    /// Config directory of maa-run
+    /// Directory of maa-cli's config
     Config,
-    /// Cache directory to store downloaded files
+    /// Directory of maa-cli's cache
     Cache,
-    /// Resource directory of MaaCore
+    /// Directory of MaaCore's resource
     Resource,
-    /// Log directory of MaaCore
+    /// Directory of MaaCore's log
     Log,
 }
 
-fn main() -> Result<ExitCode> {
+fn main() -> Result<()> {
     let proj = ProjectDirs::from("com", "loong", "maa");
     let proj_dirs = dirs::Dirs::new(proj);
 
@@ -230,8 +280,6 @@ fn main() -> Result<ExitCode> {
             force,
         } => {
             MaaCore::new(channel).install(&proj_dirs, force, no_resource, test_time)?;
-
-            Ok(ExitCode::SUCCESS)
         }
         CLI::Update {
             channel,
@@ -239,75 +287,47 @@ fn main() -> Result<ExitCode> {
             test_time,
         } => {
             MaaCore::new(channel).update(&proj_dirs, no_resource, test_time)?;
-
-            Ok(ExitCode::SUCCESS)
         }
         CLI::SelfCommand(self_command) => match self_command {
-            SelfCommand::Install => {
-                CLIComponent::MaaRun.install(&proj_dirs)?;
-                Ok(ExitCode::SUCCESS)
-            }
             SelfCommand::Update => {
-                CLIComponent::MaaCLI.update(&proj_dirs)?;
-                CLIComponent::MaaRun.update(&proj_dirs)?;
-                Ok(ExitCode::SUCCESS)
+                maa_cli::update(&proj_dirs)?;
             }
         },
-        CLI::Dir { dir_type } => {
-            let dir = match dir_type {
-                Dir::Data => proj_dirs.data(),
-                Dir::Binary | Dir::Bin => proj_dirs.binary(),
-                Dir::Library | Dir::Lib => proj_dirs.library(),
-                Dir::Config => proj_dirs.config(),
-                Dir::Cache => proj_dirs.cache(),
-                Dir::Resource => proj_dirs.resource(),
-                Dir::Log => proj_dirs.log(),
-            };
-            println!("{}", dir.display());
-
-            Ok(ExitCode::SUCCESS)
-        }
+        CLI::Dir { dir_type } => match dir_type {
+            Dir::Data => println!("{}", proj_dirs.data().display()),
+            Dir::Library | Dir::Lib => {
+                println!("{}", maa_core::find_lib_dir(&proj_dirs).unwrap().display())
+            }
+            Dir::Config => println!("{}", proj_dirs.config().display()),
+            Dir::Cache => println!("{}", proj_dirs.cache().display()),
+            Dir::Resource => {
+                println!("{}", maa_core::find_resource(&proj_dirs).unwrap().display())
+            }
+            Dir::Log => println!("{}", proj_dirs.log().display()),
+        },
         CLI::Version { component } => match component {
             Component::All => {
                 println!("maa-cli {}", env!("CARGO_PKG_VERSION"));
-                command(&proj_dirs)?
-                    .set_ld_lib_path(&proj_dirs)
-                    .arg("--version")
-                    .status()?
-                    .to_code()?;
-                command(&proj_dirs)?
-                    .set_ld_lib_path(&proj_dirs)
-                    .arg("version")
-                    .status()?
-                    .to_code()?;
-                Ok(ExitCode::SUCCESS)
+                println!("MaaCore {}", run::core_version(&proj_dirs)?);
             }
             Component::MaaCLI => {
                 println!("maa-cli {}", env!("CARGO_PKG_VERSION"));
-                Ok(ExitCode::SUCCESS)
             }
-            Component::MaaRun => command(&proj_dirs)?
-                .set_ld_lib_path(&proj_dirs)
-                .arg("--version")
-                .status()?
-                .to_code(),
-            Component::MaaCore => command(&proj_dirs)?
-                .set_ld_lib_path(&proj_dirs)
-                .arg("version")
-                .status()?
-                .to_code(),
+            Component::MaaCore => {
+                println!("MaaCore {}", run::core_version(&proj_dirs)?);
+            }
         },
-        CLI::Run { args } => command(&proj_dirs)?
-            .set_ld_lib_path(&proj_dirs)
-            .arg("run")
-            .args(&args)
-            .status()?
-            .to_code(),
+        CLI::Run {
+            task,
+            addr,
+            user_resource,
+            verbose,
+            quiet,
+        } => run::run(&proj_dirs, task, addr, user_resource, verbose, quiet)?,
         CLI::List => {
             let task_dir = proj_dirs.config().join("tasks");
             if !task_dir.exists() {
                 println!("No tasks found");
-                Ok(ExitCode::SUCCESS)
             } else {
                 for entry in task_dir.read_dir()? {
                     let entry = entry?;
@@ -316,26 +336,9 @@ fn main() -> Result<ExitCode> {
                         println!("{}", path.file_stem().unwrap().to_str().unwrap());
                     }
                 }
-                Ok(ExitCode::SUCCESS)
             }
         }
     }
-}
 
-/// Convert `ExitStatus` to `ExitCode`
-///
-/// If the command is successful, return `ExitCode::SUCCESS`,
-/// otherwise return an error with the exit code.
-trait ToCode {
-    fn to_code(&self) -> Result<ExitCode>;
-}
-
-impl ToCode for ExitStatus {
-    fn to_code(&self) -> Result<ExitCode> {
-        if self.success() {
-            Ok(ExitCode::SUCCESS)
-        } else {
-            Err(anyhow!("Command failed with exit code {}", self))
-        }
-    }
+    Ok(())
 }

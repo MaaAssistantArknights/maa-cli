@@ -1,9 +1,6 @@
 // This file is used to download and extract prebuilt packages of maa-cli.
 
-use crate::{
-    dirs::{Dirs, Ensure},
-    maa_run::{command, SetLDLibPath},
-};
+use crate::dirs::{Dirs, Ensure};
 
 use super::{
     download::{download, Checker},
@@ -11,7 +8,6 @@ use super::{
 };
 
 use std::env::{consts::EXE_SUFFIX, current_exe};
-use std::str::from_utf8;
 use std::{env::var_os, path::Path};
 
 use anyhow::{bail, Context, Ok, Result};
@@ -21,55 +17,32 @@ use tokio::runtime::Runtime;
 
 const MAA_CLI_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[derive(Copy, Clone)]
-pub enum CLIComponent {
-    MaaCLI,
-    MaaRun,
+pub fn name() -> String {
+    format!("maa{}", EXE_SUFFIX)
 }
 
-impl CLIComponent {
-    pub fn name(self) -> String {
-        match self {
-            CLIComponent::MaaCLI => format!("maa{}", EXE_SUFFIX),
-            CLIComponent::MaaRun => format!("maa-run{}", EXE_SUFFIX),
-        }
-    }
+pub fn version() -> Result<Version> {
+    Version::parse(MAA_CLI_VERSION).context("Failed to parse maa-cli version")
+}
 
-    pub fn version(self, dirs: &Dirs) -> Result<Version> {
-        match self {
-            CLIComponent::MaaCLI => {
-                Version::parse(MAA_CLI_VERSION).context("Failed to parse maa-cli version")
-            }
-            CLIComponent::MaaRun => {
-                let output = &command(dirs)?
-                    .set_ld_lib_path(dirs)
-                    .arg("--version")
-                    .output()
-                    .context("Failed to run maa-run")?
-                    .stdout;
-                // Remove "maa-run " prefix and "\n" suffix
-                let ver_str = from_utf8(&output[8..output.len() - 1])
-                    .context("Failed to parse maa-run output")?;
-                Version::parse(ver_str).context("Failed to parse maa-run version")
-            }
-        }
-    }
+pub fn update(dirs: &Dirs) -> Result<()> {
+    let version_json = get_metadata()?;
+    let asset = version_json.get_asset()?;
+    let cur_version = asset.version();
 
-    pub fn install(self, dirs: &Dirs) -> Result<()> {
-        let bin_dir = dirs.binary().ensure()?;
-        let bin_name = self.name();
-        let bin_path = bin_dir.join(&bin_name);
-        if bin_path.exists() {
-            bail!(
-                "{} already exists, please run `maa self update` to update it",
-                bin_path.display()
-            );
-        };
+    let cache_dir = dirs.cache().ensure()?;
 
-        let version_json = get_metadata()?;
-        let asset = version_json.get_asset(self)?;
+    let last_version = version()?;
+    if *cur_version > last_version {
+        println!(
+            "Found newer {} version v{} (current: v{}), updating...",
+            name(),
+            cur_version,
+            last_version
+        );
 
-        let cache_dir = dirs.cache().ensure()?;
+        let bin_name = name();
+        let bin_path = current_exe()?;
 
         asset.download(cache_dir)?.extract(|path| {
             if path.ends_with(&bin_name) {
@@ -77,50 +50,19 @@ impl CLIComponent {
             } else {
                 None
             }
-        })
+        })?;
+    } else {
+        println!("Up to date: {} v{}.", name(), last_version);
     }
 
-    pub fn update(self, dirs: &Dirs) -> Result<()> {
-        let version_json = get_metadata()?;
-        let asset = version_json.get_asset(self)?;
-        let version = asset.version();
-
-        let cache_dir = dirs.cache().ensure()?;
-
-        let last_version = self.version(dirs)?;
-        if *version > last_version {
-            println!(
-                "Found newer {} version v{} (current: v{}), updating...",
-                self.name(),
-                version,
-                last_version
-            );
-            let bin_name = self.name();
-            let bin_path = match self {
-                CLIComponent::MaaCLI => current_exe()?,
-                CLIComponent::MaaRun => dirs.binary().join(&bin_name),
-            };
-
-            asset.download(cache_dir)?.extract(|path| {
-                if path.ends_with(&bin_name) {
-                    Some(bin_path.clone())
-                } else {
-                    None
-                }
-            })?;
-        } else {
-            println!("Up to date: {} v{}.", self.name(), last_version);
-        }
-
-        Ok(())
-    }
+    Ok(())
 }
 
 fn get_metadata() -> Result<VersionJSON> {
     let metadata_url = if let Some(url) = var_os("MAA_CLI_API") {
         url.into_string().unwrap()
     } else {
-        String::from("https://github.com/wangl-cc/maa-cli/raw/version/version.json")
+        String::from("https://github.com/MaaAssistantArknights/maa-cli/raw/version/version.json")
     };
     let metadata: VersionJSON = reqwest::blocking::get(metadata_url)?.json()?;
     Ok(metadata)
@@ -154,15 +96,11 @@ fn get_metadata() -> Result<VersionJSON> {
 /// ```
 struct VersionJSON {
     pub maa_cli: Targets,
-    pub maa_run: Targets,
 }
 
 impl VersionJSON {
-    pub fn get_asset(&self, compoment: CLIComponent) -> Result<&Asset> {
-        let targets = match compoment {
-            CLIComponent::MaaCLI => &self.maa_cli,
-            CLIComponent::MaaRun => &self.maa_run,
-        };
+    pub fn get_asset(&self) -> Result<&Asset> {
+        let targets = &self.maa_cli;
 
         if cfg!(target_os = "macos") {
             Ok(&targets.universal_macos)
@@ -234,7 +172,7 @@ fn format_url(tag: &str, name: &str) -> String {
         format!("{}/{}/{}", url.into_string().unwrap(), tag, name)
     } else {
         format!(
-            "https://github.com/wangl-cc/maa-cli/releases/download/{}/{}",
+            "https://github.com/MaaAssistantArknights/maa-cli/releases/download/{}/{}",
             tag, name
         )
     }

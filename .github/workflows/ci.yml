@@ -5,7 +5,6 @@ on:
     branches: [ "main" ]
     paths:
       - "maa-cli/**"
-      - "maa-run/**"
       - "maa-sys/**"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -14,7 +13,6 @@ on:
     branches: [ "main" ]
     paths:
       - "maa-cli/**"
-      - "maa-run/**"
       - "maa-sys/**"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -52,28 +50,25 @@ jobs:
         run: |
           rustup target add $CARGO_BUILD_TARGET
           rustup component add clippy rustfmt
-      - name: Install MaaCore with maa-updater
-        env:
-          MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
-        run: |
-          cargo build --locked --bin maa
-          cargo run --bin maa -- install stable
-          ls -l "$(cargo run --bin maa -- dir library)"
-          ls -l "$(cargo run --bin maa -- dir resource)"
       - name: Build
         run: cargo build --workspace --locked
       - name: Lint (clippy)
         run: cargo clippy --all-targets --all-features -- -D warnings
       - name: Lint (rustfmt)
         run: cargo fmt --all --check
-      - name: Test
-        run: cargo test --all-targets --all-features --locked
-      - name: Try to run maa-run
-        run: ./target/$CARGO_BUILD_TARGET/debug/maa-run version
-      - name: Try to run relocated lib with maa
+      - name: Install MaaCore
+        env:
+          MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
         run: |
-          maa="./target/$CARGO_BUILD_TARGET/debug/maa"
-          old_data_dir=$($maa dir data)
-          new_data_dir="$PWD/data"
-          mv "$old_data_dir" "$new_data_dir"
-          MAA_DATA_DIR="$new_data_dir" $maa version all
+          cargo run install beta
+          ls -l "$(cargo run dir library)"
+          ls -l "$(cargo run dir resource)"
+      - name: Test
+        run: |
+          export MAA_CORE_DIR="$(cargo run dir library)"
+          export DYLD_FALLBACK_LIBRARY_PATH="$MAA_CORE_DIR"
+          cargo test --all-targets --all-features --locked
+      - name: Try run
+        run: |
+          export DYLD_FALLBACK_LIBRARY_PATH="$(cargo run dir library)"
+          cargo run -- version
