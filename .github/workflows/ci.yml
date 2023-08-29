@@ -61,12 +61,14 @@ jobs:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
         run: |
           cargo run install beta
-          ls -l "$(cargo run -- dir library)"
-          ls -l "$(cargo run -- dir resource)"
+          ls -l "$(cargo run dir library)"
+          ls -l "$(cargo run dir resource)"
       - name: Test
         run: |
-          export MAA_CORE_DIR="$(cargo run --bin maa -- dir library)"
+          export MAA_CORE_DIR="$(cargo run dir library)"
+          export DYLD_FALLBACK_LIBRARY_PATH="$MAA_CORE_DIR"
           cargo test --all-targets --all-features --locked
       - name: Try run
         run: |
+          export DYLD_FALLBACK_LIBRARY_PATH="$(cargo run dir library)"
           cargo run -- version
