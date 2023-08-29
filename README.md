@@ -21,17 +21,14 @@ and I'm not familiar with Windows development. PR is welcome.
 
 ## Installation
 
-This CLI is consists of two parts:
-`maa-cli` (provide command `maa`) and `maa-run`.
-But you only need to install `maa-cli` to use this CLI.
 You can install CLI by download prebuilt binary from
 [release page](https://github.com/wangl-cc/maa-cli/releases/latest)
 (universal-apple-darwin is for macOS, x86_64-unknown-linux-gnu is for Linux),
 and extract it to a directory in your `$PATH` (e.g. `$HOME/.local/bin`).
 
-Once the CLI is installed, you can install `maa-run` and `MaaCore` by `maa`:
+Once the CLI is installed, you can install `MaaCore` by `maa`:
 ```bash
-maa install && maa self install
+maa install
 ```
 
 **Note**: `adb` is not included in this CLI. Please make sure `adb` is installed, if you connect game with it.
@@ -45,9 +42,8 @@ The `maa` is used to run some you defined tasks
 ```sh
 maa run <task> [options]
 ```
-More details about `maa run` can be found by `maa run -- --help`.
+More details about `maa run` can be found by `maa run --help`.
 And Other commands can be found by `maa --help`.
-
 
 ### Config dir
 
