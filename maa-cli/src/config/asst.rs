@@ -151,6 +151,8 @@ mod tests {
                     device: String::from("emulator-5554"),
                     config: if cfg!(target_os = "macos") {
                         String::from("CompatMac")
+                    } else if cfg!(target_os = "linux") {
+                        String::from("CompatPOSIXShell")
                     } else {
                         String::from("General")
                     },
