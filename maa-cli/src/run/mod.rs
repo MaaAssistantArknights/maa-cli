@@ -24,7 +24,7 @@ pub fn run(
     verbose: u8,
     quiet: u8,
 ) -> Result<()> {
-    let core_path = find_maa_core(&dirs).context("Failed to find MaaCore!")?;
+    let core_path = find_maa_core(dirs).context("Failed to find MaaCore!")?;
 
     maa_sys::binding::load(core_path);
 
@@ -38,7 +38,7 @@ pub fn run(
     debug!("State directory:", state_dir.display());
     Assistant::set_user_dir(state_dir).context("Failed to set user directory!")?;
 
-    let data_dir = find_resource(&dirs).context("Failed to find resource!")?;
+    let data_dir = find_resource(dirs).context("Failed to find resource!")?;
     debug!("Data directory:", data_dir.display());
     Assistant::load_resource(data_dir.parent().unwrap()).context("Failed to load resource!")?;
 

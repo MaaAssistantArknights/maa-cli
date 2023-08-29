@@ -66,6 +66,8 @@ macro_rules! link {
         }
 
         $(
+            /// # Safety
+            /// This function is unsafe because it calls a function from a shared library.
             #[allow(non_snake_case)]
             pub unsafe fn $name($($pname: $pty), *) $(-> $ret)* {
                 SHARED_LIBRARY.with(|lib| match lib.borrow().as_ref() {
