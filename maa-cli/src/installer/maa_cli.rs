@@ -62,7 +62,7 @@ fn get_metadata() -> Result<VersionJSON> {
     let metadata_url = if let Some(url) = var_os("MAA_CLI_API") {
         url.into_string().unwrap()
     } else {
-        String::from("https://github.com/wangl-cc/maa-cli/raw/version/version.json")
+        String::from("https://github.com/MaaAssistantArknights/maa-cli/raw/version/version.json")
     };
     let metadata: VersionJSON = reqwest::blocking::get(metadata_url)?.json()?;
     Ok(metadata)
@@ -172,7 +172,7 @@ fn format_url(tag: &str, name: &str) -> String {
         format!("{}/{}/{}", url.into_string().unwrap(), tag, name)
     } else {
         format!(
-            "https://github.com/wangl-cc/maa-cli/releases/download/{}/{}",
+            "https://github.com/MaaAssistantArknights/maa-cli/releases/download/{}/{}",
             tag, name
         )
     }
