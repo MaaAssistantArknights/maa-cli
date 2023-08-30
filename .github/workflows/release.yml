@@ -21,6 +21,8 @@ jobs:
   version:
     name: Get Version
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -69,25 +71,20 @@ jobs:
           fi
           echo "CARGO_CMD=$CARGO_CMD" >> $GITHUB_ENV
           echo "CARGO_BUILD_TARGET=$CARGO_BUILD_TARGET" >> $GITHUB_ENV
-      - name: Build and Archive
-        id: archive
+      - name: Build
+        id: build
         run: |
           $CARGO_CMD build --release --locked --package maa-cli
           cd "target/$CARGO_BUILD_TARGET/release"
           version=${{ needs.version.outputs.version }}
-          if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
-            archive_name="maa_cli-v$version-$target.tar.gz"
-            tar -czvf $archive_name maa
-          else
-            archive_name="maa_cli-v$version-$target.zip"
-            zip $archive_name maa
-          fi
-          echo "file_path=$PWD/$archive_name" >> $GITHUB_OUTPUT
+          tarball="maa_cli-v$version-$CARGO_BUILD_TARGET.tar"
+          tar -cvf $tarball maa
+          echo "file_path=$PWD/$tarball" >> $GITHUB_OUTPUT
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
-          name: maa_cli-v${{ needs.version.outputs.version }}-${{ env.CARGO_BUILD_TARGET }}
-          path: ${{ steps.archive.outputs.file_path }}
+          name: maa_cli-v${{ needs.version.outputs.version }}-${{ env.CARGO_BUILD_TARGET }}.tar
+          path: ${{ steps.build.outputs.file_path }}
           retention-days: 1
 
   build-universal:
@@ -99,26 +96,26 @@ jobs:
       # because this action don't support wildcards
       - name: Download Artifacts
         uses: actions/download-artifact@v3
-      - name: Create universal binaries and Archive
-        id: archive
+      - name: Create universal binaries
+        id: build
         run: |
           ls -la
           version=${{ needs.version.outputs.version }}
           for arch in x86_64 aarch64; do
             target="$arch-apple-darwin"
-            zipfile="maa_cli-v$version-$target.zip"
-            mkdir "$target" && unzip -d "$target" "$zipfile"
+            tarball="maa_cli-v$version-$target.tar"
+            mkdir "$target" && tar -xvf "maa_cli-v$version-$target.tar" -C "$target"
           done
           target="universal-apple-darwin"
-          archive_name="maa_cli-v$version-$target.zip"
           lipo -create -output maa x86_64-apple-darwin/maa aarch64-apple-darwin/maa
-          zip $archive_name maa
+          tarball="maa_cli-v$version-$target.tar"
+          tar -cvf $tarball maa
           echo "file_path=$PWD/$archive_name" >> $GITHUB_OUTPUT
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
           name: maa_cli-v${{ needs.version.outputs.version }}-universal-apple-darwin
-          path: ${{ steps.archive.outputs.file_path }}
+          path: ${{ steps.build.outputs.file_path }}
           retention-days: 1
 
   release:
@@ -146,10 +143,13 @@ jobs:
         run: |
           version=${{ needs.version.outputs.version }}
           for target in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu universal-apple-darwin; do
+            mkdir "$target" && tar -xvf "maa_cli-v$version-$target.tar" -C "$target"
             if [ "$target" == "universal-apple-darwin" ]; then
               archive_name="maa_cli-v$version-$target.zip"
+              zip -r $archive_name $target/maa
             else
               archive_name="maa_cli-v$version-$target.tar.gz"
+              tar -czvf $archive_name $target/maa
             fi
             checksum=$(sha256sum $archive_name)
             size=$(stat -c%s $archive_name)
@@ -177,8 +177,8 @@ jobs:
             maa_cli-v${{ needs.version.outputs.version }}-aarch64-unknown-linux-gnu.tar.gz*
             maa_cli-v${{ needs.version.outputs.version }}-universal-apple-darwin.zip*
       - name: Commit version.json and Push
+        working-directory: version
         run: |
-          cd version
           git config --local user.name "github-actions[bot]"
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit version.json -m "Update version.json"
