@@ -80,16 +80,6 @@ jobs:
         run: |
           ls -l "$(cargo run dir library)"
           ls -l "$(cargo run dir resource)"
-      - name: Test (maa-sys, static)
-        shell: bash
-        run: |
-          export MAA_CORE_DIR="$(cargo run dir library)"
-          cargo test --bin maa-sys --locked
-      - name: Test (maa-sys, runtime)
-        shell: bash
-        run: |
-          export MAA_CORE_DIR="$(cargo run dir library)"
-          cargo test --bin maa-sys --features runtime --locked
       - name: Test (maa-cli)
         shell: bash
         run: |
@@ -100,3 +90,15 @@ jobs:
         run: |
           export DYLD_FALLBACK_LIBRARY_PATH="$(cargo run dir library)"
           cargo run -- version
+      - name: Test (maa-sys, static)
+        shell: bash
+        run: |
+          export MAA_CORE_DIR="$(cargo run dir library)"
+          echo "MAA_CORE_DIR=$MAA_CORE_DIR"
+          cargo test --lib --locked
+      - name: Test (maa-sys, runtime)
+        shell: bash
+        run: |
+          export MAA_CORE_DIR="$(cargo run dir library)"
+          echo "MAA_CORE_DIR=$MAA_CORE_DIR"
+          cargo test --lib --features runtime --locked
