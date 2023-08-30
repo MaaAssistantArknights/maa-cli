@@ -25,8 +25,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Get Version
+        id: version
         run: |
           VERSION=$(yq -oy ".package.version" maa-cli/Cargo.toml)
+          echo "$VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
   build:
