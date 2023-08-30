@@ -56,7 +56,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Setup target
+      - name: Setup build environment
         run: |
           if [ "${{ matrix.arch }}" = "aarch64" ]; then
             cargo install cross
@@ -79,12 +79,12 @@ jobs:
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
         run: |
-          $CARGO_CMD run -- install beta
+          $CARGO_CMD run --target $CARGO_BUILD_TARGET -- install beta
       - name: Show installation and setup environment
         if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
         run: |
-          ls -l "$($CARGO_CMD run dir library)"
-          ls -l "$($CARGO_CMD run dir resource)"
+          MAA_CORE_DIR="$($CARGO_CMD run --target $CARGO_BUILD_TARGET -- dir library)"
+          ls -l "$MAA_CORE_DIR"
           echo "MAA_CORE_DIR=$($CARGO_CMD run dir library)" >> $GITHUB_ENV
       - name: Test (maa-cli)
         if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
@@ -93,8 +93,9 @@ jobs:
       - name: Try run
         if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
         run: |
+          unset CARGO_BUILD_TARGET
           export DYLD_FALLBACK_LIBRARY_PATH="$MAA_CORE_DIR"
-          $CARGO_CMD run --package maa-cli --locked -- version
+          $CARGO_CMD run --package maa-cli --target $CARGO_BUILD_TARGET --locked -- version
       - name: Test (maa-sys, static)
         if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
         run: |

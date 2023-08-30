@@ -13,22 +13,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        targets:
-          - x86_64-unknown-linux-gnu
-          - aarch64-unknown-linux-gnu
-    env:
-      CARGO_BUILD_TARGET: ${{ matrix.targets }}
+        arch:
+          - x86_64
+          - aarch64
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Setup Rust
+      - name: Setup build environment
         run: |
+          if [ "${{ matrix.arch }}" = "aarch64" ]; then
+            cargo install cross
+            echo "CARGO_CMD=cross" >> "$GITHUB_ENV"
+          else
+            echo "CARGO_CMD=cargo" >> "$GITHUB_ENV"
+          fi
+          CARGO_BUILD_TARGET="${{ matrix.arch }}-unknown-linux-gnu"
           rustup target add $CARGO_BUILD_TARGET
-      - name: Setup cross-compilation for aarch64
-        if: matrix.targets == 'aarch64-unknown-linux-gnu'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
+          echo "CARGO_BUILD_TARGET=$CARGO_BUILD_TARGET" >> $GITHUB_ENV
       - name: Build
         run: |
           cargo build --release --locked --bin maa
