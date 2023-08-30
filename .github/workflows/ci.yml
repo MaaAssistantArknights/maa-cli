@@ -62,11 +62,11 @@ jobs:
             CARGO_BUILD_TARGET="${{ matrix.arch }}-unknown-linux-gnu"
           fi
           echo "CARGO_BUILD_TARGET=$CARGO_BUILD_TARGET" >> $GITHUB_ENV
-      - name: Setup toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: ${{ env.CARGO_BUILD_TARGET }}
+      - name: Setup rust toolchain
+        if: matrix.arch != 'x86_64'
+        shell: bash
+        run: |
+          rustup target add $CARGO_BUILD_TARGET
       - name: Build (maa-cli)
         uses: actions-rs/cargo@v1
         with:
