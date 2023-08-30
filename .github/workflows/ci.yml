@@ -56,36 +56,45 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Setup build environment
+      - name: Install Cross
+        if: matrix.os == 'ubuntu-latest' && matrix.arch == 'aarch64'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+      - name: Setup environment
         run: |
-          if [ "${{ matrix.arch }}" = "aarch64" ]; then
-            cargo install cross
-            echo "CARGO_CMD=cross" >> "$GITHUB_ENV"
-          else
-            echo "CARGO_CMD=cargo" >> "$GITHUB_ENV"
-          fi
           if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            rustup target add $CARGO_BUILD_TARGET
+            CARGO_CMD=cargo
             CARGO_BUILD_TARGET="${{ matrix.arch }}-apple-darwin"
           else
+            if [ "${{ matrix.arch }}" = "aarch64" ]; then
+              CARGO_CMD=cross
+            else
+              CARGO_CMD=cargo
+            fi
             CARGO_BUILD_TARGET="${{ matrix.arch }}-unknown-linux-gnu"
           fi
-          rustup target add $CARGO_BUILD_TARGET
+          echo "CARGO_CMD=$CARGO_CMD" >> $GITHUB_ENV
           echo "CARGO_BUILD_TARGET=$CARGO_BUILD_TARGET" >> $GITHUB_ENV
+          echo "CARGO_TARGET_DIR=$PWD/target" >> $GITHUB_ENV
+          echo "MAA_DATA_DIR=$PWD/target/maa-data" >> $GITHUB_ENV
+          echo "MAA_CORE_DIR=$PWD/target/maa-data/lib" >> $GITHUB_ENV
       - name: Build (maa-cli)
         run: |
           $CARGO_CMD build --package maa-cli --locked
+      # All following steps are not run for aarch64-apple-darwin
+      # bacause cross doesn't support it.
       - name: Install MaaCore
         if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
         run: |
           $CARGO_CMD run --target $CARGO_BUILD_TARGET -- install beta
-      - name: Show installation and setup environment
+      - name: Show installation
         if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
         run: |
-          MAA_CORE_DIR="$($CARGO_CMD run --target $CARGO_BUILD_TARGET -- dir library)"
-          ls -l "$MAA_CORE_DIR"
-          echo "MAA_CORE_DIR=$($CARGO_CMD run dir library)" >> $GITHUB_ENV
+          tree -L 2 $MAA_DATA_DIR
       - name: Test (maa-cli)
         if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
         run: |
@@ -93,9 +102,8 @@ jobs:
       - name: Try run
         if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
         run: |
-          unset CARGO_BUILD_TARGET
           export DYLD_FALLBACK_LIBRARY_PATH="$MAA_CORE_DIR"
-          $CARGO_CMD run --package maa-cli --target $CARGO_BUILD_TARGET --locked -- version
+          $CARGO_CMD run --target $CARGO_BUILD_TARGET --locked -- version
       - name: Test (maa-sys, static)
         if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
         run: |
