@@ -20,15 +20,22 @@
       "version": "0.3.1",
       "tag": "v0.3.1",
       "name": "maa_cli-v0.3.1-x86_64-unknown-linux-gnu.tar.gz",
-      "size": 4613069,
-      "sha256sum": "33a05fd3cc6f6c06ce7c36ba36edb245870c1140f37697aa019b8663519be60d"
+      "size": 4612886,
+      "sha256sum": "59dca4c775c33ad7a66c3dce364e9deb2d2496f9ed0854895d17ec8511831c6c"
     },
     "universal-apple-darwin": {
       "version": "0.3.1",
       "tag": "v0.3.1",
       "name": "maa_cli-v0.3.1-universal-apple-darwin.zip",
-      "size": 6364080,
-      "sha256sum": "849b20a697d221133fdf4781e9e04ce2337610275d2bcb88c142ef699ae245ad"
+      "size": 6316862,
+      "sha256sum": "bae6012eafc0b80f005e8e02f3872c63a00a38eeaf70e9f0961e981b60ff8b0f"
+    },
+    "aarch64-unknown-linux-gnu": {
+      "version": "0.3.1",
+      "tag": "v0.3.1",
+      "name": "maa_cli-v0.3.1-aarch64-unknown-linux-gnu.tar.gz",
+      "size": 4456556,
+      "sha256sum": "facafaf9e7db2003b4264855664a220d266a19fea4b864d94d103875f129c8ea"
     }
   }
 }
