@@ -17,11 +17,11 @@
   },
   "maa-cli": {
     "x86_64-unknown-linux-gnu": {
-      "version": "0.3.0",
-      "tag": "v0.3.0",
-      "name": "maa_cli-v0.3.0-x86_64-unknown-linux-gnu.tar.gz",
-      "size": 3707842,
-      "sha256sum": "b89bde70216a8f2bd186e6920917ac80ca6fb3486a2467b0b73c9ebe793e96f0"
+      "version": "0.3.1",
+      "tag": "v0.3.1",
+      "name": "maa_cli-v0.3.1-x86_64-unknown-linux-gnu.tar.gz",
+      "size": 4613069,
+      "sha256sum": "33a05fd3cc6f6c06ce7c36ba36edb245870c1140f37697aa019b8663519be60d"
     },
     "universal-apple-darwin": {
       "version": "0.3.0",
