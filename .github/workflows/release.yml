@@ -92,6 +92,7 @@ jobs:
           yq -i -oj ".maa-cli.$target.size = $size" $version_file
           yq -i -oj ".maa-cli.$target.sha256sum = \"$(echo $checksum | cut -d ' ' -f 1)\"" $version_file
           echo "name=v$version" >> $GITHUB_OUTPUT
+          echo "file_path=$PWD/$archive_name" >> $GITHUB_OUTPUT
       - name: Upload to GitHub Releases
         if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
         uses: svenstaro/upload-release-action@v2
@@ -99,19 +100,19 @@ jobs:
           release_name: ${{ steps.archive.outputs.name }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file_glob: true
-          file: target/*/release/maa.*z*
+          file: ${{ steps.archive.outputs.file_path }}*
           overwrite: true
       - name: Upload to Artifact
         uses: actions/upload-artifact@v3
         with:
           name: maa_cli-v${{ steps.archive.outputs.name }}-${{ env.CARGO_BUILD_TARGET }}
-          path: target/*/release/maa.*z*
+          path: ${{ steps.archive.outputs.file_path }}*
           retention-days: 1
       - name: Commit and push version.json
         run: |
           cd version || exit 1
           git config --local user.name "github-actions[bot]"
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if [ -z "$(git diff version.json)" ]; then
             echo "No changes to commit"
             exit 1
@@ -173,25 +174,26 @@ jobs:
           yq -i -oj ".maa-cli.$target.size = $(stat -f %z $archive_name)" $version_file
           yq -i -oj ".maa-cli.$target.sha256sum = \"$(echo $checksum | cut -d ' ' -f 1)\"" $version_file
           echo "name=v$version" >> $GITHUB_OUTPUT
+          echo "file_path=$PWD/$archive_name" >> $GITHUB_OUTPUT
       - name: Upload to GitHub Releases
         uses: svenstaro/upload-release-action@v2
         if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file_glob: true
-          file: target/maa*.zip*
+          file: ${{ steps.archive.outputs.file_path }}*
           overwrite: true
       - name: Upload to artifacts
         uses: actions/upload-artifact@v3
         with:
           name: maa_cli-v${{ env.MAA_CLI_VERSION }}-${{ env.CARGO_BUILD_TARGET }}
-          path: target/maa*.zip*
+          path: ${{ steps.archive.outputs.file_path }}*
           retention-days: 1
       - name: Commit and push version.json
         run: |
           cd version || exit 1
           git config --local user.name "github-actions[bot]"
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if [ -z "$(git diff version.json)" ]; then
             echo "No changes to commit"
             exit 0
