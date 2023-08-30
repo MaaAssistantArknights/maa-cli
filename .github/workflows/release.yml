@@ -117,6 +117,10 @@ jobs:
             echo "No changes to commit"
             exit 1
           fi
+          # pull before push to avoid conflicts
+          git stash
+          git pull
+          git stash pop
           git commit version.json -m "Update version.json" &&
             git push
 
