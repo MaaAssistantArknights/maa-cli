@@ -40,6 +40,8 @@ fn extract_mapper(
         match c {
             Component::Normal(c) => {
                 if resource && c == "resource" {
+                    println!("components raw: {:?}", components);
+                    println!("components: {}", components.as_path().display());
                     return Some(resource_dir.join(components.as_path()));
                 } else if c
                     .to_str() // The DLL suffix may not the last part of the file name
@@ -298,7 +300,7 @@ pub fn find_resource(dirs: &Dirs) -> Option<PathBuf> {
             return Some(resource_dir);
         }
         if let Some(dir) = exe_dir.parent() {
-            let resource_dir = dir.join("share/maa/resource");
+            let resource_dir = dir.join("share").join("maa").join("resource");
             if resource_dir.exists() {
                 return Some(resource_dir);
             }
