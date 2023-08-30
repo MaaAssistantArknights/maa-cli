@@ -22,8 +22,23 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Rust
+        run: |
+          rustup component add clippy rustfmt
+      - name: Lint (clippy)
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Lint (rustfmt)
+        run: cargo fmt --all --check
+
   build:
     name: Build and test
+    needs: lint
     runs-on: ${{ matrix.os }}
     env:
       CARGO_BUILD_TARGET: ${{ matrix.triple }}
@@ -49,14 +64,10 @@ jobs:
       - name: Setup Rust
         run: |
           rustup target add $CARGO_BUILD_TARGET
-          rustup component add clippy rustfmt
       - name: Build
         run: cargo build --workspace --locked
-      - name: Lint (clippy)
-        run: cargo clippy --all-targets --all-features -- -D warnings
-      - name: Lint (rustfmt)
-        run: cargo fmt --all --check
       - name: Install MaaCore
+        shell: bash
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
         run: |
@@ -64,11 +75,13 @@ jobs:
           ls -l "$(cargo run dir library)"
           ls -l "$(cargo run dir resource)"
       - name: Test
+        shell: bash
         run: |
           export MAA_CORE_DIR="$(cargo run dir library)"
           export DYLD_FALLBACK_LIBRARY_PATH="$MAA_CORE_DIR"
           cargo test --all-targets --all-features --locked
       - name: Try run
+        shell: bash
         run: |
           export DYLD_FALLBACK_LIBRARY_PATH="$(cargo run dir library)"
           cargo run -- version
