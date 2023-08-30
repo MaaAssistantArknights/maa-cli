@@ -94,7 +94,7 @@ jobs:
           echo "name=v$version" >> $GITHUB_OUTPUT
       - name: Upload to GitHub Releases
         if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
-        uses: svenstaro/upload-release-action@v3
+        uses: svenstaro/upload-release-action@v2
         with:
           release_name: ${{ steps.archive.outputs.name }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
