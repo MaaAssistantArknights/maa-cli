@@ -79,7 +79,7 @@ jobs:
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
         run: |
-          $CARGO_CMD run install beta
+          $CARGO_CMD run -- install beta
       - name: Show installation and setup environment
         if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
         run: |
