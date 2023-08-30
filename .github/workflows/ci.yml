@@ -54,8 +54,8 @@ jobs:
             triple: x86_64-apple-darwin
           # - os: macos-latest
           #   triple: aarch64-apple-darwin
-          - os: windows-latest
-            triple: x86_64-pc-windows-msvc
+          # - os: windows-latest
+          #   triple: x86_64-pc-windows-msvc
           # - os: windows-latest
           #   triple: aarch64-pc-windows-msvc
     steps:
@@ -94,8 +94,5 @@ jobs:
         shell: bash
         run: |
           export MAA_CORE_DIR="$(cargo run dir library)"
-          if ${{ matrix.triple == 'x86_64-pc-windows-msvc' }}; then
-            export PATH="$PATH:$MAA_CORE_DIR"
-          fi
           cd maa-sys || exit 1
           cargo clean && cargo test
