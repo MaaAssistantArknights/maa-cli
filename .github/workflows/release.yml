@@ -97,16 +97,13 @@ jobs:
       - name: Create universal binaries
         id: build
         run: |
-          ls -la
           for arch in x86_64 aarch64; do
             target="$arch-apple-darwin"
             dir="maa_cli-$target"
-            ls -al $dir
             tar -xvf "$dir/$target.tar" -C "$dir"
           done
-          target="universal-apple-darwin"
           lipo -create -output maa maa_cli-x86_64-apple-darwin/maa maa_cli-aarch64-apple-darwin/maa
-          tarball="maa_cli-v$version-$target.tar"
+          tarball="universal-apple-darwin.tar"
           tar -cvf $tarball maa
           echo "file_path=$PWD/$tarball" >> $GITHUB_OUTPUT
       - name: Upload Artifact
