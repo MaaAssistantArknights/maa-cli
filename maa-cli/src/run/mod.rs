@@ -10,6 +10,9 @@ use task::{TaskList, TaskType};
 mod message;
 use message::callback;
 
+use signal_hook::consts::TERM_SIGNALS;
+use std::sync::Arc;
+
 use std::path::PathBuf;
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -185,6 +188,14 @@ pub fn run(
         }
     }
 
+    let stop_bool = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    for sig in TERM_SIGNALS {
+        signal_hook::flag::register_conditional_default(*sig, Arc::clone(&stop_bool))
+            .context("Failed to register signal handler!")?;
+        signal_hook::flag::register(*sig, Arc::clone(&stop_bool))
+            .context("Failed to register signal handler!")?;
+    }
+
     /* ----------------------- Init Assistant ----------------------*/
     let assistant = Assistant::new(Some(callback), None);
 
@@ -291,9 +302,15 @@ pub fn run(
     /* ------------------------ Run Assistant ----------------------*/
     assistant.start()?;
     while assistant.running() {
-        std::thread::sleep(std::time::Duration::from_millis(5000));
+        if stop_bool.load(std::sync::atomic::Ordering::Relaxed) {
+            bail!("Interrupted by user!");
+        }
+        std::thread::sleep(std::time::Duration::from_millis(500));
     }
     assistant.stop()?;
+
+    // TODO: Better ways to restore signal handlers?
+    stop_bool.store(true, std::sync::atomic::Ordering::Relaxed);
 
     /* ------------------------- Close Game ------------------------*/
     if close_app > 1 {
