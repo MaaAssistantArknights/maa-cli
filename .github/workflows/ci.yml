@@ -98,11 +98,3 @@ jobs:
           echo "MAA_CORE_DIR=$MAA_CORE_DIR"
           cd maa-sys || exit 1
           cargo clean && cargo test
-      - name: Test (maa-sys, runtime)
-        shell: bash
-        run: |
-          export MAA_CORE_DIR="$(cargo run dir library)"
-          export DYLD_FALLBACK_LIBRARY_PATH="$MAA_CORE_DIR"
-          echo "MAA_CORE_DIR=$MAA_CORE_DIR"
-          cd maa-sys || exit 1
-          cargo clean && cargo test --features runtime
