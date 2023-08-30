@@ -84,8 +84,6 @@ jobs:
         if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
         run: |
           $CARGO_CMD test --package maa-cli --locked
-      # All following steps are not run for aarch64
-      # We just make sure that the build works
       - name: Install MaaCore
         if: matrix.arch == 'x86_64'
         env:
@@ -97,10 +95,10 @@ jobs:
         run: |
           MAA_CORE_DIR="$(cargo run -- dir lib)"
           RESOURCE_DIR="$(cargo run -- dir resource)"
-          cd $MAA_CORE_DIR || exit 1
-          ls -l $MAA_CORE_DIR
-          cd $RESOURCE_DIR || exit 1
-          ls -l $RESOURCE_DIR
+          cd "$MAA_CORE_DIR" || exit 1
+          ls -l "$MAA_CORE_DIR"
+          cd "$RESOURCE_DIR" || exit 1
+          ls -l "$RESOURCE_DIR"
           echo "MAA_CORE_DIR=$MAA_CORE_DIR" >> $GITHUB_ENV
       - name: Try run with MaaCore
         if: matrix.arch == 'x86_64'
