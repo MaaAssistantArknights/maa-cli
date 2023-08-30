@@ -39,60 +39,73 @@ jobs:
   build:
     name: Build and test
     needs: lint
+    defaults:
+      run:
+        shell: bash
     runs-on: ${{ matrix.os }}
-    env:
-      CARGO_BUILD_TARGET: ${{ matrix.triple }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            triple: x86_64-unknown-linux-gnu
-          # - os: ubuntu-latest
-          #   triple: aarch64-unknown-linux-gnu
-          - os: macos-latest
-            triple: x86_64-apple-darwin
-          # - os: macos-latest
-          #   triple: aarch64-apple-darwin
-          # - os: windows-latest
-          #   triple: x86_64-pc-windows-msvc
-          # - os: windows-latest
-          #   triple: aarch64-pc-windows-msvc
+        os:
+          - ubuntu-latest
+          - macos-latest
+          # - windows-latest
+        arch:
+          - x86_64
+          - aarch64
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Setup Rust
-        shell: bash
+      - name: Install Cross
+        if: matrix.os == 'ubuntu-latest' && matrix.arch == 'aarch64'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+      - name: Setup environment
         run: |
-          rustup target add $CARGO_BUILD_TARGET
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            CARGO_CMD=cargo
+            CARGO_BUILD_TARGET="${{ matrix.arch }}-apple-darwin"
+            rustup target add $CARGO_BUILD_TARGET
+          else
+            if [ "${{ matrix.arch }}" = "aarch64" ]; then
+              CARGO_CMD=cross
+            else
+              CARGO_CMD=cargo
+            fi
+            CARGO_BUILD_TARGET="${{ matrix.arch }}-unknown-linux-gnu"
+          fi
+          echo "CARGO_CMD=$CARGO_CMD" >> $GITHUB_ENV
+          echo "CARGO_BUILD_TARGET=$CARGO_BUILD_TARGET" >> $GITHUB_ENV
       - name: Build (maa-cli)
-        shell: bash
         run: |
-          cargo build --bin maa --locked
+          $CARGO_CMD build --package maa-cli --locked
+      - name: Test (maa-cli)
+        if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
+        run: |
+          $CARGO_CMD test --package maa-cli --locked
       - name: Install MaaCore
-        shell: bash
+        if: matrix.arch == 'x86_64'
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
         run: |
-          cargo run install beta
+          cargo run -- install beta
       - name: Show installation
-        shell: bash
+        if: matrix.arch == 'x86_64'
         run: |
-          ls -l "$(cargo run dir library)"
-          ls -l "$(cargo run dir resource)"
-      - name: Test (maa-cli)
-        shell: bash
+          MAA_CORE_DIR="$(cargo run -- dir lib)"
+          RESOURCE_DIR="$(cargo run -- dir resource)"
+          cd "$MAA_CORE_DIR" || exit 1
+          ls -l "$MAA_CORE_DIR"
+          cd "$RESOURCE_DIR" || exit 1
+          ls -l "$RESOURCE_DIR"
+          echo "MAA_CORE_DIR=$MAA_CORE_DIR" >> $GITHUB_ENV
+      - name: Try run with MaaCore
+        if: matrix.arch == 'x86_64'
         run: |
-          export DYLD_FALLBACK_LIBRARY_PATH="$(cargo run dir library)"
-          cargo test --bin maa --locked
-      - name: Try run
-        shell: bash
-        run: |
-          export DYLD_FALLBACK_LIBRARY_PATH="$(cargo run dir library)"
+          export DYLD_FALLBACK_LIBRARY_PATH="$MAA_CORE_DIR"
           cargo run -- version
       - name: Test (maa-sys, static)
-        shell: bash
+        if: matrix.arch == 'x86_64'
         run: |
-          export MAA_CORE_DIR="$(cargo run dir library)"
-          cd maa-sys || exit 1
-          cargo clean && cargo test
+          cargo test --package maa-sys --locked
