@@ -57,7 +57,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Setup target
-        id: target
         run: |
           if [ "${{ matrix.arch }}" = "aarch64" ]; then
             cargo install cross
@@ -74,7 +73,7 @@ jobs:
           echo "CARGO_BUILD_TARGET=$CARGO_BUILD_TARGET" >> $GITHUB_ENV
       - name: Build (maa-cli)
         run: |
-          $CARGO_CMD build --package maa-cli --locked --target $CARGO_BUILD_TARGET
+          $CARGO_CMD build --package maa-cli --locked
       - name: Install MaaCore
         if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
         env:
@@ -84,19 +83,19 @@ jobs:
       - name: Show installation and setup environment
         if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
         run: |
-          ls -l "$(cargo run dir library)"
-          ls -l "$(cargo run dir resource)"
-          echo "MAA_CORE_DIR=$(cargo run dir library)" >> $GITHUB_ENV
-          echo "DYLD_FALLBACK_LIBRARY_PATH=$(cargo run dir library)" >> $GITHUB_ENV
+          ls -l "$($CARGO_CMD run dir library)"
+          ls -l "$($CARGO_CMD run dir resource)"
+          echo "MAA_CORE_DIR=$($CARGO_CMD run dir library)" >> $GITHUB_ENV
       - name: Test (maa-cli)
-        if: matrix.arch == 'x86_64' || matrix.os == 'macos-latest'
+        if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
         run: |
-          $CARGO_CMD test --package maa-cli --locked --target $CARGO_BUILD_TARGET
+          $CARGO_CMD test --package maa-cli --locked
       - name: Try run
-        if: matrix.arch == 'x86_64' || matrix.os == 'macos-latest'
+        if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
         run: |
-          $CARGO_CMD run --package maa-cli --locked --target $CARGO_BUILD_TARGET -- version
+          export DYLD_FALLBACK_LIBRARY_PATH="$MAA_CORE_DIR"
+          $CARGO_CMD run --package maa-cli --locked -- version
       - name: Test (maa-sys, static)
-        if: matrix.arch == 'x86_64' || matrix.os == 'macos-latest'
+        if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
         run: |
-          $CARGO_CMD test --package maa-sys --locked --target $CARGO_BUILD_TARGET
+          $CARGO_CMD test --package maa-sys --locked
