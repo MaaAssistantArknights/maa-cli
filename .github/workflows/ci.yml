@@ -22,8 +22,23 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Rust
+        run: |
+          rustup component add clippy rustfmt
+      - name: Lint (clippy)
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Lint (rustfmt)
+        run: cargo fmt --all --check
+
   build:
     name: Build and test
+    needs: lint
     runs-on: ${{ matrix.os }}
     env:
       CARGO_BUILD_TARGET: ${{ matrix.triple }}
@@ -47,28 +62,37 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Setup Rust
+        shell: bash
         run: |
           rustup target add $CARGO_BUILD_TARGET
-          rustup component add clippy rustfmt
-      - name: Build
-        run: cargo build --workspace --locked
-      - name: Lint (clippy)
-        run: cargo clippy --all-targets --all-features -- -D warnings
-      - name: Lint (rustfmt)
-        run: cargo fmt --all --check
+      - name: Build (maa-cli)
+        shell: bash
+        run: |
+          cargo build --bin maa --locked
       - name: Install MaaCore
+        shell: bash
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
         run: |
           cargo run install beta
+      - name: Show installation
+        shell: bash
+        run: |
           ls -l "$(cargo run dir library)"
           ls -l "$(cargo run dir resource)"
-      - name: Test
+      - name: Test (maa-cli)
+        shell: bash
         run: |
-          export MAA_CORE_DIR="$(cargo run dir library)"
-          export DYLD_FALLBACK_LIBRARY_PATH="$MAA_CORE_DIR"
-          cargo test --all-targets --all-features --locked
+          export DYLD_FALLBACK_LIBRARY_PATH="$(cargo run dir library)"
+          cargo test --bin maa --locked
       - name: Try run
+        shell: bash
         run: |
           export DYLD_FALLBACK_LIBRARY_PATH="$(cargo run dir library)"
           cargo run -- version
+      - name: Test (maa-sys, static)
+        shell: bash
+        run: |
+          export MAA_CORE_DIR="$(cargo run dir library)"
+          cd maa-sys || exit 1
+          cargo clean && cargo test

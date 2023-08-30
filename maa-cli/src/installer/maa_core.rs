@@ -36,11 +36,18 @@ fn extract_mapper(
     resource: bool,
 ) -> Option<PathBuf> {
     let mut components = path.components();
-    while let Some(c) = components.next() {
+    for c in components.by_ref() {
         match c {
             Component::Normal(c) => {
                 if resource && c == "resource" {
-                    return Some(resource_dir.join(components.as_path()));
+                    // The components.as_path() is not working
+                    // because it return a path with / as separator on windows
+                    // I don't know why
+                    let mut path = resource_dir.to_path_buf();
+                    for c in components.by_ref() {
+                        path.push(c);
+                    }
+                    return Some(path);
                 } else if c
                     .to_str() // The DLL suffix may not the last part of the file name
                     .is_some_and(|s| s.starts_with(DLL_PREFIX) && s.contains(DLL_SUFFIX))
@@ -298,7 +305,7 @@ pub fn find_resource(dirs: &Dirs) -> Option<PathBuf> {
             return Some(resource_dir);
         }
         if let Some(dir) = exe_dir.parent() {
-            let resource_dir = dir.join("share/maa/resource");
+            let resource_dir = dir.join("share").join("maa").join("resource");
             if resource_dir.exists() {
                 return Some(resource_dir);
             }

@@ -320,6 +320,7 @@ pub fn run(
 
 pub fn core_version<'a>(dirs: &Dirs) -> Result<&'a str> {
     let core_path = find_maa_core(dirs).context("Failed to find MaaCore!")?;
+
     maa_sys::binding::load(core_path);
 
     Ok(Assistant::get_version()?)

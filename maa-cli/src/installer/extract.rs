@@ -94,11 +94,14 @@ fn extract_zip(file: &Path, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Result
             None => continue,
         };
 
-        if file.is_dir() {
-            outpath.ensure()?;
-        } else if outpath.exists() && metadata(&outpath).is_ok_and(|m| m.len() == file.size()) {
+        if file.is_dir()
+            || (outpath.exists() && metadata(&outpath).is_ok_and(|m| m.len() == file.size()))
+        {
             continue;
         } else {
+            if let Some(p) = outpath.parent() {
+                p.ensure()?;
+            }
             let mut outfile = File::create(&outpath)
                 .with_context(|| format!("Failed to create file: {}", outpath.display()))?;
             copy(&mut file, &mut outfile)

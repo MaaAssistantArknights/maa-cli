@@ -6,12 +6,18 @@ on:
   workflow_dispatch:
 
 jobs:
-  x86_64-unknown-linux-gnu:
+  linux-gnu:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        targets:
+          - x86_64-unknown-linux-gnu
+          - aarch64-unknown-linux-gnu
     env:
-      CARGO_BUILD_TARGET: x86_64-unknown-linux-gnu
+      CARGO_BUILD_TARGET: ${{ matrix.targets }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -121,3 +127,70 @@ jobs:
             exit 0
           fi
           git commit version.json -m "Update version.json" && git push
+
+  # windows-msvc:
+  #   runs-on: windows-latest
+  #   permissions:
+  #     contents: write
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       targets:
+  #         - x86_64-pc-windows-msvc
+  #         - aarch64-pc-windows-msvc
+  #   env:
+  #     CARGO_BUILD_TARGET: ${{ matrix.targets }}
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v3
+  #     - name: Setup Rust
+  #       shell: bash
+  #       run: |
+  #         rustup target add $CARGO_BUILD_TARGET
+  #     - name: Build
+  #       shell: bash
+  #       run: |
+  #         cargo build --release --locked --bin maa
+  #     - name: Checkout version branch
+  #       uses: actions/checkout@v3
+  #       with:
+  #         ref: version
+  #         path: version
+  #     - name: Archive binaries, generate checksums and update version.json
+  #       id: archive
+  #       shell: bash
+  #       run: |
+  #         version_file="$PWD/version/version.json"
+  #         target="$CARGO_BUILD_TARGET"
+  #         maa_cli_version=$(yq -oy ".package.version" maa-cli/Cargo.toml)
+  #         cd target/x86_64-pc-windows-msvc/release || exit 1
+  #           version=$maa_cli_version
+  #           archive_name="maa_cli-v$version-$target.zip"
+  #           zip $archive_name maa.exe &&
+  #             checksum=$(shasum -a 256 $archive_name) &&
+  #             echo "$checksum" > $archive_name.sha256sum &&
+  #             yq -i -oj ".maa-cli.$target.version = \"$version\"" $version_file &&
+  #             yq -i -oj ".maa-cli.$target.tag = \"v$version\"" $version_file &&
+  #             yq -i -oj ".maa-cli.$target.name = \"$archive_name\"" $version_file &&
+  #             yq -i -oj ".maa-cli.$target.size = $(stat -c %s $archive_name)" $version_file &&
+  #             yq -i -oj ".maa-cli.$target.sha256sum = \"$(echo $checksum | cut -d ' ' -f 1)\"" $version_file &&
+  #             echo "name=v$version" >> $GITHUB_OUTPUT &&
+  #             exit 0
+  #     - name: Upload to GitHub Releases
+  #       uses: svenstaro/upload-release-action@v2
+  #       with:
+  #         repo_token: ${{ secrets.GITHUB_TOKEN }}
+  #         file_glob: true
+  #         file: target/x86_64-pc-windows-msvc/release/maa*.zip*
+  #         overwrite: true
+  #     - name: Commit and push version.json
+  #       shell: bash
+  #       run: |
+  #         cd version || exit 1
+  #         git config --local user.name "github-actions[bot]"
+  #         git config --local user.email "github-actions[bot]@users.noreply.github.com"
+  #         if [ -z "$(git diff version.json)" ]; then
+  #           echo "No changes to commit"
+  #           exit 0
+  #         fi
+  #         git commit version.json -m "Update version.json" && git push
