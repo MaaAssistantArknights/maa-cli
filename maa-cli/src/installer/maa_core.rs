@@ -36,7 +36,7 @@ fn extract_mapper(
     resource: bool,
 ) -> Option<PathBuf> {
     let mut components = path.components();
-    while let Some(c) = components.next() {
+    for c in components.by_ref() {
         match c {
             Component::Normal(c) => {
                 if resource && c == "resource" {
@@ -44,7 +44,7 @@ fn extract_mapper(
                     // because it return a path with / as separator on windows
                     // I don't know why
                     let mut path = resource_dir.to_path_buf();
-                    while let Some(c) = components.next() {
+                    for c in components.by_ref() {
                         path.push(c);
                     }
                     return Some(path);
