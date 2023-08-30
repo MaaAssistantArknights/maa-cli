@@ -9,16 +9,33 @@ on:
       - main
     paths:
       - ".github/workflows/release.yml"
-  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
 
 jobs:
+  version:
+    name: Get Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Get Version
+        id: version
+        run: |
+          VERSION=$(yq -oy ".package.version" maa-cli/Cargo.toml)
+          echo "$VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
   build:
+    name: Build
     runs-on: ${{ matrix.os }}
-    permissions:
-      contents: write
-    defaults:
-      run:
-        shell: bash
     strategy:
       fail-fast: false
       matrix:
@@ -37,7 +54,7 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cross
-      - name: Setup environment
+      - name: Setup Environment
         run: |
           if [ "${{ matrix.os }}" = "macos-latest" ]; then
             CARGO_CMD=cargo
@@ -54,117 +71,111 @@ jobs:
           echo "CARGO_CMD=$CARGO_CMD" >> $GITHUB_ENV
           echo "CARGO_BUILD_TARGET=$CARGO_BUILD_TARGET" >> $GITHUB_ENV
       - name: Build
+        id: build
         run: |
           $CARGO_CMD build --release --locked --package maa-cli
-      - name: Checkout version branch
-        uses: actions/checkout@v3
+          cd "target/$CARGO_BUILD_TARGET/release"
+          tarball="$CARGO_BUILD_TARGET.tar"
+          tar -cvf $tarball maa
+          echo "file_path=$PWD/$tarball" >> $GITHUB_OUTPUT
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
         with:
-          ref: version
-          path: version
-      - name: Archive binaries, generate checksums and update version.json
-        id: archive
-        run: |
-          version_file="$PWD/version/version.json"
-          target="$CARGO_BUILD_TARGET"
-          version=$(yq -oy ".package.version" maa-cli/Cargo.toml)
-          cd "target/$target/release" || exit 1
-          if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
-            archive_name="maa_cli-v$version-$target.tar.gz"
-            tar -czvf $archive_name maa || exit 1
-            yq -i -oj ".maa-cli.$target.size = $(stat -c %s $archive_name)" $version_file
-          else
-            archive_name="maa_cli-v$version-$target.zip"
-            zip $archive_name maa || exit 1
-            yq -i -oj ".maa-cli.$target.size = $(stat -f %z $archive_name)" $version_file
-          fi
-          checksum="$(shasum -a 256 $archive_name)"
-          echo "$checksum" > $archive_name.sha256sum
-          yq -i -oj ".maa-cli.$target.version = \"$version\"" $version_file
-          yq -i -oj ".maa-cli.$target.tag = \"v$version\"" $version_file
-          yq -i -oj ".maa-cli.$target.name = \"$archive_name\"" $version_file
-          yq -i -oj ".maa-cli.$target.sha256sum = \"$(echo $checksum | cut -d ' ' -f 1)\"" $version_file
-          echo "name=v$version" >> $GITHUB_OUTPUT
-      - name: Upload to GitHub Releases
-        if: github.event_name == 'push' && github.ref == 'refs/tags/v*'
-        uses: svenstaro/upload-release-action@v2
-        with:
-          release_name: ${{ steps.archive.outputs.name }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file_glob: true
-          file: target/*/release/maa.*z*
-          overwrite: true
-      - name: Commit and push version.json
-        if: github.event_name == 'push' && github.ref == 'refs/tags/v*'
-        run: |
-          cd version || exit 1
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          if [ -z "$(git diff version.json)" ]; then
-            echo "No changes to commit"
-            exit 1
-          fi
-          git commit version.json -m "Update version.json" &&
-            git push
+          name: maa_cli-${{ env.CARGO_BUILD_TARGET }}
+          path: ${{ steps.build.outputs.file_path }}
+          retention-days: 1
 
-  universal-apple-darwin:
+  build-universal:
+    name: Build Universal Binary
     runs-on: macos-latest
     needs: build
+    steps:
+      # download all artifacts, even if not all are used,
+      # because this action don't support wildcards
+      - name: Download Artifacts
+        uses: actions/download-artifact@v3
+      - name: Create universal binaries
+        id: build
+        run: |
+          for arch in x86_64 aarch64; do
+            target="$arch-apple-darwin"
+            dir="maa_cli-$target"
+            tar -xvf "$dir/$target.tar" -C "$dir"
+          done
+          lipo -create -output maa maa_cli-x86_64-apple-darwin/maa maa_cli-aarch64-apple-darwin/maa
+          tarball="universal-apple-darwin.tar"
+          tar -cvf $tarball maa
+          echo "file_path=$PWD/$tarball" >> $GITHUB_OUTPUT
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: maa_cli-universal-apple-darwin
+          path: ${{ steps.build.outputs.file_path }}
+          retention-days: 1
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [version, build, build-universal]
     permissions:
       contents: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Get tag
-        run: |
-          echo "MAA_CLI_VERSION=$(yq -oy ".package.version" maa-cli/Cargo.toml)" >> $GITHUB_ENV
-      - name: Download artifacts from GitHub Release
-        uses: robinraju/release-downloader@v1.8
-        with:
-          tag: "v${{ env.MAA_CLI_VERSION }}"
-          filename: maa_cli-v${{ env.MAA_CLI_VERSION }}-*-apple-darwin.zip
-      - name: Checkout version branch
+      - name: Download Artifacts
+        uses: actions/download-artifact@v3
+      - name: Checkout version branch (Release)
+        if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
         uses: actions/checkout@v3
         with:
           ref: version
           path: version
-      - name: Create universal binaries, archive, generate checksums and update version.json
-        id: archive
-        run: |
-          version_file="$PWD/version/version.json"
-          version=$MAA_CLI_VERSION
-          for arch in x86_64 aarch64; do
-            mkdir -p "arch-apple-darwin"
-            unzip maa_cli-v$version-$arch-apple-darwin.zip -d arch-apple-darwin
-          done
-          target="universal-apple-darwin"
-          archive_name="maa_cli-v$version-$target.zip"
-          lipo -create -output maa x86_64-apple-darwin/release/maa aarch64-apple-darwin/release/maa &&
-            zip $archive_name maa &&
-            checksum=$(shasum -a 256 $archive_name) &&
-            echo "$checksum" > $archive_name.sha256sum &&
-            yq -i -oj ".maa-cli.$target.version = \"$version\"" $version_file &&
-            yq -i -oj ".maa-cli.$target.tag = \"v$version\"" $version_file &&
-            yq -i -oj ".maa-cli.$target.name = \"$archive_name\"" $version_file &&
-            yq -i -oj ".maa-cli.$target.size = $(stat -f %z $archive_name)" $version_file &&
-            yq -i -oj ".maa-cli.$target.sha256sum = \"$(echo $checksum | cut -d ' ' -f 1)\"" $version_file &&
-            echo "name=v$version" >> $GITHUB_OUTPUT &&
-            exit 0
-      - name: Upload to GitHub Releases
-        uses: svenstaro/upload-release-action@v2
-        if: github.event_name == 'push' && github.ref == 'refs/tags/v*'
+      - name: Checkout version branch (Test)
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v3
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file_glob: true
-          file: target/maa*.zip*
-          overwrite: true
-      - name: Commit and push version.json
-        if: github.event_name == 'push' && github.ref == 'refs/tags/v*'
+          ref: version-test
+          path: version
+      - name: Extract files, Generate checksums and Update version.json
         run: |
-          cd version || exit 1
+          version=${{ needs.version.outputs.version }}
+          for target in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu universal-apple-darwin; do
+            dir="maa_cli-$target"
+            tar -xvf "$dir/$target.tar" -C "$dir"
+            if [ "$target" == "universal-apple-darwin" ]; then
+              archive_name="maa_cli-v$version-$target.zip"
+              zip -r $archive_name $dir/maa
+            else
+              archive_name="maa_cli-v$version-$target.tar.gz"
+              tar -czvf $archive_name $dir/maa
+            fi
+            checksum=$(sha256sum $archive_name)
+            size=$(stat -c%s $archive_name)
+            checksum_hash=$(echo $checksum | cut -d ' ' -f 1)
+            echo $checksum > $archive_name.sha256sum
+            version_file="version/version.json"
+            yq -i -oj ".maa-cli.$target.version = \"$version\"" $version_file
+            yq -i -oj ".maa-cli.$target.tag = \"v$version\"" $version_file
+            yq -i -oj ".maa-cli.$target.name = \"$archive_name\"" $version_file
+            yq -i -oj ".maa-cli.$target.size = $size" $version_file
+            yq -i -oj ".maa-cli.$target.sha256sum = \"$(echo $checksum | cut -d ' ' -f 1)\"" $version_file
+          done
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+        with:
+          name: v${{ needs.version.outputs.version }}
+          body: |
+            # maa-cli v${{ needs.version.outputs.version }}
+            ## Changelog
+            $(git log --pretty=format:"* %s" $(git describe --tags --abbrev=0)..HEAD)
+          fail_on_unmatched_files: true
+          files: |
+            maa_cli-v${{ needs.version.outputs.version }}-x86_64-unknown-linux-gnu.tar.gz*
+            maa_cli-v${{ needs.version.outputs.version }}-aarch64-unknown-linux-gnu.tar.gz*
+            maa_cli-v${{ needs.version.outputs.version }}-universal-apple-darwin.zip*
+      - name: Commit version.json and Push
+        working-directory: version
+        run: |
           git config --local user.name "github-actions[bot]"
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          if [ -z "$(git diff version.json)" ]; then
-            echo "No changes to commit"
-            exit 0
-          fi
-          git commit version.json -m "Update version.json" && git push
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit version.json -m "Update version.json"
+          git push
