@@ -118,7 +118,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    needs: [version, build, build-universal-apple-darwin]
+    needs: [version, build, build-universal]
     permissions:
       contents: write
     steps:
