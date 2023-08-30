@@ -69,11 +69,8 @@ impl MaaCore {
     }
 
     pub fn version(&self, dirs: &Dirs) -> Result<Version> {
-        let ver_str = run::core_version(dirs)?;
-
-        // Remove "\n" suffix
-        // Not works for nightly version
-        Version::parse(&ver_str[0..ver_str.len() - 1]).context("Failed to parse version")
+        let ver_str = run::core_version(dirs)?.trim();
+        Version::parse(&ver_str[1..]).context("Failed to parse version")
     }
 
     pub fn install(&self, dirs: &Dirs, force: bool, no_resource: bool, t: u64) -> Result<()> {
