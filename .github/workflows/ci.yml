@@ -65,22 +65,36 @@ jobs:
         shell: bash
         run: |
           rustup target add $CARGO_BUILD_TARGET
-      - name: Build
-        run: cargo build --workspace --locked
+      - name: Build (maa-cli)
+        shell: bash
+        run: |
+          cargo build --bin maa --locked
       - name: Install MaaCore
         shell: bash
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
         run: |
           cargo run install beta
+      - name: Show installation
+        shell: bash
+        run: |
           ls -l "$(cargo run dir library)"
           ls -l "$(cargo run dir resource)"
-      - name: Test
+      - name: Test (maa-sys, static)
         shell: bash
         run: |
           export MAA_CORE_DIR="$(cargo run dir library)"
-          export DYLD_FALLBACK_LIBRARY_PATH="$MAA_CORE_DIR"
-          cargo test --all-targets --all-features --locked
+          cargo test --bin maa-sys --locked
+      - name: Test (maa-sys, runtime)
+        shell: bash
+        run: |
+          export MAA_CORE_DIR="$(cargo run dir library)"
+          cargo test --bin maa-sys --features runtime --locked
+      - name: Test (maa-cli)
+        shell: bash
+        run: |
+          export DYLD_FALLBACK_LIBRARY_PATH="$(cargo run dir library)"
+          cargo test --bin maa --locked
       - name: Try run
         shell: bash
         run: |
