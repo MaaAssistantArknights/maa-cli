@@ -27,7 +27,7 @@ jobs:
       - name: Get Version
         run: |
           VERSION=$(yq -oy ".package.version" maa-cli/Cargo.toml)
-          echo "version=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
   build:
     name: Build
@@ -72,6 +72,7 @@ jobs:
         run: |
           $CARGO_CMD build --release --locked --package maa-cli
           cd "target/$CARGO_BUILD_TARGET/release"
+          version=${{ needs.version.outputs.version }}
           if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
             archive_name="maa_cli-v$version-$target.tar.gz"
             tar -czvf $archive_name maa
