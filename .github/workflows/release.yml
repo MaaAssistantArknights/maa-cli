@@ -36,7 +36,6 @@ jobs:
   build:
     name: Build
     runs-on: ${{ matrix.os }}
-    needs: version
     strategy:
       fail-fast: false
       matrix:
@@ -89,7 +88,7 @@ jobs:
   build-universal:
     name: Build Universal Binary
     runs-on: macos-latest
-    needs: [version, build]
+    needs: build
     steps:
       # download all artifacts, even if not all are used,
       # because this action don't support wildcards
@@ -109,11 +108,11 @@ jobs:
           lipo -create -output maa maa_cli-x86_64-apple-darwin/maa maa_cli-aarch64-apple-darwin/maa
           tarball="maa_cli-v$version-$target.tar"
           tar -cvf $tarball maa
-          echo "file_path=$PWD/$archive_name" >> $GITHUB_OUTPUT
+          echo "file_path=$PWD/$tarball" >> $GITHUB_OUTPUT
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
-          name: maa_cli-v${{ needs.version.outputs.version }}-universal-apple-darwin
+          name: maa_cli-universal-apple-darwin
           path: ${{ steps.build.outputs.file_path }}
           retention-days: 1
 
