@@ -114,7 +114,6 @@ impl MaaCore {
         // because the download may be interrupted
         let lib_dir = find_lib_dir(dirs).context("MaaCore not found")?;
         let resource_dir = find_resource(dirs).context("Resource dir not found")?;
-        lib_dir.ensure_clean()?;
         resource_dir.ensure_clean()?;
         archive
             .extract(|path: &Path| extract_mapper(path, &lib_dir, &resource_dir, !no_resource))?;
