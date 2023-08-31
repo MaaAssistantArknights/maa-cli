@@ -96,4 +96,5 @@ pub trait FindFile: FromFile {
 impl<T> FindFile for T where T: FromFile {}
 
 pub mod asst;
+pub mod cli;
 pub mod task;
