@@ -122,7 +122,9 @@ impl MaaCore {
     }
 }
 
-#[derive(ValueEnum, Clone, Copy, Default)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(ValueEnum, Clone, Copy, Default, Deserialize)]
+#[serde(rename_all = "kebab-case")] // Rename to kebab-case to match CLI option
 pub enum Channel {
     #[default]
     Stable,

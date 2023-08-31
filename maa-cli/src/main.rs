@@ -4,6 +4,7 @@ mod installer;
 mod log;
 mod run;
 
+use crate::config::{cli::CLIConfig, FindFile};
 use crate::installer::{
     maa_cli,
     maa_core::{self, Channel, MaaCore},
@@ -25,7 +26,6 @@ enum CLI {
     /// please update them by `maa-cli update`.
     /// Note: If you want to install maa-run, please use `maa-cli self install`.
     Install {
-        #[arg(default_value_t = Channel::default())]
         /// Channel to download prebuilt package
         ///
         /// There are three channels of maa-core prebuilt packages,
@@ -33,8 +33,10 @@ enum CLI {
         /// The default channel is stable, you can use this flag to change the channel.
         /// If you want to use the latest features of maa-core,
         /// you can use beta or alpha channel.
+        /// You can also configure the default channel
+        /// in the cli configure file `$MAA_CONFIG_DIR/cli.toml` with the key `channel`.
         /// Note: the alpha channel is only available for windows.
-        channel: Channel,
+        channel: Option<Channel>,
         /// Time to test download speed
         ///
         /// There are several mirrors of maa-core prebuilt packages,
@@ -83,7 +85,6 @@ enum CLI {
     /// Note: If the maa-core and resource are not installed,
     /// please install them by `maa-cli install`.
     Update {
-        #[arg(default_value_t = Channel::default())]
         /// Channel to download prebuilt package
         ///
         /// There are three channels of maa-core prebuilt packages,
@@ -91,9 +92,12 @@ enum CLI {
         /// The default channel is stable, you can use this flag to change the channel.
         /// If you want to use the latest features of maa-core,
         /// you can use beta or alpha channel.
+        /// You can also configure the default channel
+        /// in the cli configure file `$MAA_CONFIG_DIR/cli.toml` with the key `channel`.
         /// Note: the alpha channel is only available for windows.
-        /// Note: if the maa-core is not installed, we will install it.
-        channel: Channel,
+        /// Note: if the maa-core is not installed, please use `maa-cli install` instead.
+        /// And if the core is broken, please use `maa-cli install --force` to reinstall it.
+        channel: Option<Channel>,
         /// Do not update resource
         ///
         /// By default, resources are shipped with maa-core,
@@ -279,6 +283,9 @@ fn main() -> Result<()> {
             test_time,
             force,
         } => {
+            let cli_config =
+                CLIConfig::find_file(&proj_dirs.config().join("cli")).unwrap_or_default();
+            let channel = channel.unwrap_or(cli_config.channel);
             MaaCore::new(channel).install(&proj_dirs, force, no_resource, test_time)?;
         }
         CLI::Update {
@@ -286,6 +293,9 @@ fn main() -> Result<()> {
             no_resource,
             test_time,
         } => {
+            let cli_config =
+                CLIConfig::find_file(&proj_dirs.config().join("cli")).unwrap_or_default();
+            let channel = channel.unwrap_or(cli_config.channel);
             MaaCore::new(channel).update(&proj_dirs, no_resource, test_time)?;
         }
         CLI::SelfCommand(self_command) => match self_command {
