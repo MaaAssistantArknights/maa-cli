@@ -283,7 +283,8 @@ fn main() -> Result<()> {
             test_time,
             force,
         } => {
-            let cli_config = CLIConfig::find_file(proj_dirs.config()).unwrap_or_default();
+            let cli_config =
+                CLIConfig::find_file(&proj_dirs.config().join("cli")).unwrap_or_default();
             let channel = channel.unwrap_or(cli_config.channel);
             MaaCore::new(channel).install(&proj_dirs, force, no_resource, test_time)?;
         }
@@ -292,7 +293,8 @@ fn main() -> Result<()> {
             no_resource,
             test_time,
         } => {
-            let cli_config = CLIConfig::find_file(proj_dirs.config()).unwrap_or_default();
+            let cli_config =
+                CLIConfig::find_file(&proj_dirs.config().join("cli")).unwrap_or_default();
             let channel = channel.unwrap_or(cli_config.channel);
             MaaCore::new(channel).update(&proj_dirs, no_resource, test_time)?;
         }
