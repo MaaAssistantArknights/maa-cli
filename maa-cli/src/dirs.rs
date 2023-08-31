@@ -233,7 +233,7 @@ mod tests {
                     home_dir.join("Library/Application Support/com.loong.maa/config")
                 );
             } else if cfg!(target_os = "linux") {
-                assert_eq!(dirs.config(), home_dir.join(".config/maa/config"));
+                assert_eq!(dirs.config(), home_dir.join(".config/maa"));
             }
 
             env::set_var("XDG_CONFIG_HOME", "/xdg");
