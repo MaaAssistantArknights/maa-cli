@@ -1,7 +1,7 @@
 [package]
 name = "maa-cli"
 authors = ["Loong Wang <wangl-cc@outlook.com>"]
-version = "0.3.2"
+version = "0.3.3"
 edition = "2021"
 license.workspace = true
 
