@@ -163,10 +163,7 @@ jobs:
         if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
         with:
           name: v${{ needs.version.outputs.version }}
-          body: |
-            # maa-cli v${{ needs.version.outputs.version }}
-            ## Changelog
-            $(git log --pretty=format:"* %s" $(git describe --tags --abbrev=0)..HEAD)
+          generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
             maa_cli-v${{ needs.version.outputs.version }}-x86_64-unknown-linux-gnu.tar.gz*
