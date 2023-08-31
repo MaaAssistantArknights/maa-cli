@@ -71,7 +71,7 @@ impl Dirs {
             config: get_config_dir(&proj),
             resource: data_dir.join("resource"),
             state: state_dir.clone(),
-            log: state_dir.join("log"),
+            log: state_dir.join("debug"),
         }
     }
 
@@ -141,5 +141,129 @@ impl Ensure for &Path {
         }
         create_dir(self)?;
         Ok(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod get_dir {
+        use super::*;
+        use std::env;
+
+        #[test]
+        fn state_relative() {
+            env::remove_var("XDG_STATE_HOME");
+            let project = ProjectDirs::from("com", "loong", "maa");
+            let home_dir = PathBuf::from(env::var_os("HOME").unwrap());
+            let dirs = Dirs::new(project.clone());
+            if cfg!(target_os = "macos") {
+                assert_eq!(
+                    dirs.state(),
+                    home_dir.join("Library/Application Support/com.loong.maa")
+                );
+                assert_eq!(
+                    dirs.log(),
+                    home_dir.join("Library/Application Support/com.loong.maa/debug")
+                );
+            } else if cfg!(target_os = "linux") {
+                assert_eq!(dirs.state(), home_dir.join(".local/state/maa"));
+                assert_eq!(dirs.log(), home_dir.join(".local/state/maa/debug"));
+            }
+
+            env::set_var("XDG_STATE_HOME", "/xdg");
+            let dirs = Dirs::new(project.clone());
+            assert_eq!(dirs.state(), PathBuf::from("/xdg/maa"));
+            assert_eq!(dirs.log(), PathBuf::from("/xdg/maa/debug"));
+
+            env::set_var("MAA_STATE_DIR", "/maa");
+            let dirs = Dirs::new(project.clone());
+            assert_eq!(dirs.state(), PathBuf::from("/maa"));
+            assert_eq!(dirs.log(), PathBuf::from("/maa/debug"));
+        }
+
+        #[test]
+        fn data_relative() {
+            env::remove_var("XDG_DATA_HOME");
+            let project = ProjectDirs::from("com", "loong", "maa");
+            let home_dir = PathBuf::from(env::var_os("HOME").unwrap());
+            let dirs = Dirs::new(project.clone());
+            if cfg!(target_os = "macos") {
+                assert_eq!(
+                    dirs.data(),
+                    home_dir.join("Library/Application Support/com.loong.maa")
+                );
+                assert_eq!(
+                    dirs.library(),
+                    home_dir.join("Library/Application Support/com.loong.maa/lib")
+                );
+                assert_eq!(
+                    dirs.resource(),
+                    home_dir.join("Library/Application Support/com.loong.maa/resource")
+                );
+            } else if cfg!(target_os = "linux") {
+                assert_eq!(dirs.data(), home_dir.join(".local/share/maa"));
+                assert_eq!(dirs.library(), home_dir.join(".local/share/maa/lib"));
+                assert_eq!(dirs.resource(), home_dir.join(".local/share/maa/resource"));
+            }
+
+            env::set_var("XDG_DATA_HOME", "/xdg");
+            let dirs = Dirs::new(project.clone());
+            assert_eq!(dirs.data(), PathBuf::from("/xdg/maa"));
+            assert_eq!(dirs.library(), PathBuf::from("/xdg/maa/lib"));
+            assert_eq!(dirs.resource(), PathBuf::from("/xdg/maa/resource"));
+
+            env::set_var("MAA_DATA_DIR", "/maa");
+            let dirs = Dirs::new(project.clone());
+            assert_eq!(dirs.data(), PathBuf::from("/maa"));
+            assert_eq!(dirs.library(), PathBuf::from("/maa/lib"));
+            assert_eq!(dirs.resource(), PathBuf::from("/maa/resource"));
+        }
+
+        #[test]
+        fn config_dir() {
+            env::remove_var("XDG_CONFIG_HOME");
+            let project = ProjectDirs::from("com", "loong", "maa");
+            let home_dir = PathBuf::from(env::var_os("HOME").unwrap());
+            let dirs = Dirs::new(project.clone());
+            if cfg!(target_os = "macos") {
+                assert_eq!(
+                    dirs.config(),
+                    home_dir.join("Library/Application Support/com.loong.maa/config")
+                );
+            } else if cfg!(target_os = "linux") {
+                assert_eq!(dirs.config(), home_dir.join(".config/maa/config"));
+            }
+
+            env::set_var("XDG_CONFIG_HOME", "/xdg");
+            let dirs = Dirs::new(project.clone());
+            assert_eq!(dirs.config(), PathBuf::from("/xdg/maa"));
+
+            env::set_var("MAA_CONFIG_DIR", "/maa");
+            let dirs = Dirs::new(project.clone());
+            assert_eq!(dirs.config(), PathBuf::from("/maa"));
+        }
+
+        #[test]
+        fn cache_dir() {
+            env::remove_var("XDG_CACHE_HOME");
+            let project = ProjectDirs::from("com", "loong", "maa");
+            let home_dir = PathBuf::from(env::var_os("HOME").unwrap());
+            let dirs = Dirs::new(project.clone());
+            if cfg!(target_os = "macos") {
+                assert_eq!(dirs.cache(), home_dir.join("Library/Caches/com.loong.maa"));
+            } else if cfg!(target_os = "linux") {
+                assert_eq!(dirs.cache(), home_dir.join(".cache/maa"));
+            }
+
+            env::set_var("XDG_CACHE_HOME", "/xdg");
+            let dirs = Dirs::new(project.clone());
+            assert_eq!(dirs.cache(), PathBuf::from("/xdg/maa"));
+
+            env::set_var("MAA_CACHE_DIR", "/maa");
+            let dirs = Dirs::new(project.clone());
+            assert_eq!(dirs.cache(), PathBuf::from("/maa"));
+        }
     }
 }
