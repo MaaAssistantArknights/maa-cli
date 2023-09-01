@@ -185,7 +185,9 @@ pub fn run(
                         }
                         None => true,
                     };
-                    close_app = playtools && enable;
+                    if playtools && enable {
+                        close_app = true;
+                    }
                 }
                 _ => {
                     // For any task that has a filename parameter
