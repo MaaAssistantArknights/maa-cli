@@ -1,11 +1,6 @@
 use crate::dirs::Ensure;
 
-use std::{
-    fs::{metadata, File},
-    io::copy,
-    path::Path,
-    path::PathBuf,
-};
+use std::{fs::File, io::copy, path::Path, path::PathBuf};
 
 use anyhow::{anyhow, bail, Context, Result};
 
