@@ -1,11 +1,6 @@
 use crate::dirs::Ensure;
 
-use std::{
-    fs::{metadata, File},
-    io::copy,
-    path::Path,
-    path::PathBuf,
-};
+use std::{fs::File, io::copy, path::Path, path::PathBuf};
 
 use anyhow::{anyhow, bail, Context, Result};
 
@@ -94,9 +89,7 @@ fn extract_zip(file: &Path, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Result
             None => continue,
         };
 
-        if file.is_dir()
-            || (outpath.exists() && metadata(&outpath).is_ok_and(|m| m.len() == file.size()))
-        {
+        if file.is_dir() {
             continue;
         } else {
             if let Some(p) = outpath.parent() {
@@ -142,11 +135,7 @@ fn extract_tar_gz(file: &Path, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Res
             p.ensure()?;
         }
 
-        if outpath.exists() && metadata(&outpath).is_ok_and(|m| m.len() == file.size()) {
-            continue;
-        } else {
-            file.unpack(&outpath)?;
-        }
+        file.unpack(&outpath)?;
     }
 
     println!("Done!");
