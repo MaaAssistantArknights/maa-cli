@@ -39,14 +39,11 @@ enum CLI {
         channel: Option<Channel>,
         /// Time to test download speed
         ///
-        /// There are several mirrors of maa-core prebuilt packages,
-        /// we will test the download speed of these mirrors,
+        /// There are several mirrors of maa-core prebuilt packages.
+        /// This command will test the download speed of these mirrors,
         /// and choose the fastest one to download.
-        /// This flag is used to set the time to test download speed.
-        /// If you want to increase the accuracy of the test,
-        /// please increase the value of this flag.
-        /// But if you think the test is too slow,
-        /// you can decrease the value of this flag.
+        /// This flag is used to set the time in seconds to test download speed.
+        /// If test time is 0, speed test will be skipped.
         #[arg(short, long, default_value_t = 3)]
         test_time: u64,
         /// Force to install even if the maa and resource already exists
@@ -115,14 +112,11 @@ enum CLI {
         no_resource: bool,
         /// Time to test download speed
         ///
-        /// There are several mirrors of maa-core prebuilt packages,
-        /// we will test the download speed of these mirrors,
+        /// There are several mirrors of maa-core prebuilt packages.
+        /// This command will test the download speed of these mirrors,
         /// and choose the fastest one to download.
-        /// This flag is used to set the time to test download speed.
-        /// If you want to increase the accuracy of the test,
-        /// please increase the value of this flag.
-        /// But if you think the test is too slow,
-        /// you can decrease the value of this flag.
+        /// This flag is used to set the time in seconds to test download speed.
+        /// If test time is 0, speed test will be skipped.
         #[arg(short, long, default_value_t = 3)]
         test_time: u64,
     },
@@ -229,8 +223,6 @@ enum SelfCommand {
     ///
     /// This command will download prebuilt binary of maa-cli,
     /// and install them to it current directory.
-    /// Note: we will check the version of maa-cli,
-    /// if the version is not newer, we will not update them.
     Update,
 }
 
@@ -317,11 +309,11 @@ fn main() -> Result<()> {
         },
         CLI::Version { component } => match component {
             Component::All => {
-                println!("maa-cli {}", env!("CARGO_PKG_VERSION"));
+                println!("maa-cli v{}", env!("CARGO_PKG_VERSION"));
                 println!("MaaCore {}", run::core_version(&proj_dirs)?);
             }
             Component::MaaCLI => {
-                println!("maa-cli {}", env!("CARGO_PKG_VERSION"));
+                println!("maa-cli v{}", env!("CARGO_PKG_VERSION"));
             }
             Component::MaaCore => {
                 println!("MaaCore {}", run::core_version(&proj_dirs)?);

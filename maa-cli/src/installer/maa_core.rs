@@ -80,13 +80,15 @@ impl MaaCore {
             bail!("MaaCore already exists, use `maa update` to update it or `maa install --force` to force reinstall")
         }
 
-        println!("Installing package (channel: {})...", self.channel);
-
+        println!(
+            "Fetching MaaCore version info (channel: {})...",
+            self.channel
+        );
+        let version_json = get_version_json(self.channel)?;
+        let asset = version_json.asset()?;
+        println!("Downloading MaaCore {}...", version_json.version_str());
         let cache_dir = &dirs.cache().ensure()?;
         let resource_dir = &dirs.resource().ensure_clean()?;
-
-        let version_json = get_version_json(self.channel)?;
-        let asset = &version_json.asset()?;
         let archive = asset.download(cache_dir, t)?;
         archive.extract(|path: &Path| extract_mapper(path, lib_dir, resource_dir, !no_resource))?;
 
@@ -94,17 +96,21 @@ impl MaaCore {
     }
 
     pub fn update(&self, dirs: &Dirs, no_resource: bool, t: u64) -> Result<()> {
+        println!(
+            "Fetching MaaCore version info (channel: {})...",
+            self.channel
+        );
         let version_json = get_version_json(self.channel)?;
         let current_version = self.version(dirs)?;
-        let new_version = version_json.version();
-        if current_version >= new_version {
-            println!("MaaCore is already up to date: v{}.", current_version);
+        let last_version = version_json.version();
+        if current_version >= last_version {
+            println!("Up to data: MaaCore v{}.", current_version);
             return Ok(());
         }
 
         println!(
-            "Found newer MaaCore version v{} current: v{}, updating...",
-            new_version, current_version
+            "Found newer MaaCore version: v{} (current: v{}), downloading...",
+            last_version, current_version
         );
 
         let cache_dir = &dirs.cache().ensure()?;
@@ -174,6 +180,10 @@ pub struct VersionJSON {
 impl VersionJSON {
     pub fn version(&self) -> Version {
         Version::parse(&self.version[1..]).unwrap()
+    }
+
+    pub fn version_str(&self) -> &str {
+        &self.version
     }
 
     pub fn name(&self) -> Result<String> {
@@ -249,15 +259,18 @@ impl Asset {
         }
 
         let url = &self.browser_download_url;
-        let mirrors = self.mirrors.clone();
+        let mut mirrors = self.mirrors.clone();
+        mirrors.push(url.to_owned());
 
         let client = reqwest::Client::builder()
-            .connect_timeout(Duration::from_secs(t))
+            .connect_timeout(Duration::from_secs(1))
             .build()
             .context("Failed to build reqwest client")?;
         Runtime::new()
             .context("Failed to create tokio runtime")?
-            .block_on(download_mirrors(&client, url, mirrors, &path, size, None))?;
+            .block_on(download_mirrors(
+                &client, url, mirrors, &path, size, t, None,
+            ))?;
 
         Archive::try_from(path)
     }
