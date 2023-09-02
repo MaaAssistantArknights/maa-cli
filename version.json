@@ -17,25 +17,25 @@
   },
   "maa-cli": {
     "x86_64-unknown-linux-gnu": {
-      "version": "0.3.5",
-      "tag": "v0.3.5",
-      "name": "maa_cli-v0.3.5-x86_64-unknown-linux-gnu.tar.gz",
-      "size": 4651322,
-      "sha256sum": "54189866da178ab2c82c2eeacca3e84678f448b0e997ad5ab75be52f8bcf05a4"
+      "version": "0.3.6",
+      "tag": "v0.3.6",
+      "name": "maa_cli-v0.3.6-x86_64-unknown-linux-gnu.tar.gz",
+      "size": 4651530,
+      "sha256sum": "77a4ddd51297af46a2874aa9ca9c5343ebdb314c3480d39baea4281415976e44"
     },
     "universal-apple-darwin": {
-      "version": "0.3.5",
-      "tag": "v0.3.5",
-      "name": "maa_cli-v0.3.5-universal-apple-darwin.zip",
-      "size": 6386210,
-      "sha256sum": "f63f9570363da2ddd0a4d6ff58312e1fdc10e77599298a37dc60500c9b8213e8"
+      "version": "0.3.6",
+      "tag": "v0.3.6",
+      "name": "maa_cli-v0.3.6-universal-apple-darwin.zip",
+      "size": 6424251,
+      "sha256sum": "00d67651d3bbbd0c4272e4299c06840b45092ed3ab3d3be8d869c01febcfc78b"
     },
     "aarch64-unknown-linux-gnu": {
-      "version": "0.3.5",
-      "tag": "v0.3.5",
-      "name": "maa_cli-v0.3.5-aarch64-unknown-linux-gnu.tar.gz",
-      "size": 4492177,
-      "sha256sum": "de473aaaa251d4e0b1cb814ba3dd00f9766a490b2c5bbe163f0f4dc62437d618"
+      "version": "0.3.6",
+      "tag": "v0.3.6",
+      "name": "maa_cli-v0.3.6-aarch64-unknown-linux-gnu.tar.gz",
+      "size": 4489463,
+      "sha256sum": "1fa1a73cae51330a8f98ccae1c7d8888d6cbeecead8fe964bed7ce5efc8dc6dd"
     }
   }
 }
