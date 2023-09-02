@@ -52,7 +52,7 @@ pub fn update(dirs: &Dirs) -> Result<()> {
             }
         })?;
     } else {
-        println!("Up to date: {} v{}.", name(), last_version);
+        println!("Up to date: maa-cli v{}.", last_version);
     }
 
     Ok(())

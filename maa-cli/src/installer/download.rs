@@ -186,34 +186,35 @@ async fn try_download(client: &Client, url: &str, timeout: Duration) -> Result<u
 /// * `mirrors` - The mirrors to choose from.
 /// * `path` - The path to save the downloaded file.
 /// * `size` - The size of the file.
+/// * `skip` - Whether to skip the speed test.
 /// * `checker` - The optional checksum checker.
-///
-/// *Note*: This function will skip the speed test if running in CI
-/// to reduce the load of the mirror server.
 pub async fn download_mirrors<'a>(
     client: &Client,
     fallback: &str,
     mirrors: Vec<String>,
     path: &Path,
     size: u64,
+    t: u64,
+    skip: bool,
     checker: Option<Checker<'a>>,
 ) -> Result<()> {
-    if std::env::var_os("CI").is_some() {
-        println!("Running in CI, skipping speed test...");
+    if skip || std::env::var_os("CI").is_some() {
+        println!("Skipping speed test...");
         download(client, fallback, path, size, checker).await?;
         return Ok(());
     }
 
-    let duration = Duration::from_secs(3);
+    let duration = Duration::from_secs(t);
     let mut fast_link = fallback;
     let mut largest: u64 = 0;
 
     println!("Speed test for mirrors...");
     for link in mirrors.iter() {
-        let downloaded = try_download(client, link, duration).await?;
-        if downloaded > largest {
-            largest = downloaded;
-            fast_link = link;
+        if let Ok(downloaded) = try_download(client, link, duration).await {
+            if downloaded > largest {
+                largest = downloaded;
+                fast_link = link;
+            }
         }
     }
 

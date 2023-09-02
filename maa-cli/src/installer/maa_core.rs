@@ -73,7 +73,14 @@ impl MaaCore {
         Version::parse(&ver_str[1..]).context("Failed to parse version")
     }
 
-    pub fn install(&self, dirs: &Dirs, force: bool, no_resource: bool, t: u64) -> Result<()> {
+    pub fn install(
+        &self,
+        dirs: &Dirs,
+        force: bool,
+        no_resource: bool,
+        t: u64,
+        skip: bool,
+    ) -> Result<()> {
         let lib_dir = &dirs.library().ensure()?;
 
         if lib_dir.join(MAA_CORE_NAME).exists() && !force {
@@ -87,18 +94,18 @@ impl MaaCore {
 
         let version_json = get_version_json(self.channel)?;
         let asset = &version_json.asset()?;
-        let archive = asset.download(cache_dir, t)?;
+        let archive = asset.download(cache_dir, t, skip)?;
         archive.extract(|path: &Path| extract_mapper(path, lib_dir, resource_dir, !no_resource))?;
 
         Ok(())
     }
 
-    pub fn update(&self, dirs: &Dirs, no_resource: bool, t: u64) -> Result<()> {
+    pub fn update(&self, dirs: &Dirs, no_resource: bool, t: u64, skip: bool) -> Result<()> {
         let version_json = get_version_json(self.channel)?;
         let current_version = self.version(dirs)?;
         let new_version = version_json.version();
         if current_version >= new_version {
-            println!("MaaCore is already up to date: v{}.", current_version);
+            println!("Up to data: MaaCore v{}.", current_version);
             return Ok(());
         }
 
@@ -109,7 +116,7 @@ impl MaaCore {
 
         let cache_dir = &dirs.cache().ensure()?;
         let asset = version_json.asset()?;
-        let archive = asset.download(cache_dir, t)?;
+        let archive = asset.download(cache_dir, t, skip)?;
         // Clean dirs before extracting, but not before downloading
         // because the download may be interrupted
         let lib_dir = find_lib_dir(dirs).context("MaaCore not found")?;
@@ -233,7 +240,7 @@ pub struct Asset {
 }
 
 impl Asset {
-    pub fn download(&self, dir: &Path, t: u64) -> Result<Archive> {
+    pub fn download(&self, dir: &Path, t: u64, skip: bool) -> Result<Archive> {
         let path = dir.join(&self.name);
         let size = self.size;
 
@@ -249,15 +256,18 @@ impl Asset {
         }
 
         let url = &self.browser_download_url;
-        let mirrors = self.mirrors.clone();
+        let mut mirrors = self.mirrors.clone();
+        mirrors.push(url.to_owned());
 
         let client = reqwest::Client::builder()
-            .connect_timeout(Duration::from_secs(t))
+            .connect_timeout(Duration::from_secs(1))
             .build()
             .context("Failed to build reqwest client")?;
         Runtime::new()
             .context("Failed to create tokio runtime")?
-            .block_on(download_mirrors(&client, url, mirrors, &path, size, None))?;
+            .block_on(download_mirrors(
+                &client, url, mirrors, &path, size, t, skip, None,
+            ))?;
 
         Archive::try_from(path)
     }
