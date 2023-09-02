@@ -73,50 +73,49 @@ impl MaaCore {
         Version::parse(&ver_str[1..]).context("Failed to parse version")
     }
 
-    pub fn install(
-        &self,
-        dirs: &Dirs,
-        force: bool,
-        no_resource: bool,
-        t: u64,
-        skip: bool,
-    ) -> Result<()> {
+    pub fn install(&self, dirs: &Dirs, force: bool, no_resource: bool, t: u64) -> Result<()> {
         let lib_dir = &dirs.library().ensure()?;
 
         if lib_dir.join(MAA_CORE_NAME).exists() && !force {
             bail!("MaaCore already exists, use `maa update` to update it or `maa install --force` to force reinstall")
         }
 
-        println!("Installing package (channel: {})...", self.channel);
-
+        println!(
+            "Fetching MaaCore version info (channel: {})...",
+            self.channel
+        );
+        let version_json = get_version_json(self.channel)?;
+        let asset = version_json.asset()?;
+        println!("Downloading MaaCore {}...", version_json.version_str());
         let cache_dir = &dirs.cache().ensure()?;
         let resource_dir = &dirs.resource().ensure_clean()?;
-
-        let version_json = get_version_json(self.channel)?;
-        let asset = &version_json.asset()?;
-        let archive = asset.download(cache_dir, t, skip)?;
+        let archive = asset.download(cache_dir, t)?;
         archive.extract(|path: &Path| extract_mapper(path, lib_dir, resource_dir, !no_resource))?;
 
         Ok(())
     }
 
-    pub fn update(&self, dirs: &Dirs, no_resource: bool, t: u64, skip: bool) -> Result<()> {
+    pub fn update(&self, dirs: &Dirs, no_resource: bool, t: u64) -> Result<()> {
+        println!(
+            "Fetching MaaCore version info (channel: {})...",
+            self.channel
+        );
         let version_json = get_version_json(self.channel)?;
         let current_version = self.version(dirs)?;
-        let new_version = version_json.version();
-        if current_version >= new_version {
+        let last_version = version_json.version();
+        if current_version >= last_version {
             println!("Up to data: MaaCore v{}.", current_version);
             return Ok(());
         }
 
         println!(
-            "Found newer MaaCore version v{} current: v{}, updating...",
-            new_version, current_version
+            "Found newer MaaCore version: v{} (current: v{}), downloading...",
+            last_version, current_version
         );
 
         let cache_dir = &dirs.cache().ensure()?;
         let asset = version_json.asset()?;
-        let archive = asset.download(cache_dir, t, skip)?;
+        let archive = asset.download(cache_dir, t)?;
         // Clean dirs before extracting, but not before downloading
         // because the download may be interrupted
         let lib_dir = find_lib_dir(dirs).context("MaaCore not found")?;
@@ -183,6 +182,10 @@ impl VersionJSON {
         Version::parse(&self.version[1..]).unwrap()
     }
 
+    pub fn version_str(&self) -> &str {
+        &self.version
+    }
+
     pub fn name(&self) -> Result<String> {
         let version = self.version();
         if cfg!(target_os = "macos") {
@@ -240,7 +243,7 @@ pub struct Asset {
 }
 
 impl Asset {
-    pub fn download(&self, dir: &Path, t: u64, skip: bool) -> Result<Archive> {
+    pub fn download(&self, dir: &Path, t: u64) -> Result<Archive> {
         let path = dir.join(&self.name);
         let size = self.size;
 
@@ -266,7 +269,7 @@ impl Asset {
         Runtime::new()
             .context("Failed to create tokio runtime")?
             .block_on(download_mirrors(
-                &client, url, mirrors, &path, size, t, skip, None,
+                &client, url, mirrors, &path, size, t, None,
             ))?;
 
         Archive::try_from(path)

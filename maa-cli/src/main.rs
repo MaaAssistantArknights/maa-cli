@@ -39,25 +39,13 @@ enum CLI {
         channel: Option<Channel>,
         /// Time to test download speed
         ///
-        /// There are several mirrors of maa-core prebuilt packages,
-        /// we will test the download speed of these mirrors,
+        /// There are several mirrors of maa-core prebuilt packages.
+        /// This command will test the download speed of these mirrors,
         /// and choose the fastest one to download.
-        /// This flag is used to set the time to test download speed.
-        /// If you want to increase the accuracy of the test,
-        /// please increase the value of this flag.
-        /// But if you think the test is too slow,
-        /// you can decrease the value of this flag.
+        /// This flag is used to set the time in seconds to test download speed.
+        /// If test time is 0, speed test will be skipped.
         #[arg(short, long, default_value_t = 3)]
         test_time: u64,
-        /// Skip download speed test
-        ///
-        /// By default, we will test the download speed of mirrors,
-        /// and choose the fastest one to download.
-        /// If you want to skip the speed test,
-        /// you can use this flag to disable it.
-        /// And we will download from the GitHub release directly.
-        #[arg(long)]
-        skip_speed_test: bool,
         /// Force to install even if the maa and resource already exists
         ///
         /// If the maa-core and resource already exists,
@@ -124,25 +112,13 @@ enum CLI {
         no_resource: bool,
         /// Time to test download speed
         ///
-        /// There are several mirrors of maa-core prebuilt packages,
-        /// we will test the download speed of these mirrors,
+        /// There are several mirrors of maa-core prebuilt packages.
+        /// This command will test the download speed of these mirrors,
         /// and choose the fastest one to download.
-        /// This flag is used to set the time to test download speed.
-        /// If you want to increase the accuracy of the test,
-        /// please increase the value of this flag.
-        /// But if you think the test is too slow,
-        /// you can decrease the value of this flag.
+        /// This flag is used to set the time in seconds to test download speed.
+        /// If test time is 0, speed test will be skipped.
         #[arg(short, long, default_value_t = 3)]
         test_time: u64,
-        /// Skip download speed test
-        ///
-        /// By default, we will test the download speed of mirrors,
-        /// and choose the fastest one to download.
-        /// If you want to skip the speed test,
-        /// you can use this flag to disable it.
-        /// And we will download from the GitHub release directly.
-        #[arg(long)]
-        skip_speed_test: bool,
     },
     /// Manage maa-cli self and maa-run
     ///
@@ -247,8 +223,6 @@ enum SelfCommand {
     ///
     /// This command will download prebuilt binary of maa-cli,
     /// and install them to it current directory.
-    /// Note: we will check the version of maa-cli,
-    /// if the version is not newer, we will not update them.
     Update,
 }
 
@@ -299,30 +273,22 @@ fn main() -> Result<()> {
             channel,
             no_resource,
             test_time,
-            skip_speed_test,
             force,
         } => {
             let cli_config =
                 CLIConfig::find_file(&proj_dirs.config().join("cli")).unwrap_or_default();
             let channel = channel.unwrap_or(cli_config.channel);
-            MaaCore::new(channel).install(
-                &proj_dirs,
-                force,
-                no_resource,
-                test_time,
-                skip_speed_test,
-            )?;
+            MaaCore::new(channel).install(&proj_dirs, force, no_resource, test_time)?;
         }
         CLI::Update {
             channel,
             no_resource,
             test_time,
-            skip_speed_test,
         } => {
             let cli_config =
                 CLIConfig::find_file(&proj_dirs.config().join("cli")).unwrap_or_default();
             let channel = channel.unwrap_or(cli_config.channel);
-            MaaCore::new(channel).update(&proj_dirs, no_resource, test_time, skip_speed_test)?;
+            MaaCore::new(channel).update(&proj_dirs, no_resource, test_time)?;
         }
         CLI::SelfCommand(self_command) => match self_command {
             SelfCommand::Update => {

@@ -195,11 +195,10 @@ pub async fn download_mirrors<'a>(
     path: &Path,
     size: u64,
     t: u64,
-    skip: bool,
     checker: Option<Checker<'a>>,
 ) -> Result<()> {
-    if skip || std::env::var_os("CI").is_some() {
-        println!("Skipping speed test...");
+    if t == 0 {
+        println!("Skip speed test, downloading from fallback mirror...");
         download(client, fallback, path, size, checker).await?;
         return Ok(());
     }

@@ -89,7 +89,7 @@ jobs:
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
         run: |
-          cargo run -- install beta
+          cargo run -- install beta -t0
       - name: Show installation
         if: matrix.arch == 'x86_64'
         run: |

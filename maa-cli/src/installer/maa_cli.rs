@@ -26,34 +26,33 @@ pub fn version() -> Result<Version> {
 }
 
 pub fn update(dirs: &Dirs) -> Result<()> {
+    println!("Fetching maa-cli version info...");
     let version_json = get_metadata()?;
     let asset = version_json.get_asset()?;
-    let cur_version = asset.version();
+    let current_version = version()?;
+    let last_version = asset.version();
 
+    if current_version >= *last_version {
+        println!("Up to date: maa-cli v{}.", current_version);
+        return Ok(());
+    }
+
+    println!(
+        "Found newer maa-cli version: v{} (current: v{}), downloading...",
+        last_version, current_version
+    );
+
+    let bin_name = name();
+    let bin_path = current_exe()?;
     let cache_dir = dirs.cache().ensure()?;
 
-    let last_version = version()?;
-    if *cur_version > last_version {
-        println!(
-            "Found newer {} version v{} (current: v{}), updating...",
-            name(),
-            cur_version,
-            last_version
-        );
-
-        let bin_name = name();
-        let bin_path = current_exe()?;
-
-        asset.download(cache_dir)?.extract(|path| {
-            if path.ends_with(&bin_name) {
-                Some(bin_path.clone())
-            } else {
-                None
-            }
-        })?;
-    } else {
-        println!("Up to date: maa-cli v{}.", last_version);
-    }
+    asset.download(cache_dir)?.extract(|path| {
+        if path.ends_with(&bin_name) {
+            Some(bin_path.clone())
+        } else {
+            None
+        }
+    })?;
 
     Ok(())
 }
