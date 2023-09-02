@@ -186,7 +186,7 @@ async fn try_download(client: &Client, url: &str, timeout: Duration) -> Result<u
 /// * `mirrors` - The mirrors to choose from.
 /// * `path` - The path to save the downloaded file.
 /// * `size` - The size of the file.
-/// * `skip` - Whether to skip the speed test.
+/// * `t` - The test duration for each mirror, in seconds, 0 to skip the test.
 /// * `checker` - The optional checksum checker.
 pub async fn download_mirrors<'a>(
     client: &Client,
@@ -207,7 +207,7 @@ pub async fn download_mirrors<'a>(
     let mut fast_link = fallback;
     let mut largest: u64 = 0;
 
-    println!("Speed test for mirrors...");
+    println!("Testing download speed...");
     for link in mirrors.iter() {
         if let Ok(downloaded) = try_download(client, link, duration).await {
             if downloaded > largest {
