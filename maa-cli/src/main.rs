@@ -11,14 +11,15 @@ use crate::installer::{
 };
 
 use anyhow::Result;
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
+use clap_complete::{generate, Shell};
 use directories::ProjectDirs;
 
 #[derive(Parser)]
-#[command(author, version)]
+#[command(name = "maa", author, version)]
 #[allow(clippy::upper_case_acronyms)]
 enum CLI {
-    /// Install maa core or resources
+    /// Install maa core and resources
     ///
     /// This command will install maa-core and resources
     /// by downloading prebuilt packages.
@@ -34,7 +35,7 @@ enum CLI {
         /// If you want to use the latest features of maa-core,
         /// you can use beta or alpha channel.
         /// You can also configure the default channel
-        /// in the cli configure file `$MAA_CONFIG_DIR/cli.toml` with the key `channel`.
+        /// in the cli configure file `$MAA_CONFIG_DIR/cli.toml` with the key `core.channel`.
         /// Note: the alpha channel is only available for windows.
         channel: Option<Channel>,
         /// Time to test download speed
@@ -63,6 +64,9 @@ enum CLI {
         /// and we will install them when installing maa-core.
         /// If you do not want to install resource,
         /// you can use this flag to disable it.
+        /// You can also configure the default value in the cli configure file
+        /// `$MAA_CONFIG_DIR/cli.toml` with the key `core.component.resource`;
+        /// set it to false to disable installing resource by default.
         /// This is useful when you want to install maa-core only.
         /// For my own, I will use this flag to install maa-core,
         /// because I use the latest resource from github,
@@ -73,7 +77,7 @@ enum CLI {
         #[arg(long)]
         no_resource: bool,
     },
-    /// Update maa core or resources
+    /// Update maa core and resources
     ///
     /// This command will update maa-core and resources
     /// by downloading prebuilt packages.
@@ -90,7 +94,7 @@ enum CLI {
         /// If you want to use the latest features of maa-core,
         /// you can use beta or alpha channel.
         /// You can also configure the default channel
-        /// in the cli configure file `$MAA_CONFIG_DIR/cli.toml` with the key `channel`.
+        /// in the cli configure file `$MAA_CONFIG_DIR/cli.toml` with the key `core.channel`.
         /// Note: the alpha channel is only available for windows.
         /// Note: if the maa-core is not installed, please use `maa-cli install` instead.
         /// And if the core is broken, please use `maa-cli install --force` to reinstall it.
@@ -101,6 +105,9 @@ enum CLI {
         /// and we will update them when updating maa-core.
         /// If you do not want to update resource,
         /// you can use this flag to disable it.
+        /// You can also configure the default value in the cli configure file
+        /// `$MAA_CONFIG_DIR/cli.toml` with the key `core.component.resource`;
+        /// set it to false to disable updating resource by default.
         /// This is useful when you want to update maa-core only.
         /// For my own, I will use this flag to update maa-core,
         /// because I use the latest resource from github,
@@ -215,9 +222,12 @@ enum CLI {
     },
     /// List all available tasks
     List,
+    /// Generate completion script for given shell
+    Complete { shell: Shell },
 }
 
 #[derive(Subcommand)]
+#[command(name = "self")]
 enum SelfCommand {
     /// Update maa-cli self
     ///
@@ -341,6 +351,9 @@ fn main() -> Result<()> {
                     }
                 }
             }
+        }
+        CLI::Complete { shell } => {
+            generate(shell, &mut CLI::command(), "maa", &mut std::io::stdout());
         }
     }
 
