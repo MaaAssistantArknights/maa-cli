@@ -283,18 +283,18 @@ impl Asset {
 
 pub fn find_lib_dir(dirs: &Dirs) -> Option<PathBuf> {
     let lib_dir = dirs.library();
-    if lib_dir.join(MAA_CORE_NAME).exists() {
+    if lib_dir.join(MAA_CORE_NAME).is_file() {
         return Some(lib_dir.to_path_buf());
     }
 
     if let Ok(path) = std::env::current_exe() {
         let exe_dir = path.parent().unwrap();
-        if exe_dir.join(MAA_CORE_NAME).exists() {
+        if exe_dir.join(MAA_CORE_NAME).is_file() {
             return Some(exe_dir.to_path_buf());
         }
         if let Some(dir) = exe_dir.parent() {
             let lib_dir = dir.join("lib");
-            if lib_dir.join(MAA_CORE_NAME).exists() {
+            if lib_dir.join(MAA_CORE_NAME).is_file() {
                 return Some(lib_dir);
             }
         }
@@ -310,19 +310,19 @@ pub fn find_maa_core(dirs: &Dirs) -> Option<PathBuf> {
 
 pub fn find_resource(dirs: &Dirs) -> Option<PathBuf> {
     let resource_dir = dirs.resource();
-    if resource_dir.exists() {
+    if resource_dir.is_dir() {
         return Some(resource_dir.to_path_buf());
     }
 
     if let Ok(path) = std::env::current_exe() {
         let exe_dir = path.parent().unwrap();
         let resource_dir = exe_dir.join("resource");
-        if resource_dir.exists() {
+        if resource_dir.is_dir() {
             return Some(resource_dir);
         }
         if let Some(dir) = exe_dir.parent() {
             let resource_dir = dir.join("share").join("maa").join("resource");
-            if resource_dir.exists() {
+            if resource_dir.is_dir() {
                 return Some(resource_dir);
             }
         }

@@ -47,7 +47,7 @@ pub fn run(
 
     /*--------------------- Load Config Files ---------------------*/
     let config_dir = dirs.config();
-    if !config_dir.exists() {
+    if !config_dir.is_dir() {
         bail!("Config directory not exists!");
     }
     debug!("Config directory:", config_dir.display());
@@ -244,7 +244,7 @@ pub fn run(
     }
 
     if user_resource {
-        if config_dir.join("resource").exists() {
+        if config_dir.join("resource").is_dir() {
             debug!("Loading user resource:", config_dir.display());
             Assistant::load_resource(config_dir).context("Failed to load user resource!")?;
         } else {

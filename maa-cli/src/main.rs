@@ -340,7 +340,7 @@ fn main() -> Result<()> {
         } => run::run(&proj_dirs, task, addr, user_resource, verbose, quiet)?,
         CLI::List => {
             let task_dir = proj_dirs.config().join("tasks");
-            if !task_dir.exists() {
+            if !task_dir.is_dir() {
                 println!("No tasks found");
             } else {
                 for entry in task_dir.read_dir()? {
