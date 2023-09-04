@@ -25,7 +25,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Get Version
         id: version
         run: |
@@ -48,7 +48,7 @@ jobs:
           - aarch64
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Cross
         if: matrix.arch == 'aarch64' && matrix.os == 'ubuntu-latest'
         uses: taiki-e/install-action@v2
@@ -124,13 +124,13 @@ jobs:
         uses: actions/download-artifact@v3
       - name: Checkout version branch (Release)
         if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: version
           path: version
       - name: Checkout version branch (Test)
         if: github.event_name == 'pull_request'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: version-test
           path: version
