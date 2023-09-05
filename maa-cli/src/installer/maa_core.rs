@@ -88,7 +88,10 @@ impl MaaCore {
         let asset = version_json.asset()?;
         println!("Downloading MaaCore {}...", version_json.version_str());
         let cache_dir = &dirs.cache().ensure()?;
-        let resource_dir = &dirs.resource().ensure_clean()?;
+        let resource_dir = dirs.resource();
+        if !no_resource {
+            resource_dir.ensure_clean()?;
+        }
         let archive = asset.download(cache_dir, t)?;
         archive.extract(|path: &Path| extract_mapper(path, lib_dir, resource_dir, !no_resource))?;
 
@@ -120,7 +123,9 @@ impl MaaCore {
         // because the download may be interrupted
         let lib_dir = find_lib_dir(dirs).context("MaaCore not found")?;
         let resource_dir = find_resource(dirs).context("Resource dir not found")?;
-        resource_dir.ensure_clean()?;
+        if !no_resource {
+            resource_dir.ensure_clean()?;
+        }
         archive
             .extract(|path: &Path| extract_mapper(path, &lib_dir, &resource_dir, !no_resource))?;
 
