@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup Rust
         run: |
           rustup component add clippy rustfmt
@@ -55,7 +55,7 @@ jobs:
           - aarch64
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Cross
         if: matrix.os == 'ubuntu-latest' && matrix.arch == 'aarch64'
         uses: taiki-e/install-action@v2
