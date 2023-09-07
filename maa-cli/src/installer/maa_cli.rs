@@ -140,7 +140,7 @@ impl Asset {
         let path = dir.join(&self.name);
         let size = self.size;
 
-        if path.exists() {
+        if path.is_file() {
             let file_size = path.metadata()?.len();
             if file_size == size {
                 println!("Found existing file: {}", path.display());

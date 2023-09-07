@@ -124,7 +124,7 @@ impl Ensure for &Path {
     type Error = std::io::Error;
 
     fn ensure(self) -> Result<Self, Self::Error> {
-        if !self.exists() {
+        if !self.is_dir() {
             if let Some(parent) = self.parent() {
                 parent.ensure()?;
             }

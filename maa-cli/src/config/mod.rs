@@ -55,7 +55,7 @@ const SUPPORTED_EXTENSION: [&str; 4] = ["json", "yaml", "yml", "toml"];
 
 pub trait FromFile: Sized + serde::de::DeserializeOwned {
     fn from_file(path: &Path) -> Result<Self, Error> {
-        if !path.exists() {
+        if !path.is_file() {
             return Err(Error::FileNotFound(path.to_str().unwrap().to_string()));
         }
         let filetype = path.extension().ok_or(Error::UnknownFiletype)?;
@@ -85,7 +85,7 @@ pub trait FindFile: FromFile {
     fn find_file(path: &Path) -> Result<Self, Error> {
         for filetype in SUPPORTED_EXTENSION.iter() {
             let path = path.with_extension(filetype);
-            if path.exists() {
+            if path.is_file() {
                 return Self::from_file(&path);
             }
         }
