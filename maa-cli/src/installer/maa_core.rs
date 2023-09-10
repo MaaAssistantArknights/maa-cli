@@ -316,7 +316,14 @@ pub fn find_resource(dirs: &Dirs) -> Option<PathBuf> {
             return Some(resource_dir);
         }
         if let Some(dir) = exe_dir.parent() {
-            let resource_dir = dir.join("share").join("maa").join("resource");
+            let share_dir = dir.join("share");
+            if let Some(extra_share) = option_env!("MAA_EXTRA_SHARE_NAME") {
+                let resource_dir = share_dir.join(extra_share).join("resource");
+                if resource_dir.exists() {
+                    return Some(resource_dir);
+                }
+            }
+            let resource_dir = share_dir.join("maa").join("resource");
             if resource_dir.exists() {
                 return Some(resource_dir);
             }
