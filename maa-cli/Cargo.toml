@@ -5,6 +5,10 @@ version = "0.3.8"
 edition = "2021"
 license.workspace = true
 
+[features]
+default = ["self"]
+self = []
+
 [[bin]]
 name = "maa"
 path = "src/main.rs"
