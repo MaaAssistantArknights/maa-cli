@@ -5,10 +5,9 @@ mod log;
 mod run;
 
 use crate::config::{cli::CLIConfig, FindFile};
-use crate::installer::{
-    maa_cli,
-    maa_core::{self, Channel, MaaCore},
-};
+#[cfg(feature = "self")]
+use crate::installer::maa_cli;
+use crate::installer::maa_core::{self, Channel, MaaCore};
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
@@ -132,6 +131,7 @@ enum CLI {
     /// This command is used to manage maa-cli self and maa-run.
     /// Note: If you want to install or update maa-core and resource,
     /// please use `maa-cli install` or `maa-cli update` instead.
+    #[cfg(feature = "self")]
     #[command(subcommand, name = "self")]
     SelfCommand(SelfCommand),
     /// Print path of maa directories
@@ -302,6 +302,7 @@ fn main() -> Result<()> {
             let no_resource = no_resource || !cli_config.resource();
             MaaCore::new(channel).update(&proj_dirs, no_resource, test_time)?;
         }
+        #[cfg(feature = "self")]
         CLI::SelfCommand(self_command) => match self_command {
             SelfCommand::Update => {
                 maa_cli::update(&proj_dirs)?;
