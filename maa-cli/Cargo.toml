@@ -34,7 +34,7 @@ sha2 = "0.10.7"
 digest = "0.10.7"
 signal-hook = "0.3.17"
 clap_complete = { version = "4.4" }
-maa_types = { version = "0.3.0", features = ["message"] }
+maa-types = { path = "../maa-types" }
 
 [dependencies.chrono]
 version = "0.4.26"

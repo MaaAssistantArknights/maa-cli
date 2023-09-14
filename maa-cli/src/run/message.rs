@@ -3,8 +3,8 @@ use crate::{error, info, normal, trace, warning};
 use std::fmt::Write;
 
 use maa_sys::binding::AsstMsgId;
-use maa_types::message::{AsstMessage, detail::{ConnectionInfoDetail, ConnectionInfoWhat, taskchain::{TaskChainDetail, TaskChain, TaskChainStatus}, subtask::{SubTaskDetail, SubTaskStatus, Task, ProcessTaskDetails}}};
-use maa_types::message::detail::subtask::{SubTaskExtraInfoDetail, SubTaskExtraInfoDetails};
+use maa_types::{AsstMessage, detail::{ConnectionInfoDetail, ConnectionInfoWhat, taskchain::{TaskChainDetail, TaskChain, TaskChainStatus}, subtask::{SubTaskDetail, SubTaskStatus, Task, ProcessTaskDetails}}};
+use maa_types::detail::subtask::{SubTaskExtraInfoDetail, SubTaskExtraInfoDetails};
 
 trait IterExt: Iterator {
     fn join(&mut self, sep: &str) -> String
