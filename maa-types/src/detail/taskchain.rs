@@ -1,11 +1,11 @@
-use std::fmt::Formatter;
-use std::fmt::Display;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::fmt::Display;
+use std::fmt::Formatter;
 
 use crate::enum_display;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub enum TaskChain {
     StartUp,
     CloseDown,
