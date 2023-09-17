@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+
+use crate::MaybeDeserialized;
 
 use super::taskchain::TaskChain;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub enum Task {
     StartButton2,
     AutoRecruitTask,
@@ -32,9 +34,16 @@ pub enum Task {
     StageEmergencyDps,
     StageDreadfulFoe,
     StartGameTask,
+    #[serde(rename = "StageDreadfulFoe-5Enter")]
+    StageDreadfulFoe5Enter,
+    AbandonAction,
+    OfflineConfirm,
+    GamePass,
+    BattleStartAll,
+    StageTraderSpecialShoppingAfterRefresh,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct ProcessTaskDetails {
     pub task: Task,
     pub action: i32,
@@ -87,14 +96,14 @@ impl SubTaskDetail {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct StageDropsStage {
     pub stage_code: String,
     pub stage_id: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct StageDropsStat {
     pub item_id: String,
@@ -103,30 +112,32 @@ pub struct StageDropsStat {
     pub add_quantity: i32,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct StageDropsDetail {
     pub stage: StageDropsStage,
     pub stars: i32,
     pub stats: Vec<StageDropsStat>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct RecruitTagsDetectedDetail {
     pub tags: Vec<String>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct RecruitSpecialTagDetail {
     pub tag: String,
 }
 
-#[derive(Deserialize, Debug)]
+pub type RecruitRobotTagDetail = RecruitSpecialTagDetail;
+
+#[derive(Deserialize, Serialize, Debug)]
 pub struct RecruitResultOperator {
     pub name: String,
     pub level: i32,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct RecruitResultItem {
     pub tags: Vec<String>,
     pub level: i32,
@@ -134,14 +145,14 @@ pub struct RecruitResultItem {
     pub operators: Vec<RecruitResultOperator>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct RecruitResultDetail {
     pub tags: Vec<String>,
     pub level: i32,
     pub result: Vec<RecruitResultItem>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct RecruitTagsRefreshedDetail {
     pub count: i32,
     pub refresh_limit: i32,
@@ -149,7 +160,7 @@ pub struct RecruitTagsRefreshedDetail {
 
 pub type RecruitTagsSelectedDetail = RecruitTagsDetectedDetail;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct EnterFacilityDetail {
     pub facility: String,
     pub index: i32,
@@ -157,57 +168,62 @@ pub struct EnterFacilityDetail {
 
 pub type NotEnoughStaffDetail = EnterFacilityDetail;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
+pub struct CustomInfrastRoomOperatorsDetail {
+    pub names: Vec<String>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
 pub struct ProductOfFacilityDetail {
     pub product: String,
     pub facility: String,
     pub index: i32,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct StageInfoDetail {
     pub name: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct PenguinIdDetail {
     pub id: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct DepotItem {
     pub id: String,
     pub have: i32,
     pub name: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct DepotArkPlannerObject {
     pub items: Vec<DepotItem>,
     #[serde(rename = "@type")]
     pub object_type: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct DepotArkPlanner {
     pub object: DepotArkPlannerObject,
     pub data: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct DepotLolicon {
     pub object: HashMap<String, i32>,
     pub data: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct DepotDetail {
     pub done: bool,
     pub arkplanner: DepotArkPlanner,
     pub lolicon: DepotLolicon,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct OperatorBoxAllItem {
     pub id: String,
     pub name: String,
@@ -215,7 +231,7 @@ pub struct OperatorBoxAllItem {
     pub rarity: i32,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct OperatorBoxOwnItem {
     pub id: String,
     pub name: String,
@@ -226,19 +242,36 @@ pub struct OperatorBoxOwnItem {
     pub rarity: i32,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct OperBoxDetail {
     pub done: bool,
     pub all_oper: Vec<OperatorBoxAllItem>,
     pub own_opes: Vec<OperatorBoxOwnItem>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
+pub struct BattleFormationDetail {
+    pub formation: String
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct BattleFormationSelectedDetail {
+    pub selected: String
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct CopilotActionDetail {
+    pub action: String,
+    pub target: String
+}
+
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(tag = "what", content = "details")]
 pub enum SubTaskExtraInfoDetails {
     StageDrops(StageDropsDetail),
     RecruitTagsDetected(RecruitTagsDetectedDetail),
     RecruitSpecialTag(RecruitSpecialTagDetail),
+    RecruitRobotTag(RecruitRobotTagDetail),
     RecruitResult(RecruitResultDetail),
     RecruitTagsRefreshed(RecruitTagsRefreshedDetail),
     RecruitTagsSelected(RecruitTagsSelectedDetail),
@@ -246,12 +279,19 @@ pub enum SubTaskExtraInfoDetails {
     RecruitError,
     EnterFacility(EnterFacilityDetail),
     NotEnoughStaff(NotEnoughStaffDetail),
+    CustomInfrastRoomOperators(CustomInfrastRoomOperatorsDetail),
     ProductOfFacility(ProductOfFacilityDetail),
+    ProductIncorrect,
+    ProductUnknown,
+    ProductChanged,
     StageInfo(StageInfoDetail),
     StageInfoError,
+    BattleFormation(BattleFormationDetail),
+    BattleFormationSelected(BattleFormationSelectedDetail),
     PenguinId(PenguinIdDetail),
     Depot(DepotDetail),
     OperBox(OperBoxDetail),
+    CopilotAction(CopilotActionDetail),
     UnsupportedLevel,
 }
 
@@ -260,7 +300,7 @@ pub struct SubTaskExtraInfoDetail {
     pub taskchain: TaskChain,
     pub class: String,
     pub uuid: String,
-    pub details: SubTaskExtraInfoDetails,
+    pub details: MaybeDeserialized<SubTaskExtraInfoDetails>,
 }
 
 impl<'de> Deserialize<'de> for SubTaskExtraInfoDetail {
@@ -278,7 +318,7 @@ impl<'de> Deserialize<'de> for SubTaskExtraInfoDetail {
             "what":what,
             "details":details,
         });
-        let details: SubTaskExtraInfoDetails = serde_json::from_value(details_json).unwrap();
+        let details = MaybeDeserialized::get(&details_json.to_string());
         Ok(SubTaskExtraInfoDetail {
             taskchain,
             class,

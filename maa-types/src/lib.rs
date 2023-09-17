@@ -1,3 +1,6 @@
+use core::panic;
+
+use serde::Deserialize;
 use thiserror::Error;
 
 pub mod detail;
@@ -19,6 +22,28 @@ macro_rules! enum_display {
             }
         }
     };
+}
+
+#[derive(Debug)]
+pub enum MaybeDeserialized<T: for<'a> Deserialize<'a>> {
+    Raw(String),
+    Deserialized(T),
+}
+
+impl<T: for<'a> Deserialize<'a>> MaybeDeserialized<T> {
+    pub fn get(json:&str) -> Self {
+        match serde_json::from_str::<T>(json) {
+            Ok(v) => MaybeDeserialized::Deserialized(v),
+            Err(_) => MaybeDeserialized::Raw(json.to_string()),
+        }
+    }
+
+    pub fn unwrap(self) -> T {
+        match self {
+            MaybeDeserialized::Raw(_json) => panic!("Cannot unwrap raw"),
+            MaybeDeserialized::Deserialized(v) => v,
+        }
+    }
 }
 
 #[derive(Debug)]
