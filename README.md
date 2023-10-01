@@ -87,7 +87,7 @@ config = "CompatMac" # maa connect的配置
 `[instance_options]`部分用于配置MAA实例的选项：
 ```toml
 [instance_options]
-touch_mode = "ADB" # 使用的触摸模式，可选值为"ADB", "MiniTouch", "MaaTouch"  或者 "MacPlayTools"(仅适用于PlayCover)
+touch_mode = "ADB" # 使用的触摸模式，可选值为"ADB", "MiniTouch", "MAATouch"  或者 "MacPlayTools"(仅适用于PlayCover)
 deployment_with_pause = false # 是否在部署时暂停游戏
 adb_lite_enabled = false # 是否使用adb-lite
 kill_adb_on_exit = false # 是否在退出时杀死adb
