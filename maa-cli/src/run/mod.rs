@@ -6,6 +6,7 @@ use crate::{
         asst::{self, AsstConfig, Connection},
         task::{
             task_type::{TaskOrUnknown, TaskType},
+            value::input::enable_batch_mode,
             TaskList, Value,
         },
         Error as ConfigError, FindFile,
@@ -30,6 +31,7 @@ pub fn run(
     user_resource: bool,
     verbose: u8,
     quiet: u8,
+    batch: bool,
 ) -> Result<()> {
     let core_path = find_maa_core(dirs).context("Failed to find MaaCore!")?;
 
@@ -37,6 +39,9 @@ pub fn run(
 
     /*------------------- Setup global log level -------------------*/
     unsafe {
+        if batch {
+            enable_batch_mode();
+        }
         set_level(level() as u8 + verbose - quiet);
     }
 

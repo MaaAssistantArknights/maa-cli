@@ -8,7 +8,11 @@ use serde::{Deserialize, Serialize};
 
 // Use batch mode in tests by default to avoid blocking tests.
 // This variable can also be change at runtime by cli argument
-static BATCH_MODE: bool = cfg!(test);
+static mut BATCH_MODE: bool = cfg!(test);
+
+pub unsafe fn enable_batch_mode() {
+    BATCH_MODE = true;
+}
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Deserialize, Debug, Clone)]
@@ -20,7 +24,7 @@ pub enum UserInput<F> {
 
 impl<F: FromStr + Clone + Display> UserInput<F> {
     pub fn get(&self) -> Result<F> {
-        if BATCH_MODE {
+        if unsafe { BATCH_MODE } {
             // In batch mode, we use default value and do not ask user for input.
             let writer = std::io::sink();
             match self {

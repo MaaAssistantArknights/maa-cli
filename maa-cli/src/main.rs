@@ -346,7 +346,8 @@ fn main() -> Result<()> {
             user_resource,
             verbose,
             quiet,
-        } => run::run(&proj_dirs, task, addr, user_resource, verbose, quiet)?,
+            batch,
+        } => run::run(&proj_dirs, task, addr, user_resource, verbose, quiet, batch)?,
         CLI::List => {
             let task_dir = proj_dirs.config().join("tasks");
             if !task_dir.exists() {
