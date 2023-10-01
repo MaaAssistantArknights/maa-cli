@@ -219,6 +219,14 @@ enum CLI {
         /// If you want to see less information, you can use this option to decrease the log level.
         #[clap(short, long, action = clap::ArgAction::Count, verbatim_doc_comment)]
         quiet: u8,
+        /// Run tasks in batch mode
+        ///
+        /// If there are some input parameters in the task file,
+        /// some prompts will be displayed to ask for input.
+        /// In batch mode, the prompts will be skipped,
+        /// and parameters will be set to default values.
+        #[clap(short, long, verbatim_doc_comment)]
+        batch: bool,
     },
     /// List all available tasks
     List,
@@ -360,3 +368,6 @@ fn main() -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod test {}

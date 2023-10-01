@@ -1,0 +1,485 @@
+pub mod input;
+
+use std::fmt::Display;
+
+use input::UserInput;
+
+use serde::{Deserialize, Serialize};
+
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum Value {
+    InputString(UserInput<String>),
+    InputBool(UserInput<bool>),
+    InputInt(UserInput<i64>),
+    InputFloat(UserInput<f64>),
+    Object(Map<Value>),
+    Array(Vec<Value>),
+    String(String),
+    Bool(bool),
+    Int(i64),
+    Float(f64),
+    Null,
+}
+
+impl Default for Value {
+    fn default() -> Self {
+        Self::Object(Default::default())
+    }
+}
+
+impl<const N: usize> From<[(String, Value); N]> for Value {
+    fn from(value: [(String, Value); N]) -> Self {
+        Self::Object(Map::from(value))
+    }
+}
+
+impl<const N: usize> From<[(&str, Value); N]> for Value {
+    fn from(value: [(&str, Value); N]) -> Self {
+        Self::Object(Map::from(value.map(|(k, v)| (k.to_string(), v))))
+    }
+}
+
+impl From<bool> for Value {
+    fn from(value: bool) -> Self {
+        Self::Bool(value.into())
+    }
+}
+
+impl From<i64> for Value {
+    fn from(value: i64) -> Self {
+        Self::Int(value.into())
+    }
+}
+
+impl From<f64> for Value {
+    fn from(value: f64) -> Self {
+        Self::Float(value.into())
+    }
+}
+
+impl From<String> for Value {
+    fn from(value: String) -> Self {
+        Self::String(value.into())
+    }
+}
+
+impl From<&str> for Value {
+    fn from(value: &str) -> Self {
+        Self::String(value.into())
+    }
+}
+
+impl Value {
+    pub fn get(&self, key: &str) -> Option<&Self> {
+        if let Self::Object(map) = self {
+            if let Some(value) = map.get(key) {
+                return Some(value);
+            }
+        }
+        None
+    }
+
+    /// Get value with key or return default value
+    ///
+    /// This will try to convert the value to the type of the default value.
+    /// If the key does not exist, the default value will be returned.
+    pub fn get_or<'a, T>(&'a self, key: &str, default: T) -> std::result::Result<T, T::Error>
+    where
+        T: TryFrom<&'a Self>,
+    {
+        if let Self::Object(map) = self {
+            if let Some(value) = map.get(key) {
+                return value.try_into();
+            }
+        }
+        Ok(default)
+    }
+
+    pub fn set(&mut self, key: &str, value: impl Into<Self>) {
+        if let Self::Object(map) = self {
+            map.insert(key.to_string(), value.into());
+        }
+    }
+
+    pub fn is_null(&self) -> bool {
+        matches!(self, Self::Null)
+    }
+
+    pub fn is_bool(&self) -> bool {
+        match self {
+            Self::InputBool(_) => true,
+            Self::Bool(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn as_bool(&self) -> TryFromResult<bool> {
+        match self {
+            Self::InputBool(v) => Ok(v.get()?),
+            Self::Bool(v) => Ok(*v),
+            _ => Err(TryFromError::TypeMismatch),
+        }
+    }
+
+    pub fn is_int(&self) -> bool {
+        match self {
+            Self::InputInt(_) => true,
+            Self::Int(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn as_int(&self) -> TryFromResult<i64> {
+        match self {
+            Self::InputInt(v) => Ok(v.get()?),
+            Self::Int(v) => Ok(*v),
+            _ => Err(TryFromError::TypeMismatch),
+        }
+    }
+
+    pub fn is_float(&self) -> bool {
+        match self {
+            Self::InputFloat(_) => true,
+            Self::Float(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn as_float(&self) -> TryFromResult<f64> {
+        match self {
+            Self::InputFloat(v) => Ok(v.get()?),
+            Self::Float(v) => Ok(*v),
+            _ => Err(TryFromError::TypeMismatch),
+        }
+    }
+
+    pub fn is_string(&self) -> bool {
+        match self {
+            Self::InputString(_) => true,
+            Self::String(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn as_string(&self) -> TryFromResult<String> {
+        match self {
+            Self::InputString(v) => Ok(v.get()?),
+            Self::String(v) => Ok(v.clone()),
+            _ => Err(TryFromError::TypeMismatch),
+        }
+    }
+
+    pub fn is_array(&self) -> bool {
+        matches!(self, Self::Array(_))
+    }
+
+    pub fn as_array(&self) -> TryFromResult<&Vec<Self>> {
+        match self {
+            Self::Array(v) => Ok(v),
+            _ => Err(TryFromError::TypeMismatch),
+        }
+    }
+
+    pub fn is_object(&self) -> bool {
+        matches!(self, Self::Object(_))
+    }
+
+    pub fn as_object(&self) -> TryFromResult<&Map<Self>> {
+        match self {
+            Self::Object(v) => Ok(v),
+            _ => Err(TryFromError::TypeMismatch),
+        }
+    }
+
+    pub fn merge(&self, other: &Self) -> Self {
+        let mut ret = self.clone();
+        ret.merge_mut(other);
+        ret
+    }
+
+    pub fn merge_mut(&mut self, other: &Self) {
+        match (self, other) {
+            (Self::Object(self_map), Self::Object(other_map)) => {
+                for (key, value) in other_map {
+                    if let Some(self_value) = self_map.get_mut(key) {
+                        self_value.merge_mut(value);
+                    } else {
+                        self_map.insert(key.clone(), value.clone());
+                    }
+                }
+            }
+            (s, o) => *s = o.clone(),
+        }
+    }
+}
+
+impl TryFrom<&Value> for bool {
+    type Error = TryFromError;
+
+    fn try_from(value: &Value) -> Result<Self, Self::Error> {
+        value.as_bool()
+    }
+}
+
+impl TryFrom<&Value> for i64 {
+    type Error = TryFromError;
+
+    fn try_from(value: &Value) -> Result<Self, Self::Error> {
+        value.as_int()
+    }
+}
+
+impl TryFrom<&Value> for f64 {
+    type Error = TryFromError;
+
+    fn try_from(value: &Value) -> Result<Self, Self::Error> {
+        value.as_float()
+    }
+}
+
+impl TryFrom<&Value> for String {
+    type Error = TryFromError;
+
+    fn try_from(value: &Value) -> Result<Self, Self::Error> {
+        value.as_string()
+    }
+}
+
+type TryFromResult<T> = Result<T, TryFromError>;
+
+#[derive(Debug)]
+pub enum TryFromError {
+    TypeMismatch,
+    IOError(std::io::Error),
+}
+
+impl From<std::io::Error> for TryFromError {
+    fn from(error: std::io::Error) -> Self {
+        Self::IOError(error)
+    }
+}
+
+impl Display for TryFromError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TryFromError::TypeMismatch => write!(f, "type mismatch"),
+            TryFromError::IOError(error) => write!(f, "io error: {}", error),
+        }
+    }
+}
+
+impl std::error::Error for TryFromError {}
+
+pub type Map<T> = std::collections::BTreeMap<String, T>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod serde {
+        use super::*;
+
+        use serde_test::{assert_tokens, Token};
+
+        #[test]
+        fn value() {
+            let mut map = Map::new();
+            map.insert("bool".to_string(), Value::Bool(true.into()));
+            map.insert("int".to_string(), Value::Int(1.into()));
+            map.insert("float".to_string(), Value::Float(1.0.into()));
+            map.insert(
+                "string".to_string(),
+                Value::String("string".to_string().into()),
+            );
+            map.insert(
+                "array".to_string(),
+                Value::Array(vec![Value::Int(1.into()), Value::Int(2.into())]),
+            );
+
+            let mut sub_map = Map::new();
+            sub_map.insert("key".to_string(), Value::String("value".to_string().into()));
+            map.insert("object".to_string(), Value::Object(sub_map));
+
+            let value = Value::Object(map);
+
+            assert_tokens(
+                &value,
+                &[
+                    Token::Map { len: Some(6) },
+                    Token::Str("array"),
+                    Token::Seq { len: Some(2) },
+                    Token::I64(1),
+                    Token::I64(2),
+                    Token::SeqEnd,
+                    Token::Str("bool"),
+                    Token::Bool(true),
+                    Token::Str("float"),
+                    Token::F64(1.0),
+                    Token::Str("int"),
+                    Token::I64(1),
+                    Token::Str("object"),
+                    Token::Map { len: Some(1) },
+                    Token::Str("key"),
+                    Token::Str("value"),
+                    Token::MapEnd,
+                    Token::Str("string"),
+                    Token::Str("string"),
+                    Token::MapEnd,
+                ],
+            )
+        }
+
+        #[test]
+        fn array() {
+            let value = Value::Array(vec![
+                Value::Bool(true.into()),
+                Value::Int(1.into()),
+                Value::Float(1.0.into()),
+                Value::String("string".to_string().into()),
+                Value::Array(vec![Value::Int(1.into()), Value::Int(2.into())]),
+                Value::Object({
+                    let mut map = Map::new();
+                    map.insert("key".to_string(), Value::String("value".to_string().into()));
+                    map
+                }),
+            ]);
+            assert_tokens(
+                &value,
+                &[
+                    Token::Seq { len: Some(6) },
+                    Token::Bool(true),
+                    Token::I64(1),
+                    Token::F64(1.0),
+                    Token::Str("string"),
+                    Token::Seq { len: Some(2) },
+                    Token::I64(1),
+                    Token::I64(2),
+                    Token::SeqEnd,
+                    Token::Map { len: Some(1) },
+                    Token::Str("key"),
+                    Token::Str("value"),
+                    Token::MapEnd,
+                    Token::SeqEnd,
+                ],
+            )
+        }
+
+        #[test]
+        fn bool() {
+            let boolean = Value::Bool(true);
+            assert_tokens(&boolean, &[Token::Bool(true)]);
+        }
+
+        #[test]
+        fn int() {
+            let integer = Value::Int(1);
+            assert_tokens(&integer, &[Token::I64(1)]);
+        }
+
+        #[test]
+        fn float() {
+            let float = Value::Float(1.0);
+            assert_tokens(&float, &[Token::F64(1.0)]);
+        }
+
+        #[test]
+        fn string() {
+            let string = Value::String("string".to_string());
+            assert_tokens(&string, &[Token::Str("string")]);
+        }
+
+        #[test]
+        fn null() {
+            let null = Value::Null;
+            assert_tokens(&null, &[Token::Unit]);
+        }
+    }
+
+    #[test]
+    fn merge() {
+        let mut map_base = Map::new();
+        map_base.insert("bool".to_string(), Value::Bool(true.into()));
+        map_base.insert("int".to_string(), Value::Int(1.into()));
+        map_base.insert("float".to_string(), Value::Float(1.0.into()));
+        map_base.insert(
+            "string".to_string(),
+            Value::String("string".to_string().into()),
+        );
+        map_base.insert(
+            "array".to_string(),
+            Value::Array(vec![Value::Int(1.into()), Value::Int(2.into())]),
+        );
+
+        let mut sub_map = Map::new();
+        sub_map.insert(
+            "key1".to_string(),
+            Value::String("value1".to_string().into()),
+        );
+        sub_map.insert(
+            "key2".to_string(),
+            Value::String("value2".to_string().into()),
+        );
+
+        map_base.insert("object".to_string(), Value::Object(sub_map));
+
+        let value = Value::Object(map_base);
+
+        let mut map_other = Map::new();
+        map_other.insert("bool".to_string(), Value::Bool(false.into()));
+        map_other.insert("int".to_string(), Value::Int(2.into()));
+        map_other.insert(
+            "array".to_string(),
+            Value::Array(vec![Value::Int(3.into()), Value::Int(4.into())]),
+        );
+
+        let mut sub_map2 = Map::new();
+        sub_map2.insert(
+            "key2".to_string(),
+            Value::String("value2_2".to_string().into()),
+        );
+        sub_map2.insert(
+            "key3".to_string(),
+            Value::String("value3".to_string().into()),
+        );
+
+        map_other.insert("object".to_string(), Value::Object(sub_map2));
+
+        let value2 = Value::Object(map_other);
+
+        let value_merged = value.merge(&value2);
+
+        let mut map_expected = Map::new();
+        map_expected.insert("bool".to_string(), Value::Bool(false.into()));
+        map_expected.insert("int".to_string(), Value::Int(2.into()));
+        map_expected.insert("float".to_string(), Value::Float(1.0.into()));
+        map_expected.insert(
+            "string".to_string(),
+            Value::String("string".to_string().into()),
+        );
+        map_expected.insert(
+            "array".to_string(),
+            Value::Array(vec![Value::Int(3.into()), Value::Int(4.into())]),
+        );
+
+        let mut sub_map_expected = Map::new();
+        sub_map_expected.insert(
+            "key1".to_string(),
+            Value::String("value1".to_string().into()),
+        );
+        sub_map_expected.insert(
+            "key2".to_string(),
+            Value::String("value2_2".to_string().into()),
+        );
+        sub_map_expected.insert(
+            "key3".to_string(),
+            Value::String("value3".to_string().into()),
+        );
+        map_expected.insert("object".to_string(), Value::Object(sub_map_expected));
+
+        let value_expected = Value::Object(map_expected);
+
+        assert_eq!(value_merged, value_expected);
+    }
+}
