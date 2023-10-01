@@ -196,11 +196,11 @@ mod tests {
         fn input() {
             let value = vec![
                 UserInput::Input(Input {
-                    default: Some(1 as i64),
+                    default: Some(1_i64),
                     description: Some("a number".to_string()),
                 }),
                 UserInput::Input(Input {
-                    default: Some(2 as i64),
+                    default: Some(2_i64),
                     description: None,
                 }),
                 UserInput::Input(Input {
@@ -252,11 +252,11 @@ mod tests {
         fn select() {
             let value = vec![
                 UserInput::Select(Select {
-                    alternatives: vec![1 as i64, 2 as i64],
+                    alternatives: vec![1_i64, 2_i64],
                     description: Some("a number".to_string()),
                 }),
                 UserInput::Select(Select {
-                    alternatives: vec![3 as i64],
+                    alternatives: vec![3_i64],
                     description: None,
                 }),
             ];
@@ -347,7 +347,7 @@ mod tests {
         #[test]
         fn input_no_description() {
             let value = Input {
-                default: Some(1 as i64),
+                default: Some(1_i64),
                 description: None,
             };
             let input = b"2\n";

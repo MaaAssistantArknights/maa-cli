@@ -43,25 +43,25 @@ impl<const N: usize> From<[(&str, Value); N]> for Value {
 
 impl From<bool> for Value {
     fn from(value: bool) -> Self {
-        Self::Bool(value.into())
+        Self::Bool(value)
     }
 }
 
 impl From<i64> for Value {
     fn from(value: i64) -> Self {
-        Self::Int(value.into())
+        Self::Int(value)
     }
 }
 
 impl From<f64> for Value {
     fn from(value: f64) -> Self {
-        Self::Float(value.into())
+        Self::Float(value)
     }
 }
 
 impl From<String> for Value {
     fn from(value: String) -> Self {
-        Self::String(value.into())
+        Self::String(value)
     }
 }
 
@@ -108,11 +108,7 @@ impl Value {
     }
 
     pub fn is_bool(&self) -> bool {
-        match self {
-            Self::InputBool(_) => true,
-            Self::Bool(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Bool(_) | Self::InputBool(_))
     }
 
     pub fn as_bool(&self) -> TryFromResult<bool> {
@@ -124,11 +120,7 @@ impl Value {
     }
 
     pub fn is_int(&self) -> bool {
-        match self {
-            Self::InputInt(_) => true,
-            Self::Int(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Int(_) | Self::InputInt(_))
     }
 
     pub fn as_int(&self) -> TryFromResult<i64> {
@@ -140,11 +132,7 @@ impl Value {
     }
 
     pub fn is_float(&self) -> bool {
-        match self {
-            Self::InputFloat(_) => true,
-            Self::Float(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Float(_) | Self::InputFloat(_))
     }
 
     pub fn as_float(&self) -> TryFromResult<f64> {
@@ -156,11 +144,7 @@ impl Value {
     }
 
     pub fn is_string(&self) -> bool {
-        match self {
-            Self::InputString(_) => true,
-            Self::String(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::String(_) | Self::InputString(_))
     }
 
     pub fn as_string(&self) -> TryFromResult<String> {
@@ -286,20 +270,17 @@ mod tests {
         #[test]
         fn value() {
             let mut map = Map::new();
-            map.insert("bool".to_string(), Value::Bool(true.into()));
+            map.insert("bool".to_string(), Value::Bool(true));
             map.insert("int".to_string(), Value::Int(1.into()));
-            map.insert("float".to_string(), Value::Float(1.0.into()));
-            map.insert(
-                "string".to_string(),
-                Value::String("string".to_string().into()),
-            );
+            map.insert("float".to_string(), Value::Float(1.0));
+            map.insert("string".to_string(), Value::String("string".to_string()));
             map.insert(
                 "array".to_string(),
                 Value::Array(vec![Value::Int(1.into()), Value::Int(2.into())]),
             );
 
             let mut sub_map = Map::new();
-            sub_map.insert("key".to_string(), Value::String("value".to_string().into()));
+            sub_map.insert("key".to_string(), Value::String("value".to_string()));
             map.insert("object".to_string(), Value::Object(sub_map));
 
             let value = Value::Object(map);
@@ -334,14 +315,14 @@ mod tests {
         #[test]
         fn array() {
             let value = Value::Array(vec![
-                Value::Bool(true.into()),
+                Value::Bool(true),
                 Value::Int(1.into()),
-                Value::Float(1.0.into()),
-                Value::String("string".to_string().into()),
+                Value::Float(1.0),
+                Value::String("string".to_string()),
                 Value::Array(vec![Value::Int(1.into()), Value::Int(2.into())]),
                 Value::Object({
                     let mut map = Map::new();
-                    map.insert("key".to_string(), Value::String("value".to_string().into()));
+                    map.insert("key".to_string(), Value::String("value".to_string()));
                     map
                 }),
             ]);
@@ -400,34 +381,25 @@ mod tests {
     #[test]
     fn merge() {
         let mut map_base = Map::new();
-        map_base.insert("bool".to_string(), Value::Bool(true.into()));
+        map_base.insert("bool".to_string(), Value::Bool(true));
         map_base.insert("int".to_string(), Value::Int(1.into()));
-        map_base.insert("float".to_string(), Value::Float(1.0.into()));
-        map_base.insert(
-            "string".to_string(),
-            Value::String("string".to_string().into()),
-        );
+        map_base.insert("float".to_string(), Value::Float(1.0));
+        map_base.insert("string".to_string(), Value::String("string".to_string()));
         map_base.insert(
             "array".to_string(),
             Value::Array(vec![Value::Int(1.into()), Value::Int(2.into())]),
         );
 
         let mut sub_map = Map::new();
-        sub_map.insert(
-            "key1".to_string(),
-            Value::String("value1".to_string().into()),
-        );
-        sub_map.insert(
-            "key2".to_string(),
-            Value::String("value2".to_string().into()),
-        );
+        sub_map.insert("key1".to_string(), Value::String("value1".to_string()));
+        sub_map.insert("key2".to_string(), Value::String("value2".to_string()));
 
         map_base.insert("object".to_string(), Value::Object(sub_map));
 
         let value = Value::Object(map_base);
 
         let mut map_other = Map::new();
-        map_other.insert("bool".to_string(), Value::Bool(false.into()));
+        map_other.insert("bool".to_string(), Value::Bool(false));
         map_other.insert("int".to_string(), Value::Int(2.into()));
         map_other.insert(
             "array".to_string(),
@@ -435,14 +407,8 @@ mod tests {
         );
 
         let mut sub_map2 = Map::new();
-        sub_map2.insert(
-            "key2".to_string(),
-            Value::String("value2_2".to_string().into()),
-        );
-        sub_map2.insert(
-            "key3".to_string(),
-            Value::String("value3".to_string().into()),
-        );
+        sub_map2.insert("key2".to_string(), Value::String("value2_2".to_string()));
+        sub_map2.insert("key3".to_string(), Value::String("value3".to_string()));
 
         map_other.insert("object".to_string(), Value::Object(sub_map2));
 
@@ -451,31 +417,19 @@ mod tests {
         let value_merged = value.merge(&value2);
 
         let mut map_expected = Map::new();
-        map_expected.insert("bool".to_string(), Value::Bool(false.into()));
+        map_expected.insert("bool".to_string(), Value::Bool(false));
         map_expected.insert("int".to_string(), Value::Int(2.into()));
-        map_expected.insert("float".to_string(), Value::Float(1.0.into()));
-        map_expected.insert(
-            "string".to_string(),
-            Value::String("string".to_string().into()),
-        );
+        map_expected.insert("float".to_string(), Value::Float(1.0));
+        map_expected.insert("string".to_string(), Value::String("string".to_string()));
         map_expected.insert(
             "array".to_string(),
             Value::Array(vec![Value::Int(3.into()), Value::Int(4.into())]),
         );
 
         let mut sub_map_expected = Map::new();
-        sub_map_expected.insert(
-            "key1".to_string(),
-            Value::String("value1".to_string().into()),
-        );
-        sub_map_expected.insert(
-            "key2".to_string(),
-            Value::String("value2_2".to_string().into()),
-        );
-        sub_map_expected.insert(
-            "key3".to_string(),
-            Value::String("value3".to_string().into()),
-        );
+        sub_map_expected.insert("key1".to_string(), Value::String("value1".to_string()));
+        sub_map_expected.insert("key2".to_string(), Value::String("value2_2".to_string()));
+        sub_map_expected.insert("key3".to_string(), Value::String("value3".to_string()));
         map_expected.insert("object".to_string(), Value::Object(sub_map_expected));
 
         let value_expected = Value::Object(map_expected);
