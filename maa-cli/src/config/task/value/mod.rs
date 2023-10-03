@@ -165,22 +165,8 @@ impl Value {
         matches!(self, Self::Array(_))
     }
 
-    pub fn as_array(&self) -> TryFromResult<&Vec<Self>> {
-        match self {
-            Self::Array(v) => Ok(v),
-            _ => Err(TryFromError::TypeMismatch),
-        }
-    }
-
     pub fn is_object(&self) -> bool {
         matches!(self, Self::Object(_))
-    }
-
-    pub fn as_object(&self) -> TryFromResult<&Map<Self>> {
-        match self {
-            Self::Object(v) => Ok(v),
-            _ => Err(TryFromError::TypeMismatch),
-        }
     }
 
     pub fn merge(&self, other: &Self) -> Self {
@@ -267,6 +253,8 @@ pub type Map<T> = std::collections::BTreeMap<String, T>;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use super::input::Input;
 
     mod serde {
         use super::*;
@@ -385,6 +373,19 @@ mod tests {
     }
 
     #[test]
+    fn get() {
+        let mut map = Map::new();
+        map.insert("int".to_string(), Value::Int(1.into()));
+        let value = Value::Object(map);
+
+        assert_eq!(value.get("int").unwrap(), &Value::Int(1.into()));
+        assert!(value.get("float").is_none());
+
+        assert_eq!(value.get_or("int", 2).unwrap(), 1);
+        assert_eq!(value.get_or("float", 2.0).unwrap(), 2.0);
+    }
+
+    #[test]
     fn is_sth() {
         assert!(Value::Null.is_null());
         assert!(Value::from(true).is_bool());
@@ -405,10 +406,28 @@ mod tests {
             i64::try_from(&bool_value),
             Err(TryFromError::TypeMismatch)
         ));
+        let bool_input_value = Value::InputBool(UserInput::Input(Input {
+            default: Some(true),
+            description: None,
+        }));
+        assert_eq!(bool::try_from(&bool_input_value).unwrap(), true);
+        assert!(matches!(
+            i64::try_from(&bool_input_value),
+            Err(TryFromError::TypeMismatch)
+        ));
         let int_value = Value::from(1);
         assert_eq!(i64::try_from(&int_value).unwrap(), 1);
         assert!(matches!(
             bool::try_from(&int_value),
+            Err(TryFromError::TypeMismatch)
+        ));
+        let int_input_value = Value::InputInt(UserInput::Input(Input {
+            default: Some(1),
+            description: None,
+        }));
+        assert_eq!(i64::try_from(&int_input_value).unwrap(), 1);
+        assert!(matches!(
+            bool::try_from(&int_input_value),
             Err(TryFromError::TypeMismatch)
         ));
         let float_value = Value::from(1.0);
@@ -417,10 +436,28 @@ mod tests {
             bool::try_from(&float_value),
             Err(TryFromError::TypeMismatch)
         ));
+        let float_input_value = Value::InputFloat(UserInput::Input(Input {
+            default: Some(1.0),
+            description: None,
+        }));
+        assert_eq!(f64::try_from(&float_input_value).unwrap(), 1.0);
+        assert!(matches!(
+            bool::try_from(&float_input_value),
+            Err(TryFromError::TypeMismatch)
+        ));
         let string_value = Value::from("string");
         assert_eq!(String::try_from(&string_value).unwrap(), "string");
         assert!(matches!(
             bool::try_from(&string_value),
+            Err(TryFromError::TypeMismatch)
+        ));
+        let string_input_value = Value::InputString(UserInput::Input(Input {
+            default: Some("string".to_string()),
+            description: None,
+        }));
+        assert_eq!(String::try_from(&string_input_value).unwrap(), "string");
+        assert!(matches!(
+            bool::try_from(&string_input_value),
             Err(TryFromError::TypeMismatch)
         ));
     }
