@@ -305,13 +305,13 @@ mod tests {
                 default: Some(1),
                 description: Some("a number".to_string()),
             };
-            let input = b"2\n";
+            let input = b"a\n2\n";
             let mut output = b"".to_vec();
             value.prompt(&mut output).unwrap();
             assert_eq!(&output, b"Please input a number [default: 1]: ");
             output.clear();
             assert_eq!(value.ask(&mut output, &input[..]).unwrap(), 2);
-            assert_eq!(&output, b"");
+            assert_eq!(&output, b"Invalid input, please try again: ");
         }
 
         #[test]
@@ -335,13 +335,13 @@ mod tests {
                 default: None,
                 description: Some("a number".to_string()),
             };
-            let input = b"2\n";
+            let input = b"\n2\n";
             let mut output = b"".to_vec();
             value.prompt(&mut output).unwrap();
             assert_eq!(&output, b"Please input a number: ");
             output.clear();
             assert_eq!(value.ask(&mut output, &input[..]).unwrap(), 2);
-            assert_eq!(&output, b"");
+            assert_eq!(&output, b"Default value not set, please input a value: ");
         }
 
         #[test]

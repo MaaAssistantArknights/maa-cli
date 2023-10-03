@@ -29,18 +29,6 @@ impl Default for Value {
     }
 }
 
-impl<const N: usize> From<[(String, Value); N]> for Value {
-    fn from(value: [(String, Value); N]) -> Self {
-        Self::Object(Map::from(value))
-    }
-}
-
-impl<const N: usize> From<[(&str, Value); N]> for Value {
-    fn from(value: [(&str, Value); N]) -> Self {
-        Self::Object(Map::from(value.map(|(k, v)| (k.to_string(), v))))
-    }
-}
-
 impl From<bool> for Value {
     fn from(value: bool) -> Self {
         Self::Bool(value)
@@ -68,6 +56,24 @@ impl From<String> for Value {
 impl From<&str> for Value {
     fn from(value: &str) -> Self {
         Self::String(value.into())
+    }
+}
+
+impl<const N: usize> From<[(String, Value); N]> for Value {
+    fn from(value: [(String, Value); N]) -> Self {
+        Self::Object(Map::from(value))
+    }
+}
+
+impl<const N: usize> From<[(&str, Value); N]> for Value {
+    fn from(value: [(&str, Value); N]) -> Self {
+        Self::Object(Map::from(value.map(|(k, v)| (k.to_string(), v))))
+    }
+}
+
+impl<const N: usize> From<[Value; N]> for Value {
+    fn from(value: [Value; N]) -> Self {
+        Self::Array(value.into())
     }
 }
 
@@ -376,6 +382,46 @@ mod tests {
             let null = Value::Null;
             assert_tokens(&null, &[Token::Unit]);
         }
+    }
+
+    #[test]
+    fn is_sth() {
+        assert!(Value::Null.is_null());
+        assert!(Value::from(true).is_bool());
+        assert!(Value::from(1).is_int());
+        assert!(Value::from(1.0).is_float());
+        assert!(Value::from(String::from("string")).is_string());
+        assert!(Value::from("string").is_string());
+        assert!(Value::from([Value::from(1), Value::from(2)]).is_array());
+        assert!(Value::from([(String::from("key"), Value::from("value"))]).is_object());
+    }
+
+    #[test]
+    fn try_from() {
+        let bool_value = Value::from(true);
+        assert_eq!(bool::try_from(&bool_value).unwrap(), true);
+        assert!(matches!(
+            i64::try_from(&bool_value),
+            Err(TryFromError::TypeMismatch)
+        ));
+        let int_value = Value::from(1);
+        assert_eq!(i64::try_from(&int_value).unwrap(), 1);
+        assert!(matches!(
+            bool::try_from(&int_value),
+            Err(TryFromError::TypeMismatch)
+        ));
+        let float_value = Value::from(1.0);
+        assert_eq!(f64::try_from(&float_value).unwrap(), 1.0);
+        assert!(matches!(
+            bool::try_from(&float_value),
+            Err(TryFromError::TypeMismatch)
+        ));
+        let string_value = Value::from("string");
+        assert_eq!(String::try_from(&string_value).unwrap(), "string");
+        assert!(matches!(
+            bool::try_from(&string_value),
+            Err(TryFromError::TypeMismatch)
+        ));
     }
 
     #[test]
