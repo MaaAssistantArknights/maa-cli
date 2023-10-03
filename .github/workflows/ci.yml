@@ -113,16 +113,23 @@ jobs:
   coverage:
     name: Coverage
     needs: build
-    runs-on: ubuntu-latest
-    container:
-      image: xd009642/tarpaulin:develop-nightly
-      options: --security-opt seccomp=unconfined
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          # - windows-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Install Cargo tarpaulin
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-tarpaulin
       - name: Generate code coverage
         run: |
-          cargo +nightly tarpaulin --all-features --workspace --timeout 120 --out xml
+          cargo tarpaulin --all-features --workspace --timeout 120 --out xml
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v3
         with:
