@@ -397,6 +397,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::bool_assert_comparison)]
     fn try_from() {
         let bool_value = Value::from(true);
         assert_eq!(bool::try_from(&bool_value).unwrap(), true);

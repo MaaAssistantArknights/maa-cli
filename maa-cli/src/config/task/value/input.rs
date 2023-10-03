@@ -156,13 +156,18 @@ impl<F: FromStr + Clone + Display> Select<F> {
             let trimmed = input.trim();
             if trimmed.is_empty() {
                 write!(writer, "Please select one of the alternatives: ")?;
+                writer.flush()?;
             } else {
                 match trimmed.parse::<usize>() {
                     Ok(value) => {
                         if value > 0 && value <= self.alternatives.len() {
                             break Ok(self.alternatives[value - 1].clone());
                         } else {
-                            write!(writer, "Invalid input, please try again: ")?;
+                            write!(
+                                writer,
+                                "Index out of range, must be between 1 and {}: ",
+                                self.alternatives.len()
+                            )?;
                             writer.flush()?;
                         }
                     }
@@ -380,13 +385,16 @@ mod tests {
                 alternatives: vec!['A', 'B'],
                 description: Some("a char".to_string()),
             };
-            let input = b"2\n";
+            let input = b"3\na\n2\n";
             let mut output = b"".to_vec();
             value.prompt(&mut output).unwrap();
             assert_eq!(&output, b"1. A\n2. B\nPlease select a char: ");
             output.clear();
             assert_eq!(value.ask(&mut output, &input[..]).unwrap(), 'B');
-            assert_eq!(&output, b"");
+            assert_eq!(
+                &output,
+                b"Index out of range, must be between 1 and 2: Invalid input, please try again: "
+            );
         }
 
         #[test]
