@@ -75,26 +75,7 @@ impl super::FromFile for TaskList {}
 mod tests {
     use super::*;
 
-    use value::input::{Input, Select};
-
-    use chrono::{NaiveDateTime, NaiveTime, TimeZone, Weekday};
     use task_type::TaskType;
-
-    fn naive_local_datetime(y: i32, m: u32, d: u32, h: u32, mi: u32, s: u32) -> NaiveDateTime {
-        chrono::Local
-            .with_ymd_and_hms(y, m, d, h, mi, s)
-            .unwrap()
-            .naive_local()
-    }
-
-    /// Create a object from a list of key-value pairs
-    macro_rules! object {
-        ($($key:expr => $value:expr),* $(,)?) => {{
-            let mut map = std::collections::BTreeMap::new();
-            $(map.insert($key.to_string(), $value.into());)*
-            Value::Object(map)
-        }};
-    }
 
     impl Task {
         pub fn new<T, V, S>(task_type: T, params: V, variants: S) -> Self
@@ -111,80 +92,279 @@ mod tests {
         }
     }
 
-    fn example_tasks() -> TaskList {
-        TaskList {
-            tasks: vec![
+    /// Create a object from a list of key-value pairs
+    macro_rules! object {
+        () => {
+            Value::Object(std::collections::BTreeMap::new())
+        };
+        ($($key:expr => $value:expr),* $(,)?) => {{
+            let mut map = std::collections::BTreeMap::new();
+            $(map.insert($key.to_string(), $value.into());)*
+            Value::Object(map)
+        }};
+    }
+
+    mod task {
+        use super::*;
+
+        #[test]
+        fn is_active() {
+            assert!(Task::new(
+                TaskType::StartUp,
+                Value::default(),
+                vec![TaskVariant {
+                    condition: Condition::Always,
+                    params: Value::default(),
+                }]
+            )
+            .is_active());
+            assert!(!Task::new(
+                TaskType::StartUp,
+                Value::default(),
+                vec![TaskVariant {
+                    condition: Condition::Never,
+                    params: Value::default(),
+                }]
+            )
+            .is_active());
+            assert!(Task::new(
+                TaskType::StartUp,
+                Value::default(),
+                vec![
+                    TaskVariant {
+                        condition: Condition::Never,
+                        params: Value::default(),
+                    },
+                    TaskVariant {
+                        condition: Condition::Always,
+                        params: Value::default(),
+                    },
+                ]
+            )
+            .is_active());
+            assert!(!Task::new(
+                TaskType::StartUp,
+                Value::default(),
+                vec![
+                    TaskVariant {
+                        condition: Condition::Never,
+                        params: Value::default(),
+                    },
+                    TaskVariant {
+                        condition: Condition::Never,
+                        params: Value::default(),
+                    },
+                ]
+            )
+            .is_active());
+        }
+
+        #[test]
+        fn get_type() {
+            assert_eq!(
+                Task::new(TaskType::StartUp, Value::default(), default_variants()).get_type(),
+                &TaskType::StartUp.into()
+            );
+        }
+
+        #[test]
+        fn get_params() {
+            assert_eq!(
                 Task::new(
                     TaskType::StartUp,
-                    [
-                        ("client_type", "Official".into()),
-                        ("start_game_enabled", true.into()),
-                    ],
-                    vec![TaskVariant::default()],
-                ),
+                    object!("a" => 1),
+                    vec![TaskVariant {
+                        condition: Condition::Always,
+                        params: object!(),
+                    }]
+                )
+                .get_params(),
+                object!("a" => 1)
+            );
+            assert_eq!(
                 Task::new(
-                    TaskType::Fight,
+                    TaskType::StartUp,
+                    object!("a" => 1),
+                    vec![TaskVariant {
+                        condition: Condition::Always,
+                        params: object!("b" => 2),
+                    }]
+                )
+                .get_params(),
+                object!("a" => 1, "b" => 2)
+            );
+            assert_eq!(
+                Task::new(
+                    TaskType::StartUp,
                     Value::default(),
+                    vec![TaskVariant {
+                        condition: Condition::Always,
+                        params: object!("a" => 1),
+                    }]
+                )
+                .get_params(),
+                object!("a" => 1)
+            );
+            assert_eq!(
+                Task::new(
+                    TaskType::StartUp,
+                    object!("a" => 1),
+                    vec![TaskVariant {
+                        condition: Condition::Always,
+                        params: object!("a" => 2),
+                    }]
+                )
+                .get_params(),
+                object!("a" => 2)
+            );
+            assert_eq!(
+                Task::new(
+                    TaskType::StartUp,
+                    object!("a" => 1),
                     vec![
                         TaskVariant {
-                            condition: Condition::DateTime {
-                                start: Some(naive_local_datetime(2023, 8, 1, 16, 0, 0)),
-                                end: Some(naive_local_datetime(2023, 8, 21, 3, 59, 59)),
-                            },
-                            params: object!("stage" => Value::InputString(
-                                    Select {
-                                        alternatives: vec![
-                                            "SL-6".to_string(),
-                                            "SL-7".to_string(),
-                                            "SL-8".to_string(),
-                                        ],
-                                        description: Some("a stage to fight in summer event".to_string()),
-                                    }
-                                    .into(),
-                                )
-                            ),
-                        },
-                        TaskVariant {
-                            condition: Condition::Weekday {
-                                weekdays: vec![Weekday::Tue, Weekday::Thu, Weekday::Sat],
-                            },
-                            params: object!("stage" => "CE-6"),
+                            condition: Condition::Always,
+                            params: object!("a" => 2),
                         },
                         TaskVariant {
                             condition: Condition::Always,
-                            params: object!(
-                                "stage" => Value::InputString(
-                                    Input{
-                                        default: Some("1-7".to_string()),
-                                        description: Some("a stage to fight".to_string()) }
-                                    .into(),
-                                )
-                            ),
+                            params: object!("a" => 3),
                         },
-                    ],
-                ),
+                    ]
+                )
+                .get_params(),
+                object!("a" => 2)
+            );
+            assert_eq!(
                 Task::new(
-                    TaskType::Mall,
-                    Value::default(),
-                    vec![TaskVariant {
-                        condition: Condition::Time {
-                            start: Some(NaiveTime::from_hms_opt(16, 0, 0).unwrap()),
-                            end: None,
+                    TaskType::StartUp,
+                    object!("a" => 1),
+                    vec![
+                        TaskVariant {
+                            condition: Condition::Always,
+                            params: object!("a" => 2),
                         },
-                        params: Value::default(),
-                    }],
-                ),
+                        TaskVariant {
+                            condition: Condition::Always,
+                            params: object!("a" => 3, "b" => 4),
+                        },
+                    ]
+                )
+                .get_params(),
+                object!("a" => 2),
+            );
+            assert_eq!(
                 Task::new(
-                    TaskType::CloseDown,
-                    Value::default(),
-                    vec![TaskVariant::default()],
-                ),
-            ],
+                    TaskType::StartUp,
+                    object!("a" => 1, "c" => 5),
+                    vec![
+                        TaskVariant {
+                            condition: Condition::Never,
+                            params: object!("a" => 2),
+                        },
+                        TaskVariant {
+                            condition: Condition::Always,
+                            params: object!("a" => 3, "b" => 4),
+                        },
+                    ]
+                )
+                .get_params(),
+                object!("a" => 3, "b" => 4, "c" => 5),
+            )
         }
     }
 
     mod deserialize_example {
         use super::*;
+
+        use value::input::{Input, Select};
+
+        use chrono::{NaiveDateTime, NaiveTime, TimeZone, Weekday};
+
+        fn example_tasks() -> TaskList {
+            TaskList {
+                tasks: vec![
+                    Task::new(
+                        TaskType::StartUp,
+                        [
+                            ("client_type", "Official".into()),
+                            ("start_game_enabled", true.into()),
+                        ],
+                        vec![TaskVariant {
+                            condition: Condition::Always,
+                            params: object!(),
+                        }],
+                    ),
+                    Task::new(
+                        TaskType::Fight,
+                        object!(),
+                        vec![
+                            TaskVariant {
+                                condition: Condition::DateTime {
+                                    start: Some(naive_local_datetime(2023, 8, 1, 16, 0, 0)),
+                                    end: Some(naive_local_datetime(2023, 8, 21, 3, 59, 59)),
+                                },
+                                params: object!("stage" => Value::InputString(
+                                        Select {
+                                            alternatives: vec![
+                                                "SL-6".to_string(),
+                                                "SL-7".to_string(),
+                                                "SL-8".to_string(),
+                                            ],
+                                            description: Some("a stage to fight in summer event".to_string()),
+                                        }
+                                        .into(),
+                                    )
+                                ),
+                            },
+                            TaskVariant {
+                                condition: Condition::Weekday {
+                                    weekdays: vec![Weekday::Tue, Weekday::Thu, Weekday::Sat],
+                                },
+                                params: object!("stage" => "CE-6"),
+                            },
+                            TaskVariant {
+                                condition: Condition::Always,
+                                params: object!(
+                                    "stage" => Value::InputString(
+                                        Input{
+                                            default: Some("1-7".to_string()),
+                                            description: Some("a stage to fight".to_string()) }
+                                        .into(),
+                                    )
+                                ),
+                            },
+                        ],
+                    ),
+                    Task::new(
+                        TaskType::Mall,
+                        object!(),
+                        vec![TaskVariant {
+                            condition: Condition::Time {
+                                start: Some(NaiveTime::from_hms_opt(16, 0, 0).unwrap()),
+                                end: None,
+                            },
+                            params: object!(),
+                        }],
+                    ),
+                    Task::new(
+                        TaskType::CloseDown,
+                        object!(),
+                        vec![TaskVariant {
+                            condition: Condition::Always,
+                            params: object!(),
+                        }],
+                    ),
+                ],
+            }
+        }
+
+        fn naive_local_datetime(y: i32, m: u32, d: u32, h: u32, mi: u32, s: u32) -> NaiveDateTime {
+            chrono::Local
+                .with_ymd_and_hms(y, m, d, h, mi, s)
+                .unwrap()
+                .naive_local()
+        }
 
         #[test]
         fn json() {

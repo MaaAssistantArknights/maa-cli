@@ -6,26 +6,36 @@ use serde::Deserialize;
 #[serde(tag = "type")]
 #[derive(Default)]
 pub enum Condition {
+    /// The task is always active
     #[default]
     Always,
-    Weekday {
-        weekdays: Vec<Weekday>,
-    },
+    /// The task is never active, only used for testing
+    #[cfg(test)]
+    Never,
+    /// The task is active on the specified weekdays
+    Weekday { weekdays: Vec<Weekday> },
+    /// The task is active on the specified time range
+    ///
+    /// If `start` is `None`, the task is active before `end`.
+    /// If `end` is `None`, the task is active after `start`.
     Time {
         #[serde(default, deserialize_with = "deserialize_from_str")]
         start: Option<NaiveTime>,
         #[serde(default, deserialize_with = "deserialize_from_str")]
         end: Option<NaiveTime>,
     },
+    /// The task is active on the specified datetime range
+    ///
+    /// If `start` is `None`, the task is active before `end`.
+    /// If `end` is `None`, the task is active after `start`.
     DateTime {
         #[serde(default, deserialize_with = "deserialize_from_str")]
         start: Option<NaiveDateTime>,
         #[serde(default, deserialize_with = "deserialize_from_str")]
         end: Option<NaiveDateTime>,
     },
-    Combined {
-        conditions: Vec<Condition>,
-    },
+    /// The task is active if all the sub-conditions are met
+    Combined { conditions: Vec<Condition> },
 }
 
 fn deserialize_from_str<'de, S, D>(deserializer: D) -> Result<Option<S>, D::Error>
@@ -48,6 +58,8 @@ impl Condition {
     pub fn is_active(&self) -> bool {
         match self {
             Condition::Always => true,
+            #[cfg(test)]
+            Condition::Never => false,
             Condition::Weekday { weekdays } => {
                 let now = Local::now();
                 let weekday = now.date_naive().weekday();
@@ -130,9 +142,34 @@ mod tests {
                 end: Some(now_time + Duration::minutes(10)),
             }
             .is_active());
+            assert!(Condition::Time {
+                start: Some(now_time + Duration::minutes(-10)),
+                end: None,
+            }
+            .is_active());
+            assert!(Condition::Time {
+                start: None,
+                end: Some(now_time + Duration::minutes(10)),
+            }
+            .is_active());
+            assert!(Condition::Time {
+                start: None,
+                end: None,
+            }
+            .is_active());
             assert!(!Condition::Time {
                 start: Some(now_time + Duration::minutes(10)),
                 end: Some(now_time + Duration::minutes(20)),
+            }
+            .is_active());
+            assert!(!Condition::Time {
+                start: Some(now_time + Duration::minutes(10)),
+                end: None,
+            }
+            .is_active());
+            assert!(!Condition::Time {
+                start: None,
+                end: Some(now_time + Duration::minutes(-10)),
             }
             .is_active());
         }
@@ -147,9 +184,34 @@ mod tests {
                 end: Some(now_datetime + Duration::minutes(10)),
             }
             .is_active());
+            assert!(Condition::DateTime {
+                start: Some(now_datetime + Duration::minutes(-10)),
+                end: None,
+            }
+            .is_active());
+            assert!(Condition::DateTime {
+                start: None,
+                end: Some(now_datetime + Duration::minutes(10)),
+            }
+            .is_active());
+            assert!(Condition::DateTime {
+                start: None,
+                end: None,
+            }
+            .is_active());
             assert!(!Condition::DateTime {
                 start: Some(now_datetime + Duration::minutes(10)),
                 end: Some(now_datetime + Duration::minutes(20)),
+            }
+            .is_active());
+            assert!(!Condition::DateTime {
+                start: Some(now_datetime + Duration::minutes(10)),
+                end: None,
+            }
+            .is_active());
+            assert!(!Condition::DateTime {
+                start: None,
+                end: Some(now_datetime + Duration::minutes(-10)),
             }
             .is_active());
         }

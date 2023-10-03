@@ -124,6 +124,24 @@ mod tests {
     #[test]
     fn as_str() {
         assert_eq!(TaskType::StartUp.as_ref(), "StartUp",);
+        assert_eq!(TaskType::CloseDown.as_ref(), "CloseDown",);
+        assert_eq!(TaskType::Fight.as_ref(), "Fight",);
+        assert_eq!(TaskType::Recruit.as_ref(), "Recruit",);
+        assert_eq!(TaskType::Infrast.as_ref(), "Infrast",);
+        assert_eq!(TaskType::Mall.as_ref(), "Mall",);
+        assert_eq!(TaskType::Award.as_ref(), "Award",);
+        assert_eq!(TaskType::Roguelike.as_ref(), "Roguelike",);
+        assert_eq!(TaskType::Copilot.as_ref(), "Copilot",);
+        assert_eq!(TaskType::SSSCopilot.as_ref(), "SSSCopilot",);
+        assert_eq!(TaskType::Depot.as_ref(), "Depot",);
+        assert_eq!(TaskType::OperBox.as_ref(), "OperBox",);
+        assert_eq!(
+            TaskType::ReclamationAlgorithm.as_ref(),
+            "ReclamationAlgorithm",
+        );
+        assert_eq!(TaskType::Custom.as_ref(), "Custom",);
+        assert_eq!(TaskType::SingleStep.as_ref(), "SingleStep",);
+        assert_eq!(TaskType::VideoRecognition.as_ref(), "VideoRecognition",);
         assert_eq!(TaskOrUnknown::Task(TaskType::StartUp).as_ref(), "StartUp");
         assert_eq!(TaskOrUnknown::Unknown("Other".into()).as_ref(), "Other");
     }
