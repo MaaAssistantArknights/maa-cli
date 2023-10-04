@@ -179,11 +179,11 @@ params = { stage = "CE-6" }
 params = { stage = "1-7" }
 ```
 
-With default strategy, if multiple variants are matched, nly the first one will be used.
+With default strategy, if multiple variants are matched, only the first one will be used.
 And if the condition is not given, the variant will always be matched,
 So you can put a variant without condition at the end of variants.
 
-The strategy can be changed by `strategy` field:
+The strategy of matching variants can be changed by `strategy` field:
 
 ```toml
 [[tasks]]
@@ -213,6 +213,7 @@ If multiple variants have the same param, the last one will be used.
 
 If no variant is matched, the task will not be executed,
 which is useful when you want to only run a task in some conditions:
+
 ```toml
 # Mall after 18:00
 [[tasks]]
