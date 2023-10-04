@@ -9,7 +9,7 @@
     },
     {
       "type": "Fight",
-      "merge_strategy": "override",
+      "strategy": "merge",
       "variants": [
         {
           "condition": {

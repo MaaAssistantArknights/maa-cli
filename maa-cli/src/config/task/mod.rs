@@ -26,16 +26,16 @@ fn default_variants() -> Vec<TaskVariant> {
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Deserialize, Debug, Default)]
 #[serde(rename_all = "kebab-case")]
-/// How to merge params from different variants
+/// How to select params from different variants
 ///
 /// If the strategy is `First`, the params from the first active variant will be used.
-/// If the strategy is `Override`, the params from all active variants will be merged,
+/// If the strategy is `Merge`, the params from all active variants will be merged,
 /// and the params from the later variants will override the params from the earlier variants.
 /// The default strategy is `First`.
-pub enum MergeStrategy {
+pub enum Strategy {
     #[default]
     First,
-    Override,
+    Merge,
 }
 
 #[cfg_attr(test, derive(PartialEq))]
@@ -47,7 +47,7 @@ pub struct Task {
     #[serde(default)]
     params: Value,
     #[serde(default)]
-    merge_strategy: MergeStrategy,
+    strategy: Strategy,
     #[serde(default = "default_variants")]
     variants: Vec<TaskVariant>,
 }
@@ -68,9 +68,9 @@ impl Task {
 
     pub fn get_params(&self) -> Value {
         let mut params = self.params.clone();
-        match self.merge_strategy {
+        match self.strategy {
             // Merge params from the first active variant
-            MergeStrategy::First => {
+            Strategy::First => {
                 for variant in &self.variants {
                     if variant.condition.is_active() {
                         params.merge_mut(&variant.params);
@@ -79,7 +79,7 @@ impl Task {
                 }
             }
             // Merge params from all active variants
-            MergeStrategy::Override => {
+            Strategy::Merge => {
                 for variant in &self.variants {
                     if variant.condition.is_active() {
                         params.merge_mut(&variant.params);
@@ -107,7 +107,7 @@ mod tests {
     use task_type::TaskType;
 
     impl Task {
-        pub fn new<T, V, S>(task_type: T, params: V, strategy: MergeStrategy, variants: S) -> Self
+        pub fn new<T, V, S>(task_type: T, params: V, strategy: Strategy, variants: S) -> Self
         where
             T: Into<TaskOrUnknown>,
             V: Into<Value>,
@@ -115,7 +115,7 @@ mod tests {
         {
             Self {
                 task_type: task_type.into(),
-                merge_strategy: strategy,
+                strategy,
                 params: params.into(),
                 variants: variants.into_iter().collect(),
             }
@@ -142,7 +142,7 @@ mod tests {
             assert!(Task::new(
                 TaskType::StartUp,
                 Value::default(),
-                MergeStrategy::default(),
+                Strategy::default(),
                 vec![TaskVariant {
                     condition: Condition::Always,
                     params: Value::default(),
@@ -152,7 +152,7 @@ mod tests {
             assert!(!Task::new(
                 TaskType::StartUp,
                 Value::default(),
-                MergeStrategy::default(),
+                Strategy::default(),
                 vec![TaskVariant {
                     condition: Condition::Never,
                     params: Value::default(),
@@ -162,7 +162,7 @@ mod tests {
             assert!(Task::new(
                 TaskType::StartUp,
                 Value::default(),
-                MergeStrategy::default(),
+                Strategy::default(),
                 vec![
                     TaskVariant {
                         condition: Condition::Never,
@@ -178,7 +178,7 @@ mod tests {
             assert!(!Task::new(
                 TaskType::StartUp,
                 Value::default(),
-                MergeStrategy::default(),
+                Strategy::default(),
                 vec![
                     TaskVariant {
                         condition: Condition::Never,
@@ -199,7 +199,7 @@ mod tests {
                 Task::new(
                     TaskType::StartUp,
                     Value::default(),
-                    MergeStrategy::default(),
+                    Strategy::default(),
                     vec![]
                 )
                 .get_type(),
@@ -213,7 +213,7 @@ mod tests {
                 Task::new(
                     TaskType::StartUp,
                     object!("a" => 1),
-                    MergeStrategy::First,
+                    Strategy::First,
                     vec![TaskVariant {
                         condition: Condition::Always,
                         params: object!(),
@@ -226,7 +226,7 @@ mod tests {
                 Task::new(
                     TaskType::StartUp,
                     object!("a" => 1),
-                    MergeStrategy::First,
+                    Strategy::First,
                     vec![TaskVariant {
                         condition: Condition::Always,
                         params: object!("b" => 2),
@@ -239,7 +239,7 @@ mod tests {
                 Task::new(
                     TaskType::StartUp,
                     Value::default(),
-                    MergeStrategy::First,
+                    Strategy::First,
                     vec![TaskVariant {
                         condition: Condition::Always,
                         params: object!("a" => 1),
@@ -252,7 +252,7 @@ mod tests {
                 Task::new(
                     TaskType::StartUp,
                     object!("a" => 1),
-                    MergeStrategy::First,
+                    Strategy::First,
                     vec![TaskVariant {
                         condition: Condition::Always,
                         params: object!("a" => 2),
@@ -265,7 +265,7 @@ mod tests {
                 Task::new(
                     TaskType::StartUp,
                     object!("a" => 1),
-                    MergeStrategy::First,
+                    Strategy::First,
                     vec![
                         TaskVariant {
                             condition: Condition::Always,
@@ -284,7 +284,7 @@ mod tests {
                 Task::new(
                     TaskType::StartUp,
                     object!("a" => 1),
-                    MergeStrategy::Override,
+                    Strategy::Merge,
                     vec![
                         TaskVariant {
                             condition: Condition::Always,
@@ -303,7 +303,7 @@ mod tests {
                 Task::new(
                     TaskType::StartUp,
                     object!("a" => 1),
-                    MergeStrategy::First,
+                    Strategy::First,
                     vec![
                         TaskVariant {
                             condition: Condition::Always,
@@ -322,7 +322,7 @@ mod tests {
                 Task::new(
                     TaskType::StartUp,
                     object!("a" => 1),
-                    MergeStrategy::Override,
+                    Strategy::Merge,
                     vec![
                         TaskVariant {
                             condition: Condition::Always,
@@ -341,7 +341,7 @@ mod tests {
                 Task::new(
                     TaskType::StartUp,
                     object!("a" => 1, "c" => 5),
-                    MergeStrategy::First,
+                    Strategy::First,
                     vec![
                         TaskVariant {
                             condition: Condition::Never,
@@ -375,7 +375,7 @@ mod tests {
                             "client_type" => "Official",
                             "start_game_enabled" => true,
                         ),
-                        MergeStrategy::default(),
+                        Strategy::default(),
                         vec![TaskVariant {
                             condition: Condition::Always,
                             params: object!(),
@@ -384,7 +384,7 @@ mod tests {
                     Task::new(
                         TaskType::Fight,
                         object!(),
-                        MergeStrategy::Override,
+                        Strategy::Merge,
                         vec![
                             TaskVariant {
                                 condition: Condition::Weekday {
@@ -432,7 +432,7 @@ mod tests {
                     Task::new(
                         TaskType::Mall,
                         object!(),
-                        MergeStrategy::default(),
+                        Strategy::default(),
                         vec![TaskVariant {
                             condition: Condition::Time {
                                 start: Some(NaiveTime::from_hms_opt(16, 0, 0).unwrap()),
@@ -444,7 +444,7 @@ mod tests {
                     Task::new(
                         TaskType::CloseDown,
                         object!(),
-                        MergeStrategy::default(),
+                        Strategy::default(),
                         vec![TaskVariant {
                             condition: Condition::Always,
                             params: object!(),
