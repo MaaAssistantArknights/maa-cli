@@ -117,6 +117,7 @@ A task should be defined with a TOML or JSON file, the located in `$MAA_CONFIG_D
 A task is consists of multiple subtasks,
 available subtasks and params are defined by `type` and `params` fields,
 it will passed to MaaCore, see [here](https://maa.plus/docs/en-us/3.1-INTEGRATION.html#asstappendtask) for more details:
+
 ```toml
 [[tasks]]
 type = "StartUp" # the type of maa task
@@ -127,6 +128,7 @@ params = { client_type = "Official", start_game_enabled = true } # the params of
 
 If you want to run a task with different params based on some conditions,
 you can define multiple variants of a task:
+
 ```toml
 [[tasks]]
 type = "Infrast"
@@ -150,6 +152,7 @@ params = { plan_index = 2 }
 condition = { type = "Time", start = "18:00:00" } # if end is not defined, it will be 23:59:59
 params = { plan_index = 0 }
 ```
+
 The `condition` field is used to determine whether the variant should be used,
 and the `params` field of matched variant will be merged into the params of the task.
 
@@ -158,6 +161,7 @@ including the time period defined in the `infrast` file,
 so you must define the time period in the `condition` field.
 
 Besides of `Time` condition, there are also `DateTime` and `Weakday` conditions:
+
 ```toml
 [[tasks]]
 type = "Fight"
@@ -174,12 +178,42 @@ params = { stage = "CE-6" }
 [[tasks.variants]]
 params = { stage = "1-7" }
 ```
-If multiple variants are matched, the first one will be used.
+
+With default strategy, if multiple variants are matched, only the first one will be used.
 And if the condition is not given, the variant will always be matched,
 So you can put a variant without condition at the end of variants.
 
+The strategy of matching variants can be changed by `strategy` field:
+
+```toml
+[[tasks]]
+type = "Fight"
+strategy = "merge" # or "first" (default)
+
+# use 5 expiring medicine on Sunday
+[[tasks.variants]]
+condition = { type = "Weekday", weekdays = ["Sun"] }
+params = { expiring_medicine = 5 }
+# fight 1-7 otherwise
+[[tasks.variants]]
+params = { stage = "1-7" }
+# fight CE-6 on Tue, Thu, Sat if not on summer event
+[[tasks.variants]]
+condition = { type = "Weekday", weekdays = ["Tue", "Thu", "Sat"] }
+params = { stage = "CE-6" }
+# fight SL-8 on summer event
+[[tasks.variants]]
+params = { stage = "SL-8" }
+condition = { type = "DateTime", start = "2023-08-01T16:00:00", end = "2023-08-21T03:59:59" }
+```
+
+This example will fight the same stage as above, but use 5 expiring medicine on Sunday additionally.
+With the `merge` strategy, if multiple variants are matched, the params of all matched variants will be merged.
+If multiple variants have the same param, the last one will be used.
+
 If no variant is matched, the task will not be executed,
 which is useful when you want to only run a task in some conditions:
+
 ```toml
 # Mall after 18:00
 [[tasks]]
