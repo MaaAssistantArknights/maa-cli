@@ -216,7 +216,7 @@ condition = { type = "Weekday", weekdays = ["Tue", "Thu", "Sat"] }
 params = { stage = "CE-6" }
 
 # Input a stage to fight
-[tasks.variants]]
+[[tasks.variants]]
 [tasks.variants.params.stage]
 default = "1-7" # default value of stage, optional (if not given, user can input empty value to re-prompt)
 description = "a stage to fight" # description of the input, optional

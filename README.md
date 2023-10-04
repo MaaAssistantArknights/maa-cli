@@ -209,7 +209,7 @@ condition = { type = "Weekday", weekdays = ["Tue", "Thu", "Sat"] }
 params = { stage = "CE-6" }
 
 # 输入一个关卡
-[tasks.variants]]
+[[tasks.variants]]
 [tasks.variants.params.stage]
 default = "1-7" # 默认的关卡，可选（如果没有默认值，输入空值将会重新提示输入）
 description = "a stage to fight" # 描述，可选
