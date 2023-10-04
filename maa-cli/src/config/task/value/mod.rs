@@ -78,6 +78,10 @@ impl<const N: usize> From<[Value; N]> for Value {
 }
 
 impl Value {
+    /// Get value with key
+    ///
+    /// If the value is an object and the key exists, the value will be returned.
+    /// Otherwise `None` will be returned.
     pub fn get(&self, key: &str) -> Option<&Self> {
         if let Self::Object(map) = self {
             if let Some(value) = map.get(key) {
@@ -89,18 +93,16 @@ impl Value {
 
     /// Get value with key or return default value
     ///
-    /// This will try to convert the value to the type of the default value.
-    /// If the key does not exist, the default value will be returned.
+    /// Get value with key by calling `get`. If the key is not exist, the default value will be returned.
+    /// Otherwise the value will be converted to the type of the default value.
     pub fn get_or<'a, T>(&'a self, key: &str, default: T) -> std::result::Result<T, T::Error>
     where
         T: TryFrom<&'a Self>,
     {
-        if let Self::Object(map) = self {
-            if let Some(value) = map.get(key) {
-                return value.try_into();
-            }
+        match self.get(key) {
+            Some(value) => value.try_into(),
+            None => Ok(default),
         }
-        Ok(default)
     }
 
     pub fn set(&mut self, key: &str, value: impl Into<Self>) {
@@ -386,6 +388,14 @@ mod tests {
     }
 
     #[test]
+    fn set() {
+        let mut value = Value::Object(Map::new());
+        assert_eq!(value.get_or("int", 2).unwrap(), 2);
+        value.set("int", 1);
+        assert_eq!(value.get_or("int", 2).unwrap(), 1);
+    }
+
+    #[test]
     fn is_sth() {
         assert!(Value::Null.is_null());
         assert!(Value::from(true).is_bool());
@@ -400,6 +410,7 @@ mod tests {
     #[test]
     #[allow(clippy::bool_assert_comparison)]
     fn try_from() {
+        // Bool
         let bool_value = Value::from(true);
         assert_eq!(bool::try_from(&bool_value).unwrap(), true);
         assert!(matches!(
@@ -415,10 +426,12 @@ mod tests {
             i64::try_from(&bool_input_value),
             Err(TryFromError::TypeMismatch)
         ));
+
+        // Int
         let int_value = Value::from(1);
         assert_eq!(i64::try_from(&int_value).unwrap(), 1);
         assert!(matches!(
-            bool::try_from(&int_value),
+            f64::try_from(&int_value),
             Err(TryFromError::TypeMismatch)
         ));
         let int_input_value = Value::InputInt(UserInput::Input(Input {
@@ -427,13 +440,15 @@ mod tests {
         }));
         assert_eq!(i64::try_from(&int_input_value).unwrap(), 1);
         assert!(matches!(
-            bool::try_from(&int_input_value),
+            f64::try_from(&int_input_value),
             Err(TryFromError::TypeMismatch)
         ));
+
+        // Float
         let float_value = Value::from(1.0);
         assert_eq!(f64::try_from(&float_value).unwrap(), 1.0);
         assert!(matches!(
-            bool::try_from(&float_value),
+            String::try_from(&float_value),
             Err(TryFromError::TypeMismatch)
         ));
         let float_input_value = Value::InputFloat(UserInput::Input(Input {
@@ -442,9 +457,11 @@ mod tests {
         }));
         assert_eq!(f64::try_from(&float_input_value).unwrap(), 1.0);
         assert!(matches!(
-            bool::try_from(&float_input_value),
+            String::try_from(&float_input_value),
             Err(TryFromError::TypeMismatch)
         ));
+
+        // String
         let string_value = Value::from("string");
         assert_eq!(String::try_from(&string_value).unwrap(), "string");
         assert!(matches!(

@@ -112,6 +112,8 @@ platform specific resource.
 
 A task should be defined with a TOML or JSON file, the located in `$MAA_CONFIG_DIR/tasks`.
 
+#### Basic structure
+
 A task is consists of multiple subtasks,
 available subtasks and params are defined by `type` and `params` fields,
 it will passed to MaaCore, see [here](https://maa.plus/docs/en-us/3.1-INTEGRATION.html#asstappendtask) for more details:
@@ -120,6 +122,8 @@ it will passed to MaaCore, see [here](https://maa.plus/docs/en-us/3.1-INTEGRATIO
 type = "StartUp" # the type of maa task
 params = { client_type = "Official", start_game_enabled = true } # the params of given task
 ```
+
+#### Task variants and conditions
 
 If you want to run a task with different params based on some conditions,
 you can define multiple variants of a task:
@@ -188,6 +192,41 @@ blacklist = ["碳", "家具", "加急许可"]
 [[tasks.variants]]
 condition = { type = "Time", start = "18:00:00" }
 ```
+
+#### User input
+
+In some case, you may want to input some value at runtime, instead of hard code it in the task file.
+Such as the stage to fight, the item to buy, etc.
+You can specify the value `Input` or `Select` type:
+
+```toml
+[[tasks]]
+type = "Fight"
+
+# Select a stage to fight
+[[tasks.variants]]
+condition = { type = "DateTime", start = "2023-08-01T16:00:00", end = "2023-08-21T03:59:59" }
+[tasks.variants.params.stage]
+alternatives = ["SL-6", "SL-7", "SL-8"] # the alternatives of stage, at least one alternative should be given
+description = "a stage to fight in summer event" # description of the input, optional
+
+# Task without input
+[[tasks.variants]]
+condition = { type = "Weekday", weekdays = ["Tue", "Thu", "Sat"] }
+params = { stage = "CE-6" }
+
+# Input a stage to fight
+[tasks.variants]]
+[tasks.variants.params.stage]
+default = "1-7" # default value of stage, optional (if not given, user can input empty value to re-prompt)
+description = "a stage to fight" # description of the input, optional
+```
+
+For `Input` type, a prompt will be shown to ask user to input a value.
+If the default value is given, it will be used if user input empty value, otherwise it will re-prompt.
+For `Select` type, a prompt will be shown to ask user to select a value from alternatives (by index).
+If user input is not a valid index, it will re-prompt.
+
 
 Example of config file can be found at [`config_examples` directory](./config_examples).
 Anothor example can be found at my [dotfiles](https://github.com/wangl-cc/dotfiles/tree/master/.config/maa).
