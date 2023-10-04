@@ -413,6 +413,7 @@ mod tests {
             description: None,
         });
         let mut value = Value::new();
+        value.insert("null", Value::Null);
         value.insert("bool", Value::InputBool(input_bool.clone()));
         value.insert("int", Value::InputInt(input_int.clone()));
         value.insert("float", Value::InputFloat(input_float.clone()));
@@ -426,6 +427,7 @@ mod tests {
             Value::from([("int", Value::InputInt(input_int.clone()))]),
         );
 
+        assert_eq!(value.get("null").unwrap(), &Value::Null);
         assert_eq!(value.get("bool").unwrap(), &Value::InputBool(input_bool));
         assert_eq!(
             value.get("int").unwrap(),
@@ -450,6 +452,7 @@ mod tests {
 
         value.init().unwrap();
 
+        assert_eq!(value.get("null").unwrap(), &Value::Null);
         assert_eq!(value.get("bool").unwrap(), &Value::Bool(true));
         assert_eq!(value.get("int").unwrap(), &Value::Int(1));
         assert_eq!(value.get("float").unwrap(), &Value::Float(1.0));
@@ -469,9 +472,7 @@ mod tests {
 
     #[test]
     fn get() {
-        let mut map = Map::new();
-        map.insert("int".to_string(), Value::Int(1.into()));
-        let value = Value::Object(map);
+        let value = Value::from([("int", 1)]);
 
         assert_eq!(value.get("int").unwrap(), &Value::Int(1.into()));
         assert!(value.get("float").is_none());
@@ -481,11 +482,25 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
+    fn get_panic() {
+        let value = Value::Null;
+        value.get("int");
+    }
+
+    #[test]
     fn insert() {
         let mut value = Value::Object(Map::new());
         assert_eq!(value.get_or("int", 2).unwrap(), 2);
         value.insert("int", 1);
         assert_eq!(value.get_or("int", 2).unwrap(), 1);
+    }
+
+    #[test]
+    #[should_panic]
+    fn insert_panic() {
+        let mut value = Value::Null;
+        value.insert("int", 1);
     }
 
     #[test]
