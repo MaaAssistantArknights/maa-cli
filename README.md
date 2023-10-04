@@ -105,12 +105,18 @@ resources = ["platform_diff/macOS"]
 每一个任务都是一个单独的文件，它们储存在`$MAA_CONFIG_DIR/tasks`中。
 任务文件的格式是`<name>.toml`或者`<name>.json`，其中`<name>`是任务的名字。
 
+
+#### 基本结构
+
 一个任务文件包含多个子任务，每一个子任务是一个[MAA任务链](https://maa.plus/docs/3.1-集成文档.html#asstappendtask)：
 ```toml
 [[tasks]]
 type = "StartUp" # maa任务的类型
 params = { client_type = "Official", start_game_enabled = true } # maa任务的参数
 ```
+
+#### 任务条件
+
 如果你想要根据一些条件运行不同参数的任务，你可以定义多个任务的变体：
 ```toml
 [[tasks]]
@@ -180,6 +186,39 @@ blacklist = ["碳", "家具", "加急许可"]
 [[tasks.variants]]
 condition = { type = "Time", start = "18:00:00" }
 ```
+
+#### 用户输入
+
+对于一些任务，你可能想要在运行时输入一些参数，例如关卡名称。
+你可以将对应需要输入的参数设置为 `Input` 或者 `Select` 类型：
+
+```toml
+[[tasks]]
+type = "Fight"
+
+# 选择一个关卡
+[[tasks.variants]]
+condition = { type = "DateTime", start = "2023-08-01T16:00:00", end = "2023-08-21T03:59:59" }
+[tasks.variants.params.stage]
+alternatives = ["SL-6", "SL-7", "SL-8"] # 可选的关卡，必须提供至少一个可选值
+description = "a stage to fight in summer event" # 描述，可选
+
+# 无需任何输入
+[[tasks.variants]]
+condition = { type = "Weekday", weekdays = ["Tue", "Thu", "Sat"] }
+params = { stage = "CE-6" }
+
+# 输入一个关卡
+[[tasks.variants]]
+[tasks.variants.params.stage]
+default = "1-7" # 默认的关卡，可选（如果没有默认值，输入空值将会重新提示输入）
+description = "a stage to fight" # 描述，可选
+```
+
+对于 `Input` 类型，当运行任务时，你将会被提示输入一个值。如果你输入了一个空值，那么默认值将会被使用。
+对于 `Select` 类型，当运行任务时，你将会被提示选择一个值 （通过输入可选值的序号）。
+注意，当你的输入不是可选值时，你将会被提示重新输入。
+
 
 配置文件的例子可以在[`config_examples`目录](./config_examples)中找到。
 另一个例子是我自己的配置文件，你可以在[这里](https://github.com/wangl-cc/dotfiles/tree/master/.config/maa)找到。

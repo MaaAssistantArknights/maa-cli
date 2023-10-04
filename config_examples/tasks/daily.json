@@ -17,7 +17,14 @@
             "end": "2023-08-21T03:59:59"
           },
           "params": {
-            "stage": ""
+            "stage": {
+              "alternatives": [
+                "SL-6",
+                "SL-7",
+                "SL-8"
+              ],
+              "description": "a stage to fight in summer event"
+            }
           }
         },
         {
@@ -35,7 +42,10 @@
         },
         {
           "params": {
-            "stage": "1-7"
+            "stage": {
+              "default": "1-7",
+              "description": "a stage to fight"
+            }
           }
         }
       ]
