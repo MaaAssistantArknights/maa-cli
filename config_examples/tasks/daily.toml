@@ -5,7 +5,7 @@ params = { client_type = "Official", start_game_enabled = true }
 
 [[tasks]]
 type = "Fight"
-merge_strategy = "override"
+strategy = "merge"
 
 # use expiring medicine on Sunday
 [[tasks.variants]]

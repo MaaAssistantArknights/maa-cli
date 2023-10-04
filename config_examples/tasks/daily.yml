@@ -4,7 +4,7 @@ tasks:
       client_type: Official
       start_game_enabled: true
   - type: Fight
-    merge_strategy: override
+    strategy: merge
     variants:
       - condition:
           type: Weekday
