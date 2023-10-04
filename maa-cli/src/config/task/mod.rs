@@ -24,6 +24,21 @@ fn default_variants() -> Vec<TaskVariant> {
 }
 
 #[cfg_attr(test, derive(PartialEq))]
+#[derive(Deserialize, Debug, Default)]
+#[serde(rename_all = "kebab-case")]
+/// How to merge params from different variants
+///
+/// If the strategy is `First`, the params from the first active variant will be used.
+/// If the strategy is `Override`, the params from all active variants will be merged,
+/// and the params from the later variants will override the params from the earlier variants.
+/// The default strategy is `First`.
+pub enum MergeStrategy {
+    #[default]
+    First,
+    Override,
+}
+
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct Task {
@@ -31,6 +46,8 @@ pub struct Task {
     task_type: TaskOrUnknown,
     #[serde(default)]
     params: Value,
+    #[serde(default)]
+    merge_strategy: MergeStrategy,
     #[serde(default = "default_variants")]
     variants: Vec<TaskVariant>,
 }
@@ -51,11 +68,23 @@ impl Task {
 
     pub fn get_params(&self) -> Value {
         let mut params = self.params.clone();
-        for variant in &self.variants {
+        match self.merge_strategy {
+            // Merge params from the first active variant
+            MergeStrategy::First => {
+                for variant in &self.variants {
+                    if variant.condition.is_active() {
+                        params.merge_mut(&variant.params);
+                        break;
+                    }
+                }
+            }
             // Merge params from all active variants
-            if variant.condition.is_active() {
-                params.merge_mut(&variant.params);
-                break;
+            MergeStrategy::Override => {
+                for variant in &self.variants {
+                    if variant.condition.is_active() {
+                        params.merge_mut(&variant.params);
+                    }
+                }
             }
         }
         params
@@ -78,7 +107,7 @@ mod tests {
     use task_type::TaskType;
 
     impl Task {
-        pub fn new<T, V, S>(task_type: T, params: V, variants: S) -> Self
+        pub fn new<T, V, S>(task_type: T, params: V, strategy: MergeStrategy, variants: S) -> Self
         where
             T: Into<TaskOrUnknown>,
             V: Into<Value>,
@@ -86,6 +115,7 @@ mod tests {
         {
             Self {
                 task_type: task_type.into(),
+                merge_strategy: strategy,
                 params: params.into(),
                 variants: variants.into_iter().collect(),
             }
@@ -112,6 +142,7 @@ mod tests {
             assert!(Task::new(
                 TaskType::StartUp,
                 Value::default(),
+                MergeStrategy::default(),
                 vec![TaskVariant {
                     condition: Condition::Always,
                     params: Value::default(),
@@ -121,6 +152,7 @@ mod tests {
             assert!(!Task::new(
                 TaskType::StartUp,
                 Value::default(),
+                MergeStrategy::default(),
                 vec![TaskVariant {
                     condition: Condition::Never,
                     params: Value::default(),
@@ -130,6 +162,7 @@ mod tests {
             assert!(Task::new(
                 TaskType::StartUp,
                 Value::default(),
+                MergeStrategy::default(),
                 vec![
                     TaskVariant {
                         condition: Condition::Never,
@@ -145,6 +178,7 @@ mod tests {
             assert!(!Task::new(
                 TaskType::StartUp,
                 Value::default(),
+                MergeStrategy::default(),
                 vec![
                     TaskVariant {
                         condition: Condition::Never,
@@ -162,7 +196,13 @@ mod tests {
         #[test]
         fn get_type() {
             assert_eq!(
-                Task::new(TaskType::StartUp, Value::default(), default_variants()).get_type(),
+                Task::new(
+                    TaskType::StartUp,
+                    Value::default(),
+                    MergeStrategy::default(),
+                    vec![]
+                )
+                .get_type(),
                 &TaskType::StartUp.into()
             );
         }
@@ -173,6 +213,7 @@ mod tests {
                 Task::new(
                     TaskType::StartUp,
                     object!("a" => 1),
+                    MergeStrategy::First,
                     vec![TaskVariant {
                         condition: Condition::Always,
                         params: object!(),
@@ -185,6 +226,7 @@ mod tests {
                 Task::new(
                     TaskType::StartUp,
                     object!("a" => 1),
+                    MergeStrategy::First,
                     vec![TaskVariant {
                         condition: Condition::Always,
                         params: object!("b" => 2),
@@ -197,6 +239,7 @@ mod tests {
                 Task::new(
                     TaskType::StartUp,
                     Value::default(),
+                    MergeStrategy::First,
                     vec![TaskVariant {
                         condition: Condition::Always,
                         params: object!("a" => 1),
@@ -209,6 +252,7 @@ mod tests {
                 Task::new(
                     TaskType::StartUp,
                     object!("a" => 1),
+                    MergeStrategy::First,
                     vec![TaskVariant {
                         condition: Condition::Always,
                         params: object!("a" => 2),
@@ -221,6 +265,7 @@ mod tests {
                 Task::new(
                     TaskType::StartUp,
                     object!("a" => 1),
+                    MergeStrategy::First,
                     vec![
                         TaskVariant {
                             condition: Condition::Always,
@@ -239,6 +284,7 @@ mod tests {
                 Task::new(
                     TaskType::StartUp,
                     object!("a" => 1),
+                    MergeStrategy::Override,
                     vec![
                         TaskVariant {
                             condition: Condition::Always,
@@ -246,7 +292,26 @@ mod tests {
                         },
                         TaskVariant {
                             condition: Condition::Always,
-                            params: object!("a" => 3, "b" => 4),
+                            params: object!("a" => 3),
+                        },
+                    ]
+                )
+                .get_params(),
+                object!("a" => 3)
+            );
+            assert_eq!(
+                Task::new(
+                    TaskType::StartUp,
+                    object!("a" => 1),
+                    MergeStrategy::First,
+                    vec![
+                        TaskVariant {
+                            condition: Condition::Always,
+                            params: object!("a" => 2),
+                        },
+                        TaskVariant {
+                            condition: Condition::Always,
+                            params: object!("b" => 4),
                         },
                     ]
                 )
@@ -256,7 +321,27 @@ mod tests {
             assert_eq!(
                 Task::new(
                     TaskType::StartUp,
+                    object!("a" => 1),
+                    MergeStrategy::Override,
+                    vec![
+                        TaskVariant {
+                            condition: Condition::Always,
+                            params: object!("a" => 2),
+                        },
+                        TaskVariant {
+                            condition: Condition::Always,
+                            params: object!("b" => 4),
+                        },
+                    ]
+                )
+                .get_params(),
+                object!("a" => 2, "b" => 4),
+            );
+            assert_eq!(
+                Task::new(
+                    TaskType::StartUp,
                     object!("a" => 1, "c" => 5),
+                    MergeStrategy::First,
                     vec![
                         TaskVariant {
                             condition: Condition::Never,
@@ -270,7 +355,7 @@ mod tests {
                 )
                 .get_params(),
                 object!("a" => 3, "b" => 4, "c" => 5),
-            )
+            );
         }
     }
 
@@ -290,6 +375,7 @@ mod tests {
                             "client_type" => "Official",
                             "start_game_enabled" => true,
                         ),
+                        MergeStrategy::default(),
                         vec![TaskVariant {
                             condition: Condition::Always,
                             params: object!(),
@@ -298,7 +384,31 @@ mod tests {
                     Task::new(
                         TaskType::Fight,
                         object!(),
+                        MergeStrategy::Override,
                         vec![
+                            TaskVariant {
+                                condition: Condition::Weekday {
+                                    weekdays: vec![Weekday::Sun],
+                                },
+                                params: object!("expiring_medicine" => 5),
+                            },
+                            TaskVariant {
+                                condition: Condition::Always,
+                                params: object!(
+                                    "stage" => Value::InputString(
+                                        Input{
+                                            default: Some("1-7".to_string()),
+                                            description: Some("a stage to fight".to_string()) }
+                                        .into(),
+                                    )
+                                ),
+                            },
+                            TaskVariant {
+                                condition: Condition::Weekday {
+                                    weekdays: vec![Weekday::Tue, Weekday::Thu, Weekday::Sat],
+                                },
+                                params: object!("stage" => "CE-6"),
+                            },
                             TaskVariant {
                                 condition: Condition::DateTime {
                                     start: Some(naive_local_datetime(2023, 8, 1, 16, 0, 0)),
@@ -317,28 +427,12 @@ mod tests {
                                     )
                                 ),
                             },
-                            TaskVariant {
-                                condition: Condition::Weekday {
-                                    weekdays: vec![Weekday::Tue, Weekday::Thu, Weekday::Sat],
-                                },
-                                params: object!("stage" => "CE-6"),
-                            },
-                            TaskVariant {
-                                condition: Condition::Always,
-                                params: object!(
-                                    "stage" => Value::InputString(
-                                        Input{
-                                            default: Some("1-7".to_string()),
-                                            description: Some("a stage to fight".to_string()) }
-                                        .into(),
-                                    )
-                                ),
-                            },
                         ],
                     ),
                     Task::new(
                         TaskType::Mall,
                         object!(),
+                        MergeStrategy::default(),
                         vec![TaskVariant {
                             condition: Condition::Time {
                                 start: Some(NaiveTime::from_hms_opt(16, 0, 0).unwrap()),
@@ -350,6 +444,7 @@ mod tests {
                     Task::new(
                         TaskType::CloseDown,
                         object!(),
+                        MergeStrategy::default(),
                         vec![TaskVariant {
                             condition: Condition::Always,
                             params: object!(),
