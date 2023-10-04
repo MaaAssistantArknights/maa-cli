@@ -95,12 +95,12 @@ mod tests {
     /// Create a object from a list of key-value pairs
     macro_rules! object {
         () => {
-            Value::Object(std::collections::BTreeMap::new())
+            Value::new()
         };
         ($($key:expr => $value:expr),* $(,)?) => {{
-            let mut map = std::collections::BTreeMap::new();
-            $(map.insert($key.to_string(), $value.into());)*
-            Value::Object(map)
+            let mut value = Value::new();
+            $(value.insert($key, $value);)*
+            value
         }};
     }
 
@@ -286,10 +286,10 @@ mod tests {
                 tasks: vec![
                     Task::new(
                         TaskType::StartUp,
-                        [
-                            ("client_type", "Official".into()),
-                            ("start_game_enabled", true.into()),
-                        ],
+                        object!(
+                            "client_type" => "Official",
+                            "start_game_enabled" => true,
+                        ),
                         vec![TaskVariant {
                             condition: Condition::Always,
                             params: object!(),

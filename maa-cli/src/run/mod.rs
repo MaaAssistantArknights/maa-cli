@@ -106,42 +106,33 @@ pub fn run(
     /*----------------------- Process Task -------------------------*/
     let mut tasks: Vec<String> = Vec::new();
     let mut task_params: Vec<String> = Vec::new();
+
     let mut start_app: bool = false; // start iOS app before connect
     let mut close_app: bool = false; // close iOS app after disconnect
-    let mut app = PlayCoverApp::from("明日方舟");
+    let mut app_name: Option<String> = None;
 
     for task in task_list.tasks {
         if task.is_active() {
             let task_type = task.get_type();
-            let params = &mut task.get_params();
+
+            let mut params = task.get_params();
+            params.init().context("Failed to init task params!")?;
 
             match task_type {
                 TaskOrUnknown::Task(task_type) => match task_type {
-                    TaskType::StartUp => {
-                        match params.get("client_type") {
-                            Some(client_type) => {
-                                app = client_name(client_type, &resource_dir)?;
-                            }
-                            None => {
-                                if playtools {
-                                    warning!(
-                                        "No client type specified",
-                                        "using default app name \"明日方舟\""
-                                    );
-                                }
-                            }
-                        };
-                        if playtools
-                            && params.get_or("enable", true)?
+                    TaskType::StartUp if playtools => {
+                        if params.get_or("enable", true)?
                             && params.get_or("start_game_enabled", false)?
                         {
                             start_app = true;
                         }
+
+                        if let Some(client_type) = params.get("client_type") {
+                            app_name = Some(client_name(client_type, &resource_dir)?);
+                        };
                     }
-                    TaskType::CloseDown => {
-                        if playtools && params.get_or("enable", true)? {
-                            close_app = true;
-                        }
+                    TaskType::CloseDown if playtools => {
+                        close_app = params.get_or("enable", true)?;
                     }
                     _ => {
                         // For any task that has a filename parameter
@@ -153,7 +144,7 @@ pub fn run(
                             let path = std::path::Path::new(&filename);
                             if !path.is_absolute() {
                                 let type_name: &str = task_type.as_ref();
-                                params.set(
+                                params.insert(
                                     "filename",
                                     config_dir
                                         .join(type_name.to_lowercase())
@@ -179,9 +170,27 @@ pub fn run(
         }
     }
 
+    let app = if start_app || close_app {
+        match app_name {
+            Some(name) => {
+                debug!("Using PlayCover to launch app", name);
+                Some(PlayCoverApp::new(name))
+            }
+            None => {
+                warning!(
+                    "No client type specified, ",
+                    format!("using default app name {}", "明日方舟")
+                );
+                Some(PlayCoverApp::from("明日方舟"))
+            }
+        }
+    } else {
+        None
+    };
+
     /*------------------- Load Additional resource -----------------*/
     if playtools {
-        debug!("Load additional resource", "for PlayTools");
+        debug!("Load additional resource for PlayTools");
         Assistant::load_resource(resource_dir.join("platform_diff/iOS"))
             .context("Failed to load additional resource!")?;
     }
@@ -267,9 +276,10 @@ pub fn run(
 
     /*----------------------- Connect to Game ----------------------*/
     if start_app {
-        app.open()?;
+        app.as_ref().unwrap().open()?;
         std::thread::sleep(std::time::Duration::from_secs(5));
     }
+
     assistant.async_connect(adb_path, address, config, true)?;
 
     /* ------------------------- Append Tasks ----------------------*/
@@ -292,7 +302,7 @@ pub fn run(
 
     /* ------------------------- Close Game ------------------------*/
     if close_app {
-        app.close();
+        app.as_ref().unwrap().close();
     }
 
     Ok(())
@@ -349,24 +359,15 @@ impl From<&str> for PlayCoverApp {
     }
 }
 
-fn client_name(client: &Value, resource_dir: &Path) -> Result<PlayCoverApp> {
+fn client_name(client: &Value, resource_dir: &Path) -> Result<String> {
     let client = String::try_from(client)?;
 
     let (resource, app) = match client.as_str() {
         "Official" | "Bilibili" | "" => (None, None),
-        "txwy" => (Some(resource_dir.join("global").join("txwy")), None),
-        "YoStarEN" => (
-            Some(resource_dir.join("global").join("YoStarEN")),
-            Some(PlayCoverApp::from("Arknights")),
-        ),
-        "YoStarJP" => (
-            Some(resource_dir.join("global").join("YoStarJP")),
-            Some(PlayCoverApp::from("アークナイツ")),
-        ),
-        "YoStarKR" => (
-            Some(resource_dir.join("global").join("YoStarKR")),
-            Some(PlayCoverApp::from("명일방주")),
-        ),
+        "txwy" => (Some("txwy"), None),
+        "YoStarEN" => (Some("YoStarEN"), Some("Arknights")),
+        "YoStarJP" => (Some("YoStarJP"), Some("アークナイツ")),
+        "YoStarKR" => (Some("YoStarKR"), Some("명일방주")),
         _ => {
             error!("Unknown client type", client);
             (None, None)
@@ -374,13 +375,10 @@ fn client_name(client: &Value, resource_dir: &Path) -> Result<PlayCoverApp> {
     };
 
     if let Some(resource) = resource {
-        debug!("Loading additional resource", resource.display());
-        Assistant::load_resource(&resource).context("Failed to load additional resource!")?;
+        debug!("Loading additional resource for global client", resource);
+        Assistant::load_resource(resource_dir.join("global").join(resource))
+            .context("Failed to load additional resource!")?;
     }
 
-    if let Some(app) = app {
-        Ok(app)
-    } else {
-        Ok(PlayCoverApp::from("明日方舟"))
-    }
+    Ok(app.unwrap_or("明日方舟").to_string())
 }

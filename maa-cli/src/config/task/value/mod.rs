@@ -25,7 +25,7 @@ pub enum Value {
 
 impl Default for Value {
     fn default() -> Self {
-        Self::Object(Default::default())
+        Self::new()
     }
 }
 
@@ -59,43 +59,68 @@ impl From<&str> for Value {
     }
 }
 
-impl<const N: usize> From<[(String, Value); N]> for Value {
-    fn from(value: [(String, Value); N]) -> Self {
-        Self::Object(Map::from(value))
+impl<const N: usize, S: Into<String>, V: Into<Value>> From<[(S, V); N]> for Value {
+    fn from(value: [(S, V); N]) -> Self {
+        Self::Object(Map::from(value.map(|(k, v)| (k.into(), v.into()))))
     }
 }
 
-impl<const N: usize> From<[(&str, Value); N]> for Value {
-    fn from(value: [(&str, Value); N]) -> Self {
-        Self::Object(Map::from(value.map(|(k, v)| (k.to_string(), v))))
-    }
-}
-
-impl<const N: usize> From<[Value; N]> for Value {
-    fn from(value: [Value; N]) -> Self {
-        Self::Array(value.into())
+impl<const N: usize, T: Into<Value>> From<[T; N]> for Value {
+    fn from(value: [T; N]) -> Self {
+        Self::Array(Vec::from(value.map(|v| v.into())))
     }
 }
 
 impl Value {
-    /// Get value with key
-    ///
-    /// If the value is an object and the key exists, the value will be returned.
-    /// Otherwise `None` will be returned.
-    pub fn get(&self, key: &str) -> Option<&Self> {
-        if let Self::Object(map) = self {
-            if let Some(value) = map.get(key) {
-                return Some(value);
-            }
-        }
-        None
+    /// Create a new empty object
+    pub fn new() -> Self {
+        Self::Object(Map::new())
     }
 
-    /// Get value with key or return default value
+    /// Initialize the value
     ///
-    /// Get value with key by calling `get`. If the key is not exist, the default value will be returned.
+    /// If the value is an input value, try to get the value from user input and set it to the value.
+    /// If the value is an array or an object, initialize all the values in it recursively.
+    pub fn init(&mut self) -> Result<(), TryFromError> {
+        match self {
+            Self::InputString(v) => *self = Self::String(v.get()?),
+            Self::InputBool(v) => *self = Self::Bool(v.get()?),
+            Self::InputInt(v) => *self = Self::Int(v.get()?),
+            Self::InputFloat(v) => *self = Self::Float(v.get()?),
+            Self::Object(map) => {
+                for value in map.values_mut() {
+                    value.init()?;
+                }
+            }
+            Self::Array(array) => {
+                for value in array {
+                    value.init()?;
+                }
+            }
+            _ => {}
+        }
+
+        Ok(())
+    }
+
+    /// Get value of given key
+    ///
+    /// If the value is an object and the key exists, the value will be returned.
+    /// If the key is not exist, `None` will be returned.
+    /// Otherwise, the panic will be raised.
+    pub fn get(&self, key: &str) -> Option<&Self> {
+        if let Self::Object(map) = self {
+            map.get(key)
+        } else {
+            panic!("value is not an object");
+        }
+    }
+
+    /// Get value of given key or return default value
+    ///
+    /// Get value of key by calling `get`. If the key is not exist, the default value will be returned.
     /// Otherwise the value will be converted to the type of the default value.
-    pub fn get_or<'a, T>(&'a self, key: &str, default: T) -> std::result::Result<T, T::Error>
+    pub fn get_or<'a, T>(&'a self, key: &str, default: T) -> Result<T, T::Error>
     where
         T: TryFrom<&'a Self>,
     {
@@ -105,9 +130,11 @@ impl Value {
         }
     }
 
-    pub fn set(&mut self, key: &str, value: impl Into<Self>) {
+    pub fn insert(&mut self, key: impl Into<String>, value: impl Into<Self>) {
         if let Self::Object(map) = self {
-            map.insert(key.to_string(), value.into());
+            map.insert(key.into(), value.into());
+        } else {
+            panic!("value is not an object");
         }
     }
 
@@ -258,6 +285,8 @@ mod tests {
 
     use super::input::Input;
 
+    impl Value {}
+
     mod serde {
         use super::*;
 
@@ -265,26 +294,19 @@ mod tests {
 
         #[test]
         fn value() {
-            let mut map = Map::new();
-            map.insert("bool".to_string(), Value::Bool(true));
-            map.insert("int".to_string(), Value::Int(1.into()));
-            map.insert("float".to_string(), Value::Float(1.0));
-            map.insert("string".to_string(), Value::String("string".to_string()));
-            map.insert(
-                "array".to_string(),
-                Value::Array(vec![Value::Int(1.into()), Value::Int(2.into())]),
-            );
-
-            let mut sub_map = Map::new();
-            sub_map.insert("key".to_string(), Value::String("value".to_string()));
-            map.insert("object".to_string(), Value::Object(sub_map));
-
-            let value = Value::Object(map);
+            let mut value = Value::new();
+            value.insert("array", [1, 2]);
+            value.insert("bool", true);
+            value.insert("float", 1.0);
+            value.insert("int", 1);
+            value.insert("null", Value::Null);
+            value.insert("object", [("key", "value")]);
+            value.insert("string", "string");
 
             assert_tokens(
                 &value,
                 &[
-                    Token::Map { len: Some(6) },
+                    Token::Map { len: Some(7) },
                     Token::Str("array"),
                     Token::Seq { len: Some(2) },
                     Token::I64(1),
@@ -296,6 +318,8 @@ mod tests {
                     Token::F64(1.0),
                     Token::Str("int"),
                     Token::I64(1),
+                    Token::Str("null"),
+                    Token::Unit,
                     Token::Str("object"),
                     Token::Map { len: Some(1) },
                     Token::Str("key"),
@@ -312,15 +336,11 @@ mod tests {
         fn array() {
             let value = Value::Array(vec![
                 Value::Bool(true),
-                Value::Int(1.into()),
+                Value::Int(1_i64),
                 Value::Float(1.0),
                 Value::String("string".to_string()),
-                Value::Array(vec![Value::Int(1.into()), Value::Int(2.into())]),
-                Value::Object({
-                    let mut map = Map::new();
-                    map.insert("key".to_string(), Value::String("value".to_string()));
-                    map
-                }),
+                Value::from([1, 2]),
+                Value::from([("key", "value")]),
             ]);
             assert_tokens(
                 &value,
@@ -375,6 +395,79 @@ mod tests {
     }
 
     #[test]
+    fn init() {
+        let input_bool = UserInput::Input(Input {
+            default: Some(true),
+            description: None,
+        });
+        let input_int = UserInput::Input(Input {
+            default: Some(1),
+            description: None,
+        });
+        let input_float = UserInput::Input(Input {
+            default: Some(1.0),
+            description: None,
+        });
+        let input_string = UserInput::Input(Input {
+            default: Some("string".to_string()),
+            description: None,
+        });
+        let mut value = Value::new();
+        value.insert("bool", Value::InputBool(input_bool.clone()));
+        value.insert("int", Value::InputInt(input_int.clone()));
+        value.insert("float", Value::InputFloat(input_float.clone()));
+        value.insert("string", Value::InputString(input_string.clone()));
+        value.insert(
+            "array",
+            Value::Array(vec![Value::InputInt(input_int.clone())]),
+        );
+        value.insert(
+            "object",
+            Value::from([("int", Value::InputInt(input_int.clone()))]),
+        );
+
+        assert_eq!(value.get("bool").unwrap(), &Value::InputBool(input_bool));
+        assert_eq!(
+            value.get("int").unwrap(),
+            &Value::InputInt(input_int.clone())
+        );
+        assert_eq!(value.get("float").unwrap(), &Value::InputFloat(input_float));
+        assert_eq!(
+            value.get("string").unwrap(),
+            &Value::InputString(input_string)
+        );
+        assert_eq!(
+            value.get("array").unwrap(),
+            &Value::Array(vec![Value::InputInt(input_int.clone())])
+        );
+        assert_eq!(
+            value.get("object").unwrap(),
+            &Value::Object(Map::from([(
+                "int".to_string(),
+                Value::InputInt(input_int.clone())
+            )]))
+        );
+
+        value.init().unwrap();
+
+        assert_eq!(value.get("bool").unwrap(), &Value::Bool(true));
+        assert_eq!(value.get("int").unwrap(), &Value::Int(1));
+        assert_eq!(value.get("float").unwrap(), &Value::Float(1.0));
+        assert_eq!(
+            value.get("string").unwrap(),
+            &Value::String("string".to_string())
+        );
+        assert_eq!(
+            value.get("array").unwrap(),
+            &Value::Array(vec![Value::Int(1)])
+        );
+        assert_eq!(
+            value.get("object").unwrap(),
+            &Value::Object(Map::from([("int".to_string(), Value::Int(1))]))
+        );
+    }
+
+    #[test]
     fn get() {
         let mut map = Map::new();
         map.insert("int".to_string(), Value::Int(1.into()));
@@ -388,10 +481,10 @@ mod tests {
     }
 
     #[test]
-    fn set() {
+    fn insert() {
         let mut value = Value::Object(Map::new());
         assert_eq!(value.get_or("int", 2).unwrap(), 2);
-        value.set("int", 1);
+        value.insert("int", 1);
         assert_eq!(value.get_or("int", 2).unwrap(), 1);
     }
 
@@ -403,8 +496,8 @@ mod tests {
         assert!(Value::from(1.0).is_float());
         assert!(Value::from(String::from("string")).is_string());
         assert!(Value::from("string").is_string());
-        assert!(Value::from([Value::from(1), Value::from(2)]).is_array());
-        assert!(Value::from([(String::from("key"), Value::from("value"))]).is_object());
+        assert!(Value::from([1, 2]).is_array());
+        assert!(Value::from([("key", "value")]).is_object());
     }
 
     #[test]
