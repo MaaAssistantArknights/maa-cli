@@ -1,0 +1,77 @@
+name: Publish AUR Package
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      pkgver:
+        required: false
+        type: string
+      pkgrel:
+        default: 1
+        required: false
+        type: number
+      dryrun:
+        description: 'Do not push changes to aur'
+        default: true
+        required: true
+        type: boolean
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+
+    steps:
+    - name: Upgrade system
+      run: |
+        pacman -Syu --needed --noconfirm git openssh pacman-contrib namcap
+        sed -i '/E_ROOT/d' /usr/bin/makepkg
+
+    - name: Setup ssh
+      run: |
+        mkdir -vpm700 ~root/.ssh && cd "$_"
+        install -m700 <(echo '${{ secrets.AUR_SSH_PRIVATE_KEY }}') id_rsa
+        install -m700 <(ssh-keyscan -H aur.archlinux.org) known_hosts
+
+    - name: Fetch from aur
+      run: |
+        git clone ssh://aur@aur.archlinux.org/maa-cli.git
+
+    - name: Patch pkgver
+      run: |
+        cd maa-cli
+        ref=${{ inputs.pkgver || github.ref }}
+        sed -i "/^pkgver=/cpkgver=${ref#refs/tags/v}" PKGBUILD
+        sed -i "/^pkgrel=/cpkgrel=${{ inputs.pkgrel || 1 }}" PKGBUILD
+
+    - name: Makepkg
+      run: |
+        cd maa-cli
+        updpkgsums
+        makepkg -s --noconfirm
+        namcap *.pkg.tar.zst
+        makepkg --printsrcinfo > .SRCINFO
+
+    - name: Commit changes
+      run: |
+        cd maa-cli
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+        git add .
+
+        echo '```diff' >> $GITHUB_STEP_SUMMARY
+        git diff --staged >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+
+        git commit -m "github-actions[bot]: Upgrade to ${{ inputs.pkgver || github.ref_name }}"
+        git push origin --verbose ${{ inputs.dryrun && '--dry-run' || '' }}
+
+    - uses: actions/upload-artifact@v3
+      with:
+        name: package
+        path: maa-cli/*.pkg.tar.zst
