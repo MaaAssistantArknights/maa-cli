@@ -1,12 +1,26 @@
-name: arch-package
+name: Publish AUR Package
 
 on:
-  push:
-    tags:
-      - 'v*'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      pkgver:
+        required: false
+        type: string
+      pkgrel:
+        default: 1
+        required: false
+        type: number
+      dryrun:
+        description: 'Do not push changes to aur'
+        default: true
+        required: true
+        type: boolean
 
 jobs:
-  build:
+  publish:
+    name: Publish
     runs-on: ubuntu-latest
     container:
       image: archlinux:base-devel
@@ -30,9 +44,9 @@ jobs:
     - name: Patch pkgver
       run: |
         cd maa-cli
-        ref=${{ github.ref }}
+        ref=${{ inputs.pkgver || github.ref }}
         sed -i "/^pkgver=/cpkgver=${ref#refs/tags/v}" PKGBUILD
-        sed -i "/^pkgrel=/cpkgrel=1" PKGBUILD
+        sed -i "/^pkgrel=/cpkgrel=${{ inputs.pkgrel || 1 }}" PKGBUILD
 
     - name: Makepkg
       run: |
@@ -54,5 +68,10 @@ jobs:
         git diff --staged >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
 
-        git commit -m "github-actions[bot]: Upgrade to ${{ github.ref_name }}"
-        git push origin --verbose
+        git commit -m "github-actions[bot]: Upgrade to ${{ inputs.pkgver || github.ref_name }}"
+        git push origin --verbose ${{ inputs.dryrun && '--dry-run' || '' }}
+
+    - uses: actions/upload-artifact@v3
+      with:
+        name: package
+        path: maa-cli/*.pkg.tar.zst
