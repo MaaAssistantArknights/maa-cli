@@ -56,7 +56,7 @@ jobs:
               echo "Version mismatch: $REF_VERSION != $CARGO_VERSION"
             fi
           fi
-          echo "Get version: $CARGO_VERSION"
+          echo "Version: $CARGO_VERSION"
           echo "version=$CARGO_VERSION" >> $GITHUB_OUTPUT
 
   build:
@@ -84,24 +84,32 @@ jobs:
         x86_64-apple-darwin/release/maa
         aarch64-apple-darwin/release/maa
     - name: Tarball Binary and Share
+      id: tarball
       run: |
         version=${{ needs.meta.outputs.version }}
+        name=maa_cli-v$version-universal-hombrew.tar.gz
         mkdir maa
         cp -vR target/maa maa-cli/share maa/
-        tar -czf maa-cli-v$version-cask.tar.gz maa
+        tar -czvf $name maa
+        sha256sum $name > $name.sha256
+        echo "file_path=$PWD/$name" >> $GITHUB_OUTPUT
     - name: Upload to Release
-      if: ${{ needs.meta.outputs.dryrun }} == false
+      if: ${{ !needs.meta.outputs.dryrun }}
       uses: softprops/action-gh-release@v1
       with:
         tag_name: v${{ needs.meta.outputs.version }}
-        files: maa-cli-v${{ needs.meta.outputs.version }}-cask.tar.gz
+        files: |
+          ${{ steps.tarball.outputs.file_path }}
+          ${{ steps.tarball.outputs.file_path }}.sha256
         fail_on_unmatched_files: true
     - name: Upload to Artifact (Dryrun)
-      if: ${{ needs.meta.outputs.dryrun }} == true
+      if: ${{ needs.meta.outputs.dryrun }}
       uses: actions/upload-artifact@v3
       with:
         name: homebrew-cask
-        path: maa-cli-v${{ needs.meta.outputs.version }}-cask.tar.gz
+        path: |
+          ${{ steps.tarball.outputs.file_path }}
+          ${{ steps.tarball.outputs.file_path }}.sha256
         retention-days: 1
 
   bump-cask:
