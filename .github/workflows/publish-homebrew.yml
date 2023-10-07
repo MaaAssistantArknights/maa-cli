@@ -11,7 +11,6 @@ on:
         type: string
       dryrun:
         description: Do not push changes to Homebrew
-        default: true
         required: true
         type: boolean
     secrets:
@@ -51,11 +50,11 @@ jobs:
           tag: ${{ inputs.version || github.ref }}
           no_fork: true
           force: false
-          dryrun: $${ inputs.dryrun || false }
+          dryrun: ${{ github.event_name != 'release' || inputs.dryrun }}
 
   formula:
     name: Formula
-    if: ${{ !inputs.dryrun || true }}
+    if: ${{ github.event_name == 'release' || !inputs.dryrun }}
     runs-on: macos-latest
     steps:
       - name: Update Homebrew Formula
@@ -64,6 +63,6 @@ jobs:
           token: ${{secrets.MAA_HOMEBREW_BUMP_PR}}
           tap: MaaAssistantArknights/homebrew-tap
           formula: maa-cli
-          tag: v${{ needs.meta.outputs.version }}
+          tag: ${{ inputs.version || github.ref }}
           no_fork: true
           force: false
