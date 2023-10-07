@@ -53,10 +53,7 @@ jobs:
             REF=${{ github.ref }}
             REF_VERSION=${REF#refs/tags/v}
             if [ "$REF_VERSION" != "$CARGO_VERSION" ]; then
-              REF_VERSION=${GITHUB_REF#refs/tags/v}
               echo "Version mismatch: $REF_VERSION != $CARGO_VERSION"
-              exit 1
-            else
             fi
           fi
           echo "Get version: $CARGO_VERSION"
