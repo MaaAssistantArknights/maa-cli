@@ -28,7 +28,7 @@ jobs:
   meta:
     runs-on: ubuntu-latest
     outputs:
-      dryrun: ${{ fromJson(steps.dryrun.outputs.dryrun) }}
+      dryrun: ${{ steps.dryrun.outputs.dryrun }}
       version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout
@@ -43,8 +43,11 @@ jobs:
           else
             dryrun=true
           fi
-          echo "Dryrun: $dryrun"
           echo "dryrun=$dryrun" >> $GITHUB_OUTPUT
+      - name: If Dryrun
+        if: ${{ fromJson(steps.dryrun.outputs.dryrun) }}
+        run: |
+          echo "Dryrun"
       - name: Get Version
         id: version
         run: |
@@ -183,7 +186,7 @@ jobs:
           done
       - name: Create Release
         uses: softprops/action-gh-release@v1
-        if: ${{ !needs.meta.outputs.dryrun }}
+        if: ${{ !fromJson(needs.meta.outputs.dryrun) }}
         with:
           name: v${{ needs.meta.outputs.version }}
           generate_release_notes: true
@@ -201,4 +204,4 @@ jobs:
           git diff version.json >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           git commit version.json -m "Update version.json"
-          git push --verbose ${{ needs.meta.outputs.dryrun && '--dry-run' || ''}}
+          git push --verbose ${{ fromJson(needs.meta.outputs.dryrun) && '--dry-run' || ''}}
