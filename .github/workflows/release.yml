@@ -9,6 +9,13 @@ on:
       - main
     paths:
       - ".github/workflows/release.yml"
+  workflow_dispatch:
+    inputs:
+      dryrun:
+        description: Don't create release
+        default: true
+        required: true
+        type: boolean
 
 defaults:
   run:
@@ -18,20 +25,40 @@ permissions:
   contents: read
 
 jobs:
-  version:
-    name: Get Version
+  meta:
     runs-on: ubuntu-latest
     outputs:
+      dryrun: ${{ steps.dryrun.outputs.dryrun }}
       version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Check if Dryrun
+        id: dryrun
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+            dryrun=false
+          elif [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            dryrun=${{ inputs.dryrun }}
+          else
+            dryrun=true
+          fi
+          echo "Dryrun: $dryrun"
+          echo "dryrun=$dryrun" >> $GITHUB_OUTPUT
       - name: Get Version
         id: version
         run: |
-          VERSION=$(yq -oy ".package.version" maa-cli/Cargo.toml)
-          echo "$VERSION"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          CARGO_VERSION=$(yq -oy ".package.version" maa-cli/Cargo.toml)
+          # check if version is equal to tag if not PR
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
+            REF=${{ github.ref }}
+            REF_VERSION=${REF#refs/tags/v}
+            if [ "$REF_VERSION" != "$CARGO_VERSION" ]; then
+              echo "Version mismatch: $REF_VERSION != $CARGO_VERSION"
+            fi
+          fi
+          echo "Version: $CARGO_VERSION"
+          echo "version=$CARGO_VERSION" >> $GITHUB_OUTPUT
 
   build:
     name: Build
@@ -116,7 +143,7 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    needs: [version, build, build-universal]
+    needs: [meta, build, build-universal]
     permissions:
       contents: write
     steps:
@@ -136,7 +163,7 @@ jobs:
           path: version
       - name: Extract files, Generate checksums and Update version.json
         run: |
-          version=${{ needs.version.outputs.version }}
+          version=${{ needs.meta.outputs.version }}
           for target in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu universal-apple-darwin; do
             dir="maa_cli-$target"
             tar -xvf "$dir/$target.tar" -C "$dir"
@@ -162,13 +189,13 @@ jobs:
         uses: softprops/action-gh-release@v1
         if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
         with:
-          name: v${{ needs.version.outputs.version }}
+          name: v${{ needs.meta.outputs.version }}
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
-            maa_cli-v${{ needs.version.outputs.version }}-x86_64-unknown-linux-gnu.tar.gz*
-            maa_cli-v${{ needs.version.outputs.version }}-aarch64-unknown-linux-gnu.tar.gz*
-            maa_cli-v${{ needs.version.outputs.version }}-universal-apple-darwin.zip*
+            maa_cli-v${{ needs.meta.outputs.version }}-x86_64-unknown-linux-gnu.tar.gz*
+            maa_cli-v${{ needs.meta.outputs.version }}-aarch64-unknown-linux-gnu.tar.gz*
+            maa_cli-v${{ needs.meta.outputs.version }}-universal-apple-darwin.zip*
       - name: Commit version.json and Push
         working-directory: version
         run: |

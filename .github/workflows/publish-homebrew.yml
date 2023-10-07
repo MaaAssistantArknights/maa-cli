@@ -3,18 +3,6 @@ name: Publish Homebrew
 on:
   release:
     types: [published]
-  pull_request:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/publish-homebrew.yml"
-  workflow_dispatch:
-    inputs:
-      dryrun:
-        description: Don't create PR to homebrew
-        default: true
-        required: true
-        type: boolean
 
 defaults:
   run:
@@ -27,23 +15,10 @@ jobs:
   meta:
     runs-on: ubuntu-latest
     outputs:
-      dryrun: ${{ steps.dryrun.outputs.dryrun }}
       version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Check if Dryrun
-        id: dryrun
-        run: |
-          if [ "$GITHUB_EVENT_NAME" = "release" ]; then
-            dryrun=false
-          elif [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            dryrun=${{ inputs.dryrun }}
-          else
-            dryrun=true
-          fi
-          echo "Dryrun: $dryrun"
-          echo "dryrun=$dryrun" >> $GITHUB_OUTPUT
       - name: Get Version
         id: version
         run: |
@@ -59,60 +34,10 @@ jobs:
           echo "Version: $CARGO_VERSION"
           echo "version=$CARGO_VERSION" >> $GITHUB_OUTPUT
 
-  build:
-    name: Build and Release Cask
-    runs-on: macos-latest
-    needs: meta 
-    permissions:
-      contents: write
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Setup Rust
-      run: |
-        rustup target add x86_64-apple-darwin
-        rustup target add aarch64-apple-darwin
-    - name: Build
-      run: >
-        cargo build --release --locked --package maa-cli
-        --no-default-features
-        --target x86_64-apple-darwin --target aarch64-apple-darwin
-    - name: Create Universal Binary
-      working-directory: target
-      run: >
-        lipo -create -output maa
-        x86_64-apple-darwin/release/maa
-        aarch64-apple-darwin/release/maa
-    - name: Tarball Binary and Share
-      id: tarball
-      run: |
-        version=${{ needs.meta.outputs.version }}
-        name=maa_cli-v$version-universal-hombrew.tar.gz
-        mkdir maa
-        cp -vR target/maa maa-cli/share maa/
-        tar -czvf $name maa
-        echo "file_path=$PWD/$name" >> $GITHUB_OUTPUT
-    - name: Upload to Release
-      if: ${{ !needs.meta.outputs.dryrun }}
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: v${{ needs.meta.outputs.version }}
-        files: |
-          ${{ steps.tarball.outputs.file_path }}
-        fail_on_unmatched_files: true
-    - name: Upload to Artifact (Dryrun)
-      if: ${{ needs.meta.outputs.dryrun }}
-      uses: actions/upload-artifact@v3
-      with:
-        name: homebrew-cask
-        path: |
-          ${{ steps.tarball.outputs.file_path }}
-        retention-days: 1
-
   bump-cask:
     name: Bump Cask and Open PR
     runs-on: macos-latest
-    needs: [meta, build]
+    needs: [meta]
     steps:
       - name: Update Homebrew Cask
         uses: wangl-cc/action-homebrew-bump-cask@master
@@ -123,7 +48,6 @@ jobs:
           tag: v${{ needs.meta.outputs.version }}
           no_fork: true
           force: false
-          dryrun: ${{ needs.meta.outputs.dryrun }}
 
   bump-formula:
     name: Bump Formula and Open PR
@@ -139,4 +63,3 @@ jobs:
           tag: v${{ needs.meta.outputs.version }}
           no_fork: true
           force: false
-          dyrun: ${{ needs.meta.outputs.dryrun }}
