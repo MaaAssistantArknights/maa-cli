@@ -285,12 +285,82 @@ mod tests {
 
     use super::input::Input;
 
-    impl Value {}
-
     mod serde {
         use super::*;
 
-        use serde_test::{assert_tokens, Token};
+        use serde_test::{assert_de_tokens, assert_tokens, Token};
+
+        #[test]
+        fn input() {
+            let mut value = Value::new();
+            value.insert(
+                "bool",
+                Value::InputBool(UserInput::Input(Input {
+                    default: Some(true),
+                    description: None,
+                })),
+            );
+            value.insert(
+                "int",
+                Value::InputInt(UserInput::Input(Input {
+                    default: Some(1),
+                    description: None,
+                })),
+            );
+            value.insert(
+                "float",
+                Value::InputFloat(UserInput::Input(Input {
+                    default: Some(1.0),
+                    description: None,
+                })),
+            );
+            value.insert(
+                "string",
+                Value::InputString(UserInput::Input(Input {
+                    default: Some("string".to_string()),
+                    description: None,
+                })),
+            );
+
+            value.insert(
+                "no_default",
+                Value::InputString(UserInput::Input(Input {
+                    default: None,
+                    description: None,
+                })),
+            );
+
+            assert_de_tokens(
+                &value,
+                &[
+                    Token::Map { len: Some(5) },
+                    Token::Str("bool"),
+                    Token::Map { len: Some(1) },
+                    Token::Str("default"),
+                    Token::Bool(true),
+                    Token::MapEnd,
+                    Token::Str("int"),
+                    Token::Map { len: Some(1) },
+                    Token::Str("default"),
+                    Token::I64(1),
+                    Token::MapEnd,
+                    Token::Str("float"),
+                    Token::Map { len: Some(1) },
+                    Token::Str("default"),
+                    Token::F64(1.0),
+                    Token::MapEnd,
+                    Token::Str("string"),
+                    Token::Map { len: Some(1) },
+                    Token::Str("default"),
+                    Token::Str("string"),
+                    Token::MapEnd,
+                    Token::Str("no_default"),
+                    Token::Map { len: Some(0) },
+                    Token::MapEnd,
+                    Token::MapEnd,
+                ],
+            )
+        }
 
         #[test]
         fn value() {
