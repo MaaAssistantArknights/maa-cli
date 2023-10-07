@@ -3,17 +3,38 @@ name: Publish AUR Package
 on:
   release:
     types: [published]
-  workflow_dispatch:
+  workflow_call:
     inputs:
       pkgver:
+        description: Package version
         required: false
         type: string
       pkgrel:
+        description: Package release number
         default: 1
         required: false
         type: number
       dryrun:
-        description: 'Do not push changes to aur'
+        description: Do not push changes to AUR
+        required: true
+        type: boolean
+    secrets:
+      AUR_SSH_PRIVATE_KEY:
+        description: SSH private key for AUR
+        required: true
+  workflow_dispatch:
+    inputs:
+      pkgver:
+        description: Package version
+        required: false
+        type: string
+      pkgrel:
+        description: Package release number
+        default: 1
+        required: false
+        type: number
+      dryrun:
+        description: Do not push changes to AUR
         default: true
         required: true
         type: boolean
@@ -37,7 +58,7 @@ jobs:
         install -m700 <(echo '${{ secrets.AUR_SSH_PRIVATE_KEY }}') id_rsa
         install -m700 <(ssh-keyscan -H aur.archlinux.org) known_hosts
 
-    - name: Fetch from aur
+    - name: Fetch from AUR
       run: |
         git clone ssh://aur@aur.archlinux.org/maa-cli.git
 
