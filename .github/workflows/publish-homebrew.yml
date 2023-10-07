@@ -14,6 +14,10 @@ on:
         default: true
         required: true
         type: boolean
+    secrets:
+      MAA_HOMEBREW_BUMP_PR:
+        description: GitHub PAT for creating PR
+        required: true
   workflow_dispatch:
     inputs:
       version:
@@ -51,7 +55,7 @@ jobs:
 
   formula:
     name: Formula
-    if: ${{ inputs.dryrun || false }}
+    if: ${{ !inputs.dryrun || true }}
     runs-on: macos-latest
     steps:
       - name: Update Homebrew Formula

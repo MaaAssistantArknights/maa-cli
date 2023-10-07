@@ -204,18 +204,21 @@ jobs:
 
   publish-homebrew:
     needs: [meta, release]
-    name: Publish Homebrew Formula and Cask
+    name: Publish Homebrew
     uses: ./.github/workflows/publish-homebrew.yml
     with:
       version: v${{ needs.meta.outputs.version }}
       dryrun: ${{ fromJson(needs.meta.outputs.dryrun) }}
+    secrets:
+      MAA_HOMEBREW_BUMP_PR: ${{ secrets.MAA_HOMEBREW_BUMP_PR }}
 
   publish-aur:
     needs: [meta, release]
+    if: ${{ !fromJson(needs.meta.outputs.dryrun) }}
     name: Publish AUR Package
     uses: ./.github/workflows/publish-aur.yml
     with:
       pkgver: ${{ needs.meta.outputs.version }}
-      dryrun: ${{ fromJson(needs.meta.outputs.dryrun) }}
+      dryrun: false
     secrets:
       AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
