@@ -149,17 +149,10 @@ jobs:
     steps:
       - name: Download Artifacts
         uses: actions/download-artifact@v3
-      - name: Checkout version branch (Release)
-        if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+      - name: Checkout version branch
         uses: actions/checkout@v4
         with:
           ref: version
-          path: version
-      - name: Checkout version branch (Test)
-        if: github.event_name == 'pull_request'
-        uses: actions/checkout@v4
-        with:
-          ref: version-test
           path: version
       - name: Extract files, Generate checksums and Update version.json
         run: |
@@ -187,7 +180,7 @@ jobs:
           done
       - name: Create Release
         uses: softprops/action-gh-release@v1
-        if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+        if: ${{ !needs.meta.outputs.dryrun } }}
         with:
           name: v${{ needs.meta.outputs.version }}
           generate_release_notes: true
@@ -201,5 +194,9 @@ jobs:
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          dryrun=${{ needs.meta.outputs.dryrun }}
+          echo '```diff' >> $GITHUB_STEP_SUMMARY
+          git diff version.json >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
           git commit version.json -m "Update version.json"
-          git push
+          git push --verbose ${{ needs.meta.outputs.dryrun && '--dry-run' || ''}}
