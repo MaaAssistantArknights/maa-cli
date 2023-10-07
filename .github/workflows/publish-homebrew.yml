@@ -1,0 +1,113 @@
+name: Publish Homebrew
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dryrun:
+        description: Don't create PR to homebrew
+        default: true
+        required: true
+        type: boolean
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Get Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Get Version
+        id: version
+        run: |
+          REF=${{ github.ref }}
+          REF_VERSION=${REF#refs/tags/v}
+          CARGO_VERSION=$(yq -oy ".package.version" maa-cli/Cargo.toml)
+          if [ "$REF_VERSION" != "$CARGO_VERSION" ]; then
+            echo "Version mismatch: $REF_VERSION != $CARGO_VERSION"
+            exit 1
+          else
+            echo "Get version: $REF_VERSION"
+          fi
+          VERSION=$REF_VERSION
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+  build:
+    name: Build and Release Cask
+    runs-on: macos-latest
+    needs: version
+    permissions:
+      contents: write
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Setup Rust
+      run: |
+        rustup target add x86_64-apple-darwin
+        rustup target add aarch64-apple-darwin
+    - name: Build
+      run: >
+        cargo build --release --locked --package maa-cli
+        --no-default-features
+        --target x86_64-apple-darwin --target aarch64-apple-darwin
+    - name: Create Universal Binary
+      working-directory: target
+      run: >
+        lipo -create -output maa
+        x86_64-apple-darwin/release/maa
+        aarch64-apple-darwin/release/maa
+    - name: Tarball Binary and Share
+      run: |
+        version=${{ needs.version.outputs.version }}}
+        mkdir maa
+        cp -vR target/maa maa-cli/share maa/
+        tar -czf maa-cli-v$version-cask.tar.gz maa
+    - name: Upload to Release
+      uses: softprops/action-gh-release@v1
+      if: github.event_name == 'release' || inputs.dryrun == 'false'
+      with:
+        tag_name: v${{ needs.version.outputs.version }}
+        files: maa-cli-v${{ needs.version.outputs.version }}-cask.tar.gz
+        fail_on_unmatched_files: true
+
+  bump-cask:
+    name: Bump Cask and Open PR
+    runs-on: macos-latest
+    needs: [version, build]
+    steps:
+      - name: Update Homebrew Cask
+        uses: wangl-cc/action-homebrew-bump-cask@master
+        with:
+          token: ${{secrets.MAA_HOMEBREW_BUMP_PR}}
+          tap: MaaAssistantArknights/homebrew-tap
+          cask: maa-cli-bin
+          tag: v${{ needs.version.outputs.version }}
+          no_fork: true
+          force: false
+          dryrun: ${{ inputs.dryrun || false }}
+
+  bump-formula:
+    name: Bump Formula and Open PR
+    runs-on: macos-latest
+    needs: [version]
+    steps:
+      - name: Update Homebrew Formula
+        uses: dawidd6/action-homebrew-bump-formula@v3
+        with:
+          token: ${{secrets.MAA_HOMEBREW_BUMP_PR}}
+          tap: MaaAssistantArknights/homebrew-tap
+          formula: maa-cli
+          tag: v${{ needs.version.outputs.version }}
+          no_fork: true
+          force: false
+          dryrun: ${{ inputs.dryrun || false }}
