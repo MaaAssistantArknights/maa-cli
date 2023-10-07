@@ -91,7 +91,6 @@ jobs:
         mkdir maa
         cp -vR target/maa maa-cli/share maa/
         tar -czvf $name maa
-        sha256sum $name > $name.sha256
         echo "file_path=$PWD/$name" >> $GITHUB_OUTPUT
     - name: Upload to Release
       if: ${{ !needs.meta.outputs.dryrun }}
@@ -100,7 +99,6 @@ jobs:
         tag_name: v${{ needs.meta.outputs.version }}
         files: |
           ${{ steps.tarball.outputs.file_path }}
-          ${{ steps.tarball.outputs.file_path }}.sha256
         fail_on_unmatched_files: true
     - name: Upload to Artifact (Dryrun)
       if: ${{ needs.meta.outputs.dryrun }}
@@ -109,7 +107,6 @@ jobs:
         name: homebrew-cask
         path: |
           ${{ steps.tarball.outputs.file_path }}
-          ${{ steps.tarball.outputs.file_path }}.sha256
         retention-days: 1
 
   bump-cask:
