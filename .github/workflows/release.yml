@@ -28,7 +28,7 @@ jobs:
   meta:
     runs-on: ubuntu-latest
     outputs:
-      dryrun: ${{ steps.dryrun.outputs.dryrun }}
+      dryrun: ${{ fromJson(steps.dryrun.outputs.dryrun) }}
       version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout
