@@ -62,6 +62,7 @@ jobs:
 
   build:
     name: Build
+    needs: meta
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -83,17 +84,19 @@ jobs:
           tool: cross
       - name: Setup Environment
         run: |
-          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+          OS=${{ matrix.os }}
+          ARCH=${{ matrix.arch }}
+          if [ "$OS" = "macos-latest" ]; then
             CARGO_CMD=cargo
-            CARGO_BUILD_TARGET="${{ matrix.arch }}-apple-darwin"
+            CARGO_BUILD_TARGET="$ARCH-apple-darwin"
             rustup target add $CARGO_BUILD_TARGET
           else
-            if [ "${{ matrix.arch }}" = "aarch64" ]; then
+            if [ "$ARCH" = "aarch64" ]; then
               CARGO_CMD=cross
             else
               CARGO_CMD=cargo
             fi
-            CARGO_BUILD_TARGET="${{ matrix.arch }}-unknown-linux-gnu"
+            CARGO_BUILD_TARGET="$ARCH-unknown-linux-gnu"
           fi
           echo "CARGO_CMD=$CARGO_CMD" >> $GITHUB_ENV
           echo "CARGO_BUILD_TARGET=$CARGO_BUILD_TARGET" >> $GITHUB_ENV
@@ -115,7 +118,7 @@ jobs:
   build-universal:
     name: Build Universal Binary
     runs-on: macos-latest
-    needs: build
+    needs: [meta, build]
     steps:
       # download all artifacts, even if not all are used,
       # because this action don't support wildcards
