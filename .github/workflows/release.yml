@@ -180,7 +180,7 @@ jobs:
           done
       - name: Create Release
         uses: softprops/action-gh-release@v1
-        if: ${{ !needs.meta.outputs.dryrun } }}
+        if: ${{ !needs.meta.outputs.dryrun }}
         with:
           name: v${{ needs.meta.outputs.version }}
           generate_release_notes: true
@@ -194,7 +194,6 @@ jobs:
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          dryrun=${{ needs.meta.outputs.dryrun }}
           echo '```diff' >> $GITHUB_STEP_SUMMARY
           git diff version.json >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
