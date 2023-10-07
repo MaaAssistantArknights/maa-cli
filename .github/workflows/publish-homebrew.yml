@@ -3,6 +3,11 @@ name: Publish Homebrew
 on:
   release:
     types: [published]
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/publish-homebrew.yml"
   workflow_dispatch:
     inputs:
       dryrun:
@@ -19,33 +24,48 @@ permissions:
   contents: read
 
 jobs:
-  version:
-    name: Get Version
+  meta:
     runs-on: ubuntu-latest
     outputs:
+      dryrun: ${{ steps.dryrun.outputs.dryrun }}
       version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Check if Dryrun
+        id: dryrun
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+            dryrun=false
+          elif [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            dryrun=${{ inputs.dryrun }}
+          else
+            dryrun=true
+          fi
+          echo "Dryrun: $dryrun"
+          echo "dryrun=$dryrun" >> $GITHUB_OUTPUT
       - name: Get Version
         id: version
         run: |
-          REF=${{ github.ref }}
-          REF_VERSION=${REF#refs/tags/v}
           CARGO_VERSION=$(yq -oy ".package.version" maa-cli/Cargo.toml)
-          if [ "$REF_VERSION" != "$CARGO_VERSION" ]; then
-            echo "Version mismatch: $REF_VERSION != $CARGO_VERSION"
-            exit 1
-          else
-            echo "Get version: $REF_VERSION"
+          # check if version is equal to tag if not PR
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
+            REF=${{ github.ref }}
+            REF_VERSION=${REF#refs/tags/v}
+            if [ "$REF_VERSION" != "$CARGO_VERSION" ]; then
+              REF_VERSION=${GITHUB_REF#refs/tags/v}
+              echo "Version mismatch: $REF_VERSION != $CARGO_VERSION"
+              exit 1
+            else
+            fi
           fi
-          VERSION=$REF_VERSION
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Get version: $CARGO_VERSION"
+          echo "version=$CARGO_VERSION" >> $GITHUB_OUTPUT
 
   build:
     name: Build and Release Cask
     runs-on: macos-latest
-    needs: version
+    needs: meta 
     permissions:
       contents: write
     steps:
@@ -68,17 +88,24 @@ jobs:
         aarch64-apple-darwin/release/maa
     - name: Tarball Binary and Share
       run: |
-        version=${{ needs.version.outputs.version }}}
+        version=${{ needs.meta.outputs.version }}
         mkdir maa
         cp -vR target/maa maa-cli/share maa/
         tar -czf maa-cli-v$version-cask.tar.gz maa
     - name: Upload to Release
+      if: ${{ needs.meta.outputs.dryrun }} == false
       uses: softprops/action-gh-release@v1
-      if: github.event_name == 'release' || inputs.dryrun == 'false'
       with:
-        tag_name: v${{ needs.version.outputs.version }}
-        files: maa-cli-v${{ needs.version.outputs.version }}-cask.tar.gz
+        tag_name: v${{ needs.meta.outputs.version }}
+        files: maa-cli-v${{ needs.meta.outputs.version }}-cask.tar.gz
         fail_on_unmatched_files: true
+    - name: Upload to Artifact (Dryrun)
+      if: ${{ needs.meta.outputs.dryrun }} == true
+      uses: actions/upload-artifact@v3
+      with:
+        name: homebrew-cask
+        path: maa-cli-v${{ needs.meta.outputs.version }}-cask.tar.gz
+        retention-days: 1
 
   bump-cask:
     name: Bump Cask and Open PR
@@ -91,10 +118,10 @@ jobs:
           token: ${{secrets.MAA_HOMEBREW_BUMP_PR}}
           tap: MaaAssistantArknights/homebrew-tap
           cask: maa-cli-bin
-          tag: v${{ needs.version.outputs.version }}
+          tag: v${{ needs.meta.outputs.version }}
           no_fork: true
           force: false
-          dryrun: ${{ inputs.dryrun || false }}
+          dryrun: ${{ needs.meta.outputs.dryrun }}
 
   bump-formula:
     name: Bump Formula and Open PR
@@ -107,7 +134,7 @@ jobs:
           token: ${{secrets.MAA_HOMEBREW_BUMP_PR}}
           tap: MaaAssistantArknights/homebrew-tap
           formula: maa-cli
-          tag: v${{ needs.version.outputs.version }}
+          tag: v${{ needs.meta.outputs.version }}
           no_fork: true
           force: false
-          dryrun: ${{ inputs.dryrun || false }}
+          dyrun: ${{ needs.meta.outputs.dryrun }}
