@@ -36,7 +36,7 @@ jobs:
       - name: Check if Dryrun
         id: dryrun
         run: |
-          if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+          if [[ "$GITHUB_EVENT_NAME" = "push" && "$GITHUB_REF" = "refs/tags/v"* ]]; then
             dryrun=false
           elif [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             dryrun=${{ inputs.dryrun }}
