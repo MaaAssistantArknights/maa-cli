@@ -110,7 +110,7 @@ jobs:
   bump-cask:
     name: Bump Cask and Open PR
     runs-on: macos-latest
-    needs: [version, build]
+    needs: [meta, build]
     steps:
       - name: Update Homebrew Cask
         uses: wangl-cc/action-homebrew-bump-cask@master
@@ -126,7 +126,7 @@ jobs:
   bump-formula:
     name: Bump Formula and Open PR
     runs-on: macos-latest
-    needs: [version]
+    needs: [meta]
     steps:
       - name: Update Homebrew Formula
         uses: dawidd6/action-homebrew-bump-formula@v3
