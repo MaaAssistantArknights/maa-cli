@@ -44,10 +44,6 @@ jobs:
             dryrun=true
           fi
           echo "dryrun=$dryrun" >> $GITHUB_OUTPUT
-      - name: If Dryrun
-        if: ${{ fromJson(steps.dryrun.outputs.dryrun) }}
-        run: |
-          echo "Dryrun"
       - name: Get Version
         id: version
         run: |
@@ -205,3 +201,24 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           git commit version.json -m "Update version.json"
           git push --verbose ${{ fromJson(needs.meta.outputs.dryrun) && '--dry-run' || ''}}
+
+  publish-homebrew:
+    needs: [meta, release]
+    name: Publish Homebrew
+    uses: ./.github/workflows/publish-homebrew.yml
+    with:
+      version: v${{ needs.meta.outputs.version }}
+      dryrun: ${{ fromJson(needs.meta.outputs.dryrun) }}
+    secrets:
+      MAA_HOMEBREW_BUMP_PR: ${{ secrets.MAA_HOMEBREW_BUMP_PR }}
+
+  publish-aur:
+    needs: [meta, release]
+    if: ${{ !fromJson(needs.meta.outputs.dryrun) }}
+    name: Publish AUR Package
+    uses: ./.github/workflows/publish-aur.yml
+    with:
+      pkgver: ${{ needs.meta.outputs.version }}
+      dryrun: false
+    secrets:
+      AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}

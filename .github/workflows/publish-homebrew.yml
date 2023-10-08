@@ -3,6 +3,31 @@ name: Publish Homebrew
 on:
   release:
     types: [published]
+  workflow_call:
+    inputs:
+      version:
+        description: Package version
+        required: false
+        type: string
+      dryrun:
+        description: Do not push changes to Homebrew
+        required: true
+        type: boolean
+    secrets:
+      MAA_HOMEBREW_BUMP_PR:
+        description: GitHub PAT for creating PR
+        required: true
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version
+        required: false
+        type: string
+      dryrun:
+        description: Do not push changes to Homebrew
+        default: true
+        required: true
+        type: boolean
 
 defaults:
   run:
@@ -12,32 +37,9 @@ permissions:
   contents: read
 
 jobs:
-  meta:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Get Version
-        id: version
-        run: |
-          CARGO_VERSION=$(yq -oy ".package.version" maa-cli/Cargo.toml)
-          # check if version is equal to tag if not PR
-          if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
-            REF=${{ github.ref }}
-            REF_VERSION=${REF#refs/tags/v}
-            if [ "$REF_VERSION" != "$CARGO_VERSION" ]; then
-              echo "Version mismatch: $REF_VERSION != $CARGO_VERSION"
-            fi
-          fi
-          echo "Version: $CARGO_VERSION"
-          echo "version=$CARGO_VERSION" >> $GITHUB_OUTPUT
-
-  bump-cask:
-    name: Bump Cask and Open PR
+  cask:
+    name: Cask
     runs-on: macos-latest
-    needs: [meta]
     steps:
       - name: Update Homebrew Cask
         uses: wangl-cc/action-homebrew-bump-cask@master
@@ -45,14 +47,15 @@ jobs:
           token: ${{secrets.MAA_HOMEBREW_BUMP_PR}}
           tap: MaaAssistantArknights/homebrew-tap
           cask: maa-cli-bin
-          tag: v${{ needs.meta.outputs.version }}
+          tag: ${{ inputs.version || github.ref }}
           no_fork: true
           force: false
+          dryrun: ${{ github.event_name != 'release' || inputs.dryrun }}
 
-  bump-formula:
-    name: Bump Formula and Open PR
+  formula:
+    name: Formula
+    if: ${{ github.event_name == 'release' || !inputs.dryrun }}
     runs-on: macos-latest
-    needs: [meta]
     steps:
       - name: Update Homebrew Formula
         uses: dawidd6/action-homebrew-bump-formula@v3
@@ -60,6 +63,6 @@ jobs:
           token: ${{secrets.MAA_HOMEBREW_BUMP_PR}}
           tap: MaaAssistantArknights/homebrew-tap
           formula: maa-cli
-          tag: v${{ needs.meta.outputs.version }}
+          tag: ${{ inputs.version || github.ref }}
           no_fork: true
           force: false
