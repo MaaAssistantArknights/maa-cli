@@ -33,7 +33,11 @@ description = "a stage to fight in summer event"
 # Mall after 16:00
 [[tasks]]
 type = "Mall"
-
+[tasks.params]
+shopping = true
+credit_fight = true
+buy_first = ["招聘许可", "龙门币"]
+blacklist = ["碳", "家具", "加急许可"]
 [[tasks.variants]]
 condition = { type = "Time", start = "16:00:00" }
 

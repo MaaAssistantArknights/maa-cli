@@ -431,7 +431,19 @@ mod tests {
                     ),
                     Task::new(
                         TaskType::Mall,
-                        object!(),
+                        object!(
+                           "shopping" => true,
+                            "credit_fight" => true,
+                            "buy_first" => [
+                                "招聘许可",
+                                "龙门币",
+                            ],
+                            "blacklist" => [
+                                "碳",
+                                "家具",
+                                "加急许可",
+                            ],
+                        ),
                         Strategy::default(),
                         vec![TaskVariant {
                             condition: Condition::Time {

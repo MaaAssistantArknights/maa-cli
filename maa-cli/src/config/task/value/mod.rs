@@ -10,12 +10,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum Value {
+    Array(Vec<Value>),
     InputString(UserInput<String>),
     InputBool(UserInput<bool>),
     InputInt(UserInput<i64>),
     InputFloat(UserInput<f64>),
     Object(Map<Value>),
-    Array(Vec<Value>),
     String(String),
     Bool(bool),
     Int(i64),

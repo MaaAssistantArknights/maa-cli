@@ -36,6 +36,16 @@ tasks:
               - SL-8
             description: a stage to fight in summer event
   - type: Mall
+    params:
+      shopping: true
+      credit_fight: true
+      buy_first:
+        - 招聘许可
+        - 龙门币
+      blacklist:
+        - 碳
+        - 家具
+        - 加急许可
     variants:
       - condition:
           type: Time
