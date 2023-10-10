@@ -40,6 +40,7 @@ complete -c maa -n "__fish_seen_subcommand_from run" -f -a "$(maa list)"
 complete -c maa -n "__fish_seen_subcommand_from run" -s a -l addr -d 'ADB serial number of device or MaaTools address set in PlayCover' -r
 complete -c maa -n "__fish_seen_subcommand_from run" -s v -l verbose -d 'Output more information, repeat to increase verbosity'
 complete -c maa -n "__fish_seen_subcommand_from run" -s q -l quiet -d 'Output less information, repeat to increase quietness'
+complete -c maa -n "__fish_seen_subcommand_from run" -s b -l batch -d 'Run task in batch mode without interaction'
 complete -c maa -n "__fish_seen_subcommand_from run" -l user-resource -d 'Load resources from the user config directory'
 complete -c maa -n "__fish_seen_subcommand_from run" -s h -l help -d 'Print help (see more with \'--help\')'
 ## Help

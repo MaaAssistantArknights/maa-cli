@@ -1,2 +1,4 @@
 /target
 /version
+/cobertura.xml
+/tarpaulin-report.html

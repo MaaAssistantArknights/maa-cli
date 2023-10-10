@@ -67,7 +67,7 @@ MAA的设置储存在`$MAA_CONFIG_DIR/asst.json`或者`$MAA_CONFIG_DIR/asst.toml
 当你使用ADB连接时，你需要提供`adb`的路径和设备的序列号：
 ```toml
 [connection]
-type = "ADB" # or "PlayCover" 但是后者还没有实现
+type = "ADB"
 adb_path = "adb" # adb可执行文件的路径
 device = "emulator-5554" # 你的android设备的序列号
 config = "General" # maa connect的配置
@@ -87,7 +87,7 @@ config = "CompatMac" # maa connect的配置
 `[instance_options]`部分用于配置MAA实例的选项：
 ```toml
 [instance_options]
-touch_mode = "ADB" # 使用的触摸模式，可选值为"ADB", "MiniTouch", "MaaTouch"  或者 "MacPlayTools"(仅适用于PlayCover)
+touch_mode = "ADB" # 使用的触摸模式，可选值为"ADB", "MiniTouch", "MAATouch"  或者 "MacPlayTools"(仅适用于PlayCover)
 deployment_with_pause = false # 是否在部署时暂停游戏
 adb_lite_enabled = false # 是否使用adb-lite
 kill_adb_on_exit = false # 是否在退出时杀死adb
@@ -105,13 +105,21 @@ resources = ["platform_diff/macOS"]
 每一个任务都是一个单独的文件，它们储存在`$MAA_CONFIG_DIR/tasks`中。
 任务文件的格式是`<name>.toml`或者`<name>.json`，其中`<name>`是任务的名字。
 
+
+#### 基本结构
+
 一个任务文件包含多个子任务，每一个子任务是一个[MAA任务链](https://maa.plus/docs/3.1-集成文档.html#asstappendtask)：
+
 ```toml
 [[tasks]]
 type = "StartUp" # maa任务的类型
 params = { client_type = "Official", start_game_enabled = true } # maa任务的参数
 ```
+
+#### 任务条件
+
 如果你想要根据一些条件运行不同参数的任务，你可以定义多个任务的变体：
+
 ```toml
 [[tasks]]
 type = "Infrast"
@@ -135,15 +143,17 @@ params = { plan_index = 2 }
 condition = { type = "Time", start = "18:00:00" }
 params = { plan_index = 0 }
 ```
-这里的`condition`字段用于确定哪一个变体应该被使用，
-而匹配的变体的`params`字段将会被合并到任务的参数中。
 
-**注意**：这个CLI不会读取基建计划文件中的任何内容，
+这里的 `condition` 字段用于确定哪一个变体应该被使用，
+而匹配的变体的 `params` 字段将会被合并到任务的参数中。
+
+**注意**：这个 CLI 不会读取基建计划文件中的任何内容，
 包括基建计划文件中定义的时间段，
-所以你必须在`condition`字段中定义时间段，
+所以你必须在 `condition` 字段中定义时间段，
 来在不同的时间运行不同的基建计划。
 
-除了`Time`条件，还有`DateTime`和`Weakday`条件：
+除了 `Time` 条件，还有 `DateTime` 和 `Weakday` 条件：
+
 ```toml
 [[tasks]]
 type = "Fight"
@@ -162,12 +172,45 @@ params = { stage = "CE-6" }
 [[tasks.variants]]
 params = { stage = "1-7" }
 ```
-如果有多个变体被匹配，第一个将会被使用。
+
+在默认的策略下，如果有多个变体被匹配，第一个将会被使用。
 如果没有给出条件，那么变体将会总是被匹配，
 所以你可以把没有条件的变体放在最后，作为默认的情况。
 
+你可以使用 `strategy` 字段来改变匹配策略：
+
+```toml
+[[tasks]]
+type = "Fight"
+strategy = "merge" # 或者 "first" (默认)
+
+# 在周天，使用5个即将过期的理智药
+[[tasks.variants]]
+condition = { type = "Weekday", weekdays = ["Sun"] }
+params = { expiring_medicine = 5 }
+
+# 默认刷1-7
+[[tasks.variants]]
+params = { stage = "1-7" }
+
+# 在周二、周四和周六，刷CE-6
+[[tasks.variants]]
+condition = { type = "Weekday", weekdays = ["Tue", "Thu", "Sat"] }
+params = { stage = "CE-6" }
+
+# 在夏活期间，刷SL-8
+[[tasks.variants]]
+params = { stage = "SL-8" }
+condition = { type = "DateTime", start = "2023-08-01T16:00:00", end = "2023-08-21T03:59:59" }
+```
+
+这个例子和上面的例子将刷同样的关卡，但是在周天，它将会使用5个即将过期的理智药。
+在 `merge` 策略下，如果有多个变体被匹配，后面的变体的参数将合并入前面的变体的参数中。
+如果多个变体都有相同的参数，那么后面的变体的参数将会覆盖前面的变体的参数。
+
 如果没有变体被匹配，那么任务将不会被执行，
 这在你想要只在某些条件下运行任务时很有用：
+
 ```toml
 # 只在在18:00:00之后进行信用商店相关的操作
 [[tasks]]
@@ -180,6 +223,39 @@ blacklist = ["碳", "家具", "加急许可"]
 [[tasks.variants]]
 condition = { type = "Time", start = "18:00:00" }
 ```
+
+#### 用户输入
+
+对于一些任务，你可能想要在运行时输入一些参数，例如关卡名称。
+你可以将对应需要输入的参数设置为 `Input` 或者 `Select` 类型：
+
+```toml
+[[tasks]]
+type = "Fight"
+
+# 选择一个关卡
+[[tasks.variants]]
+condition = { type = "DateTime", start = "2023-08-01T16:00:00", end = "2023-08-21T03:59:59" }
+[tasks.variants.params.stage]
+alternatives = ["SL-6", "SL-7", "SL-8"] # 可选的关卡，必须提供至少一个可选值
+description = "a stage to fight in summer event" # 描述，可选
+
+# 无需任何输入
+[[tasks.variants]]
+condition = { type = "Weekday", weekdays = ["Tue", "Thu", "Sat"] }
+params = { stage = "CE-6" }
+
+# 输入一个关卡
+[[tasks.variants]]
+[tasks.variants.params.stage]
+default = "1-7" # 默认的关卡，可选（如果没有默认值，输入空值将会重新提示输入）
+description = "a stage to fight" # 描述，可选
+```
+
+对于 `Input` 类型，当运行任务时，你将会被提示输入一个值。如果你输入了一个空值，那么默认值将会被使用。
+对于 `Select` 类型，当运行任务时，你将会被提示选择一个值 （通过输入可选值的序号）。
+注意，当你的输入不是可选值时，你将会被提示重新输入。
+
 
 配置文件的例子可以在[`config_examples`目录](./config_examples)中找到。
 另一个例子是我自己的配置文件，你可以在[这里](https://github.com/wangl-cc/dotfiles/tree/master/.config/maa)找到。

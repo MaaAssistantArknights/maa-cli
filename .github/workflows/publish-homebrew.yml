@@ -1,0 +1,68 @@
+name: Publish Homebrew
+
+on:
+  release:
+    types: [published]
+  workflow_call:
+    inputs:
+      version:
+        description: Package version
+        required: false
+        type: string
+      dryrun:
+        description: Do not push changes to Homebrew
+        required: true
+        type: boolean
+    secrets:
+      MAA_HOMEBREW_BUMP_PR:
+        description: GitHub PAT for creating PR
+        required: true
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version
+        required: false
+        type: string
+      dryrun:
+        description: Do not push changes to Homebrew
+        default: true
+        required: true
+        type: boolean
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+
+jobs:
+  cask:
+    name: Cask
+    runs-on: macos-latest
+    steps:
+      - name: Update Homebrew Cask
+        uses: wangl-cc/action-homebrew-bump-cask@master
+        with:
+          token: ${{secrets.MAA_HOMEBREW_BUMP_PR}}
+          tap: MaaAssistantArknights/homebrew-tap
+          cask: maa-cli-bin
+          tag: ${{ inputs.version || github.ref }}
+          no_fork: true
+          force: false
+          dryrun: ${{ github.event_name != 'release' || inputs.dryrun }}
+
+  formula:
+    name: Formula
+    if: ${{ github.event_name == 'release' || !inputs.dryrun }}
+    runs-on: macos-latest
+    steps:
+      - name: Update Homebrew Formula
+        uses: dawidd6/action-homebrew-bump-formula@v3
+        with:
+          token: ${{secrets.MAA_HOMEBREW_BUMP_PR}}
+          tap: MaaAssistantArknights/homebrew-tap
+          formula: maa-cli
+          tag: ${{ inputs.version || github.ref }}
+          no_fork: true
+          force: false

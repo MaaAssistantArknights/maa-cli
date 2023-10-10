@@ -1,23 +1,28 @@
-use crate::config::{asst, task, Error as ConfigError, FindFile};
-use crate::dirs::{Dirs, Ensure};
-use crate::installer::maa_core::{find_maa_core, find_resource};
-use crate::log::{level, set_level};
-use crate::{debug, normal, warning};
-
-use asst::{AsstConfig, Connection};
-use task::{TaskList, TaskType};
-
 mod message;
 use message::callback;
 
-use signal_hook::consts::TERM_SIGNALS;
-use std::sync::Arc;
+use crate::{
+    config::{
+        asst::{self, AsstConfig, Connection},
+        task::{
+            task_type::{TaskOrUnknown, TaskType},
+            value::input::enable_batch_mode,
+            TaskList, Value,
+        },
+        Error as ConfigError, FindFile,
+    },
+    dirs::{Dirs, Ensure},
+    installer::maa_core::{find_maa_core, find_resource},
+    log::{level, set_level},
+    {debug, error, normal, warning},
+};
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use anyhow::{anyhow, bail, Context, Result};
 use maa_sys::Assistant;
-use serde_json::Value;
+use signal_hook::consts::TERM_SIGNALS;
 
 pub fn run(
     dirs: &Dirs,
@@ -26,6 +31,7 @@ pub fn run(
     user_resource: bool,
     verbose: u8,
     quiet: u8,
+    batch: bool,
 ) -> Result<()> {
     let core_path = find_maa_core(dirs).context("Failed to find MaaCore!")?;
 
@@ -33,6 +39,9 @@ pub fn run(
 
     /*------------------- Setup global log level -------------------*/
     unsafe {
+        if batch {
+            enable_batch_mode();
+        }
         set_level(level() as u8 + verbose - quiet);
     }
 
@@ -95,137 +104,93 @@ pub fn run(
     };
 
     /*----------------------- Process Task -------------------------*/
-    let mut task_typs: Vec<TaskType> = Vec::new();
+    let mut tasks: Vec<String> = Vec::new();
     let mut task_params: Vec<String> = Vec::new();
+
     let mut start_app: bool = false; // start iOS app before connect
     let mut close_app: bool = false; // close iOS app after disconnect
-    let mut app = PlayCoverApp::new("明日方舟");
+    let mut app_name: Option<String> = None;
 
     for task in task_list.tasks {
         if task.is_active() {
             let task_type = task.get_type();
-            let params = &mut task.get_params();
+
+            let mut params = task.get_params();
+            params.init().context("Failed to init task params!")?;
 
             match task_type {
-                TaskType::StartUp => {
-                    let enable = match params.get("enable") {
-                        Some(enable) => {
-                            enable.as_bool().ok_or(anyhow!("key enable must be bool"))?
+                TaskOrUnknown::Task(task_type) => match task_type {
+                    TaskType::StartUp if playtools => {
+                        if params.get_or("enable", true)?
+                            && params.get_or("start_game_enabled", false)?
+                        {
+                            start_app = true;
                         }
-                        None => true,
-                    };
-                    match params.get("client_type") {
-                        Some(client_type) => {
-                            let client_type = client_type
-                                .as_str()
-                                .ok_or(anyhow!("key client_type must be string"))?;
 
-                            match client_type {
-                                "Official" | "Bilibili" | "" => (),
-                                "txwy" => {
-                                    debug!("Loading additional resource", "for txwy");
-                                    let resource_path = resource_dir.join("global").join("txwy");
-                                    Assistant::load_resource(&resource_path)
-                                        .context("Failed to load additional resource!")?;
-                                }
-                                "YoStarEN" => {
-                                    debug!("Loading additional resource", "for YoStarEN");
-                                    let resource_path =
-                                        resource_dir.join("global").join("YoStarEN");
-                                    Assistant::load_resource(&resource_path)
-                                        .context("Failed to load additional resource!")?;
-                                    app = PlayCoverApp::new("Arknights");
-                                }
-                                "YoStarJP" => {
-                                    debug!("Loading additional resource", "for YoStarJP");
-                                    let resource_path =
-                                        resource_dir.join("global").join("YoStarJP");
-                                    Assistant::load_resource(&resource_path)
-                                        .context("Failed to load additional resource!")?;
-                                    app = PlayCoverApp::new("アークナイツ");
-                                }
-                                "YoStarKR" => {
-                                    debug!("Loading additional resource", "for YoStarKR");
-                                    let resource_path =
-                                        resource_dir.join("global").join("YoStarKR");
-                                    Assistant::load_resource(&resource_path)
-                                        .context("Failed to load additional resource!")?;
-                                    app = PlayCoverApp::new("명일방주");
-                                }
-                                _ => {
-                                    warning!(
-                                        format!("Unknown client type \"{}\",", client_type),
-                                        "using default app name \"明日方舟\""
-                                    );
-                                }
-                            };
-                        }
-                        None => {
-                            if playtools {
-                                warning!(
-                                    "No client type specified",
-                                    "using default app name \"明日方舟\""
+                        if let Some(client_type) = params.get("client_type") {
+                            app_name = Some(client_name(client_type, &resource_dir)?);
+                        };
+                    }
+                    TaskType::CloseDown if playtools => {
+                        close_app = params.get_or("enable", true)?;
+                    }
+                    _ => {
+                        // For any task that has a filename parameter
+                        // and the filename parameter is not an absolute path,
+                        // it will be treated as a relative path to the config directory
+                        // and will be converted to an absolute path.
+                        if let Some(v) = params.get("filename") {
+                            let filename = String::try_from(v)?;
+                            let path = std::path::Path::new(&filename);
+                            if !path.is_absolute() {
+                                let type_name: &str = task_type.as_ref();
+                                params.insert(
+                                    "filename",
+                                    config_dir
+                                        .join(type_name.to_lowercase())
+                                        .join(path)
+                                        .to_str()
+                                        .ok_or(anyhow!("Invalid Path!"))?,
                                 );
                             }
                         }
-                    };
-                    let start_game = params
-                        .get("start_game_enabled")
-                        .unwrap_or(&Value::Bool(false))
-                        .as_bool()
-                        .ok_or(anyhow!("key enable must be bool"))?;
-                    if playtools && enable && start_game {
-                        start_app = true;
                     }
-                }
-                TaskType::CloseDown => {
-                    let enable = match params.get("enable") {
-                        Some(enable) => {
-                            enable.as_bool().ok_or(anyhow!("key enable must be bool"))?
-                        }
-                        None => true,
-                    };
-                    if playtools && enable {
-                        close_app = true;
-                    }
-                }
-                _ => {
-                    // For any task that has a filename parameter
-                    // and the filename parameter is not an absolute path,
-                    // it will be treated as a relative path to the config directory
-                    // and will be converted to an absolute path.
-                    if let Some(v) = params.get_mut("filename") {
-                        let filename = v.as_str().ok_or(anyhow!("Filename must be string!"))?;
-                        let path = std::path::Path::new(filename);
-                        if !path.is_absolute() {
-                            let type_name: &str = task_type.into();
-                            *v = Value::String(
-                                config_dir
-                                    .join(type_name.to_lowercase())
-                                    .join(path)
-                                    .to_str()
-                                    .ok_or(anyhow!("Invalid Path!"))?
-                                    .to_string(),
-                            );
-                        }
-                    }
-                }
+                },
+                TaskOrUnknown::Unknown(_) => (),
             }
 
-            debug!("Task:", task_type);
-            debug!(
-                "Params:",
-                serde_json::to_string(&params).map_or_else(|_| "Unknown".to_string(), |s| s)
-            );
+            let task_str = task_type.as_ref();
+            let param_str = serde_json::to_string(&params)?;
 
-            task_typs.push(task_type.clone());
-            task_params.push(serde_json::to_string(&params)?);
+            debug!("Task:", task_str);
+            debug!("Params:", param_str);
+
+            tasks.push(task_str.into());
+            task_params.push(param_str);
         }
     }
 
+    let app = if start_app || close_app {
+        match app_name {
+            Some(name) => {
+                debug!("Using PlayCover to launch app", name);
+                Some(PlayCoverApp::new(name))
+            }
+            None => {
+                warning!(
+                    "No client type specified, ",
+                    format!("using default app name {}", "明日方舟")
+                );
+                Some(PlayCoverApp::from("明日方舟"))
+            }
+        }
+    } else {
+        None
+    };
+
     /*------------------- Load Additional resource -----------------*/
     if playtools {
-        debug!("Load additional resource", "for PlayTools");
+        debug!("Load additional resource for PlayTools");
         Assistant::load_resource(resource_dir.join("platform_diff/iOS"))
             .context("Failed to load additional resource!")?;
     }
@@ -311,14 +276,15 @@ pub fn run(
 
     /*----------------------- Connect to Game ----------------------*/
     if start_app {
-        app.open()?;
+        app.as_ref().unwrap().open()?;
         std::thread::sleep(std::time::Duration::from_secs(5));
     }
+
     assistant.async_connect(adb_path, address, config, true)?;
 
     /* ------------------------- Append Tasks ----------------------*/
-    for (i, task_type) in task_typs.iter().enumerate() {
-        assistant.append_task(task_type, task_params[i].as_str())?;
+    for i in 0..tasks.len() {
+        assistant.append_task(tasks[i].as_str(), task_params[i].as_str())?;
     }
 
     /* ------------------------ Run Assistant ----------------------*/
@@ -336,7 +302,7 @@ pub fn run(
 
     /* ------------------------- Close Game ------------------------*/
     if close_app {
-        app.close();
+        app.as_ref().unwrap().close();
     }
 
     Ok(())
@@ -350,12 +316,12 @@ pub fn core_version<'a>(dirs: &Dirs) -> Result<&'a str> {
     Ok(Assistant::get_version()?)
 }
 
-struct PlayCoverApp<'a> {
-    name: &'a str,
+struct PlayCoverApp {
+    name: String,
 }
 
-impl<'a> PlayCoverApp<'a> {
-    pub fn new(name: &'a str) -> Self {
+impl PlayCoverApp {
+    pub fn new(name: String) -> Self {
         Self { name }
     }
 
@@ -371,7 +337,7 @@ impl<'a> PlayCoverApp<'a> {
         normal!("Starting game...");
         std::process::Command::new("open")
             .arg("-a")
-            .arg(self.name)
+            .arg(&self.name)
             .status()
             .context("Failed to start game!")?;
         Ok(())
@@ -385,4 +351,34 @@ impl<'a> PlayCoverApp<'a> {
             .status()
             .expect("Failed to close game!");
     }
+}
+
+impl From<&str> for PlayCoverApp {
+    fn from(name: &str) -> Self {
+        Self::new(name.into())
+    }
+}
+
+fn client_name(client: &Value, resource_dir: &Path) -> Result<String> {
+    let client = String::try_from(client)?;
+
+    let (resource, app) = match client.as_str() {
+        "Official" | "Bilibili" | "" => (None, None),
+        "txwy" => (Some("txwy"), None),
+        "YoStarEN" => (Some("YoStarEN"), Some("Arknights")),
+        "YoStarJP" => (Some("YoStarJP"), Some("アークナイツ")),
+        "YoStarKR" => (Some("YoStarKR"), Some("명일방주")),
+        _ => {
+            error!("Unknown client type", client);
+            (None, None)
+        }
+    };
+
+    if let Some(resource) = resource {
+        debug!("Loading additional resource for global client", resource);
+        Assistant::load_resource(resource_dir.join("global").join(resource))
+            .context("Failed to load additional resource!")?;
+    }
+
+    Ok(app.unwrap_or("明日方舟").to_string())
 }

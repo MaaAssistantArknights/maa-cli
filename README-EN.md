@@ -93,7 +93,7 @@ All available values can be found at `resource/config.json` in MAA repo.
 And the `instance_options` section is used to configure maa instance options:
 ```toml
 [instance_options]
-touch_mode = "ADB" # touch mode to use, can be "ADB", "MiniTouch", "MaaTouch" or "MacPlayTools" (only for PlayCover)
+touch_mode = "ADB" # touch mode to use, can be "ADB", "MiniTouch", "MAATouch" or "MacPlayTools" (only for PlayCover)
 deployment_with_pause = false # whether pause the game when deployment
 adb_lite_enabled = false # whether use adb-lite
 kill_adb_on_exit = false # whether kill adb when exit
@@ -112,17 +112,23 @@ platform specific resource.
 
 A task should be defined with a TOML or JSON file, the located in `$MAA_CONFIG_DIR/tasks`.
 
+#### Basic structure
+
 A task is consists of multiple subtasks,
 available subtasks and params are defined by `type` and `params` fields,
 it will passed to MaaCore, see [here](https://maa.plus/docs/en-us/3.1-INTEGRATION.html#asstappendtask) for more details:
+
 ```toml
 [[tasks]]
 type = "StartUp" # the type of maa task
 params = { client_type = "Official", start_game_enabled = true } # the params of given task
 ```
 
+#### Task variants and conditions
+
 If you want to run a task with different params based on some conditions,
 you can define multiple variants of a task:
+
 ```toml
 [[tasks]]
 type = "Infrast"
@@ -146,6 +152,7 @@ params = { plan_index = 2 }
 condition = { type = "Time", start = "18:00:00" } # if end is not defined, it will be 23:59:59
 params = { plan_index = 0 }
 ```
+
 The `condition` field is used to determine whether the variant should be used,
 and the `params` field of matched variant will be merged into the params of the task.
 
@@ -154,6 +161,7 @@ including the time period defined in the `infrast` file,
 so you must define the time period in the `condition` field.
 
 Besides of `Time` condition, there are also `DateTime` and `Weakday` conditions:
+
 ```toml
 [[tasks]]
 type = "Fight"
@@ -170,12 +178,42 @@ params = { stage = "CE-6" }
 [[tasks.variants]]
 params = { stage = "1-7" }
 ```
-If multiple variants are matched, the first one will be used.
+
+With default strategy, if multiple variants are matched, only the first one will be used.
 And if the condition is not given, the variant will always be matched,
 So you can put a variant without condition at the end of variants.
 
+The strategy of matching variants can be changed by `strategy` field:
+
+```toml
+[[tasks]]
+type = "Fight"
+strategy = "merge" # or "first" (default)
+
+# use 5 expiring medicine on Sunday
+[[tasks.variants]]
+condition = { type = "Weekday", weekdays = ["Sun"] }
+params = { expiring_medicine = 5 }
+# fight 1-7 otherwise
+[[tasks.variants]]
+params = { stage = "1-7" }
+# fight CE-6 on Tue, Thu, Sat if not on summer event
+[[tasks.variants]]
+condition = { type = "Weekday", weekdays = ["Tue", "Thu", "Sat"] }
+params = { stage = "CE-6" }
+# fight SL-8 on summer event
+[[tasks.variants]]
+params = { stage = "SL-8" }
+condition = { type = "DateTime", start = "2023-08-01T16:00:00", end = "2023-08-21T03:59:59" }
+```
+
+This example will fight the same stage as above, but use 5 expiring medicine on Sunday additionally.
+With the `merge` strategy, if multiple variants are matched, the params of all matched variants will be merged.
+If multiple variants have the same param, the last one will be used.
+
 If no variant is matched, the task will not be executed,
 which is useful when you want to only run a task in some conditions:
+
 ```toml
 # Mall after 18:00
 [[tasks]]
@@ -188,6 +226,41 @@ blacklist = ["碳", "家具", "加急许可"]
 [[tasks.variants]]
 condition = { type = "Time", start = "18:00:00" }
 ```
+
+#### User input
+
+In some case, you may want to input some value at runtime, instead of hard code it in the task file.
+Such as the stage to fight, the item to buy, etc.
+You can specify the value `Input` or `Select` type:
+
+```toml
+[[tasks]]
+type = "Fight"
+
+# Select a stage to fight
+[[tasks.variants]]
+condition = { type = "DateTime", start = "2023-08-01T16:00:00", end = "2023-08-21T03:59:59" }
+[tasks.variants.params.stage]
+alternatives = ["SL-6", "SL-7", "SL-8"] # the alternatives of stage, at least one alternative should be given
+description = "a stage to fight in summer event" # description of the input, optional
+
+# Task without input
+[[tasks.variants]]
+condition = { type = "Weekday", weekdays = ["Tue", "Thu", "Sat"] }
+params = { stage = "CE-6" }
+
+# Input a stage to fight
+[[tasks.variants]]
+[tasks.variants.params.stage]
+default = "1-7" # default value of stage, optional (if not given, user can input empty value to re-prompt)
+description = "a stage to fight" # description of the input, optional
+```
+
+For `Input` type, a prompt will be shown to ask user to input a value.
+If the default value is given, it will be used if user input empty value, otherwise it will re-prompt.
+For `Select` type, a prompt will be shown to ask user to select a value from alternatives (by index).
+If user input is not a valid index, it will re-prompt.
+
 
 Example of config file can be found at [`config_examples` directory](./config_examples).
 Anothor example can be found at my [dotfiles](https://github.com/wangl-cc/dotfiles/tree/master/.config/maa).
