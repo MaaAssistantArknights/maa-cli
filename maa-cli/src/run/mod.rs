@@ -12,7 +12,7 @@ use crate::{
         Error as ConfigError, FindFile,
     },
     dirs::{Dirs, Ensure},
-    installer::maa_core::{find_maa_core, find_resource},
+    installer::maa_core::{find_maa_core, find_resource, MAA_CORE_NAME},
     log::{level, set_level},
     {debug, error, normal, warning},
 };
@@ -33,9 +33,8 @@ pub fn run(
     quiet: u8,
     batch: bool,
 ) -> Result<()> {
-    let core_path = find_maa_core(dirs).context("Failed to find MaaCore!")?;
-
-    maa_sys::binding::load(core_path);
+    /*------------------------ Load MaaCore ------------------------*/
+    load_core(dirs);
 
     /*------------------- Setup global log level -------------------*/
     unsafe {
@@ -309,9 +308,7 @@ pub fn run(
 }
 
 pub fn core_version<'a>(dirs: &Dirs) -> Result<&'a str> {
-    let core_path = find_maa_core(dirs).context("Failed to find MaaCore!")?;
-
-    maa_sys::binding::load(core_path);
+    load_core(dirs);
 
     Ok(Assistant::get_version()?)
 }
@@ -381,4 +378,12 @@ fn client_name(client: &Value, resource_dir: &Path) -> Result<String> {
     }
 
     Ok(app.unwrap_or("明日方舟").to_string())
+}
+
+fn load_core(dirs: &Dirs) {
+    if let Some(core_path) = find_maa_core(dirs) {
+        maa_sys::binding::load(core_path);
+    } else {
+        maa_sys::binding::load(MAA_CORE_NAME);
+    }
 }
