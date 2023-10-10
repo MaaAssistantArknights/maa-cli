@@ -67,7 +67,7 @@ MAA的设置储存在`$MAA_CONFIG_DIR/asst.json`或者`$MAA_CONFIG_DIR/asst.toml
 当你使用ADB连接时，你需要提供`adb`的路径和设备的序列号：
 ```toml
 [connection]
-type = "ADB" # or "PlayCover" 但是后者还没有实现
+type = "ADB"
 adb_path = "adb" # adb可执行文件的路径
 device = "emulator-5554" # 你的android设备的序列号
 config = "General" # maa connect的配置
