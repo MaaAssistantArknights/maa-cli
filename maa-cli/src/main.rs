@@ -4,10 +4,14 @@ mod installer;
 mod log;
 mod run;
 
-use crate::config::{cli::CLIConfig, FindFile};
+use crate::{
+    config::{cli::CLIConfig, FindFile},
+    installer::maa_core::{self, Channel, MaaCore},
+    log::{level, set_level},
+};
+
 #[cfg(feature = "self")]
 use crate::installer::maa_cli;
-use crate::installer::maa_core::{self, Channel, MaaCore};
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
@@ -17,7 +21,25 @@ use directories::ProjectDirs;
 #[derive(Parser)]
 #[command(name = "maa", author, version)]
 #[allow(clippy::upper_case_acronyms)]
-enum CLI {
+struct CLI {
+    #[command(subcommand)]
+    command: SubCommand,
+    /// Output more information, repeat to increase verbosity
+    ///
+    /// If you want to see more information, you can use this option to increase the log level.
+    /// See documentation of log level for more information.
+    #[arg(short, long, verbatim_doc_comment, action = clap::ArgAction::Count, global = true)]
+    verbose: u8,
+    /// Output less information, repeat to increase quietness
+    ///
+    /// If you want to see less information, you can use this option to decrease the log level.
+    /// See documentation of log level for more information.
+    #[arg(short, long, verbatim_doc_comment, action = clap::ArgAction::Count, global = true)]
+    quiet: u8,
+}
+
+#[derive(Subcommand)]
+enum SubCommand {
     /// Install maa core and resources
     ///
     /// This command will install maa-core and resources
@@ -194,35 +216,6 @@ enum CLI {
         /// Use at your own risk!
         #[clap(long, verbatim_doc_comment)]
         user_resource: Option<bool>,
-        /// Output more information, repeat to increase verbosity
-        ///
-        /// This option is used to control the log level of this program and MaaCore.
-        /// There are 6 levels of log:
-        /// Error   // show only error messages
-        /// Warning // show all error and warning messages
-        /// normal  // show all above messages and basic information
-        /// Info    // show all above messages and more detailed information
-        /// Debug   // show all above messages and some information about configuration
-        /// Trace   // show all above messages and trace information
-        ///
-        /// The default log level is normal.
-        /// If you want to see more information, you can use this option to increase the log level.
-        #[clap(short, long, action = clap::ArgAction::Count, verbatim_doc_comment)]
-        verbose: u8,
-        /// Output less information, repeat to increase quietness
-        ///
-        /// This option is used to control the log level of this program and MaaCore.
-        /// There are 6 levels of log:
-        /// Error   // show only error messages
-        /// Warning // show all error and warning messages
-        /// normal  // show all above messages and basic information
-        /// Info    // show all above messages and more detailed information
-        /// Debug   // show all above messages and some information about configuration
-        /// Trace   // show all above messages and trace information
-        /// The default log level is normal.
-        /// If you want to see less information, you can use this option to decrease the log level.
-        #[clap(short, long, action = clap::ArgAction::Count, verbatim_doc_comment)]
-        quiet: u8,
         /// Run tasks in batch mode
         ///
         /// If there are some input parameters in the task file,
@@ -290,8 +283,14 @@ fn main() -> Result<()> {
 
     let cli = CLI::parse();
 
-    match cli {
-        CLI::Install {
+    let subcommand = cli.command;
+
+    unsafe {
+        set_level(level() as u8 + cli.verbose - cli.quiet);
+    }
+
+    match subcommand {
+        SubCommand::Install {
             channel,
             no_resource,
             test_time,
@@ -303,7 +302,7 @@ fn main() -> Result<()> {
             let no_resource = no_resource || !cli_config.resource();
             MaaCore::new(channel).install(&proj_dirs, force, no_resource, test_time)?;
         }
-        CLI::Update {
+        SubCommand::Update {
             channel,
             no_resource,
             test_time,
@@ -315,12 +314,12 @@ fn main() -> Result<()> {
             MaaCore::new(channel).update(&proj_dirs, no_resource, test_time)?;
         }
         #[cfg(feature = "self")]
-        CLI::SelfCommand(self_command) => match self_command {
+        SubCommand::SelfCommand(self_command) => match self_command {
             SelfCommand::Update => {
                 maa_cli::update(&proj_dirs)?;
             }
         },
-        CLI::Dir { dir_type } => match dir_type {
+        SubCommand::Dir { dir_type } => match dir_type {
             Dir::Data => println!("{}", proj_dirs.data().display()),
             Dir::Library | Dir::Lib => {
                 println!("{}", maa_core::find_lib_dir(&proj_dirs).unwrap().display())
@@ -332,7 +331,7 @@ fn main() -> Result<()> {
             }
             Dir::Log => println!("{}", proj_dirs.log().display()),
         },
-        CLI::Version { component } => match component {
+        SubCommand::Version { component } => match component {
             Component::All => {
                 println!("maa-cli v{}", env!("CARGO_PKG_VERSION"));
                 println!("MaaCore {}", run::core_version(&proj_dirs)?);
@@ -344,15 +343,13 @@ fn main() -> Result<()> {
                 println!("MaaCore {}", run::core_version(&proj_dirs)?);
             }
         },
-        CLI::Run {
+        SubCommand::Run {
             task,
             addr,
             user_resource,
-            verbose,
-            quiet,
             batch,
-        } => run::run(&proj_dirs, task, addr, user_resource, verbose, quiet, batch)?,
-        CLI::List => {
+        } => run::run(&proj_dirs, task, addr, user_resource, batch)?,
+        SubCommand::List => {
             let task_dir = proj_dirs.config().join("tasks");
             if !task_dir.exists() {
                 println!("No tasks found");
@@ -366,7 +363,7 @@ fn main() -> Result<()> {
                 }
             }
         }
-        CLI::Complete { shell } => {
+        SubCommand::Complete { shell } => {
             generate(shell, &mut CLI::command(), "maa", &mut std::io::stdout());
         }
     }
