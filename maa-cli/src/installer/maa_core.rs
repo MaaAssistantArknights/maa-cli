@@ -1,15 +1,20 @@
 // This file is used to download and extract prebuilt packages of maa-core.
 
-use super::download::download_mirrors;
-use super::extract::Archive;
+use super::{download::download_mirrors, extract::Archive, maa_cli::current_exe};
 
-use crate::dirs::{Dirs, Ensure};
-use crate::run;
+use crate::{
+    dirs::{Dirs, Ensure},
+    run,
+};
 
-use std::env::consts::{DLL_PREFIX, DLL_SUFFIX};
-use std::env::var_os;
-use std::path::{Component, Path, PathBuf};
-use std::time::Duration;
+use std::{
+    env::{
+        consts::{DLL_PREFIX, DLL_SUFFIX},
+        var_os,
+    },
+    path::{Component, Path, PathBuf},
+    time::Duration,
+};
 
 use anyhow::{anyhow, bail, Context, Result};
 use clap::ValueEnum;
@@ -287,7 +292,7 @@ pub fn find_lib_dir(dirs: &Dirs) -> Option<PathBuf> {
         return Some(lib_dir.to_path_buf());
     }
 
-    if let Ok(path) = std::env::current_exe() {
+    if let Ok(path) = current_exe() {
         let exe_dir = path.parent().unwrap();
         if exe_dir.join(MAA_CORE_NAME).exists() {
             return Some(exe_dir.to_path_buf());
@@ -314,7 +319,7 @@ pub fn find_resource(dirs: &Dirs) -> Option<PathBuf> {
         return Some(resource_dir.to_path_buf());
     }
 
-    if let Ok(path) = std::env::current_exe() {
+    if let Ok(path) = current_exe() {
         let exe_dir = path.parent().unwrap();
         let resource_dir = exe_dir.join("resource");
         if resource_dir.exists() {

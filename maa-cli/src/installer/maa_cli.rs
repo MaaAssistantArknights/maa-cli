@@ -1,16 +1,16 @@
-// This file is used to download and extract prebuilt packages of maa-cli.
-
-use crate::dirs::{Dirs, Ensure};
-
 use super::{
     download::{download, Checker},
     extract::Archive,
 };
 
-use std::env::{consts::EXE_SUFFIX, current_exe};
-use std::{env::var_os, path::Path};
+use crate::dirs::{Dirs, Ensure};
 
-use anyhow::{bail, Context, Ok, Result};
+use std::{
+    env::{consts::EXE_SUFFIX, var_os},
+    path::{Path, PathBuf},
+};
+
+use anyhow::{bail, Context, Result};
 use semver::Version;
 use serde::Deserialize;
 use tokio::runtime::Runtime;
@@ -55,6 +55,10 @@ pub fn update(dirs: &Dirs) -> Result<()> {
     })?;
 
     Ok(())
+}
+
+pub fn current_exe() -> std::io::Result<PathBuf> {
+    std::env::current_exe()?.canonicalize()
 }
 
 fn get_metadata() -> Result<VersionJSON> {
@@ -144,7 +148,7 @@ impl Asset {
             let file_size = path.metadata()?.len();
             if file_size == size {
                 println!("Found existing file: {}", path.display());
-                return Ok(Archive::try_from(path)?);
+                return Archive::try_from(path);
             }
         }
 
@@ -162,7 +166,7 @@ impl Asset {
             ))
             .context("Failed to download maa-cli")?;
 
-        Ok(Archive::try_from(path)?)
+        Archive::try_from(path)
     }
 }
 
