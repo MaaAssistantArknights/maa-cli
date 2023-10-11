@@ -4,6 +4,8 @@ use serde::Deserialize;
 #[derive(Deserialize, Default)]
 pub struct AsstConfig {
     #[serde(default)]
+    pub user_resource: bool,
+    #[serde(default)]
     pub resources: Vec<String>,
     #[serde(default)]
     pub connection: Connection,
@@ -123,6 +125,7 @@ mod tests {
         assert_eq!(
             config,
             AsstConfig {
+                user_resource: true,
                 resources: vec![String::from("platform_diff/macOS")],
                 connection: Connection::ADB {
                     adb_path: String::from("adb"),
@@ -130,7 +133,7 @@ mod tests {
                     config: String::from("CompatMac"),
                 },
                 instance_options: InstanceOption {
-                    touch_mode: Some(TouchMode::MiniTouch),
+                    touch_mode: Some(TouchMode::MAATouch),
                     deployment_with_pause: Some(false),
                     adb_lite_enabled: Some(false),
                     kill_adb_on_exit: Some(false),
@@ -145,6 +148,7 @@ mod tests {
         assert_eq!(
             config,
             AsstConfig {
+                user_resource: false,
                 resources: vec![],
                 connection: Connection::ADB {
                     adb_path: String::from("adb"),

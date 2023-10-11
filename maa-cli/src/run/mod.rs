@@ -7,7 +7,7 @@ use crate::{
         task::{
             task_type::{TaskOrUnknown, TaskType},
             value::input::enable_batch_mode,
-            TaskList, Value,
+            TaskList,
         },
         Error as ConfigError, FindFile,
     },
@@ -17,7 +17,7 @@ use crate::{
     {debug, error, normal, warning},
 };
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -28,7 +28,7 @@ pub fn run(
     dirs: &Dirs,
     task: String,
     addr: Option<String>,
-    user_resource: bool,
+    user_resource: Option<bool>,
     verbose: u8,
     quiet: u8,
     batch: bool,
@@ -108,7 +108,9 @@ pub fn run(
 
     let mut start_app: bool = false; // start iOS app before connect
     let mut close_app: bool = false; // close iOS app after disconnect
-    let mut app_name: Option<String> = None;
+    let mut app_name: Option<&str> = None;
+
+    let mut client_resource: Option<&str> = None;
 
     for task in task_list.tasks {
         if task.is_active() {
@@ -127,7 +129,9 @@ pub fn run(
                         }
 
                         if let Some(client_type) = params.get("client_type") {
-                            app_name = Some(client_name(client_type, &resource_dir)?);
+                            let client_name = String::try_from(client_type)?;
+                            app_name = match_app_name(&client_name);
+                            client_resource = match_resource(&client_name);
                         };
                     }
                     TaskType::CloseDown if playtools => {
@@ -180,20 +184,29 @@ pub fn run(
                     "No client type specified, ",
                     format!("using default app name {}", "明日方舟")
                 );
-                Some(PlayCoverApp::from("明日方舟"))
+                Some(PlayCoverApp::new("明日方舟"))
             }
         }
     } else {
         None
     };
 
-    /*------------------- Load Additional resource -----------------*/
+    /*------------------------ Load Resource -----------------------*/
+    // Cilent specific resource
+    if let Some(resource) = client_resource {
+        debug!("Loading additional resource for client", resource);
+        Assistant::load_resource(resource_dir.join("global").join(resource))
+            .with_context(|| format!("Failed to load additional resource {}!", resource))?;
+    }
+
+    // Platform specific resource
     if playtools {
         debug!("Load additional resource for PlayTools");
         Assistant::load_resource(resource_dir.join("platform_diff/iOS"))
-            .context("Failed to load additional resource!")?;
+            .context("Failed to load additional resource for iOS App!")?;
     }
 
+    // User specified additional resource
     for resource in asst_config.resources.iter() {
         let path = PathBuf::from(resource);
         let path = if path.is_absolute() {
@@ -207,12 +220,13 @@ pub fn run(
             .with_context(|| format!("Failed to load additional resource {}!", path.display()))?;
     }
 
-    if user_resource {
+    // User resource in config directory
+    if user_resource.unwrap_or(asst_config.user_resource) {
         if config_dir.join("resource").exists() {
             debug!("Loading user resource:", config_dir.display());
             Assistant::load_resource(config_dir).context("Failed to load user resource!")?;
         } else {
-            warning!("`--user-resource` is specified, but no user resource found!");
+            warning!("`User resource` is enabled, but no resource directory found!");
         }
     }
 
@@ -313,12 +327,12 @@ pub fn core_version<'a>(dirs: &Dirs) -> Result<&'a str> {
     Ok(Assistant::get_version()?)
 }
 
-struct PlayCoverApp {
-    name: String,
+struct PlayCoverApp<'n> {
+    name: &'n str,
 }
 
-impl PlayCoverApp {
-    pub fn new(name: String) -> Self {
+impl<'n> PlayCoverApp<'n> {
+    pub fn new(name: &'n str) -> Self {
         Self { name }
     }
 
@@ -334,7 +348,7 @@ impl PlayCoverApp {
         normal!("Starting game...");
         std::process::Command::new("open")
             .arg("-a")
-            .arg(&self.name)
+            .arg(self.name)
             .status()
             .context("Failed to start game!")?;
         Ok(())
@@ -350,34 +364,27 @@ impl PlayCoverApp {
     }
 }
 
-impl From<&str> for PlayCoverApp {
-    fn from(name: &str) -> Self {
-        Self::new(name.into())
+fn match_app_name(client: &str) -> Option<&'static str> {
+    match client {
+        "Official" | "Bilibili" | "txwy" | "" => None,
+        "YoStarEN" => Some("Arknights"),
+        "YoStarJP" => Some("アークナイツ"),
+        "YoStarKR" => Some("명일방주"),
+        _ => {
+            error!("Unknown client type", client);
+            None
+        }
     }
 }
 
-fn client_name(client: &Value, resource_dir: &Path) -> Result<String> {
-    let client = String::try_from(client)?;
-
-    let (resource, app) = match client.as_str() {
-        "Official" | "Bilibili" | "" => (None, None),
-        "txwy" => (Some("txwy"), None),
-        "YoStarEN" => (Some("YoStarEN"), Some("Arknights")),
-        "YoStarJP" => (Some("YoStarJP"), Some("アークナイツ")),
-        "YoStarKR" => (Some("YoStarKR"), Some("명일방주")),
-        _ => {
-            error!("Unknown client type", client);
-            (None, None)
-        }
-    };
-
-    if let Some(resource) = resource {
-        debug!("Loading additional resource for global client", resource);
-        Assistant::load_resource(resource_dir.join("global").join(resource))
-            .context("Failed to load additional resource!")?;
+fn match_resource(client: &str) -> Option<&'static str> {
+    match client {
+        "txwy" => Some("txwy"),
+        "YoStarEN" => Some("YoStarEN"),
+        "YoStarJP" => Some("YoStarJP"),
+        "YoStarKR" => Some("YoStarKR"),
+        _ => None,
     }
-
-    Ok(app.unwrap_or("明日方舟").to_string())
 }
 
 fn load_core(dirs: &Dirs) {

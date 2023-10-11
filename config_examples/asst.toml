@@ -1,3 +1,4 @@
+user_resource = true
 resources = ["platform_diff/macOS"]
 
 [connection]
@@ -7,7 +8,7 @@ device = "emulator-5554"
 config = "CompatMac"
 
 [instance_options]
-touch_mode = "MiniTouch"
+touch_mode = "MAATouch"
 deployment_with_pause = false
 adb_lite_enabled = false
 kill_adb_on_exit = false

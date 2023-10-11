@@ -175,21 +175,25 @@ enum CLI {
         /// and then you can specify the address of MaaTools here.
         #[clap(short, long, verbatim_doc_comment)]
         addr: Option<String>,
-        /// Load resources from the user config directory
+        /// Load resources from the config directory
         ///
-        /// By default, MaaCore loads resources from the data directory,
-        /// which is shipped with the program.
-        /// If you want to load resources from the user config directory,
-        /// you can use this option.
-        /// The `resource` directory must be in the config directory
-        /// and the resources must be in the `resource` directory.
+        /// By default, MaaCore loads resources from the resource installed with MaaCore.
+        /// If you want to modify some configuration of MaaCore or you want to use your own resources,
+        /// you can use this option to load resources from the `resource` directory,
+        /// which is a subdirectory of the config directory.
         ///
-        /// Note: user resources will be loaded at the end,
-        /// so if there are resources with the same name,
-        /// the user resources will overwrite the default resources.
-        /// use at your own risk!
+        /// This option can alse be enabled by setting the value of the key `user_resource` to true
+        /// in the asst configure file `$MAA_CONFIG_DIR/asst.toml`.
+        ///
+        /// Note:
+        /// CLI will load resources shipped with MaaCore firstly,
+        /// then some client specific or platform specific when needed,
+        /// lastly, it will load resources from the config directory.
+        /// MAACore will overwrite the resources loaded before,
+        /// if there are some resources with the same name.
+        /// Use at your own risk!
         #[clap(long, verbatim_doc_comment)]
-        user_resource: bool,
+        user_resource: Option<bool>,
         /// Output more information, repeat to increase verbosity
         ///
         /// This option is used to control the log level of this program and MaaCore.
