@@ -13,7 +13,6 @@ use crate::{
     },
     dirs::{Dirs, Ensure},
     installer::maa_core::{find_maa_core, find_resource, MAA_CORE_NAME},
-    log::{level, set_level},
     {debug, error, normal, warning},
 };
 
@@ -29,8 +28,6 @@ pub fn run(
     task: String,
     addr: Option<String>,
     user_resource: Option<bool>,
-    verbose: u8,
-    quiet: u8,
     batch: bool,
 ) -> Result<()> {
     /*------------------------ Load MaaCore ------------------------*/
@@ -41,7 +38,6 @@ pub fn run(
         if batch {
             enable_batch_mode();
         }
-        set_level(level() as u8 + verbose - quiet);
     }
 
     /*--------------------- Setup MaaCore Dirs ---------------------*/
