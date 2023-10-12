@@ -117,8 +117,9 @@ pub fn run(
 
             match task_type {
                 TaskOrUnknown::Task(task_type) => match task_type {
-                    TaskType::StartUp if playtools => {
-                        if params.get_or("enable", true)?
+                    TaskType::StartUp => {
+                        if playtools
+                            && params.get_or("enable", true)?
                             && params.get_or("start_game_enabled", false)?
                         {
                             start_app = true;
