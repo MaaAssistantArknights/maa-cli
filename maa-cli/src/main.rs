@@ -215,7 +215,7 @@ enum SubCommand {
         /// if there are some resources with the same name.
         /// Use at your own risk!
         #[clap(long, verbatim_doc_comment)]
-        user_resource: Option<bool>,
+        user_resource: bool,
         /// Run tasks in batch mode
         ///
         /// If there are some input parameters in the task file,

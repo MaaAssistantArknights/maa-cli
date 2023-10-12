@@ -27,7 +27,7 @@ pub fn run(
     dirs: &Dirs,
     task: String,
     addr: Option<String>,
-    user_resource: Option<bool>,
+    user_resource: bool,
     batch: bool,
 ) -> Result<()> {
     /*------------------------ Load MaaCore ------------------------*/
@@ -217,7 +217,7 @@ pub fn run(
     }
 
     // User resource in config directory
-    if user_resource.unwrap_or(asst_config.user_resource) {
+    if user_resource || asst_config.user_resource {
         if config_dir.join("resource").exists() {
             debug!("Loading user resource:", config_dir.display());
             Assistant::load_resource(config_dir).context("Failed to load user resource!")?;
