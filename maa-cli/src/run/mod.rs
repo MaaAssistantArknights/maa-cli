@@ -465,7 +465,7 @@ fn load_core(dirs: &Dirs) {
             use std::os::windows::ffi::OsStrExt;
             use windows_sys::Win32::System::LibraryLoader::SetDllDirectoryW;
 
-            let lib_dir_w: Vec<u16> = lib_dir.as_ref().encode_wide().chain(Some(0)).collect();
+            let lib_dir_w: Vec<u16> = lib_dir.as_os_str().encode_wide().chain(Some(0)).collect();
             unsafe { SetDllDirectoryW(lib_dir_w.as_ptr()) };
         }
         maa_sys::binding::load(lib_dir.join(MAA_CORE_NAME));
