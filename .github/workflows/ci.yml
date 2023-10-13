@@ -49,7 +49,7 @@ jobs:
         os:
           - ubuntu-latest
           - macos-latest
-          # - windows-latest
+          - windows-latest
         arch:
           - x86_64
           - aarch64
@@ -105,6 +105,10 @@ jobs:
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
         run: |
+          # setup PATH on Windows
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            export PATH="$MAA_CORE_DIR:$PATH"
+          fi
           cargo run -- version
           cargo run -- run daily --dry-run --batch
       - name: Test (maa-sys, static)
