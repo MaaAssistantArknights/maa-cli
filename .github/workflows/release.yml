@@ -69,10 +69,14 @@ jobs:
         os:
           - ubuntu-latest
           - macos-latest
-          # - windows-latest
+          - windows-latest
         arch:
           - x86_64
           - aarch64
+        exclude:
+          # Failed to cross compile ring on Windows
+          - os: windows-latest
+            arch: aarch64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -88,6 +92,10 @@ jobs:
           if [ "$OS" = "macos-latest" ]; then
             CARGO_CMD=cargo
             CARGO_BUILD_TARGET="$ARCH-apple-darwin"
+            rustup target add $CARGO_BUILD_TARGET
+          elif [ "$OS" = "windows-latest" ]; then
+            CARGO_CMD=cargo
+            CARGO_BUILD_TARGET="$ARCH-pc-windows-msvc"
             rustup target add $CARGO_BUILD_TARGET
           else
             if [ "$ARCH" = "aarch64" ]; then
@@ -159,7 +167,13 @@ jobs:
       - name: Extract files, Generate checksums and Update version.json
         run: |
           version=${{ needs.meta.outputs.version }}
-          for target in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu universal-apple-darwin; do
+          targets=(
+            x86_64-unknown-linux-gnu
+            aarch64-unknown-linux-gnu
+            universal-apple-darwin
+            x86_64-pc-windows-msvc
+          )
+          for target in "${targets[@]}"; do
             dir="maa_cli-$target"
             tar -xvf "$dir/$target.tar" -C "$dir"
             if [ "$target" == "universal-apple-darwin" ]; then
