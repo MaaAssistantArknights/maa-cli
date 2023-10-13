@@ -108,18 +108,15 @@ jobs:
           echo "CARGO_CMD=$CARGO_CMD" >> $GITHUB_ENV
           echo "CARGO_BUILD_TARGET=$CARGO_BUILD_TARGET" >> $GITHUB_ENV
       - name: Build
-        id: build
         run: |
           $CARGO_CMD build --release --locked --package maa-cli
           cd "target/$CARGO_BUILD_TARGET/release"
-          tarball="$CARGO_BUILD_TARGET.tar"
-          tar -cvf $tarball maa
-          echo "file_path=$PWD/$tarball" >> $GITHUB_OUTPUT
+          tar -cvf "$CARGO_BUILD_TARGET.tar" maa
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
           name: maa_cli-${{ env.CARGO_BUILD_TARGET }}
-          path: ${{ steps.build.outputs.file_path }}
+          path: target/$CARGO_BUILD_TARGET/release/*.tar
           retention-days: 1
 
   build-universal:
@@ -132,7 +129,6 @@ jobs:
       - name: Download Artifacts
         uses: actions/download-artifact@v3
       - name: Create universal binaries
-        id: build
         run: |
           for arch in x86_64 aarch64; do
             target="$arch-apple-darwin"
@@ -140,14 +136,12 @@ jobs:
             tar -xvf "$dir/$target.tar" -C "$dir"
           done
           lipo -create -output maa maa_cli-x86_64-apple-darwin/maa maa_cli-aarch64-apple-darwin/maa
-          tarball="universal-apple-darwin.tar"
-          tar -cvf $tarball maa
-          echo "file_path=$PWD/$tarball" >> $GITHUB_OUTPUT
+          tar -cvf "universal-apple-darwin.tar" maa
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
           name: maa_cli-universal-apple-darwin
-          path: ${{ steps.build.outputs.file_path }}
+          path: universal-apple-darwin.tar
           retention-days: 1
 
   release:
@@ -176,12 +170,13 @@ jobs:
           for target in "${targets[@]}"; do
             dir="maa_cli-$target"
             tar -xvf "$dir/$target.tar" -C "$dir"
-            if [ "$target" == "universal-apple-darwin" ]; then
-              archive_name="maa_cli-v$version-$target.zip"
-              zip -r $archive_name $dir/maa
-            else
+            # use tar on linux and zip on other platforms
+            if [ "$target" = *"unknown-linux-gnu" ]; then
               archive_name="maa_cli-v$version-$target.tar.gz"
               tar -czvf $archive_name $dir/maa
+            else
+              archive_name="maa_cli-v$version-$target.zip"
+              zip -r $archive_name $dir/maa
             fi
             checksum=$(sha256sum $archive_name)
             size=$(stat -c%s $archive_name)
@@ -205,6 +200,7 @@ jobs:
             maa_cli-v${{ needs.meta.outputs.version }}-x86_64-unknown-linux-gnu.tar.gz*
             maa_cli-v${{ needs.meta.outputs.version }}-aarch64-unknown-linux-gnu.tar.gz*
             maa_cli-v${{ needs.meta.outputs.version }}-universal-apple-darwin.zip*
+            maa_cli-v${{ needs.meta.outputs.version }}-x86_64-pc-windows-msvc.zip*
       - name: Commit version.json and Push
         working-directory: version
         run: |
