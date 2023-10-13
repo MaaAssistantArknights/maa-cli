@@ -110,17 +110,18 @@ jobs:
           cd "$RESOURCE_DIR" || exit 1
           ls -l "$RESOURCE_DIR"
           echo "MAA_CORE_DIR=$MAA_CORE_DIR" >> $GITHUB_ENV
+      - name: Setup PATH
+        if: matrix.os == 'windows-latest'
+        shell: 
+          pwsh
+        run: |
+          $env:PATH = "$env:MAA_CORE_DIR;$env:PATH"
+          echo "$env:PATH" >> $GITHUB_ENV
       - name: Try run with MaaCore
         if: matrix.arch == 'x86_64'
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
         run: |
-          # setup PATH on Windows
-          OS=${{ matrix.os }}
-          if [ "$OS" = "windows-latest" ]; then
-            export PATH="$MAA_CORE_DIR:$PATH"
-            echo "$PATH"
-          fi
           cargo run -- version
           cargo run -- run daily --dry-run --batch
       - name: Test (maa-sys, static)
