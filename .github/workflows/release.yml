@@ -118,6 +118,7 @@ jobs:
           name: maa_cli-${{ env.CARGO_BUILD_TARGET }}
           path: target/${{ env.CARGO_BUILD_TARGET }}/release/*.tar
           retention-days: 1
+          if-no-files-found: error
 
   build-universal:
     name: Build Universal Binary
@@ -143,6 +144,7 @@ jobs:
           name: maa_cli-universal-apple-darwin
           path: universal-apple-darwin.tar
           retention-days: 1
+          if-no-files-found: error
 
   release:
     name: Release
