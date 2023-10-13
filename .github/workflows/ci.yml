@@ -67,6 +67,10 @@ jobs:
             CARGO_CMD=cargo
             CARGO_BUILD_TARGET="${{ matrix.arch }}-apple-darwin"
             rustup target add $CARGO_BUILD_TARGET
+          elif [ "${{ matrix.os }}" = "windows-latest" ]; then
+            CARGO_CMD=cargo
+            CARGO_BUILD_TARGET="${{ matrix.arch }}-pc-windows-msvc"
+            rustup target add $CARGO_BUILD_TARGET
           else
             if [ "${{ matrix.arch }}" = "aarch64" ]; then
               CARGO_CMD=cross
