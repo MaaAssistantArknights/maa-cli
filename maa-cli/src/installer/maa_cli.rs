@@ -6,8 +6,8 @@ use super::{
 use crate::dirs::{Dirs, Ensure};
 
 use std::{
-    env::{consts::EXE_SUFFIX, var_os},
-    path::{Path, PathBuf},
+    env::{consts::EXE_SUFFIX, current_exe, var_os},
+    path::Path,
 };
 
 use anyhow::{bail, Context, Result};
@@ -43,7 +43,7 @@ pub fn update(dirs: &Dirs) -> Result<()> {
     );
 
     let bin_name = name();
-    let bin_path = current_exe()?;
+    let bin_path = current_exe()?.canonicalize()?;
     let cache_dir = dirs.cache().ensure()?;
 
     asset.download(cache_dir)?.extract(|path| {
@@ -55,10 +55,6 @@ pub fn update(dirs: &Dirs) -> Result<()> {
     })?;
 
     Ok(())
-}
-
-pub fn current_exe() -> std::io::Result<PathBuf> {
-    std::env::current_exe()?.canonicalize()
 }
 
 fn get_metadata() -> Result<VersionJSON> {

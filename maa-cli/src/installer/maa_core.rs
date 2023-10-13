@@ -1,6 +1,6 @@
 // This file is used to download and extract prebuilt packages of maa-core.
 
-use super::{download::download_mirrors, extract::Archive, maa_cli::current_exe};
+use super::{download::download_mirrors, extract::Archive};
 
 use crate::{
     dirs::{Dirs, Ensure},
@@ -10,7 +10,7 @@ use crate::{
 use std::{
     env::{
         consts::{DLL_PREFIX, DLL_SUFFIX},
-        var_os,
+        current_exe, var_os,
     },
     path::{Component, Path, PathBuf},
     time::Duration,
@@ -293,6 +293,7 @@ pub fn find_lib_dir(dirs: &Dirs) -> Option<PathBuf> {
     }
 
     if let Ok(path) = current_exe() {
+        let path = path.canonicalize().unwrap();
         let exe_dir = path.parent().unwrap();
         if exe_dir.join(MAA_CORE_NAME).exists() {
             return Some(exe_dir.to_path_buf());
@@ -320,6 +321,7 @@ pub fn find_resource(dirs: &Dirs) -> Option<PathBuf> {
     }
 
     if let Ok(path) = current_exe() {
+        let path = path.canonicalize().unwrap();
         let exe_dir = path.parent().unwrap();
         let resource_dir = exe_dir.join("resource");
         if resource_dir.exists() {
