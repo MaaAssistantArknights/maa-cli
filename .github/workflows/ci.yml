@@ -115,8 +115,7 @@ jobs:
         shell: 
           pwsh
         run: |
-          $env:PATH = "$env:MAA_CORE_DIR;$env:PATH"
-          echo "$env:PATH" >> $GITHUB_ENV
+          "$env:MAA_CORE_DIR" | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: Try run with MaaCore
         if: matrix.arch == 'x86_64'
         env:
