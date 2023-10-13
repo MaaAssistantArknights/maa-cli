@@ -124,7 +124,10 @@ jobs:
           cargo run -- version
           cargo run -- run daily --dry-run --batch
       - name: Test (maa-sys, static)
-        if: matrix.arch == 'x86_64'
+        # It seems rust needs a static library to check the linking.
+        # Without this, we can not build maa-sys on Windows.
+        # https://stackoverflow.com/questions/63394094/rust-linker-seeks-a-lib-rather-than-a-dll
+        if: matrix.arch == 'x86_64' && matrix.os != 'windows-latest'
         run: |
           cargo test --package maa-sys --locked
 
