@@ -116,7 +116,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: maa_cli-${{ env.CARGO_BUILD_TARGET }}
-          path: target/$CARGO_BUILD_TARGET/release/*.tar
+          path: target/${{ env.CARGO_BUILD_TARGET }}/release/*.tar
           retention-days: 1
 
   build-universal:
