@@ -737,6 +737,7 @@ dependencies = [
  "tar",
  "tokio",
  "toml",
+ "windows-sys 0.48.0",
  "zip",
 ]
 
@@ -746,7 +747,6 @@ version = "0.2.0"
 dependencies = [
  "directories",
  "libloading",
- "windows-sys 0.48.0",
 ]
 
 [[package]]

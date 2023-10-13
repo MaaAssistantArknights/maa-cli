@@ -54,20 +54,6 @@ macro_rules! link {
         }
 
         pub fn load(path: impl AsRef<std::ffi::OsStr>) {
-                // Set DLL search path to the directory of the shared library.
-                #[cfg(target_os = "windows")]
-                {
-                    use windows_sys::windows::Win32::System::LibraryLoader::SetDllDirectoryW;
-                    use std::os::windows::ffi::OsStrExt;
-
-                    let pathbuf = std::path::PathBuf::from(path.as_ref());
-
-                    if let Some(dll_dir) = pathbuf.parent() {
-                        let wine_dll_dir: Vec<u16> = path.as_ref().encode_wide().chain(Some(0)).collect();
-                        unsafe { SetDllDirectoryW(path.as_ptr()) };
-                    }
-                }
-
                 SHARED_LIBRARY.with(|lib| {
                     *lib.borrow_mut() = Some(Arc::new(SharedLibrary::new(path).unwrap()));
                 });

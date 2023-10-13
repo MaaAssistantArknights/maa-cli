@@ -308,11 +308,6 @@ pub fn find_lib_dir(dirs: &Dirs) -> Option<PathBuf> {
     None
 }
 
-pub fn find_maa_core(dirs: &Dirs) -> Option<PathBuf> {
-    let lib_dir = find_lib_dir(dirs)?;
-    Some(lib_dir.join(MAA_CORE_NAME))
-}
-
 pub fn find_resource(dirs: &Dirs) -> Option<PathBuf> {
     let resource_dir = dirs.resource();
     if resource_dir.exists() {
