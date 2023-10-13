@@ -13,8 +13,13 @@ fn static_link() {
     if !core_dir.join(core_name).exists() {
         panic!("cannot find maa core, make sure you have installed maa core at correct path");
     }
-    println!("cargo:rustc-link-search=native={}", core_dir.display());
-    println!("cargo:rustc-link-arg=-Wl,-rpath,{}", core_dir.display());
+    // Setup linker flags
+    if cfg!(unix) {
+        println!("cargo:rustc-link-search=native={}", core_dir.display());
+        println!("cargo:rustc-link-arg=-Wl,-rpath,{}", core_dir.display());
+    } else if cfg!(windows) {
+        println!("cargo:rustc-link-search=native={}", core_name);
+    }
 }
 
 fn main() {
