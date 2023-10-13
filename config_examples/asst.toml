@@ -1,5 +1,5 @@
 user_resource = true
-resources = ["platform_diff/macOS"]
+resources = ["platform_diff/iOS"]
 
 [connection]
 type = "ADB"

@@ -102,9 +102,11 @@ jobs:
           echo "MAA_CORE_DIR=$MAA_CORE_DIR" >> $GITHUB_ENV
       - name: Try run with MaaCore
         if: matrix.arch == 'x86_64'
+        env:
+          MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
         run: |
-          export DYLD_FALLBACK_LIBRARY_PATH="$MAA_CORE_DIR"
           cargo run -- version
+          cargo run -- run daily --dry-run --batch
       - name: Test (maa-sys, static)
         if: matrix.arch == 'x86_64'
         run: |

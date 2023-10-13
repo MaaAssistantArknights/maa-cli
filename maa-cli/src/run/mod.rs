@@ -3,7 +3,7 @@ use message::callback;
 
 use crate::{
     config::{
-        asst::{self, AsstConfig, Connection},
+        asst::{self, AsstConfig, Connection, TouchMode},
         task::{
             task_type::{TaskOrUnknown, TaskType},
             value::input::enable_batch_mode,
@@ -13,11 +13,11 @@ use crate::{
     },
     dirs::{Dirs, Ensure},
     installer::maa_core::{find_maa_core, find_resource, MAA_CORE_NAME},
-    {debug, error, normal, warning},
+    log::{set_level, LogLevel},
+    {debug, normal, warning},
 };
 
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, bail, Context, Result};
 use maa_sys::Assistant;
@@ -29,35 +29,32 @@ pub fn run(
     addr: Option<String>,
     user_resource: bool,
     batch: bool,
+    dryrun: bool,
 ) -> Result<()> {
-    /*------------------------ Load MaaCore ------------------------*/
-    load_core(dirs);
-
-    /*------------------- Setup global log level -------------------*/
-    unsafe {
-        if batch {
-            enable_batch_mode();
-        }
+    if dryrun {
+        unsafe { set_level(LogLevel::Debug) };
+        debug!("Dryrun mode!");
     }
 
-    /*--------------------- Setup MaaCore Dirs ---------------------*/
+    if batch {
+        unsafe { enable_batch_mode() }
+        debug!("Running in batch mode!");
+    }
+
+    // Get directories
     let state_dir = dirs.state().ensure()?;
-    debug!("State directory:", state_dir.display());
-    Assistant::set_user_dir(state_dir).context("Failed to set user directory!")?;
+    let config_dir = dirs.config().ensure()?;
+    let base_resource_dir = find_resource(dirs).context("Failed to find resource!")?;
+    debug!("State Directory:", state_dir.display());
+    debug!("Config Directory:", config_dir.display());
+    debug!("Base Resource Directory:", base_resource_dir.display());
 
-    let resource_dir = find_resource(dirs).context("Failed to find resource!")?;
-    debug!("Resources directory:", resource_dir.display());
-    Assistant::load_resource(resource_dir.parent().unwrap()).context("Failed to load resource!")?;
+    /*------------------- Process Asst Config ----------------------*/
 
-    /*--------------------- Load Config Files ---------------------*/
-    let config_dir = dirs.config();
-    if !config_dir.exists() {
-        bail!("Config directory not exists!");
-    }
-    debug!("Config directory:", config_dir.display());
-
-    // asst.toml
-    let asst_config = match AsstConfig::find_file(&config_dir.join("asst")) {
+    // Load asst config from config_dir/asst.(toml|yaml|json)
+    let asst_file = config_dir.join("asst");
+    debug!("Finding asst config file:", asst_file.display());
+    let asst_config = match AsstConfig::find_file(&asst_file) {
         Ok(config) => config,
         Err(ConfigError::FileNotFound(_)) => {
             warning!("Failed to find asst config file, using default config!");
@@ -66,17 +63,7 @@ pub fn run(
         Err(e) => return Err(e.into()),
     };
 
-    // tasks/<task>.toml
-    let task_file = config_dir.join("tasks").join(&task);
-    let task_list = TaskList::find_file(&task_file).with_context(|| {
-        format!(
-            "Failed to find task file {} in {}",
-            task,
-            task_file.display()
-        )
-    })?;
-
-    /*--------------------- Process Connection ---------------------*/
+    // Process connection
     let mut playtools: bool = false;
     let (adb_path, address, config) = match asst_config.connection {
         Connection::ADB {
@@ -84,9 +71,11 @@ pub fn run(
             device,
             config,
         } => {
-            debug!("Setting adb_path to", &adb_path);
-            debug!("Setting device to", &device);
-            debug!("Setting config to", &config);
+            let device = addr.unwrap_or(device);
+            debug!("Connect to device via ADB");
+            debug!("adb_path:", &adb_path);
+            debug!("device:", &device);
+            debug!("config:", &config);
             (adb_path, device, config)
         }
         Connection::PlayTools { address, config } => {
@@ -98,7 +87,48 @@ pub fn run(
         }
     };
 
+    // Process instance options
+    let mut instance_options = asst_config.instance_options;
+    if let Some(v) = instance_options.touch_mode {
+        if playtools && v != asst::TouchMode::MacPlayTools {
+            warning!("Force set `touch_mode` to `MacPlayTools` when using `PlayTools`");
+            instance_options.touch_mode = Some(TouchMode::MacPlayTools);
+        } else {
+            debug!("Instance Option `touch_mode`:", v);
+        }
+    } else if playtools {
+        let mode = asst::TouchMode::MacPlayTools;
+        debug!("Instance Option `touch_mode`:", mode);
+        instance_options.touch_mode = Some(mode);
+    } else {
+        let mode = asst::TouchMode::default();
+        debug!("Instance Option `touch_mode`:", mode);
+        instance_options.touch_mode = Some(mode);
+    }
+
+    if let Some(v) = instance_options.adb_lite_enabled {
+        debug!("Instance Option `adb_lite_enabled`:", v);
+    }
+    if let Some(v) = instance_options.deployment_with_pause {
+        debug!("Instance Option `deployment_with_pause`:", v);
+    }
+    if let Some(v) = instance_options.kill_adb_on_exit {
+        debug!("Instance Option `kill_adb_on_exit`:", v);
+    }
+
     /*----------------------- Process Task -------------------------*/
+
+    // Load task from tasks/<task>.(toml|yaml|json)
+    let task_file = config_dir.join("tasks").join(&task);
+    debug!("Finding task file:", task_file.display());
+    let task_list = TaskList::find_file(&task_file).with_context(|| {
+        format!(
+            "Failed to find task file {} in {}",
+            task,
+            task_file.display()
+        )
+    })?;
+
     let mut tasks: Vec<String> = Vec::new();
     let mut task_params: Vec<String> = Vec::new();
 
@@ -127,8 +157,11 @@ pub fn run(
 
                         if let Some(client_type) = params.get("client_type") {
                             let client_name = String::try_from(client_type)?;
-                            app_name = match_app_name(&client_name);
-                            client_resource = match_resource(&client_name);
+                            let cilent_type: ClientType = client_name.parse()?;
+                            if playtools {
+                                app_name = Some(cilent_type.app_name());
+                            };
+                            client_resource = cilent_type.resource();
                         };
                     }
                     TaskType::CloseDown if playtools => {
@@ -173,12 +206,12 @@ pub fn run(
     let app = if start_app || close_app {
         match app_name {
             Some(name) => {
-                debug!("Using PlayCover to launch app", name);
+                debug!("PlayCover app:", name);
                 Some(PlayCoverApp::new(name))
             }
             None => {
                 warning!(
-                    "No client type specified, ",
+                    "No client type specified,",
                     format!("using default app name {}", "明日方舟")
                 );
                 Some(PlayCoverApp::new("明日方舟"))
@@ -188,46 +221,60 @@ pub fn run(
         None
     };
 
-    /*------------------------ Load Resource -----------------------*/
+    /*----------------------- Process Resource ---------------------*/
+    // Resource directorys
+    let mut resource_dirs = vec![base_resource_dir.parent().unwrap().to_path_buf()];
+
     // Cilent specific resource
     if let Some(resource) = client_resource {
-        debug!("Loading additional resource for client", resource);
-        Assistant::load_resource(resource_dir.join("global").join(resource))
-            .with_context(|| format!("Failed to load additional resource {}!", resource))?;
+        debug!("Client specific resource:", resource);
+        resource_dirs.push(base_resource_dir.join("global").join(resource));
     }
 
     // Platform specific resource
     if playtools {
-        debug!("Load additional resource for PlayTools");
-        Assistant::load_resource(resource_dir.join("platform_diff/iOS"))
-            .context("Failed to load additional resource for iOS App!")?;
+        debug!("Platform specific resource:", "iOS");
+        resource_dirs.push(base_resource_dir.join("platform_diff/iOS"));
     }
 
     // User specified additional resource
     for resource in asst_config.resources.iter() {
         let path = PathBuf::from(resource);
         let path = if path.is_absolute() {
-            debug!("Loading additional resource:", path.display());
+            debug!("User specified additional resource:", resource);
             path
         } else {
-            debug!("Loading additional resource:", resource);
-            resource_dir.join(resource)
+            base_resource_dir.join(resource)
         };
-        Assistant::load_resource(&path)
-            .with_context(|| format!("Failed to load additional resource {}!", path.display()))?;
+        if let Some(path) = process_resource_dir(path) {
+            resource_dirs.push(path);
+        }
     }
 
     // User resource in config directory
     if user_resource || asst_config.user_resource {
-        if config_dir.join("resource").exists() {
-            debug!("Loading user resource:", config_dir.display());
-            Assistant::load_resource(config_dir).context("Failed to load user resource!")?;
-        } else {
-            warning!("`User resource` is enabled, but no resource directory found!");
+        if let Some(path) = process_resource_dir(config_dir.join("resource")) {
+            resource_dirs.push(path);
         }
     }
 
-    /*------------------------ Init Assistant ----------------------*/
+    /*----------------------- Start Assistant ----------------------*/
+    // Load MaaCore
+    load_core(dirs);
+
+    // TODO: Set static option (used in future version of MaaCore)
+
+    // Set user directory (some debug info and cache will be stored here)
+    // Must be called before load resource (if not it will be set to resource directory)
+    Assistant::set_user_dir(state_dir).context("Failed to set user directory!")?;
+
+    // Load Resource
+    for path in resource_dirs.iter() {
+        Assistant::load_resource(path)
+            .with_context(|| format!("Failed to load resource from {}", path.display()))?;
+    }
+
+    // Init Assistant
     let stop_bool = Arc::new(std::sync::atomic::AtomicBool::new(false));
     for sig in TERM_SIGNALS {
         signal_hook::flag::register_conditional_default(*sig, Arc::clone(&stop_bool))
@@ -237,83 +284,56 @@ pub fn run(
     }
     let assistant = Assistant::new(Some(callback), None);
 
-    /*------------------------ Setup Instance ----------------------*/
-    let options = asst_config.instance_options;
-    if let Some(v) = options.touch_mode {
-        if playtools && v != asst::TouchMode::MacPlayTools {
-            warning!(
-                "Wrong touch mode,",
-                "force set touch_mode to MacPlayTools when using PlayTools"
-            );
-            assistant
-                .set_instance_option(2, asst::TouchMode::MacPlayTools)
-                .context("Failed to set touch mode!")?;
-        } else {
-            debug!("Setting touch_mode to", v);
-            assistant
-                .set_instance_option(2, v)
-                .context("Failed to set touch mode!")?;
-        }
-    } else if playtools {
-        debug!("Setting touch_mode to MacPlayTools");
+    // Set instance options
+    if let Some(v) = instance_options.touch_mode {
         assistant
-            .set_instance_option(2, asst::TouchMode::MacPlayTools)
-            .context("Failed to set touch mode!")?;
-    } else {
-        let mode = asst::TouchMode::default();
-        warning!(
-            "No touch mode specified,",
-            format!("using default touch mode {}.", mode)
-        );
-        assistant
-            .set_instance_option(2, mode)
-            .context("Failed to set touch mode!")?;
+            .set_instance_option(2, v)
+            .context("Failed to set instance option `touch_mode`!")?;
     }
-    if let Some(v) = options.deployment_with_pause {
-        debug!("Setting deployment_with_pause to", v);
+    if let Some(v) = instance_options.deployment_with_pause {
         assistant
             .set_instance_option(3, v)
-            .context("Failed to set deployment with pause!")?;
+            .context("Failed to set instance option `deployment_with_pause`!")?;
     }
-    if let Some(v) = options.adb_lite_enabled {
-        debug!("Setting adb_lite_enabled to", v);
-        assistant.set_instance_option(4, v)?;
+    if let Some(v) = instance_options.adb_lite_enabled {
+        assistant
+            .set_instance_option(4, v)
+            .context("Failed to set instance option `adb_lite_enabled`!")?;
     }
-    if let Some(v) = options.kill_adb_on_exit {
-        debug!("Setting kill_adb_on_exit to", v);
-        assistant.set_instance_option(5, v)?;
-    }
-
-    /*----------------------- Connect to Game ----------------------*/
-    if start_app {
-        app.as_ref().unwrap().open()?;
-        std::thread::sleep(std::time::Duration::from_secs(5));
+    if let Some(v) = instance_options.kill_adb_on_exit {
+        assistant
+            .set_instance_option(5, v)
+            .context("Failed to set instance option `kill_adb_on_exit`!")?;
     }
 
-    assistant.async_connect(adb_path, address, config, true)?;
-
-    /* ------------------------- Append Tasks ----------------------*/
-    for i in 0..tasks.len() {
-        assistant.append_task(tasks[i].as_str(), task_params[i].as_str())?;
-    }
-
-    /* ------------------------ Run Assistant ----------------------*/
-    assistant.start()?;
-    while assistant.running() {
-        if stop_bool.load(std::sync::atomic::Ordering::Relaxed) {
-            bail!("Interrupted by user!");
+    if !dryrun {
+        if start_app {
+            app.as_ref().unwrap().open()?;
+            std::thread::sleep(std::time::Duration::from_secs(5));
         }
-        std::thread::sleep(std::time::Duration::from_millis(500));
+
+        assistant.async_connect(adb_path, address, config, true)?;
+
+        for i in 0..tasks.len() {
+            assistant.append_task(tasks[i].as_str(), task_params[i].as_str())?;
+        }
+
+        assistant.start()?;
+        while assistant.running() {
+            if stop_bool.load(std::sync::atomic::Ordering::Relaxed) {
+                bail!("Interrupted by user!");
+            }
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+        assistant.stop()?;
+
+        if close_app {
+            app.as_ref().unwrap().close();
+        }
     }
-    assistant.stop()?;
 
     // TODO: Better ways to restore signal handlers?
     stop_bool.store(true, std::sync::atomic::Ordering::Relaxed);
-
-    /* ------------------------- Close Game ------------------------*/
-    if close_app {
-        app.as_ref().unwrap().close();
-    }
 
     Ok(())
 }
@@ -361,26 +381,79 @@ impl<'n> PlayCoverApp<'n> {
     }
 }
 
-fn match_app_name(client: &str) -> Option<&'static str> {
-    match client {
-        "Official" | "Bilibili" | "txwy" | "" => None,
-        "YoStarEN" => Some("Arknights"),
-        "YoStarJP" => Some("アークナイツ"),
-        "YoStarKR" => Some("명일방주"),
-        _ => {
-            error!("Unknown client type", client);
-            None
+#[derive(Clone, Copy)]
+enum ClientType {
+    Official,
+    Bilibili,
+    Txwy,
+    YoStarEN,
+    YoStarJP,
+    YoStarKR,
+}
+
+impl ClientType {
+    pub fn app_name(self) -> &'static str {
+        match self {
+            ClientType::Official | ClientType::Bilibili | ClientType::Txwy => "明日方舟",
+            ClientType::YoStarEN => "Arknights",
+            ClientType::YoStarJP => "アークナイツ",
+            ClientType::YoStarKR => "명일방주",
+        }
+    }
+
+    pub fn resource(self) -> Option<&'static str> {
+        match self {
+            ClientType::Txwy => Some("txwy"),
+            ClientType::YoStarEN => Some("YoStarEN"),
+            ClientType::YoStarJP => Some("YoStarJP"),
+            ClientType::YoStarKR => Some("YoStarKR"),
+            _ => None,
         }
     }
 }
 
-fn match_resource(client: &str) -> Option<&'static str> {
-    match client {
-        "txwy" => Some("txwy"),
-        "YoStarEN" => Some("YoStarEN"),
-        "YoStarJP" => Some("YoStarJP"),
-        "YoStarKR" => Some("YoStarKR"),
-        _ => None,
+impl std::str::FromStr for ClientType {
+    type Err = ParseClientTypeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Official" | "" => Ok(ClientType::Official),
+            "Bilibili" => Ok(ClientType::Bilibili),
+            "txwy" => Ok(ClientType::Txwy),
+            "YoStarEN" => Ok(ClientType::YoStarEN),
+            "YoStarJP" => Ok(ClientType::YoStarJP),
+            "YoStarKR" => Ok(ClientType::YoStarKR),
+            _ => Err(ParseClientTypeError::UnknownClientType),
+        }
+    }
+}
+
+#[derive(Debug)]
+enum ParseClientTypeError {
+    UnknownClientType,
+}
+
+impl std::fmt::Display for ParseClientTypeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ParseClientTypeError::UnknownClientType => write!(f, "Unknown client type!"),
+        }
+    }
+}
+
+impl std::error::Error for ParseClientTypeError {}
+
+fn process_resource_dir(path: PathBuf) -> Option<PathBuf> {
+    let path = if path.ends_with("resource") {
+        path
+    } else {
+        path.join("resource")
+    };
+    if path.is_dir() {
+        Some(path.parent().unwrap().to_path_buf())
+    } else {
+        warning!(format!("Resource directory {} not found!", path.display()));
+        None
     }
 }
 

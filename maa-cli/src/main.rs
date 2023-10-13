@@ -195,7 +195,7 @@ enum SubCommand {
         /// And if you want to use PlayCover,
         /// you need to set the connection type to PlayCover in the config file
         /// and then you can specify the address of MaaTools here.
-        #[clap(short, long, verbatim_doc_comment)]
+        #[arg(short, long, verbatim_doc_comment)]
         addr: Option<String>,
         /// Load resources from the config directory
         ///
@@ -211,10 +211,10 @@ enum SubCommand {
         /// CLI will load resources shipped with MaaCore firstly,
         /// then some client specific or platform specific when needed,
         /// lastly, it will load resources from the config directory.
-        /// MAACore will overwrite the resources loaded before,
+        /// MaaCore will overwrite the resources loaded before,
         /// if there are some resources with the same name.
         /// Use at your own risk!
-        #[clap(long, verbatim_doc_comment)]
+        #[arg(long, verbatim_doc_comment)]
         user_resource: bool,
         /// Run tasks in batch mode
         ///
@@ -222,8 +222,16 @@ enum SubCommand {
         /// some prompts will be displayed to ask for input.
         /// In batch mode, the prompts will be skipped,
         /// and parameters will be set to default values.
-        #[clap(short, long, verbatim_doc_comment)]
+        #[arg(short, long, verbatim_doc_comment)]
         batch: bool,
+        /// Parse the your config but do not connect to the game
+        ///
+        /// This option is useful when you want to check your config file.
+        /// It will parse your config file and set the log level to debug.
+        /// If there are some errors in your config file,
+        /// it will print the error message and exit.
+        #[arg(long, verbatim_doc_comment)]
+        dry_run: bool,
     },
     /// List all available tasks
     List,
@@ -264,9 +272,8 @@ pub enum Dir {
     /// Directory of maa-cli's data
     Data,
     /// Directory of maa-cli's dynamic library
+    #[value(alias("lib"))]
     Library,
-    /// Directory of maa-cli's dynamic library, alias of library
-    Lib,
     /// Directory of maa-cli's config
     Config,
     /// Directory of maa-cli's cache
@@ -321,7 +328,7 @@ fn main() -> Result<()> {
         },
         SubCommand::Dir { dir_type } => match dir_type {
             Dir::Data => println!("{}", proj_dirs.data().display()),
-            Dir::Library | Dir::Lib => {
+            Dir::Library => {
                 println!("{}", maa_core::find_lib_dir(&proj_dirs).unwrap().display())
             }
             Dir::Config => println!("{}", proj_dirs.config().display()),
@@ -348,7 +355,8 @@ fn main() -> Result<()> {
             addr,
             user_resource,
             batch,
-        } => run::run(&proj_dirs, task, addr, user_resource, batch)?,
+            dry_run,
+        } => run::run(&proj_dirs, task, addr, user_resource, batch, dry_run)?,
         SubCommand::List => {
             let task_dir = proj_dirs.config().join("tasks");
             if !task_dir.exists() {
@@ -372,4 +380,240 @@ fn main() -> Result<()> {
 }
 
 #[cfg(test)]
-mod test {}
+mod test {
+    use super::*;
+
+    mod parser {
+        use super::*;
+
+        #[test]
+        fn log_level() {
+            assert!(matches!(CLI::parse_from(["maa", "-v", "help"]).verbose, 1));
+            assert!(matches!(CLI::parse_from(["maa", "help", "-v"]).verbose, 1));
+            assert!(matches!(CLI::parse_from(["maa", "help", "-vv"]).verbose, 2));
+            assert!(matches!(CLI::parse_from(["maa", "help", "-q"]).quiet, 1));
+            assert!(matches!(CLI::parse_from(["maa", "help", "-qq"]).quiet, 2));
+        }
+
+        #[test]
+        fn install() {
+            assert!(matches!(
+                CLI::parse_from(["maa", "install"]).command,
+                SubCommand::Install { .. }
+            ));
+
+            assert!(matches!(
+                CLI::parse_from(["maa", "install", "beta"]).command,
+                SubCommand::Install {
+                    channel: Some(Channel::Beta),
+                    ..
+                }
+            ));
+
+            assert!(matches!(
+                CLI::parse_from(["maa", "install", "-t5"]).command,
+                SubCommand::Install { test_time: 5, .. }
+            ));
+            assert!(matches!(
+                CLI::parse_from(["maa", "install", "--test-time", "5"]).command,
+                SubCommand::Install { test_time: 5, .. }
+            ));
+
+            assert!(matches!(
+                CLI::parse_from(["maa", "install", "--force"]).command,
+                SubCommand::Install { force: true, .. }
+            ));
+
+            assert!(matches!(
+                CLI::parse_from(["maa", "install", "--no-resource"]).command,
+                SubCommand::Install {
+                    no_resource: true,
+                    ..
+                }
+            ));
+        }
+
+        #[test]
+        fn update() {
+            assert!(matches!(
+                CLI::parse_from(["maa", "update"]).command,
+                SubCommand::Update {
+                    channel: None,
+                    test_time: 3,
+                    no_resource: false,
+                }
+            ));
+
+            assert!(matches!(
+                CLI::parse_from(["maa", "update", "beta"]).command,
+                SubCommand::Update {
+                    channel: Some(Channel::Beta),
+                    ..
+                }
+            ));
+
+            assert!(matches!(
+                CLI::parse_from(["maa", "update", "-t5"]).command,
+                SubCommand::Update { test_time: 5, .. }
+            ));
+            assert!(matches!(
+                CLI::parse_from(["maa", "update", "--test-time", "5"]).command,
+                SubCommand::Update { test_time: 5, .. }
+            ));
+
+            assert!(matches!(
+                CLI::parse_from(["maa", "update", "--no-resource"]).command,
+                SubCommand::Update {
+                    no_resource: true,
+                    ..
+                }
+            ));
+        }
+
+        #[test]
+        #[cfg(feature = "self")]
+        fn self_command() {
+            assert!(matches!(
+                CLI::parse_from(["maa", "self", "update"]).command,
+                SubCommand::SelfCommand(SelfCommand::Update)
+            ));
+        }
+
+        #[test]
+        fn dir() {
+            assert!(matches!(
+                CLI::parse_from(["maa", "dir", "data"]).command,
+                SubCommand::Dir {
+                    dir_type: Dir::Data
+                }
+            ));
+            assert!(matches!(
+                CLI::parse_from(["maa", "dir", "library"]).command,
+                SubCommand::Dir {
+                    dir_type: Dir::Library
+                }
+            ));
+            assert!(matches!(
+                CLI::parse_from(["maa", "dir", "lib"]).command,
+                SubCommand::Dir {
+                    dir_type: Dir::Library
+                }
+            ));
+            assert!(matches!(
+                CLI::parse_from(["maa", "dir", "config"]).command,
+                SubCommand::Dir {
+                    dir_type: Dir::Config
+                }
+            ));
+            assert!(matches!(
+                CLI::parse_from(["maa", "dir", "cache"]).command,
+                SubCommand::Dir {
+                    dir_type: Dir::Cache
+                }
+            ));
+            assert!(matches!(
+                CLI::parse_from(["maa", "dir", "resource"]).command,
+                SubCommand::Dir {
+                    dir_type: Dir::Resource
+                }
+            ));
+            assert!(matches!(
+                CLI::parse_from(["maa", "dir", "log"]).command,
+                SubCommand::Dir { dir_type: Dir::Log }
+            ));
+        }
+
+        #[test]
+        fn version() {
+            assert!(matches!(
+                CLI::parse_from(["maa", "version"]).command,
+                SubCommand::Version {
+                    component: Component::All
+                }
+            ));
+            assert!(matches!(
+                CLI::parse_from(["maa", "version", "all"]).command,
+                SubCommand::Version {
+                    component: Component::All
+                }
+            ));
+            assert!(matches!(
+                CLI::parse_from(["maa", "version", "maa-cli"]).command,
+                SubCommand::Version {
+                    component: Component::MaaCLI
+                }
+            ));
+            assert!(matches!(
+                CLI::parse_from(["maa", "version", "maa-core"]).command,
+                SubCommand::Version {
+                    component: Component::MaaCore
+                }
+            ));
+        }
+
+        #[test]
+        fn run() {
+            assert!(matches!(
+                CLI::parse_from(["maa", "run", "task"]).command,
+                SubCommand::Run {
+                    task,
+                    addr: None,
+                    user_resource: false,
+                    batch: false,
+                    dry_run: false,
+                } if task == "task"
+            ));
+
+            assert!(matches!(
+                CLI::parse_from(["maa", "run", "task", "-a", "addr"]).command,
+                SubCommand::Run {
+                    task,
+                    addr: Some(addr),
+                    ..
+                } if task == "task" && addr == "addr"
+            ));
+            assert!(matches!(
+                CLI::parse_from(["maa", "run", "task", "--addr", "addr"]).command,
+                SubCommand::Run {
+                    task,
+                    addr: Some(addr),
+                    ..
+                } if task == "task" && addr == "addr"
+            ));
+
+            assert!(matches!(
+                CLI::parse_from(["maa", "run", "task", "--user-resource"]).command,
+                SubCommand::Run {
+                    task,
+                    user_resource: true,
+                    ..
+                } if task == "task"
+            ));
+
+            assert!(matches!(
+                CLI::parse_from(["maa", "run", "task", "--batch"]).command,
+                SubCommand::Run {
+                    task,
+                    batch: true,
+                    ..
+                } if task == "task"
+            ));
+        }
+
+        #[test]
+        fn list() {
+            assert!(matches!(
+                CLI::parse_from(["maa", "list"]).command,
+                SubCommand::List
+            ));
+        }
+
+        #[test]
+        fn complete() {
+            assert!(matches!(
+                CLI::parse_from(["maa", "complete", "bash"]).command,
+                SubCommand::Complete { shell: Shell::Bash }
+            ));
+        }
+    }
+}
