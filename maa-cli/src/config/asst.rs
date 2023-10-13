@@ -10,12 +10,12 @@ pub struct AsstConfig {
     #[serde(default)]
     pub connection: Connection,
     #[serde(default)]
-    pub instance_options: InstanceOption,
+    pub instance_options: InstanceOptions,
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Default)]
-pub struct InstanceOption {
+pub struct InstanceOptions {
     #[serde(default)]
     pub touch_mode: Option<TouchMode>,
     pub deployment_with_pause: Option<bool>,
@@ -132,7 +132,7 @@ mod tests {
                     device: String::from("emulator-5554"),
                     config: String::from("CompatMac"),
                 },
-                instance_options: InstanceOption {
+                instance_options: InstanceOptions {
                     touch_mode: Some(TouchMode::MAATouch),
                     deployment_with_pause: Some(false),
                     adb_lite_enabled: Some(false),
@@ -161,7 +161,7 @@ mod tests {
                         String::from("General")
                     },
                 },
-                instance_options: InstanceOption {
+                instance_options: InstanceOptions {
                     touch_mode: None,
                     deployment_with_pause: None,
                     adb_lite_enabled: None,
