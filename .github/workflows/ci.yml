@@ -53,6 +53,10 @@ jobs:
         arch:
           - x86_64
           - aarch64
+        exclude:
+          # Failed to cross compile ring on Windows
+          - os: windows-latest
+            arch: aarch64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -63,21 +67,23 @@ jobs:
           tool: cross
       - name: Setup environment
         run: |
-          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+          OS=${{ matrix.os }}
+          ARCH=${{ matrix.arch }}
+          if [ "$OS" = "macos-latest" ]; then
             CARGO_CMD=cargo
-            CARGO_BUILD_TARGET="${{ matrix.arch }}-apple-darwin"
+            CARGO_BUILD_TARGET="${ARCH}-apple-darwin"
             rustup target add $CARGO_BUILD_TARGET
-          elif [ "${{ matrix.os }}" = "windows-latest" ]; then
+          elif [ "$OS" = "windows-latest" ]; then
             CARGO_CMD=cargo
-            CARGO_BUILD_TARGET="${{ matrix.arch }}-pc-windows-msvc"
+            CARGO_BUILD_TARGET="${ARCH}-pc-windows-msvc"
             rustup target add $CARGO_BUILD_TARGET
           else
-            if [ "${{ matrix.arch }}" = "aarch64" ]; then
+            if [ "$ARCH" = "aarch64" ]; then
               CARGO_CMD=cross
             else
               CARGO_CMD=cargo
             fi
-            CARGO_BUILD_TARGET="${{ matrix.arch }}-unknown-linux-gnu"
+            CARGO_BUILD_TARGET="${ARCH}-unknown-linux-gnu"
           fi
           echo "CARGO_CMD=$CARGO_CMD" >> $GITHUB_ENV
           echo "CARGO_BUILD_TARGET=$CARGO_BUILD_TARGET" >> $GITHUB_ENV
@@ -110,8 +116,10 @@ jobs:
           MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
         run: |
           # setup PATH on Windows
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+          OS=${{ matrix.os }}
+          if [ "$OS" = "windows-latest" ]; then
             export PATH="$MAA_CORE_DIR:$PATH"
+            echo "$PATH"
           fi
           cargo run -- version
           cargo run -- run daily --dry-run --batch
@@ -129,7 +137,7 @@ jobs:
         os:
           - ubuntu-latest
           - macos-latest
-          # - windows-latest
+          - windows-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
