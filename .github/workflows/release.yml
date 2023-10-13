@@ -173,7 +173,7 @@ jobs:
             dir="maa_cli-$target"
             tar -xvf "$dir/$target.tar" -C "$dir"
             # use tar on linux and zip on other platforms
-            if [ "$target" = *"unknown-linux-gnu" ]; then
+            if [[ "$target" == *"linux"* ]]; then
               archive_name="maa_cli-v$version-$target.tar.gz"
               tar -czvf $archive_name $dir/maa
             else
