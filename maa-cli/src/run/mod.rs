@@ -81,9 +81,8 @@ pub fn run(
         Connection::PlayTools { address, config } => {
             playtools = true;
             let address = addr.unwrap_or(address);
-            debug!("Connect to game via PlayTools");
-            debug!("address:", &address);
-            debug!("config:", &config);
+            debug!("Setting address to", &address);
+            debug!("Setting config to", &config);
             (String::new(), address, config)
         }
     };
@@ -286,7 +285,6 @@ pub fn run(
     let assistant = Assistant::new(Some(callback), None);
 
     // Set instance options
-    debug!("Setting instance options...");
     if let Some(v) = instance_options.touch_mode {
         assistant
             .set_instance_option(2, v)
@@ -335,7 +333,6 @@ pub fn run(
     }
 
     // TODO: Better ways to restore signal handlers?
-    debug!("Restoring signal handlers...");
     stop_bool.store(true, std::sync::atomic::Ordering::Relaxed);
 
     Ok(())
