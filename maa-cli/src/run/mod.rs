@@ -12,7 +12,7 @@ use crate::{
         Error as ConfigError, FindFile,
     },
     dirs::{Dirs, Ensure},
-    installer::maa_core::{find_maa_core, find_resource, MAA_CORE_NAME},
+    installer::maa_core::{find_lib_dir, find_resource, MAA_CORE_NAME},
     log::{set_level, LogLevel},
     {debug, normal, warning},
 };
@@ -458,8 +458,17 @@ fn process_resource_dir(path: PathBuf) -> Option<PathBuf> {
 }
 
 fn load_core(dirs: &Dirs) {
-    if let Some(core_path) = find_maa_core(dirs) {
-        maa_sys::binding::load(core_path);
+    if let Some(lib_dir) = find_lib_dir(dirs) {
+        // Set DLL directory on Windows
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::ffi::OsStrExt;
+            use windows_sys::Win32::System::LibraryLoader::SetDllDirectoryW;
+
+            let lib_dir_w: Vec<u16> = lib_dir.as_os_str().encode_wide().chain(Some(0)).collect();
+            unsafe { SetDllDirectoryW(lib_dir_w.as_ptr()) };
+        }
+        maa_sys::binding::load(lib_dir.join(MAA_CORE_NAME));
     } else {
         maa_sys::binding::load(MAA_CORE_NAME);
     }

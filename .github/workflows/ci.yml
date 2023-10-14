@@ -28,7 +28,14 @@ defaults:
 jobs:
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -49,10 +56,14 @@ jobs:
         os:
           - ubuntu-latest
           - macos-latest
-          # - windows-latest
+          - windows-latest
         arch:
           - x86_64
           - aarch64
+        exclude:
+          # Failed to cross compile ring on Windows
+          - os: windows-latest
+            arch: aarch64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -63,17 +74,23 @@ jobs:
           tool: cross
       - name: Setup environment
         run: |
-          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+          OS=${{ matrix.os }}
+          ARCH=${{ matrix.arch }}
+          if [ "$OS" = "macos-latest" ]; then
             CARGO_CMD=cargo
-            CARGO_BUILD_TARGET="${{ matrix.arch }}-apple-darwin"
+            CARGO_BUILD_TARGET="${ARCH}-apple-darwin"
+            rustup target add $CARGO_BUILD_TARGET
+          elif [ "$OS" = "windows-latest" ]; then
+            CARGO_CMD=cargo
+            CARGO_BUILD_TARGET="${ARCH}-pc-windows-msvc"
             rustup target add $CARGO_BUILD_TARGET
           else
-            if [ "${{ matrix.arch }}" = "aarch64" ]; then
+            if [ "$ARCH" = "aarch64" ]; then
               CARGO_CMD=cross
             else
               CARGO_CMD=cargo
             fi
-            CARGO_BUILD_TARGET="${{ matrix.arch }}-unknown-linux-gnu"
+            CARGO_BUILD_TARGET="${ARCH}-unknown-linux-gnu"
           fi
           echo "CARGO_CMD=$CARGO_CMD" >> $GITHUB_ENV
           echo "CARGO_BUILD_TARGET=$CARGO_BUILD_TARGET" >> $GITHUB_ENV
@@ -108,7 +125,10 @@ jobs:
           cargo run -- version
           cargo run -- run daily --dry-run --batch
       - name: Test (maa-sys, static)
-        if: matrix.arch == 'x86_64'
+        # It seems rust needs a static library to check the linking.
+        # Without this, we can not build maa-sys on Windows.
+        # https://stackoverflow.com/questions/63394094/rust-linker-seeks-a-lib-rather-than-a-dll
+        if: matrix.arch == 'x86_64' && matrix.os != 'windows-latest'
         run: |
           cargo test --package maa-sys --locked
 
@@ -121,7 +141,7 @@ jobs:
         os:
           - ubuntu-latest
           - macos-latest
-          # - windows-latest
+          - windows-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

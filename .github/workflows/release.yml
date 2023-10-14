@@ -69,10 +69,14 @@ jobs:
         os:
           - ubuntu-latest
           - macos-latest
-          # - windows-latest
+          - windows-latest
         arch:
           - x86_64
           - aarch64
+        exclude:
+          # Failed to cross compile ring on Windows
+          - os: windows-latest
+            arch: aarch64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -89,6 +93,10 @@ jobs:
             CARGO_CMD=cargo
             CARGO_BUILD_TARGET="$ARCH-apple-darwin"
             rustup target add $CARGO_BUILD_TARGET
+          elif [ "$OS" = "windows-latest" ]; then
+            CARGO_CMD=cargo
+            CARGO_BUILD_TARGET="$ARCH-pc-windows-msvc"
+            rustup target add $CARGO_BUILD_TARGET
           else
             if [ "$ARCH" = "aarch64" ]; then
               CARGO_CMD=cross
@@ -100,19 +108,17 @@ jobs:
           echo "CARGO_CMD=$CARGO_CMD" >> $GITHUB_ENV
           echo "CARGO_BUILD_TARGET=$CARGO_BUILD_TARGET" >> $GITHUB_ENV
       - name: Build
-        id: build
         run: |
           $CARGO_CMD build --release --locked --package maa-cli
           cd "target/$CARGO_BUILD_TARGET/release"
-          tarball="$CARGO_BUILD_TARGET.tar"
-          tar -cvf $tarball maa
-          echo "file_path=$PWD/$tarball" >> $GITHUB_OUTPUT
+          tar -cvf "$CARGO_BUILD_TARGET.tar" maa
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
           name: maa_cli-${{ env.CARGO_BUILD_TARGET }}
-          path: ${{ steps.build.outputs.file_path }}
+          path: target/${{ env.CARGO_BUILD_TARGET }}/release/*.tar
           retention-days: 1
+          if-no-files-found: error
 
   build-universal:
     name: Build Universal Binary
@@ -124,7 +130,6 @@ jobs:
       - name: Download Artifacts
         uses: actions/download-artifact@v3
       - name: Create universal binaries
-        id: build
         run: |
           for arch in x86_64 aarch64; do
             target="$arch-apple-darwin"
@@ -132,15 +137,14 @@ jobs:
             tar -xvf "$dir/$target.tar" -C "$dir"
           done
           lipo -create -output maa maa_cli-x86_64-apple-darwin/maa maa_cli-aarch64-apple-darwin/maa
-          tarball="universal-apple-darwin.tar"
-          tar -cvf $tarball maa
-          echo "file_path=$PWD/$tarball" >> $GITHUB_OUTPUT
+          tar -cvf "universal-apple-darwin.tar" maa
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
           name: maa_cli-universal-apple-darwin
-          path: ${{ steps.build.outputs.file_path }}
+          path: universal-apple-darwin.tar
           retention-days: 1
+          if-no-files-found: error
 
   release:
     name: Release
@@ -159,15 +163,22 @@ jobs:
       - name: Extract files, Generate checksums and Update version.json
         run: |
           version=${{ needs.meta.outputs.version }}
-          for target in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu universal-apple-darwin; do
+          targets=(
+            x86_64-unknown-linux-gnu
+            aarch64-unknown-linux-gnu
+            universal-apple-darwin
+            x86_64-pc-windows-msvc
+          )
+          for target in "${targets[@]}"; do
             dir="maa_cli-$target"
             tar -xvf "$dir/$target.tar" -C "$dir"
-            if [ "$target" == "universal-apple-darwin" ]; then
-              archive_name="maa_cli-v$version-$target.zip"
-              zip -r $archive_name $dir/maa
-            else
+            # use tar on linux and zip on other platforms
+            if [[ "$target" == *"linux"* ]]; then
               archive_name="maa_cli-v$version-$target.tar.gz"
               tar -czvf $archive_name $dir/maa
+            else
+              archive_name="maa_cli-v$version-$target.zip"
+              zip -r $archive_name $dir/maa
             fi
             checksum=$(sha256sum $archive_name)
             size=$(stat -c%s $archive_name)
@@ -191,6 +202,7 @@ jobs:
             maa_cli-v${{ needs.meta.outputs.version }}-x86_64-unknown-linux-gnu.tar.gz*
             maa_cli-v${{ needs.meta.outputs.version }}-aarch64-unknown-linux-gnu.tar.gz*
             maa_cli-v${{ needs.meta.outputs.version }}-universal-apple-darwin.zip*
+            maa_cli-v${{ needs.meta.outputs.version }}-x86_64-pc-windows-msvc.zip*
       - name: Commit version.json and Push
         working-directory: version
         run: |
