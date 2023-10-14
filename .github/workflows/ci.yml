@@ -131,6 +131,10 @@ jobs:
         if: matrix.arch == 'x86_64' && matrix.os != 'windows-latest'
         run: |
           cargo test --package maa-sys --locked
+      - name: Test (maa-cli, no-default-features)
+        if: matrix.arch == 'x86_64'
+        run: |
+          cargo test --package maa-cli --no-default-features --locked
 
   coverage:
     name: Coverage
