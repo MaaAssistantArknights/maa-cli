@@ -17,11 +17,10 @@ use crate::{
     {debug, normal, warning},
 };
 
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
 use anyhow::{anyhow, bail, Context, Result};
 use maa_sys::Assistant;
-use signal_hook::consts::TERM_SIGNALS;
 
 pub fn run(
     dirs: &Dirs,
@@ -275,13 +274,20 @@ pub fn run(
     }
 
     // Init Assistant
-    let stop_bool = Arc::new(std::sync::atomic::AtomicBool::new(false));
-    for sig in TERM_SIGNALS {
-        signal_hook::flag::register_conditional_default(*sig, Arc::clone(&stop_bool))
-            .context("Failed to register signal handler!")?;
-        signal_hook::flag::register(*sig, Arc::clone(&stop_bool))
-            .context("Failed to register signal handler!")?;
-    }
+    let stop_bool = if cfg!(unix) {
+        use signal_hook::consts::TERM_SIGNALS;
+        use std::sync::Arc;
+        let stop_bool = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        for sig in TERM_SIGNALS {
+            signal_hook::flag::register_conditional_default(*sig, Arc::clone(&stop_bool))
+                .context("Failed to register signal handler!")?;
+            signal_hook::flag::register(*sig, Arc::clone(&stop_bool))
+                .context("Failed to register signal handler!")?;
+        }
+        Some(stop_bool)
+    } else {
+        None
+    };
     let assistant = Assistant::new(Some(callback), None);
 
     // Set instance options
@@ -320,8 +326,10 @@ pub fn run(
 
         assistant.start()?;
         while assistant.running() {
-            if stop_bool.load(std::sync::atomic::Ordering::Relaxed) {
-                bail!("Interrupted by user!");
+            if let Some(stop_bool) = stop_bool.as_ref() {
+                if stop_bool.load(std::sync::atomic::Ordering::Relaxed) {
+                    bail!("Interrupted by user!");
+                }
             }
             std::thread::sleep(std::time::Duration::from_millis(500));
         }
@@ -333,7 +341,9 @@ pub fn run(
     }
 
     // TODO: Better ways to restore signal handlers?
-    stop_bool.store(true, std::sync::atomic::Ordering::Relaxed);
+    if let Some(stop_bool) = stop_bool.as_ref() {
+        stop_bool.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
 
     Ok(())
 }
