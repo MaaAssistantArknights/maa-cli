@@ -117,6 +117,7 @@ jobs:
           cd "$RESOURCE_DIR" || exit 1
           ls -l "$RESOURCE_DIR"
           echo "MAA_CORE_DIR=$MAA_CORE_DIR" >> $GITHUB_ENV
+          echo "RESOURCE_DIR=$RESOURCE_DIR" >> $GITHUB_ENV
       - name: Test (maa-sys, static)
         # It seems rust needs a static library to check the linking.
         # Without this, we can not build maa-sys on Windows.
