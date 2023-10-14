@@ -737,6 +737,7 @@ dependencies = [
  "tar",
  "tokio",
  "toml",
+ "windows-sys 0.48.0",
  "zip",
 ]
 

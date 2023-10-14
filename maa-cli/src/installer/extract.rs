@@ -1,10 +1,9 @@
 use crate::dirs::Ensure;
 
 use std::{
-    fs::{self, File},
-    io::{copy, Read},
-    path::Path,
-    path::PathBuf,
+    fs::File,
+    io::copy,
+    path::{Path, PathBuf},
 };
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -103,8 +102,13 @@ fn extract_zip(file: &Path, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Result
 
             #[cfg(unix)]
             {
+                use std::{
+                    fs::remove_file,
+                    io::Read,
+                    os::unix::{ffi::OsStringExt, fs::symlink},
+                };
+
                 const S_IFLNK: u32 = 0o120000;
-                use std::os::unix::{self, ffi::OsStringExt};
 
                 if let Some(mode) = file.unix_mode() {
                     if mode & S_IFLNK == S_IFLNK {
@@ -112,11 +116,11 @@ fn extract_zip(file: &Path, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Result
                         file.read_to_end(&mut contents)?;
                         let link_target = std::ffi::OsString::from_vec(contents);
                         if outpath.exists() {
-                            fs::remove_file(&outpath).with_context(|| {
+                            remove_file(&outpath).with_context(|| {
                                 format!("Failed to remove existing file: {}", outpath.display())
                             })?;
                         }
-                        unix::fs::symlink(link_target, &outpath).with_context(|| {
+                        symlink(link_target, &outpath).with_context(|| {
                             format!("Failed to extract file: {}", outpath.display())
                         })?;
                         continue;
