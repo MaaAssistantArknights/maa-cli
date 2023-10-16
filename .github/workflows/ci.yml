@@ -40,6 +40,10 @@ jobs:
         arch:
           - x86_64
           - aarch64
+        exclude:
+          # Failed to cross compile ring on Windows
+          - os: windows-latest
+            arch: aarch64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,7 +62,6 @@ jobs:
           cargo fmt --all -- --check
       - name: Build (maa-cli)
         run: |
-          echo $PATH
           cargo build --package maa-cli --locked
       - name: Test (maa-cli)
         if: matrix.arch == 'x86_64'
