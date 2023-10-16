@@ -88,7 +88,7 @@ jobs:
           arch: ${{ matrix.arch }}
       - name: Build
         run: |
-          $CARGO_CMD build --release --locked --package maa-cli
+          cargo build --release --locked --package maa-cli
           cd "target/$CARGO_BUILD_TARGET/release"
           tar -cvf "$CARGO_BUILD_TARGET.tar" maa
       - name: Upload Artifact

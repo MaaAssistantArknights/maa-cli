@@ -29,7 +29,6 @@ defaults:
 jobs:
   build:
     name: Build and Test
-    needs: lint
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
