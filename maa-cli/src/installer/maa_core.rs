@@ -316,8 +316,9 @@ pub fn find_resource(dirs: &Dirs) -> Option<PathBuf> {
     }
 
     if let Ok(path) = current_exe() {
-        let path = path.canonicalize().unwrap();
         println!("path: {:?}", path);
+        let path = path.canonicalize().unwrap();
+        println!("path canonicalized: {:?}", path);
         let exe_dir = path.parent().unwrap();
         let resource_dir = exe_dir.join("resource");
         if resource_dir.exists() {
