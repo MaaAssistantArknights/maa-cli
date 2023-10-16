@@ -98,9 +98,11 @@ pub struct Assistant {
 
 impl Drop for Assistant {
     fn drop(&mut self) {
+        println!("Dropping Assistant");
         unsafe {
             binding::AsstDestroy(self.handle);
         }
+        println!("Dropped Assistant");
     }
 }
 
