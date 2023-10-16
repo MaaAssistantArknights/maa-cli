@@ -1,12 +1,13 @@
 use super::{
     download::{download, Checker},
     extract::Archive,
+    maa_core::current_exe,
 };
 
 use crate::dirs::{Dirs, Ensure};
 
 use std::{
-    env::{consts::EXE_SUFFIX, current_exe, var_os},
+    env::{consts::EXE_SUFFIX, var_os},
     path::Path,
 };
 

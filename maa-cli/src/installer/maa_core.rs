@@ -10,7 +10,7 @@ use crate::{
 use std::{
     env::{
         consts::{DLL_PREFIX, DLL_SUFFIX},
-        current_exe, var_os,
+        var_os,
     },
     path::{Component, Path, PathBuf},
     time::Duration,
@@ -18,6 +18,7 @@ use std::{
 
 use anyhow::{anyhow, bail, Context, Result};
 use clap::ValueEnum;
+use dunce::canonicalize;
 use semver::Version;
 use serde::Deserialize;
 use tokio::runtime::Runtime;
@@ -293,7 +294,6 @@ pub fn find_lib_dir(dirs: &Dirs) -> Option<PathBuf> {
     }
 
     if let Ok(path) = current_exe() {
-        let path = path.canonicalize().unwrap();
         let exe_dir = path.parent().unwrap();
         if exe_dir.join(MAA_CORE_NAME).exists() {
             return Some(exe_dir.to_path_buf());
@@ -316,9 +316,6 @@ pub fn find_resource(dirs: &Dirs) -> Option<PathBuf> {
     }
 
     if let Ok(path) = current_exe() {
-        println!("path: {:?}", path);
-        let path = path.canonicalize().unwrap();
-        println!("path canonicalized: {:?}", path);
         let exe_dir = path.parent().unwrap();
         let resource_dir = exe_dir.join("resource");
         if resource_dir.exists() {
@@ -340,4 +337,9 @@ pub fn find_resource(dirs: &Dirs) -> Option<PathBuf> {
     }
 
     None
+}
+
+pub fn current_exe() -> Result<PathBuf> {
+    let path = std::env::current_exe()?;
+    Ok(canonicalize(path)?)
 }
