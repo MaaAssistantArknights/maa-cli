@@ -78,19 +78,19 @@ jobs:
       - name: Show installation
         if: matrix.arch == 'x86_64'
         run: |
-          MAA_CORE_DIR="$($CARGO_CMD run -- dir core)"
+          MAA_CORE_DIR="$($CARGO_CMD run -- dir lib)"
           MAA_RESOURCE_DIR="$($CARGO_CMD run -- dir resource)"
           ls -l "$MAA_CORE_DIR"
           ls -l "$MAA_RESOURCE_DIR"
           echo "MAA_CORE_DIR=$MAA_CORE_DIR" >> $GITHUB_ENV
           echo "MAA_RESOURCE_DIR=$RESOURCE_DIR" >> $GITHUB_ENV
-      - name: Test (maa-sys, static)
+      - name: Test (maa-sys)
         # It seems rust needs a static library to check the linking.
         # Without this, we can not build maa-sys on Windows.
         # https://stackoverflow.com/questions/63394094/rust-linker-seeks-a-lib-rather-than-a-dll
         if: matrix.arch == 'x86_64' && matrix.os != 'windows-latest'
         run: |
-          $CARGO_CMD test --package maa-sys --locked --features static
+          $CARGO_CMD test --package maa-sys --locked
       - name: Run with MaaCore (default path)
         if: matrix.arch == 'x86_64'
         timeout-minutes: 1
