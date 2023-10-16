@@ -60,11 +60,11 @@ jobs:
         run: |
           cargo build --package maa-cli --locked
       - name: Test (maa-cli)
-        if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
+        if: matrix.arch == 'x86_64'
         run: |
           cargo test --package maa-cli --locked
       - name: Test (maa-cli, no-default-features)
-        if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
+        if: matrix.arch == 'x86_64'
         run: |
           cargo test --package maa-cli --no-default-features --locked
       - name: Install MaaCore

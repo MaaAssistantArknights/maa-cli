@@ -57,3 +57,4 @@ runs:
         vs_version=$(ls "/c/Program Files (x86)/Microsoft Visual Studio/")
         echo "C:\Program Files (x86)\Microsoft Visual Studio\$vs_version\Enterprise\VC\Tools\Llvm\x64\bin" >> $GITHUB_PATH
         echo "RUSTFLAGS=-C target-feature=+crt-static" >> $GITHUB_ENV
+        echo $PATH
