@@ -120,6 +120,7 @@ jobs:
           cargo run -- version
           cargo run -- run daily --dry-run --batch
       - name: Cat MaaCore Log
+        if: matrix.arch == 'x86_64'
         run: |
           cat "$(cargo run -- dir log)/asst.log"
 
