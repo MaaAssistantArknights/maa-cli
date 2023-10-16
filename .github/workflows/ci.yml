@@ -58,6 +58,7 @@ jobs:
           cargo fmt --all -- --check
       - name: Build (maa-cli)
         run: |
+          echo $PATH
           cargo build --package maa-cli --locked
       - name: Test (maa-cli)
         if: matrix.arch == 'x86_64'
