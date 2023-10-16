@@ -132,7 +132,7 @@ jobs:
       - name: Run with MaaCore (default path)
         if: matrix.arch == 'x86_64'
         timeout-minutes: 1
-        continue-on-error: true
+        continue-on-error: ${{ matrix.os == 'windows-latest' }}
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
         run: |
@@ -141,7 +141,7 @@ jobs:
       - name: Run with MaaCore (relative path)
         if: matrix.arch == 'x86_64'
         timeout-minutes: 1
-        continue-on-error: true
+        continue-on-error: ${{ matrix.os == 'windows-latest' }}
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
         run: |
