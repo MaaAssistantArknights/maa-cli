@@ -55,11 +55,11 @@ jobs:
       - name: Lint (clippy)
         if: matrix.arch == 'x86_64'
         run: |
-          $CARGO_CMD clippy --all-targets --all-features -- -D warnings
+          cargo clippy --all-targets --all-features -- -D warnings
       - name: Lint (rustfmt)
         if: matrix.arch == 'x86_64'
         run: |
-          $CARGO_CMD fmt --all -- --check
+          cargo fmt --all -- --check
       - name: Build (maa-cli)
         run: |
           cargo build --package maa-cli --locked
@@ -76,12 +76,12 @@ jobs:
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
         run: |
-          $CARGO_CMD run -- install beta -t0
+          cargo run -- install beta -t0
       - name: Show installation
         if: matrix.arch == 'x86_64'
         run: |
-          MAA_CORE_DIR="$($CARGO_CMD run -- dir lib)"
-          MAA_RESOURCE_DIR="$($CARGO_CMD run -- dir resource)"
+          MAA_CORE_DIR="$(cargo run -- dir lib)"
+          MAA_RESOURCE_DIR="$(cargo run -- dir resource)"
           ls -l "$MAA_CORE_DIR"
           ls -l "$MAA_RESOURCE_DIR"
           echo "MAA_CORE_DIR=$MAA_CORE_DIR" >> $GITHUB_ENV
@@ -92,7 +92,7 @@ jobs:
         # https://stackoverflow.com/questions/63394094/rust-linker-seeks-a-lib-rather-than-a-dll
         if: matrix.arch == 'x86_64' && matrix.os != 'windows-latest'
         run: |
-          $CARGO_CMD test --package maa-sys --locked
+          cargo test --package maa-sys --locked
       - name: Run with MaaCore (default path)
         if: matrix.arch == 'x86_64'
         timeout-minutes: 1
@@ -100,8 +100,8 @@ jobs:
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
         run: |
-          $CARGO_CMD run -- version
-          $CARGO_CMD run -- run daily --dry-run --batch
+          cargo run -- version
+          cargo run -- run daily --dry-run --batch
       - name: Run with MaaCore (relative path)
         if: matrix.arch == 'x86_64'
         timeout-minutes: 1
@@ -117,12 +117,12 @@ jobs:
           mkdir -p "$share_dir"
           mv "$MAA_RESOURCE_DIR" "$share_dir/resource"
           ls -l "$share_dir"
-          $CARGO_CMD run -- version
-          $CARGO_CMD run -- run daily --dry-run --batch
+          cargo run -- version
+          cargo run -- run daily --dry-run --batch
       - name: Cat MaaCore Log if failed
         if: failure()
         run: |
-          cat "$($CARGO_CMD run -- dir log)/asst.log"
+          cat "$(cargo run -- dir log)/asst.log"
 
   coverage:
     name: Coverage

@@ -36,18 +36,15 @@ runs:
       if: inputs.arch == 'aarch64'
       shell: bash
       run: rustup target add $CARGO_BUILD_TARGET
-    - name: Install Cross
+    - name: Cross Compile Dependencies
       if: inputs.arch == 'aarch64' && inputs.os == 'ubuntu-latest'
-      uses: taiki-e/install-action@v2
-      with:
-        tool: cross
-    - name: Set Cargo Command
       shell: bash
       run: |
-        if command -v cross >/dev/null 2>&1; then
-          cargo="cross"
-        else
-          cargo="cargo"
-        fi
-        echo "CARGO_CMD=$cargo" >> $GITHUB_ENV
-
+        sudo apt-get update
+        sudo apt-get install -y \
+          qemu-user \
+          gcc-aarch64-linux-gnu \
+          libc6-dev-arm64-cross
+        echo "CFLAGS_aarch64_unknown_linux_gnu='--sysroot=/usr/aarch64-linux-gnu'" >> $GITHUB_ENV
+        echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+        echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER=qemu-aarch64" >> $GITHUB_ENV
