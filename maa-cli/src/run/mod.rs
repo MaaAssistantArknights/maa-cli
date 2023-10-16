@@ -341,14 +341,9 @@ pub fn run(
     }
 
     // TODO: Better ways to restore signal handlers?
-    debug!("Restoring signal handlers...");
     if let Some(stop_bool) = stop_bool.as_ref() {
         stop_bool.store(true, std::sync::atomic::Ordering::Relaxed);
     }
-
-    debug!("Done!");
-
-    drop(assistant);
 
     Ok(())
 }

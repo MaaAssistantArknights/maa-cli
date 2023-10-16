@@ -44,7 +44,7 @@ pub fn update(dirs: &Dirs) -> Result<()> {
     );
 
     let bin_name = name();
-    let bin_path = current_exe()?.canonicalize()?;
+    let bin_path = current_exe()?;
     let cache_dir = dirs.cache().ensure()?;
 
     asset.download(cache_dir)?.extract(|path| {

@@ -356,10 +356,7 @@ fn main() -> Result<()> {
             user_resource,
             batch,
             dry_run,
-        } => {
-            run::run(&proj_dirs, task, addr, user_resource, batch, dry_run)?;
-            println!("Run Done");
-        }
+        } => run::run(&proj_dirs, task, addr, user_resource, batch, dry_run)?,
         SubCommand::List => {
             let task_dir = proj_dirs.config().join("tasks");
             if !task_dir.exists() {
