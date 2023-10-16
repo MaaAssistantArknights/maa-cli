@@ -347,6 +347,9 @@ pub fn run(
     }
 
     debug!("Done!");
+
+    drop(assistant);
+
     Ok(())
 }
 
