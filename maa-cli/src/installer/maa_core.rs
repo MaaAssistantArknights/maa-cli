@@ -1,6 +1,6 @@
 // This file is used to download and extract prebuilt packages of maa-core.
 
-use super::{download::download_mirrors, extract::Archive, maa_cli::current_exe};
+use super::{download::download_mirrors, extract::Archive};
 
 use crate::{
     dirs::{Dirs, Ensure},
@@ -18,6 +18,7 @@ use std::{
 
 use anyhow::{anyhow, bail, Context, Result};
 use clap::ValueEnum;
+use dunce::canonicalize;
 use semver::Version;
 use serde::Deserialize;
 use tokio::runtime::Runtime;
@@ -336,4 +337,9 @@ pub fn find_resource(dirs: &Dirs) -> Option<PathBuf> {
     }
 
     None
+}
+
+pub fn current_exe() -> Result<PathBuf> {
+    let path = std::env::current_exe()?;
+    Ok(canonicalize(path)?)
 }

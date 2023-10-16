@@ -1,13 +1,14 @@
 use super::{
     download::{download, Checker},
     extract::Archive,
+    maa_core::current_exe,
 };
 
 use crate::dirs::{Dirs, Ensure};
 
 use std::{
     env::{consts::EXE_SUFFIX, var_os},
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 use anyhow::{bail, Context, Result};
@@ -55,10 +56,6 @@ pub fn update(dirs: &Dirs) -> Result<()> {
     })?;
 
     Ok(())
-}
-
-pub fn current_exe() -> std::io::Result<PathBuf> {
-    std::env::current_exe()?.canonicalize()
 }
 
 fn get_metadata() -> Result<VersionJSON> {

@@ -47,7 +47,7 @@ jobs:
         run: cargo fmt --all --check
 
   build:
-    name: Build and test
+    name: Build and Test
     needs: lint
     runs-on: ${{ matrix.os }}
     strategy:
@@ -101,6 +101,10 @@ jobs:
         if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
         run: |
           $CARGO_CMD test --package maa-cli --locked
+      - name: Test (maa-cli, no-default-features)
+        if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
+        run: |
+          $CARGO_CMD test --package maa-cli --no-default-features --locked
       - name: Install MaaCore
         if: matrix.arch == 'x86_64'
         env:
@@ -117,13 +121,7 @@ jobs:
           cd "$RESOURCE_DIR" || exit 1
           ls -l "$RESOURCE_DIR"
           echo "MAA_CORE_DIR=$MAA_CORE_DIR" >> $GITHUB_ENV
-      - name: Try run with MaaCore
-        if: matrix.arch == 'x86_64'
-        env:
-          MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
-        run: |
-          cargo run -- version
-          cargo run -- run daily --dry-run --batch
+          echo "RESOURCE_DIR=$RESOURCE_DIR" >> $GITHUB_ENV
       - name: Test (maa-sys, static)
         # It seems rust needs a static library to check the linking.
         # Without this, we can not build maa-sys on Windows.
@@ -131,6 +129,36 @@ jobs:
         if: matrix.arch == 'x86_64' && matrix.os != 'windows-latest'
         run: |
           cargo test --package maa-sys --locked
+      - name: Run with MaaCore (default path)
+        if: matrix.arch == 'x86_64'
+        timeout-minutes: 1
+        continue-on-error: ${{ matrix.os == 'windows-latest' }}
+        env:
+          MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
+        run: |
+          cargo run -- version
+          cargo run -- run daily --dry-run --batch
+      - name: Run with MaaCore (relative path)
+        if: matrix.arch == 'x86_64'
+        timeout-minutes: 1
+        continue-on-error: ${{ matrix.os == 'windows-latest' }}
+        env:
+          MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
+        run: |
+          target_dir="target/${CARGO_BUILD_TARGET}"
+          lib_dir="$target_dir/lib"
+          share_dir="$target_dir/share/maa"
+          mv "$MAA_CORE_DIR" "$lib_dir"
+          ls -l "$lib_dir"
+          mkdir -p "$share_dir"
+          mv "$RESOURCE_DIR" "$share_dir/resource"
+          ls -l "$share_dir"
+          cargo run -- version
+          cargo run -- run daily --dry-run --batch
+      - name: Cat MaaCore Log if failed
+        if: failure()
+        run: |
+          cat "$(cargo run -- dir log)/asst.log"
 
   coverage:
     name: Coverage
