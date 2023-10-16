@@ -26,6 +26,7 @@ permissions:
 
 jobs:
   meta:
+    name: Meta
     runs-on: ubuntu-latest
     outputs:
       dryrun: ${{ steps.dryrun.outputs.dryrun }}
@@ -80,33 +81,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install Cross
-        if: matrix.arch == 'aarch64' && matrix.os == 'ubuntu-latest'
-        uses: taiki-e/install-action@v2
+      - name: Setup Rust
+        uses: ./.github/actions/setup
         with:
-          tool: cross
-      - name: Setup Environment
-        run: |
-          OS=${{ matrix.os }}
-          ARCH=${{ matrix.arch }}
-          if [ "$OS" = "macos-latest" ]; then
-            CARGO_CMD=cargo
-            CARGO_BUILD_TARGET="$ARCH-apple-darwin"
-            rustup target add $CARGO_BUILD_TARGET
-          elif [ "$OS" = "windows-latest" ]; then
-            CARGO_CMD=cargo
-            CARGO_BUILD_TARGET="$ARCH-pc-windows-msvc"
-            rustup target add $CARGO_BUILD_TARGET
-          else
-            if [ "$ARCH" = "aarch64" ]; then
-              CARGO_CMD=cross
-            else
-              CARGO_CMD=cargo
-            fi
-            CARGO_BUILD_TARGET="$ARCH-unknown-linux-gnu"
-          fi
-          echo "CARGO_CMD=$CARGO_CMD" >> $GITHUB_ENV
-          echo "CARGO_BUILD_TARGET=$CARGO_BUILD_TARGET" >> $GITHUB_ENV
+          os: ${{ matrix.os }}
+          arch: ${{ matrix.arch }}
       - name: Build
         run: |
           $CARGO_CMD build --release --locked --package maa-cli
@@ -199,10 +178,9 @@ jobs:
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
-            maa_cli-v${{ needs.meta.outputs.version }}-x86_64-unknown-linux-gnu.tar.gz*
-            maa_cli-v${{ needs.meta.outputs.version }}-aarch64-unknown-linux-gnu.tar.gz*
+            maa_cli-v${{ needs.meta.outputs.version }}-*-unknown-linux-gnu.tar.gz*
             maa_cli-v${{ needs.meta.outputs.version }}-universal-apple-darwin.zip*
-            maa_cli-v${{ needs.meta.outputs.version }}-x86_64-pc-windows-msvc.zip*
+            maa_cli-v${{ needs.meta.outputs.version }}-*-pc-windows-msvc.zip*
       - name: Commit version.json and Push
         working-directory: version
         run: |

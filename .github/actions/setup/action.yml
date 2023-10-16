@@ -1,0 +1,48 @@
+name: Setup Rust
+description: 'Setup Rust for cross-compilation'
+inputs:
+  os:
+    description: 'Host and target OS'
+    required: true
+  arch:
+    description: 'Target architecture'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Compute Target Triple
+      shell: bash
+      run: |
+        os=${{ inputs.os }}
+        arch=${{ inputs.arch }}
+        case "$os" in
+          ubuntu*)
+            target="$arch-unknown-linux-gnu"
+            ;;
+          macos*)
+            target="$arch-apple-darwin"
+            ;;
+          windows*)
+            target="$arch-pc-windows-msvc"
+            ;;
+          *)
+            echo "Unknown OS: $os"
+            exit 1
+            ;;
+        esac
+        echo "CARGO_BUILD_TARGET=$target" >> $GITHUB_ENV
+    - name: Install Target
+      if: inputs.arch == 'aarch64'
+      shell: bash
+      run: rustup target add $CARGO_BUILD_TARGET
+    - name: Install Cross
+      if: inputs.arch == 'aarch64' && inputs.os == 'ubuntu-latest'
+      uses: taiki-e/install-action@v2
+      with:
+        tool: cross
+    - name: Use Cross
+      if: inputs.arch == 'aarch64' && inputs.os == 'ubuntu-latest'
+      shell: bash
+      run: echo "CARGO=cross" >> $GITHUB_ENV
+
