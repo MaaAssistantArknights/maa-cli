@@ -36,8 +36,8 @@ runs:
       if: inputs.arch == 'aarch64'
       shell: bash
       run: rustup target add $CARGO_BUILD_TARGET
-    - name: Cross Compile Dependencies
-      if: inputs.arch == 'aarch64' && inputs.os == 'ubuntu-latest'
+    - name: Cross Compile Dependencies (Linux)
+      if: inputs.arch == 'aarch64' && startsWith(inputs.os, 'ubuntu')
       shell: bash
       run: |
         sudo apt-get update
@@ -45,6 +45,15 @@ runs:
           qemu-user \
           gcc-aarch64-linux-gnu \
           libc6-dev-arm64-cross
+        echo "CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+        echo "AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar" >> $GITHUB_ENV
         echo "CFLAGS_aarch64_unknown_linux_gnu='--sysroot=/usr/aarch64-linux-gnu'" >> $GITHUB_ENV
         echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
         echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER=qemu-aarch64" >> $GITHUB_ENV
+    - name: Cross Compile Dependencies (Windows)
+      if: inputs.arch == 'aarch64' && startsWith(inputs.os, 'windows')
+      shell: bash
+      run: |
+        vs_version=$(ls "/c/Program Files (x86)/Microsoft Visual Studio/")
+        echo "C:\Program Files (x86)\Microsoft Visual Studio\$vs_version\Enterprise\VC\Tools\Llvm\x64\bin" >> $GITHUB_PATH
+        echo "RUSTFLAGS=-C target-feature=+crt-static" >> $GITHUB_ENV
