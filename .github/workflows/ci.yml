@@ -119,8 +119,7 @@ jobs:
           ls -l "$share_dir"
           cargo run -- version
           cargo run -- run daily --dry-run --batch
-      - name: Cat MaaCore Log if failed
-        if: failure()
+      - name: Cat MaaCore Log
         run: |
           cat "$(cargo run -- dir log)/asst.log"
 
