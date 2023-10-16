@@ -36,13 +36,15 @@ runs:
       if: inputs.arch == 'aarch64'
       shell: bash
       run: rustup target add $CARGO_BUILD_TARGET
-    - name: Install Cross
-      if: inputs.arch == 'aarch64' && inputs.os == 'ubuntu-latest'
-      uses: taiki-e/install-action@v2
-      with:
-        tool: cross
-    - name: Use Cross
-      if: inputs.arch == 'aarch64' && inputs.os == 'ubuntu-latest'
+    - name: Cross Compile Dependencies (Linux)
+      if: inputs.arch == 'aarch64' && startsWith(inputs.os, 'ubuntu')
       shell: bash
-      run: echo "CARGO=cross" >> $GITHUB_ENV
-
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          gcc-aarch64-linux-gnu \
+          libc6-dev-arm64-cross
+        echo "CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+        echo "AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar" >> $GITHUB_ENV
+        echo "CFLAGS_aarch64_unknown_linux_gnu=--sysroot=/usr/aarch64-linux-gnu" >> $GITHUB_ENV
+        echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV

@@ -29,7 +29,6 @@ defaults:
 jobs:
   build:
     name: Build and Test
-    needs: lint
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -54,20 +53,22 @@ jobs:
           os: ${{ matrix.os }}
           arch: ${{ matrix.arch }}
       - name: Lint (clippy)
+        if: matrix.arch == 'x86_64'
         run: |
           cargo clippy --all-targets --all-features -- -D warnings
       - name: Lint (rustfmt)
+        if: matrix.arch == 'x86_64'
         run: |
           cargo fmt --all -- --check
       - name: Build (maa-cli)
         run: |
           cargo build --package maa-cli --locked
       - name: Test (maa-cli)
-        if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
+        if: matrix.arch == 'x86_64'
         run: |
           cargo test --package maa-cli --locked
       - name: Test (maa-cli, no-default-features)
-        if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
+        if: matrix.arch == 'x86_64'
         run: |
           cargo test --package maa-cli --no-default-features --locked
       - name: Install MaaCore
@@ -80,12 +81,12 @@ jobs:
         if: matrix.arch == 'x86_64'
         run: |
           MAA_CORE_DIR="$(cargo run -- dir lib)"
-          MAA_RESOURCE_DIR="$(cargo run -- dir resource)
+          MAA_RESOURCE_DIR="$(cargo run -- dir resource)"
           ls -l "$MAA_CORE_DIR"
           ls -l "$MAA_RESOURCE_DIR"
           echo "MAA_CORE_DIR=$MAA_CORE_DIR" >> $GITHUB_ENV
-          echo "MAA_RESOURCE_DIR=$RESOURCE_DIR" >> $GITHUB_ENV
-      - name: Test (maa-sys, static)
+          echo "MAA_RESOURCE_DIR=$MAA_RESOURCE_DIR" >> $GITHUB_ENV
+      - name: Test (maa-sys)
         # It seems rust needs a static library to check the linking.
         # Without this, we can not build maa-sys on Windows.
         # https://stackoverflow.com/questions/63394094/rust-linker-seeks-a-lib-rather-than-a-dll
