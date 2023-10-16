@@ -96,7 +96,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: maa_cli-${{ env.CARGO_BUILD_TARGET }}
-          path: $CARGO_BUILD_TARGET.tar
+          path: ${{ env.CARGO_BUILD_TARGET }}.tar
           retention-days: 1
           if-no-files-found: error
 
