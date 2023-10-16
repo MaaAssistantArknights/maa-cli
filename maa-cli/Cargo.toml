@@ -29,7 +29,7 @@ futures-util = "0.3.28"
 flate2 = "1"
 tar = "0.4.40"
 zip = { version = "0.6.6", default-features = false, features = ["deflate"] }
-semver = { version = "1.0.19", features = ["serde"] }
+semver = { version = "1.0.20", features = ["serde"] }
 sha2 = "0.10.7"
 digest = "0.10.7"
 signal-hook = "0.3.17"
