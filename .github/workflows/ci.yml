@@ -139,16 +139,16 @@ jobs:
         run: |
           target_dir="target/${CARGO_BUILD_TARGET}"
           lib_dir="$target_dir/lib"
-          resource_dir="$target_dir/share/maa"
+          share_dir="$target_dir/share/maa"
           mv "$MAA_CORE_DIR" "$lib_dir"
           ls -l "$lib_dir"
-          mkdir -p "$resource_dir"
-          mv "$RESOURCE_DIR" "$resource_dir"
-          ls -l "$resource_dir"
+          mkdir -p "$share_dir"
+          mv "$RESOURCE_DIR" "$share_dir/resource"
+          ls -l "$share_dir"
           cargo run -- version
           cargo run -- run daily --dry-run --batch
       - name: Test (maa-cli, no-default-features)
-        if: matrix.arch == 'x86_64'
+        if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
         run: |
           cargo test --package maa-cli --no-default-features --locked
 
