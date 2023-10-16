@@ -131,11 +131,16 @@ jobs:
           cargo test --package maa-sys --locked
       - name: Run with MaaCore (default path)
         if: matrix.arch == 'x86_64'
+        timeout-minutes: 1
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
         run: |
           cargo run -- version
           cargo run -- run daily --dry-run --batch
+      - name: Cat MaaCore Log if time out
+        if: failure()
+        run: |
+          cat "$(cargo run -- dir log)/asst.log"
       - name: Run with MaaCore (relative path)
         if: matrix.arch == 'x86_64'
         env:
