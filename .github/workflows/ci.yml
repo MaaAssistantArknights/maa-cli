@@ -47,8 +47,8 @@ jobs:
         run: cargo fmt --all --check
 
   build:
-    name: Build and test
-    needs: lint
+    name: Build and Test
+    # needs: lint
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
