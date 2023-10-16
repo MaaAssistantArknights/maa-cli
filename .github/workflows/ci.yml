@@ -54,32 +54,32 @@ jobs:
           arch: ${{ matrix.arch }}
       - name: Lint (clippy)
         run: |
-          cargo clippy --all-targets --all-features -- -D warnings
+          $CARGO_CMD clippy --all-targets --all-features -- -D warnings
       - name: Lint (rustfmt)
         run: |
-          cargo fmt --all -- --check
+          $CARGO_CMD fmt --all -- --check
       - name: Build (maa-cli)
         run: |
-          cargo build --package maa-cli --locked
+          $CARGO_CMD build --package maa-cli --locked
       - name: Test (maa-cli)
         if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
         run: |
-          cargo test --package maa-cli --locked
+          $CARGO_CMD test --package maa-cli --locked
       - name: Test (maa-cli, no-default-features)
         if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
         run: |
-          cargo test --package maa-cli --no-default-features --locked
+          $CARGO_CMD test --package maa-cli --no-default-features --locked
       - name: Install MaaCore
         if: matrix.arch == 'x86_64'
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
         run: |
-          cargo run -- install beta -t0
+          $CARGO_CMD run -- install beta -t0
       - name: Show installation
         if: matrix.arch == 'x86_64'
         run: |
-          MAA_CORE_DIR="$(cargo run -- dir lib)"
-          MAA_RESOURCE_DIR="$(cargo run -- dir resource)
+          MAA_CORE_DIR="$($CARGO_CMD run -- dir core)"
+          MAA_RESOURCE_DIR="$($CARGO_CMD run -- dir resource)"
           ls -l "$MAA_CORE_DIR"
           ls -l "$MAA_RESOURCE_DIR"
           echo "MAA_CORE_DIR=$MAA_CORE_DIR" >> $GITHUB_ENV
@@ -90,7 +90,7 @@ jobs:
         # https://stackoverflow.com/questions/63394094/rust-linker-seeks-a-lib-rather-than-a-dll
         if: matrix.arch == 'x86_64' && matrix.os != 'windows-latest'
         run: |
-          cargo test --package maa-sys --locked
+          $CARGO_CMD test --package maa-sys --locked --features static
       - name: Run with MaaCore (default path)
         if: matrix.arch == 'x86_64'
         timeout-minutes: 1
@@ -98,8 +98,8 @@ jobs:
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
         run: |
-          cargo run -- version
-          cargo run -- run daily --dry-run --batch
+          $CARGO_CMD run -- version
+          $CARGO_CMD run -- run daily --dry-run --batch
       - name: Run with MaaCore (relative path)
         if: matrix.arch == 'x86_64'
         timeout-minutes: 1
@@ -115,12 +115,12 @@ jobs:
           mkdir -p "$share_dir"
           mv "$MAA_RESOURCE_DIR" "$share_dir/resource"
           ls -l "$share_dir"
-          cargo run -- version
-          cargo run -- run daily --dry-run --batch
+          $CARGO_CMD run -- version
+          $CARGO_CMD run -- run daily --dry-run --batch
       - name: Cat MaaCore Log if failed
         if: failure()
         run: |
-          cat "$(cargo run -- dir log)/asst.log"
+          cat "$($CARGO_CMD run -- dir log)/asst.log"
 
   coverage:
     name: Coverage

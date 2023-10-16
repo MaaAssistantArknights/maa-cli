@@ -41,8 +41,13 @@ runs:
       uses: taiki-e/install-action@v2
       with:
         tool: cross
-    - name: Use Cross
-      if: inputs.arch == 'aarch64' && inputs.os == 'ubuntu-latest'
+    - name: Set Cargo Command
       shell: bash
-      run: echo "CARGO=cross" >> $GITHUB_ENV
+      run: |
+        if command -v cross >/dev/null 2>&1; then
+          cargo="cross"
+        else
+          cargo="cargo"
+        fi
+        echo "CARGO_CMD=$cargo" >> $GITHUB_ENV
 

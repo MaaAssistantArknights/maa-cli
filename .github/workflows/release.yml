@@ -88,14 +88,15 @@ jobs:
           arch: ${{ matrix.arch }}
       - name: Build
         run: |
-          cargo build --release --locked --package maa-cli
-          cd "target/$CARGO_BUILD_TARGET/release"
-          tar -cvf "$CARGO_BUILD_TARGET.tar" maa
+          $CARGO_CMD build --release --locked --package maa-cli
+      - name: Tar Artifact
+        run: |
+          tar -cvf "$CARGO_BUILD_TARGET.tar" -C target/$CARGO_BUILD_TARGET/release maa
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
           name: maa_cli-${{ env.CARGO_BUILD_TARGET }}
-          path: target/${{ env.CARGO_BUILD_TARGET }}/release/*.tar
+          path: $CARGO_BUILD_TARGET.tar
           retention-days: 1
           if-no-files-found: error
 
