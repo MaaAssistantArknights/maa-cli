@@ -53,9 +53,11 @@ jobs:
           os: ${{ matrix.os }}
           arch: ${{ matrix.arch }}
       - name: Lint (clippy)
+        if: matrix.arch == 'x86_64'
         run: |
           $CARGO_CMD clippy --all-targets --all-features -- -D warnings
       - name: Lint (rustfmt)
+        if: matrix.arch == 'x86_64'
         run: |
           $CARGO_CMD fmt --all -- --check
       - name: Build (maa-cli)
@@ -83,7 +85,7 @@ jobs:
           ls -l "$MAA_CORE_DIR"
           ls -l "$MAA_RESOURCE_DIR"
           echo "MAA_CORE_DIR=$MAA_CORE_DIR" >> $GITHUB_ENV
-          echo "MAA_RESOURCE_DIR=$RESOURCE_DIR" >> $GITHUB_ENV
+          echo "MAA_RESOURCE_DIR=$MAA_RESOURCE_DIR" >> $GITHUB_ENV
       - name: Test (maa-sys)
         # It seems rust needs a static library to check the linking.
         # Without this, we can not build maa-sys on Windows.
