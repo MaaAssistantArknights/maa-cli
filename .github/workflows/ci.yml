@@ -138,11 +138,13 @@ jobs:
           MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
         run: |
           target_dir="target/${CARGO_BUILD_TARGET}"
-          mv "$MAA_CORE_DIR" "$target_dir/lib"
-          mv "$RESOURCE_DIR" "$target_dir/share"
-          ls -l "$target_dir"
-          ls -l "$target_dir/lib"
-          ls -l "$target_dir/share"
+          lib_dir="$target_dir/lib"
+          resource_dir="$target_dir/share/maa"
+          mv "$MAA_CORE_DIR" "$lib_dir"
+          ls -l "$lib_dir"
+          mkdir -p "$resource_dir"
+          mv "$RESOURCE_DIR" "$resource_dir"
+          ls -l "$resource_dir"
           cargo run -- version
           cargo run -- run daily --dry-run --batch
       - name: Test (maa-cli, no-default-features)
