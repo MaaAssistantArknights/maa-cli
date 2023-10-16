@@ -60,15 +60,15 @@ jobs:
           $CARGO_CMD fmt --all -- --check
       - name: Build (maa-cli)
         run: |
-          $CARGO_CMD build --package maa-cli --locked
+          cargo build --package maa-cli --locked
       - name: Test (maa-cli)
         if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
         run: |
-          $CARGO_CMD test --package maa-cli --locked
+          cargo test --package maa-cli --locked
       - name: Test (maa-cli, no-default-features)
         if: matrix.arch == 'x86_64' || matrix.os == 'ubuntu-latest'
         run: |
-          $CARGO_CMD test --package maa-cli --no-default-features --locked
+          cargo test --package maa-cli --no-default-features --locked
       - name: Install MaaCore
         if: matrix.arch == 'x86_64'
         env:
