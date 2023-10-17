@@ -13,7 +13,7 @@ use crate::{
 #[cfg(feature = "self")]
 use crate::installer::maa_cli;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::{generate, Shell};
 use directories::ProjectDirs;
@@ -329,12 +329,22 @@ fn main() -> Result<()> {
         SubCommand::Dir { dir_type } => match dir_type {
             Dir::Data => println!("{}", proj_dirs.data().display()),
             Dir::Library => {
-                println!("{}", maa_core::find_lib_dir(&proj_dirs).unwrap().display())
+                println!(
+                    "{}",
+                    maa_core::find_lib_dir(&proj_dirs)
+                        .context("Library not found")?
+                        .display()
+                )
             }
             Dir::Config => println!("{}", proj_dirs.config().display()),
             Dir::Cache => println!("{}", proj_dirs.cache().display()),
             Dir::Resource => {
-                println!("{}", maa_core::find_resource(&proj_dirs).unwrap().display())
+                println!(
+                    "{}",
+                    maa_core::find_resource(&proj_dirs)
+                        .context("Resource not found")?
+                        .display()
+                )
             }
             Dir::Log => println!("{}", proj_dirs.log().display()),
         },
