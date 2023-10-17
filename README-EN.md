@@ -2,121 +2,139 @@
 
 ![CI](https://img.shields.io/github/actions/workflow/status/MaaAssistantArknights/maa-cli/ci.yml)
 ![maa-cli latest release](https://img.shields.io/github/v/release/MaaAssistantArknights/maa-cli?filter=v*)
+![platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blueviolet">)
+![Codecov](https://img.shields.io/codecov/c/github/MaaAssistantArknights/maa-cli)
 
 A simple CLI for [MAA](https://github.com/MaaAssistantArknights/MaaAssistantArknights) by Rust.
-A alternative way use MAA on **Linux** and **macOS**.
-Windows is not supported now,
-because I don't have a Windows machine
-and I'm not familiar with Windows development. PR is welcome.
 
 ## Feature
 
-- Install and update MAA core and resources with `maa install` and `maa update`;
-- Install and update self with `maa self install` and `maa self update`;
-- Define tasks by TOML, YAML or JSON file, then run it by `maa run <task>`, see below for more details;
-- Handle MAA core message for monitoring of MAA running status.
+- Define tasks by TOML, YAML or JSON file, then run it by `maa run <task>`;
+- Install and update `MaaCore` and resources with `maa install` and `maa update`;
+- Update self with `maa self update`;
 
 ## Installation
 
-You can install CLI by download prebuilt binary from
-[release page](https://github.com/wangl-cc/maa-cli/releases/latest)
-(universal-apple-darwin is for macOS, x86_64-unknown-linux-gnu is for Linux),
-and extract it to a directory in your `$PATH` (e.g. `$HOME/.local/bin`).
+### Package manager
 
-Once the CLI is installed, you can install `MaaCore` by `maa`:
+#### macOS
+
+Install with [Homebrew](https://brew.sh/):
+
+```bash
+brew install MaaAssistantArknights/tap/maa-cli
+```
+
+#### Linux
+
+ArchLinux user can install [AUR package](https://aur.archlinux.org/packages/maa-cli/):
+
+```bash
+yay -S maa-cli
+```
+
+For LinuxBrew user, you can install with [LinuxBrew](https://docs.brew.sh/Homebrew-on-Linux):
+
+```bash
+brew install MaaAssistantArknights/tap/maa-cli
+```
+
+### Prebuilt binary
+
+You can install CLI by download prebuilt binary from
+[release page](https://github.com/wangl-cc/maa-cli/releases/latest) and extract it to your favorite location. The filename for different platform is:
+
+<table>
+    <thead>
+        <tr>
+            <th>Opearting System</th>
+            <th>Architecture</th>
+            <th>Filename</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td rowspan=2>Linux</td>
+            <td>x86_64</td>
+            <td>maa_cli-x86_64-unknown-linux-gnu.tar.gz</td>
+        </tr>
+        <tr>
+            <td>aarch64</td>
+            <td>maa_cli-aarch64-unknown-linux-gnu.tar.gz</td>
+        </tr>
+        <tr>
+            <td rowspan=2>macOS</td>
+            <td>x86_64</td>
+            <td rowspan=2>
+              maa_cli-universal-apple-darwin.zip
+            </td>
+        </tr>
+        <tr>
+            <td>aaarch64</td>
+        </tr>
+        <tr>
+            <td rowspan=2>Windows</td>
+            <td>x86_64</td>
+            <td>maa_cli-x86_64-pc-windows-msvc.zip</td>
+        </tr>
+    </tbody>
+</table>
+
+### Build from source
+
+You can also build from source by yourself with `cargo`:
+
+```bash
+cargo install --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --locked
+```
+
+### Dependencies
+
+#### MaaCore
+
+`maa-cli` only provides a interface for MaaCore, it needs `MaaCore` and resources to run tasks, which can be installed by `maa install`:
+
 ```bash
 maa install
 ```
 
-**Note**: `adb` is not included in this CLI. Please make sure `adb` is installed, if you connect game with it.
+## Usage
 
-## Usage and configuration
+### Commands
 
-### Run a task
+The main feature of `maa-cli` is to run tasks, you can run a task by `maa run <task>`. Here `<task>` is the name of a task, you can list all available tasks by `maa list`.
 
-The `maa` is used to run some you defined tasks
-(how to define a task will be introduced later):
-```sh
-maa run <task> [options]
-```
-More details about `maa run` can be found by `maa run --help`.
-And Other commands can be found by `maa --help`.
+More details can be found by `maa help`.
 
-### Config dir
+## Configurations
 
-Your config files (maa options, tasks, etc.) are located in your config dir.
-You can get the config dir by `maa dir config` and
-create it by `mkdir -p "$(maa dir config)"`.
-**Note**: the double quotes is necessary for macOS user with zsh and bash.
-Because the path may contains space and will be split into multiple arguments.
+### Configuration directory
 
-*Tip*: For macOS user who prefer to XDG style config directory,
-you can set `XDG_CONFIG_HOME`, e.g. `export XDG_CONFIG_HOME="$HOME/.config"`.
-Alternatively, you can make a symlink from XDG style dir to Apple style dir:
-```sh
+All configurations of `maa-cli` is located in a specific configuation directory, which can be get by `maa dir config`.
+The configuration directory can be changed by environment variable `MAA_CONFIG_DIR`. In below examples, we will use `$MAA_CONFIG_DIR` to represent the configuration directory.
+
+All configuration files can be written in TOML, YAML or JSON format. In below examples, we will use TOML format and `.toml` as file extension. But you can mix these three formats as long as the file extension is correct.
+
+<details>
+
+<summary> XDG style configuration directory on macOS </summary>
+
+Due to the limitation of [Directories](https://github.com/dirs-dev/directories-rs/), `maa-cli` use Apple style configuration directory on macOS by default. But XDG style configuration directory is more suitable for command line program. If you want to use XDG style configuration directory, you can set `XDG_CONFIG_HOME` environment variable, such as `export XDG_CONFIG_HOME="$HOME/.config"`, this will make `maa-cli` use XDG style configuration directory. Or you can use below command to create a symbolic link:
+
+```bash
 mkdir -p "$HOME/.config/maa"
 ln -s "$HOME/.config/maa" "$(maa dir config)"
 ```
 
-In below examples, we assume the config dir is `$MAA_CONFIG_DIR`.
-
-### Maa options
-
-The maa options is a TOML, YAML or JSON file that contains the options of maa,
-The maa options contains three sections `connection`, `instance_options` and `resources`.
-
-The `connection` section is used to connect to the game,
-the `type` field can be `ADB` or `PlayTools`.
-If you use `ADB`, you should set `adb_path` and `device` fields:
-```toml
-[connection]
-type = "ADB"
-adb_path = "adb" # the path of adb executable
-device = "emulator-5554" # the serial of your android device
-config = "General" # the config of maa
-```
-and if you use `PlayTools`, you should set `address`
-which is the address of MaaTools set in PlayCover,
-more details can be found at
-[here](https://maa.plus/docs/en-us/1.4-EMULATOR_SUPPORTS_FOR_MAC.html#✅-playcover-the-software-runs-most-fluently-for-its-nativity-🚀):
-```toml
-[connection]
-type = "PlayTools"
-address = "localhost:1717" # the address of MaaTools
-config = "CompatMac" # the same as above
-```
-Both `ADB` and `PlayTools` can set `config` field,
-which is a parameter of `connect` function of maa.
-It's default value is `CompatMac` on macOS, `General` on other platforms.
-All available values can be found at `resource/config.json` in MAA repo.
-
-And the `instance_options` section is used to configure maa instance options:
-```toml
-[instance_options]
-touch_mode = "ADB" # touch mode to use, can be "ADB", "MiniTouch", "MAATouch" or "MacPlayTools" (only for PlayCover)
-deployment_with_pause = false # whether pause the game when deployment
-adb_lite_enabled = false # whether use adb-lite
-kill_adb_on_exit = false # whether kill adb when exit
-```
-Note: If you connect to the game with `PlayCover`, the `touch_mode` must be `MacPlayTools`.
-
-The `resources` section is used to configure additional resources of maa,
-which is a list of resource directories (relative to `resource` directory of MAA repo):
-```toml
-resources = ["platform_diff/macOS"]
-```
-This is useful for adding other server game resources and
-platform specific resource.
+</details>
 
 ### Define tasks
 
-A task should be defined with a TOML or JSON file, the located in `$MAA_CONFIG_DIR/tasks`.
+A `maa-cli` task should be defined in a single file, which should be located in `$MAA_CONFIG_DIR/tasks` directory.
 
 #### Basic structure
 
-A task is consists of multiple subtasks,
-available subtasks and params are defined by `type` and `params` fields,
-it will passed to MaaCore, see [here](https://maa.plus/docs/en-us/3.1-INTEGRATION.html#asstappendtask) for more details:
+A `maa-cli` task is a sequence of `MAA` tasks, each `MAA` task is defined by `type` and `params` fields:
 
 ```toml
 [[tasks]]
@@ -124,10 +142,11 @@ type = "StartUp" # the type of maa task
 params = { client_type = "Official", start_game_enabled = true } # the params of given task
 ```
 
+See documentation of [MAA](https://maa.plus/docs/en-us/3.1-INTEGRATION.html#asstappendtask) for all available task types and params.
+
 #### Task variants and conditions
 
-If you want to run a task with different params based on some conditions,
-you can define multiple variants of a task:
+In some case, you may want to run a task with different params in different conditions. You can define multiple variants for a task, and use `condition` field to determine whether the variant should be used. For example, you may want to use different infrast plan in different time period of a day:
 
 ```toml
 [[tasks]]
@@ -137,7 +156,7 @@ type = "Infrast"
 mode = 10000
 facility = ["Trade", "Reception", "Mfg", "Control", "Power", "Office", "Dorm"]
 dorm_trust_enabled = true
-filename = "normal.json" # the filename of custom infrast plan should located in `$MAA_CONFIG_DIR/infrast`
+filename = "normal.json" # the filename of custom infrast plan
 
 # use plan 1 before 12:00:00, use plan 2 between 12:00:00 and 18:00:00, use plan 0 after 18:00:00
 [[tasks.variants]]
@@ -156,11 +175,9 @@ params = { plan_index = 0 }
 The `condition` field is used to determine whether the variant should be used,
 and the `params` field of matched variant will be merged into the params of the task.
 
-**Note**: this CLI will not read any content inside the infrast plan file,
-including the time period defined in the `infrast` file,
-so you must define the time period in the `condition` field.
+**Note**: If the `filename` field is a relative path, it will be relative to `$MAA_CONFIG_DIR/infrast`. Besides, the custom infrast plan file will not be read by `maa-cli` but `MaaCore`. So the format of the file must be `JSON` and time period defined in the file will not be used to select the corresponding sub-plan. So you must specify the `plan_index` field in the params of the task to use the correct infrast plan in the corresponding time period. This will ensure that the correct infrast plan is used in the appropriate time period.
 
-Besides of `Time` condition, there are also `DateTime` and `Weakday` conditions:
+Besides of `Time` condition, there are also `DateTime`, `Weakday`, and `Combined` conditions. `DateTime` condition is used to specify a specific datetime period, `Weekday` condition is used to specify some days in a week, `Combined` condition is used to specify a combination of multiple conditions.
 
 ```toml
 [[tasks]]
@@ -179,9 +196,7 @@ params = { stage = "CE-6" }
 params = { stage = "1-7" }
 ```
 
-With default strategy, if multiple variants are matched, only the first one will be used.
-And if the condition is not given, the variant will always be matched,
-So you can put a variant without condition at the end of variants.
+With default strategy, if multiple variants are matched, only the first one will be used. And if the condition is not given, the variant will always be matched. So you can put a variant without condition at the end of variants.
 
 The strategy of matching variants can be changed by `strategy` field:
 
@@ -190,26 +205,33 @@ The strategy of matching variants can be changed by `strategy` field:
 type = "Fight"
 strategy = "merge" # or "first" (default)
 
-# use 5 expiring medicine on Sunday
+# use all expiring medicine on Sunday night
 [[tasks.variants]]
-condition = { type = "Weekday", weekdays = ["Sun"] }
-params = { expiring_medicine = 5 }
-# fight 1-7 otherwise
+params = { expiring_medicine = 1000 }
+[tasks.variants.condition]
+type = "Combined"
+conditions = [
+  { type = "Time", start = "18:00:00" },
+  { type = "Weekday", weekdays = ["Sun"] },
+]
+
+# fight 1-7 by default
 [[tasks.variants]]
 params = { stage = "1-7" }
+
 # fight CE-6 on Tue, Thu, Sat if not on summer event
 [[tasks.variants]]
 condition = { type = "Weekday", weekdays = ["Tue", "Thu", "Sat"] }
 params = { stage = "CE-6" }
+
 # fight SL-8 on summer event
 [[tasks.variants]]
 params = { stage = "SL-8" }
 condition = { type = "DateTime", start = "2023-08-01T16:00:00", end = "2023-08-21T03:59:59" }
 ```
 
-This example will fight the same stage as above, but use 5 expiring medicine on Sunday additionally.
-With the `merge` strategy, if multiple variants are matched, the params of all matched variants will be merged.
-If multiple variants have the same param, the last one will be used.
+The outcome stage of this example should be identical to the previous one, but expiring medicine will be used on Sunday night additionally.
+With the `merge` strategy, if multiple variants are matched, the params of all matched variants will be merged. If multiple variants have the same param, the last one will be used.
 
 If no variant is matched, the task will not be executed,
 which is useful when you want to only run a task in some conditions:
@@ -218,20 +240,14 @@ which is useful when you want to only run a task in some conditions:
 # Mall after 18:00
 [[tasks]]
 type = "Mall"
-[tasks.params]
-shopping = true
-credit_fight = true
-buy_first = ["招聘许可", "龙门币"]
-blacklist = ["碳", "家具", "加急许可"]
+
 [[tasks.variants]]
 condition = { type = "Time", start = "18:00:00" }
 ```
 
 #### User input
 
-In some case, you may want to input some value at runtime, instead of hard code it in the task file.
-Such as the stage to fight, the item to buy, etc.
-You can specify the value `Input` or `Select` type:
+In some case, you may want to input some value at runtime, instead of hard code it in the task file. Such as the stage to fight, the item to buy, etc. You can specify the value as `Input` or `Select` type:
 
 ```toml
 [[tasks]]
@@ -240,6 +256,8 @@ type = "Fight"
 # Select a stage to fight
 [[tasks.variants]]
 condition = { type = "DateTime", start = "2023-08-01T16:00:00", end = "2023-08-21T03:59:59" }
+
+# Set the stage to a `Select` type with alternatives and description
 [tasks.variants.params.stage]
 alternatives = ["SL-6", "SL-7", "SL-8"] # the alternatives of stage, at least one alternative should be given
 description = "a stage to fight in summer event" # description of the input, optional
@@ -251,34 +269,90 @@ params = { stage = "CE-6" }
 
 # Input a stage to fight
 [[tasks.variants]]
+
+# Set the stage to a `Input` type with default value and description
 [tasks.variants.params.stage]
 default = "1-7" # default value of stage, optional (if not given, user can input empty value to re-prompt)
 description = "a stage to fight" # description of the input, optional
 ```
 
-For `Input` type, a prompt will be shown to ask user to input a value.
-If the default value is given, it will be used if user input empty value, otherwise it will re-prompt.
-For `Select` type, a prompt will be shown to ask user to select a value from alternatives (by index).
-If user input is not a valid index, it will re-prompt.
+For `Input` type, a prompt will be shown to ask user to input a value. If the default value is given, it will be used if user input empty value, otherwise it will re-prompt. For `Select` type, a prompt will be shown to ask user to select a value from alternatives (by index). If user input is not a valid index, it will re-prompt. The promote and input can be disabled by `--batch` option, which is useful for running tasks in Schedule.
 
+Example of config file can be found at [`config_examples` directory](./config_examples). Anothor example can be found at my [dotfiles](https://github.com/wangl-cc/dotfiles/tree/master/.config/maa).
 
-Example of config file can be found at [`config_examples` directory](./config_examples).
-Anothor example can be found at my [dotfiles](https://github.com/wangl-cc/dotfiles/tree/master/.config/maa).
+### `MaaCore` related configurations
 
-### Handle MAA core message
+The related configurations of `MaaCore` is located in `$MAA_CONFIG_DIR/asst.toml`. The current available configurations are:
 
-This CLI can handle MAA core message when running a task,
-but not all messages will be printed,
-the log level is used to control which message will be printed.
-There are 6 log level:
-- Error: something wrong, the program may exit or not work as expected;
-- Warning: something wrong, but the program can still work;
-- Normal: some important information, e.g. a task started and finished;
-- Info: more detailed information, e.g. stage drop info;
-- Debug: details about your configuration, e.g. the params of a task;
-  this is useful for you to debug your configuration;
-- Trace: any maa message from MAA core which is not handled by this CLI;
-  this is useful for developers to debug this CLI.
+```toml
+user_resource = true
+resources = ["platform_diff/iOS"]
 
-The default log level is `Normal`, and it can be controlled by `-v` and `-q` options:
-`-v` will increase the log level, and `-q` will decrease the log level.
+[connection]
+type = "ADB"
+adb_path = "adb"
+device = "emulator-5554"
+config = "CompatMac"
+
+[instance_options]
+touch_mode = "MAATouch"
+deployment_with_pause = false
+adb_lite_enabled = false
+kill_adb_on_exit = false
+```
+
+The feild `user_resource` is used to specify whether load user resource, which is a boolean value. If it is `true`, additional resources in `$MAA_CONFIG_DIR/resource` directory will be loaded at last (after all other resources). This is identical to the `--user-resource` command line option.
+See `maa help run` for more information.
+
+The `resources` field is used to specify additional resources, which is a list of resource directories (if relative path is given, it will be relative to `$(maa dir resource)/resource` directory):
+
+The `connection` section is used to specify how to connect to the game. Currently, there are two types of connection: `ADB` and `PlayTools`.
+
+If you use `ADB`, you should set `adb_path` and `device` fields:
+
+```toml
+[connection]
+type = "ADB"
+adb_path = "adb" # the path of adb executable
+device = "emulator-5554" # the serial of your android device
+config = "General" # the config of maa
+```
+
+and if you use `PlayTools`, you should set `address`
+which is the address of MaaTools set in PlayCover,
+more details can be found at
+[here](https://maa.plus/docs/en-us/1.4-EMULATOR_SUPPORTS_FOR_MAC.html#✅-playcover-the-software-runs-most-fluently-for-its-nativity-🚀):
+
+```toml
+[connection]
+type = "PlayTools"
+address = "localhost:1717" # the address of MaaTools
+config = "CompatMac" # the same as above
+```
+
+Both `ADB` and `PlayTools` share the `config` field, which is a parameter of `connect` function of maa.It's default value is `CompatMac` on macOS, `CompatPOSIXShell` on Linux and `General` on other platforms.More optional configs can be found in `config.json` in resource directory.
+
+The `instance_options` section is used to configure maa [instance options](https://maa.plus/docs/en-us/3.1-INTEGRATION.html#asstsetinstanceoption):
+
+```toml
+[instance_options]
+touch_mode = "ADB" # touch mode to use, can be "ADB", "MiniTouch", "MAATouch" or "MacPlayTools" (only for PlayCover)
+deployment_with_pause = false # whether pause the game when deployment
+adb_lite_enabled = false # whether use adb-lite
+kill_adb_on_exit = false # whether kill adb when exit
+```
+
+Note: If you connect to the game with `PlayCover`, the `touch_mode` will be ignored and `MacPlayTools` will be used.
+
+### `maa-cli` related configurations
+
+The `maa-cli` related configurations should be located in `$MAA_CONFIG_DIR/cli.toml`. Currently, it only contains one section: `core`:
+
+```toml
+[core]
+channel = "beta"
+[core.components]
+resource = false
+```
+
+The `channel` field is used to specify the channel of `MaaCore` to install, which can be `stable`, `beta` or `alpha`. The components of `MaaCore` to install can be specified by `components` field, which is a table of boolean values. Currently, only `resource` component is supported.
