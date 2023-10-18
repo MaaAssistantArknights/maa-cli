@@ -117,7 +117,7 @@ jobs:
           mkdir -p "$local_dir"
           mkdir -p "$local/bin"
           mkdir -p "$share_dir"
-          cp -v "$target/$CARGO_BUILD_TARGET/debug/$MAA_EXE" "$local/bin"
+          cp -v "target/$CARGO_BUILD_TARGET/debug/$MAA_EXE" "$local/bin"
           mv -v "$MAA_CORE_DIR" "$local"
           mv -v "$MAA_RESOURCE_DIR" "$share_dir/resource"
           ls -l "$local_dir"
