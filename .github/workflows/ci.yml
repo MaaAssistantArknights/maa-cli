@@ -54,6 +54,9 @@ jobs:
           arch: ${{ matrix.arch }}
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
+      - name: Build (maa-cli)
+        run: |
+          cargo build --package maa-cli --locked
       - name: Lint (clippy)
         if: matrix.arch == 'x86_64'
         run: |
@@ -62,9 +65,6 @@ jobs:
         if: matrix.arch == 'x86_64'
         run: |
           cargo fmt --all -- --check
-      - name: Build (maa-cli)
-        run: |
-          cargo build --package maa-cli --locked
       - name: Test (maa-cli)
         if: matrix.arch == 'x86_64'
         run: |
