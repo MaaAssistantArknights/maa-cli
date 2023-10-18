@@ -113,13 +113,17 @@ jobs:
           MAA_EXE: ${{ startsWith(matrix.os, 'windows') && 'maa.exe' || 'maa' }}
         run: |
           local_dir="local"
-          bin_dir="$local_dir/bin"
-          target_dir="target/$CARGO_BUILD_TARGET/debug"
-          mkdir -p "$bin_dir" && cp -v "$target_dir/$MAA_EXE" "$bin_dir"
-          lib_dir="$local_dir/lib"
-          mkdir -p "$lib_dir" && mv -v "$MAA_CORE_DIR/*" "$lib_dir"
           share_dir="$local_dir/share/maa"
-          mkdir -p "$share_dir" && mv -v "$MAA_RESOURCE_DIR" "$share_dir/resource"
+          mkdir -p "$local_dir"
+          mkdir -p "$local/bin"
+          mkdir -p "$share_dir"
+          cp -v "$target/$CARGO_BUILD_TARGET/debug/$MAA_EXE" "$local/bin"
+          mv -v "$MAA_CORE_DIR" "$local"
+          mv -v "$MAA_RESOURCE_DIR" "$share_dir/resource"
+          ls -l "$local_dir"
+          ls -l "$local_dir/bin"
+          ls -l "$local_dir/lib"
+          ls -l "$share_dir"
           $bin_dir/$MAA_EXE version
           $bin_dir/$MAA_EXE run daily --dry-run --batch
       - name: Cat MaaCore Log
@@ -140,12 +144,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Setup Cache
-        uses: Swatinem/rust-cache@v2
       - name: Install Cargo tarpaulin
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-tarpaulin
+      - name: Setup Cache
+        uses: Swatinem/rust-cache@v2
       - name: Generate code coverage
         run: |
           cargo tarpaulin --all-features --workspace --timeout 120 --out xml
