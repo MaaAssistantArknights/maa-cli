@@ -156,11 +156,11 @@ pub fn run(
 
                         if let Some(client_type) = params.get("client_type") {
                             let client_name = String::try_from(client_type)?;
-                            let cilent_type: ClientType = client_name.parse()?;
+                            let client_type: ClientType = client_name.parse()?;
                             if playtools {
-                                app_name = Some(cilent_type.app_name());
+                                app_name = Some(client_type.app_name());
                             };
-                            client_resource = cilent_type.resource();
+                            client_resource = client_type.resource();
                         };
                     }
                     TaskType::CloseDown if playtools => {
@@ -224,7 +224,7 @@ pub fn run(
     // Resource directorys
     let mut resource_dirs = vec![base_resource_dir.parent().unwrap().to_path_buf()];
 
-    // Cilent specific resource
+    // Client specific resource
     if let Some(resource) = client_resource {
         debug!("Client specific resource:", resource);
         resource_dirs.push(base_resource_dir.join("global").join(resource));
@@ -391,6 +391,7 @@ impl<'n> PlayCoverApp<'n> {
     }
 }
 
+#[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Clone, Copy)]
 enum ClientType {
     Official,
@@ -481,5 +482,45 @@ fn load_core(dirs: &Dirs) {
         maa_sys::binding::load(lib_dir.join(MAA_CORE_NAME));
     } else {
         maa_sys::binding::load(MAA_CORE_NAME);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod client_type {
+        use super::*;
+
+        #[test]
+        fn parse_client() {
+            assert_eq!(ClientType::Official, "Official".parse().unwrap());
+            assert_eq!(ClientType::Official, "".parse().unwrap());
+            assert_eq!(ClientType::Bilibili, "Bilibili".parse().unwrap());
+            assert_eq!(ClientType::Txwy, "txwy".parse().unwrap());
+            assert_eq!(ClientType::YoStarEN, "YoStarEN".parse().unwrap());
+            assert_eq!(ClientType::YoStarJP, "YoStarJP".parse().unwrap());
+            assert_eq!(ClientType::YoStarKR, "YoStarKR".parse().unwrap());
+        }
+
+        #[test]
+        fn client_to_app() {
+            assert_eq!(ClientType::Official.app_name(), "明日方舟");
+            assert_eq!(ClientType::Bilibili.app_name(), "明日方舟");
+            assert_eq!(ClientType::Txwy.app_name(), "明日方舟");
+            assert_eq!(ClientType::YoStarEN.app_name(), "Arknights");
+            assert_eq!(ClientType::YoStarJP.app_name(), "アークナイツ");
+            assert_eq!(ClientType::YoStarKR.app_name(), "명일방주");
+        }
+
+        #[test]
+        fn client_to_resource() {
+            assert_eq!(ClientType::Official.resource(), None);
+            assert_eq!(ClientType::Bilibili.resource(), None);
+            assert_eq!(ClientType::Txwy.resource(), Some("txwy"));
+            assert_eq!(ClientType::YoStarEN.resource(), Some("YoStarEN"));
+            assert_eq!(ClientType::YoStarJP.resource(), Some("YoStarJP"));
+            assert_eq!(ClientType::YoStarKR.resource(), Some("YoStarKR"));
+        }
     }
 }
