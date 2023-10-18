@@ -21,8 +21,6 @@ on:
 env:
   RUST_BACKTRACE: full
   CARGO_TERM_COLOR: always
-  RUSTC_WRAPPER: sccache
-  SCCACHE_GHA_ENABLED: true
 
 defaults:
   run:
@@ -54,8 +52,10 @@ jobs:
         with:
           os: ${{ matrix.os }}
           arch: ${{ matrix.arch }}
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.3
+      - name: Setup Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.os }}-${{ matrix.arch }}
       - name: Lint (clippy)
         if: matrix.arch == 'x86_64'
         run: |
@@ -112,17 +112,17 @@ jobs:
         continue-on-error: ${{ matrix.os == 'windows-latest' }}
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
+          MAA_EXE: ${{ startsWith(matrix.os, 'windows') && 'maa.exe' || 'maa' }}
         run: |
-          target_dir="target/${CARGO_BUILD_TARGET}"
-          lib_dir="$target_dir/lib"
-          share_dir="$target_dir/share/maa"
-          mv "$MAA_CORE_DIR" "$lib_dir"
-          ls -l "$lib_dir"
-          mkdir -p "$share_dir"
-          mv "$MAA_RESOURCE_DIR" "$share_dir/resource"
-          ls -l "$share_dir"
-          cargo run -- version
-          cargo run -- run daily --dry-run --batch
+          local_dir="local"
+          bin_dir="$local_dir/bin"
+          mkdir -p "$bin_dir" && cp -v "target/debug/$MAA_EXE" "$bin_dir"
+          lib_dir="$local_dir/lib"
+          mkdir -p "$lib_dir" && mv -v "$MAA_CORE_DIR/*" "$lib_dir"
+          share_dir="$local_dir/share/maa"
+          mkdir -p "$share_dir" && mv -v "$MAA_RESOURCE_DIR" "$share_dir/resource"
+          $bin_dir/$MAA_EXE version
+          $bin_dir/$MAA_EXE run daily --dry-run --batch
       - name: Cat MaaCore Log
         if: matrix.arch == 'x86_64'
         run: |
@@ -141,8 +141,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.3
+      - name: Setup Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.os }}-coverage
       - name: Install Cargo tarpaulin
         uses: taiki-e/install-action@v2
         with:
