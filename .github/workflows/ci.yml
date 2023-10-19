@@ -52,6 +52,11 @@ jobs:
         with:
           os: ${{ matrix.os }}
           arch: ${{ matrix.arch }}
+      - name: Setup Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Build (maa-cli)
+        run: |
+          cargo build --package maa-cli --locked
       - name: Lint (clippy)
         if: matrix.arch == 'x86_64'
         run: |
@@ -60,9 +65,6 @@ jobs:
         if: matrix.arch == 'x86_64'
         run: |
           cargo fmt --all -- --check
-      - name: Build (maa-cli)
-        run: |
-          cargo build --package maa-cli --locked
       - name: Test (maa-cli)
         if: matrix.arch == 'x86_64'
         run: |
@@ -108,17 +110,24 @@ jobs:
         continue-on-error: ${{ matrix.os == 'windows-latest' }}
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
+          MAA_EXE: ${{ startsWith(matrix.os, 'windows') && 'maa.exe' || 'maa' }}
         run: |
-          target_dir="target/${CARGO_BUILD_TARGET}"
-          lib_dir="$target_dir/lib"
-          share_dir="$target_dir/share/maa"
-          mv "$MAA_CORE_DIR" "$lib_dir"
-          ls -l "$lib_dir"
+          local_dir="local"
+          bin_dir="$local_dir/bin"
+          lib_dir="$local_dir/lib"
+          share_dir="$local_dir/share/maa"
+          mkdir -p "$local_dir"
+          mkdir -p "$bin_dir"
           mkdir -p "$share_dir"
-          mv "$MAA_RESOURCE_DIR" "$share_dir/resource"
+          cp -v "target/$CARGO_BUILD_TARGET/debug/$MAA_EXE" "$bin_dir"
+          mv -v "$MAA_CORE_DIR" "$lib_dir"
+          mv -v "$MAA_RESOURCE_DIR" "$share_dir/resource"
+          ls -l "$local_dir"
+          ls -l "$local_dir/bin"
+          ls -l "$local_dir/lib"
           ls -l "$share_dir"
-          cargo run -- version
-          cargo run -- run daily --dry-run --batch
+          $bin_dir/$MAA_EXE version
+          $bin_dir/$MAA_EXE run daily --dry-run --batch
       - name: Cat MaaCore Log
         if: matrix.arch == 'x86_64'
         run: |
@@ -141,9 +150,11 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-tarpaulin
+      - name: Setup Cache
+        uses: Swatinem/rust-cache@v2
       - name: Generate code coverage
         run: |
-          cargo tarpaulin --all-features --workspace --timeout 120 --out xml
+          cargo tarpaulin --all-features --workspace --timeout 120 --out xml ${{ github.run_attempt == 1 && '--skip-clean' || '' }}
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v3
         with:
