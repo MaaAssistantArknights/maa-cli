@@ -86,6 +86,15 @@ pub fn run(
         }
     };
 
+    // Process static options
+    let static_options = asst_config.static_options;
+    if let Some(v) = static_options.cpu_ocr {
+        debug!("Static Option `cpu_ocr`:", v);
+    }
+    if let Some(v) = static_options.gpu_ocr {
+        debug!("Static Option `gpu_ocr`:", v);
+    }
+
     // Process instance options
     let mut instance_options = asst_config.instance_options;
     if let Some(v) = instance_options.touch_mode {
@@ -261,7 +270,14 @@ pub fn run(
     // Load MaaCore
     load_core(dirs);
 
-    // TODO: Set static option (used in future version of MaaCore)
+    // Set static option
+    if static_options.cpu_ocr.is_some_and(|v| v) {
+        Assistant::set_static_option(1, true).context("Failed to set static option `cpu_ocr`!")?;
+    }
+    if let Some(v) = static_options.gpu_ocr {
+        Assistant::set_static_option(2, v.to_string())
+            .context("Failed to set static option `gpu_ocr`!")?;
+    }
 
     // Set user directory (some debug info and cache will be stored here)
     // Must be called before load resource (if not it will be set to resource directory)
