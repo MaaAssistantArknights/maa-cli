@@ -77,11 +77,6 @@ jobs:
         with:
           config: cliff.toml
           args: -vv ${{ fromJson(needs.meta.outputs.dryrun) && '-u' || '-l' }}
-      - name: Print Release Notes
-        run: |
-          echo "```markdown" >> $GITHUB_STEP_SUMMARY
-          cat "${{ steps.git_cliff.outputs.changelog }}" >> $GITHUB_STEP_SUMMARY
-          echo "```" >> $GITHUB_STEP_SUMMARY
 
   build:
     name: Build
