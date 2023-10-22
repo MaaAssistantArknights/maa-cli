@@ -173,7 +173,7 @@ jobs:
           done
       - name: Generate Release Notes
         id: git_cliff
-        uses: orhun/git-cliff-action
+        uses: orhun/git-cliff-action@v2
         with:
           args: -vv ${{ !fromJson(needs.meta.outputs.dryrun) && '-u' || '-l' }}
       - name: Create Release
