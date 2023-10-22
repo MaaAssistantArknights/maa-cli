@@ -1,24 +1,22 @@
 [changelog]
 # changelog header
 header = """
-# Release Notes
+# Release Notes\n
 """
 # template for the changelog body
 # https://keats.github.io/tera/docs/#introduction
 body = """
-{% if not version %}
-  {% for group in ["Breaking Changes", "Features", "Bug Fixes", "Performance",
-  "Refactor", "Documentation", "Testing", "Miscellaneous", "Security", "Revert"] -%}
-      {% set grouped_commits = commits | filter(attribute="group", value=group) -%}
-      {% if grouped_commits | length > 0 -%}
-          ## {{ group }}\n
-          {% for commit in grouped_commits -%}
-            - {{ commit.message | upper_first }}
-          {% endfor -%}
-          {{ "" }}
-      {% endif -%}
-  {% endfor -%}
-{% endif %}
+{% for group in ["Breaking Changes", "Features", "Bug Fixes", "Performance",
+"Refactor", "Documentation", "Testing", "Miscellaneous", "Security", "Revert"] -%}
+    {% set grouped_commits = commits | filter(attribute="group", value=group) -%}
+    {% if grouped_commits | length > 0 -%}
+        ## {{ group }}\n
+        {% for commit in grouped_commits -%}
+          - {{ commit.message | upper_first }}
+        {% endfor -%}
+        {{ "" }}
+    {% endif -%}
+{% endfor -%}
 """
 # remove the leading and trailing whitespace from the template
 trim = true
