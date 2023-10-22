@@ -126,7 +126,7 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-  release_note:
+  release-note:
     name: Generate Release Notes
     runs-on: ubuntu-latest
     needs: [meta]
@@ -199,7 +199,7 @@ jobs:
         if: ${{ !fromJson(needs.meta.outputs.dryrun) }}
         with:
           name: v${{ needs.meta.outputs.version }}
-          body: ${{ needs.release_note.outputs.content }}
+          body: ${{ needs.release-note.outputs.content }}
           fail_on_unmatched_files: true
           files: |
             maa_cli-v${{ needs.meta.outputs.version }}-*-unknown-linux-gnu.tar.gz*
