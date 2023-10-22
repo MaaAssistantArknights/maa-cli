@@ -60,6 +60,29 @@ jobs:
           echo "Version: $CARGO_VERSION"
           echo "version=$CARGO_VERSION" >> $GITHUB_OUTPUT
 
+  release-note:
+    name: Generate Release Notes
+    runs-on: ubuntu-latest
+    needs: [meta]
+    outputs:
+      content: ${{ steps.git_cliff.outputs.content }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Generate Release Notes
+        id: git_cliff
+        uses: orhun/git-cliff-action@v2
+        with:
+          config: cliff.toml
+          args: -vv ${{ fromJson(needs.meta.outputs.dryrun) && '-u' || '-l' }}
+      - name: Print Release Notes
+        run: |
+          echo "```markdown" >> $GITHUB_STEP_SUMMARY
+          cat "${{ steps.git_cliff.outputs.changelog }}" >> $GITHUB_STEP_SUMMARY
+          echo "```" >> $GITHUB_STEP_SUMMARY
+
   build:
     name: Build
     needs: meta
@@ -125,29 +148,6 @@ jobs:
           path: universal-apple-darwin.tar
           retention-days: 1
           if-no-files-found: error
-
-  release-note:
-    name: Generate Release Notes
-    runs-on: ubuntu-latest
-    needs: [meta]
-    outputs:
-      content: ${{ steps.git_cliff.outputs.content }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Generate Release Notes
-        id: git_cliff
-        uses: orhun/git-cliff-action@v2
-        with:
-          config: cliff.toml
-          args: -vv ${{ fromJson(needs.meta.outputs.dryrun) && '-u' || '-l' }}
-      - name: Print Release Notes
-        run: |
-          echo "```markdown" >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.git_cliff.outputs.content }}" >> $GITHUB_STEP_SUMMARY
-          echo "```" >> $GITHUB_STEP_SUMMARY
 
   release:
     name: Release
