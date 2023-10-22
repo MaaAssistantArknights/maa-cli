@@ -181,7 +181,7 @@ jobs:
         if: ${{ !fromJson(needs.meta.outputs.dryrun) }}
         with:
           name: v${{ needs.meta.outputs.version }}
-          body: ${{ steps.git_cliff.outputs.changelog }}
+          body_path: ${{ steps.git_cliff.outputs.changelog }}
           fail_on_unmatched_files: true
           files: |
             maa_cli-v${{ needs.meta.outputs.version }}-*-unknown-linux-gnu.tar.gz*
@@ -191,7 +191,7 @@ jobs:
         if: ${{ fromJson(needs.meta.outputs.dryrun) }}
         run: |
           echo "Release Notes:" >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.git_cliff.outputs.changelog }}" >> $GITHUB_STEP_SUMMARY
+          cat "${{ steps.git_cliff.outputs.changelog }}" >> $GITHUB_STEP_SUMMARY
       - name: Commit version.json and Push
         working-directory: version
         run: |
