@@ -171,22 +171,33 @@ jobs:
             yq -i -oj ".maa-cli.$target.size = $size" $version_file
             yq -i -oj ".maa-cli.$target.sha256sum = \"$(echo $checksum | cut -d ' ' -f 1)\"" $version_file
           done
+      - name: Generate Release Notes
+        id: git_cliff
+        uses: orhun/git-cliff-action
+        with:
+          args: -vv ${{ !fromJson(needs.meta.outputs.dryrun) && '-u' || '-l' }}
       - name: Create Release
         uses: softprops/action-gh-release@v1
         if: ${{ !fromJson(needs.meta.outputs.dryrun) }}
         with:
           name: v${{ needs.meta.outputs.version }}
-          generate_release_notes: true
+          body: ${{ steps.git_cliff.outputs.changelog }}
           fail_on_unmatched_files: true
           files: |
             maa_cli-v${{ needs.meta.outputs.version }}-*-unknown-linux-gnu.tar.gz*
             maa_cli-v${{ needs.meta.outputs.version }}-universal-apple-darwin.zip*
             maa_cli-v${{ needs.meta.outputs.version }}-*-pc-windows-msvc.zip*
+      - name: Print Release Notes
+        if: ${{ fromJson(needs.meta.outputs.dryrun) }}
+        run: |
+          echo "Release Notes:" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.git_cliff.outputs.changelog }}" >> $GITHUB_STEP_SUMMARY
       - name: Commit version.json and Push
         working-directory: version
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          echo "Commit changes to version.json" >> $GITHUB_STEP_SUMMARY
           echo '```diff' >> $GITHUB_STEP_SUMMARY
           git diff version.json >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
