@@ -270,7 +270,11 @@ pub fn run(
     // Load MaaCore
     load_core(dirs);
 
-    // Set static option
+    // Set user directory (some debug info and cache will be stored here)
+    // Must be called any other function (set_static_option, load_resource, etc.)
+    Assistant::set_user_dir(state_dir).context("Failed to set user directory!")?;
+
+    // Set static option (this must be called before load_resource and after set_user_dir)
     if static_options.cpu_ocr.is_some_and(|v| v) {
         Assistant::set_static_option(1, true).context("Failed to set static option `cpu_ocr`!")?;
     }
@@ -278,10 +282,6 @@ pub fn run(
         Assistant::set_static_option(2, v.to_string())
             .context("Failed to set static option `gpu_ocr`!")?;
     }
-
-    // Set user directory (some debug info and cache will be stored here)
-    // Must be called before load resource (if not it will be set to resource directory)
-    Assistant::set_user_dir(state_dir).context("Failed to set user directory!")?;
 
     // Load Resource
     for path in resource_dirs.iter() {
