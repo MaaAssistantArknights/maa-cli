@@ -200,11 +200,6 @@ jobs:
             maa_cli-v${{ needs.meta.outputs.version }}-*-unknown-linux-gnu.tar.gz*
             maa_cli-v${{ needs.meta.outputs.version }}-universal-apple-darwin.zip*
             maa_cli-v${{ needs.meta.outputs.version }}-*-pc-windows-msvc.zip*
-      - name: Print Release Notes
-        run: |
-          echo "```markdown" >> $GITHUB_STEP_SUMMARY
-          cat "${{ steps.git_cliff.outputs.content }}" >> $GITHUB_STEP_SUMMARY
-          echo "```" >> $GITHUB_STEP_SUMMARY
       - name: Commit version.json and Push
         working-directory: version
         run: |
