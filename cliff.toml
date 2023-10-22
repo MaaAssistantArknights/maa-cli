@@ -55,7 +55,7 @@ commit_parsers = [
   { body = ".*security", group = "Security" },
   { message = "^[Rr]evert", group = "Revert" },
 
-  { message = "^bump", skip = true },
+  { message = "^Bump", skip = true },
 ]
 # protect breaking changes from being skipped due to matching a skipping commit_parser
 protect_breaking_commits = false
