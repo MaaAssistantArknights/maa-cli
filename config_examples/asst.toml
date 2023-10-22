@@ -7,6 +7,10 @@ adb_path = "adb"
 device = "emulator-5554"
 config = "CompatMac"
 
+[static_options]
+cpu_ocr = true
+# gpu_ocr = 1 # we can't use gpu_ocr on CI, so this option is commented out
+
 [instance_options]
 touch_mode = "MAATouch"
 deployment_with_pause = false

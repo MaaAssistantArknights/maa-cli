@@ -10,7 +10,16 @@ pub struct AsstConfig {
     #[serde(default)]
     pub connection: Connection,
     #[serde(default)]
+    pub static_options: StaticOptions,
+    #[serde(default)]
     pub instance_options: InstanceOptions,
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Deserialize, Default)]
+pub struct StaticOptions {
+    pub cpu_ocr: Option<bool>,
+    pub gpu_ocr: Option<i64>,
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -163,6 +172,10 @@ mod tests {
                         device: String::from("emulator-5554"),
                         config: String::from("CompatMac"),
                     },
+                    static_options: StaticOptions {
+                        cpu_ocr: Some(true),
+                        gpu_ocr: None
+                    },
                     instance_options: InstanceOptions {
                         touch_mode: Some(TouchMode::MAATouch),
                         deployment_with_pause: Some(false),
@@ -191,6 +204,10 @@ mod tests {
                         } else {
                             String::from("General")
                         },
+                    },
+                    static_options: StaticOptions {
+                        cpu_ocr: None,
+                        gpu_ocr: None,
                     },
                     instance_options: InstanceOptions {
                         touch_mode: None,
