@@ -79,7 +79,7 @@ jobs:
         run: brew tap MaaAssistantArknights/homebrew-tap
       - name: Bump Formula
         run: >
-          brew bump-formula-pr ${{ fromJson(needs.meta.outputs.dryrun) && "--dry-run" || "" }}
+          brew bump-formula-pr ${{ fromJson(needs.meta.outputs.dryrun) && '--dry-run' || '' }}
             --no-browse
             --no-fork
             --version='${{ needs.meta.outputs.version }}'
@@ -95,7 +95,7 @@ jobs:
         run: brew tap MaaAssistantArknights/homebrew-tap
       - name: Bump Cask
         run: >
-          brew bump-cask-pr ${{ fromJson(needs.meta.outputs.dryrun) && "--dry-run" || "" }}
+          brew bump-cask-pr ${{ fromJson(needs.meta.outputs.dryrun) && '--dry-run' || '' }}
             --no-browse
             --no-fork
             --version='${{ needs.meta.outputs.version }}'
