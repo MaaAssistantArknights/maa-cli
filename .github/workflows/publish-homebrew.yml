@@ -36,33 +36,67 @@ defaults:
 permissions:
   contents: read
 
+env:
+  HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.MAA_HOMEBREW_BUMP_PR }}
+
 jobs:
-  cask:
-    name: Cask
-    runs-on: macos-latest
+  meta:
+    name: Meta
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      dryrun: ${{ steps.dryrun.outputs.dryrun }}
     steps:
-      - name: Update Homebrew Cask
-        uses: wangl-cc/action-homebrew-bump-cask@master
-        with:
-          token: ${{secrets.MAA_HOMEBREW_BUMP_PR}}
-          tap: MaaAssistantArknights/homebrew-tap
-          cask: maa-cli-bin
-          tag: ${{ inputs.version || github.ref }}
-          no_fork: true
-          force: false
-          dryrun: ${{ github.event_name != 'release' || inputs.dryrun }}
+      - name: Check if Dryrun
+        id: dryrun
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+            dryrun='false'
+          else
+            dryrun='${{ inputs.dryrun }}'
+          fi
+          echo "Dryrun: $dryrun"
+          echo "dryrun=$dryrun" >> $GITHUB_OUTPUT
+      - name: Get version
+        id : version
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+            tag='${{ github.ref }}'
+            version=${tag#refs/tags/v}
+          else
+            version='${{ inputs.version }}'
+          fi
+          echo "Version: $version"
+          echo "version=$version" >> $GITHUB_OUTPUT
+
 
   formula:
     name: Formula
-    if: ${{ github.event_name == 'release' || !inputs.dryrun }}
     runs-on: macos-latest
     steps:
-      - name: Update Homebrew Formula
-        uses: dawidd6/action-homebrew-bump-formula@v3
-        with:
-          token: ${{secrets.MAA_HOMEBREW_BUMP_PR}}
-          tap: MaaAssistantArknights/homebrew-tap
-          formula: maa-cli
-          tag: ${{ inputs.version || github.ref }}
-          no_fork: true
-          force: false
+      - name: Tap MaasistantArknights Tap
+        run: brew tap MaaAssistantArknights/homebrew-tap
+      - name: Bump Formula
+        run: >
+          brew bump-formula-pr maa-cli
+            ${{ fromJson(needs.meta.outputs.dryrun) && "--dry-run" || "" }}
+            --no-browse
+            --no-fork
+            --version='${{ needs.meta.outputs.version }}'
+            --message='Bump `maa-cli` to `${{ needs.meta.outputs.version }}`'
+
+  cask:
+    name: Cask
+    needs: [meta]
+    runs-on: macos-latest
+    steps:
+      - name: Tap MaasistantArknights Tap
+        run: brew tap MaaAssistantArknights/homebrew-tap
+      - name: Bump Cask
+        run: >
+          brew bump-cask-pr maa-cli-bin
+            ${{ fromJson(needs.meta.outputs.dryrun) && "--dry-run" || "" }}
+            --no-browse
+            --no-fork
+            --version='${{ needs.meta.outputs.version }}'
+            --message='Bump `maa-cli-bin` to `${{ needs.meta.outputs.version }}`'

@@ -44,6 +44,7 @@ jobs:
           else
             dryrun=true
           fi
+          echo "Dryrun: $dryrun"
           echo "dryrun=$dryrun" >> $GITHUB_OUTPUT
       - name: Get Version
         id: version
@@ -217,7 +218,7 @@ jobs:
     name: Publish Homebrew
     uses: ./.github/workflows/publish-homebrew.yml
     with:
-      version: v${{ needs.meta.outputs.version }}
+      version: ${{ needs.meta.outputs.version }}
       dryrun: ${{ fromJson(needs.meta.outputs.dryrun) }}
     secrets:
       MAA_HOMEBREW_BUMP_PR: ${{ secrets.MAA_HOMEBREW_BUMP_PR }}
