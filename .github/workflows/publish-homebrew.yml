@@ -10,7 +10,7 @@ on:
         required: false
         type: string
       dryrun:
-        description: Do not push changes to Homebrew
+        description: Do not create PR
         required: true
         type: boolean
     secrets:
@@ -24,7 +24,7 @@ on:
         required: false
         type: string
       dryrun:
-        description: Do not push changes to Homebrew
+        description: Do not create PR
         default: true
         required: true
         type: boolean
@@ -82,7 +82,6 @@ jobs:
           brew bump-formula-pr maa-cli
           ${{ fromJson(needs.meta.outputs.dryrun) && '--dry-run' || '' }}
           --no-browse
-          --no-fork
           --version='${{ needs.meta.outputs.version }}'
           --message='Bump `maa-cli` to `${{ needs.meta.outputs.version }}`'
 
@@ -98,6 +97,5 @@ jobs:
           brew bump-cask-pr maa-cli-bin
           ${{ fromJson(needs.meta.outputs.dryrun) && '--dry-run' || '' }}
           --no-browse
-          --no-fork
           --version='${{ needs.meta.outputs.version }}'
           --message='Bump `maa-cli-bin` to `${{ needs.meta.outputs.version }}`'
