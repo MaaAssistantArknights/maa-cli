@@ -79,12 +79,12 @@ jobs:
         run: brew tap MaaAssistantArknights/homebrew-tap
       - name: Bump Formula
         run: >
-          brew bump-formula-pr ${{ fromJson(needs.meta.outputs.dryrun) && '--dry-run' || '' }}
-            --no-browse
-            --no-fork
-            --version='${{ needs.meta.outputs.version }}'
-            --message='Bump `maa-cli` to `${{ needs.meta.outputs.version }}`'
-            maa-cli
+          brew bump-formula-pr maa-cli
+          ${{ fromJson(needs.meta.outputs.dryrun) && '--dry-run' || '' }}
+          --no-browse
+          --no-fork
+          --version='${{ needs.meta.outputs.version }}'
+          --message='Bump `maa-cli` to `${{ needs.meta.outputs.version }}`'
 
   cask:
     name: Cask
@@ -95,9 +95,9 @@ jobs:
         run: brew tap MaaAssistantArknights/homebrew-tap
       - name: Bump Cask
         run: >
-          brew bump-cask-pr ${{ fromJson(needs.meta.outputs.dryrun) && '--dry-run' || '' }}
-            --no-browse
-            --no-fork
-            --version='${{ needs.meta.outputs.version }}'
-            --message='Bump `maa-cli-bin` to `${{ needs.meta.outputs.version }}`'
-            maa-cli-bin
+          brew bump-cask-pr maa-cli-bin
+          ${{ fromJson(needs.meta.outputs.dryrun) && '--dry-run' || '' }}
+          --no-browse
+          --no-fork
+          --version='${{ needs.meta.outputs.version }}'
+          --message='Bump `maa-cli-bin` to `${{ needs.meta.outputs.version }}`'
