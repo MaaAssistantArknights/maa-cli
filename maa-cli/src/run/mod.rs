@@ -230,7 +230,7 @@ pub fn run(
     };
 
     /*----------------------- Process Resource ---------------------*/
-    // Resource directorys
+    // Resource directories
     let mut resource_dirs = vec![base_resource_dir.parent().unwrap().to_path_buf()];
 
     // Client specific resource

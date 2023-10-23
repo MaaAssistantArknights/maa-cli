@@ -204,7 +204,7 @@ enum SubCommand {
         /// you can use this option to load resources from the `resource` directory,
         /// which is a subdirectory of the config directory.
         ///
-        /// This option can alse be enabled by setting the value of the key `user_resource` to true
+        /// This option can also be enabled by setting the value of the key `user_resource` to true
         /// in the asst configure file `$MAA_CONFIG_DIR/asst.toml`.
         ///
         /// Note:

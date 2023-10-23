@@ -47,7 +47,7 @@ You can install CLI by download prebuilt binary from
 <table>
     <thead>
         <tr>
-            <th>Opearting System</th>
+            <th>Operation System</th>
             <th>Architecture</th>
             <th>Filename</th>
         </tr>
@@ -110,7 +110,7 @@ More details can be found by `maa help`.
 
 ### Configuration directory
 
-All configurations of `maa-cli` is located in a specific configuation directory, which can be get by `maa dir config`.
+All configurations of `maa-cli` is located in a specific configuration directory, which can be get by `maa dir config`.
 The configuration directory can be changed by environment variable `MAA_CONFIG_DIR`. In below examples, we will use `$MAA_CONFIG_DIR` to represent the configuration directory.
 
 All configuration files can be written in TOML, YAML or JSON format. In below examples, we will use TOML format and `.toml` as file extension. But you can mix these three formats as long as the file extension is correct.
@@ -301,7 +301,7 @@ adb_lite_enabled = false
 kill_adb_on_exit = false
 ```
 
-The feild `user_resource` is used to specify whether load user resource, which is a boolean value. If it is `true`, additional resources in `$MAA_CONFIG_DIR/resource` directory will be loaded at last (after all other resources). This is identical to the `--user-resource` command line option.
+The field `user_resource` is used to specify whether load user resource, which is a boolean value. If it is `true`, additional resources in `$MAA_CONFIG_DIR/resource` directory will be loaded at last (after all other resources). This is identical to the `--user-resource` command line option.
 See `maa help run` for more information.
 
 The `resources` field is used to specify additional resources, which is a list of resource directories (if relative path is given, it will be relative to `$(maa dir resource)/resource` directory):

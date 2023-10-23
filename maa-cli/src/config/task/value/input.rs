@@ -398,7 +398,7 @@ mod tests {
         }
 
         #[test]
-        fn select_no_decription() {
+        fn select_no_description() {
             let value = Select {
                 alternatives: vec!['A', 'B'],
                 description: None,

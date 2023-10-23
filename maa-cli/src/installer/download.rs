@@ -178,7 +178,7 @@ async fn try_download(client: &Client, url: &str, timeout: Duration) -> Result<u
     Ok(downloaded)
 }
 
-/// Download from mutiple mirrors and choose the fastest one.
+/// Download from multiple mirrors and choose the fastest one.
 ///
 /// # Arguments
 /// * `client` - A reqwest client.

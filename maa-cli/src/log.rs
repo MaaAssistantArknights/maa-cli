@@ -5,7 +5,7 @@ pub enum LogLevel {
     Warning,   // Show some warning about the program
     Normal, // Default log level, show some basic info about this program and MaaCore running status
     Info,   // Some additional info about the program, like some detail status of the MaaCore
-    Debug, // Detailed info about configuration and others, is used for user to debug thier own configuration
+    Debug, // Detailed info about configuration and others, is used for user to debug their own configuration
     Trace, // Trace the running of MaaCore, show every failed message processing, used for developer to debug the program
 }
 

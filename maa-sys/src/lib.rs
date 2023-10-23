@@ -238,8 +238,8 @@ impl Assistant {
     pub fn get_version<'a>() -> Result<&'a str> {
         unsafe {
             let c_str = binding::AsstGetVersion();
-            let verion = CStr::from_ptr(c_str).to_str()?;
-            Ok(verion)
+            let version = CStr::from_ptr(c_str).to_str()?;
+            Ok(version)
         }
     }
     pub fn log(level: impl ToCString, msg: impl ToCString) -> Result<()> {
