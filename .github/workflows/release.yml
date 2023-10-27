@@ -219,11 +219,12 @@ jobs:
 
   publish-homebrew:
     needs: [meta, release]
+    if: ${{ !fromJson(needs.meta.outputs.dryrun) }}
     name: Publish Homebrew
     uses: ./.github/workflows/publish-homebrew.yml
     with:
       version: ${{ needs.meta.outputs.version }}
-      dryrun: ${{ fromJson(needs.meta.outputs.dryrun) }}
+      dryrun: false
     secrets:
       MAA_HOMEBREW_BUMP_PR: ${{ secrets.MAA_HOMEBREW_BUMP_PR }}
 
