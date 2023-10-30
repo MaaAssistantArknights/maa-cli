@@ -10,7 +10,7 @@ use crate::{
 use std::{
     env::{
         consts::{DLL_PREFIX, DLL_SUFFIX},
-        var_os,
+        current_exe, var_os,
     },
     path::{Component, Path, PathBuf},
     time::Duration,
@@ -293,8 +293,7 @@ pub fn find_lib_dir(dirs: &Dirs) -> Option<PathBuf> {
         return Some(lib_dir.to_path_buf());
     }
 
-    if let Ok(path) = current_exe() {
-        let exe_dir = path.parent().unwrap();
+    current_exe_dir_find(|exe_dir| {
         if exe_dir.join(MAA_CORE_NAME).exists() {
             return Some(exe_dir.to_path_buf());
         }
@@ -304,9 +303,9 @@ pub fn find_lib_dir(dirs: &Dirs) -> Option<PathBuf> {
                 return Some(lib_dir);
             }
         }
-    }
 
-    None
+        None
+    })
 }
 
 pub fn find_resource(dirs: &Dirs) -> Option<PathBuf> {
@@ -315,8 +314,7 @@ pub fn find_resource(dirs: &Dirs) -> Option<PathBuf> {
         return Some(resource_dir.to_path_buf());
     }
 
-    if let Ok(path) = current_exe() {
-        let exe_dir = path.parent().unwrap();
+    current_exe_dir_find(|exe_dir| {
         let resource_dir = exe_dir.join("resource");
         if resource_dir.exists() {
             return Some(resource_dir);
@@ -334,12 +332,26 @@ pub fn find_resource(dirs: &Dirs) -> Option<PathBuf> {
                 return Some(resource_dir);
             }
         }
-    }
-
-    None
+        None
+    })
 }
 
-pub fn current_exe() -> Result<PathBuf> {
-    let path = std::env::current_exe()?;
-    Ok(canonicalize(path)?)
+/// Find path starting from current executable directory
+pub fn current_exe_dir_find<F>(finder: F) -> Option<PathBuf>
+where
+    F: Fn(&Path) -> Option<PathBuf>,
+{
+    let exe_path = current_exe().ok()?;
+    println!("exe_path: {:?}", exe_path);
+    let exe_dir = exe_path.parent().unwrap();
+    if let Some(path) = finder(exe_dir) {
+        return Some(path);
+    }
+    let canonicalized = canonicalize(exe_dir).ok()?;
+    println!("canonicalized: {:?}", canonicalized);
+    if canonicalized == exe_dir {
+        None
+    } else {
+        finder(&canonicalized)
+    }
 }
