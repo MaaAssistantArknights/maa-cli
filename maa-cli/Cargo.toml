@@ -25,7 +25,7 @@ paste = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.8"
-serde_yaml = "0.9.25"
+serde_yaml = "0.9.27"
 indicatif = "0.17.7"
 tokio = { version = "1.31", default-features = false, features = ["rt"] }
 futures-util = "0.3.28"
