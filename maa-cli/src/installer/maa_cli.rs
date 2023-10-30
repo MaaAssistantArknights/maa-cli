@@ -1,17 +1,17 @@
 use super::{
     download::{download, Checker},
     extract::Archive,
-    maa_core::current_exe,
 };
 
 use crate::dirs::{Dirs, Ensure};
 
 use std::{
-    env::{consts::EXE_SUFFIX, var_os},
+    env::{consts::EXE_SUFFIX, current_exe, var_os},
     path::Path,
 };
 
 use anyhow::{bail, Context, Result};
+use dunce::canonicalize;
 use semver::Version;
 use serde::Deserialize;
 use tokio::runtime::Runtime;
@@ -44,7 +44,7 @@ pub fn update(dirs: &Dirs) -> Result<()> {
     );
 
     let bin_name = name();
-    let bin_path = current_exe()?;
+    let bin_path = canonicalize(current_exe()?)?;
     let cache_dir = dirs.cache().ensure()?;
 
     asset.download(cache_dir)?.extract(|path| {
