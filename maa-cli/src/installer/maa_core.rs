@@ -342,13 +342,11 @@ where
     F: Fn(&Path) -> Option<PathBuf>,
 {
     let exe_path = current_exe().ok()?;
-    println!("exe_path: {:?}", exe_path);
     let exe_dir = exe_path.parent().unwrap();
     if let Some(path) = finder(exe_dir) {
         return Some(path);
     }
     let canonicalized = canonicalize(exe_dir).ok()?;
-    println!("canonicalized: {:?}", canonicalized);
     if canonicalized == exe_dir {
         None
     } else {
