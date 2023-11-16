@@ -1,6 +1,8 @@
 mod message;
 use message::callback;
 
+pub mod fight;
+
 use crate::{
     config::{
         asst::{self, AsstConfig, Connection, TouchMode},
@@ -22,9 +24,26 @@ use std::path::PathBuf;
 use anyhow::{anyhow, bail, Context, Result};
 use maa_sys::Assistant;
 
+pub enum CLITask {
+    TaskList(TaskList),
+    TaskName(String),
+}
+
+impl From<TaskList> for CLITask {
+    fn from(task_list: TaskList) -> Self {
+        Self::TaskList(task_list)
+    }
+}
+
+impl From<String> for CLITask {
+    fn from(task_name: String) -> Self {
+        Self::TaskName(task_name)
+    }
+}
+
 pub fn run(
     dirs: &Dirs,
-    task: String,
+    task: impl Into<CLITask>,
     addr: Option<String>,
     user_resource: bool,
     batch: bool,
@@ -127,15 +146,20 @@ pub fn run(
     /*----------------------- Process Task -------------------------*/
 
     // Load task from tasks/<task>.(toml|yaml|json)
-    let task_file = config_dir.join("tasks").join(&task);
-    debug!("Finding task file:", task_file.display());
-    let task_list = TaskList::find_file(&task_file).with_context(|| {
-        format!(
-            "Failed to find task file {} in {}",
-            task,
-            task_file.display()
-        )
-    })?;
+    let task_list = match task.into() {
+        CLITask::TaskList(task_list) => task_list,
+        CLITask::TaskName(task_name) => {
+            let task_file = config_dir.join("tasks").join(&task_name);
+            debug!("Finding task file:", task_file.display());
+            TaskList::find_file(&task_file).with_context(|| {
+                format!(
+                    "Failed to find task file {} in {}",
+                    task_name,
+                    task_file.display()
+                )
+            })?
+        }
+    };
 
     let mut tasks: Vec<String> = Vec::new();
     let mut task_params: Vec<String> = Vec::new();
