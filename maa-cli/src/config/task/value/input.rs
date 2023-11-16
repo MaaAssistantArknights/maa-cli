@@ -75,6 +75,17 @@ pub struct Input<F> {
 }
 
 impl<F: FromStr + Clone + Display> Input<F> {
+    pub fn new<I, S>(default: Option<I>, description: Option<S>) -> Self
+    where
+        I: Into<F>,
+        S: Into<String>,
+    {
+        Self {
+            default: default.map(|i| i.into()),
+            description: description.map(|s| s.into()),
+        }
+    }
+
     pub fn prompt(&self, mut writer: impl Write) -> Result<()> {
         write!(writer, "Please input")?;
         if let Some(description) = &self.description {
@@ -134,6 +145,17 @@ pub struct Select<F> {
 }
 
 impl<F: FromStr + Clone + Display> Select<F> {
+    pub fn new<I, S>(alternatives: Vec<I>, description: Option<S>) -> Self
+    where
+        I: Into<F>,
+        S: Into<String>,
+    {
+        Self {
+            alternatives: alternatives.into_iter().map(|i| i.into()).collect(),
+            description: description.map(|s| s.into()),
+        }
+    }
+
     pub fn prompt(&self, mut writer: impl Write) -> Result<()> {
         for (i, alternative) in self.alternatives.iter().enumerate() {
             writeln!(writer, "{}. {}", i + 1, alternative)?;

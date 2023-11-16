@@ -19,7 +19,7 @@ pub struct TaskVariant {
     pub params: Value,
 }
 
-fn default_variants() -> Vec<TaskVariant> {
+pub fn default_variants() -> Vec<TaskVariant> {
     vec![Default::default()]
 }
 
@@ -53,6 +53,20 @@ pub struct Task {
 }
 
 impl Task {
+    pub fn new<T, V, S>(task_type: T, params: V, strategy: Strategy, variants: S) -> Self
+    where
+        T: Into<TaskOrUnknown>,
+        V: Into<Value>,
+        S: IntoIterator<Item = TaskVariant>,
+    {
+        Self {
+            task_type: task_type.into(),
+            strategy,
+            params: params.into(),
+            variants: variants.into_iter().collect(),
+        }
+    }
+
     pub fn is_active(&self) -> bool {
         for variant in &self.variants {
             if variant.condition.is_active() {
@@ -105,22 +119,6 @@ mod tests {
     use super::*;
 
     use task_type::TaskType;
-
-    impl Task {
-        pub fn new<T, V, S>(task_type: T, params: V, strategy: Strategy, variants: S) -> Self
-        where
-            T: Into<TaskOrUnknown>,
-            V: Into<Value>,
-            S: IntoIterator<Item = TaskVariant>,
-        {
-            Self {
-                task_type: task_type.into(),
-                strategy,
-                params: params.into(),
-                variants: variants.into_iter().collect(),
-            }
-        }
-    }
 
     /// Create a object from a list of key-value pairs
     macro_rules! object {

@@ -233,6 +233,21 @@ enum SubCommand {
         #[arg(long, verbatim_doc_comment)]
         dry_run: bool,
     },
+    /// Run fight task
+    Fight {
+        #[arg(short, long)]
+        addr: Option<String>,
+        #[arg(long)]
+        user_resource: bool,
+        #[arg(short, long)]
+        batch: bool,
+        /// Run startup task before the fight
+        #[arg(long)]
+        startup: bool,
+        /// Close the game after the fight
+        #[arg(long)]
+        closedown: bool,
+    },
     /// List all available tasks
     List,
     /// Generate completion script for given shell
@@ -367,6 +382,13 @@ fn main() -> Result<()> {
             batch,
             dry_run,
         } => run::run(&proj_dirs, task, addr, user_resource, batch, dry_run)?,
+        SubCommand::Fight {
+            addr,
+            user_resource,
+            batch,
+            startup,
+            closedown,
+        } => run::fight::fight(&proj_dirs, addr, user_resource, batch, startup, closedown)?,
         SubCommand::List => {
             let task_dir = proj_dirs.config().join("tasks");
             if !task_dir.exists() {
@@ -607,6 +629,32 @@ mod test {
                     batch: true,
                     ..
                 } if task == "task"
+            ));
+        }
+
+        #[test]
+        fn fight() {
+            assert!(matches!(
+                CLI::parse_from(["maa", "fight"]).command,
+                SubCommand::Fight {
+                    addr: None,
+                    user_resource: false,
+                    batch: false,
+                    startup: false,
+                    closedown: false,
+                }
+            ));
+
+            assert!(matches!(
+                CLI::parse_from(["maa", "fight", "--startup"]).command,
+                SubCommand::Fight { startup: true, .. }
+            ));
+            assert!(matches!(
+                CLI::parse_from(["maa", "fight", "--closedown"]).command,
+                SubCommand::Fight {
+                    closedown: true,
+                    ..
+                }
             ));
         }
 
