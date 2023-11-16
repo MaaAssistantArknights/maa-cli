@@ -3,6 +3,7 @@ use crate::{
         default_variants, task_type::TaskType, value::input::Input, Strategy, Task, TaskList, Value,
     },
     dirs::Dirs,
+    object,
 };
 
 use super::{run, Result};
@@ -25,18 +26,15 @@ pub fn fight(
         ));
     }
 
-    let mut fight_params = Value::new();
-    fight_params.insert(
-        "stage",
-        Value::InputString(Input::new(Some("1-7"), Some("a stage to fight")).into()),
-    );
-    fight_params.insert(
-        "medicine",
-        Value::InputInt(Input::new(Some(0), Some("medicine to use")).into()),
-    );
+    let stage: Input<String> = Input::new(Some("1-7".to_string()), Some("a stage to fight"));
+    let medicine: Input<i64> = Input::new(Some(0), Some("medicine to use"));
+
     task_list.push(Task::new(
         TaskType::Fight,
-        fight_params,
+        object!(
+            "stage" => stage,
+            "medicine" => medicine,
+        ),
         Strategy::default(),
         default_variants(),
     ));

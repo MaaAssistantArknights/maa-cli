@@ -221,23 +221,11 @@ mod tests {
 
         #[test]
         fn input() {
-            let value = vec![
-                UserInput::Input(Input {
-                    default: Some(1_i64),
-                    description: Some("a number".to_string()),
-                }),
-                UserInput::Input(Input {
-                    default: Some(2_i64),
-                    description: None,
-                }),
-                UserInput::Input(Input {
-                    default: None,
-                    description: Some("a number".to_string()),
-                }),
-                UserInput::Input(Input {
-                    default: None,
-                    description: None,
-                }),
+            let value: Vec<UserInput<i64>> = vec![
+                UserInput::Input(Input::new(Some(1), Some("a number"))),
+                UserInput::Input(Input::new::<i64, &str>(Some(2), None)),
+                UserInput::Input(Input::new::<i64, &str>(None, Some("a number"))),
+                UserInput::Input(Input::new::<i64, &str>(None, None)),
             ];
 
             assert_de_tokens(
@@ -277,15 +265,9 @@ mod tests {
 
         #[test]
         fn select() {
-            let value = vec![
-                UserInput::Select(Select {
-                    alternatives: vec![1_i64, 2_i64],
-                    description: Some("a number".to_string()),
-                }),
-                UserInput::Select(Select {
-                    alternatives: vec![3_i64],
-                    description: None,
-                }),
+            let value: Vec<UserInput<i64>> = vec![
+                UserInput::Select(Select::new(vec![1, 2], Some("a number"))),
+                UserInput::Select(Select::new::<i64, &str>(vec![3], None)),
             ];
 
             assert_de_tokens(
@@ -328,10 +310,7 @@ mod tests {
 
         #[test]
         fn input() {
-            let value = Input {
-                default: Some(1),
-                description: Some("a number".to_string()),
-            };
+            let value: Input<i64> = Input::new(Some(1), Some("a number"));
             let input = b"a\n2\n";
             let mut output = b"".to_vec();
             value.prompt(&mut output).unwrap();
@@ -343,10 +322,7 @@ mod tests {
 
         #[test]
         fn input_empty() {
-            let value = Input {
-                default: Some(1),
-                description: Some("a number".to_string()),
-            };
+            let value: Input<i64> = Input::new(Some(1), Some("a number"));
             let input = b"\n";
             let mut output = b"".to_vec();
             value.prompt(&mut output).unwrap();
@@ -358,10 +334,7 @@ mod tests {
 
         #[test]
         fn input_no_default() {
-            let value: Input<i64> = Input {
-                default: None,
-                description: Some("a number".to_string()),
-            };
+            let value: Input<i64> = Input::new::<i64, &str>(None, Some("a number"));
             let input = b"\n2\n";
             let mut output = b"".to_vec();
             value.prompt(&mut output).unwrap();
@@ -373,10 +346,7 @@ mod tests {
 
         #[test]
         fn input_no_description() {
-            let value = Input {
-                default: Some(1_i64),
-                description: None,
-            };
+            let value: Input<i64> = Input::new::<i64, &str>(Some(1), None);
             let input = b"2\n";
             let mut output = b"".to_vec();
             value.prompt(&mut output).unwrap();
@@ -388,10 +358,7 @@ mod tests {
 
         #[test]
         fn input_empty_no_default() {
-            let value: Input<i64> = Input {
-                default: None,
-                description: Some("a number".to_string()),
-            };
+            let value: Input<i64> = Input::new::<i64, &str>(None, Some("a number"));
             let input = b"\n2\n";
             let mut output = b"".to_vec();
             value.prompt(&mut output).unwrap();
@@ -403,10 +370,7 @@ mod tests {
 
         #[test]
         fn select() {
-            let value = Select {
-                alternatives: vec!['A', 'B'],
-                description: Some("a char".to_string()),
-            };
+            let value: Select<char> = Select::new(vec!['A', 'B'], Some("a char"));
             let input = b"3\na\n2\n";
             let mut output = b"".to_vec();
             value.prompt(&mut output).unwrap();
@@ -421,10 +385,7 @@ mod tests {
 
         #[test]
         fn select_no_description() {
-            let value = Select {
-                alternatives: vec!['A', 'B'],
-                description: None,
-            };
+            let value: Select<char> = Select::new::<char, &str>(vec!['A', 'B'], None);
             let input = b"2\n";
             let mut output = b"".to_vec();
             value.prompt(&mut output).unwrap();
@@ -436,10 +397,7 @@ mod tests {
 
         #[test]
         fn select_empty() {
-            let value = Select {
-                alternatives: vec!['A', 'B'],
-                description: Some("a char".to_string()),
-            };
+            let value: Select<char> = Select::new(vec!['A', 'B'], Some("a char"));
             let input = b"\n2\n";
             let mut output = b"".to_vec();
             value.prompt(&mut output).unwrap();

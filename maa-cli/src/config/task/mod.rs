@@ -118,19 +118,9 @@ impl super::FromFile for TaskList {}
 mod tests {
     use super::*;
 
-    use task_type::TaskType;
+    use crate::object;
 
-    /// Create a object from a list of key-value pairs
-    macro_rules! object {
-        () => {
-            Value::new()
-        };
-        ($($key:expr => $value:expr),* $(,)?) => {{
-            let mut value = Value::new();
-            $(value.insert($key, $value);)*
-            value
-        }};
-    }
+    use task_type::TaskType;
 
     mod task {
         use super::*;
