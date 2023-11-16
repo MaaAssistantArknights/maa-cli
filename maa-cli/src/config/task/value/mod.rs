@@ -2,7 +2,7 @@ pub mod input;
 
 use std::fmt::Display;
 
-use input::UserInput;
+use input::{Input, Select, UserInput};
 
 use serde::{Deserialize, Serialize};
 
@@ -35,9 +35,45 @@ impl From<bool> for Value {
     }
 }
 
+impl From<UserInput<bool>> for Value {
+    fn from(value: UserInput<bool>) -> Self {
+        Self::InputBool(value)
+    }
+}
+
+impl From<Input<bool>> for Value {
+    fn from(value: Input<bool>) -> Self {
+        Self::InputBool(UserInput::Input(value))
+    }
+}
+
+impl From<Select<bool>> for Value {
+    fn from(value: Select<bool>) -> Self {
+        Self::InputBool(UserInput::Select(value))
+    }
+}
+
 impl From<i64> for Value {
     fn from(value: i64) -> Self {
         Self::Int(value)
+    }
+}
+
+impl From<UserInput<i64>> for Value {
+    fn from(value: UserInput<i64>) -> Self {
+        Self::InputInt(value)
+    }
+}
+
+impl From<Input<i64>> for Value {
+    fn from(value: Input<i64>) -> Self {
+        Self::InputInt(UserInput::Input(value))
+    }
+}
+
+impl From<Select<i64>> for Value {
+    fn from(value: Select<i64>) -> Self {
+        Self::InputInt(UserInput::Select(value))
     }
 }
 
@@ -47,9 +83,45 @@ impl From<f64> for Value {
     }
 }
 
+impl From<UserInput<f64>> for Value {
+    fn from(value: UserInput<f64>) -> Self {
+        Self::InputFloat(value)
+    }
+}
+
+impl From<Input<f64>> for Value {
+    fn from(value: Input<f64>) -> Self {
+        Self::InputFloat(UserInput::Input(value))
+    }
+}
+
+impl From<Select<f64>> for Value {
+    fn from(value: Select<f64>) -> Self {
+        Self::InputFloat(UserInput::Select(value))
+    }
+}
+
 impl From<String> for Value {
     fn from(value: String) -> Self {
         Self::String(value)
+    }
+}
+
+impl From<UserInput<String>> for Value {
+    fn from(value: UserInput<String>) -> Self {
+        Self::InputString(value)
+    }
+}
+
+impl From<Input<String>> for Value {
+    fn from(value: Input<String>) -> Self {
+        Self::InputString(UserInput::Input(value))
+    }
+}
+
+impl From<Select<String>> for Value {
+    fn from(value: Select<String>) -> Self {
+        Self::InputString(UserInput::Select(value))
     }
 }
 
@@ -220,6 +292,18 @@ impl Value {
     }
 }
 
+#[macro_export]
+macro_rules! object {
+    () => {
+        Value::new()
+    };
+    ($($key:expr => $value:expr),* $(,)?) => {{
+        let mut value = Value::new();
+        $(value.insert($key, $value);)*
+        value
+    }};
+}
+
 impl TryFrom<&Value> for bool {
     type Error = TryFromError;
 
@@ -292,70 +376,103 @@ mod tests {
 
         #[test]
         fn input() {
-            let mut value = Value::new();
-            value.insert(
-                "bool",
-                Value::InputBool(UserInput::Input(Input {
+            let value = object!(
+                "input_bool" => Input {
                     default: Some(true),
                     description: None,
-                })),
-            );
-            value.insert(
-                "int",
-                Value::InputInt(UserInput::Input(Input {
+                },
+                "input_int" => Input {
                     default: Some(1),
                     description: None,
-                })),
-            );
-            value.insert(
-                "float",
-                Value::InputFloat(UserInput::Input(Input {
+                },
+                "input_float" => Input {
                     default: Some(1.0),
                     description: None,
-                })),
-            );
-            value.insert(
-                "string",
-                Value::InputString(UserInput::Input(Input {
+                },
+                "input_string" => Input {
                     default: Some("string".to_string()),
                     description: None,
-                })),
-            );
-
-            value.insert(
-                "no_default",
-                Value::InputString(UserInput::Input(Input {
+                },
+                "input_no_default" => Input::<String> {
                     default: None,
                     description: None,
-                })),
+                },
+                "select_bool" => Select {
+                    alternatives: vec![true, false],
+                    description: None,
+                },
+                "select_int" => Select {
+                    alternatives: vec![1, 2],
+                    description: None,
+                },
+                "select_float" => Select {
+                    alternatives: vec![1.0, 2.0],
+                    description: None,
+                },
+                "select_string" => Select {
+                    alternatives: vec!["string1".to_string(), "string2".to_string()],
+                    description: None,
+                },
             );
 
             assert_de_tokens(
                 &value,
                 &[
-                    Token::Map { len: Some(5) },
-                    Token::Str("bool"),
+                    Token::Map { len: Some(9) },
+                    Token::Str("input_bool"),
                     Token::Map { len: Some(1) },
                     Token::Str("default"),
                     Token::Bool(true),
                     Token::MapEnd,
-                    Token::Str("int"),
+                    Token::Str("input_int"),
                     Token::Map { len: Some(1) },
                     Token::Str("default"),
                     Token::I64(1),
                     Token::MapEnd,
-                    Token::Str("float"),
+                    Token::Str("input_float"),
                     Token::Map { len: Some(1) },
                     Token::Str("default"),
                     Token::F64(1.0),
                     Token::MapEnd,
-                    Token::Str("string"),
+                    Token::Str("input_string"),
                     Token::Map { len: Some(1) },
                     Token::Str("default"),
                     Token::Str("string"),
                     Token::MapEnd,
-                    Token::Str("no_default"),
+                    Token::Str("input_no_default"),
                     Token::Map { len: Some(0) },
+                    Token::MapEnd,
+                    Token::Str("select_bool"),
+                    Token::Map { len: Some(1) },
+                    Token::Str("alternatives"),
+                    Token::Seq { len: Some(2) },
+                    Token::Bool(true),
+                    Token::Bool(false),
+                    Token::SeqEnd,
+                    Token::MapEnd,
+                    Token::Str("select_int"),
+                    Token::Map { len: Some(1) },
+                    Token::Str("alternatives"),
+                    Token::Seq { len: Some(2) },
+                    Token::I64(1),
+                    Token::I64(2),
+                    Token::SeqEnd,
+                    Token::MapEnd,
+                    Token::Str("select_float"),
+                    Token::Map { len: Some(1) },
+                    Token::Str("alternatives"),
+                    Token::Seq { len: Some(2) },
+                    Token::F64(1.0),
+                    Token::F64(2.0),
+                    Token::SeqEnd,
+                    Token::MapEnd,
+                    Token::Str("select_string"),
+                    Token::Map { len: Some(1) },
+                    Token::Str("alternatives"),
+                    Token::Seq { len: Some(2) },
+                    Token::Str("string1"),
+                    Token::Str("string2"),
+                    Token::SeqEnd,
                     Token::MapEnd,
                     Token::MapEnd,
                 ],
@@ -364,14 +481,15 @@ mod tests {
 
         #[test]
         fn value() {
-            let mut value = Value::new();
-            value.insert("array", [1, 2]);
-            value.insert("bool", true);
-            value.insert("float", 1.0);
-            value.insert("int", 1);
-            value.insert("null", Value::Null);
-            value.insert("object", [("key", "value")]);
-            value.insert("string", "string");
+            let value = object!(
+                "array" => [1, 2],
+                "bool" => true,
+                "float" => 1.0,
+                "int" => 1,
+                "null" => Value::Null,
+                "object" => [("key", "value")],
+                "string" => "string",
+            );
 
             assert_tokens(
                 &value,
@@ -412,6 +530,7 @@ mod tests {
                 Value::from([1, 2]),
                 Value::from([("key", "value")]),
             ]);
+
             assert_tokens(
                 &value,
                 &[
@@ -482,19 +601,15 @@ mod tests {
             default: Some("string".to_string()),
             description: None,
         });
-        let mut value = Value::new();
-        value.insert("null", Value::Null);
-        value.insert("bool", Value::InputBool(input_bool.clone()));
-        value.insert("int", Value::InputInt(input_int.clone()));
-        value.insert("float", Value::InputFloat(input_float.clone()));
-        value.insert("string", Value::InputString(input_string.clone()));
-        value.insert(
-            "array",
-            Value::Array(vec![Value::InputInt(input_int.clone())]),
-        );
-        value.insert(
-            "object",
-            Value::from([("int", Value::InputInt(input_int.clone()))]),
+
+        let mut value = object!(
+            "null" => Value::Null,
+            "bool" => input_bool.clone(),
+            "int" => input_int.clone(),
+            "float" => input_float.clone(),
+            "string" => input_string.clone(),
+            "array" => [input_int.clone()],
+            "object" => [("int", input_int.clone())],
         );
 
         assert_eq!(value.get("null").unwrap(), &Value::Null);
@@ -659,60 +774,32 @@ mod tests {
 
     #[test]
     fn merge() {
-        let mut map_base = Map::new();
-        map_base.insert("bool".to_string(), Value::Bool(true));
-        map_base.insert("int".to_string(), Value::Int(1.into()));
-        map_base.insert("float".to_string(), Value::Float(1.0));
-        map_base.insert("string".to_string(), Value::String("string".to_string()));
-        map_base.insert(
-            "array".to_string(),
-            Value::Array(vec![Value::Int(1.into()), Value::Int(2.into())]),
+        let value = object!(
+            "bool" => true,
+            "int" => 1,
+            "float" => 1.0,
+            "string" => "string",
+            "array" => [1, 2],
+            "object" => [("key1", "value1"), ("key2", "value2")],
         );
 
-        let mut sub_map = Map::new();
-        sub_map.insert("key1".to_string(), Value::String("value1".to_string()));
-        sub_map.insert("key2".to_string(), Value::String("value2".to_string()));
-
-        map_base.insert("object".to_string(), Value::Object(sub_map));
-
-        let value = Value::Object(map_base);
-
-        let mut map_other = Map::new();
-        map_other.insert("bool".to_string(), Value::Bool(false));
-        map_other.insert("int".to_string(), Value::Int(2.into()));
-        map_other.insert(
-            "array".to_string(),
-            Value::Array(vec![Value::Int(3.into()), Value::Int(4.into())]),
+        let value2 = object!(
+            "bool" => false,
+            "int" => 2,
+            "array" => [3, 4],
+            "object" => [("key2", "value2_2"), ("key3", "value3")],
         );
 
-        let mut sub_map2 = Map::new();
-        sub_map2.insert("key2".to_string(), Value::String("value2_2".to_string()));
-        sub_map2.insert("key3".to_string(), Value::String("value3".to_string()));
-
-        map_other.insert("object".to_string(), Value::Object(sub_map2));
-
-        let value2 = Value::Object(map_other);
-
-        let value_merged = value.merge(&value2);
-
-        let mut map_expected = Map::new();
-        map_expected.insert("bool".to_string(), Value::Bool(false));
-        map_expected.insert("int".to_string(), Value::Int(2.into()));
-        map_expected.insert("float".to_string(), Value::Float(1.0));
-        map_expected.insert("string".to_string(), Value::String("string".to_string()));
-        map_expected.insert(
-            "array".to_string(),
-            Value::Array(vec![Value::Int(3.into()), Value::Int(4.into())]),
+        assert_eq!(
+            value.merge(&value2),
+            object!(
+                "bool" => false,
+                "int" => 2,
+                "float" => 1.0,
+                "string" => "string",
+                "array" => [3, 4], // array will be replaced instead of merged
+                "object" => [("key1", "value1"), ("key2", "value2_2"), ("key3", "value3")],
+            ),
         );
-
-        let mut sub_map_expected = Map::new();
-        sub_map_expected.insert("key1".to_string(), Value::String("value1".to_string()));
-        sub_map_expected.insert("key2".to_string(), Value::String("value2_2".to_string()));
-        sub_map_expected.insert("key3".to_string(), Value::String("value3".to_string()));
-        map_expected.insert("object".to_string(), Value::Object(sub_map_expected));
-
-        let value_expected = Value::Object(map_expected);
-
-        assert_eq!(value_merged, value_expected);
     }
 }
