@@ -377,24 +377,40 @@ mod tests {
         #[test]
         fn input() {
             let value = object!(
-                "bool" => Input {
+                "input_bool" => Input {
                     default: Some(true),
                     description: None,
                 },
-                "int" => Input {
+                "input_int" => Input {
                     default: Some(1),
                     description: None,
                 },
-                "float" => Input {
+                "input_float" => Input {
                     default: Some(1.0),
                     description: None,
                 },
-                "string" => Input {
+                "input_string" => Input {
                     default: Some("string".to_string()),
                     description: None,
                 },
-                "no_default" => Input::<String> {
+                "input_no_default" => Input::<String> {
                     default: None,
+                    description: None,
+                },
+                "select_bool" => Select {
+                    alternatives: vec![true, false],
+                    description: None,
+                },
+                "select_int" => Select {
+                    alternatives: vec![1, 2],
+                    description: None,
+                },
+                "select_float" => Select {
+                    alternatives: vec![1.0, 2.0],
+                    description: None,
+                },
+                "select_string" => Select {
+                    alternatives: vec!["string1".to_string(), "string2".to_string()],
                     description: None,
                 },
             );
@@ -402,29 +418,61 @@ mod tests {
             assert_de_tokens(
                 &value,
                 &[
-                    Token::Map { len: Some(5) },
-                    Token::Str("bool"),
+                    Token::Map { len: Some(9) },
+                    Token::Str("input_bool"),
                     Token::Map { len: Some(1) },
                     Token::Str("default"),
                     Token::Bool(true),
                     Token::MapEnd,
-                    Token::Str("int"),
+                    Token::Str("input_int"),
                     Token::Map { len: Some(1) },
                     Token::Str("default"),
                     Token::I64(1),
                     Token::MapEnd,
-                    Token::Str("float"),
+                    Token::Str("input_float"),
                     Token::Map { len: Some(1) },
                     Token::Str("default"),
                     Token::F64(1.0),
                     Token::MapEnd,
-                    Token::Str("string"),
+                    Token::Str("input_string"),
                     Token::Map { len: Some(1) },
                     Token::Str("default"),
                     Token::Str("string"),
                     Token::MapEnd,
-                    Token::Str("no_default"),
+                    Token::Str("input_no_default"),
                     Token::Map { len: Some(0) },
+                    Token::MapEnd,
+                    Token::Str("select_bool"),
+                    Token::Map { len: Some(1) },
+                    Token::Str("alternatives"),
+                    Token::Seq { len: Some(2) },
+                    Token::Bool(true),
+                    Token::Bool(false),
+                    Token::SeqEnd,
+                    Token::MapEnd,
+                    Token::Str("select_int"),
+                    Token::Map { len: Some(1) },
+                    Token::Str("alternatives"),
+                    Token::Seq { len: Some(2) },
+                    Token::I64(1),
+                    Token::I64(2),
+                    Token::SeqEnd,
+                    Token::MapEnd,
+                    Token::Str("select_float"),
+                    Token::Map { len: Some(1) },
+                    Token::Str("alternatives"),
+                    Token::Seq { len: Some(2) },
+                    Token::F64(1.0),
+                    Token::F64(2.0),
+                    Token::SeqEnd,
+                    Token::MapEnd,
+                    Token::Str("select_string"),
+                    Token::Map { len: Some(1) },
+                    Token::Str("alternatives"),
+                    Token::Seq { len: Some(2) },
+                    Token::Str("string1"),
+                    Token::Str("string2"),
+                    Token::SeqEnd,
                     Token::MapEnd,
                     Token::MapEnd,
                 ],
