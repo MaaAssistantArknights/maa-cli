@@ -1,8 +1,13 @@
-use std::env::var_os;
-use std::fs::{create_dir, remove_dir_all};
-use std::path::{Path, PathBuf};
+use crate::consts::MAA_CORE_LIB;
+
+use std::{
+    env::{current_exe, var_os},
+    fs::{create_dir, remove_dir_all},
+    path::{Path, PathBuf},
+};
 
 use directories::ProjectDirs;
+use dunce::canonicalize;
 use paste::paste;
 
 macro_rules! matct_loc {
@@ -66,9 +71,9 @@ impl Dirs {
 
         Self {
             data: data_dir.clone(),
-            library: data_dir.join("lib"),
             cache: get_cache_dir(&proj),
             config: get_config_dir(&proj),
+            library: data_dir.join("lib"),
             resource: data_dir.join("resource"),
             state: state_dir.clone(),
             log: state_dir.join("debug"),
@@ -101,6 +106,74 @@ impl Dirs {
 
     pub fn log(&self) -> &Path {
         &self.log
+    }
+
+    pub fn find_library(&self) -> Option<PathBuf> {
+        let lib_dir = self.library();
+        if lib_dir.join(MAA_CORE_LIB).exists() {
+            return Some(lib_dir.to_path_buf());
+        }
+
+        current_exe_dir_find(|exe_dir| {
+            if exe_dir.join(MAA_CORE_LIB).exists() {
+                return Some(exe_dir.to_path_buf());
+            }
+            if let Some(dir) = exe_dir.parent() {
+                let lib_dir = dir.join("lib");
+                let lib_path = lib_dir.join(MAA_CORE_LIB);
+                if lib_path.exists() {
+                    return Some(lib_dir);
+                }
+            }
+
+            None
+        })
+    }
+
+    pub fn find_resource(&self) -> Option<PathBuf> {
+        let resource_dir = self.resource();
+        if resource_dir.exists() {
+            return Some(resource_dir.to_path_buf());
+        }
+
+        current_exe_dir_find(|exe_dir| {
+            let resource_dir = exe_dir.join("resource");
+            if resource_dir.exists() {
+                return Some(resource_dir);
+            }
+            if let Some(dir) = exe_dir.parent() {
+                let share_dir = dir.join("share");
+                if let Some(extra_share) = option_env!("MAA_EXTRA_SHARE_NAME") {
+                    let resource_dir = share_dir.join(extra_share).join("resource");
+                    if resource_dir.exists() {
+                        return Some(resource_dir);
+                    }
+                }
+                let resource_dir = share_dir.join("maa").join("resource");
+                if resource_dir.exists() {
+                    return Some(resource_dir);
+                }
+            }
+            None
+        })
+    }
+}
+
+/// Find path starting from current executable directory
+pub fn current_exe_dir_find<F>(finder: F) -> Option<PathBuf>
+where
+    F: Fn(&Path) -> Option<PathBuf>,
+{
+    let exe_path = current_exe().ok()?;
+    let exe_dir = exe_path.parent().unwrap();
+    let canonicalized = canonicalize(exe_dir).ok()?;
+    if let Some(path) = finder(&canonicalized) {
+        return Some(path);
+    };
+    if canonicalized != exe_dir {
+        finder(exe_dir)
+    } else {
+        None
     }
 }
 

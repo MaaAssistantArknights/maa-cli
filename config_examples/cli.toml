@@ -1,0 +1,15 @@
+[core]
+channel = "Beta"
+test_time = 0
+api_url = "https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version/"
+[core.components]
+library = true
+resource = true
+
+[cli]
+channel = "Alpha"
+# the double v in @vversion is necessary instead of a typo
+api_url = "https://cdn.jsdelivr.net/gh/MaaAssistantArknights/maa-cli@vversion/"
+download_url = "https://github.com/MaaAssistantArknights/maa-cli/releases/download/"
+[cli.components]
+binary = false

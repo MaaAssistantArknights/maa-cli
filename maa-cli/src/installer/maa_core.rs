@@ -1,64 +1,64 @@
 // This file is used to download and extract prebuilt packages of maa-core.
 
-use super::{download::download_mirrors, extract::Archive};
+use super::{
+    download::{check_file_exists, download_mirrors},
+    extract::Archive,
+    version_json::VersionJSON,
+};
 
 use crate::{
+    config::cli::maa_core::{Components, Config},
+    consts::MAA_CORE_LIB,
+    debug,
     dirs::{Dirs, Ensure},
-    run,
+    normal, run,
 };
 
 use std::{
-    env::{
-        consts::{DLL_PREFIX, DLL_SUFFIX},
-        current_exe, var_os,
-    },
-    path::{Component, Path, PathBuf},
+    env::consts::{ARCH, DLL_PREFIX, DLL_SUFFIX, OS},
+    path::{self, Path, PathBuf},
     time::Duration,
 };
 
 use anyhow::{anyhow, bail, Context, Result};
-use clap::ValueEnum;
-use dunce::canonicalize;
 use semver::Version;
 use serde::Deserialize;
 use tokio::runtime::Runtime;
 
-pub struct MaaCore {
-    channel: Channel,
-}
-
-pub const MAA_CORE_NAME: &str = if cfg!(target_os = "macos") {
-    "libMaaCore.dylib"
-} else if cfg!(target_os = "windows") {
-    "MaaCore.dll"
-} else {
-    "libMaaCore.so"
-};
-
 fn extract_mapper(
-    path: &Path,
+    src: &Path,
     lib_dir: &Path,
     resource_dir: &Path,
-    resource: bool,
+    config: &Components,
 ) -> Option<PathBuf> {
-    let mut components = path.components();
-    for c in components.by_ref() {
+    debug!("Extracting file:", src.display());
+    let mut path_components = src.components();
+    for c in path_components.by_ref() {
         match c {
-            Component::Normal(c) => {
-                if resource && c == "resource" {
+            path::Component::Normal(c) => {
+                if config.resource && c == "resource" {
                     // The components.as_path() is not working
                     // because it return a path with / as separator on windows
                     // I don't know why
-                    let mut path = resource_dir.to_path_buf();
-                    for c in components.by_ref() {
-                        path.push(c);
+                    let mut dest = resource_dir.to_path_buf();
+                    for c in path_components.by_ref() {
+                        dest.push(c);
                     }
-                    return Some(path);
-                } else if c
+                    debug!(
+                        "Extracting",
+                        format!("{} => {}", src.display(), dest.display())
+                    );
+                    return Some(dest);
+                } else if config.library && c
                     .to_str() // The DLL suffix may not the last part of the file name
                     .is_some_and(|s| s.starts_with(DLL_PREFIX) && s.contains(DLL_SUFFIX))
                 {
-                    return Some(lib_dir.join(c));
+                    let dest = lib_dir.join(src.file_name()?);
+                    debug!(
+                        "Extracting",
+                        format!("{} => {}", src.display(), dest.display())
+                    );
+                    return Some(dest);
                 } else {
                     continue;
                 }
@@ -66,290 +66,331 @@ fn extract_mapper(
             _ => continue,
         }
     }
+    debug!("Ignore file:", src.display());
     None
 }
 
-impl MaaCore {
-    pub fn new(channel: Channel) -> Self {
-        Self { channel }
-    }
-
-    pub fn version(&self, dirs: &Dirs) -> Result<Version> {
-        let ver_str = run::core_version(dirs)?.trim();
-        Version::parse(&ver_str[1..]).context("Failed to parse version")
-    }
-
-    pub fn install(&self, dirs: &Dirs, force: bool, no_resource: bool, t: u64) -> Result<()> {
-        let lib_dir = &dirs.library().ensure()?;
-
-        if lib_dir.join(MAA_CORE_NAME).exists() && !force {
-            bail!("MaaCore already exists, use `maa update` to update it or `maa install --force` to force reinstall")
-        }
-
-        println!(
-            "Fetching MaaCore version info (channel: {})...",
-            self.channel
-        );
-        let version_json = get_version_json(self.channel)?;
-        let asset = version_json.asset()?;
-        println!("Downloading MaaCore {}...", version_json.version_str());
-        let cache_dir = &dirs.cache().ensure()?;
-        let resource_dir = dirs.resource();
-        if !no_resource {
-            resource_dir.ensure_clean()?;
-        }
-        let archive = asset.download(cache_dir, t)?;
-        archive.extract(|path: &Path| extract_mapper(path, lib_dir, resource_dir, !no_resource))?;
-
-        Ok(())
-    }
-
-    pub fn update(&self, dirs: &Dirs, no_resource: bool, t: u64) -> Result<()> {
-        println!(
-            "Fetching MaaCore version info (channel: {})...",
-            self.channel
-        );
-        let version_json = get_version_json(self.channel)?;
-        let current_version = self.version(dirs)?;
-        let last_version = version_json.version();
-        if current_version >= last_version {
-            println!("Up to data: MaaCore v{}.", current_version);
-            return Ok(());
-        }
-
-        println!(
-            "Found newer MaaCore version: v{} (current: v{}), downloading...",
-            last_version, current_version
-        );
-
-        let cache_dir = &dirs.cache().ensure()?;
-        let asset = version_json.asset()?;
-        let archive = asset.download(cache_dir, t)?;
-        // Clean dirs before extracting, but not before downloading
-        // because the download may be interrupted
-        let lib_dir = find_lib_dir(dirs).context("MaaCore not found")?;
-        let resource_dir = find_resource(dirs).context("Resource dir not found")?;
-        if !no_resource {
-            resource_dir.ensure_clean()?;
-        }
-        archive
-            .extract(|path: &Path| extract_mapper(path, &lib_dir, &resource_dir, !no_resource))?;
-
-        Ok(())
-    }
+pub fn version(dirs: &Dirs) -> Result<Version> {
+    let ver_str = run::core_version(dirs)?.trim();
+    Version::parse(&ver_str[1..]).context("Failed to parse version")
 }
 
-#[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(ValueEnum, Clone, Copy, Default, Deserialize)]
-#[serde(rename_all = "kebab-case")] // Rename to kebab-case to match CLI option
-pub enum Channel {
-    #[default]
-    Stable,
-    Beta,
-    Alpha,
-}
+pub fn install(dirs: &Dirs, force: bool, config: &Config) -> Result<()> {
+    let lib_dir = &dirs.library();
 
-impl From<&Channel> for &str {
-    fn from(channel: &Channel) -> Self {
-        match channel {
-            Channel::Stable => "stable",
-            Channel::Beta => "beta",
-            Channel::Alpha => "alpha",
-        }
+    if lib_dir.join(MAA_CORE_LIB).exists() && !force {
+        bail!("MaaCore already exists, use `maa update` to update it or `maa install --force` to force reinstall")
     }
-}
 
-impl std::fmt::Display for Channel {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s: &str = self.into();
-        write!(f, "{}", s)
+    normal!(format!(
+        "Fetching MaaCore version info (channel: {})...",
+        config.channel()
+    ));
+    let version_json = get_version_json(config)?;
+    let asset_version = version_json.version();
+    let asset_name = name(asset_version)?;
+    let asset = version_json.details().asset(&asset_name)?;
+
+    normal!(format!("Downloading MaaCore {}...", asset_version));
+    let cache_dir = &dirs.cache().ensure()?;
+    let archive = download(
+        &cache_dir.join(asset_name),
+        asset.size(),
+        asset.download_links(),
+        config,
+    )?;
+
+    normal!("Installing MaaCore...");
+    let components = config.components();
+    if components.library {
+        debug!("Cleaning library directory");
+        lib_dir.ensure_clean()?;
     }
+    let resource_dir = dirs.resource();
+    if components.resource {
+        debug!("Cleaning resource directory");
+        resource_dir.ensure_clean()?;
+    }
+    archive.extract(|path: &Path| extract_mapper(path, lib_dir, resource_dir, components))?;
+
+    Ok(())
 }
 
-fn get_version_json(channel: Channel) -> Result<VersionJSON> {
-    let api_url = if let Some(url) = var_os("MAA_API_URL") {
-        url.to_str().unwrap().to_owned()
-    } else {
-        "https://ota.maa.plus/MaaAssistantArknights/api/version".to_owned()
-    };
+pub fn update(dirs: &Dirs, config: &Config) -> Result<()> {
+    let components = config.components();
 
-    let url = format!("{}/{}.json", api_url, channel);
-    let version_json: VersionJSON = reqwest::blocking::get(url)
-        .context("Failed to get version json")?
+    // Check if any component is specified
+    if !(components.library || components.resource) {
+        bail!("No component specified, aborting");
+    }
+
+    // Check if MaaCore is installed and installed by maa
+    let lib_dir = dirs.library();
+    let resource_dir = dirs.resource();
+
+    match (components.library, dirs.find_library()) {
+        (true, Some(dir)) if dir == lib_dir => bail!(
+            "MaaCore found at {} but not installed by maa, aborting",
+            dir.display()
+        ),
+        _ => {}
+    }
+
+    match (components.resource, dirs.find_resource()) {
+        (true, Some(dir)) if dir == resource_dir => bail!(
+            "MaaCore resource found at {} but not installed by maa, aborting",
+            dir.display()
+        ),
+        _ => {}
+    }
+
+    normal!(format!(
+        "Fetching MaaCore version info (channel: {})...",
+        config.channel()
+    ));
+    let version_json = get_version_json(config)?;
+    let asset_version = version_json.version();
+    let current_version = version(dirs)?;
+    if !version_json.can_update("MaaCore", &current_version)? {
+        return Ok(());
+    }
+    let asset_name = name(asset_version)?;
+    let asset = version_json.details().asset(&asset_name)?;
+
+    normal!(format!("Downloading MaaCore {}...", asset_version));
+    let cache_dir = &dirs.cache().ensure()?;
+    let asset_path = cache_dir.join(asset_name);
+    let archive = download(&asset_path, asset.size(), asset.download_links(), config)?;
+
+    normal!("Installing MaaCore...");
+    if components.library {
+        debug!("Cleaning library directory");
+        lib_dir.ensure_clean()?;
+    }
+    if components.resource {
+        debug!("Cleaning resource directory");
+        resource_dir.ensure_clean()?;
+    }
+    archive.extract(|path| extract_mapper(path, lib_dir, resource_dir, components))?;
+
+    Ok(())
+}
+
+fn get_version_json(config: &Config) -> Result<VersionJSON<Details>> {
+    let url = config.api_url();
+    let version_json = reqwest::blocking::get(&url)
+        .with_context(|| format!("Failed to fetch version info from {}", url))?
         .json()
-        .context("Failed to parse version json")?;
+        .with_context(|| "Failed to parse version info")?;
+
     Ok(version_json)
 }
 
-#[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Deserialize)]
-pub struct VersionJSON {
-    version: String,
-    details: VersionDetails,
+/// Get the name of the asset for the current platform
+fn name(version: &Version) -> Result<String> {
+    match OS {
+        "macos" => Ok(format!("MAA-v{}-macos-runtime-universal.zip", version)),
+        "linux" => match ARCH {
+            "x86_64" => Ok(format!("MAA-v{}-linux-x86_64.tar.gz", version)),
+            "aarch64" => Ok(format!("MAA-v{}-linux-aarch64.tar.gz", version)),
+            _ => Err(anyhow!("Unsupported architecture: {}", ARCH)),
+        },
+        "windows" => match ARCH {
+            "x86_64" => Ok(format!("MAA-v{}-win-x64.zip", version)),
+            "aarch64" => Ok(format!("MAA-v{}-win-arm64.zip", version)),
+            _ => Err(anyhow!("Unsupported architecture: {}", ARCH)),
+        },
+        _ => Err(anyhow!("Unsupported platform: {}", OS)),
+    }
 }
 
-impl VersionJSON {
-    pub fn version(&self) -> Version {
-        Version::parse(&self.version[1..]).unwrap()
-    }
+#[derive(Deserialize)]
+pub struct Details {
+    assets: Vec<Asset>,
+}
 
-    pub fn version_str(&self) -> &str {
-        &self.version
-    }
-
-    pub fn name(&self) -> Result<String> {
-        let version = self.version();
-        if cfg!(target_os = "macos") {
-            Ok(format!("MAA-v{}-macos-runtime-universal.zip", version))
-        } else if cfg!(target_os = "linux") {
-            if cfg!(target_arch = "x86_64") {
-                Ok(format!("MAA-v{}-linux-x86_64.tar.gz", version))
-            } else if cfg!(target_arch = "aarch64") {
-                Ok(format!("MAA-v{}-linux-aarch64.tar.gz", version))
-            } else {
-                Err(anyhow!(
-                    "Unsupported architecture: {}",
-                    std::env::consts::ARCH
-                ))
-            }
-        } else if cfg!(target_os = "windows") {
-            if cfg!(target_arch = "x86_64") {
-                Ok(format!("MAA-v{}-win-x64.zip", version))
-            } else if cfg!(target_arch = "aarch64") {
-                Ok(format!("MAA-v{}-win-arm64.zip", version))
-            } else {
-                Err(anyhow!(
-                    "Unsupported architecture: {}",
-                    std::env::consts::ARCH
-                ))
-            }
-        } else {
-            Err(anyhow!("Unsupported platform"))
-        }
-    }
-
-    pub fn asset(&self) -> Result<&Asset> {
-        let asset_name = self.name()?;
-        self.details
-            .assets
+impl Details {
+    pub fn asset(&self, name: &str) -> Result<&Asset> {
+        self.assets
             .iter()
-            .find(|asset| asset.name == asset_name)
+            .find(|asset| name == asset.name())
             .ok_or_else(|| anyhow!("Asset not found"))
     }
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize)]
-pub struct VersionDetails {
-    pub assets: Vec<Asset>,
-}
-
-#[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Deserialize)]
 pub struct Asset {
-    pub name: String,
-    pub size: u64,
-    pub browser_download_url: String,
-    pub mirrors: Vec<String>,
+    name: String,
+    size: u64,
+    browser_download_url: String,
+    mirrors: Vec<String>,
 }
 
 impl Asset {
-    pub fn download(&self, dir: &Path, t: u64) -> Result<Archive> {
-        let path = dir.join(&self.name);
-        let size = self.size;
+    pub fn name(&self) -> &str {
+        &self.name
+    }
 
-        if path.exists() {
-            let file_size = match path.metadata() {
-                Ok(metadata) => metadata.len(),
-                Err(_) => 0,
-            };
-            if file_size == size {
-                println!("File {} already exists, skip download!", &self.name);
-                return Archive::try_from(path);
-            }
-        }
+    pub fn size(&self) -> u64 {
+        self.size
+    }
 
-        let url = &self.browser_download_url;
-        let mut mirrors = self.mirrors.clone();
-        mirrors.push(url.to_owned());
-
-        let client = reqwest::Client::builder()
-            .connect_timeout(Duration::from_secs(1))
-            .build()
-            .context("Failed to build reqwest client")?;
-        Runtime::new()
-            .context("Failed to create tokio runtime")?
-            .block_on(download_mirrors(
-                &client, url, mirrors, &path, size, t, None,
-            ))?;
-
-        Archive::try_from(path)
+    pub fn download_links(&self) -> Vec<String> {
+        let mut links = self.mirrors.clone();
+        links.insert(0, self.browser_download_url.clone());
+        links
     }
 }
 
-pub fn find_lib_dir(dirs: &Dirs) -> Option<PathBuf> {
-    let lib_dir = dirs.library();
-    if lib_dir.join(MAA_CORE_NAME).exists() {
-        return Some(lib_dir.to_path_buf());
+pub fn download(path: &Path, size: u64, links: Vec<String>, config: &Config) -> Result<Archive> {
+    if check_file_exists(path, size) {
+        normal!("Already downloaded, skip downloading");
+        return Archive::try_from(path);
     }
 
-    current_exe_dir_find(|exe_dir| {
-        if exe_dir.join(MAA_CORE_NAME).exists() {
-            return Some(exe_dir.to_path_buf());
-        }
-        if let Some(dir) = exe_dir.parent() {
-            let lib_dir = dir.join("lib");
-            if lib_dir.join(MAA_CORE_NAME).exists() {
-                return Some(lib_dir);
-            }
-        }
+    let client = reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(3))
+        .build()
+        .context("Failed to build reqwest client")?;
+    Runtime::new()
+        .context("Failed to create tokio runtime")?
+        .block_on(download_mirrors(
+            &client,
+            links,
+            path,
+            size,
+            config.test_time(),
+            None,
+        ))
+        .context("Failed to download asset")?;
 
-        None
-    })
+    Archive::try_from(path)
 }
 
-pub fn find_resource(dirs: &Dirs) -> Option<PathBuf> {
-    let resource_dir = dirs.resource();
-    if resource_dir.exists() {
-        return Some(resource_dir.to_path_buf());
-    }
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    current_exe_dir_find(|exe_dir| {
-        let resource_dir = exe_dir.join("resource");
-        if resource_dir.exists() {
-            return Some(resource_dir);
-        }
-        if let Some(dir) = exe_dir.parent() {
-            let share_dir = dir.join("share");
-            if let Some(extra_share) = option_env!("MAA_EXTRA_SHARE_NAME") {
-                let resource_dir = share_dir.join(extra_share).join("resource");
-                if resource_dir.exists() {
-                    return Some(resource_dir);
-                }
-            }
-            let resource_dir = share_dir.join("maa").join("resource");
-            if resource_dir.exists() {
-                return Some(resource_dir);
-            }
-        }
-        None
-    })
-}
+    use serde_json;
 
-/// Find path starting from current executable directory
-pub fn current_exe_dir_find<F>(finder: F) -> Option<PathBuf>
-where
-    F: Fn(&Path) -> Option<PathBuf>,
+    #[test]
+    fn deserialize_version_json() {
+        // This is a stripped version of the real json
+        let json_str = r#"
 {
-    let exe_path = current_exe().ok()?;
-    let exe_dir = exe_path.parent().unwrap();
-    if let Some(path) = finder(exe_dir) {
-        return Some(path);
-    }
-    let canonicalized = canonicalize(exe_dir).ok()?;
-    if canonicalized == exe_dir {
-        None
-    } else {
-        finder(&canonicalized)
+  "version": "v4.26.1",
+  "details": {
+    "tag_name": "v4.26.1",
+    "name": "v4.26.1",
+    "draft": false,
+    "prerelease": false,
+    "created_at": "2023-11-02T16:27:04Z",
+    "published_at": "2023-11-02T16:50:51Z",
+    "assets": [
+      {
+        "name": "MAA-v4.26.1-linux-aarch64.tar.gz",
+        "size": 152067668,
+        "browser_download_url": "https://github.com/MaaAssistantArknights/MaaAssistantArknights/releases/download/v4.26.1/MAA-v4.26.1-linux-aarch64.tar.gz",
+        "mirrors": [
+          "https://s3.maa-org.net:25240/maa-release/MaaAssistantArknights/MaaAssistantArknights/releases/download/v4.26.1/MAA-v4.26.1-linux-aarch64.tar.gz",
+          "https://agent.imgg.dev/MaaAssistantArknights/MaaAssistantArknights/releases/download/v4.26.1/MAA-v4.26.1-linux-aarch64.tar.gz",
+          "https://maa.r2.imgg.dev/MaaAssistantArknights/MaaAssistantArknights/releases/download/v4.26.1/MAA-v4.26.1-linux-aarch64.tar.gz"
+        ]
+      },
+      {
+        "name": "MAA-v4.26.1-linux-x86_64.tar.gz",
+        "size": 155241185,
+        "browser_download_url": "https://github.com/MaaAssistantArknights/MaaAssistantArknights/releases/download/v4.26.1/MAA-v4.26.1-linux-x86_64.tar.gz",
+        "mirrors": [
+          "https://s3.maa-org.net:25240/maa-release/MaaAssistantArknights/MaaAssistantArknights/releases/download/v4.26.1/MAA-v4.26.1-linux-x86_64.tar.gz",
+          "https://agent.imgg.dev/MaaAssistantArknights/MaaAssistantArknights/releases/download/v4.26.1/MAA-v4.26.1-linux-x86_64.tar.gz",
+          "https://maa.r2.imgg.dev/MaaAssistantArknights/MaaAssistantArknights/releases/download/v4.26.1/MAA-v4.26.1-linux-x86_64.tar.gz"
+        ]
+      },
+      {
+        "name": "MAA-v4.26.1-win-arm64.zip",
+        "size": 148806502,
+        "browser_download_url": "https://github.com/MaaAssistantArknights/MaaAssistantArknights/releases/download/v4.26.1/MAA-v4.26.1-win-arm64.zip",
+        "mirrors": [
+          "https://s3.maa-org.net:25240/maa-release/MaaAssistantArknights/MaaAssistantArknights/releases/download/v4.26.1/MAA-v4.26.1-win-arm64.zip",
+          "https://agent.imgg.dev/MaaAssistantArknights/MaaAssistantArknights/releases/download/v4.26.1/MAA-v4.26.1-win-arm64.zip",
+          "https://maa.r2.imgg.dev/MaaAssistantArknights/MaaAssistantArknights/releases/download/v4.26.1/MAA-v4.26.1-win-arm64.zip"
+        ]
+      },
+      {
+        "name": "MAA-v4.26.1-win-x64.zip",
+        "size": 150092421,
+        "browser_download_url": "https://github.com/MaaAssistantArknights/MaaAssistantArknights/releases/download/v4.26.1/MAA-v4.26.1-win-x64.zip",
+        "mirrors": [
+          "https://s3.maa-org.net:25240/maa-release/MaaAssistantArknights/MaaAssistantArknights/releases/download/v4.26.1/MAA-v4.26.1-win-x64.zip",
+          "https://agent.imgg.dev/MaaAssistantArknights/MaaAssistantArknights/releases/download/v4.26.1/MAA-v4.26.1-win-x64.zip",
+          "https://maa.r2.imgg.dev/MaaAssistantArknights/MaaAssistantArknights/releases/download/v4.26.1/MAA-v4.26.1-win-x64.zip"
+        ]
+      },
+      {
+        "name": "MAA-v4.26.1-macos-runtime-universal.zip",
+        "size": 164012486,
+        "browser_download_url": "https://github.com/MaaAssistantArknights/MaaRelease/releases/download/v4.26.1/MAA-v4.26.1-macos-runtime-universal.zip",
+        "mirrors": [
+          "https://s3.maa-org.net:25240/maa-release/MaaAssistantArknights/MaaRelease/releases/download/v4.26.1/MAA-v4.26.1-macos-runtime-universal.zip",
+          "https://agent.imgg.dev/MaaAssistantArknights/MaaRelease/releases/download/v4.26.1/MAA-v4.26.1-macos-runtime-universal.zip",
+          "https://maa.r2.imgg.dev/MaaAssistantArknights/MaaRelease/releases/download/v4.26.1/MAA-v4.26.1-macos-runtime-universal.zip"
+        ]
+      }
+    ],
+    "tarball_url": "https://api.github.com/repos/MaaAssistantArknights/MaaAssistantArknights/tarball/v4.26.1",
+    "zipball_url": "https://api.github.com/repos/MaaAssistantArknights/MaaAssistantArknights/zipball/v4.26.1"
+  }
+}
+            "#;
+
+        let version_json: VersionJSON<Details> =
+            serde_json::from_str(json_str).expect("Failed to parse json");
+
+        assert_eq!(
+            version_json.version(),
+            &Version::parse("4.26.1").expect("Failed to parse version")
+        );
+
+        let details = version_json.details();
+        let asset_name = name(version_json.version()).unwrap();
+        let asset = details.asset(&asset_name).unwrap();
+
+        // Test asset name, size and download links
+        match OS {
+            "macos" => {
+                assert_eq!(asset.name(), "MAA-v4.26.1-macos-runtime-universal.zip");
+                assert_eq!(asset.size(), 164012486);
+                assert_eq!(asset.download_links().len(), 4);
+            }
+            "linux" => match ARCH {
+                "x86_64" => {
+                    assert_eq!(asset.name(), "MAA-v4.26.1-linux-x86_64.tar.gz");
+                    assert_eq!(asset.size(), 155241185);
+                    assert_eq!(asset.download_links().len(), 4);
+                }
+                "aarch64" => {
+                    assert_eq!(asset.name(), "MAA-v4.26.1-linux-aarch64.tar.gz");
+                    assert_eq!(asset.size(), 152067668);
+                    assert_eq!(asset.download_links().len(), 4);
+                }
+                _ => (),
+            },
+            "windows" => match ARCH {
+                "x86_64" => {
+                    assert_eq!(asset.name(), "MAA-v4.26.1-win-x64.zip");
+                    assert_eq!(asset.size(), 150092421);
+                    assert_eq!(asset.download_links().len(), 4);
+                }
+                "aarch64" => {
+                    assert_eq!(asset.name(), "MAA-v4.26.1-win-arm64.zip");
+                    assert_eq!(asset.size(), 148806502);
+                    assert_eq!(asset.download_links().len(), 4);
+                }
+                _ => (),
+            },
+            _ => (),
+        }
     }
 }

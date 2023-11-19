@@ -69,14 +69,10 @@ jobs:
         if: matrix.arch == 'x86_64'
         run: |
           cargo test --package maa-cli --locked
-      - name: Test (maa-cli, no-default-features)
-        if: matrix.arch == 'x86_64'
-        run: |
-          cargo test --package maa-cli --no-default-features --locked
       - name: Install MaaCore
         if: matrix.arch == 'x86_64'
         env:
-          MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
+          MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
         run: |
           cargo run -- install beta -t0
       - name: Show installation
@@ -95,8 +91,8 @@ jobs:
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
         run: |
-          cargo run -- version
-          cargo run -- run daily --dry-run --batch
+          cargo run -- version -vv
+          cargo run -- run daily --dry-run --batch -vv
       - name: Run with MaaCore (relative path)
         if: matrix.arch == 'x86_64'
         timeout-minutes: 1
@@ -119,12 +115,46 @@ jobs:
           ls -l "$local_dir/bin"
           ls -l "$local_dir/lib"
           ls -l "$share_dir"
-          $bin_dir/$MAA_EXE version
-          $bin_dir/$MAA_EXE run daily --dry-run --batch
+          $bin_dir/$MAA_EXE version -vv
+          $bin_dir/$MAA_EXE run daily --dry-run --batch -vv
       - name: Cat MaaCore Log
         if: matrix.arch == 'x86_64'
         run: |
           cat "$(cargo run -- dir log)/asst.log"
+
+  features:
+    name: Build with no default features
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+        features:
+          - --features core_installer
+          - --features cli_installer
+          - ""
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: ./.github/actions/setup
+        with:
+          os: ${{ matrix.os }}
+          arch: x86_64
+      - name: Setup Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: feature-${{ matrix.feature }}
+      - name: Build (maa-cli)
+        run: |
+          cargo build --package maa-cli --no-default-features ${{ matrix.features }} --locked
+      - name: Test (maa-cli)
+        run: |
+          cargo test --package maa-cli --no-default-features ${{ matrix.features }} --locked
 
   coverage:
     name: Coverage
