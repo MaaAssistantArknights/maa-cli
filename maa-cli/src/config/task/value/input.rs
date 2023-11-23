@@ -495,33 +495,30 @@ mod tests {
             output.clear();
 
             let input_invalid = b"invalid\ny\n";
-            assert_eq!(value.ask(&mut output, &input_invalid[..]).unwrap(), true);
+            assert!(value.ask(&mut output, &input_invalid[..]).unwrap());
             assert_eq!(&output, b"Invalid input, please input y/n: ");
             output.clear();
-            assert_eq!(value.ask(&mut output, &INPUT_YES[..]).unwrap(), true);
-            assert_eq!(value.ask(&mut output, &INPUT_NO[..]).unwrap(), false);
-            assert_eq!(value.ask(&mut output, &INPUT_EMPTY[..]).unwrap(), true);
+            assert!(value.ask(&mut output, INPUT_YES).unwrap());
+            assert!(!value.ask(&mut output, INPUT_NO).unwrap());
+            assert!(value.ask(&mut output, INPUT_EMPTY).unwrap());
             assert_eq!(&output, b"");
 
             let value: BoolInput = BoolInput::new(Some(false), Some("fight"));
             value.prompt(&mut output).unwrap();
             assert_eq!(&output, b"Whether to fight [y/N]: ");
             output.clear();
-            assert_eq!(value.ask(&mut output, &INPUT_YES[..]).unwrap(), true);
-            assert_eq!(value.ask(&mut output, &INPUT_NO[..]).unwrap(), false);
-            assert_eq!(value.ask(&mut output, &INPUT_EMPTY[..]).unwrap(), false);
+            assert!(value.ask(&mut output, INPUT_YES).unwrap());
+            assert!(!value.ask(&mut output, INPUT_NO).unwrap());
+            assert!(!value.ask(&mut output, INPUT_EMPTY).unwrap());
 
             let input_empty_then_yes = b"\ny\n";
             let value: BoolInput = BoolInput::new(None, Some("fight"));
             value.prompt(&mut output).unwrap();
             assert_eq!(&output, b"Whether to fight [y/n]: ");
             output.clear();
-            assert_eq!(value.ask(&mut output, &INPUT_YES[..]).unwrap(), true);
-            assert_eq!(value.ask(&mut output, &INPUT_NO[..]).unwrap(), false);
-            assert_eq!(
-                value.ask(&mut output, &input_empty_then_yes[..]).unwrap(),
-                true
-            );
+            assert!(value.ask(&mut output, INPUT_YES).unwrap());
+            assert!(!value.ask(&mut output, INPUT_NO).unwrap());
+            assert!(value.ask(&mut output, &input_empty_then_yes[..]).unwrap());
             assert_eq!(&output, b"Default value not set, please input y/n: ");
             output.clear();
 
@@ -529,12 +526,9 @@ mod tests {
             value.prompt(&mut output).unwrap();
             assert_eq!(&output, b"Whether to do something [y/n]: ");
             output.clear();
-            assert_eq!(value.ask(&mut output, &INPUT_YES[..]).unwrap(), true);
-            assert_eq!(value.ask(&mut output, &INPUT_NO[..]).unwrap(), false);
-            assert_eq!(
-                value.ask(&mut output, &input_empty_then_yes[..]).unwrap(),
-                true
-            );
+            assert!(value.ask(&mut output, INPUT_YES).unwrap());
+            assert!(!value.ask(&mut output, INPUT_NO).unwrap());
+            assert!(value.ask(&mut output, &input_empty_then_yes[..]).unwrap());
             assert_eq!(&output, b"Default value not set, please input y/n: ");
             output.clear();
         }
