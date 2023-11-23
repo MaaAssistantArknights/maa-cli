@@ -2,7 +2,7 @@ pub mod input;
 
 use std::fmt::Display;
 
-use input::{Input, Select, UserInput};
+use input::{BoolInput, Input, Select, UserInput};
 
 use serde::{Deserialize, Serialize};
 
@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 pub enum Value {
     Array(Vec<Value>),
     InputString(UserInput<String>),
-    InputBool(UserInput<bool>),
+    InputBool(BoolInput),
     InputInt(UserInput<i64>),
     InputFloat(UserInput<f64>),
     Object(Map<Value>),
@@ -35,21 +35,9 @@ impl From<bool> for Value {
     }
 }
 
-impl From<UserInput<bool>> for Value {
-    fn from(value: UserInput<bool>) -> Self {
+impl From<BoolInput> for Value {
+    fn from(value: BoolInput) -> Self {
         Self::InputBool(value)
-    }
-}
-
-impl From<Input<bool>> for Value {
-    fn from(value: Input<bool>) -> Self {
-        Self::InputBool(UserInput::Input(value))
-    }
-}
-
-impl From<Select<bool>> for Value {
-    fn from(value: Select<bool>) -> Self {
-        Self::InputBool(UserInput::Select(value))
     }
 }
 
@@ -341,12 +329,12 @@ type TryFromResult<T> = Result<T, TryFromError>;
 #[derive(Debug)]
 pub enum TryFromError {
     TypeMismatch,
-    IOError(std::io::Error),
+    InputError(input::Error),
 }
 
-impl From<std::io::Error> for TryFromError {
-    fn from(error: std::io::Error) -> Self {
-        Self::IOError(error)
+impl From<input::Error> for TryFromError {
+    fn from(error: input::Error) -> Self {
+        Self::InputError(error)
     }
 }
 
@@ -354,7 +342,7 @@ impl Display for TryFromError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             TryFromError::TypeMismatch => write!(f, "type mismatch"),
-            TryFromError::IOError(error) => write!(f, "io error: {}", error),
+            TryFromError::InputError(error) => write!(f, "{}", error),
         }
     }
 }
@@ -377,7 +365,7 @@ mod tests {
         #[test]
         fn input() {
             let value = object!(
-                "input_bool" => Input {
+                "input_bool" => BoolInput {
                     default: Some(true),
                     description: None,
                 },
@@ -397,10 +385,6 @@ mod tests {
                     default: None,
                     description: None,
                 },
-                "select_bool" => Select {
-                    alternatives: vec![true, false],
-                    description: None,
-                },
                 "select_int" => Select {
                     alternatives: vec![1, 2],
                     description: None,
@@ -418,7 +402,7 @@ mod tests {
             assert_de_tokens(
                 &value,
                 &[
-                    Token::Map { len: Some(9) },
+                    Token::Map { len: Some(8) },
                     Token::Str("input_bool"),
                     Token::Map { len: Some(1) },
                     Token::Str("default"),
@@ -441,14 +425,6 @@ mod tests {
                     Token::MapEnd,
                     Token::Str("input_no_default"),
                     Token::Map { len: Some(0) },
-                    Token::MapEnd,
-                    Token::Str("select_bool"),
-                    Token::Map { len: Some(1) },
-                    Token::Str("alternatives"),
-                    Token::Seq { len: Some(2) },
-                    Token::Bool(true),
-                    Token::Bool(false),
-                    Token::SeqEnd,
                     Token::MapEnd,
                     Token::Str("select_int"),
                     Token::Map { len: Some(1) },
@@ -585,10 +561,10 @@ mod tests {
 
     #[test]
     fn init() {
-        let input_bool = UserInput::Input(Input {
+        let input_bool = BoolInput {
             default: Some(true),
             description: None,
-        });
+        };
         let input_int = UserInput::Input(Input {
             default: Some(1),
             description: None,
@@ -710,10 +686,10 @@ mod tests {
             i64::try_from(&bool_value),
             Err(TryFromError::TypeMismatch)
         ));
-        let bool_input_value = Value::InputBool(UserInput::Input(Input {
+        let bool_input_value = Value::InputBool(BoolInput {
             default: Some(true),
             description: None,
-        }));
+        });
         assert_eq!(bool::try_from(&bool_input_value).unwrap(), true);
         assert!(matches!(
             i64::try_from(&bool_input_value),

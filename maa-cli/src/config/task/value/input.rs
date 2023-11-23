@@ -1,6 +1,6 @@
 use std::{
     fmt::Display,
-    io::{BufRead, Result, Write},
+    io::{BufRead, Write},
     str::FromStr,
 };
 
@@ -14,6 +14,99 @@ pub unsafe fn enable_batch_mode() {
     BATCH_MODE = true;
 }
 
+/// A struct that represents a user input that queries the user for boolean input.
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Deserialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct BoolInput {
+    /// Default value for this parameter.
+    pub default: Option<bool>,
+    /// Description of this parameter
+    pub description: Option<String>,
+}
+
+impl Serialize for BoolInput {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        self.get()
+            .map_err(serde::ser::Error::custom)?
+            .serialize(serializer)
+    }
+}
+
+impl BoolInput {
+    pub fn new<S>(default: Option<bool>, description: Option<S>) -> Self
+    where
+        S: Into<String>,
+    {
+        Self {
+            default,
+            description: description.map(|s| s.into()),
+        }
+    }
+
+    pub fn get(&self) -> Result<bool> {
+        if unsafe { BATCH_MODE } {
+            // In batch mode, we use default value and do not ask user for input.
+            self.default.ok_or(Error::DefaultNotSet)
+        } else {
+            let writer = std::io::stdout();
+            let reader = std::io::stdin().lock();
+            self.prompt(&writer)?;
+            self.ask(writer, reader)
+        }
+    }
+
+    pub fn prompt(&self, mut writer: impl Write) -> Result<()> {
+        write!(writer, "Whether to")?;
+        if let Some(description) = &self.description {
+            write!(writer, " {}", description)?;
+        } else {
+            write!(writer, " do something")?;
+        }
+        if let Some(default) = &self.default {
+            if *default {
+                write!(writer, " [Y/n]: ")?;
+            } else {
+                write!(writer, " [y/N]: ")?;
+            }
+        } else {
+            write!(writer, " [y/n]: ")?;
+        }
+        writer.flush()?;
+        Ok(())
+    }
+
+    /// Ask user to input a value for this parameter.
+    pub fn ask(&self, mut writer: impl Write, mut reader: impl BufRead) -> Result<bool> {
+        let mut input = String::new();
+        loop {
+            reader.read_line(&mut input)?;
+            let trimmed = input.trim();
+            if trimmed.is_empty() {
+                if let Some(default) = self.default {
+                    break Ok(default);
+                } else {
+                    write!(writer, "Default value not set, please input y/n: ")?;
+                    writer.flush()?;
+                }
+            } else {
+                match trimmed {
+                    "y" | "Y" | "yes" | "Yes" | "YES" => break Ok(true),
+                    "n" | "N" | "no" | "No" | "NO" => break Ok(false),
+                    _ => {
+                        write!(writer, "Invalid input, please input y/n: ")?;
+                        writer.flush()?;
+                    }
+                };
+            }
+            input.clear();
+        }
+    }
+}
+
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Deserialize, Debug, Clone)]
 #[serde(untagged)]
@@ -25,13 +118,9 @@ pub enum UserInput<F> {
 impl<F: FromStr + Clone + Display> UserInput<F> {
     pub fn get(&self) -> Result<F> {
         if unsafe { BATCH_MODE } {
-            // In batch mode, we use default value and do not ask user for input.
-            let writer = std::io::sink();
             match self {
-                // use default value
-                Self::Input(i) => i.ask(writer, b"\n".as_ref()),
-                // use first alternative
-                Self::Select(s) => s.ask(writer, b"1\n".as_ref()),
+                Self::Input(i) => i.get_default(),
+                Self::Select(s) => s.get_first(),
             }
         } else {
             let writer = std::io::stdout();
@@ -86,6 +175,10 @@ impl<F: FromStr + Clone + Display> Input<F> {
         }
     }
 
+    pub fn get_default(&self) -> Result<F> {
+        self.default.clone().ok_or(Error::DefaultNotSet)
+    }
+
     pub fn prompt(&self, mut writer: impl Write) -> Result<()> {
         write!(writer, "Please input")?;
         if let Some(description) = &self.description {
@@ -135,7 +228,7 @@ impl<F> From<Input<F>> for UserInput<F> {
 }
 
 #[cfg_attr(test, derive(PartialEq))]
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Select<F> {
     /// Alternatives for this parameter
@@ -154,6 +247,13 @@ impl<F: FromStr + Clone + Display> Select<F> {
             alternatives: alternatives.into_iter().map(|i| i.into()).collect(),
             description: description.map(|s| s.into()),
         }
+    }
+
+    pub fn get_first(&self) -> Result<F> {
+        self.alternatives
+            .get(0)
+            .cloned()
+            .ok_or(Error::DefaultNotSet)
     }
 
     pub fn prompt(&self, mut writer: impl Write) -> Result<()> {
@@ -210,6 +310,31 @@ impl<F> From<Select<F>> for UserInput<F> {
     }
 }
 
+#[derive(Debug)]
+pub enum Error {
+    DefaultNotSet,
+    Io(std::io::Error),
+}
+
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Self {
+        Self::Io(e)
+    }
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            Self::DefaultNotSet => write!(f, "Failed to get default value"),
+            Self::Io(e) => write!(f, "IO error: {}", e),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+pub type Result<T> = std::result::Result<T, Error>;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -218,6 +343,54 @@ mod tests {
         use super::*;
 
         use serde_test::{assert_de_tokens, assert_ser_tokens, Token};
+
+        #[test]
+        fn bool_input() {
+            let value: Vec<BoolInput> = vec![
+                BoolInput::new(Some(true), Some("do something")),
+                BoolInput::new::<&str>(Some(false), None),
+                BoolInput::new(None, Some("do something")),
+                BoolInput::new::<&str>(None, None),
+            ];
+
+            assert_de_tokens(
+                &value,
+                &[
+                    Token::Seq { len: Some(4) },
+                    Token::Map { len: Some(2) },
+                    Token::Str("default"),
+                    Token::Some,
+                    Token::Bool(true),
+                    Token::Str("description"),
+                    Token::Some,
+                    Token::Str("do something"),
+                    Token::MapEnd,
+                    Token::Map { len: Some(1) },
+                    Token::Str("default"),
+                    Token::Some,
+                    Token::Bool(false),
+                    Token::MapEnd,
+                    Token::Map { len: Some(1) },
+                    Token::Str("description"),
+                    Token::Some,
+                    Token::Str("do something"),
+                    Token::MapEnd,
+                    Token::Map { len: Some(0) },
+                    Token::MapEnd,
+                    Token::SeqEnd,
+                ],
+            );
+
+            assert_ser_tokens(
+                &value[..2],
+                &[
+                    Token::Seq { len: Some(2) },
+                    Token::Bool(true),
+                    Token::Bool(false),
+                    Token::SeqEnd,
+                ],
+            );
+        }
 
         #[test]
         fn input() {
@@ -307,6 +480,64 @@ mod tests {
 
     mod get {
         use super::*;
+
+        const INPUT_YES: &[u8] = b"y\n";
+        const INPUT_NO: &[u8] = b"n\n";
+        const INPUT_EMPTY: &[u8] = b"\n";
+
+        #[test]
+        fn bool_input() {
+            let mut output = b"".to_vec();
+
+            let value: BoolInput = BoolInput::new(Some(true), Some("fight"));
+            value.prompt(&mut output).unwrap();
+            assert_eq!(&output, b"Whether to fight [Y/n]: ");
+            output.clear();
+
+            let input_invalid = b"invalid\ny\n";
+            assert_eq!(value.ask(&mut output, &input_invalid[..]).unwrap(), true);
+            assert_eq!(&output, b"Invalid input, please input y/n: ");
+            output.clear();
+            assert_eq!(value.ask(&mut output, &INPUT_YES[..]).unwrap(), true);
+            assert_eq!(value.ask(&mut output, &INPUT_NO[..]).unwrap(), false);
+            assert_eq!(value.ask(&mut output, &INPUT_EMPTY[..]).unwrap(), true);
+            assert_eq!(&output, b"");
+
+            let value: BoolInput = BoolInput::new(Some(false), Some("fight"));
+            value.prompt(&mut output).unwrap();
+            assert_eq!(&output, b"Whether to fight [y/N]: ");
+            output.clear();
+            assert_eq!(value.ask(&mut output, &INPUT_YES[..]).unwrap(), true);
+            assert_eq!(value.ask(&mut output, &INPUT_NO[..]).unwrap(), false);
+            assert_eq!(value.ask(&mut output, &INPUT_EMPTY[..]).unwrap(), false);
+
+            let input_empty_then_yes = b"\ny\n";
+            let value: BoolInput = BoolInput::new(None, Some("fight"));
+            value.prompt(&mut output).unwrap();
+            assert_eq!(&output, b"Whether to fight [y/n]: ");
+            output.clear();
+            assert_eq!(value.ask(&mut output, &INPUT_YES[..]).unwrap(), true);
+            assert_eq!(value.ask(&mut output, &INPUT_NO[..]).unwrap(), false);
+            assert_eq!(
+                value.ask(&mut output, &input_empty_then_yes[..]).unwrap(),
+                true
+            );
+            assert_eq!(&output, b"Default value not set, please input y/n: ");
+            output.clear();
+
+            let value: BoolInput = BoolInput::new::<&str>(None, None);
+            value.prompt(&mut output).unwrap();
+            assert_eq!(&output, b"Whether to do something [y/n]: ");
+            output.clear();
+            assert_eq!(value.ask(&mut output, &INPUT_YES[..]).unwrap(), true);
+            assert_eq!(value.ask(&mut output, &INPUT_NO[..]).unwrap(), false);
+            assert_eq!(
+                value.ask(&mut output, &input_empty_then_yes[..]).unwrap(),
+                true
+            );
+            assert_eq!(&output, b"Default value not set, please input y/n: ");
+            output.clear();
+        }
 
         #[test]
         fn input() {

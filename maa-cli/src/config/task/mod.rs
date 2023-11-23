@@ -350,7 +350,7 @@ mod tests {
     mod deserialize_example {
         use super::*;
 
-        use value::input::{Input, Select};
+        use value::input::{BoolInput, Input, Select};
 
         use chrono::{NaiveDateTime, NaiveTime, TimeZone, Weekday};
 
@@ -361,7 +361,10 @@ mod tests {
                         TaskType::StartUp,
                         object!(
                             "client_type" => "Official",
-                            "start_game_enabled" => true,
+                            "start_game_enabled" => BoolInput::new(
+                                Some(true),
+                                Some("start the game"),
+                            ),
                         ),
                         Strategy::default(),
                         vec![TaskVariant {
