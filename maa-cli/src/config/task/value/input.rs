@@ -483,153 +483,162 @@ mod tests {
 
         const INPUT_YES: &[u8] = b"y\n";
         const INPUT_NO: &[u8] = b"n\n";
+        const INPUT_ONE: &[u8] = b"1\n";
+        const INPUT_TWO: &[u8] = b"2\n";
+        const INPUT_THREE: &[u8] = b"3\n";
         const INPUT_EMPTY: &[u8] = b"\n";
+        const INPUT_INVALID: &[u8] = b"invalid\n";
+
+        macro_rules! combine_input {
+            ($input1:ident, $input2:ident) => {
+                &[$input1, $input2].concat()[..]
+            };
+        }
+
+        macro_rules! assert_output_then_clear {
+            ($output:ident, $expected:expr) => {
+                assert_eq!(&$output, $expected);
+                $output.clear();
+            };
+            ($output:ident) => {
+                assert_eq!(&$output, b"");
+            };
+        }
+
+        macro_rules! assert_matches {
+            ($value:expr, $pattern:pat) => {
+                assert!(matches!($value, $pattern));
+            };
+        }
 
         #[test]
         fn bool_input() {
             let mut output = b"".to_vec();
+            let input_empty_then_yes = combine_input!(INPUT_EMPTY, INPUT_YES);
+            let input_invalid = combine_input!(INPUT_INVALID, INPUT_YES);
 
             let value: BoolInput = BoolInput::new(Some(true), Some("fight"));
             value.prompt(&mut output).unwrap();
-            assert_eq!(&output, b"Whether to fight [Y/n]: ");
-            output.clear();
-
-            let input_invalid = b"invalid\ny\n";
-            assert!(value.ask(&mut output, &input_invalid[..]).unwrap());
-            assert_eq!(&output, b"Invalid input, please input y/n: ");
-            output.clear();
+            assert_output_then_clear!(output, b"Whether to fight [Y/n]: ");
             assert!(value.ask(&mut output, INPUT_YES).unwrap());
             assert!(!value.ask(&mut output, INPUT_NO).unwrap());
             assert!(value.ask(&mut output, INPUT_EMPTY).unwrap());
-            assert_eq!(&output, b"");
+            assert!(value.ask(&mut output, input_invalid).unwrap());
+            assert_output_then_clear!(output, b"Invalid input, please input y/n: ");
+            assert!(value.get().unwrap());
 
             let value: BoolInput = BoolInput::new(Some(false), Some("fight"));
             value.prompt(&mut output).unwrap();
-            assert_eq!(&output, b"Whether to fight [y/N]: ");
-            output.clear();
+            assert_output_then_clear!(output, b"Whether to fight [y/N]: ");
             assert!(value.ask(&mut output, INPUT_YES).unwrap());
             assert!(!value.ask(&mut output, INPUT_NO).unwrap());
             assert!(!value.ask(&mut output, INPUT_EMPTY).unwrap());
+            assert!(value.ask(&mut output, input_invalid).unwrap());
+            assert_output_then_clear!(output, b"Invalid input, please input y/n: ");
+            assert!(!value.get().unwrap());
 
-            let input_empty_then_yes = b"\ny\n";
             let value: BoolInput = BoolInput::new(None, Some("fight"));
             value.prompt(&mut output).unwrap();
-            assert_eq!(&output, b"Whether to fight [y/n]: ");
-            output.clear();
+            assert_output_then_clear!(output, b"Whether to fight [y/n]: ");
             assert!(value.ask(&mut output, INPUT_YES).unwrap());
             assert!(!value.ask(&mut output, INPUT_NO).unwrap());
-            assert!(value.ask(&mut output, &input_empty_then_yes[..]).unwrap());
-            assert_eq!(&output, b"Default value not set, please input y/n: ");
-            output.clear();
+            assert!(value.ask(&mut output, input_empty_then_yes).unwrap());
+            assert_output_then_clear!(output, b"Default value not set, please input y/n: ");
+            assert!(value.ask(&mut output, input_invalid).unwrap());
+            assert_output_then_clear!(output, b"Invalid input, please input y/n: ");
+            assert_matches!(value.get(), Err(Error::DefaultNotSet));
 
             let value: BoolInput = BoolInput::new::<&str>(None, None);
             value.prompt(&mut output).unwrap();
-            assert_eq!(&output, b"Whether to do something [y/n]: ");
-            output.clear();
+            assert_output_then_clear!(output, b"Whether to do something [y/n]: ");
             assert!(value.ask(&mut output, INPUT_YES).unwrap());
             assert!(!value.ask(&mut output, INPUT_NO).unwrap());
-            assert!(value.ask(&mut output, &input_empty_then_yes[..]).unwrap());
-            assert_eq!(&output, b"Default value not set, please input y/n: ");
-            output.clear();
+            assert!(value.ask(&mut output, input_empty_then_yes).unwrap());
+            assert_output_then_clear!(output, b"Default value not set, please input y/n: ");
+            assert!(value.ask(&mut output, input_invalid).unwrap());
+            assert_output_then_clear!(output, b"Invalid input, please input y/n: ");
+            assert!(matches!(value.get(), Err(Error::DefaultNotSet)));
         }
 
         #[test]
         fn input() {
+            let mut output = b"".to_vec();
+            let input_empty_then_one = combine_input!(INPUT_EMPTY, INPUT_ONE);
+            let input_invalid_then_one = combine_input!(INPUT_INVALID, INPUT_ONE);
+
             let value: Input<i64> = Input::new(Some(1), Some("a number"));
-            let input = b"a\n2\n";
-            let mut output = b"".to_vec();
             value.prompt(&mut output).unwrap();
-            assert_eq!(&output, b"Please input a number [default: 1]: ");
-            output.clear();
-            assert_eq!(value.ask(&mut output, &input[..]).unwrap(), 2);
-            assert_eq!(&output, b"Invalid input, please try again: ");
-        }
+            assert_output_then_clear!(output, b"Please input a number [default: 1]: ");
+            assert_matches!(value.ask(&mut output, INPUT_ONE), Ok(1));
+            assert_matches!(value.ask(&mut output, INPUT_TWO), Ok(2));
+            assert_matches!(value.ask(&mut output, INPUT_EMPTY), Ok(1));
+            assert_matches!(value.ask(&mut output, input_invalid_then_one), Ok(1));
+            assert_output_then_clear!(output, b"Invalid input, please try again: ");
+            assert_matches!(value.get_default(), Ok(1));
 
-        #[test]
-        fn input_empty() {
-            let value: Input<i64> = Input::new(Some(1), Some("a number"));
-            let input = b"\n";
-            let mut output = b"".to_vec();
-            value.prompt(&mut output).unwrap();
-            assert_eq!(&output, b"Please input a number [default: 1]: ");
-            output.clear();
-            assert_eq!(value.ask(&mut output, &input[..]).unwrap(), 1);
-            assert_eq!(&output, b"");
-        }
-
-        #[test]
-        fn input_no_default() {
-            let value: Input<i64> = Input::new::<i64, &str>(None, Some("a number"));
-            let input = b"\n2\n";
-            let mut output = b"".to_vec();
-            value.prompt(&mut output).unwrap();
-            assert_eq!(&output, b"Please input a number: ");
-            output.clear();
-            assert_eq!(value.ask(&mut output, &input[..]).unwrap(), 2);
-            assert_eq!(&output, b"Default value not set, please input a value: ");
-        }
-
-        #[test]
-        fn input_no_description() {
             let value: Input<i64> = Input::new::<i64, &str>(Some(1), None);
-            let input = b"2\n";
-            let mut output = b"".to_vec();
             value.prompt(&mut output).unwrap();
-            assert_eq!(&output, b"Please input a i64 [default: 1]: ");
-            output.clear();
-            assert_eq!(value.ask(&mut output, &input[..]).unwrap(), 2);
-            assert_eq!(&output, b"");
-        }
+            assert_output_then_clear!(output, b"Please input a i64 [default: 1]: ");
+            assert_matches!(value.ask(&mut output, INPUT_ONE), Ok(1));
+            assert_matches!(value.ask(&mut output, INPUT_TWO), Ok(2));
+            assert_matches!(value.ask(&mut output, INPUT_EMPTY), Ok(1));
+            assert_matches!(value.ask(&mut output, input_invalid_then_one), Ok(1));
+            assert_output_then_clear!(output, b"Invalid input, please try again: ");
+            assert_matches!(value.get_default(), Ok(1));
 
-        #[test]
-        fn input_empty_no_default() {
             let value: Input<i64> = Input::new::<i64, &str>(None, Some("a number"));
-            let input = b"\n2\n";
-            let mut output = b"".to_vec();
             value.prompt(&mut output).unwrap();
-            assert_eq!(&output, b"Please input a number: ");
-            output.clear();
-            assert_eq!(value.ask(&mut output, &input[..]).unwrap(), 2);
-            assert_eq!(&output, b"Default value not set, please input a value: ");
+            assert_output_then_clear!(output, b"Please input a number: ");
+            assert_matches!(value.ask(&mut output, INPUT_ONE), Ok(1));
+            assert_matches!(value.ask(&mut output, INPUT_TWO), Ok(2));
+            assert_matches!(value.ask(&mut output, input_empty_then_one), Ok(1));
+            assert_output_then_clear!(output, b"Default value not set, please input a value: ");
+            assert_matches!(value.get_default(), Err(Error::DefaultNotSet));
+
+            let value: Input<i64> = Input::new::<i64, &str>(None, None);
+            value.prompt(&mut output).unwrap();
+            assert_output_then_clear!(output, b"Please input a i64: ");
+            assert_matches!(value.ask(&mut output, INPUT_ONE), Ok(1));
+            assert_matches!(value.ask(&mut output, INPUT_TWO), Ok(2));
+            assert_matches!(value.ask(&mut output, input_empty_then_one), Ok(1));
+            assert_output_then_clear!(output, b"Default value not set, please input a value: ");
+            assert_matches!(value.get_default(), Err(Error::DefaultNotSet));
         }
 
         #[test]
         fn select() {
-            let value: Select<char> = Select::new(vec!['A', 'B'], Some("a char"));
-            let input = b"3\na\n2\n";
             let mut output = b"".to_vec();
-            value.prompt(&mut output).unwrap();
-            assert_eq!(&output, b"1. A\n2. B\nPlease select a char: ");
-            output.clear();
-            assert_eq!(value.ask(&mut output, &input[..]).unwrap(), 'B');
-            assert_eq!(
-                &output,
-                b"Index out of range, must be between 1 and 2: Invalid input, please try again: "
-            );
-        }
+            let input_empty_then_one = combine_input!(INPUT_EMPTY, INPUT_ONE);
+            let input_invalid_then_one = combine_input!(INPUT_INVALID, INPUT_ONE);
+            let input_out_of_range_then_one = combine_input!(INPUT_THREE, INPUT_ONE);
 
-        #[test]
-        fn select_no_description() {
+            let value: Select<char> = Select::new(vec!['A', 'B'], Some("an option"));
+            value.prompt(&mut output).unwrap();
+            assert_output_then_clear!(output, b"1. A\n2. B\nPlease select an option: ");
+            assert_matches!(value.ask(&mut output, INPUT_ONE), Ok('A'));
+            assert_matches!(value.ask(&mut output, INPUT_TWO), Ok('B'));
+            assert_matches!(value.ask(&mut output, input_empty_then_one), Ok('A'));
+            assert_output_then_clear!(output, b"Please select one of the alternatives: ");
+            assert_matches!(value.ask(&mut output, input_invalid_then_one), Ok('A'));
+            assert_output_then_clear!(output, b"Invalid input, please try again: ");
+            assert_matches!(value.ask(&mut output, input_out_of_range_then_one), Ok('A'));
+            assert_output_then_clear!(output, b"Index out of range, must be between 1 and 2: ");
+            assert_matches!(value.get_first(), Ok('A'));
+
             let value: Select<char> = Select::new::<char, &str>(vec!['A', 'B'], None);
-            let input = b"2\n";
-            let mut output = b"".to_vec();
             value.prompt(&mut output).unwrap();
-            assert_eq!(&output, b"1. A\n2. B\nPlease select a char: ");
-            output.clear();
-            assert_eq!(value.ask(&mut output, &input[..]).unwrap(), 'B');
-            assert_eq!(&output, b"");
-        }
+            assert_output_then_clear!(output, b"1. A\n2. B\nPlease select a char: ");
+            assert_matches!(value.ask(&mut output, INPUT_ONE), Ok('A'));
+            assert_matches!(value.ask(&mut output, INPUT_TWO), Ok('B'));
+            assert_matches!(value.ask(&mut output, input_empty_then_one), Ok('A'));
+            assert_output_then_clear!(output, b"Please select one of the alternatives: ");
+            assert_matches!(value.ask(&mut output, input_invalid_then_one), Ok('A'));
+            assert_output_then_clear!(output, b"Invalid input, please try again: ");
+            assert_matches!(value.ask(&mut output, input_out_of_range_then_one), Ok('A'));
+            assert_output_then_clear!(output, b"Index out of range, must be between 1 and 2: ");
 
-        #[test]
-        fn select_empty() {
-            let value: Select<char> = Select::new(vec!['A', 'B'], Some("a char"));
-            let input = b"\n2\n";
-            let mut output = b"".to_vec();
-            value.prompt(&mut output).unwrap();
-            assert_eq!(&output, b"1. A\n2. B\nPlease select a char: ");
-            output.clear();
-            assert_eq!(value.ask(&mut output, &input[..]).unwrap(), 'B');
-            assert_eq!(&output, b"Please select one of the alternatives: ");
+            let value: Select<char> = Select::new::<char, &str>(vec![], Some("a char"));
+            assert_matches!(value.get_first(), Err(Error::DefaultNotSet));
         }
     }
 }
