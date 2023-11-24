@@ -1,7 +1,10 @@
 # startup game
 [[tasks]]
 type = "StartUp"
-params = { client_type = "Official", start_game_enabled = true }
+
+[tasks.params]
+client_type = "Official"
+start_game_enabled = { default = true, description = "start the game" }
 
 [[tasks]]
 type = "Fight"
