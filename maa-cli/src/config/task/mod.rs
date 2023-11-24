@@ -386,12 +386,10 @@ mod tests {
                             TaskVariant {
                                 condition: Condition::Always,
                                 params: object!(
-                                    "stage" => Value::InputString(
-                                        Input{
-                                            default: Some("1-7".to_string()),
-                                            description: Some("a stage to fight".to_string()) }
-                                        .into(),
-                                    )
+                                    "stage" => Input {
+                                        default: Some("1-7".to_string()),
+                                        description: Some("a stage to fight".to_string())
+                                    }
                                 ),
                             },
                             TaskVariant {
@@ -405,17 +403,15 @@ mod tests {
                                     start: Some(naive_local_datetime(2023, 8, 1, 16, 0, 0)),
                                     end: Some(naive_local_datetime(2023, 8, 21, 3, 59, 59)),
                                 },
-                                params: object!("stage" => Value::InputString(
-                                        Select {
-                                            alternatives: vec![
-                                                "SL-6".to_string(),
-                                                "SL-7".to_string(),
-                                                "SL-8".to_string(),
-                                            ],
-                                            description: Some("a stage to fight in summer event".to_string()),
-                                        }
-                                        .into(),
-                                    )
+                                params: object!(
+                                    "stage" => Select {
+                                        alternatives: vec![
+                                            "SL-6".to_string(),
+                                            "SL-7".to_string(),
+                                            "SL-8".to_string(),
+                                        ],
+                                        description: Some("a stage to fight in summer event".to_string()),
+                                    }
                                 ),
                             },
                         ],
@@ -423,7 +419,7 @@ mod tests {
                     Task::new(
                         TaskType::Mall,
                         object!(
-                           "shopping" => true,
+                            "shopping" => true,
                             "credit_fight" => true,
                             "buy_first" => [
                                 "招聘许可",
