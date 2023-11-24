@@ -9,7 +9,7 @@ use crate::{
         task::{
             task_type::{TaskOrUnknown, TaskType},
             value::input::enable_batch_mode,
-            TaskList,
+            TaskConfig,
         },
         Error as ConfigError, FindFile,
     },
@@ -25,19 +25,19 @@ use anyhow::{anyhow, bail, Context, Result};
 use maa_sys::Assistant;
 
 pub enum CLITask {
-    TaskList(TaskList),
-    TaskName(String),
+    TaskConfig(TaskConfig),
+    TaskFile(String),
 }
 
-impl From<TaskList> for CLITask {
-    fn from(task_list: TaskList) -> Self {
-        Self::TaskList(task_list)
+impl From<TaskConfig> for CLITask {
+    fn from(task_list: TaskConfig) -> Self {
+        Self::TaskConfig(task_list)
     }
 }
 
 impl From<String> for CLITask {
     fn from(task_name: String) -> Self {
-        Self::TaskName(task_name)
+        Self::TaskFile(task_name)
     }
 }
 
@@ -147,11 +147,11 @@ pub fn run(
 
     // Load task from tasks/<task>.(toml|yaml|json)
     let task_list = match task.into() {
-        CLITask::TaskList(task_list) => task_list,
-        CLITask::TaskName(task_name) => {
+        CLITask::TaskConfig(task_list) => task_list,
+        CLITask::TaskFile(task_name) => {
             let task_file = config_dir.join("tasks").join(&task_name);
             debug!("Finding task file:", task_file.display());
-            TaskList::find_file(&task_file).with_context(|| {
+            TaskConfig::find_file(&task_file).with_context(|| {
                 format!(
                     "Failed to find task file {} in {}",
                     task_name,
@@ -170,11 +170,11 @@ pub fn run(
 
     let mut client_resource: Option<&str> = None;
 
-    for task in task_list.tasks {
+    for task in task_list.tasks() {
         if task.is_active() {
-            let task_type = task.get_type();
+            let task_type = task.task_type();
 
-            let mut params = task.get_params();
+            let mut params = task.params();
             params.init().context("Failed to init task params!")?;
 
             match task_type {
