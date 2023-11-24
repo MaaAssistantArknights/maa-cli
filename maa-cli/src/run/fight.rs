@@ -1,6 +1,7 @@
 use crate::{
     config::task::{
-        default_variants, task_type::TaskType, value::input::Input, Strategy, Task, TaskList, Value,
+        default_variants, task_type::TaskType, value::input::Input, Strategy, Task, TaskConfig,
+        Value,
     },
     dirs::Dirs,
     object,
@@ -16,9 +17,10 @@ pub fn fight(
     startup: bool,
     closedown: bool,
 ) -> Result<()> {
-    let mut task_list: Vec<Task> = Vec::new();
+    let mut task_config = TaskConfig::new();
+
     if startup {
-        task_list.push(Task::new(
+        task_config.push(Task::new(
             TaskType::StartUp,
             Value::default(),
             Strategy::default(),
@@ -29,7 +31,7 @@ pub fn fight(
     let stage: Input<String> = Input::new(Some("1-7".to_string()), Some("a stage to fight"));
     let medicine: Input<i64> = Input::new(Some(0), Some("medicine to use"));
 
-    task_list.push(Task::new(
+    task_config.push(Task::new(
         TaskType::Fight,
         object!(
             "stage" => stage,
@@ -40,7 +42,7 @@ pub fn fight(
     ));
 
     if closedown {
-        task_list.push(Task::new(
+        task_config.push(Task::new(
             TaskType::CloseDown,
             Value::default(),
             Strategy::default(),
@@ -48,7 +50,5 @@ pub fn fight(
         ));
     }
 
-    let task = TaskList { tasks: task_list };
-
-    run(dirs, task, addr, user_resource, batch, false)
+    run(dirs, task_config, addr, user_resource, batch, false)
 }
