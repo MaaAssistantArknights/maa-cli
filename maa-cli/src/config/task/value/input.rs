@@ -558,6 +558,19 @@ mod tests {
             assert!(value.ask(&mut output, input_invalid).unwrap());
             assert_output_then_clear!(output, b"Invalid input, please input y/n: ");
             assert!(matches!(value.get(), Err(Error::DefaultNotSet)));
+
+            // test other valid inputs
+            let value: BoolInput = BoolInput::new::<&str>(None, None);
+            assert!(value.ask(&mut output, &b"y\n"[..]).unwrap());
+            assert!(value.ask(&mut output, &b"Y\n"[..]).unwrap());
+            assert!(value.ask(&mut output, &b"yes\n"[..]).unwrap());
+            assert!(value.ask(&mut output, &b"Yes\n"[..]).unwrap());
+            assert!(value.ask(&mut output, &b"YES\n"[..]).unwrap());
+            assert!(!value.ask(&mut output, &b"n\n"[..]).unwrap());
+            assert!(!value.ask(&mut output, &b"N\n"[..]).unwrap());
+            assert!(!value.ask(&mut output, &b"no\n"[..]).unwrap());
+            assert!(!value.ask(&mut output, &b"No\n"[..]).unwrap());
+            assert!(!value.ask(&mut output, &b"NO\n"[..]).unwrap());
         }
 
         #[test]
