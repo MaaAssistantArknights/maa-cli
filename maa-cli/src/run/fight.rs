@@ -1,9 +1,8 @@
 use crate::{
     config::task::{
-        default_variants,
         task_type::TaskType,
         value::input::{BoolInput, Input, Select},
-        Strategy, Task, TaskConfig, Value,
+        Task, TaskConfig, Value,
     },
     dirs::Dirs,
     object,
@@ -15,7 +14,7 @@ pub fn fight(dirs: &Dirs, startup: bool, closedown: bool, common: CommonArgs) ->
     let mut task_config = TaskConfig::new();
 
     if startup {
-        task_config.push(Task::new(
+        task_config.push(Task::new_with_default(
             TaskType::StartUp,
             object!(
                 "start_game_enabled" => BoolInput::new(Some(true), Some("start game")),
@@ -25,27 +24,21 @@ pub fn fight(dirs: &Dirs, startup: bool, closedown: bool, common: CommonArgs) ->
                     Some("client type"),
                 ),
             ),
-            Strategy::default(),
-            default_variants(),
         ));
     }
 
-    task_config.push(Task::new(
+    task_config.push(Task::new_with_default(
         TaskType::Fight,
         object!(
             "stage" => Input::<String>::new(Some("1-7"), Some("a stage to fight")),
             "medicine" => Input::<i64>::new(Some(0), Some("medicine to use")),
         ),
-        Strategy::default(),
-        default_variants(),
     ));
 
     if closedown {
-        task_config.push(Task::new(
+        task_config.push(Task::new_with_default(
             TaskType::CloseDown,
             Value::default(),
-            Strategy::default(),
-            default_variants(),
         ));
     }
 

@@ -84,6 +84,14 @@ impl Task {
         }
     }
 
+    pub fn new_with_default<T, V>(task_type: T, params: V) -> Self
+    where
+        T: Into<TaskOrUnknown>,
+        V: Into<Value>,
+    {
+        Self::new(task_type, params, Strategy::default(), default_variants())
+    }
+
     pub fn is_active(&self) -> bool {
         for variant in self.variants.iter() {
             if variant.is_active() {
@@ -393,7 +401,7 @@ mod tests {
         fn example_task_config() -> TaskConfig {
             let mut task_list = TaskConfig::new();
 
-            task_list.push(Task::new(
+            task_list.push(Task::new_with_default(
                 TaskType::StartUp,
                 object!(
                     "client_type" => "Official",
@@ -402,8 +410,6 @@ mod tests {
                         Some("start the game"),
                     ),
                 ),
-                Strategy::default(),
-                default_variants(),
             ));
 
             task_list.push(Task::new(
@@ -476,12 +482,7 @@ mod tests {
                 }],
             ));
 
-            task_list.push(Task::new(
-                TaskType::CloseDown,
-                object!(),
-                Strategy::default(),
-                default_variants(),
-            ));
+            task_list.push(Task::new_with_default(TaskType::CloseDown, object!()));
 
             task_list
         }
