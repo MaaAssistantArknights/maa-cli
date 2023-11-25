@@ -7,7 +7,7 @@ use super::{
 use crate::{
     config::cli::maa_cli::Config,
     consts::{MAA_CLI_EXE, MAA_CLI_VERSION},
-    dirs::{Dirs, Ensure},
+    dirs::{self, Ensure},
     normal,
 };
 
@@ -26,7 +26,7 @@ pub fn version() -> Result<Version> {
     Version::parse(MAA_CLI_VERSION).context("Failed to parse maa-cli version")
 }
 
-pub fn update(dirs: &Dirs, config: &Config) -> Result<()> {
+pub fn update(config: &Config) -> Result<()> {
     normal!("Fetching maa-cli version info...");
     let version_json: VersionJSON<Details> = reqwest::blocking::get(config.api_url())
         .context("Failed to fetch version info")?
@@ -43,7 +43,7 @@ pub fn update(dirs: &Dirs, config: &Config) -> Result<()> {
     let asset_name = asset.name();
     let asset_size = asset.size();
     let asset_checksum = asset.checksum();
-    let cache_path = dirs.cache().ensure()?.join(asset_name);
+    let cache_path = dirs::cache().ensure()?.join(asset_name);
 
     if cache_path.exists() && cache_path.metadata()?.len() == asset_size {
         normal!(format!("Found existing file: {}", cache_path.display()));

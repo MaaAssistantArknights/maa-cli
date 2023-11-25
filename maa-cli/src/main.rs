@@ -21,7 +21,6 @@ use crate::installer::maa_core;
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::{generate, Shell};
-use directories::ProjectDirs;
 
 #[derive(Parser)]
 #[command(name = "maa", author, version)]
@@ -55,7 +54,7 @@ enum SubCommand {
     #[cfg(feature = "core_installer")]
     Install {
         #[command(flatten)]
-        common_args: CoreCommonerArgs,
+        common: cli::maa_core::CommonArgs,
         /// Force to install even if the maa and resource already exists
         ///
         /// If the maa-core and resource already exists,
@@ -79,7 +78,7 @@ enum SubCommand {
     #[cfg(feature = "core_installer")]
     Update {
         #[command(flatten)]
-        common_args: CoreCommonerArgs,
+        common: cli::maa_core::CommonArgs,
     },
     /// Manage maa-cli self and maa-run
     ///
@@ -168,73 +167,6 @@ enum SelfCommand {
     },
 }
 
-#[cfg(feature = "core_installer")]
-#[derive(Parser, Default)]
-struct CoreCommonerArgs {
-    /// Channel to download prebuilt package
-    ///
-    /// There are three channels of maa-core prebuilt packages,
-    /// stable, beta and alpha.
-    /// The default channel is stable, you can use this flag to change the channel.
-    /// If you want to use the latest features of maa-core,
-    /// you can use beta or alpha channel.
-    /// You can also configure the default channel
-    /// in the cli configure file `$MAA_CONFIG_DIR/cli.toml` with the key `maa_core.channel`.
-    /// Note: the alpha channel is only available for windows.
-    channel: Option<Channel>,
-    /// Do not install resource
-    ///
-    /// By default, resources are shipped with maa-core,
-    /// and we will install them when installing maa-core.
-    /// If you do not want to install resource,
-    /// you can use this flag to disable it.
-    /// You can also configure the default value in the cli configure file
-    /// `$MAA_CONFIG_DIR/cli.toml` with the key `maa_core.component.resource`;
-    /// set it to false to disable installing resource by default.
-    /// This is useful when you want to install maa-core only.
-    /// For my own, I will use this flag to install maa-core,
-    /// because I use the latest resource from github,
-    /// and this flag can avoid the resource being overwritten.
-    /// Note: if you use resources that too new or too old,
-    /// you may encounter some problems.
-    /// Use at your own risk.
-    #[arg(long)]
-    no_resource: bool,
-    /// Time to test download speed
-    ///
-    /// There are several mirrors of maa-core prebuilt packages.
-    /// This command will test the download speed of these mirrors,
-    /// and choose the fastest one to download.
-    /// This flag is used to set the time in seconds to test download speed.
-    /// If test time is 0, speed test will be skipped.
-    #[arg(short, long)]
-    test_time: Option<u64>,
-    /// URL of api to get version information
-    ///
-    /// This flag is used to set the URL of api to get version information.
-    /// It can also be changed by environment variable `MAA_API_URL`.
-    #[arg(long)]
-    api_url: Option<String>,
-}
-
-#[cfg(feature = "core_installer")]
-fn apply_core_args(config: &mut cli::maa_core::Config, args: &CoreCommonerArgs) {
-    if let Some(channel) = args.channel {
-        config.set_channel(channel);
-    }
-    if let Some(test_time) = args.test_time {
-        config.set_test_time(test_time);
-    }
-    if let Some(api_url) = args.api_url.as_ref() {
-        config.set_api_url(api_url);
-    }
-    if args.no_resource {
-        config.set_components(|components| {
-            components.resource = false;
-        });
-    }
-}
-
 #[derive(ValueEnum, Clone, Default)]
 enum Component {
     #[default]
@@ -271,9 +203,6 @@ pub enum Dir {
 }
 
 fn main() -> Result<()> {
-    let proj = ProjectDirs::from("com", "loong", "maa");
-    let proj_dirs = dirs::Dirs::new(proj);
-
     let cli = CLI::parse();
 
     let subcommand = cli.command;
@@ -284,20 +213,12 @@ fn main() -> Result<()> {
 
     match subcommand {
         #[cfg(feature = "core_installer")]
-        SubCommand::Install { common_args, force } => {
-            let mut core_config = InstallerConfig::find_file(&proj_dirs.config().join("cli"))
-                .unwrap_or_default()
-                .core_config();
-            apply_core_args(&mut core_config, &common_args);
-            maa_core::install(&proj_dirs, force, &core_config)?;
+        SubCommand::Install { force, common } => {
+            maa_core::install(force, &common)?;
         }
         #[cfg(feature = "core_installer")]
-        SubCommand::Update { common_args } => {
-            let mut core_config = InstallerConfig::find_file(&proj_dirs.config().join("cli"))
-                .unwrap_or_default()
-                .core_config();
-            apply_core_args(&mut core_config, &common_args);
-            maa_core::update(&proj_dirs, &core_config)?;
+        SubCommand::Update { common } => {
+            maa_core::update(&common)?;
         }
         #[cfg(feature = "cli_installer")]
         SubCommand::SelfCommand(self_command) => match self_command {
@@ -306,7 +227,7 @@ fn main() -> Result<()> {
                 api_url,
                 download_url,
             } => {
-                let mut cli_config = InstallerConfig::find_file(&proj_dirs.config().join("cli"))
+                let mut cli_config = InstallerConfig::find_file(&dirs::config().join("cli"))
                     .unwrap_or_default()
                     .cli_config();
                 if let Some(channel) = channel {
@@ -318,55 +239,51 @@ fn main() -> Result<()> {
                 if let Some(download_url) = download_url {
                     cli_config.set_download_url(download_url);
                 }
-                maa_cli::update(&proj_dirs, &cli_config)?;
+                maa_cli::update(&cli_config)?;
             }
         },
         SubCommand::Dir { dir_type } => match dir_type {
-            Dir::Data => println!("{}", proj_dirs.data().display()),
+            Dir::Data => println!("{}", dirs::data().display()),
             Dir::Library => {
                 println!(
                     "{}",
-                    proj_dirs
-                        .find_library()
-                        .context("Library not found")?
-                        .display()
+                    dirs::find_library().context("Library not found")?.display()
                 )
             }
-            Dir::Config => println!("{}", proj_dirs.config().display()),
-            Dir::Cache => println!("{}", proj_dirs.cache().display()),
             Dir::Resource => {
                 println!(
                     "{}",
-                    proj_dirs
-                        .find_resource()
+                    dirs::find_resource()
                         .context("Resource not found")?
                         .display()
                 )
             }
-            Dir::Log => println!("{}", proj_dirs.log().display()),
+            Dir::Config => println!("{}", dirs::config().display()),
+            Dir::Cache => println!("{}", dirs::cache().display()),
+            Dir::Log => println!("{}", dirs::log().display()),
         },
         SubCommand::Version { component } => match component {
             Component::All => {
                 println!("maa-cli v{}", env!("CARGO_PKG_VERSION"));
-                println!("MaaCore {}", run::core_version(&proj_dirs)?);
+                println!("MaaCore {}", run::core_version()?);
             }
             Component::MaaCLI => {
                 println!("maa-cli v{}", env!("CARGO_PKG_VERSION"));
             }
             Component::MaaCore => {
-                println!("MaaCore {}", run::core_version(&proj_dirs)?);
+                println!("MaaCore {}", run::core_version()?);
             }
         },
-        SubCommand::Run { task, common } => run::run(&proj_dirs, task, common)?,
+        SubCommand::Run { task, common } => run::run(task, common)?,
         SubCommand::Fight {
             startup,
             closedown,
             common,
-        } => run::fight(&proj_dirs, startup, closedown, common)?,
+        } => run::fight(startup, closedown, common)?,
         SubCommand::List => {
-            let task_dir = proj_dirs.config().join("tasks");
+            let task_dir = dirs::config().join("tasks");
             if !task_dir.exists() {
-                println!("No tasks found");
+                eprintln!("No tasks found");
             } else {
                 for entry in task_dir.read_dir()? {
                     let entry = entry?;
@@ -394,11 +311,11 @@ mod test {
 
         #[test]
         fn log_level() {
-            assert!(matches!(CLI::parse_from(["maa", "-v", "help"]).verbose, 1));
-            assert!(matches!(CLI::parse_from(["maa", "help", "-v"]).verbose, 1));
-            assert!(matches!(CLI::parse_from(["maa", "help", "-vv"]).verbose, 2));
-            assert!(matches!(CLI::parse_from(["maa", "help", "-q"]).quiet, 1));
-            assert!(matches!(CLI::parse_from(["maa", "help", "-qq"]).quiet, 2));
+            assert!(matches!(CLI::parse_from(["maa", "-v", "list"]).verbose, 1));
+            assert!(matches!(CLI::parse_from(["maa", "list", "-v"]).verbose, 1));
+            assert!(matches!(CLI::parse_from(["maa", "list", "-vv"]).verbose, 2));
+            assert!(matches!(CLI::parse_from(["maa", "list", "-q"]).quiet, 1));
+            assert!(matches!(CLI::parse_from(["maa", "list", "-qq"]).quiet, 2));
         }
 
         #[cfg(feature = "core_installer")]
@@ -407,7 +324,7 @@ mod test {
             assert!(matches!(
                 CLI::parse_from(["maa", "install"]).command,
                 SubCommand::Install {
-                    common_args: CoreCommonerArgs {
+                    common: cli::maa_core::CommonArgs {
                         channel: None,
                         test_time: None,
                         no_resource: false,
@@ -420,7 +337,7 @@ mod test {
             assert!(matches!(
                 CLI::parse_from(["maa", "install", "beta"]).command,
                 SubCommand::Install {
-                    common_args: CoreCommonerArgs {
+                    common: cli::maa_core::CommonArgs {
                         channel: Some(Channel::Beta),
                         ..
                     },
@@ -431,7 +348,7 @@ mod test {
             assert!(matches!(
                 CLI::parse_from(["maa", "install", "-t5"]).command,
                 SubCommand::Install {
-                    common_args: CoreCommonerArgs {
+                    common: cli::maa_core::CommonArgs {
                         test_time: Some(5),
                         ..
                     },
@@ -441,7 +358,7 @@ mod test {
             assert!(matches!(
                 CLI::parse_from(["maa", "install", "--test-time", "5"]).command,
                 SubCommand::Install {
-                    common_args: CoreCommonerArgs {
+                    common: cli::maa_core::CommonArgs {
                         test_time: Some(5),
                         ..
                     },
@@ -457,7 +374,7 @@ mod test {
             assert!(matches!(
                 CLI::parse_from(["maa", "install", "--no-resource"]).command,
                 SubCommand::Install {
-                    common_args: CoreCommonerArgs {
+                    common: cli::maa_core::CommonArgs {
                         no_resource: true,
                         ..
                     },
@@ -472,7 +389,7 @@ mod test {
             assert!(matches!(
                 CLI::parse_from(["maa", "update"]).command,
                 SubCommand::Update {
-                    common_args: CoreCommonerArgs {
+                    common: cli::maa_core::CommonArgs {
                         channel: None,
                         test_time: None,
                         no_resource: false,
@@ -676,75 +593,6 @@ mod test {
                 CLI::parse_from(["maa", "complete", "bash"]).command,
                 SubCommand::Complete { shell: Shell::Bash }
             ));
-        }
-    }
-
-    mod apple_args {
-        use super::*;
-
-        #[cfg(feature = "core_installer")]
-        #[test]
-        fn core_args() {
-            fn apply_to_default(args: &CoreCommonerArgs) -> cli::maa_core::Config {
-                let mut core_config = cli::maa_core::Config::default();
-                apply_core_args(&mut core_config, args);
-                core_config
-            }
-
-            assert_eq!(
-                apply_to_default(&CoreCommonerArgs::default()),
-                cli::maa_core::Config::default()
-            );
-
-            assert_eq!(
-                &apply_to_default(&CoreCommonerArgs {
-                    channel: Some(Channel::Beta),
-                    ..Default::default()
-                }),
-                cli::maa_core::Config::default().set_channel(Channel::Beta)
-            );
-
-            assert_eq!(
-                &apply_to_default(&CoreCommonerArgs {
-                    test_time: Some(5),
-                    ..Default::default()
-                }),
-                cli::maa_core::Config::default().set_test_time(5)
-            );
-
-            assert_eq!(
-                &apply_to_default(&CoreCommonerArgs {
-                    api_url: Some("https://foo.bar/core/".to_string()),
-                    ..Default::default()
-                }),
-                cli::maa_core::Config::default().set_api_url("https://foo.bar/core/")
-            );
-
-            assert_eq!(
-                &apply_to_default(&CoreCommonerArgs {
-                    no_resource: true,
-                    ..Default::default()
-                }),
-                cli::maa_core::Config::default().set_components(|components| {
-                    components.resource = false;
-                })
-            );
-
-            assert_eq!(
-                &apply_to_default(&CoreCommonerArgs {
-                    channel: Some(Channel::Beta),
-                    test_time: Some(5),
-                    api_url: Some("https://foo.bar/maa_core/".to_string()),
-                    no_resource: true,
-                }),
-                cli::maa_core::Config::default()
-                    .with_channel(Channel::Beta)
-                    .with_test_time(5)
-                    .with_api_url("https://foo.bar/maa_core/")
-                    .set_components(|components| {
-                        components.resource = false;
-                    })
-            );
         }
     }
 }

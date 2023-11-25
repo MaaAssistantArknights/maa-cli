@@ -7,10 +7,16 @@ use super::{
 };
 
 use crate::{
-    config::cli::maa_core::{Components, Config},
+    config::{
+        cli::{
+            maa_core::{CommonArgs, Components, Config},
+            InstallerConfig,
+        },
+        Error as ConfigError, FindFile,
+    },
     consts::MAA_CORE_LIB,
     debug,
-    dirs::{Dirs, Ensure},
+    dirs::{self, Ensure},
     normal, run,
 };
 
@@ -70,13 +76,27 @@ fn extract_mapper(
     None
 }
 
-pub fn version(dirs: &Dirs) -> Result<Version> {
-    let ver_str = run::core_version(dirs)?.trim();
+pub fn version() -> Result<Version> {
+    let ver_str = run::core_version()?.trim();
     Version::parse(&ver_str[1..]).context("Failed to parse version")
 }
 
-pub fn install(dirs: &Dirs, force: bool, config: &Config) -> Result<()> {
-    let lib_dir = &dirs.library();
+fn get_config(args: &CommonArgs) -> Result<Config, ConfigError> {
+    match InstallerConfig::find_file(&dirs::config().join("cli")) {
+        Ok(config) => {
+            let mut config = config.core_config();
+            config.apply_args(args);
+            Ok(config)
+        }
+        Err(ConfigError::FileNotFound(_)) => Ok(Config::default()),
+        Err(e) => Err(e),
+    }
+}
+
+pub fn install(force: bool, args: &CommonArgs) -> Result<()> {
+    let config = get_config(args)?;
+
+    let lib_dir = dirs::library();
 
     if lib_dir.join(MAA_CORE_LIB).exists() && !force {
         bail!("MaaCore already exists, use `maa update` to update it or `maa install --force` to force reinstall")
@@ -86,18 +106,18 @@ pub fn install(dirs: &Dirs, force: bool, config: &Config) -> Result<()> {
         "Fetching MaaCore version info (channel: {})...",
         config.channel()
     ));
-    let version_json = get_version_json(config)?;
+    let version_json = get_version_json(&config)?;
     let asset_version = version_json.version();
     let asset_name = name(asset_version)?;
     let asset = version_json.details().asset(&asset_name)?;
 
     normal!(format!("Downloading MaaCore {}...", asset_version));
-    let cache_dir = &dirs.cache().ensure()?;
+    let cache_dir = dirs::cache().ensure()?;
     let archive = download(
         &cache_dir.join(asset_name),
         asset.size(),
         asset.download_links(),
-        config,
+        &config,
     )?;
 
     normal!("Installing MaaCore...");
@@ -106,7 +126,7 @@ pub fn install(dirs: &Dirs, force: bool, config: &Config) -> Result<()> {
         debug!("Cleaning library directory");
         lib_dir.ensure_clean()?;
     }
-    let resource_dir = dirs.resource();
+    let resource_dir = dirs::resource();
     if components.resource {
         debug!("Cleaning resource directory");
         resource_dir.ensure_clean()?;
@@ -116,27 +136,25 @@ pub fn install(dirs: &Dirs, force: bool, config: &Config) -> Result<()> {
     Ok(())
 }
 
-pub fn update(dirs: &Dirs, config: &Config) -> Result<()> {
-    let components = config.components();
+pub fn update(args: &CommonArgs) -> Result<()> {
+    let config = get_config(args)?;
 
+    let components = config.components();
     // Check if any component is specified
     if !(components.library || components.resource) {
         bail!("No component specified, aborting");
     }
-
     // Check if MaaCore is installed and installed by maa
-    let lib_dir = dirs.library();
-    let resource_dir = dirs.resource();
-
-    match (components.library, dirs.find_library()) {
+    let lib_dir = dirs::library();
+    let resource_dir = dirs::resource();
+    match (components.library, dirs::find_library()) {
         (true, Some(dir)) if dir == lib_dir => bail!(
             "MaaCore found at {} but not installed by maa, aborting",
             dir.display()
         ),
         _ => {}
     }
-
-    match (components.resource, dirs.find_resource()) {
+    match (components.resource, dirs::find_resource()) {
         (true, Some(dir)) if dir == resource_dir => bail!(
             "MaaCore resource found at {} but not installed by maa, aborting",
             dir.display()
@@ -148,9 +166,9 @@ pub fn update(dirs: &Dirs, config: &Config) -> Result<()> {
         "Fetching MaaCore version info (channel: {})...",
         config.channel()
     ));
-    let version_json = get_version_json(config)?;
+    let version_json = get_version_json(&config)?;
     let asset_version = version_json.version();
-    let current_version = version(dirs)?;
+    let current_version = version()?;
     if !version_json.can_update("MaaCore", &current_version)? {
         return Ok(());
     }
@@ -158,9 +176,9 @@ pub fn update(dirs: &Dirs, config: &Config) -> Result<()> {
     let asset = version_json.details().asset(&asset_name)?;
 
     normal!(format!("Downloading MaaCore {}...", asset_version));
-    let cache_dir = &dirs.cache().ensure()?;
+    let cache_dir = dirs::cache().ensure()?;
     let asset_path = cache_dir.join(asset_name);
-    let archive = download(&asset_path, asset.size(), asset.download_links(), config)?;
+    let archive = download(&asset_path, asset.size(), asset.download_links(), &config)?;
 
     normal!("Installing MaaCore...");
     if components.library {

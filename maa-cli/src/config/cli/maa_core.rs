@@ -2,6 +2,7 @@ use super::{normalize_url, return_true, Channel};
 
 use std::env::var_os;
 
+use clap::Parser;
 use serde::Deserialize;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -64,6 +65,22 @@ impl Config {
         f(&mut self.components);
         self
     }
+
+    pub fn apply_args(&mut self, args: &CommonArgs) -> &Self {
+        if let Some(channel) = args.channel {
+            self.set_channel(channel);
+        }
+        if let Some(test_time) = args.test_time {
+            self.set_test_time(test_time);
+        }
+        if let Some(api_url) = &args.api_url {
+            self.set_api_url(api_url);
+        }
+        if args.no_resource {
+            self.set_components(|components| components.resource = false);
+        }
+        self
+    }
 }
 
 fn default_test_time() -> u64 {
@@ -94,6 +111,54 @@ impl Default for Components {
             resource: true,
         }
     }
+}
+
+#[derive(Parser, Default)]
+pub struct CommonArgs {
+    /// Channel to download prebuilt package
+    ///
+    /// There are three channels of maa-core prebuilt packages,
+    /// stable, beta and alpha.
+    /// The default channel is stable, you can use this flag to change the channel.
+    /// If you want to use the latest features of maa-core,
+    /// you can use beta or alpha channel.
+    /// You can also configure the default channel
+    /// in the cli configure file `$MAA_CONFIG_DIR/cli.toml` with the key `maa_core.channel`.
+    /// Note: the alpha channel is only available for windows.
+    pub channel: Option<Channel>,
+    /// Do not install resource
+    ///
+    /// By default, resources are shipped with maa-core,
+    /// and we will install them when installing maa-core.
+    /// If you do not want to install resource,
+    /// you can use this flag to disable it.
+    /// You can also configure the default value in the cli configure file
+    /// `$MAA_CONFIG_DIR/cli.toml` with the key `maa_core.component.resource`;
+    /// set it to false to disable installing resource by default.
+    /// This is useful when you want to install maa-core only.
+    /// For my own, I will use this flag to install maa-core,
+    /// because I use the latest resource from github,
+    /// and this flag can avoid the resource being overwritten.
+    /// Note: if you use resources that too new or too old,
+    /// you may encounter some problems.
+    /// Use at your own risk.
+    #[arg(long)]
+    pub no_resource: bool,
+    /// Time to test download speed
+    ///
+    /// There are several mirrors of maa-core prebuilt packages.
+    /// This command will test the download speed of these mirrors,
+    /// and choose the fastest one to download.
+    /// This flag is used to set the time in seconds to test download speed.
+    /// If test time is 0, speed test will be skipped.
+    #[arg(short, long)]
+    pub test_time: Option<u64>,
+    /// URL of api to get version information
+    ///
+    /// This flag is used to set the URL of api to get version information.
+    /// It can also be changed by environment variable `MAA_API_URL`.
+    #[arg(long)]
+    pub api_url: Option<String>,
 }
 
 #[cfg(test)]
@@ -266,6 +331,67 @@ mod tests {
                     ..
                 }
             ));
+        }
+
+        #[test]
+        fn apply_args() {
+            fn apply_to_default(args: &CommonArgs) -> Config {
+                let mut config = Config::default();
+                config.apply_args(args);
+                config
+            }
+
+            assert_eq!(apply_to_default(&CommonArgs::default()), Config::default());
+
+            assert_eq!(
+                &apply_to_default(&CommonArgs {
+                    channel: Some(Channel::Beta),
+                    ..Default::default()
+                }),
+                Config::default().set_channel(Channel::Beta)
+            );
+
+            assert_eq!(
+                &apply_to_default(&CommonArgs {
+                    test_time: Some(5),
+                    ..Default::default()
+                }),
+                Config::default().set_test_time(5)
+            );
+
+            assert_eq!(
+                &apply_to_default(&CommonArgs {
+                    api_url: Some("https://foo.bar/core/".to_string()),
+                    ..Default::default()
+                }),
+                Config::default().set_api_url("https://foo.bar/core/")
+            );
+
+            assert_eq!(
+                &apply_to_default(&CommonArgs {
+                    no_resource: true,
+                    ..Default::default()
+                }),
+                Config::default().set_components(|components| {
+                    components.resource = false;
+                })
+            );
+
+            assert_eq!(
+                &apply_to_default(&CommonArgs {
+                    channel: Some(Channel::Beta),
+                    test_time: Some(5),
+                    api_url: Some("https://foo.bar/maa_core/".to_string()),
+                    no_resource: true,
+                }),
+                Config::default()
+                    .with_channel(Channel::Beta)
+                    .with_test_time(5)
+                    .with_api_url("https://foo.bar/maa_core/")
+                    .set_components(|components| {
+                        components.resource = false;
+                    })
+            );
         }
     }
 }

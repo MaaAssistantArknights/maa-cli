@@ -731,6 +731,7 @@ dependencies = [
  "flate2",
  "futures-util",
  "indicatif",
+ "lazy_static",
  "maa-sys",
  "paste",
  "reqwest",

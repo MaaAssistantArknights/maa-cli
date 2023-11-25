@@ -8,6 +8,7 @@ use std::{
 
 use directories::ProjectDirs;
 use dunce::canonicalize;
+use lazy_static::lazy_static;
 use paste::paste;
 
 macro_rules! matct_loc {
@@ -107,56 +108,88 @@ impl Dirs {
     pub fn log(&self) -> &Path {
         &self.log
     }
+}
 
-    pub fn find_library(&self) -> Option<PathBuf> {
-        let lib_dir = self.library();
-        if lib_dir.join(MAA_CORE_LIB).exists() {
-            return Some(lib_dir.to_path_buf());
-        }
+lazy_static! {
+    pub static ref DIRS: Dirs = Dirs::new(ProjectDirs::from("com", "loong", "maa"));
+}
 
-        current_exe_dir_find(|exe_dir| {
-            if exe_dir.join(MAA_CORE_LIB).exists() {
-                return Some(exe_dir.to_path_buf());
-            }
-            if let Some(dir) = exe_dir.parent() {
-                let lib_dir = dir.join("lib");
-                let lib_path = lib_dir.join(MAA_CORE_LIB);
-                if lib_path.exists() {
-                    return Some(lib_dir);
-                }
-            }
+pub fn data() -> &'static Path {
+    DIRS.data()
+}
 
-            None
-        })
+pub fn library() -> &'static Path {
+    DIRS.library()
+}
+
+pub fn config() -> &'static Path {
+    DIRS.config()
+}
+
+pub fn cache() -> &'static Path {
+    DIRS.cache()
+}
+
+pub fn resource() -> &'static Path {
+    DIRS.resource()
+}
+
+pub fn state() -> &'static Path {
+    DIRS.state()
+}
+
+pub fn log() -> &'static Path {
+    DIRS.log()
+}
+
+pub fn find_library() -> Option<PathBuf> {
+    let lib_dir = library();
+    if lib_dir.join(MAA_CORE_LIB).exists() {
+        return Some(lib_dir.to_path_buf());
     }
 
-    pub fn find_resource(&self) -> Option<PathBuf> {
-        let resource_dir = self.resource();
-        if resource_dir.exists() {
-            return Some(resource_dir.to_path_buf());
+    current_exe_dir_find(|exe_dir| {
+        if exe_dir.join(MAA_CORE_LIB).exists() {
+            return Some(exe_dir.to_path_buf());
+        }
+        if let Some(dir) = exe_dir.parent() {
+            let lib_dir = dir.join("lib");
+            let lib_path = lib_dir.join(MAA_CORE_LIB);
+            if lib_path.exists() {
+                return Some(lib_dir);
+            }
         }
 
-        current_exe_dir_find(|exe_dir| {
-            let resource_dir = exe_dir.join("resource");
-            if resource_dir.exists() {
-                return Some(resource_dir);
-            }
-            if let Some(dir) = exe_dir.parent() {
-                let share_dir = dir.join("share");
-                if let Some(extra_share) = option_env!("MAA_EXTRA_SHARE_NAME") {
-                    let resource_dir = share_dir.join(extra_share).join("resource");
-                    if resource_dir.exists() {
-                        return Some(resource_dir);
-                    }
-                }
-                let resource_dir = share_dir.join("maa").join("resource");
+        None
+    })
+}
+
+pub fn find_resource() -> Option<PathBuf> {
+    let resource_dir = resource();
+    if resource_dir.exists() {
+        return Some(resource_dir.to_path_buf());
+    }
+
+    current_exe_dir_find(|exe_dir| {
+        let resource_dir = exe_dir.join("resource");
+        if resource_dir.exists() {
+            return Some(resource_dir);
+        }
+        if let Some(dir) = exe_dir.parent() {
+            let share_dir = dir.join("share");
+            if let Some(extra_share) = option_env!("MAA_EXTRA_SHARE_NAME") {
+                let resource_dir = share_dir.join(extra_share).join("resource");
                 if resource_dir.exists() {
                     return Some(resource_dir);
                 }
             }
-            None
-        })
-    }
+            let resource_dir = share_dir.join("maa").join("resource");
+            if resource_dir.exists() {
+                return Some(resource_dir);
+            }
+        }
+        None
+    })
 }
 
 /// Find path starting from current executable directory
@@ -244,6 +277,8 @@ mod tests {
                 assert_eq!(dirs.state(), home_dir.join(".local/state/maa"));
                 assert_eq!(dirs.log(), home_dir.join(".local/state/maa/debug"));
             }
+            assert_eq!(state(), dirs.state());
+            assert_eq!(log(), dirs.log());
 
             env::set_var("XDG_STATE_HOME", "/xdg");
             let dirs = Dirs::new(project.clone());
@@ -280,6 +315,8 @@ mod tests {
                 assert_eq!(dirs.library(), home_dir.join(".local/share/maa/lib"));
                 assert_eq!(dirs.resource(), home_dir.join(".local/share/maa/resource"));
             }
+            assert_eq!(data(), dirs.data());
+            assert_eq!(library(), dirs.library());
 
             env::set_var("XDG_DATA_HOME", "/xdg");
             let dirs = Dirs::new(project.clone());
@@ -329,6 +366,7 @@ mod tests {
             } else if cfg!(target_os = "linux") {
                 assert_eq!(dirs.cache(), home_dir.join(".cache/maa"));
             }
+            assert_eq!(cache(), dirs.cache());
 
             env::set_var("XDG_CACHE_HOME", "/xdg");
             let dirs = Dirs::new(project.clone());
