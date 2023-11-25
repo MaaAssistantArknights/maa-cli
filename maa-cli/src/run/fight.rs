@@ -1,9 +1,7 @@
 use crate::{
     config::task::{
-        default_variants,
-        task_type::TaskType,
-        value::input::{BoolInput, Input, Select},
-        Strategy, Task, TaskConfig, Value,
+        default_variants, task_type::TaskType, value::input::Input, Strategy, Task, TaskConfig,
+        Value,
     },
     dirs::Dirs,
     object,
