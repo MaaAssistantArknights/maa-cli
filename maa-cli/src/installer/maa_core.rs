@@ -148,14 +148,14 @@ pub fn update(args: &CommonArgs) -> Result<()> {
     let lib_dir = dirs::library();
     let resource_dir = dirs::resource();
     match (components.library, dirs::find_library()) {
-        (true, Some(dir)) if dir == lib_dir => bail!(
+        (true, Some(dir)) if dir != lib_dir => bail!(
             "MaaCore found at {} but not installed by maa, aborting",
             dir.display()
         ),
         _ => {}
     }
     match (components.resource, dirs::find_resource()) {
-        (true, Some(dir)) if dir == resource_dir => bail!(
+        (true, Some(dir)) if dir != resource_dir => bail!(
             "MaaCore resource found at {} but not installed by maa, aborting",
             dir.display()
         ),
