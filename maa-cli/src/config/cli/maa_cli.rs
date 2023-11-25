@@ -160,38 +160,10 @@ mod tests {
         }
     }
 
-    mod default {
+    mod methods {
         use super::*;
 
         use std::env::{remove_var, set_var};
-
-        #[test]
-        fn api_url() {
-            assert_eq!(
-                default_api_url(),
-                "https://github.com/MaaAssistantArknights/maa-cli/raw/version/"
-            );
-
-            set_var("MAA_CLI_API", "https://foo.bar/cli/");
-            assert_eq!(default_api_url(), "https://foo.bar/cli/");
-            remove_var("MAA_CLI_API");
-        }
-
-        #[test]
-        fn download_url() {
-            assert_eq!(
-                default_download_url(),
-                "https://github.com/MaaAssistantArknights/maa-cli/releases/download/",
-            );
-
-            set_var("MAA_CLI_DOWNLOAD", "https://foo.bar/download/");
-            assert_eq!(default_download_url(), "https://foo.bar/download/");
-            remove_var("MAA_CLI_DOWNLOAD");
-        }
-    }
-
-    mod methods {
-        use super::*;
 
         #[test]
         fn channel() {
@@ -208,6 +180,14 @@ mod tests {
                 Config::default().api_url(),
                 "https://github.com/MaaAssistantArknights/maa-cli/raw/version/stable.json",
             );
+
+            set_var("MAA_CLI_API", "https://foo.bar/cli/");
+            assert_eq!(
+                Config::default().api_url(),
+                "https://foo.bar/cli/stable.json",
+            );
+            remove_var("MAA_CLI_API");
+
             assert_eq!(
                 Config::default()
                     .with_channel(Channel::Alpha)
@@ -219,10 +199,20 @@ mod tests {
 
         #[test]
         fn download_url() {
+            set_var("MAA_CLI_DOWNLOAD", "https://foo.bar/download/");
+            assert_eq!(
+                Config::default()
+                    .with_download_url("https://foo.bar/download/")
+                    .download_url("v0.3.12", "maa_cli.zip"),
+                "https://foo.bar/download/v0.3.12/maa_cli.zip",
+            );
+            remove_var("MAA_CLI_DOWNLOAD");
+
             assert_eq!(
                 Config::default().download_url("v0.3.12", "maa_cli.zip"),
                 "https://github.com/MaaAssistantArknights/maa-cli/releases/download/v0.3.12/maa_cli.zip",
             );
+
             assert_eq!(
                 Config::default()
                     .with_download_url("https://foo.bar/download/")

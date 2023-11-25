@@ -182,24 +182,6 @@ mod tests {
         }
     }
 
-    mod default {
-        use super::*;
-
-        use std::env::{remove_var, set_var};
-
-        #[test]
-        fn api_url() {
-            assert_eq!(
-                default_api_url(),
-                "https://ota.maa.plus/MaaAssistantArknights/api/version/"
-            );
-
-            set_var("MAA_API_URL", "https://foo.bar/core/");
-            assert_eq!(default_api_url(), "https://foo.bar/core/");
-            remove_var("MAA_API_URL");
-        }
-    }
-
     mod serde {
         use super::*;
 
@@ -279,6 +261,8 @@ mod tests {
     mod methods {
         use super::*;
 
+        use std::env::{remove_var, set_var};
+
         #[test]
         fn channel() {
             assert_eq!(Config::default().channel(), Channel::Stable);
@@ -294,6 +278,13 @@ mod tests {
 
         #[test]
         fn api_url() {
+            set_var("MAA_API_URL", "https://foo.bar/core/");
+            assert_eq!(
+                Config::default().api_url(),
+                "https://foo.bar/core/stable.json"
+            );
+            remove_var("MAA_API_URL");
+
             assert_eq!(
                 Config::default().api_url(),
                 "https://ota.maa.plus/MaaAssistantArknights/api/version/stable.json"
