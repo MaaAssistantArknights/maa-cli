@@ -288,13 +288,6 @@ mod tests {
 
         #[test]
         fn api_url() {
-            set_var("MAA_API_URL", "https://foo.bar/core/");
-            assert_eq!(
-                Config::default().api_url(),
-                "https://foo.bar/core/stable.json"
-            );
-            remove_var("MAA_API_URL");
-
             assert_eq!(
                 default_config().set_channel(Channel::Stable).api_url(),
                 "https://ota.maa.plus/MaaAssistantArknights/api/version/stable.json"
@@ -313,6 +306,13 @@ mod tests {
                     .api_url(),
                 "https://foo.bar/api/stable.json"
             );
+
+            set_var("MAA_API_URL", "https://foo.bar/core/");
+            assert_eq!(
+                Config::default().api_url(),
+                "https://foo.bar/core/stable.json"
+            );
+            remove_var("MAA_API_URL");
         }
 
         #[test]
