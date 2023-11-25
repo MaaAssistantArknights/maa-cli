@@ -62,4 +62,8 @@ jobs:
       - name: Lint (fmt)
         run: cargo fmt --package maa-sys -- --check
       - name: Test
+        # It seems rust needs a static library to check the linking.
+        # Without this, we can not link maa-sys to MaaCore on Windows.
+        # https://stackoverflow.com/questions/63394094/rust-linker-seeks-a-lib-rather-than-a-dll
+        if: ${{ !startsWith(matrix.os, 'windows') }}
         run: cargo test --package maa-sys --locked
