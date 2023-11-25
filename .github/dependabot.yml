@@ -1,20 +1,21 @@
 version: 2
 updates:
-  - package-ecosystem: "cargo"
-    directory: "/"
-    schedule:
-      interval: "weekly"
   # group all non breaking updates into a single PR
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
       interval: "weekly"
     groups:
-      patterns:
-        - "*"
-      update-types:
-        - minor
-        - patch
+      no-breaking-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
 
   - package-ecosystem: "github-actions"
     directory: "/"
