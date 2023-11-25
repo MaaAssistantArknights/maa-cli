@@ -160,12 +160,12 @@ mod tests {
                 "sha256sum": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
             },
             "x86_64-unknown-linux-gnu": {
-                "name": "maa-cli.tar.gz",
+                "name": "maa-cli.zip",
                 "size": 123456,
                 "sha256sum": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
             },
             "aarch64-unknown-linux-gnu": {
-                "name": "maa-cli.tar.gz",
+                "name": "maa-cli.zip",
                 "size": 123456,
                 "sha256sum": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
             },
