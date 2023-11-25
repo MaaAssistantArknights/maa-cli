@@ -12,10 +12,6 @@ updates:
         update-types:
           - minor
           - patch
-  - package-ecosystem: "cargo"
-    directory: "/"
-    schedule:
-      interval: "weekly"
 
   - package-ecosystem: "github-actions"
     directory: "/"
