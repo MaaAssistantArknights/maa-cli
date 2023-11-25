@@ -1,7 +1,8 @@
 mod message;
 use message::callback;
 
-pub mod fight;
+mod fight;
+pub use fight::fight;
 
 use crate::{
     config::{
@@ -22,6 +23,7 @@ use crate::{
 use std::path::PathBuf;
 
 use anyhow::{anyhow, bail, Context, Result};
+use clap::Parser;
 use maa_sys::Assistant;
 
 pub enum CLITask {
@@ -41,20 +43,62 @@ impl From<String> for CLITask {
     }
 }
 
-pub fn run(
-    dirs: &Dirs,
-    task: impl Into<CLITask>,
-    addr: Option<String>,
-    user_resource: bool,
-    batch: bool,
-    dryrun: bool,
-) -> Result<()> {
-    if dryrun {
+#[derive(Parser, Default)]
+pub struct CommonArgs {
+    /// ADB serial number of device or MaaTools address set in PlayCover
+    ///
+    /// By default, MaaCore connects to game with ADB,
+    /// and this parameter is the serial number of the device
+    /// (default to `emulator-5554` if not specified here and not set in config file).
+    /// And if you want to use PlayCover,
+    /// you need to set the connection type to PlayCover in the config file
+    /// and then you can specify the address of MaaTools here.
+    #[arg(short, long, verbatim_doc_comment)]
+    pub addr: Option<String>,
+    /// Load resources from the config directory
+    ///
+    /// By default, MaaCore loads resources from the resource installed with MaaCore.
+    /// If you want to modify some configuration of MaaCore or you want to use your own resources,
+    /// you can use this option to load resources from the `resource` directory,
+    /// which is a subdirectory of the config directory.
+    ///
+    /// This option can also be enabled by setting the value of the key `user_resource` to true
+    /// in the asst configure file `$MAA_CONFIG_DIR/asst.toml`.
+    ///
+    /// Note:
+    /// CLI will load resources shipped with MaaCore firstly,
+    /// then some client specific or platform specific when needed,
+    /// lastly, it will load resources from the config directory.
+    /// MaaCore will overwrite the resources loaded before,
+    /// if there are some resources with the same name.
+    /// Use at your own risk!
+    #[arg(long, verbatim_doc_comment)]
+    pub user_resource: bool,
+    /// Run tasks in batch mode
+    ///
+    /// If there are some input parameters in the task file,
+    /// some prompts will be displayed to ask for input.
+    /// In batch mode, the prompts will be skipped,
+    /// and parameters will be set to default values.
+    #[arg(short, long, verbatim_doc_comment)]
+    pub batch: bool,
+    /// Parse the your config but do not connect to the game
+    ///
+    /// This option is useful when you want to check your config file.
+    /// It will parse your config file and set the log level to debug.
+    /// If there are some errors in your config file,
+    /// it will print the error message and exit.
+    #[arg(long, verbatim_doc_comment)]
+    pub dry_run: bool,
+}
+
+pub fn run(dirs: &Dirs, task: impl Into<CLITask>, args: CommonArgs) -> Result<()> {
+    if args.dry_run {
         unsafe { set_level(LogLevel::Debug) };
         debug!("Dryrun mode!");
     }
 
-    if batch {
+    if args.batch {
         unsafe { enable_batch_mode() }
         debug!("Running in batch mode!");
     }
@@ -89,7 +133,7 @@ pub fn run(
             device,
             config,
         } => {
-            let device = addr.unwrap_or(device);
+            let device = args.addr.unwrap_or(device);
             debug!("Connect to device via ADB");
             debug!("adb_path:", &adb_path);
             debug!("device:", &device);
@@ -98,7 +142,7 @@ pub fn run(
         }
         Connection::PlayTools { address, config } => {
             playtools = true;
-            let address = addr.unwrap_or(address);
+            let address = args.addr.unwrap_or(address);
             debug!("Setting address to", &address);
             debug!("Setting config to", &config);
             (String::new(), address, config)
@@ -284,7 +328,7 @@ pub fn run(
     }
 
     // User resource in config directory
-    if user_resource || asst_config.user_resource {
+    if args.user_resource || asst_config.user_resource {
         if let Some(path) = process_resource_dir(config_dir.join("resource")) {
             resource_dirs.push(path);
         }
@@ -352,7 +396,7 @@ pub fn run(
             .context("Failed to set instance option `kill_adb_on_exit`!")?;
     }
 
-    if !dryrun {
+    if !args.dry_run {
         if start_app {
             app.as_ref().unwrap().open()?;
             std::thread::sleep(std::time::Duration::from_secs(5));

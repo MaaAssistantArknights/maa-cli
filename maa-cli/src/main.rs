@@ -187,66 +187,19 @@ enum SubCommand {
         /// The task file must be in the TOML, YAML or JSON format.
         #[arg(verbatim_doc_comment)]
         task: String,
-        /// ADB serial number of device or MaaTools address set in PlayCover
-        ///
-        /// By default, MaaCore connects to game with ADB,
-        /// and this parameter is the serial number of the device
-        /// (default to `emulator-5554` if not specified here and not set in config file).
-        /// And if you want to use PlayCover,
-        /// you need to set the connection type to PlayCover in the config file
-        /// and then you can specify the address of MaaTools here.
-        #[arg(short, long, verbatim_doc_comment)]
-        addr: Option<String>,
-        /// Load resources from the config directory
-        ///
-        /// By default, MaaCore loads resources from the resource installed with MaaCore.
-        /// If you want to modify some configuration of MaaCore or you want to use your own resources,
-        /// you can use this option to load resources from the `resource` directory,
-        /// which is a subdirectory of the config directory.
-        ///
-        /// This option can also be enabled by setting the value of the key `user_resource` to true
-        /// in the asst configure file `$MAA_CONFIG_DIR/asst.toml`.
-        ///
-        /// Note:
-        /// CLI will load resources shipped with MaaCore firstly,
-        /// then some client specific or platform specific when needed,
-        /// lastly, it will load resources from the config directory.
-        /// MaaCore will overwrite the resources loaded before,
-        /// if there are some resources with the same name.
-        /// Use at your own risk!
-        #[arg(long, verbatim_doc_comment)]
-        user_resource: bool,
-        /// Run tasks in batch mode
-        ///
-        /// If there are some input parameters in the task file,
-        /// some prompts will be displayed to ask for input.
-        /// In batch mode, the prompts will be skipped,
-        /// and parameters will be set to default values.
-        #[arg(short, long, verbatim_doc_comment)]
-        batch: bool,
-        /// Parse the your config but do not connect to the game
-        ///
-        /// This option is useful when you want to check your config file.
-        /// It will parse your config file and set the log level to debug.
-        /// If there are some errors in your config file,
-        /// it will print the error message and exit.
-        #[arg(long, verbatim_doc_comment)]
-        dry_run: bool,
+        #[command(flatten)]
+        common: run::CommonArgs,
     },
     /// Run fight task
     Fight {
-        #[arg(short, long)]
-        addr: Option<String>,
-        #[arg(long)]
-        user_resource: bool,
-        #[arg(short, long)]
-        batch: bool,
         /// Run startup task before the fight
         #[arg(long)]
         startup: bool,
         /// Close the game after the fight
         #[arg(long)]
         closedown: bool,
+        #[command(flatten)]
+        common: run::CommonArgs,
     },
     /// List all available tasks
     List,
@@ -375,20 +328,12 @@ fn main() -> Result<()> {
                 println!("MaaCore {}", run::core_version(&proj_dirs)?);
             }
         },
-        SubCommand::Run {
-            task,
-            addr,
-            user_resource,
-            batch,
-            dry_run,
-        } => run::run(&proj_dirs, task, addr, user_resource, batch, dry_run)?,
+        SubCommand::Run { task, common } => run::run(&proj_dirs, task, common)?,
         SubCommand::Fight {
-            addr,
-            user_resource,
-            batch,
             startup,
             closedown,
-        } => run::fight::fight(&proj_dirs, addr, user_resource, batch, startup, closedown)?,
+            common,
+        } => run::fight(&proj_dirs, startup, closedown, common)?,
         SubCommand::List => {
             let task_dir = proj_dirs.config().join("tasks");
             if !task_dir.exists() {
@@ -589,10 +534,12 @@ mod test {
                 CLI::parse_from(["maa", "run", "task"]).command,
                 SubCommand::Run {
                     task,
-                    addr: None,
-                    user_resource: false,
-                    batch: false,
-                    dry_run: false,
+                    common: run::CommonArgs {
+                        addr: None,
+                        user_resource: false,
+                        batch: false,
+                        dry_run: false,
+                    },
                 } if task == "task"
             ));
 
@@ -600,7 +547,10 @@ mod test {
                 CLI::parse_from(["maa", "run", "task", "-a", "addr"]).command,
                 SubCommand::Run {
                     task,
-                    addr: Some(addr),
+                    common: run::CommonArgs {
+                        addr: Some(addr),
+                        ..
+                    },
                     ..
                 } if task == "task" && addr == "addr"
             ));
@@ -608,7 +558,10 @@ mod test {
                 CLI::parse_from(["maa", "run", "task", "--addr", "addr"]).command,
                 SubCommand::Run {
                     task,
-                    addr: Some(addr),
+                    common: run::CommonArgs {
+                        addr: Some(addr),
+                        ..
+                    },
                     ..
                 } if task == "task" && addr == "addr"
             ));
@@ -617,7 +570,10 @@ mod test {
                 CLI::parse_from(["maa", "run", "task", "--user-resource"]).command,
                 SubCommand::Run {
                     task,
-                    user_resource: true,
+                    common: run::CommonArgs {
+                        user_resource: true,
+                        ..
+                    },
                     ..
                 } if task == "task"
             ));
@@ -626,7 +582,10 @@ mod test {
                 CLI::parse_from(["maa", "run", "task", "--batch"]).command,
                 SubCommand::Run {
                     task,
-                    batch: true,
+                    common: run::CommonArgs {
+                        batch: true,
+                        ..
+                    },
                     ..
                 } if task == "task"
             ));
@@ -637,11 +596,9 @@ mod test {
             assert!(matches!(
                 CLI::parse_from(["maa", "fight"]).command,
                 SubCommand::Fight {
-                    addr: None,
-                    user_resource: false,
-                    batch: false,
                     startup: false,
                     closedown: false,
+                    ..
                 }
             ));
 

@@ -1,22 +1,17 @@
 use crate::{
     config::task::{
-        default_variants, task_type::TaskType, value::input::Input, Strategy, Task, TaskConfig,
-        Value,
+        default_variants,
+        task_type::TaskType,
+        value::input::{BoolInput, Input, Select},
+        Strategy, Task, TaskConfig, Value,
     },
     dirs::Dirs,
     object,
 };
 
-use super::{run, Result};
+use super::{run, CommonArgs, Result};
 
-pub fn fight(
-    dirs: &Dirs,
-    addr: Option<String>,
-    user_resource: bool,
-    batch: bool,
-    startup: bool,
-    closedown: bool,
-) -> Result<()> {
+pub fn fight(dirs: &Dirs, startup: bool, closedown: bool, common: CommonArgs) -> Result<()> {
     let mut task_config = TaskConfig::new();
 
     if startup {
@@ -50,5 +45,5 @@ pub fn fight(
         ));
     }
 
-    run(dirs, task_config, addr, user_resource, batch, false)
+    run(dirs, task_config, common)
 }
