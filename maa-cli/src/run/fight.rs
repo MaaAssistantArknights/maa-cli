@@ -7,16 +7,9 @@ use crate::{
     object,
 };
 
-use super::{run, Result};
+use super::{run, CommonArgs, Result};
 
-pub fn fight(
-    dirs: &Dirs,
-    addr: Option<String>,
-    user_resource: bool,
-    batch: bool,
-    startup: bool,
-    closedown: bool,
-) -> Result<()> {
+pub fn fight(dirs: &Dirs, startup: bool, closedown: bool, common: CommonArgs) -> Result<()> {
     let mut task_config = TaskConfig::new();
 
     if startup {
@@ -50,5 +43,5 @@ pub fn fight(
         ));
     }
 
-    run(dirs, task_config, addr, user_resource, batch, false)
+    run(dirs, task_config, common)
 }
