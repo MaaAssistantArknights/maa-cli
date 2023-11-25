@@ -1,7 +1,9 @@
 use crate::{
     config::task::{
-        default_variants, task_type::TaskType, value::input::Input, Strategy, Task, TaskConfig,
-        Value,
+        default_variants,
+        task_type::TaskType,
+        value::input::{BoolInput, Input, Select},
+        Strategy, Task, TaskConfig, Value,
     },
     dirs::Dirs,
     object,
@@ -15,20 +17,24 @@ pub fn fight(dirs: &Dirs, startup: bool, closedown: bool, common: CommonArgs) ->
     if startup {
         task_config.push(Task::new(
             TaskType::StartUp,
-            Value::default(),
+            object!(
+                "start_game_enabled" => BoolInput::new(Some(true), Some("start game")),
+                "client_type" => Select::<String>::new(
+                    // TODO: a select type that accepts a enum (maybe a trait)
+                    vec!["Official", "Bilibili", "Txwy", "YoStarEN", "YoStarJP", "YoStarKR"],
+                    Some("client type"),
+                ),
+            ),
             Strategy::default(),
             default_variants(),
         ));
     }
 
-    let stage: Input<String> = Input::new(Some("1-7".to_string()), Some("a stage to fight"));
-    let medicine: Input<i64> = Input::new(Some(0), Some("medicine to use"));
-
     task_config.push(Task::new(
         TaskType::Fight,
         object!(
-            "stage" => stage,
-            "medicine" => medicine,
+            "stage" => Input::<String>::new(Some("1-7"), Some("a stage to fight")),
+            "medicine" => Input::<i64>::new(Some(0), Some("medicine to use")),
         ),
         Strategy::default(),
         default_variants(),
