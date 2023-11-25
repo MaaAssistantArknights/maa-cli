@@ -263,15 +263,25 @@ mod tests {
 
         use std::env::{remove_var, set_var};
 
+        use lazy_static::lazy_static;
+
+        lazy_static! {
+            static ref DEFAULT_CONFIG: Config = Config::default();
+        }
+
+        fn default_config() -> Config {
+            DEFAULT_CONFIG.clone()
+        }
+
         #[test]
         fn channel() {
-            assert_eq!(Config::default().channel(), Channel::Stable);
+            assert_eq!(default_config().channel(), Channel::Stable);
             assert_eq!(
-                Config::default().set_channel(Channel::Beta).channel(),
+                default_config().set_channel(Channel::Beta).channel(),
                 Channel::Beta
             );
             assert_eq!(
-                Config::default().set_channel(Channel::Alpha).channel(),
+                default_config().set_channel(Channel::Alpha).channel(),
                 Channel::Alpha
             );
         }
@@ -286,19 +296,19 @@ mod tests {
             remove_var("MAA_API_URL");
 
             assert_eq!(
-                Config::default().api_url(),
+                default_config().set_channel(Channel::Stable).api_url(),
                 "https://ota.maa.plus/MaaAssistantArknights/api/version/stable.json"
             );
             assert_eq!(
-                Config::default().set_channel(Channel::Beta).api_url(),
+                default_config().set_channel(Channel::Beta).api_url(),
                 "https://ota.maa.plus/MaaAssistantArknights/api/version/beta.json"
             );
             assert_eq!(
-                Config::default().set_channel(Channel::Alpha).api_url(),
+                default_config().set_channel(Channel::Alpha).api_url(),
                 "https://ota.maa.plus/MaaAssistantArknights/api/version/alpha.json"
             );
             assert_eq!(
-                Config::default()
+                default_config()
                     .set_api_url("https://foo.bar/api/")
                     .api_url(),
                 "https://foo.bar/api/stable.json"
@@ -308,13 +318,13 @@ mod tests {
         #[test]
         fn components() {
             assert!(matches!(
-                Config::default()
+                default_config()
                     .set_components(|components| components.library = false)
                     .components(),
                 &Components { library: false, .. }
             ));
             assert!(matches!(
-                Config::default()
+                default_config()
                     .set_components(|components| components.resource = false)
                     .components(),
                 &Components {
@@ -327,7 +337,7 @@ mod tests {
         #[test]
         fn apply_args() {
             fn apply_to_default(args: &CommonArgs) -> Config {
-                let mut config = Config::default();
+                let mut config = default_config();
                 config.apply_args(args);
                 config
             }
@@ -339,7 +349,7 @@ mod tests {
                     channel: Some(Channel::Beta),
                     ..Default::default()
                 }),
-                Config::default().set_channel(Channel::Beta)
+                default_config().set_channel(Channel::Beta)
             );
 
             assert_eq!(
@@ -347,7 +357,7 @@ mod tests {
                     test_time: Some(5),
                     ..Default::default()
                 }),
-                Config::default().set_test_time(5)
+                default_config().set_test_time(5)
             );
 
             assert_eq!(
@@ -355,7 +365,7 @@ mod tests {
                     api_url: Some("https://foo.bar/core/".to_string()),
                     ..Default::default()
                 }),
-                Config::default().set_api_url("https://foo.bar/core/")
+                default_config().set_api_url("https://foo.bar/core/")
             );
 
             assert_eq!(
@@ -363,7 +373,7 @@ mod tests {
                     no_resource: true,
                     ..Default::default()
                 }),
-                Config::default().set_components(|components| {
+                default_config().set_components(|components| {
                     components.resource = false;
                 })
             );
