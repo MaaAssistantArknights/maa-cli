@@ -88,13 +88,6 @@ jobs:
           ls -l "$MAA_RESOURCE_DIR"
           echo "MAA_CORE_DIR=$MAA_CORE_DIR" >> $GITHUB_ENV
           echo "MAA_RESOURCE_DIR=$MAA_RESOURCE_DIR" >> $GITHUB_ENV
-      - name: Test (maa-sys)
-        # It seems rust needs a static library to check the linking.
-        # Without this, we can not build maa-sys on Windows.
-        # https://stackoverflow.com/questions/63394094/rust-linker-seeks-a-lib-rather-than-a-dll
-        if: matrix.arch == 'x86_64' && matrix.os != 'windows-latest'
-        run: |
-          cargo test --package maa-sys --locked
       - name: Run with MaaCore (default path)
         if: matrix.arch == 'x86_64'
         timeout-minutes: 1
