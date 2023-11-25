@@ -108,6 +108,54 @@ impl Dirs {
     pub fn log(&self) -> &Path {
         &self.log
     }
+
+    pub fn find_library(&self) -> Option<PathBuf> {
+        if self.library.join(MAA_CORE_LIB).exists() {
+            return Some(self.library.clone());
+        }
+
+        current_exe_dir_find(|exe_dir| {
+            if exe_dir.join(MAA_CORE_LIB).exists() {
+                return Some(exe_dir.to_path_buf());
+            }
+            if let Some(dir) = exe_dir.parent() {
+                let lib_dir = dir.join("lib");
+                let lib_path = lib_dir.join(MAA_CORE_LIB);
+                if lib_path.exists() {
+                    return Some(lib_dir);
+                }
+            }
+
+            None
+        })
+    }
+
+    pub fn find_resource(&self) -> Option<PathBuf> {
+        if self.resource.exists() {
+            return Some(self.resource.clone());
+        }
+
+        current_exe_dir_find(|exe_dir| {
+            let resource_dir = exe_dir.join("resource");
+            if resource_dir.exists() {
+                return Some(resource_dir);
+            }
+            if let Some(dir) = exe_dir.parent() {
+                let share_dir = dir.join("share");
+                if let Some(extra_share) = option_env!("MAA_EXTRA_SHARE_NAME") {
+                    let resource_dir = share_dir.join(extra_share).join("resource");
+                    if resource_dir.exists() {
+                        return Some(resource_dir);
+                    }
+                }
+                let resource_dir = share_dir.join("maa").join("resource");
+                if resource_dir.exists() {
+                    return Some(resource_dir);
+                }
+            }
+            None
+        })
+    }
 }
 
 lazy_static! {
@@ -143,53 +191,11 @@ pub fn log() -> &'static Path {
 }
 
 pub fn find_library() -> Option<PathBuf> {
-    let lib_dir = library();
-    if lib_dir.join(MAA_CORE_LIB).exists() {
-        return Some(lib_dir.to_path_buf());
-    }
-
-    current_exe_dir_find(|exe_dir| {
-        if exe_dir.join(MAA_CORE_LIB).exists() {
-            return Some(exe_dir.to_path_buf());
-        }
-        if let Some(dir) = exe_dir.parent() {
-            let lib_dir = dir.join("lib");
-            let lib_path = lib_dir.join(MAA_CORE_LIB);
-            if lib_path.exists() {
-                return Some(lib_dir);
-            }
-        }
-
-        None
-    })
+    DIRS.find_library()
 }
 
 pub fn find_resource() -> Option<PathBuf> {
-    let resource_dir = resource();
-    if resource_dir.exists() {
-        return Some(resource_dir.to_path_buf());
-    }
-
-    current_exe_dir_find(|exe_dir| {
-        let resource_dir = exe_dir.join("resource");
-        if resource_dir.exists() {
-            return Some(resource_dir);
-        }
-        if let Some(dir) = exe_dir.parent() {
-            let share_dir = dir.join("share");
-            if let Some(extra_share) = option_env!("MAA_EXTRA_SHARE_NAME") {
-                let resource_dir = share_dir.join(extra_share).join("resource");
-                if resource_dir.exists() {
-                    return Some(resource_dir);
-                }
-            }
-            let resource_dir = share_dir.join("maa").join("resource");
-            if resource_dir.exists() {
-                return Some(resource_dir);
-            }
-        }
-        None
-    })
+    DIRS.find_resource()
 }
 
 /// Find path starting from current executable directory
@@ -317,6 +323,7 @@ mod tests {
             }
             assert_eq!(data(), dirs.data());
             assert_eq!(library(), dirs.library());
+            assert_eq!(resource(), dirs.resource());
 
             env::set_var("XDG_DATA_HOME", "/xdg");
             let dirs = Dirs::new(project.clone());
@@ -345,6 +352,7 @@ mod tests {
             } else if cfg!(target_os = "linux") {
                 assert_eq!(dirs.config(), home_dir.join(".config/maa"));
             }
+            assert_eq!(config(), dirs.config());
 
             env::set_var("XDG_CONFIG_HOME", "/xdg");
             let dirs = Dirs::new(project.clone());
