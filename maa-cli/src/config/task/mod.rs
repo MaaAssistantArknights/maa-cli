@@ -36,7 +36,7 @@ impl TaskVariant {
     }
 }
 
-pub fn default_variants() -> Vec<TaskVariant> {
+fn default_variants() -> Vec<TaskVariant> {
     vec![Default::default()]
 }
 
