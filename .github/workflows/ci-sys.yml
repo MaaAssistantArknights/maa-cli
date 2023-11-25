@@ -1,4 +1,4 @@
-name: CI for maa-sys
+name: CI (maa-sys)
 
 on:
   push:
@@ -50,7 +50,7 @@ jobs:
       - name: Install MaaCore
         env:
           MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
-        run:
+        run: |
           cargo run -- install beta -t0 --no-resource
           MAA_CORE_DIR="$(cargo run -- dir lib)"
           ls -l "$MAA_CORE_DIR"
