@@ -330,7 +330,7 @@ mod tests {
             assert_eq!(resource(), TEST_DIRS.resource());
             // The value of `MAA_COER_VERSION` is set in CI,
             // where the MaaCore is installed at standard location.
-            if env::var_os("MAA_COER_VERSION").is_some() {
+            if env::var_os("MAA_CORE_INSTALLED").is_some() {
                 // This is not used in this test, but needed.
                 let extra_dir = Path::new("/usr/local/share/maa");
                 assert_eq!(
