@@ -165,6 +165,8 @@ pub struct CommonArgs {
 mod tests {
     use super::*;
 
+    use lazy_static::lazy_static;
+
     impl Config {
         pub fn with_channel(mut self, channel: Channel) -> Self {
             self.channel = channel;
@@ -182,8 +184,18 @@ mod tests {
         }
     }
 
+    lazy_static! {
+        static ref DEFAULT_CONFIG: Config = Config::default();
+    }
+
+    fn default_config() -> Config {
+        DEFAULT_CONFIG.clone()
+    }
+
     mod serde {
         use super::*;
+
+        use std::env::{remove_var, set_var};
 
         use serde_test::{assert_de_tokens, Token};
 
@@ -228,6 +240,26 @@ mod tests {
             );
 
             assert_de_tokens(
+                &default_config(),
+                &[Token::Map { len: Some(0) }, Token::MapEnd],
+            );
+
+            set_var("MAA_API_URL", "https://foo.bar/core/");
+            assert_de_tokens(
+                &Config {
+                    channel: Default::default(),
+                    test_time: default_test_time(),
+                    api_url: "https://foo.bar/core/".to_string(),
+                    components: Components {
+                        library: true,
+                        resource: true,
+                    },
+                },
+                &[Token::Map { len: Some(0) }, Token::MapEnd],
+            );
+            remove_var("MAA_API_URL");
+
+            assert_de_tokens(
                 &Config {
                     channel: Channel::Beta,
                     test_time: 10,
@@ -260,18 +292,6 @@ mod tests {
 
     mod methods {
         use super::*;
-
-        use std::env::{remove_var, set_var};
-
-        use lazy_static::lazy_static;
-
-        lazy_static! {
-            static ref DEFAULT_CONFIG: Config = Config::default();
-        }
-
-        fn default_config() -> Config {
-            DEFAULT_CONFIG.clone()
-        }
 
         #[test]
         fn channel() {
@@ -306,13 +326,6 @@ mod tests {
                     .api_url(),
                 "https://foo.bar/api/stable.json"
             );
-
-            set_var("MAA_API_URL", "https://foo.bar/core/");
-            assert_eq!(
-                Config::default().api_url(),
-                "https://foo.bar/core/stable.json"
-            );
-            remove_var("MAA_API_URL");
         }
 
         #[test]
