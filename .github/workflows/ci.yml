@@ -94,6 +94,11 @@ jobs:
         if: matrix.arch == 'x86_64'
         run: |
           cargo tarpaulin --all-features --workspace --timeout 120 --out xml ${{ github.run_attempt == 1 && '--skip-clean' || '' }}
+      - name: Upload to codecov.io
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
 
 
   features:
