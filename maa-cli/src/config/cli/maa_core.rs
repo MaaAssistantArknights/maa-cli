@@ -342,7 +342,7 @@ mod tests {
                 config
             }
 
-            assert_eq!(apply_to_default(&CommonArgs::default()), Config::default());
+            assert_eq!(apply_to_default(&CommonArgs::default()), default_config());
 
             assert_eq!(
                 &apply_to_default(&CommonArgs {
