@@ -165,7 +165,8 @@ mod tests {
                 .with_api_url("https://cdn.jsdelivr.net/gh/MaaAssistantArknights/maa-cli@vversion/")
                 .with_download_url(
                     "https://github.com/MaaAssistantArknights/maa-cli/releases/download/",
-                ),
+                )
+                .with_components(maa_cli::CLIComponents { binary: false }),
         };
 
         assert_eq!(config, expect);

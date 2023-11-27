@@ -68,10 +68,16 @@ fn default_download_url() -> String {
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Deserialize, Default, Clone)]
+#[derive(Deserialize, Clone)]
 pub struct CLIComponents {
     #[serde(default = "return_true")]
     pub binary: bool,
+}
+
+impl Default for CLIComponents {
+    fn default() -> Self {
+        Self { binary: true }
+    }
 }
 
 #[cfg(test)]
@@ -91,6 +97,11 @@ mod tests {
 
         pub fn with_download_url(mut self, download_url: impl ToString) -> Self {
             self.download_url = download_url.to_string();
+            self
+        }
+
+        pub fn with_components(mut self, components: CLIComponents) -> Self {
+            self.components = components;
             self
         }
     }
@@ -172,7 +183,7 @@ mod tests {
             assert_eq!(
                 Config::default()
                     .with_channel(Channel::Alpha)
-                    .with_api_url("https://foo.bar/cli/")
+                    .set_api_url("https://foo.bar/cli/")
                     .api_url(),
                 "https://foo.bar/cli/alpha.json",
             );
@@ -187,9 +198,24 @@ mod tests {
 
             assert_eq!(
                 Config::default()
-                    .with_download_url("https://foo.bar/download/")
+                    .set_download_url("https://foo.bar/download/")
                     .download_url("v0.3.12", "maa_cli.zip"),
                 "https://foo.bar/download/v0.3.12/maa_cli.zip",
+            );
+        }
+
+        #[test]
+        fn components() {
+            assert_eq!(
+                Config::default().components(),
+                &CLIComponents { binary: true },
+            );
+
+            assert_eq!(
+                Config::default()
+                    .with_components(CLIComponents { binary: false })
+                    .components(),
+                &CLIComponents { binary: false },
             );
         }
     }

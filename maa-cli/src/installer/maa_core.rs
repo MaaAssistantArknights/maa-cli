@@ -366,6 +366,16 @@ mod tests {
         let version_json: VersionJSON<Details> =
             serde_json::from_str(json_str).expect("Failed to parse json");
 
+        assert!(version_json
+            .can_update("MaaCore", &Version::parse("4.26.0").unwrap())
+            .unwrap());
+        assert!(version_json
+            .can_update("MaaCore", &Version::parse("4.26.1-beta.1").unwrap())
+            .unwrap());
+        assert!(!version_json
+            .can_update("MaaCore", &Version::parse("4.27.0").unwrap())
+            .unwrap());
+
         assert_eq!(
             version_json.version(),
             &Version::parse("4.26.1").expect("Failed to parse version")
