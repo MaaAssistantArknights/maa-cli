@@ -77,12 +77,14 @@ jobs:
           ls -l "$(cargo run -- dir library)"
           ls -l "$(cargo run -- dir resource)"
           ls -l "$(cargo run -- dir cache)"
-          package_name=$(basename $(ls $(cargo run -- dir cache)/MAA-v*))
+          package_name=$(basename $(ls $(cargo run -- dir cache)))
           echo "Downloaded MaaCore package: $package_name"
           version=${package_name#MAA-v}
           version=${version%%-*}
-          echo "Downloaded MaaCore version: $version"
-          echo "MAA_CORE_VERSION=v$version" >> $GITHUB_ENV
+          if [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Downloaded MaaCore version: $version"
+            echo "MAA_CORE_VERSION=v$version" >> $GITHUB_ENV
+          fi
       - name: Test
         if: matrix.arch == 'x86_64'
         run: |
