@@ -109,12 +109,12 @@ impl Dirs {
         &self.log
     }
 
-    pub fn find_library(&self) -> Option<PathBuf> {
+    pub fn find_library(&self, exe_path: &Path) -> Option<PathBuf> {
         if self.library.join(MAA_CORE_LIB).exists() {
             return Some(self.library.clone());
         }
 
-        current_exe_dir_find(|exe_dir| {
+        _find_from(exe_path, |exe_dir| {
             if exe_dir.join(MAA_CORE_LIB).exists() {
                 return Some(exe_dir.to_path_buf());
             }
@@ -130,12 +130,12 @@ impl Dirs {
         })
     }
 
-    pub fn find_resource(&self) -> Option<PathBuf> {
+    pub fn find_resource(&self, exe_path: &Path) -> Option<PathBuf> {
         if self.resource.exists() {
             return Some(self.resource.clone());
         }
 
-        current_exe_dir_find(|exe_dir| {
+        _find_from(exe_path, |exe_dir| {
             let resource_dir = exe_dir.join("resource");
             if resource_dir.exists() {
                 return Some(resource_dir);
@@ -191,29 +191,25 @@ pub fn log() -> &'static Path {
 }
 
 pub fn find_library() -> Option<PathBuf> {
-    DIRS.find_library()
+    DIRS.find_library(&current_exe().ok()?)
 }
 
 pub fn find_resource() -> Option<PathBuf> {
-    DIRS.find_resource()
+    DIRS.find_resource(&current_exe().ok()?)
 }
 
-/// Find path starting from current executable directory
-pub fn current_exe_dir_find<F>(finder: F) -> Option<PathBuf>
+/// Similar to `finder(exe_path.parent()?)`, but try to canonicalize the path first.
+fn _find_from<F>(exe_path: &Path, finder: F) -> Option<PathBuf>
 where
     F: Fn(&Path) -> Option<PathBuf>,
 {
-    let exe_path = current_exe().ok()?;
-    let exe_dir = exe_path.parent().unwrap();
-    let canonicalized = canonicalize(exe_dir).ok()?;
-    if let Some(path) = finder(&canonicalized) {
-        return Some(path);
-    };
-    if canonicalized != exe_dir {
-        finder(exe_dir)
-    } else {
-        None
+    // Try to canonicalize the path first.
+    if let Ok(canonicalized_exe_path) = canonicalize(exe_path) {
+        if let Some(path) = finder(&canonicalized_exe_path.parent()?) {
+            return Some(path);
+        };
     }
+    finder(exe_path.parent()?)
 }
 
 pub trait Ensure: Sized {
@@ -262,39 +258,45 @@ mod tests {
 
     mod get_dir {
         use super::*;
-        use std::env;
+        use std::env::{self, temp_dir};
+        use std::fs::{create_dir_all, remove_dir_all, File};
+
+        lazy_static! {
+            static ref TEST_DIRS: Dirs = Dirs::new(ProjectDirs::from("com", "loong", "maa"));
+        }
 
         #[test]
         fn state_relative() {
             env::remove_var("XDG_STATE_HOME");
             let project = ProjectDirs::from("com", "loong", "maa");
             let home_dir = PathBuf::from(env::var_os("HOME").unwrap());
-            let dirs = Dirs::new(project.clone());
             if cfg!(target_os = "macos") {
                 assert_eq!(
-                    dirs.state(),
+                    TEST_DIRS.state(),
                     home_dir.join("Library/Application Support/com.loong.maa")
                 );
                 assert_eq!(
-                    dirs.log(),
+                    TEST_DIRS.log(),
                     home_dir.join("Library/Application Support/com.loong.maa/debug")
                 );
             } else if cfg!(target_os = "linux") {
-                assert_eq!(dirs.state(), home_dir.join(".local/state/maa"));
-                assert_eq!(dirs.log(), home_dir.join(".local/state/maa/debug"));
+                assert_eq!(TEST_DIRS.state(), home_dir.join(".local/state/maa"));
+                assert_eq!(TEST_DIRS.log(), home_dir.join(".local/state/maa/debug"));
             }
-            assert_eq!(state(), dirs.state());
-            assert_eq!(log(), dirs.log());
+            assert_eq!(state(), TEST_DIRS.state());
+            assert_eq!(log(), TEST_DIRS.log());
 
             env::set_var("XDG_STATE_HOME", "/xdg");
             let dirs = Dirs::new(project.clone());
             assert_eq!(dirs.state(), PathBuf::from("/xdg/maa"));
             assert_eq!(dirs.log(), PathBuf::from("/xdg/maa/debug"));
+            env::remove_var("XDG_STATE_HOME");
 
             env::set_var("MAA_STATE_DIR", "/maa");
             let dirs = Dirs::new(project.clone());
             assert_eq!(dirs.state(), PathBuf::from("/maa"));
             assert_eq!(dirs.log(), PathBuf::from("/maa/debug"));
+            env::remove_var("MAA_STATE_DIR");
         }
 
         #[test]
@@ -302,40 +304,151 @@ mod tests {
             env::remove_var("XDG_DATA_HOME");
             let project = ProjectDirs::from("com", "loong", "maa");
             let home_dir = PathBuf::from(env::var_os("HOME").unwrap());
-            let dirs = Dirs::new(project.clone());
             if cfg!(target_os = "macos") {
                 assert_eq!(
-                    dirs.data(),
+                    TEST_DIRS.data(),
                     home_dir.join("Library/Application Support/com.loong.maa")
                 );
                 assert_eq!(
-                    dirs.library(),
+                    TEST_DIRS.library(),
                     home_dir.join("Library/Application Support/com.loong.maa/lib")
                 );
                 assert_eq!(
-                    dirs.resource(),
+                    TEST_DIRS.resource(),
                     home_dir.join("Library/Application Support/com.loong.maa/resource")
                 );
             } else if cfg!(target_os = "linux") {
-                assert_eq!(dirs.data(), home_dir.join(".local/share/maa"));
-                assert_eq!(dirs.library(), home_dir.join(".local/share/maa/lib"));
-                assert_eq!(dirs.resource(), home_dir.join(".local/share/maa/resource"));
+                assert_eq!(TEST_DIRS.data(), home_dir.join(".local/share/maa"));
+                assert_eq!(TEST_DIRS.library(), home_dir.join(".local/share/maa/lib"));
+                assert_eq!(
+                    TEST_DIRS.resource(),
+                    home_dir.join(".local/share/maa/resource")
+                );
             }
-            assert_eq!(data(), dirs.data());
-            assert_eq!(library(), dirs.library());
-            assert_eq!(resource(), dirs.resource());
+            assert_eq!(data(), TEST_DIRS.data());
+            assert_eq!(library(), TEST_DIRS.library());
+            assert_eq!(resource(), TEST_DIRS.resource());
+            // The value of `MAA_COER_VERSION` is set in CI,
+            // where the MaaCore is installed at standard location.
+            if env::var_os("MAA_COER_VERSION").is_some() {
+                // This is not used in this test, but needed.
+                let extra_dir = Path::new("/usr/local/share/maa");
+                assert_eq!(
+                    TEST_DIRS.find_library(extra_dir).unwrap(),
+                    TEST_DIRS.library()
+                );
+                assert_eq!(
+                    TEST_DIRS.find_resource(extra_dir).unwrap(),
+                    TEST_DIRS.resource()
+                );
+                assert_eq!(find_library().unwrap(), library());
+                assert_eq!(find_resource().unwrap(), resource());
+            }
 
             env::set_var("XDG_DATA_HOME", "/xdg");
             let dirs = Dirs::new(project.clone());
             assert_eq!(dirs.data(), PathBuf::from("/xdg/maa"));
             assert_eq!(dirs.library(), PathBuf::from("/xdg/maa/lib"));
             assert_eq!(dirs.resource(), PathBuf::from("/xdg/maa/resource"));
+            env::remove_var("XDG_DATA_HOME");
 
             env::set_var("MAA_DATA_DIR", "/maa");
             let dirs = Dirs::new(project.clone());
             assert_eq!(dirs.data(), PathBuf::from("/maa"));
             assert_eq!(dirs.library(), PathBuf::from("/maa/lib"));
             assert_eq!(dirs.resource(), PathBuf::from("/maa/resource"));
+            env::remove_var("MAA_DATA_DIR");
+
+            // In this test case we use the Dirs instance created by former test case.
+            // Because the /maa directory not exists, and which shadow the installation
+            // of MaaCore, so we can test the situation that MaaCore is installed at
+            // non-standard location.
+            let test_root = canonicalize(temp_dir().join("maa-run-test")).unwrap();
+
+            // Test the situation that maa -> path, core -> path, resource -> path/resource
+            let test_case_root = test_root.join("same-dir");
+            let bin_dir = test_case_root.clone();
+            let library_dir = test_case_root.clone();
+            let resource_dir = test_case_root.join("resource");
+            create_dir_all(&bin_dir).unwrap();
+            create_dir_all(&library_dir).unwrap();
+            create_dir_all(&resource_dir).unwrap();
+            let bin_exe = bin_dir.join("maa");
+            File::create(&bin_exe).unwrap();
+            File::create(&library_dir.join(MAA_CORE_LIB)).unwrap();
+            assert_eq!(dirs.find_library(&bin_exe).unwrap(), library_dir);
+            assert_eq!(dirs.find_resource(&bin_exe).unwrap(), resource_dir);
+            remove_dir_all(&test_case_root).unwrap();
+
+            // Test the situation maa -> path/bin, core -> path/lib, resource -> path/share/maa
+            let test_case_root = test_root.join("diff-dir");
+            let bin_dir = test_case_root.join("bin");
+            let library_dir = test_case_root.join("lib");
+            let share_dir = test_case_root.join("share").join("maa");
+            let resource_dir = share_dir.join("resource");
+            create_dir_all(&bin_dir).unwrap();
+            create_dir_all(&library_dir).unwrap();
+            create_dir_all(&resource_dir).unwrap();
+            let bin_exe = bin_dir.join("maa");
+            File::create(&bin_dir.join("maa")).unwrap();
+            File::create(&library_dir.join(MAA_CORE_LIB)).unwrap();
+            assert_eq!(dirs.find_library(&bin_exe).unwrap(), library_dir);
+            assert_eq!(dirs.find_resource(&bin_exe).unwrap(), resource_dir);
+
+            if let Some(extra_share) = option_env!("MAA_EXTRA_SHARE_NAME") {
+                let extra_share_dir = test_case_root.join("share").join(extra_share);
+                let extra_resource_dir = extra_share_dir.join("resource");
+                create_dir_all(&extra_resource_dir).unwrap();
+                assert_eq!(dirs.find_resource(&bin_exe).unwrap(), extra_resource_dir);
+                remove_dir_all(&extra_share_dir).unwrap();
+            }
+
+            remove_dir_all(&test_case_root).unwrap();
+
+            // Test the situation that maa linked
+            #[cfg(target_os = "macos")]
+            {
+                use std::os::unix::fs::symlink;
+
+                let test_case_root = test_root.join("linked");
+
+                // Test the situation that maa -> path/cellar/bin, core -> path/cellar/lib,
+                // resource -> path/share/maa, and maa is linked to path/bin.
+                let cellar = test_case_root.join("Cellar");
+                let bin_dir = cellar.join("bin");
+                let library_dir = cellar.join("lib");
+                let share_dir = test_case_root.join("share").join("maa");
+                let resource_dir = share_dir.join("resource");
+                let linked_dir = test_case_root.join("bin");
+                create_dir_all(&bin_dir).unwrap();
+                create_dir_all(&library_dir).unwrap();
+                create_dir_all(&resource_dir).unwrap();
+                create_dir_all(&linked_dir).unwrap();
+                let bin_exe = bin_dir.join("maa");
+                let linked_exe = linked_dir.join("maa");
+                File::create(&bin_exe).unwrap();
+                File::create(&library_dir.join(MAA_CORE_LIB)).unwrap();
+                symlink(&bin_exe, &linked_exe).unwrap();
+                assert_eq!(dirs.find_library(&linked_exe).unwrap(), library_dir);
+                assert_eq!(dirs.find_resource(&linked_exe).unwrap(), resource_dir);
+                // Test the situation that maa -> path/cellar/bin, core -> path/lib, resource -> path/share/maa,
+                // and maa is linked to path/bin.
+
+                // remove old dirs
+                remove_dir_all(&library_dir).unwrap();
+                remove_dir_all(&share_dir).unwrap();
+
+                let library_dir = test_case_root.join("lib");
+                let share_dir = test_case_root.join("share").join("maa");
+                let resource_dir = share_dir.join("resource");
+                std::fs::create_dir_all(&library_dir).unwrap();
+                std::fs::create_dir_all(&resource_dir).unwrap();
+                File::create(&library_dir.join(MAA_CORE_LIB)).unwrap();
+                assert_eq!(dirs.find_library(&linked_exe).unwrap(), library_dir);
+                assert_eq!(dirs.find_resource(&linked_exe).unwrap(), resource_dir);
+
+                remove_dir_all(&test_case_root).unwrap();
+            }
         }
 
         #[test]
@@ -343,16 +456,15 @@ mod tests {
             env::remove_var("XDG_CONFIG_HOME");
             let project = ProjectDirs::from("com", "loong", "maa");
             let home_dir = PathBuf::from(env::var_os("HOME").unwrap());
-            let dirs = Dirs::new(project.clone());
             if cfg!(target_os = "macos") {
                 assert_eq!(
-                    dirs.config(),
+                    TEST_DIRS.config(),
                     home_dir.join("Library/Application Support/com.loong.maa/config")
                 );
             } else if cfg!(target_os = "linux") {
-                assert_eq!(dirs.config(), home_dir.join(".config/maa"));
+                assert_eq!(TEST_DIRS.config(), home_dir.join(".config/maa"));
             }
-            assert_eq!(config(), dirs.config());
+            assert_eq!(config(), TEST_DIRS.config());
 
             env::set_var("XDG_CONFIG_HOME", "/xdg");
             let dirs = Dirs::new(project.clone());
@@ -368,13 +480,15 @@ mod tests {
             env::remove_var("XDG_CACHE_HOME");
             let project = ProjectDirs::from("com", "loong", "maa");
             let home_dir = PathBuf::from(env::var_os("HOME").unwrap());
-            let dirs = Dirs::new(project.clone());
             if cfg!(target_os = "macos") {
-                assert_eq!(dirs.cache(), home_dir.join("Library/Caches/com.loong.maa"));
+                assert_eq!(
+                    TEST_DIRS.cache(),
+                    home_dir.join("Library/Caches/com.loong.maa")
+                );
             } else if cfg!(target_os = "linux") {
-                assert_eq!(dirs.cache(), home_dir.join(".cache/maa"));
+                assert_eq!(TEST_DIRS.cache(), home_dir.join(".cache/maa"));
             }
-            assert_eq!(cache(), dirs.cache());
+            assert_eq!(cache(), TEST_DIRS.cache());
 
             env::set_var("XDG_CACHE_HOME", "/xdg");
             let dirs = Dirs::new(project.clone());

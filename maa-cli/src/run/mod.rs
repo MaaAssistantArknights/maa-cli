@@ -609,4 +609,26 @@ mod tests {
             assert_eq!(ClientType::YoStarKR.resource(), Some("YoStarKR"));
         }
     }
+
+    mod run {
+        use std::env;
+
+        use super::*;
+
+        #[test]
+        fn dry_run() {
+            if env::var("MAA_CORE_DIR").is_ok() && env::var("MAA_RESOURCE_DIR").is_ok() {
+                let task = TaskConfig::new();
+                let args = CommonArgs::default();
+                run(task, args).unwrap();
+            }
+        }
+
+        #[test]
+        fn run_version() {
+            if let Ok(version) = env::var("MAA_CORE_VERSION") {
+                assert_eq!(core_version().unwrap(), version);
+            }
+        }
+    }
 }

@@ -44,6 +44,8 @@ jobs:
           # Failed to cross compile ring on Windows
           - os: windows-latest
             arch: aarch64
+    env:
+      MAA_EXTRA_SHARE_NAME: maa-test
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,6 +54,7 @@ jobs:
         with:
           os: ${{ matrix.os }}
           arch: ${{ matrix.arch }}
+          coverage: true
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
       - name: Build (maa-cli)
@@ -65,65 +68,29 @@ jobs:
         if: matrix.arch == 'x86_64'
         run: |
           cargo fmt --all -- --check
-      - name: Test (maa-cli)
-        if: matrix.arch == 'x86_64'
-        run: |
-          cargo test --package maa-cli --locked
       - name: Install MaaCore
         if: matrix.arch == 'x86_64'
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
         run: |
           cargo run -- install beta -t0
-      - name: Show installation
+          ls -l "$(cargo run -- dir core)"
+          ls -l "$(cargo run -- dir resource)"
+          wget "$(yq -oy '.core.api_url' $MAA_CONFIG_DIR/cli.yml)/beta.json"
+          version="$(yq -oy '.version' beta.json)"
+          echo "MAA_CORE_VERSION=$version" >> $GITHUB_ENV
+      - name: Test
         if: matrix.arch == 'x86_64'
         run: |
-          MAA_CORE_DIR="$(cargo run -- dir lib)"
-          MAA_RESOURCE_DIR="$(cargo run -- dir resource)"
-          ls -l "$MAA_CORE_DIR"
-          ls -l "$MAA_RESOURCE_DIR"
-          echo "MAA_CORE_DIR=$MAA_CORE_DIR" >> $GITHUB_ENV
-          echo "MAA_RESOURCE_DIR=$MAA_RESOURCE_DIR" >> $GITHUB_ENV
-      - name: Run with MaaCore (default path)
-        if: matrix.arch == 'x86_64'
-        timeout-minutes: 1
-        continue-on-error: ${{ matrix.os == 'windows-latest' }}
-        env:
-          MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
-        run: |
-          cargo run -- version -vv
-          cargo run -- run daily --dry-run --batch -vv
-      - name: Run with MaaCore (relative path)
-        if: matrix.arch == 'x86_64'
-        timeout-minutes: 1
-        continue-on-error: ${{ matrix.os == 'windows-latest' }}
-        env:
-          MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
-          MAA_EXE: ${{ startsWith(matrix.os, 'windows') && 'maa.exe' || 'maa' }}
-        run: |
-          local_dir="local"
-          bin_dir="$local_dir/bin"
-          lib_dir="$local_dir/lib"
-          share_dir="$local_dir/share/maa"
-          mkdir -p "$local_dir"
-          mkdir -p "$bin_dir"
-          mkdir -p "$share_dir"
-          cp -v "target/$CARGO_BUILD_TARGET/debug/$MAA_EXE" "$bin_dir"
-          mv -v "$MAA_CORE_DIR" "$lib_dir"
-          mv -v "$MAA_RESOURCE_DIR" "$share_dir/resource"
-          ls -l "$local_dir"
-          ls -l "$local_dir/bin"
-          ls -l "$local_dir/lib"
-          ls -l "$share_dir"
-          $bin_dir/$MAA_EXE version -vv
-          $bin_dir/$MAA_EXE run daily --dry-run --batch -vv
-      - name: Cat MaaCore Log
+          cargo test
+      - name: Coverage
         if: matrix.arch == 'x86_64'
         run: |
-          cat "$(cargo run -- dir log)/asst.log"
+          cargo tarpaulin --all-features --workspace --timeout 120 --out xml ${{ github.run_attempt == 1 && '--skip-clean' || '' }}
+
 
   features:
-    name: Build with no default features
+    name: Build and Test (no default features)
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -136,7 +103,6 @@ jobs:
           - --features core_installer
           - --features cli_installer
           - ""
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -149,37 +115,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           key: feature-${{ matrix.feature }}
-      - name: Build (maa-cli)
+      - name: Build
         run: |
           cargo build --package maa-cli --no-default-features ${{ matrix.features }} --locked
-      - name: Test (maa-cli)
+      - name: Test
         run: |
-          cargo test --package maa-cli --no-default-features ${{ matrix.features }} --locked
-
-  coverage:
-    name: Coverage
-    needs: build
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Install Cargo tarpaulin
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-tarpaulin
-      - name: Setup Cache
-        uses: Swatinem/rust-cache@v2
-      - name: Generate code coverage
-        run: |
-          cargo tarpaulin --all-features --workspace --timeout 120 --out xml ${{ github.run_attempt == 1 && '--skip-clean' || '' }}
-      - name: Upload to codecov.io
-        uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: true
+          cargo test
