@@ -73,11 +73,13 @@ jobs:
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
         run: |
-          cargo run -- install beta -t0
+          cargo run -- install stable
           ls -l "$(cargo run -- dir library)"
           ls -l "$(cargo run -- dir resource)"
-          wget "$(yq -oy '.core.api_url' $MAA_CONFIG_DIR/cli.toml)/beta.json"
-          version="$(yq -oy '.version' beta.json)"
+          package_name=$(basename $(cargo run -- dir cache)/MAA-v*)
+          version=${package_name#MAA-v}
+          version=${version%%-*}
+          echo "Installed MaaCore version: $version"
           echo "MAA_CORE_VERSION=$version" >> $GITHUB_ENV
       - name: Test
         if: matrix.arch == 'x86_64'
