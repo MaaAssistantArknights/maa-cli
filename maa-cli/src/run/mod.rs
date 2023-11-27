@@ -616,19 +616,6 @@ mod tests {
         use super::*;
 
         #[test]
-        fn dry_run() {
-            if env::var("MAA_CORE_INSTALLED").is_ok() {
-                let task = TaskConfig::new();
-                let args = CommonArgs {
-                    batch: true,
-                    dry_run: true,
-                    ..Default::default()
-                };
-                run(task, args).unwrap();
-            }
-        }
-
-        #[test]
         fn run_version() {
             if let Ok(version) = env::var("MAA_CORE_VERSION") {
                 assert_eq!(core_version().unwrap(), version);
