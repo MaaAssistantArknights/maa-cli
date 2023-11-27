@@ -255,10 +255,10 @@ impl Ensure for &Path {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::env::{self, temp_dir};
 
     mod get_dir {
         use super::*;
-        use std::env::{self, temp_dir};
         use std::fs::{create_dir_all, remove_dir_all, File};
 
         lazy_static! {
@@ -363,34 +363,32 @@ mod tests {
             // Because the /maa directory not exists, and which shadow the installation
             // of MaaCore, so we can test the situation that MaaCore is installed at
             // non-standard location.
-            let test_root = temp_dir().join("maa-run-test");
-            create_dir_all(&test_root).unwrap();
-            let test_root = canonicalize(&test_root).unwrap();
+            let test_root = temp_dir().join("maa-test-data");
+            let test_root = canonicalize(&test_root.ensure().unwrap()).unwrap();
 
             // Test the situation that maa -> path, core -> path, resource -> path/resource
-            let test_case_root = test_root.join("same-dir");
-            let bin_dir = test_case_root.clone();
-            let library_dir = test_case_root.clone();
-            let resource_dir = test_case_root.join("resource");
-            create_dir_all(&bin_dir).unwrap();
-            create_dir_all(&library_dir).unwrap();
-            create_dir_all(&resource_dir).unwrap();
+            test_root.ensure_clean().unwrap();
+            let bin_dir = test_root.clone();
+            let library_dir = test_root.clone();
+            let resource_dir = test_root.join("resource");
+            bin_dir.ensure_clean().unwrap();
+            library_dir.ensure_clean().unwrap();
+            resource_dir.ensure_clean().unwrap();
             let bin_exe = bin_dir.join("maa");
             File::create(&bin_exe).unwrap();
             File::create(library_dir.join(MAA_CORE_LIB)).unwrap();
             assert_eq!(dirs.find_library(&bin_exe).unwrap(), library_dir);
             assert_eq!(dirs.find_resource(&bin_exe).unwrap(), resource_dir);
-            remove_dir_all(&test_case_root).unwrap();
 
             // Test the situation maa -> path/bin, core -> path/lib, resource -> path/share/maa
-            let test_case_root = test_root.join("diff-dir");
-            let bin_dir = test_case_root.join("bin");
-            let library_dir = test_case_root.join("lib");
-            let share_dir = test_case_root.join("share").join("maa");
+            test_root.ensure_clean().unwrap();
+            let bin_dir = test_root.join("bin");
+            let library_dir = test_root.join("lib");
+            let share_dir = test_root.join("share").join("maa");
             let resource_dir = share_dir.join("resource");
-            create_dir_all(&bin_dir).unwrap();
-            create_dir_all(&library_dir).unwrap();
-            create_dir_all(&resource_dir).unwrap();
+            bin_dir.ensure_clean().unwrap();
+            library_dir.ensure_clean().unwrap();
+            resource_dir.ensure_clean().unwrap();
             let bin_exe = bin_dir.join("maa");
             File::create(bin_dir.join("maa")).unwrap();
             File::create(library_dir.join(MAA_CORE_LIB)).unwrap();
@@ -398,34 +396,32 @@ mod tests {
             assert_eq!(dirs.find_resource(&bin_exe).unwrap(), resource_dir);
 
             if let Some(extra_share) = option_env!("MAA_EXTRA_SHARE_NAME") {
-                let extra_share_dir = test_case_root.join("share").join(extra_share);
+                let extra_share_dir = test_root.join("share").join(extra_share);
                 let extra_resource_dir = extra_share_dir.join("resource");
                 create_dir_all(&extra_resource_dir).unwrap();
                 assert_eq!(dirs.find_resource(&bin_exe).unwrap(), extra_resource_dir);
                 remove_dir_all(&extra_share_dir).unwrap();
             }
 
-            remove_dir_all(&test_case_root).unwrap();
-
             // Test the situation that maa linked
             #[cfg(target_os = "macos")]
             {
                 use std::os::unix::fs::symlink;
 
-                let test_case_root = test_root.join("linked");
+                test_root.ensure_clean().unwrap();
 
                 // Test the situation that maa -> path/cellar/bin, core -> path/cellar/lib,
                 // resource -> path/share/maa, and maa is linked to path/bin.
-                let cellar = test_case_root.join("Cellar");
+                let cellar = test_root.join("Cellar");
                 let bin_dir = cellar.join("bin");
                 let library_dir = cellar.join("lib");
-                let share_dir = test_case_root.join("share").join("maa");
+                let share_dir = test_root.join("share").join("maa");
                 let resource_dir = share_dir.join("resource");
-                let linked_dir = test_case_root.join("bin");
-                create_dir_all(&bin_dir).unwrap();
-                create_dir_all(&library_dir).unwrap();
-                create_dir_all(&resource_dir).unwrap();
-                create_dir_all(&linked_dir).unwrap();
+                let linked_dir = test_root.join("bin");
+                bin_dir.ensure_clean().unwrap();
+                library_dir.ensure_clean().unwrap();
+                resource_dir.ensure_clean().unwrap();
+                linked_dir.ensure_clean().unwrap();
                 let bin_exe = bin_dir.join("maa");
                 let linked_exe = linked_dir.join("maa");
                 File::create(&bin_exe).unwrap();
@@ -440,17 +436,17 @@ mod tests {
                 remove_dir_all(&library_dir).unwrap();
                 remove_dir_all(&share_dir).unwrap();
 
-                let library_dir = test_case_root.join("lib");
-                let share_dir = test_case_root.join("share").join("maa");
+                let library_dir = test_root.join("lib");
+                let share_dir = test_root.join("share").join("maa");
                 let resource_dir = share_dir.join("resource");
                 std::fs::create_dir_all(&library_dir).unwrap();
                 std::fs::create_dir_all(&resource_dir).unwrap();
                 File::create(library_dir.join(MAA_CORE_LIB)).unwrap();
                 assert_eq!(dirs.find_library(&linked_exe).unwrap(), library_dir);
                 assert_eq!(dirs.find_resource(&linked_exe).unwrap(), resource_dir);
-
-                remove_dir_all(&test_case_root).unwrap();
             }
+
+            remove_dir_all(&test_root).unwrap();
         }
 
         #[test]
@@ -500,5 +496,15 @@ mod tests {
             let dirs = Dirs::new(project.clone());
             assert_eq!(dirs.cache(), PathBuf::from("/maa"));
         }
+    }
+
+    #[test]
+    fn ensure() {
+        let test_root = temp_dir().join("maa-test-ensure");
+        let test_dir = test_root.join("test");
+        assert_eq!(test_root.ensure_clean().unwrap(), test_root);
+        assert!(!test_dir.exists());
+        assert_eq!(test_dir.ensure().unwrap(), test_dir);
+        assert!(test_dir.exists());
     }
 }
