@@ -76,7 +76,7 @@ jobs:
           cargo run -- install beta -t0
           ls -l "$(cargo run -- dir library)"
           ls -l "$(cargo run -- dir resource)"
-          wget "$(yq -oy '.core.api_url' $MAA_CONFIG_DIR/cli.yml)/beta.json"
+          wget "$(yq -oy '.core.api_url' $MAA_CONFIG_DIR/cli.toml)/beta.json"
           version="$(yq -oy '.version' beta.json)"
           echo "MAA_CORE_VERSION=$version" >> $GITHUB_ENV
       - name: Test
