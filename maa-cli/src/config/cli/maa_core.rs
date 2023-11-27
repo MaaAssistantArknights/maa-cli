@@ -284,6 +284,12 @@ mod tests {
         }
 
         #[test]
+        fn test_time() {
+            assert_eq!(default_config().test_time(), 3);
+            assert_eq!(default_config().set_test_time(5).test_time(), 5);
+        }
+
+        #[test]
         fn api_url() {
             assert_eq!(
                 default_config().set_channel(Channel::Stable).api_url(),

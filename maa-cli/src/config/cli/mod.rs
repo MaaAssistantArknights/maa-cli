@@ -215,4 +215,10 @@ mod tests {
             maa_cli::Config::default().with_channel(Channel::Alpha),
         );
     }
+
+    #[test]
+    fn normalize_url_test() {
+        assert_eq!(normalize_url("https://foo.bar"), "https://foo.bar/");
+        assert_eq!(normalize_url("https://foo.bar/"), "https://foo.bar/");
+    }
 }
