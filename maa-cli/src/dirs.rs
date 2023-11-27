@@ -205,7 +205,7 @@ where
 {
     // Try to canonicalize the path first.
     if let Ok(canonicalized_exe_path) = canonicalize(exe_path) {
-        if let Some(path) = finder(&canonicalized_exe_path.parent()?) {
+        if let Some(path) = finder(canonicalized_exe_path.parent()?) {
             return Some(path);
         };
     }
@@ -363,7 +363,9 @@ mod tests {
             // Because the /maa directory not exists, and which shadow the installation
             // of MaaCore, so we can test the situation that MaaCore is installed at
             // non-standard location.
-            let test_root = canonicalize(temp_dir().join("maa-run-test")).unwrap();
+            let test_root = temp_dir().join("maa-run-test");
+            create_dir_all(&test_root).unwrap();
+            let test_root = canonicalize(&test_root).unwrap();
 
             // Test the situation that maa -> path, core -> path, resource -> path/resource
             let test_case_root = test_root.join("same-dir");
@@ -375,7 +377,7 @@ mod tests {
             create_dir_all(&resource_dir).unwrap();
             let bin_exe = bin_dir.join("maa");
             File::create(&bin_exe).unwrap();
-            File::create(&library_dir.join(MAA_CORE_LIB)).unwrap();
+            File::create(library_dir.join(MAA_CORE_LIB)).unwrap();
             assert_eq!(dirs.find_library(&bin_exe).unwrap(), library_dir);
             assert_eq!(dirs.find_resource(&bin_exe).unwrap(), resource_dir);
             remove_dir_all(&test_case_root).unwrap();
@@ -390,8 +392,8 @@ mod tests {
             create_dir_all(&library_dir).unwrap();
             create_dir_all(&resource_dir).unwrap();
             let bin_exe = bin_dir.join("maa");
-            File::create(&bin_dir.join("maa")).unwrap();
-            File::create(&library_dir.join(MAA_CORE_LIB)).unwrap();
+            File::create(bin_dir.join("maa")).unwrap();
+            File::create(library_dir.join(MAA_CORE_LIB)).unwrap();
             assert_eq!(dirs.find_library(&bin_exe).unwrap(), library_dir);
             assert_eq!(dirs.find_resource(&bin_exe).unwrap(), resource_dir);
 
@@ -427,7 +429,7 @@ mod tests {
                 let bin_exe = bin_dir.join("maa");
                 let linked_exe = linked_dir.join("maa");
                 File::create(&bin_exe).unwrap();
-                File::create(&library_dir.join(MAA_CORE_LIB)).unwrap();
+                File::create(library_dir.join(MAA_CORE_LIB)).unwrap();
                 symlink(&bin_exe, &linked_exe).unwrap();
                 assert_eq!(dirs.find_library(&linked_exe).unwrap(), library_dir);
                 assert_eq!(dirs.find_resource(&linked_exe).unwrap(), resource_dir);
@@ -443,7 +445,7 @@ mod tests {
                 let resource_dir = share_dir.join("resource");
                 std::fs::create_dir_all(&library_dir).unwrap();
                 std::fs::create_dir_all(&resource_dir).unwrap();
-                File::create(&library_dir.join(MAA_CORE_LIB)).unwrap();
+                File::create(library_dir.join(MAA_CORE_LIB)).unwrap();
                 assert_eq!(dirs.find_library(&linked_exe).unwrap(), library_dir);
                 assert_eq!(dirs.find_resource(&linked_exe).unwrap(), resource_dir);
 
