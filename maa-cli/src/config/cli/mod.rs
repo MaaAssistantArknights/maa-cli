@@ -1,5 +1,3 @@
-use crate::warning;
-
 #[cfg(feature = "cli_installer")]
 pub mod maa_cli;
 #[cfg(feature = "core_installer")]
@@ -12,10 +10,6 @@ use serde::Deserialize;
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Default)]
 pub struct InstallerConfig {
-    /// DEPRECATED: Remove in the next breaking change
-    #[cfg(feature = "core_installer")]
-    #[serde(default)]
-    pub channel: Option<Channel>,
     /// MaaCore configuration
     #[cfg(feature = "core_installer")]
     #[serde(default)]
@@ -28,11 +22,7 @@ pub struct InstallerConfig {
 
 impl InstallerConfig {
     #[cfg(feature = "core_installer")]
-    pub fn core_config(mut self) -> maa_core::Config {
-        if let Some(channel) = self.channel.take() {
-            warning!("`channel` field in `cli.toml` is deprecated, use `maa_core.channel` instead");
-            self.core.set_channel(channel);
-        }
+    pub fn core_config(self) -> maa_core::Config {
         self.core
     }
 
@@ -123,15 +113,11 @@ mod tests {
         #[cfg(feature = "core_installer")]
         assert_de_tokens(
             &InstallerConfig {
-                channel: Some(Channel::Beta),
                 core: maa_core::Config::default().with_channel(Channel::Alpha),
                 ..Default::default()
             },
             &[
                 Token::Map { len: Some(3) },
-                Token::Str("channel"),
-                Token::Some,
-                Channel::Beta.as_token(),
                 Token::Str("core"),
                 Token::Map { len: Some(1) },
                 Token::Str("channel"),
@@ -167,8 +153,6 @@ mod tests {
 
         let expect = InstallerConfig {
             #[cfg(feature = "core_installer")]
-            channel: None,
-            #[cfg(feature = "core_installer")]
             core: maa_core::Config::default()
                 .with_channel(Channel::Beta)
                 .with_test_time(0)
@@ -193,15 +177,6 @@ mod tests {
         assert_eq!(
             InstallerConfig::default().core_config(),
             maa_core::Config::default()
-        );
-
-        assert_eq!(
-            &InstallerConfig {
-                channel: Some(Channel::Alpha),
-                ..Default::default()
-            }
-            .core_config(),
-            maa_core::Config::default().set_channel(Channel::Alpha)
         );
 
         assert_eq!(

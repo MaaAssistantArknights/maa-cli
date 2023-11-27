@@ -85,6 +85,7 @@ jobs:
             echo "Downloaded MaaCore version: $version"
             echo "MAA_CORE_VERSION=v$version" >> $GITHUB_ENV
           fi
+          echo "MAA_CORE_INSTALLED=true" >> $GITHUB_ENV
       - name: Test
         if: matrix.arch == 'x86_64'
         run: |

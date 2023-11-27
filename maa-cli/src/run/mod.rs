@@ -617,9 +617,13 @@ mod tests {
 
         #[test]
         fn dry_run() {
-            if env::var("MAA_CORE_DIR").is_ok() && env::var("MAA_RESOURCE_DIR").is_ok() {
+            if env::var("MAA_CORE_INSTALLED").is_ok() {
                 let task = TaskConfig::new();
-                let args = CommonArgs::default();
+                let args = CommonArgs {
+                    batch: true,
+                    dry_run: true,
+                    ..Default::default()
+                };
                 run(task, args).unwrap();
             }
         }

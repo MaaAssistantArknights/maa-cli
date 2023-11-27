@@ -364,7 +364,7 @@ mod tests {
             // of MaaCore, so we can test the situation that MaaCore is installed at
             // non-standard location.
             let test_root = temp_dir().join("maa-test-data");
-            let test_root = canonicalize(&test_root.ensure().unwrap()).unwrap();
+            let test_root = canonicalize(test_root.ensure().unwrap()).unwrap();
 
             // Test the situation that maa -> path, core -> path, resource -> path/resource
             test_root.ensure_clean().unwrap();

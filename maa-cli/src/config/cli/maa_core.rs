@@ -1,7 +1,5 @@
 use super::{normalize_url, return_true, Channel};
 
-use std::env::var_os;
-
 use clap::Parser;
 use serde::Deserialize;
 
@@ -88,11 +86,7 @@ fn default_test_time() -> u64 {
 }
 
 fn default_api_url() -> String {
-    if let Some(url) = var_os("MAA_API_URL") {
-        url.to_str().unwrap().to_owned()
-    } else {
-        "https://ota.maa.plus/MaaAssistantArknights/api/version/".to_owned()
-    }
+    String::from("https://ota.maa.plus/MaaAssistantArknights/api/version/")
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -195,8 +189,6 @@ mod tests {
     mod serde {
         use super::*;
 
-        use std::env::{remove_var, set_var};
-
         use serde_test::{assert_de_tokens, Token};
 
         #[test]
@@ -243,21 +235,6 @@ mod tests {
                 &default_config(),
                 &[Token::Map { len: Some(0) }, Token::MapEnd],
             );
-
-            set_var("MAA_API_URL", "https://foo.bar/core/");
-            assert_de_tokens(
-                &Config {
-                    channel: Default::default(),
-                    test_time: default_test_time(),
-                    api_url: "https://foo.bar/core/".to_string(),
-                    components: Components {
-                        library: true,
-                        resource: true,
-                    },
-                },
-                &[Token::Map { len: Some(0) }, Token::MapEnd],
-            );
-            remove_var("MAA_API_URL");
 
             assert_de_tokens(
                 &Config {
