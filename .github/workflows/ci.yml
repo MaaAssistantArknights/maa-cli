@@ -77,7 +77,7 @@ jobs:
           ls -l "$(cargo run -- dir library)"
           ls -l "$(cargo run -- dir resource)"
           ls -l "$(cargo run -- dir cache)"
-          package_name=$(basename $(cargo run -- dir cache)/MAA-v*)
+          package_name=$(basename $(ls $(cargo run -- dir cache)/MAA-v*))
           echo "Downloaded MaaCore package: $package_name"
           version=${package_name#MAA-v}
           version=${version%%-*}
