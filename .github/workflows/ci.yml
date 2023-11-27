@@ -74,7 +74,7 @@ jobs:
           MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
         run: |
           cargo run -- install beta -t0
-          ls -l "$(cargo run -- dir core)"
+          ls -l "$(cargo run -- dir library)"
           ls -l "$(cargo run -- dir resource)"
           wget "$(yq -oy '.core.api_url' $MAA_CONFIG_DIR/cli.yml)/beta.json"
           version="$(yq -oy '.version' beta.json)"
