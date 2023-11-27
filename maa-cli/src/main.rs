@@ -137,6 +137,17 @@ enum SubCommand {
     List,
     /// Generate completion script for given shell
     Complete { shell: Shell },
+    /// Maa copilot for auto-combat
+    Copilot {
+        /// The code should be copied in "https://prts.plus", such as "maa://12345".
+        link: String,
+        #[arg(short, long)]
+        addr: Option<String>,
+        #[arg(long)]
+        user_resource: bool,
+        #[arg(short, long)]
+        batch: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -297,6 +308,12 @@ fn main() -> Result<()> {
         SubCommand::Complete { shell } => {
             generate(shell, &mut CLI::command(), "maa", &mut std::io::stdout());
         }
+        SubCommand::Copilot {
+            link,
+            addr,
+            user_resource,
+            batch,
+        } => run::copilot(&proj_dirs, link, addr, user_resource, batch, false)?,
     }
 
     Ok(())
@@ -592,6 +609,20 @@ mod test {
             assert!(matches!(
                 CLI::parse_from(["maa", "complete", "bash"]).command,
                 SubCommand::Complete { shell: Shell::Bash }
+            ));
+        }
+
+        #[test]
+        #[allow(unused_variables)]
+        fn copilot() {
+            assert!(matches!(
+                CLI::parse_from(["maa", "copilot", "maa://23236"]).command,
+                SubCommand::Copilot {
+                    link,
+                    addr: None,
+                    user_resource: false,
+                    batch: false,
+                }
             ));
         }
     }
