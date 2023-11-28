@@ -112,7 +112,7 @@ jobs:
           sed -i "" '1,6 s/^version = .*/version = "${{ needs.meta.outputs.version }}"/' Cargo.toml
       - name: Patch Cargo.tom (GNU sed)
         if: ${{ !startsWith(matrix.os, 'macos') }}
-        working-directory: maa_cli
+        working-directory: maa-cli
         run: |
           sed -i '1,6 s/^version = .*/version = "${{ needs.meta.outputs.version }}"/' Cargo.toml
       - name: Build
@@ -121,7 +121,7 @@ jobs:
           CARGO_PROFILE_RELEASE_LTO: true
           CARGO_PROFILE_RELEASE_STRIP: true
         run: |
-          cargo build --release --locked --package maa-cli
+          cargo build --release --package maa-cli
       - name: Tar Artifact
         run: |
           tar -cvf "$CARGO_BUILD_TARGET.tar" -C "target/$CARGO_BUILD_TARGET/release" maa
