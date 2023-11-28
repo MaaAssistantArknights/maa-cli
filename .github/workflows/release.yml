@@ -11,11 +11,24 @@ on:
       - ".github/workflows/release.yml"
   workflow_dispatch:
     inputs:
-      dryrun:
-        description: Don't create release
+      beta:
+        description: Release as beta
         default: true
         required: true
         type: boolean
+      beta_number:
+        description: Beta number of this release
+        default: 1
+        required: true
+        type: number
+      publish:
+        description: Whether to publish a new release
+        default: false
+        required: true
+        type: boolean
+  schedule:
+    # Release alpha every day at 20:00 UTC (4:00 AM UTC+8)
+    - cron: "0 20 * * *"
 
 defaults:
   run:
@@ -29,37 +42,23 @@ jobs:
     name: Meta
     runs-on: ubuntu-latest
     outputs:
-      dryrun: ${{ steps.dryrun.outputs.dryrun }}
       version: ${{ steps.version.outputs.version }}
+      channel: ${{ steps.version.outputs.channel }}
+      prerelease: ${{ steps.version.outputs.channel != 'stable' }}
+      publish: ${{ steps.version.outputs.publish }}
+      skip: ${{ steps.version.outputs.skip }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Check if Dryrun
-        id: dryrun
-        run: |
-          if [[ "$GITHUB_EVENT_NAME" = "push" && "$GITHUB_REF" = "refs/tags/v"* ]]; then
-            dryrun=false
-          elif [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            dryrun=${{ inputs.dryrun }}
-          else
-            dryrun=true
-          fi
-          echo "Dryrun: $dryrun"
-          echo "dryrun=$dryrun" >> $GITHUB_OUTPUT
+      - name: Checkout Version Branch
+        uses: actions/checkout@v4
+        with:
+          ref: version
+          path: version
       - name: Get Version
         id: version
         run: |
-          CARGO_VERSION=$(yq -oy ".package.version" maa-cli/Cargo.toml)
-          # check if version is equal to tag if not PR
-          if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
-            REF=${{ github.ref }}
-            REF_VERSION=${REF#refs/tags/v}
-            if [ "$REF_VERSION" != "$CARGO_VERSION" ]; then
-              echo "Version mismatch: $REF_VERSION != $CARGO_VERSION"
-            fi
-          fi
-          echo "Version: $CARGO_VERSION"
-          echo "version=$CARGO_VERSION" >> $GITHUB_OUTPUT
+          bash .github/scripts/parse_version.sh
 
   release-note:
     name: Generate Release Notes
@@ -77,11 +76,12 @@ jobs:
         uses: orhun/git-cliff-action@v2
         with:
           config: cliff.toml
-          args: -vv ${{ fromJson(needs.meta.outputs.dryrun) && '-u' || '-l' }}
+          args: -vv ${{ fromJson(needs.meta.outputs.prerelease) && '-u' || '-l' }}
 
   build:
     name: Build
     needs: meta
+    if: ${{ !fromJson(needs.meta.outputs.skip) }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -105,6 +105,10 @@ jobs:
         with:
           os: ${{ matrix.os }}
           arch: ${{ matrix.arch }}
+      - name: Patch Cargo.toml
+        working-directory: maa-cli
+        run: |
+          sed -i "s/^version = .*/version = \"${{ needs.meta.outputs.version }}\"/" Cargo.toml
       - name: Build
         env:
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 1
@@ -114,7 +118,7 @@ jobs:
           cargo build --release --locked --package maa-cli
       - name: Tar Artifact
         run: |
-          tar -cvf "$CARGO_BUILD_TARGET.tar" -C target/$CARGO_BUILD_TARGET/release maa
+          tar -cvf "$CARGO_BUILD_TARGET.tar" -C "target/$CARGO_BUILD_TARGET/release" maa
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
@@ -125,6 +129,7 @@ jobs:
 
   build-universal:
     name: Build Universal Binary
+    if: ${{ !fromJson(needs.meta.outputs.skip) }}
     runs-on: macos-latest
     needs: [meta, build]
     steps:
@@ -151,6 +156,7 @@ jobs:
 
   release:
     name: Release
+    if: ${{ !fromJson(needs.meta.outputs.skip) }}
     runs-on: ubuntu-latest
     needs: [meta, build, build-universal, release-note]
     permissions:
@@ -165,40 +171,16 @@ jobs:
           path: version
       - name: Extract files, Generate checksums and Update version.json
         run: |
-          version=${{ needs.meta.outputs.version }}
-          targets=(
-            x86_64-unknown-linux-gnu
-            aarch64-unknown-linux-gnu
-            universal-apple-darwin
-            x86_64-pc-windows-msvc
-          )
-          for target in "${targets[@]}"; do
-            dir="maa_cli-$target"
-            tar -xvf "$dir/$target.tar" -C "$dir"
-            # use tar on linux and zip on other platforms
-            if [[ "$target" == *"linux"* ]]; then
-              archive_name="maa_cli-v$version-$target.tar.gz"
-              tar -czvf $archive_name $dir/maa
-            else
-              archive_name="maa_cli-v$version-$target.zip"
-              zip -r $archive_name $dir/maa
-            fi
-            checksum=$(sha256sum $archive_name)
-            size=$(stat -c%s $archive_name)
-            checksum_hash=$(echo $checksum | cut -d ' ' -f 1)
-            echo $checksum > $archive_name.sha256sum
-            version_file="version/version.json"
-            yq -i -oj ".maa-cli.$target.version = \"$version\"" $version_file
-            yq -i -oj ".maa-cli.$target.tag = \"v$version\"" $version_file
-            yq -i -oj ".maa-cli.$target.name = \"$archive_name\"" $version_file
-            yq -i -oj ".maa-cli.$target.size = $size" $version_file
-            yq -i -oj ".maa-cli.$target.sha256sum = \"$(echo $checksum | cut -d ' ' -f 1)\"" $version_file
-          done
+          .github/scripts/update_version.sh ${{ needs.meta.outputs.version }} ${{ needs.meta.outputs.channel }}
+          
       - name: Create Release
         uses: softprops/action-gh-release@v1
-        if: ${{ !fromJson(needs.meta.outputs.dryrun) }}
+        if: ${{ fromJson(needs.meta.outputs.publish) }}
         with:
           name: v${{ needs.meta.outputs.version }}
+          # use the same tag for all alpha releases
+          tag_name: ${{ fromJson(needs.meta.outputs.channel) == 'alpha' && 'alpha' || format('v{0}', needs.meta.outputs.version) }}
+          prerelease: ${{ fromJson(needs.meta.outputs.prerelease) }}
           body: ${{ needs.release-note.outputs.content }}
           fail_on_unmatched_files: true
           files: |
@@ -210,16 +192,18 @@ jobs:
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          echo "Commit changes to version.json" >> $GITHUB_STEP_SUMMARY
-          echo '```diff' >> $GITHUB_STEP_SUMMARY
-          git diff version.json >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          git commit version.json -m "Update version.json"
-          git push --verbose ${{ fromJson(needs.meta.outputs.dryrun) && '--dry-run' || ''}}
+          {
+            echo "Commit changes to version.json"
+            echo '```diff'
+            git diff version.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          git commit version.json -m "chore: bump version to v${{ needs.meta.outputs.version }}"
+          git push --verbose ${{ !fromJson(needs.meta.outputs.publish) && '--dry-run' || ''}}
 
   publish-homebrew:
     needs: [meta, release]
-    if: ${{ !fromJson(needs.meta.outputs.dryrun) }}
+    if: ${{ fromJson(needs.meta.outputs.publish) && !fromJson(needs.meta.outputs.prerelease) }}
     name: Publish Homebrew
     uses: ./.github/workflows/publish-homebrew.yml
     with:
@@ -230,7 +214,7 @@ jobs:
 
   publish-aur:
     needs: [meta, release]
-    if: ${{ !fromJson(needs.meta.outputs.dryrun) }}
+    if: ${{ fromJson(needs.meta.outputs.publish) && !fromJson(needs.meta.outputs.prerelease) }}
     name: Publish AUR Package
     uses: ./.github/workflows/publish-aur.yml
     with:
