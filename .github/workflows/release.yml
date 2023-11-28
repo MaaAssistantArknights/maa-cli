@@ -255,10 +255,10 @@ jobs:
           {
             echo "Commit changes to version.json"
             echo '```diff'
-            git diff version.json
+            git diff *.json
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          git commit version.json -m "chore: bump version to v${{ needs.meta.outputs.version }}"
+          git commit *.json -m "chore: bump version to v${{ needs.meta.outputs.version }}"
           git push --verbose ${{ !fromJson(needs.meta.outputs.publish) && '--dry-run' || ''}}
 
   publish-homebrew:
