@@ -108,7 +108,7 @@ jobs:
       - name: Patch Cargo.toml
         working-directory: maa-cli
         run: |
-          sed -i "s/^version = .*/version = \"${{ needs.meta.outputs.version }}\"/" Cargo.toml
+          sed -i "" '1,6 s/^version = .*/version = "${{ needs.meta.outputs.version }}"/' Cargo.toml
       - name: Build
         env:
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 1
