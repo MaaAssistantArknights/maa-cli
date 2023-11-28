@@ -106,12 +106,12 @@ jobs:
           os: ${{ matrix.os }}
           arch: ${{ matrix.arch }}
       - name: Patch Cargo.toml (macOS only)
-        if: ${{ startsWith(matrix.os, 'macos') } }}
+        if: ${{ startsWith(matrix.os, 'macos') }}
         working-directory: maa-cli
         run: |
           sed -i "" '1,6 s/^version = .*/version = "${{ needs.meta.outputs.version }}"/' Cargo.toml
       - name: Patch Cargo.tom (GNU sed)
-        if: ${{ !startsWith(matrix.os, 'macos') } }}
+        if: ${{ !startsWith(matrix.os, 'macos') }}
         working-directory: maa_cli
         run: |
           sed -i '1,6 s/^version = .*/version = "${{ needs.meta.outputs.version }}"/' Cargo.toml
