@@ -43,6 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      commit: ${{ steps.version.outputs.commit }}
       channel: ${{ steps.version.outputs.channel }}
       prerelease: ${{ steps.version.outputs.channel != 'stable' }}
       publish: ${{ steps.version.outputs.publish }}
@@ -178,6 +179,7 @@ jobs:
       - name: Extract files, Generate checksums and Update version.json
         run: |
           VERSION=${{ needs.meta.outputs.version }}
+          COMMIT=${{ needs.meta.outputs.commit }}
           CHANNEL=${{ needs.meta.outputs.channel }}
 
           version_files=(
@@ -190,7 +192,7 @@ jobs:
           for version_file in "${version_files[@]}"; do
             yq -i -oj ".version = \"$VERSION\"" "$version_file"
             yq -i -oj ".details.tag = \"v$VERSION\"" "$version_file"
-            yq -i -oj ".details.commit = \"$(git rev-parse HEAD)\"" "$version_file"
+            yq -i -oj ".details.commit = \"$COMMIT\"" "$version_file"
           done
 
           targets=(

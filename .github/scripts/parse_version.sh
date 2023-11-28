@@ -3,6 +3,7 @@
 set -e
 
 CARGO_PKG_VERSION=$(yq -r '.package.version' maa-cli/Cargo.toml)
+COMMIT_SHA=$(git rev-parse HEAD)
 
 if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
   echo "PR detected, marking version as alpha pre-release and skipping publish"
@@ -14,7 +15,7 @@ elif [ "$GITHUB_EVENT_NAME" == "schedule" ]; then
   # check if there are some new commits
   channel="alpha"
   pubulished_commit=$(yq -r ".details.commit" version/$channel.json)
-  last_commit=$(git rev-parse HEAD)
+  last_commit="$COMMIT_SHA"
   if [ "$pubulished_commit" == "$last_commit" ]; then
     echo "No new commits, exiting, skipping all steps"
     echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -48,6 +49,7 @@ fi
 echo "Release version $VERSION to $channel channel and publish=$publish"
 {
   echo "channel=$channel"
+  echo "commit=$COMMIT_SHA"
   echo "version=$VERSION"
   echo "publish=$publish"
   echo "skip=false"
