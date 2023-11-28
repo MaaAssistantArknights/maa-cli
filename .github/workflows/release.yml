@@ -204,7 +204,7 @@ jobs:
 
           for target in "${targets[@]}"; do
             dir="maa_cli-$target"
-            tar -xvf "$dir.tar" -C "$dir"
+            tar -xvf "$dir/$target.tar" -C "$dir"
             # use tar on linux and zip on other platforms
             if [[ "$target" == *"linux"* ]]; then
               archive_name="maa_cli-v$VERSION-$target.tar.gz"
