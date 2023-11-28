@@ -28,10 +28,23 @@ pub struct Archive {
     file_type: ArchiveType,
 }
 
-impl TryFrom<PathBuf> for Archive {
-    type Error = anyhow::Error;
+impl Archive {
+    /// Create a new `Archive` from a file with specified archive type.
+    pub fn new(file: PathBuf, file_type: ArchiveType) -> Self {
+        Self { file, file_type }
+    }
 
-    fn try_from(file: PathBuf) -> std::result::Result<Self, Self::Error> {
+    /// Create a new `Archive` from a file with automatically detected archive type.
+    ///
+    /// The archive type is determined by the file extension.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file extension is not supported.
+    /// Currently only zip and tar.gz are supported.
+    /// Or returns an error if the file extension cannot be determined.
+    pub fn try_from(file: impl AsRef<Path>) -> Result<Self> {
+        let file = file.as_ref();
         if let Some(extension) = file.extension() {
             let archive_type = match extension.to_str() {
                 Some("zip") => ArchiveType::Zip,
@@ -45,20 +58,10 @@ impl TryFrom<PathBuf> for Archive {
                 }
                 _ => bail!("Unsupported archive type"),
             };
-            Ok(Self::new(file, archive_type))
+            Ok(Self::new(file.to_path_buf(), archive_type))
         } else {
             Err(anyhow!("Failed to get file extension"))
         }
-    }
-}
-
-impl Archive {
-    /// Create a new `Archive` from a file with(optional) specified archive type.
-    ///
-    /// If the archive type is not specified, it will be automatically detected from the file extension.
-    /// Currently only zip and tar.gz are supported.
-    pub fn new(file: PathBuf, file_type: ArchiveType) -> Self {
-        Self { file, file_type }
     }
 
     /// Extract the archive file with a mapper function.

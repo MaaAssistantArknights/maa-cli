@@ -44,6 +44,8 @@ jobs:
           # Failed to cross compile ring on Windows
           - os: windows-latest
             arch: aarch64
+    env:
+      MAA_EXTRA_SHARE_NAME: maa-test
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,6 +54,7 @@ jobs:
         with:
           os: ${{ matrix.os }}
           arch: ${{ matrix.arch }}
+          coverage: true
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
       - name: Build (maa-cli)
@@ -65,91 +68,68 @@ jobs:
         if: matrix.arch == 'x86_64'
         run: |
           cargo fmt --all -- --check
-      - name: Test (maa-cli)
-        if: matrix.arch == 'x86_64'
-        run: |
-          cargo test --package maa-cli --locked
-      - name: Test (maa-cli, no-default-features)
-        if: matrix.arch == 'x86_64'
-        run: |
-          cargo test --package maa-cli --no-default-features --locked
       - name: Install MaaCore
         if: matrix.arch == 'x86_64'
         env:
-          MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
-        run: |
-          cargo run -- install beta -t0
-      - name: Show installation
-        if: matrix.arch == 'x86_64'
-        run: |
-          MAA_CORE_DIR="$(cargo run -- dir lib)"
-          MAA_RESOURCE_DIR="$(cargo run -- dir resource)"
-          ls -l "$MAA_CORE_DIR"
-          ls -l "$MAA_RESOURCE_DIR"
-          echo "MAA_CORE_DIR=$MAA_CORE_DIR" >> $GITHUB_ENV
-          echo "MAA_RESOURCE_DIR=$MAA_RESOURCE_DIR" >> $GITHUB_ENV
-      - name: Run with MaaCore (default path)
-        if: matrix.arch == 'x86_64'
-        timeout-minutes: 1
-        continue-on-error: ${{ matrix.os == 'windows-latest' }}
-        env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
         run: |
-          cargo run -- version
-          cargo run -- run daily --dry-run --batch
-      - name: Run with MaaCore (relative path)
-        if: matrix.arch == 'x86_64'
-        timeout-minutes: 1
-        continue-on-error: ${{ matrix.os == 'windows-latest' }}
-        env:
-          MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
-          MAA_EXE: ${{ startsWith(matrix.os, 'windows') && 'maa.exe' || 'maa' }}
-        run: |
-          local_dir="local"
-          bin_dir="$local_dir/bin"
-          lib_dir="$local_dir/lib"
-          share_dir="$local_dir/share/maa"
-          mkdir -p "$local_dir"
-          mkdir -p "$bin_dir"
-          mkdir -p "$share_dir"
-          cp -v "target/$CARGO_BUILD_TARGET/debug/$MAA_EXE" "$bin_dir"
-          mv -v "$MAA_CORE_DIR" "$lib_dir"
-          mv -v "$MAA_RESOURCE_DIR" "$share_dir/resource"
-          ls -l "$local_dir"
-          ls -l "$local_dir/bin"
-          ls -l "$local_dir/lib"
-          ls -l "$share_dir"
-          $bin_dir/$MAA_EXE version
-          $bin_dir/$MAA_EXE run daily --dry-run --batch
-      - name: Cat MaaCore Log
+          cargo run -- install stable
+          ls -l "$(cargo run -- dir library)"
+          ls -l "$(cargo run -- dir resource)"
+          ls -l "$(cargo run -- dir cache)"
+          package_name=$(basename "$(ls "$(cargo run -- dir cache)")")
+          echo "Downloaded MaaCore package: $package_name"
+          version=${package_name#MAA-v}
+          version=${version%%-*}
+          if [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Downloaded MaaCore version: $version"
+            echo "MAA_CORE_VERSION=v$version" >> "$GITHUB_ENV"
+          fi
+          echo "MAA_CORE_INSTALLED=true" >> "$GITHUB_ENV"
+      - name: Test
         if: matrix.arch == 'x86_64'
         run: |
-          cat "$(cargo run -- dir log)/asst.log"
+          cargo test
+      - name: Coverage
+        if: matrix.arch == 'x86_64'
+        run: |
+          cargo tarpaulin --all-features --workspace --timeout 120 --out xml ${{ github.run_attempt == 1 && '--skip-clean' || '' }}
+      - name: Upload to codecov.io
+        if: matrix.arch == 'x86_64'
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
 
-  coverage:
-    name: Coverage
-    needs: build
+  features:
+    name: Build and Test (no default features)
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os:
           - ubuntu-latest
           - macos-latest
           - windows-latest
+        features:
+          - --features core_installer
+          - --features cli_installer
+          - ""
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Install Cargo tarpaulin
-        uses: taiki-e/install-action@v2
+      - name: Setup Rust
+        uses: ./.github/actions/setup
         with:
-          tool: cargo-tarpaulin
+          os: ${{ matrix.os }}
+          arch: x86_64
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
-      - name: Generate code coverage
-        run: |
-          cargo tarpaulin --all-features --workspace --timeout 120 --out xml ${{ github.run_attempt == 1 && '--skip-clean' || '' }}
-      - name: Upload to codecov.io
-        uses: codecov/codecov-action@v3
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: true
+          key: feature-${{ matrix.features }}
+      - name: Build
+        run: |
+          cargo build --package maa-cli --no-default-features ${{ matrix.features }} --locked
+      - name: Test
+        run: |
+          cargo test

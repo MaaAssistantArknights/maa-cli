@@ -1,3 +1,5 @@
+use crate::{debug, normal};
+
 use std::cmp::min;
 use std::fs::{remove_file, File};
 use std::io::Write;
@@ -151,7 +153,7 @@ pub async fn download<'a>(
     Ok(())
 }
 
-/// Try to download a file within a timeout.
+/// Try to download a file with given url and timeout.
 ///
 /// # Arguments
 /// * `client` - A reqwest client.
@@ -182,7 +184,6 @@ async fn try_download(client: &Client, url: &str, timeout: Duration) -> Result<u
 ///
 /// # Arguments
 /// * `client` - A reqwest client.
-/// * `fallback` - The fallback url.
 /// * `mirrors` - The mirrors to choose from.
 /// * `path` - The path to save the downloaded file.
 /// * `size` - The size of the file.
@@ -190,35 +191,45 @@ async fn try_download(client: &Client, url: &str, timeout: Duration) -> Result<u
 /// * `checker` - The optional checksum checker.
 pub async fn download_mirrors<'a>(
     client: &Client,
-    fallback: &str,
     mirrors: Vec<String>,
     path: &Path,
     size: u64,
     t: u64,
     checker: Option<Checker<'a>>,
 ) -> Result<()> {
+    // The first mirror is the default download link.
+    let mut download_link = &mirrors[0];
+
     if t == 0 {
-        println!("Skip speed test, downloading from fallback mirror...");
-        download(client, fallback, path, size, checker).await?;
+        normal!("Skip speed test, downloading from first link...");
+        debug!("First link:", download_link);
+        download(client, download_link, path, size, checker).await?;
         return Ok(());
     }
 
-    let duration = Duration::from_secs(t);
-    let mut fast_link = fallback;
+    let test_duration = Duration::from_secs(t);
     let mut largest: u64 = 0;
 
-    println!("Testing download speed...");
+    normal!("Testing download speed...");
     for link in mirrors.iter() {
-        if let Ok(downloaded) = try_download(client, link, duration).await {
+        debug!("Testing {}", link);
+        if let Ok(downloaded) = try_download(client, link, test_duration).await {
             if downloaded > largest {
+                debug!("Found faster link:", link);
+                debug!("Total bytes downloaded:", downloaded);
+                download_link = link;
                 largest = downloaded;
-                fast_link = link;
             }
         }
     }
 
-    println!("Downloading from fastest mirror...");
-    download(client, fast_link, path, size, checker).await?;
+    normal!("Downloading from fastest mirror...");
+    debug!("Fastest link:", download_link);
+    download(client, download_link, path, size, checker).await?;
 
     Ok(())
+}
+
+pub fn check_file_exists(path: &Path, size: u64) -> bool {
+    path.exists() && path.is_file() && path.metadata().is_ok_and(|metadata| metadata.len() == size)
 }

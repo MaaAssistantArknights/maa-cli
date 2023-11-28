@@ -14,8 +14,8 @@ use crate::{
         },
         Error as ConfigError, FindFile,
     },
-    dirs::{Dirs, Ensure},
-    installer::maa_core::{find_lib_dir, find_resource, MAA_CORE_NAME},
+    consts::MAA_CORE_LIB,
+    dirs::{self, Ensure},
     log::{set_level, LogLevel},
     {debug, normal, warning},
 };
@@ -92,7 +92,7 @@ pub struct CommonArgs {
     pub dry_run: bool,
 }
 
-pub fn run(dirs: &Dirs, task: impl Into<CLITask>, args: CommonArgs) -> Result<()> {
+pub fn run(task: impl Into<CLITask>, args: CommonArgs) -> Result<()> {
     if args.dry_run {
         unsafe { set_level(LogLevel::Debug) };
         debug!("Dryrun mode!");
@@ -104,9 +104,9 @@ pub fn run(dirs: &Dirs, task: impl Into<CLITask>, args: CommonArgs) -> Result<()
     }
 
     // Get directories
-    let state_dir = dirs.state().ensure()?;
-    let config_dir = dirs.config().ensure()?;
-    let base_resource_dir = find_resource(dirs).context("Failed to find resource!")?;
+    let state_dir = dirs::state().ensure()?;
+    let config_dir = dirs::config().ensure()?;
+    let base_resource_dir = dirs::find_resource().context("Failed to find resource!")?;
     debug!("State Directory:", state_dir.display());
     debug!("Config Directory:", config_dir.display());
     debug!("Base Resource Directory:", base_resource_dir.display());
@@ -336,7 +336,7 @@ pub fn run(dirs: &Dirs, task: impl Into<CLITask>, args: CommonArgs) -> Result<()
 
     /*----------------------- Start Assistant ----------------------*/
     // Load MaaCore
-    load_core(dirs);
+    load_core();
 
     // Set user directory (some debug info and cache will be stored here)
     // Must be called any other function (set_static_option, load_resource, etc.)
@@ -432,8 +432,8 @@ pub fn run(dirs: &Dirs, task: impl Into<CLITask>, args: CommonArgs) -> Result<()
     Ok(())
 }
 
-pub fn core_version<'a>(dirs: &Dirs) -> Result<&'a str> {
-    load_core(dirs);
+pub fn core_version<'a>() -> Result<&'a str> {
+    load_core();
 
     Ok(Assistant::get_version()?)
 }
@@ -552,8 +552,9 @@ fn process_resource_dir(path: PathBuf) -> Option<PathBuf> {
     }
 }
 
-fn load_core(dirs: &Dirs) {
-    if let Some(lib_dir) = find_lib_dir(dirs) {
+fn load_core() {
+    if let Some(lib_dir) = dirs::find_library() {
+        debug!("Loading MaaCore from:", lib_dir.display());
         // Set DLL directory on Windows
         #[cfg(target_os = "windows")]
         {
@@ -563,9 +564,10 @@ fn load_core(dirs: &Dirs) {
             let lib_dir_w: Vec<u16> = lib_dir.as_os_str().encode_wide().chain(Some(0)).collect();
             unsafe { SetDllDirectoryW(lib_dir_w.as_ptr()) };
         }
-        maa_sys::binding::load(lib_dir.join(MAA_CORE_NAME));
+        maa_sys::binding::load(lib_dir.join(MAA_CORE_LIB));
     } else {
-        maa_sys::binding::load(MAA_CORE_NAME);
+        debug!("MaaCore not found, trying to load from system library path");
+        maa_sys::binding::load(MAA_CORE_LIB);
     }
 }
 
@@ -605,6 +607,19 @@ mod tests {
             assert_eq!(ClientType::YoStarEN.resource(), Some("YoStarEN"));
             assert_eq!(ClientType::YoStarJP.resource(), Some("YoStarJP"));
             assert_eq!(ClientType::YoStarKR.resource(), Some("YoStarKR"));
+        }
+    }
+
+    mod run {
+        use std::env;
+
+        use super::*;
+
+        #[test]
+        fn run_version() {
+            if let Ok(version) = env::var("MAA_CORE_VERSION") {
+                assert_eq!(core_version().unwrap(), version);
+            }
         }
     }
 }
