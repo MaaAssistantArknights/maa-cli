@@ -11,16 +11,15 @@ on:
       - ".github/workflows/release.yml"
   workflow_dispatch:
     inputs:
-      beta:
-        description: Release as beta
-        default: true
+      channel:
+        description: The release channel
+        default: beta
         required: true
-        type: boolean
-      beta_number:
-        description: Beta number of this release
-        default: 1
-        required: true
-        type: number
+        type: choice
+        options:
+          - alpha
+          - beta
+          - stable
       publish:
         description: Whether to publish a new release
         default: false
@@ -221,12 +220,15 @@ jobs:
             echo "$checksum" > "$archive_name.sha256"
 
             # old version info (deprecated)
-            version_file="version/version.json"
-            yq -i -oj ".maa-cli.$target.version = \"$VERSION\"" "$version_file"
-            yq -i -oj ".maa-cli.$target.tag = \"$TAG\"" "$version_file"
-            yq -i -oj ".maa-cli.$target.name = \"$archive_name\"" "$version_file"
-            yq -i -oj ".maa-cli.$target.size = $size" $version_file
-            yq -i -oj ".maa-cli.$target.sha256sum = \"$checksum_hash\"" "$version_file"
+            # only update when a stable release is published
+            if [ "$CHANNEL" == "stable" ]; then
+              version_file="version/version.json"
+              yq -i -oj ".maa-cli.$target.version = \"$VERSION\"" "$version_file"
+              yq -i -oj ".maa-cli.$target.tag = \"$TAG\"" "$version_file"
+              yq -i -oj ".maa-cli.$target.name = \"$archive_name\"" "$version_file"
+              yq -i -oj ".maa-cli.$target.size = $size" $version_file
+              yq -i -oj ".maa-cli.$target.sha256sum = \"$checksum_hash\"" "$version_file"
+            fi
 
             # target dependent version info
             for version_file in "${version_files[@]}"; do
