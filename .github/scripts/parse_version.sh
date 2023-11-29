@@ -61,7 +61,7 @@ elif [ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]; then
   publish=$(yq -oy -r '.inputs.publish' "$GITHUB_EVENT_PATH")
 elif [ "$GITHUB_EVENT_NAME" == "push" ]; then
   ref_version=${GITHUB_REF#refs/tags/v}
-  if [ "$ref_version" == "$GITHUB_REF" ]; then
+  if [ "$ref_version" != "$CARGO_PKG_VERSION" ]; then
     echo "Version tag not matched, aborting"
     exit 1
   fi
