@@ -43,6 +43,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
+      compare_base: ${{ steps.version.outputs.compare_base }}
       commit: ${{ steps.version.outputs.commit }}
       channel: ${{ steps.version.outputs.channel }}
       prerelease: ${{ steps.version.outputs.channel != 'stable' }}
@@ -77,7 +78,16 @@ jobs:
         uses: orhun/git-cliff-action@v2
         with:
           config: cliff.toml
-          args: -vv ${{ fromJson(needs.meta.outputs.prerelease) && '-u' || '-l' }}
+          args: -vv ${{ needs.meta.outputs.compare_base }}..HEAD
+      - name: Preview Release Notes
+        if: ${{ !fromJson(needs.meta.outputs.publish) }}
+        run: |
+          {
+            echo '```markdown'
+            echo "${{ steps.git_cliff.outputs.content }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
 
   build:
     name: Build
@@ -258,10 +268,10 @@ jobs:
           {
             echo "Commit changes to version.json"
             echo '```diff'
-            git diff *.json
+            git diff ./*.json
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          git commit *.json -m "chore: bump version to v${{ needs.meta.outputs.version }}"
+          git commit ./*.json -m "chore: bump version to v${{ needs.meta.outputs.version }}"
           git push --verbose ${{ !fromJson(needs.meta.outputs.publish) && '--dry-run' || ''}}
 
   publish-homebrew:
