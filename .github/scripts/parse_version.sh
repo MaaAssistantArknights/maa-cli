@@ -33,8 +33,8 @@ elif [ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]; then
     published_version_prefix=${published_version%-*}
     published_version_suffix=${published_version#*-}
     if [ "$published_version_prefix" != "$CARGO_PKG_VERSION" ]; then
-      echo "Version prefix not matched (published: $published_version_prefix, expected: $CARGO_PKG_VERSION)"
-      exit 1
+      echo "Last published version is not the same as current version (published: $published_version)"
+      version="$CARGO_PKG_VERSION-$channel.1"
     elif [ "$published_version_suffix" == "$published_version" ]; then
       echo "Last published version is not a pre-release version (published: $published_version)"
       version="$CARGO_PKG_VERSION-$channel.1"
