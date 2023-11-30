@@ -179,6 +179,11 @@ jobs:
     needs: [meta, build, build-universal, release-note]
     permissions:
       contents: write
+    env:
+      CHANNEL: ${{ needs.meta.outputs.channel }}
+      VERSION: ${{ needs.meta.outputs.version }}
+      TAG: ${{ needs.meta.outputs.tag }}
+      COMMIT: ${{ needs.meta.outputs.commit }}
     steps:
       - name: Download Artifacts
         uses: actions/download-artifact@v3
@@ -189,11 +194,6 @@ jobs:
           path: version
       - name: Extract files, Generate checksums and Update version.json
         run: |
-          VERSION=${{ needs.meta.outputs.version }}
-          TAG=${{ needs.meta.outputs.tag }}
-          COMMIT=${{ needs.meta.outputs.commit }}
-          CHANNEL=${{ needs.meta.outputs.channel }}
-
           version_files=(
             version/alpha.json
           )
@@ -248,6 +248,18 @@ jobs:
               yq -i -oj ".details.assets.$target.sha256sum = \"$checksum_hash\"" "$version_file"
             done
           done
+      - name: Check existing release
+        if: ${{ fromJson(needs.meta.outputs.publish) }}
+        run: |
+          if [ "$TAG" == "nightly" ]; then
+            echo "Release as nightly, clear existing release and tag"
+            gh release delete "$TAG" --yes  --cleanup-tag
+          else
+            if gh release view "$TAG" &> /dev/null; then
+              echo "Release $TAG already exists, abort"
+              exit 1
+            fi
+          fi
       - name: Create Release
         uses: softprops/action-gh-release@v1
         if: ${{ fromJson(needs.meta.outputs.publish) }}
