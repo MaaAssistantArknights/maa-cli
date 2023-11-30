@@ -85,7 +85,7 @@ jobs:
         run: |
           {
             echo '```markdown'
-            echo "${{ steps.git_cliff.outputs.content }}"
+            cat ${{ steps.git_cliff.outputs.changelog }}
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
