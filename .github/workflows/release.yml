@@ -180,6 +180,8 @@ jobs:
     permissions:
       contents: write
     env:
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       CHANNEL: ${{ needs.meta.outputs.channel }}
       VERSION: ${{ needs.meta.outputs.version }}
       TAG: ${{ needs.meta.outputs.tag }}
@@ -251,11 +253,11 @@ jobs:
       - name: Check existing release
         if: ${{ fromJson(needs.meta.outputs.publish) }}
         run: |
-          if [ "$TAG" == "nightly" ]; then
-            echo "Release as nightly, clear existing release and tag"
-            gh release delete "$TAG" --yes  --cleanup-tag
-          else
-            if gh release view "$TAG" &> /dev/null; then
+          if gh release view "$TAG" &> /dev/null; then
+            if [ "$TAG" == "nightly" ]; then
+              echo "Release as nightly, clear existing release and tag"
+              gh release delete "$TAG" --yes  --cleanup-tag
+            else
               echo "Release $TAG already exists, abort"
               exit 1
             fi
