@@ -76,21 +76,12 @@ version=${version:-$CARGO_PKG_VERSION}
 tag=${tag:-v$version}
 publish=${publish:-true}
 
-if [ "$channel" != "beta" ]; then
-  # both stable and alpha channel are compared to the last stable release
-  compare_base=$(yq -oy -r ".details.commit" version/stable.json)
-else
-  # beta channel is compared to the last beta release
-  compare_base=$(yq -oy -r ".details.commit" version/beta.json)
-fi
-
 echo "Release version $version with tag $tag to channel $channel (publish: $publish)"
 {
   echo "commit=$commit_sha"
   echo "channel=$channel"
   echo "version=$version"
   echo "tag=$tag"
-  echo "compare_base=$compare_base"
   echo "publish=$publish"
   echo "skip=false"
 } >> "$GITHUB_OUTPUT"
