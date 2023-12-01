@@ -19,7 +19,7 @@ release_alpha() {
 
 release_beta() {
   channel="beta"
-  published_version=$(yq -oy -r ".details.version" version/$channel.json)
+  published_version=$(yq -oy -r ".version" version/$channel.json)
   published_version_prefix=${published_version%-*}
   published_version_suffix=${published_version#*-}
   if [ "$published_version_prefix" != "$CARGO_PKG_VERSION" ]; then
