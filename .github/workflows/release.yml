@@ -124,7 +124,7 @@ jobs:
         run: |
           sed -i "" '1,6 s/^version = .*/version = "${{ needs.meta.outputs.version }}"/' Cargo.toml
           git diff Cargo.toml
-      - name: Patch Cargo.tom (GNU sed)
+      - name: Patch Cargo.toml (GNU sed)
         if: ${{ !startsWith(matrix.os, 'macos') }}
         working-directory: maa-cli
         run: |
