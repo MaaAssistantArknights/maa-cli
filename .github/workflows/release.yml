@@ -118,16 +118,18 @@ jobs:
         with:
           os: ${{ matrix.os }}
           arch: ${{ matrix.arch }}
-      - name: Patch Cargo.toml (macOS only)
+      - name: Patch Cargo.toml (BSD sed)
         if: ${{ startsWith(matrix.os, 'macos') }}
         working-directory: maa-cli
         run: |
           sed -i "" '1,6 s/^version = .*/version = "${{ needs.meta.outputs.version }}"/' Cargo.toml
+          git diff Cargo.toml
       - name: Patch Cargo.tom (GNU sed)
         if: ${{ !startsWith(matrix.os, 'macos') }}
         working-directory: maa-cli
         run: |
           sed -i '1,6 s/^version = .*/version = "${{ needs.meta.outputs.version }}"/' Cargo.toml
+          git diff Cargo.toml
       - name: Build
         env:
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 1
