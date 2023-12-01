@@ -1,8 +1,6 @@
 name: Publish AUR Package
 
 on:
-  release:
-    types: [published]
   workflow_call:
     inputs:
       pkgver:
