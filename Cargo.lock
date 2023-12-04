@@ -755,6 +755,7 @@ version = "0.2.0"
 dependencies = [
  "directories",
  "libloading",
+ "serde",
 ]
 
 [[package]]

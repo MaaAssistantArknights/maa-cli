@@ -61,6 +61,7 @@ pub struct Dirs {
     config: PathBuf,
     cache: PathBuf,
     resource: PathBuf,
+    hot_update: PathBuf,
     state: PathBuf,
     log: PathBuf,
 }
@@ -76,39 +77,31 @@ impl Dirs {
             config: get_config_dir(&proj),
             library: data_dir.join("lib"),
             resource: data_dir.join("resource"),
+            hot_update: data_dir.join("MaaResource"),
             state: state_dir.clone(),
             log: state_dir.join("debug"),
         }
     }
 
+    /// Get data directory.
     pub fn data(&self) -> &Path {
         &self.data
     }
 
+    /// Get library directory.
     pub fn library(&self) -> &Path {
         &self.library
     }
 
-    pub fn config(&self) -> &Path {
-        &self.config
-    }
-
-    pub fn cache(&self) -> &Path {
-        &self.cache
-    }
-
-    pub fn resource(&self) -> &Path {
-        &self.resource
-    }
-
-    pub fn state(&self) -> &Path {
-        &self.state
-    }
-
-    pub fn log(&self) -> &Path {
-        &self.log
-    }
-
+    /// Find the library directory.
+    ///
+    /// By default, the library directory is the `lib` directory in the data directory.
+    /// If the library `MaaCore` is not found in the default library directory,
+    /// Try to find it in the directory relative to the executable file.
+    /// First, try to find the `MaaCore` in the same directory as the executable file.
+    /// Then, assume the executable file is in the `bin` directory,
+    /// try to find the `MaaCore` in the `lib` directory in the parent directory of the executable file.
+    /// If the executable is a symbolic link, will try to find the `MaaCore` both in the symbolic link and the link target.
     pub fn find_library(&self, exe_path: &Path) -> Option<PathBuf> {
         if self.library.join(MAA_CORE_LIB).exists() {
             return Some(self.library.clone());
@@ -130,6 +123,59 @@ impl Dirs {
         })
     }
 
+    /// Get config directory.
+    pub fn config(&self) -> &Path {
+        &self.config
+    }
+
+    /// Find a file in the config directory.
+    ///
+    /// If the path is absolute, return None.
+    /// Otherwise, return the path in the config directory.
+    /// The `sub_dir` is the sub directory of the config directory.
+    /// If `sub_dir` is `None`, the path is relative to the config directory.
+    /// Otherwise, the path is relative to the `sub_dir` directory.
+    pub fn config_path<P: AsRef<Path>, D: AsRef<Path>>(
+        &self,
+        path: P,
+        sub_dir: Option<D>,
+    ) -> Option<PathBuf> {
+        let path = path.as_ref();
+        if path.is_absolute() {
+            None
+        } else {
+            let mut result = self.config.to_path_buf();
+            if let Some(sub_dir) = sub_dir {
+                result.push(sub_dir);
+            }
+            result.push(path);
+            Some(result)
+        }
+    }
+
+    /// Get cache directory.
+    pub fn cache(&self) -> &Path {
+        &self.cache
+    }
+
+    /// Get resource directory.
+    pub fn resource(&self) -> &Path {
+        &self.resource
+    }
+
+    /// Find the resource directory.
+    ///
+    /// By default, the resource directory is the `resource` directory in the data directory.
+    /// If the resource directory is not found in the default resource directory,
+    /// Try to find it in the directory relative to the executable file.
+    /// First, try to find the resource directory in the same directory as the executable file.
+    /// Then, assume the executable file is in the `bin` directory,
+    /// try to find the resource directory in the `share/maa` directory in the parent directory of the executable file.
+    /// If the executable is a symbolic link, will try to find the resource directory both in the symbolic link and the link target.
+    ///
+    /// Additionally, if maa is compiled with `MAA_EXTRA_SHARE_NAME` environment variable,
+    /// try to find the resource directory in the `share/$MAA_EXTRA_SHARE_NAME` directory.
+    /// This is used to support the situation that MaaCore is installed by other package manager.
     pub fn find_resource(&self, exe_path: &Path) -> Option<PathBuf> {
         if self.resource.exists() {
             return Some(self.resource.clone());
@@ -156,6 +202,21 @@ impl Dirs {
             None
         })
     }
+
+    /// Get hot update resource directory.
+    pub fn hot_update(&self) -> &Path {
+        &self.hot_update
+    }
+
+    /// Get state directory.
+    pub fn state(&self) -> &Path {
+        &self.state
+    }
+
+    /// Get log directory.
+    pub fn log(&self) -> &Path {
+        &self.log
+    }
 }
 
 lazy_static! {
@@ -170,8 +231,16 @@ pub fn library() -> &'static Path {
     DIRS.library()
 }
 
+pub fn find_library() -> Option<PathBuf> {
+    DIRS.find_library(&current_exe().ok()?)
+}
+
 pub fn config() -> &'static Path {
     DIRS.config()
+}
+
+pub fn config_path<P: AsRef<Path>, D: AsRef<Path>>(path: P, sub_dir: Option<D>) -> Option<PathBuf> {
+    DIRS.config_path(path, sub_dir)
 }
 
 pub fn cache() -> &'static Path {
@@ -182,20 +251,20 @@ pub fn resource() -> &'static Path {
     DIRS.resource()
 }
 
+pub fn find_resource() -> Option<PathBuf> {
+    DIRS.find_resource(&current_exe().ok()?)
+}
+
+pub fn hot_update() -> &'static Path {
+    DIRS.hot_update()
+}
+
 pub fn state() -> &'static Path {
     DIRS.state()
 }
 
 pub fn log() -> &'static Path {
     DIRS.log()
-}
-
-pub fn find_library() -> Option<PathBuf> {
-    DIRS.find_library(&current_exe().ok()?)
-}
-
-pub fn find_resource() -> Option<PathBuf> {
-    DIRS.find_resource(&current_exe().ok()?)
 }
 
 /// Similar to `finder(exe_path.parent()?)`, but try to canonicalize the path first.
@@ -250,6 +319,22 @@ impl Ensure for &Path {
         create_dir(self)?;
         Ok(self)
     }
+}
+
+/// Similar to `globpath` of vim
+pub fn global_path<I, D>(base_dirs: D, path: &Path) -> Vec<PathBuf>
+where
+    I: AsRef<Path>,
+    D: IntoIterator<Item = I>,
+{
+    let mut paths = Vec::new();
+    for base_dir in base_dirs {
+        let full_path = base_dir.as_ref().join(path);
+        if full_path.exists() {
+            paths.push(full_path);
+        }
+    }
+    paths
 }
 
 #[cfg(test)]
@@ -462,7 +547,22 @@ mod tests {
             } else if cfg!(target_os = "linux") {
                 assert_eq!(TEST_DIRS.config(), home_dir.join(".config/maa"));
             }
+            assert_eq!(
+                TEST_DIRS.config_path::<&str, &str>("foo", None).unwrap(),
+                TEST_DIRS.config().join("foo")
+            );
+            assert_eq!(
+                TEST_DIRS.config_path("foo", Some("bar")).unwrap(),
+                TEST_DIRS.config().join("bar").join("foo")
+            );
+            assert_eq!(TEST_DIRS.config_path::<&str, &str>("/tmp", None), None);
+            assert_eq!(TEST_DIRS.config_path("/tmp", Some("bar")), None);
+
             assert_eq!(config(), TEST_DIRS.config());
+            assert_eq!(
+                config_path("foo", Some("bar")).unwrap(),
+                config().join("bar").join("foo")
+            );
 
             env::set_var("XDG_CONFIG_HOME", "/xdg");
             let dirs = Dirs::new(project.clone());

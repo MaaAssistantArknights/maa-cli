@@ -505,6 +505,7 @@ mod tests {
             };
         }
 
+        #[macro_export]
         macro_rules! assert_matches {
             ($value:expr, $pattern:pat) => {
                 assert!(matches!($value, $pattern));

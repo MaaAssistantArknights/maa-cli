@@ -21,6 +21,7 @@ use crate::installer::maa_core;
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::{generate, Shell};
+use config::task::value::input::enable_batch_mode;
 
 #[derive(Parser)]
 #[command(name = "maa", author, version)]
@@ -40,6 +41,14 @@ struct CLI {
     /// See documentation of log level for more information.
     #[arg(short, long, verbatim_doc_comment, action = clap::ArgAction::Count, global = true)]
     quiet: u8,
+    /// Enable touch mode
+    ///
+    /// If there are some input parameters in the task file,
+    /// some prompts will be displayed to ask for input.
+    /// In batch mode, the prompts will be skipped,
+    /// and parameters will be set to default values.
+    #[arg(long, verbatim_doc_comment, global = true)]
+    pub batch: bool,
 }
 
 #[derive(Subcommand)]
@@ -205,11 +214,15 @@ pub enum Dir {
 fn main() -> Result<()> {
     let cli = CLI::parse();
 
-    let subcommand = cli.command;
-
-    unsafe {
-        set_level(level() as u8 + cli.verbose - cli.quiet);
+    let level_diff = cli.verbose - cli.quiet;
+    if level_diff != 0 {
+        unsafe { set_level(level() as u8 + level_diff) };
     }
+    if cli.batch {
+        unsafe { enable_batch_mode() };
+    }
+
+    let subcommand = cli.command;
 
     match subcommand {
         #[cfg(feature = "core_installer")]
@@ -313,9 +326,23 @@ mod test {
         fn log_level() {
             assert!(matches!(CLI::parse_from(["maa", "-v", "list"]).verbose, 1));
             assert!(matches!(CLI::parse_from(["maa", "list", "-v"]).verbose, 1));
+            assert!(matches!(
+                CLI::parse_from(["maa", "list", "--verbose"]).verbose,
+                1
+            ));
             assert!(matches!(CLI::parse_from(["maa", "list", "-vv"]).verbose, 2));
+
             assert!(matches!(CLI::parse_from(["maa", "list", "-q"]).quiet, 1));
+            assert!(matches!(
+                CLI::parse_from(["maa", "list", "--quiet"]).quiet,
+                1
+            ));
             assert!(matches!(CLI::parse_from(["maa", "list", "-qq"]).quiet, 2));
+
+            assert!(matches!(
+                CLI::parse_from(["maa", "list", "--batch"]).batch,
+                true
+            ));
         }
 
         #[cfg(feature = "core_installer")]
@@ -501,7 +528,6 @@ mod test {
                     common: run::CommonArgs {
                         addr: None,
                         user_resource: false,
-                        batch: false,
                         dry_run: false,
                     },
                 } if task == "task"
@@ -536,18 +562,6 @@ mod test {
                     task,
                     common: run::CommonArgs {
                         user_resource: true,
-                        ..
-                    },
-                    ..
-                } if task == "task"
-            ));
-
-            assert!(matches!(
-                CLI::parse_from(["maa", "run", "task", "--batch"]).command,
-                SubCommand::Run {
-                    task,
-                    common: run::CommonArgs {
-                        batch: true,
                         ..
                     },
                     ..

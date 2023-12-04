@@ -1,16 +1,42 @@
 user_resource = true
 resources = ["platform_diff/iOS"]
 
+# connection options for MAA Core
+
+# connect by ADB
 [connection]
-type = "ADB"
-adb_path = "adb"
-device = "emulator-5554"
-config = "CompatMac"
+type = "ADB"             # connection type
+adb_path = "adb"         # adb executable path
+device = "emulator-5554" # ADB device serial number (see `adb help` for more details)
+config = "CompatMac"     # connect config name
 
+# can also connect by PlayTools
+# [connection]
+# type = "PlayTools"         # connection type
+# address = "localhost:1717" # PlayTools address
+# config = "CompatMac"       # connect config name
+
+[resource]
+# base resource dirs, global resources and platform resources are subdirs of them
+# don't set this option to use default resource dirs
+# it's highly recommended to don't set this option, unless you know what you are doing
+resource_base_dirs = ["/usr/local/share/maa"]
+# the additional resources for non-cn clients
+global_resources = ["global/YostarEN"]
+# the additional resources for different platforms, only iOS is available now
+# all base resource is for android, so only iOS need to be specified here
+platform_resources = ["platform_diff/iOS"]
+# load resource from user config dir, load at last to override all other resources
+user_resource = true
+
+# static options for MAA Core
+# See `https://maa.plus/docs/3.1-集成文档.html#asstsetstaticoption` for more details
 [static_options]
-cpu_ocr = true
-# gpu_ocr = 1 # we can't use gpu_ocr on CI, so this option is commented out
+cpu_ocr = false # set to true to use cpu ocr, if you want to use gpu ocr, set it to false
+gpu_ocr = 1     # set the gpu_id to use gpu ocr (not set by default)
 
+# instance options for MAA Core
+# See `https://maa.plus/docs/3.1-集成文档.html#asstsetinstanceoption` for more details
 [instance_options]
 touch_mode = "MAATouch"
 deployment_with_pause = false

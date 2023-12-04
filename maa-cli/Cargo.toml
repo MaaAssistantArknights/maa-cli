@@ -19,7 +19,7 @@ name = "maa"
 path = "src/main.rs"
 
 [dependencies]
-maa-sys = { path = "../maa-sys", features = ["runtime"] }
+maa-sys = { path = "../maa-sys", features = ["runtime", "serde"] }
 
 directories = "5"
 paste = "1"

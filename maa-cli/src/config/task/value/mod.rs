@@ -180,6 +180,10 @@ impl Value {
     ///
     /// Get value of key by calling `get`. If the key is not exist, the default value will be returned.
     /// Otherwise the value will be converted to the type of the default value.
+    ///
+    /// # Errors
+    ///
+    /// If the value is not convertible to the type of the default value, the error will be returned.
     pub fn get_or<'a, T>(&'a self, key: &str, default: T) -> Result<T, T::Error>
     where
         T: TryFrom<&'a Self>,
@@ -190,6 +194,12 @@ impl Value {
         }
     }
 
+    /// Insert a key-value pair into the object
+    ///
+    /// If the value is an object, the key-value pair will be inserted into the object.
+    /// Otherwise, the panic will be raised.
+    /// If the key is already exist, the value will be replaced,
+    /// otherwise the key-value pair will be inserted.
     pub fn insert(&mut self, key: impl Into<String>, value: impl Into<Self>) {
         if let Self::Object(map) = self {
             map.insert(key.into(), value.into());

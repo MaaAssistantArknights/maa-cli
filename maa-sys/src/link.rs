@@ -65,6 +65,12 @@ macro_rules! link {
             });
         }
 
+        pub fn loaded() -> bool {
+            SHARED_LIBRARY.with(|lib| {
+                matches!(*lib.borrow(), None)
+            })
+        }
+
         $(
             /// # Safety
             /// This function is unsafe because it calls a function from a shared library.
