@@ -1,11 +1,12 @@
-use super::run;
+use super::{run, CommonArgs};
 use crate::{
     config::task::{
-        default_variants, task_type::TaskType, value::input::Input, Strategy, Task, TaskList, Value,
+        task_type::TaskType,
+        value::input::{BoolInput, Input},
+        Task, TaskConfig, Value,
     },
     debug,
-    dirs::Dirs,
-    installer::maa_core::find_resource,
+    dirs::{self, find_resource},
     normal, object, warning,
 };
 use anyhow::Result;
@@ -21,14 +22,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub fn copilot(
-    dirs: &Dirs,
-    uri_opt: Option<String>,
-    paste: bool,
-    addr: Option<String>,
-    user_resource: bool,
-    batch: bool,
-) -> Result<()> {
+pub fn copilot(uri_opt: Option<String>, paste: bool, common: CommonArgs) -> Result<()> {
     let uri = if paste {
         clipboard_reader()?
     } else {
@@ -36,7 +30,7 @@ pub fn copilot(
     };
     debug!("uri: ", uri);
     let jpr = "JSON Prase Error";
-    let results = json_reader(&uri, dirs)?;
+    let results = json_reader(&uri)?;
     let value = results.0;
 
     // Determine type of stage
@@ -46,7 +40,7 @@ pub fn copilot(
     };
 
     // Print stage info
-    let mut stage_dir = find_resource(dirs).context("Failed to find resource!")?;
+    let mut stage_dir = find_resource().context("Failed to find resource!")?;
     stage_dir.push("Arknights-Tile-Pos");
     if task_type == "Copilot" {
         let stage_code_name = value["stage_name"].as_str().context(jpr)?;
@@ -89,44 +83,38 @@ pub fn copilot(
     normal!("Operator lists:\n", table.to_string());
 
     // Get input of user
-    // Note: Waiting for the new input type of bool to be completed
-    let formation: Input<bool> =
-        Input::new(Some(true), Some("whether to quick build(true/false):"));
+    let formation = BoolInput::new(Some(true), Some("self-formation?"));
     let loop_times: Input<i64> = Input::new(Some(1), Some("loop times:"));
 
     // Append task
-    let mut task_list = Vec::new();
+    let mut task_list = TaskConfig::new();
     let json_path_str = results.1.display().to_string();
     if task_type == "Copilot" {
-        task_list.push(Task::new(
+        task_list.push(Task::new_with_default(
             TaskType::Copilot,
             object!(
                 "filename" => json_path_str,
                 "formation" => formation,
             ),
-            Strategy::default(),
-            default_variants(),
         ));
+        task_list.push(Task::new_with_default(TaskType::Copilot, object!()));
     } else {
-        task_list.push(Task::new(
+        task_list.push(Task::new_with_default(
             TaskType::SSSCopilot,
             object!(
                 "filename" => json_path_str,
                 "loop_times" => loop_times,
             ),
-            Strategy::default(),
-            default_variants(),
         ));
     };
 
-    let task = TaskList { tasks: task_list };
-    run(dirs, task, addr, user_resource, batch, false)
+    run(task_list, common)
 }
 
-fn json_reader(uri: &String, dirs: &Dirs) -> Result<(JsonValue, PathBuf)> {
+fn json_reader(uri: &String) -> Result<(JsonValue, PathBuf)> {
     let api = "https://prts.maa.plus/copilot/get/";
     let jpr = "JSON Prase Error";
-    let cache_dir = dirs.cache().display().to_string();
+    let cache_dir = dirs::cache().display().to_string();
 
     let uri_ = {
         let trimed = uri.trim();
