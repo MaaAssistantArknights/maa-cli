@@ -142,6 +142,7 @@ enum SubCommand {
         /// such as "maa://12345" or "/your/json/path.json".
         uri: Option<String>,
         #[arg(short, long)]
+        /// Allow maa to read the clipboard
         paste: bool,
         #[command(flatten)]
         common: run::CommonArgs,
