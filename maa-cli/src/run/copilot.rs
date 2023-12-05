@@ -11,6 +11,7 @@ use crate::{
 use anyhow::Result;
 use anyhow::{anyhow, Error};
 use anyhow::{Context, Ok};
+use clipboard::{ClipboardContext, ClipboardProvider};
 use prettytable::{format, row, Table};
 use reqwest::blocking::Client;
 use serde_json::{from_str, Value as JsonValue};
@@ -22,13 +23,19 @@ use std::{
 
 pub fn copilot(
     dirs: &Dirs,
-    uri: String,
+    uri_opt: Option<String>,
+    paste: bool,
     addr: Option<String>,
     user_resource: bool,
     batch: bool,
 ) -> Result<()> {
+    let uri = if paste {
+        clipboard_reader()?
+    } else {
+        uri_opt.ok_or_else(|| anyhow!("No input"))?
+    };
+    debug!("uri: ", uri);
     let jpr = "JSON Prase Error";
-
     let results = json_reader(&uri, dirs)?;
     let value = results.0;
 
@@ -38,14 +45,16 @@ pub fn copilot(
         _ => "Copilot",
     };
 
-    // Print stage and operators info
+    // Print stage info
     let mut stage_dir = find_resource(dirs).context("Failed to find resource!")?;
     stage_dir.push("Arknights-Tile-Pos");
     if task_type == "Copilot" {
         let stage_code_name = value["stage_name"].as_str().context(jpr)?;
         let result = find_json(stage_code_name, stage_dir).unwrap_or_else(|_| {
-            warning!("Your Maa version might be out of date");
-            let json_string = r#"{ "code" : " ", "name" : "unknown" }"#;
+            warning!(
+                "Unable to find target map. This may be because your Maacore version is too old."
+            );
+            let json_string = r#"{ "code" : " ", "name" : "Unknown" }"#;
             from_str(json_string).unwrap()
         });
         let stage_name = format!(
@@ -86,7 +95,7 @@ pub fn copilot(
     let loop_times: Input<i64> = Input::new(Some(1), Some("loop times:"));
 
     // Append task
-    let mut task_list: Vec<Task> = Vec::new();
+    let mut task_list = Vec::new();
     let json_path_str = results.1.display().to_string();
     if task_type == "Copilot" {
         task_list.push(Task::new(
@@ -129,7 +138,10 @@ fn json_reader(uri: &String, dirs: &Dirs) -> Result<(JsonValue, PathBuf)> {
             return Err(anyhow!("Code Invalid"));
         }
     };
+
     if !uri_.1 {
+        // Load via server's API.
+
         // Cache decision
         match find_json(uri_.0, PathBuf::from(&cache_dir)) {
             Result::Ok(value) => {
@@ -140,10 +152,9 @@ fn json_reader(uri: &String, dirs: &Dirs) -> Result<(JsonValue, PathBuf)> {
                 debug!("Cache miss")
             }
         };
-        
+
         let url = api.to_owned() + uri_.0;
 
-        // Visit the API to obtain the data of homework.
         let client = Client::new();
         let response = client.get(url).send().context("Request Error")?;
         let json: JsonValue = response.json().context(jpr)?;
@@ -162,28 +173,36 @@ fn json_reader(uri: &String, dirs: &Dirs) -> Result<(JsonValue, PathBuf)> {
             Err(anyhow!("Request Error"))
         }
     } else {
+        // Load via file.
         let content = fs::read_to_string(uri_.0)?;
         let json: JsonValue = serde_json::from_str(&content)?;
         Ok((json, PathBuf::from(uri_.0)))
     }
 }
 
-fn find_json(stage_code_name: &str, mut stage_dir: PathBuf) -> Result<JsonValue> {
-    let json_file_name = fs::read_dir(stage_dir.clone())
+fn find_json(json_file_name: &str, mut dir_path: PathBuf) -> Result<JsonValue> {
+    let json_file_name = fs::read_dir(dir_path.clone())
         .map_err(Error::msg)?
         .filter_map(|entry| {
             entry
                 .ok()
                 .and_then(|e| e.file_name().to_str().map(String::from))
         })
-        .find(|file_name| file_name.starts_with(stage_code_name))
+        .find(|file_name| file_name.starts_with(json_file_name))
         .ok_or(anyhow!("File not found"))?;
 
-    stage_dir.push(json_file_name);
+    dir_path.push(json_file_name);
 
-    let file_result = File::open(stage_dir).map_err(Error::msg)?;
+    let file_result = File::open(dir_path).map_err(Error::msg)?;
     let reader = BufReader::new(file_result);
     let json_value: JsonValue = serde_json::from_reader(reader).map_err(Error::msg)?;
 
     Ok(json_value)
+}
+
+fn clipboard_reader() -> Result<String> {
+    let mut ctx: ClipboardContext = ClipboardProvider::new().map_err(|err| anyhow!("{}", err))?;
+    let content = ctx.get_contents().map_err(|err| anyhow!("{}", err))?;
+
+    Ok(content)
 }

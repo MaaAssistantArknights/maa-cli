@@ -119,8 +119,51 @@ enum SubCommand {
         /// The task file must be in the TOML, YAML or JSON format.
         #[arg(verbatim_doc_comment)]
         task: String,
-        #[command(flatten)]
-        common: run::CommonArgs,
+        /// ADB serial number of device or MaaTools address set in PlayCover
+        ///
+        /// By default, MaaCore connects to game with ADB,
+        /// and this parameter is the serial number of the device
+        /// (default to `emulator-5554` if not specified here and not set in config file).
+        /// And if you want to use PlayCover,
+        /// you need to set the connection type to PlayCover in the config file
+        /// and then you can specify the address of MaaTools here.
+        #[arg(short, long, verbatim_doc_comment)]
+        addr: Option<String>,
+        /// Load resources from the config directory
+        ///
+        /// By default, MaaCore loads resources from the resource installed with MaaCore.
+        /// If you want to modify some configuration of MaaCore or you want to use your own resources,
+        /// you can use this option to load resources from the `resource` directory,
+        /// which is a subdirectory of the config directory.
+        ///
+        /// This option can also be enabled by setting the value of the key `user_resource` to true
+        /// in the asst configure file `$MAA_CONFIG_DIR/asst.toml`.
+        ///
+        /// Note:
+        /// CLI will load resources shipped with MaaCore firstly,
+        /// then some client specific or platform specific when needed,
+        /// lastly, it will load resources from the config directory.
+        /// MaaCore will overwrite the resources loaded before,
+        /// if there are some resources with the same name.
+        /// Use at your own risk!
+        #[arg(long, verbatim_doc_comment)]
+        user_resource: bool,
+        /// Run tasks in batch mode
+        ///
+        /// If there are some input parameters in the task file,
+        /// some prompts will be displayed to ask for input.
+        /// In batch mode, the prompts will be skipped,
+        /// and parameters will be set to default values.
+        #[arg(short, long, verbatim_doc_comment)]
+        batch: bool,
+        /// Parse the your config but do not connect to the game
+        ///
+        /// This option is useful when you want to check your config file.
+        /// It will parse your config file and set the log level to debug.
+        /// If there are some errors in your config file,
+        /// it will print the error message and exit.
+        #[arg(long, verbatim_doc_comment)]
+        dry_run: bool,
     },
     /// Run fight task
     Fight {
@@ -139,8 +182,9 @@ enum SubCommand {
     Complete { shell: Shell },
     /// Maa copilot for auto-combat
     Copilot {
-        /// The code should be copied in "https://prts.plus", such as "maa://12345".
-        link: String,
+        /// A code copied from "https://prts.plus" or a json file,
+        /// such as "maa://12345" or "/your/json/path.json".
+        uri: String,
         #[arg(short, long)]
         addr: Option<String>,
         #[arg(long)]
@@ -309,11 +353,11 @@ fn main() -> Result<()> {
             generate(shell, &mut CLI::command(), "maa", &mut std::io::stdout());
         }
         SubCommand::Copilot {
-            link,
+            uri,
             addr,
             user_resource,
             batch,
-        } => run::copilot(&proj_dirs, link, addr, user_resource, batch, false)?,
+        } => copilot(&proj_dirs, uri, addr, user_resource, batch)?,
     }
 
     Ok(())
@@ -618,7 +662,7 @@ mod test {
             assert!(matches!(
                 CLI::parse_from(["maa", "copilot", "maa://23236"]).command,
                 SubCommand::Copilot {
-                    link,
+                    uri,
                     addr: None,
                     user_resource: false,
                     batch: false,
