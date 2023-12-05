@@ -142,7 +142,7 @@ enum SubCommand {
         /// such as "maa://12345" or "/your/json/path.json".
         uri: Option<String>,
         #[arg(short, long)]
-        prase: bool,
+        paste: bool,
         #[command(flatten)]
         common: run::CommonArgs,
     },
@@ -306,7 +306,7 @@ fn main() -> Result<()> {
         SubCommand::Complete { shell } => {
             generate(shell, &mut CLI::command(), "maa", &mut std::io::stdout());
         }
-        SubCommand::Copilot { uri, prase, common } => run::copilot(uri, prase, common)?,
+        SubCommand::Copilot { uri, paste, common } => run::copilot(uri, paste, common)?,
     }
 
     Ok(())
