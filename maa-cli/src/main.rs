@@ -140,10 +140,7 @@ enum SubCommand {
     Copilot {
         /// A code copied from "https://prts.plus" or a json file,
         /// such as "maa://12345" or "/your/json/path.json".
-        uri: Option<String>,
-        #[arg(short, long)]
-        /// Allow maa to read the clipboard
-        paste: bool,
+        uri: String,
         #[command(flatten)]
         common: run::CommonArgs,
     },
@@ -307,7 +304,7 @@ fn main() -> Result<()> {
         SubCommand::Complete { shell } => {
             generate(shell, &mut CLI::command(), "maa", &mut std::io::stdout());
         }
-        SubCommand::Copilot { uri, paste, common } => run::copilot(uri, paste, common)?,
+        SubCommand::Copilot { uri, common } => run::copilot(uri, common)?,
     }
 
     Ok(())

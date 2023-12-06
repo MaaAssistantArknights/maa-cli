@@ -12,7 +12,6 @@ use crate::{
 use anyhow::Result;
 use anyhow::{anyhow, Error};
 use anyhow::{Context, Ok};
-use clipboard::{ClipboardContext, ClipboardProvider};
 use prettytable::{format, row, Table};
 use reqwest::blocking::Client;
 use serde_json::{from_str, Value as JsonValue};
@@ -22,12 +21,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub fn copilot(uri_opt: Option<String>, paste: bool, common: CommonArgs) -> Result<()> {
-    let uri = if paste {
-        clipboard_reader()?
-    } else {
-        uri_opt.ok_or_else(|| anyhow!("No input"))?
-    };
+pub fn copilot(uri: String, common: CommonArgs) -> Result<()> {
     debug!("uri: ", uri);
     let jpr = "JSON Prase Error";
     let results = json_reader(&uri)?;
@@ -186,11 +180,4 @@ fn find_json(json_file_name: &str, mut dir_path: PathBuf) -> Result<JsonValue> {
     let json_value: JsonValue = serde_json::from_reader(reader).map_err(Error::msg)?;
 
     Ok(json_value)
-}
-
-fn clipboard_reader() -> Result<String> {
-    let mut ctx: ClipboardContext = ClipboardProvider::new().map_err(|err| anyhow!("{}", err))?;
-    let content = ctx.get_contents().map_err(|err| anyhow!("{}", err))?;
-
-    Ok(content)
 }
