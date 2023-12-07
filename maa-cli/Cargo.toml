@@ -36,6 +36,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9.25"
 
+prettytable = { version = "0.10.0", default-features = false }
+
 # Dependencies used to donwload files
 indicatif = { version = "0.17.7" }
 futures-util = { version = "0.3.28" }
@@ -45,7 +47,6 @@ semver = { version = "1.0.19", features = ["serde"] }
 # Dependencies used to extract files
 flate2 = { version = "1", optional = true }
 tar = { version = "0.4.40", optional = true }
-prettytable = "0.10.0"
 
 [dependencies.chrono]
 version = "0.4.31"
