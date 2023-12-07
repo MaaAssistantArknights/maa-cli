@@ -9,9 +9,7 @@ use crate::{
     dirs::{self, find_resource},
     normal, object, warning,
 };
-use anyhow::Result;
-use anyhow::{anyhow, Error};
-use anyhow::{Context, Ok};
+use anyhow::{anyhow, bail, Context, Error, Result};
 use prettytable::{format, row, Table};
 use reqwest::blocking::Client;
 use serde_json::{from_str, Value as JsonValue};
@@ -21,9 +19,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+const API: &str = "https://prts.maa.plus/copilot/get/";
+const JSON_ERR: &str = "JSON Parse Error";
+
 pub fn copilot(uri: String, common: CommonArgs) -> Result<()> {
-    debug!("uri: ", uri);
-    let jpr = "JSON Prase Error";
     let results = json_reader(&uri)?;
     let value = results.0;
 
@@ -37,7 +36,7 @@ pub fn copilot(uri: String, common: CommonArgs) -> Result<()> {
     let mut stage_dir = find_resource().context("Failed to find resource!")?;
     stage_dir.push("Arknights-Tile-Pos");
     if task_type == "Copilot" {
-        let stage_code_name = value["stage_name"].as_str().context(jpr)?;
+        let stage_code_name = value["stage_name"].as_str().context(JSON_ERR)?;
         let result = find_json(stage_code_name, stage_dir).unwrap_or_else(|_| {
             warning!(
                 "Unable to find target map. This may be because your Maacore version is too old."
@@ -47,30 +46,30 @@ pub fn copilot(uri: String, common: CommonArgs) -> Result<()> {
         });
         let stage_name = format!(
             "{} {}",
-            result["code"].as_str().context(jpr)?,
-            result["name"].as_str().context(jpr)?
+            result["code"].as_str().context(JSON_ERR)?,
+            result["name"].as_str().context(JSON_ERR)?
         );
         normal!("Stage info:\n", stage_name);
     } else {
-        let stage_name = value["stage_name"].as_str().context(jpr)?;
+        let stage_name = value["stage_name"].as_str().context(JSON_ERR)?;
         normal!("Stage info:\n", stage_name);
     }
 
     // Print operators info
-    let opers = value["opers"].as_array().context(jpr)?;
-    let groups = value["groups"].as_array().context(jpr)?;
+    let opers = value["opers"].as_array().context(JSON_ERR)?;
+    let groups = value["groups"].as_array().context(JSON_ERR)?;
 
     let mut table = Table::new();
     table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
     table.set_titles(row!["NAME", "SKILL"]);
     for operator in opers {
-        let name = operator["name"].as_str().context(jpr)?;
-        let skill = operator["skill"].as_u64().context(jpr)?;
+        let name = operator["name"].as_str().context(JSON_ERR)?;
+        let skill = operator["skill"].as_u64().context(JSON_ERR)?;
         table.add_row(row![name, skill]);
     }
 
     for group in groups {
-        let name: String = "[".to_string() + group["name"].as_str().context(jpr)? + "]";
+        let name: String = "[".to_string() + group["name"].as_str().context(JSON_ERR)? + "]";
         let skill = "X";
         table.add_row(row![name, skill]);
     }
@@ -106,18 +105,16 @@ pub fn copilot(uri: String, common: CommonArgs) -> Result<()> {
 }
 
 fn json_reader(uri: &String) -> Result<(JsonValue, PathBuf)> {
-    let api = "https://prts.maa.plus/copilot/get/";
-    let jpr = "JSON Prase Error";
-    let cache_dir = dirs::cache().display().to_string();
+    let cache_dir = dirs::cache().to_path_buf();
 
-    let uri_ = {
+    let uri_: (&str, bool) = {
         let trimed = uri.trim();
         if trimed.starts_with("maa://") && trimed.parse::<f64>().is_err() {
             (&uri[uri.len() - 5..], false)
         } else if Path::new(trimed).is_file() {
             (trimed, true)
         } else {
-            return Err(anyhow!("Code Invalid"));
+            bail!("Code Invalid");
         }
     };
 
@@ -125,9 +122,9 @@ fn json_reader(uri: &String) -> Result<(JsonValue, PathBuf)> {
         // Load via server's API.
 
         // Cache decision
-        match find_json(uri_.0, PathBuf::from(&cache_dir)) {
+        match find_json(uri_.0, cache_dir.clone()) {
             Result::Ok(value) => {
-                let json_path = Path::new(&cache_dir).join(uri_.0).with_extension("json");
+                let json_path = cache_dir.join(uri_.0).with_extension("json");
                 return Ok((value, json_path));
             }
             Err(_error) => {
@@ -135,18 +132,18 @@ fn json_reader(uri: &String) -> Result<(JsonValue, PathBuf)> {
             }
         };
 
-        let url = api.to_owned() + uri_.0;
+        let url = API.to_owned() + uri_.0;
 
         let client = Client::new();
         let response = client.get(url).send().context("Request Error")?;
-        let json: JsonValue = response.json().context(jpr)?;
+        let json: JsonValue = response.json().context(JSON_ERR)?;
         let status_code = json["status_code"].clone().to_string();
         if status_code == "200" {
-            let context = json["data"]["content"].as_str().context(jpr)?;
-            let value: JsonValue = serde_json::from_str(context).context(jpr)?;
+            let context = json["data"]["content"].as_str().context(JSON_ERR)?;
+            let value: JsonValue = serde_json::from_str(context).context(JSON_ERR)?;
 
             // Save json file
-            let json_path = Path::new(&cache_dir).join(uri_.0).with_extension("json");
+            let json_path = cache_dir.join(uri_.0).with_extension("json");
             let mut file = File::create(json_path.clone())?;
             file.write_all(context.as_bytes())?;
 
