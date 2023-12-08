@@ -10,3 +10,5 @@ mod version_json;
 pub mod maa_cli;
 #[cfg(feature = "core_installer")]
 pub mod maa_core;
+
+pub mod resource;

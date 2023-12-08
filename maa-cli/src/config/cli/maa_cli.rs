@@ -1,5 +1,6 @@
 use super::{normalize_url, return_true, Channel};
 
+use clap::Args;
 use serde::Deserialize;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -57,6 +58,41 @@ impl Config {
     pub fn components(&self) -> &CLIComponents {
         &self.components
     }
+
+    pub fn with_args(mut self, args: &CommonArgs) -> Self {
+        if let Some(channel) = args.channel {
+            self.set_channel(channel);
+        }
+        if let Some(api_url) = args.api_url.as_ref() {
+            self.set_api_url(api_url);
+        }
+        if let Some(download_url) = args.download_url.as_ref() {
+            self.set_download_url(download_url);
+        }
+        self
+    }
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Args, Default)]
+pub struct CommonArgs {
+    /// Channel to download prebuilt CLI binary
+    ///
+    /// There are two channels of maa-cli prebuilt binary,
+    /// stable and alpha (which means nightly).
+    pub channel: Option<Channel>,
+    /// Url of api to get version information
+    ///
+    /// This flag is used to set the URL of api to get version information.
+    /// Default to https://github.com/MaaAssistantArknights/maa-cli/raw/release/.
+    #[arg(long)]
+    pub api_url: Option<String>,
+    /// Url of download to download prebuilt CLI binary
+    ///
+    /// This flag is used to set the URL of download to download prebuilt CLI binary.
+    /// Default to https://github.com/MaaAssistantArknights/maa-cli/releases/download/.
+    #[arg(long)]
+    pub download_url: Option<String>,
 }
 
 fn default_api_url() -> String {
@@ -81,28 +117,17 @@ impl Default for CLIComponents {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
 
-    impl Config {
-        pub fn with_channel(mut self, channel: Channel) -> Self {
-            self.channel = channel;
-            self
-        }
-
-        pub fn with_api_url(mut self, api_url: impl ToString) -> Self {
-            self.api_url = api_url.to_string();
-            self
-        }
-
-        pub fn with_download_url(mut self, download_url: impl ToString) -> Self {
-            self.download_url = download_url.to_string();
-            self
-        }
-
-        pub fn with_components(mut self, components: CLIComponents) -> Self {
-            self.components = components;
-            self
+    pub fn example_config() -> Config {
+        Config {
+            channel: Channel::Alpha,
+            api_url: "https://cdn.jsdelivr.net/gh/MaaAssistantArknights/maa-cli@vversion/"
+                .to_string(),
+            download_url: "https://github.com/MaaAssistantArknights/maa-cli/releases/download/"
+                .to_string(),
+            components: CLIComponents { binary: false },
         }
     }
 
@@ -140,7 +165,7 @@ mod tests {
                 &[
                     Token::Map { len: Some(4) },
                     Token::Str("channel"),
-                    Channel::Alpha.as_token(),
+                    Channel::Alpha.to_token(),
                     Token::Str("api_url"),
                     Token::Str("https://foo.bar/api/"),
                     Token::Str("download_url"),
@@ -181,10 +206,12 @@ mod tests {
             );
 
             assert_eq!(
-                Config::default()
-                    .with_channel(Channel::Alpha)
-                    .set_api_url("https://foo.bar/cli/")
-                    .api_url(),
+                Config {
+                    channel: Channel::Alpha,
+                    api_url: "https://foo.bar/cli/".to_string(),
+                    ..Default::default()
+                }
+                .api_url(),
                 "https://foo.bar/cli/alpha.json",
             );
         }
@@ -212,9 +239,11 @@ mod tests {
             );
 
             assert_eq!(
-                Config::default()
-                    .with_components(CLIComponents { binary: false })
-                    .components(),
+                Config {
+                    components: CLIComponents { binary: false },
+                    ..Default::default()
+                }
+                .components(),
                 &CLIComponents { binary: false },
             );
         }

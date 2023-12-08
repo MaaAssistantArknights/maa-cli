@@ -35,10 +35,7 @@ pub fn fight(startup: bool, closedown: bool, common: CommonArgs) -> Result<()> {
     ));
 
     if closedown {
-        task_config.push(Task::new_with_default(
-            MAATask::CloseDown,
-            Value::default(),
-        ));
+        task_config.push(Task::new_with_default(MAATask::CloseDown, Value::default()));
     }
 
     run(task_config, common)

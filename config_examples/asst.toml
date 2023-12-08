@@ -22,10 +22,10 @@ config = "CompatMac"     # connect config name
 # it's highly recommended to don't set this option, unless you know what you are doing
 resource_base_dirs = ["/usr/local/share/maa"]
 # the additional resources for non-cn clients
-global_resources = ["global/YostarEN"]
+global_resource = "YoStarEN"
 # the additional resources for different platforms, only iOS is available now
 # all base resource is for android, so only iOS need to be specified here
-platform_resources = ["platform_diff/iOS"]
+platform_diff_resource = "iOS"
 # load resource from user config dir, load at last to override all other resources
 user_resource = true
 

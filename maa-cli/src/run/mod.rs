@@ -9,12 +9,12 @@ pub use fight::fight;
 
 use crate::{
     config::{
-        asst::{AsstConfig, ConnectionConfig},
+        asst::{asst_config, AsstConfig, ConnectionConfig},
         task::{InitializedTaskConfig, TaskConfig},
-        Error as ConfigError, FindFile,
     },
     consts::MAA_CORE_LIB,
     dirs::{self, Ensure},
+    installer::resource,
     log::{set_level, LogLevel},
     {debug, warning},
 };
@@ -22,11 +22,12 @@ use crate::{
 use std::sync::{atomic, Arc};
 
 use anyhow::{bail, Context, Result};
-use clap::Parser;
+use clap::Args;
 use maa_sys::Assistant;
 use signal_hook::consts::TERM_SIGNALS;
 
-#[derive(Parser, Default)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Args, Default)]
 pub struct CommonArgs {
     /// ADB serial number of device or MaaTools address set in PlayCover
     ///
@@ -73,45 +74,40 @@ pub struct AsstInstanceBuilder {
 }
 
 impl AsstInstanceBuilder {
-    fn new<T>(task: T, args: &CommonArgs) -> Result<Self>
+    fn new<T>(config: &AsstConfig, task: T, args: &CommonArgs) -> Result<Self>
     where
         T: TryInto<TaskConfig>,
         T::Error: std::error::Error + Send + Sync + 'static,
     {
-        let asst_file = dirs::config().join("asst");
-        debug!("Finding asst config file:", asst_file.display());
-        let mut asst_config = match AsstConfig::find_file(&asst_file) {
-            Ok(config) => config,
-            Err(ConfigError::FileNotFound(_)) => {
-                warning!("Failed to find asst config file, using default config!");
-                AsstConfig::default()
-            }
-            Err(e) => return Err(e.into()),
-        };
+        let mut config = config.clone();
 
-        if matches!(asst_config.connection, ConnectionConfig::PlayTools { .. }) {
-            asst_config.resource.use_platform_diff_resource("iOS");
+        if matches!(config.connection, ConnectionConfig::PlayTools { .. }) {
+            debug!("Detected connection type:", "PlayTools");
+            debug!("Using platform diff resource:", "iOS");
+            config.resource.use_platform_diff_resource("iOS");
         }
 
         let task_config: TaskConfig = task.try_into()?;
         let task_config = task_config.init()?;
 
         if let Some(client_type) = task_config.client_type() {
+            debug!("Detected client type:", client_type.as_ref());
             if let Some(resource) = client_type.resource() {
-                asst_config.resource.use_global_resource(resource);
+                debug!("Using global resource:", resource);
+                config.resource.use_global_resource(resource);
             }
         }
 
         if args.user_resource {
-            asst_config.resource.use_user_resource();
+            config.resource.use_user_resource();
         }
 
         if let Some(addr) = args.addr.as_ref() {
-            asst_config.connection.set_address(addr);
+            config.connection.set_address(addr);
         }
 
         Ok(Self {
-            asst_config,
+            asst_config: config,
             task_config,
         })
     }
@@ -150,10 +146,10 @@ impl AsstInstanceBuilder {
         let task_config = &self.task_config;
 
         for (task_type, params) in task_config.tasks() {
-            // debug!(
-            //     format!("Adding task {} with params", task_type.as_ref()),
-            //     serde_json::to_string_pretty(params)?
-            // );
+            debug!(
+                format!("Adding task {} with params:", task_type.as_ref()),
+                serde_json::to_string_pretty(params)?
+            );
             asst.append_task(task_type, serde_json::to_string(params)?)?;
         }
 
@@ -200,7 +196,6 @@ impl PlayCoverAppConfig {
     pub fn open(&self) -> Result<()> {
         if self.start_app {
             self.app.open()?;
-            std::thread::sleep(std::time::Duration::from_secs(5));
         }
         Ok(())
     }
@@ -257,6 +252,13 @@ impl Drop for AsstInstance {
     }
 }
 
+pub fn prepare() -> Result<()> {
+    // Auto update resource
+    resource::update(true)?;
+
+    Ok(())
+}
+
 pub fn run<T: TryInto<TaskConfig>>(task: T, args: CommonArgs) -> Result<()>
 where
     T::Error: std::error::Error + Send + Sync + 'static,
@@ -265,7 +267,7 @@ where
         unsafe { set_level(LogLevel::Debug) };
     }
 
-    let builder = AsstInstanceBuilder::new(task, &args)?;
+    let builder = AsstInstanceBuilder::new(asst_config(), task, &args)?;
     let instance = builder.build()?;
 
     if !args.dry_run {
@@ -283,6 +285,11 @@ pub fn core_version<'a>() -> Result<&'a str> {
 }
 
 fn load_core() {
+    if maa_sys::binding::loaded() {
+        debug!("MaaCore already loaded");
+        return;
+    }
+
     if let Some(lib_dir) = dirs::find_library() {
         debug!("Loading MaaCore from:", lib_dir.display());
         // Set DLL directory on Windows

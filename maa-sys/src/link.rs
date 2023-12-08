@@ -67,7 +67,7 @@ macro_rules! link {
 
         pub fn loaded() -> bool {
             SHARED_LIBRARY.with(|lib| {
-                matches!(*lib.borrow(), None)
+                lib.borrow().is_some()
             })
         }
 

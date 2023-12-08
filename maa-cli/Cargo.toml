@@ -46,6 +46,7 @@ semver = { version = "1.0.19", features = ["serde"] }
 # Dependencies used to extract files
 flate2 = { version = "1", optional = true }
 tar = { version = "0.4.40", optional = true }
+git2 = "0.18.1"
 
 [dependencies.chrono]
 version = "0.4.31"

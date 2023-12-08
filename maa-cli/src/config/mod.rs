@@ -93,8 +93,26 @@ pub trait FindFile: FromFile {
     }
 }
 
+pub trait FindFileOrDefault: FromFile + Default {
+    fn find_file_or_default(path: &Path) -> Result<Self, Error> {
+        for filetype in SUPPORTED_EXTENSION.iter() {
+            let path = path.with_extension(filetype);
+            if path.exists() {
+                return Self::from_file(&path);
+            }
+        }
+        Ok(Self::default())
+    }
+}
+
 impl<T> FindFile for T where T: FromFile {}
 
+impl<T> FindFileOrDefault for T where T: FromFile + Default {}
+
 pub mod asst;
+pub use asst::asst_config;
+
 pub mod cli;
+pub use cli::installer_config;
+
 pub mod task;

@@ -5,7 +5,7 @@ use super::{
 };
 
 use crate::{
-    config::cli::maa_cli::Config,
+    config::{cli::maa_cli::CommonArgs, installer_config},
     consts::{MAA_CLI_EXE, MAA_CLI_VERSION},
     dirs::{self, Ensure},
     normal,
@@ -26,7 +26,9 @@ pub fn version() -> Result<Version> {
     Version::parse(MAA_CLI_VERSION).context("Failed to parse maa-cli version")
 }
 
-pub fn update(config: &Config) -> Result<()> {
+pub fn update(args: &CommonArgs) -> Result<()> {
+    let config = installer_config().cli_config().with_args(args);
+
     normal!("Fetching maa-cli version info...");
     let version_json: VersionJSON<Details> = reqwest::blocking::get(config.api_url())
         .context("Failed to fetch version info")?

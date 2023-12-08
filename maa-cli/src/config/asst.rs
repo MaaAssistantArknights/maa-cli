@@ -1,3 +1,5 @@
+use super::FindFileOrDefault;
+
 use crate::{
     dirs::{self, global_path},
     {debug, info, warning},
@@ -6,11 +8,12 @@ use crate::{
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
+use lazy_static::lazy_static;
 use maa_sys::{Assistant, InstanceOptionKey, StaticOptionKey, TouchMode};
 use serde::Deserialize;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, Clone)]
 pub struct AsstConfig {
     #[serde(default)]
     pub connection: ConnectionConfig,
@@ -22,8 +25,20 @@ pub struct AsstConfig {
     pub instance_options: InstanceOptions,
 }
 
+impl super::FromFile for AsstConfig {}
+
+lazy_static! {
+    static ref ASST_CONFIG: AsstConfig =
+        AsstConfig::find_file_or_default(&dirs::config().join("asst"))
+            .expect("Failed to load asst config");
+}
+
+pub fn asst_config() -> &'static AsstConfig {
+    &ASST_CONFIG
+}
+
 #[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 #[serde(tag = "type")]
 #[serde(deny_unknown_fields)]
 #[allow(clippy::upper_case_acronyms)]
@@ -84,17 +99,17 @@ impl ConnectionConfig {
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct ResourceConfig {
     /// Resource base directories, a list of directories containing resource directories
     #[serde(default = "default_resource_base_dirs")]
     resource_base_dirs: Vec<PathBuf>,
     /// Resources used by global arknights client, subdirectories of `resource_base_dirs`, e.g. `global/YostarEN`
     #[serde(default)]
-    global_resources: Option<PathBuf>,
+    global_resource: Option<PathBuf>,
     /// Resources used by platform diff, subdirectories of `resource_base_dirs`, e.g. `platform_diff/iOS`
     #[serde(default)]
-    platform_diff_resources: Option<PathBuf>,
+    platform_diff_resource: Option<PathBuf>,
     /// Whether to load resources from user config directory, when enabled, the `MAA_CONFIG_DIR/resource`
     /// will be appended to `resource_base_dirs` as the last element
     #[serde(default)]
@@ -105,8 +120,8 @@ impl Default for ResourceConfig {
     fn default() -> Self {
         Self {
             resource_base_dirs: default_resource_base_dirs(),
-            global_resources: None,
-            platform_diff_resources: None,
+            global_resource: None,
+            platform_diff_resource: None,
             user_resource: false,
         }
     }
@@ -129,7 +144,7 @@ fn default_resource_base_dirs() -> Vec<PathBuf> {
             hot_update_dir.display()
         );
         resource_dirs.push(hot_update_dir.join("resource"));
-        resource_dirs.push(hot_update_dir.join("hot/resource"));
+        resource_dirs.push(hot_update_dir.join("cache").join("resource"));
     } else {
         warning!("Hot update resource directory not found!");
     }
@@ -144,12 +159,12 @@ impl ResourceConfig {
     }
 
     pub fn use_global_resource(&mut self, resource: impl Into<PathBuf>) -> &mut Self {
-        self.global_resources = Some(resource.into());
+        self.global_resource = Some(resource.into());
         self
     }
 
     pub fn use_platform_diff_resource(&mut self, resource: impl Into<PathBuf>) -> &mut Self {
-        self.platform_diff_resources = Some(resource.into());
+        self.platform_diff_resource = Some(resource.into());
         self
     }
 
@@ -170,17 +185,11 @@ impl ResourceConfig {
         resource_dirs
     }
 
-    /// Load resources from resource directories
-    pub fn load(&self) -> Result<()> {
+    /// Get all resource directories, including global and platform diff resources
+    pub fn resource_dirs(&self) -> Result<Vec<PathBuf>> {
         let base_dirs = self.resource_base_dirs();
-
-        debug!(format!(
-            "Base resource directories: {:?}",
-            base_dirs.iter().map(|p| p.display()).collect::<Vec<_>>()
-        ));
-
         let mut resource_dirs = base_dirs.clone();
-        if let Some(global_resource) = self.global_resources.as_ref() {
+        if let Some(global_resource) = self.global_resource.as_ref() {
             let global_resource_dir = PathBuf::from("global")
                 .join(global_resource)
                 .join("resource");
@@ -194,7 +203,7 @@ impl ResourceConfig {
                 resource_dirs.extend(full_paths);
             }
         }
-        if let Some(platform_diff_resource) = self.platform_diff_resources.as_ref() {
+        if let Some(platform_diff_resource) = self.platform_diff_resource.as_ref() {
             let platform_diff_resource_dir = PathBuf::from("platform_diff")
                 .join(platform_diff_resource)
                 .join("resource");
@@ -209,7 +218,12 @@ impl ResourceConfig {
             }
         }
 
-        for resource_dir in resource_dirs.iter() {
+        Ok(resource_dirs)
+    }
+
+    pub fn load(&self) -> Result<()> {
+        let resource_dirs = self.resource_dirs()?;
+        for resource_dir in resource_dirs {
             debug!("Loading resource from", resource_dir.display());
             Assistant::load_resource(resource_dir.parent().unwrap())?;
         }
@@ -219,7 +233,7 @@ impl ResourceConfig {
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, Clone)]
 pub struct StaticOptions {
     #[serde(default)]
     pub cpu_ocr: Option<bool>,
@@ -253,7 +267,7 @@ impl StaticOptions {
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, Clone)]
 pub struct InstanceOptions {
     #[serde(default)]
     touch_mode: Option<TouchMode>,
@@ -340,8 +354,6 @@ pub fn default_config() -> String {
     }
 }
 
-impl super::FromFile for AsstConfig {}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -365,8 +377,8 @@ mod tests {
                     },
                     resource: ResourceConfig {
                         resource_base_dirs: vec![PathBuf::from("/usr/local/share/maa")],
-                        global_resources: Some(PathBuf::from("YoStarEN")),
-                        platform_diff_resources: Some(PathBuf::from("iOS")),
+                        global_resource: Some(PathBuf::from("YoStarEN")),
+                        platform_diff_resource: Some(PathBuf::from("iOS")),
                         user_resource: true,
                     },
                     static_options: StaticOptions {
@@ -402,8 +414,8 @@ mod tests {
                     },
                     resource: ResourceConfig {
                         resource_base_dirs: default_resource_base_dirs(),
-                        global_resources: None,
-                        platform_diff_resources: None,
+                        global_resource: None,
+                        platform_diff_resource: None,
                         user_resource: false,
                     },
                     static_options: StaticOptions {

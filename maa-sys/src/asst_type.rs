@@ -7,7 +7,7 @@ use crate::{impl_to_cstring_by_as_ref, Assistant, Result, ToCString};
 
 #[repr(i32)]
 #[derive(Clone, Copy)]
-#[clippy::upper_case_acronyms]
+#[allow(clippy::upper_case_acronyms)]
 pub enum StaticOptionKey {
     CpuOCR = 1,
     GpuOCR = 2,

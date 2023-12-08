@@ -37,6 +37,13 @@ impl<'n> PlayCoverApp<'n> {
             .arg(self.name)
             .status()
             .context("Failed to start game!")?;
+
+        // Wait for game ready
+        // TODO: Find a way to detect if game is ready, so we can remove this sleep
+        // The is_running() function is not enough
+        // maybe we can launch the game by macOS API instead of open command?
+        std::thread::sleep(std::time::Duration::from_secs(5));
+
         Ok(())
     }
 
