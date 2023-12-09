@@ -89,11 +89,11 @@ pub mod tests {
     pub fn example_config() -> Config {
         Config {
             auto_update: true,
-            backend: GitBackend::Git,
+            backend: GitBackend::Libgit2,
             remote: Remote {
-                url: String::from("git@github.com:MaaAssistantArknights/MaaResource.git"),
+                url: String::from("https://github.com/MaaAssistantArknights/MaaResource.git"),
                 branch: Some(String::from("main")),
-                ssh_key: Some(PathBuf::from("~/.ssh/id_ed25519")),
+                ssh_key: None,
             },
         }
     }
@@ -176,7 +176,15 @@ pub mod tests {
             );
 
             assert_de_tokens(
-                &super::example_config(),
+                &Config {
+                    auto_update: true,
+                    backend: GitBackend::Git,
+                    remote: Remote {
+                        url: String::from("git@github.com:MaaAssistantArknights/MaaResource.git"),
+                        branch: Some(String::from("main")),
+                        ssh_key: Some(PathBuf::from("~/.ssh/id_ed25519")),
+                    },
+                },
                 &[
                     Token::Map { len: Some(3) },
                     Token::Str("auto_update"),
