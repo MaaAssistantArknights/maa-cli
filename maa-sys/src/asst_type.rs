@@ -34,7 +34,7 @@ impl StaticOptionKey {
     /// # Example
     //
     /// ```no_run
-    /// use maa_core::StaticOptionKey;
+    /// use maa_sys::StaticOptionKey;
     ///
     /// StaticOptionKey::CpuOCR.apply(true);
     /// ```
@@ -75,7 +75,7 @@ impl InstanceOptionKey {
     /// # Example
     ///
     /// ```no_run
-    /// use maa_core::{Assistant, InstanceOptionKey, TouchMode};
+    /// use maa_sys::{Assistant, InstanceOptionKey, TouchMode};
     ///
     /// let asst = Assistant::new(None, None);
     /// InstanceOptionKey::TouchMode.apply(&asst, TouchMode::ADB);

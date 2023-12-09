@@ -9,7 +9,7 @@ repository.workspace = true
 license.workspace = true
 
 [features]
-default = ["cli_installer", "core_installer"]
+default = ["cli_installer", "core_installer", "git2"]
 core_installer = ["extract_helper"]
 cli_installer = ["extract_helper"]
 extract_helper = ["flate2", "tar", "zip"]
@@ -46,7 +46,9 @@ semver = { version = "1.0.19", features = ["serde"] }
 # Dependencies used to extract files
 flate2 = { version = "1", optional = true }
 tar = { version = "0.4.40", optional = true }
-git2 = "0.18.1"
+
+# Backend used to manipulate resource repository
+git2 = { version = "0.18.1", optional = true }
 
 [dependencies.chrono]
 version = "0.4.31"

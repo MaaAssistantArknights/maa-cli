@@ -267,6 +267,22 @@ pub fn log() -> &'static Path {
     DIRS.log()
 }
 
+lazy_static! {
+    static ref HOME: PathBuf = directories::BaseDirs::new()
+        .expect("Failed to get home directory")
+        .home_dir()
+        .to_path_buf();
+}
+
+pub fn expand_tilde(path: impl AsRef<Path>) -> PathBuf {
+    let path = path.as_ref();
+    if let Ok(path) = path.strip_prefix("~") {
+        HOME.join(path)
+    } else {
+        path.to_path_buf()
+    }
+}
+
 /// Similar to `finder(exe_path.parent()?)`, but try to canonicalize the path first.
 fn _find_from<F>(exe_path: &Path, finder: F) -> Option<PathBuf>
 where
@@ -555,8 +571,12 @@ mod tests {
                 TEST_DIRS.config_path("foo", Some("bar")).unwrap(),
                 TEST_DIRS.config().join("bar").join("foo")
             );
-            assert_eq!(TEST_DIRS.config_path::<&str, &str>("/tmp", None), None);
-            assert_eq!(TEST_DIRS.config_path("/tmp", Some("bar")), None);
+
+            #[cfg(unix)]
+            {
+                assert_eq!(TEST_DIRS.config_path::<&str, &str>("/tmp", None), None);
+                assert_eq!(TEST_DIRS.config_path("/tmp", Some("bar")), None);
+            }
 
             assert_eq!(config(), TEST_DIRS.config());
             assert_eq!(
@@ -596,6 +616,13 @@ mod tests {
             let dirs = Dirs::new(project.clone());
             assert_eq!(dirs.cache(), PathBuf::from("/maa"));
         }
+    }
+
+    #[test]
+    fn test_expand_tilde() {
+        assert_eq!(expand_tilde(Path::new("~")), HOME.as_path());
+        assert_eq!(expand_tilde(Path::new("~/foo")), HOME.join("foo").as_path());
+        assert_eq!(expand_tilde(Path::new("/foo")), Path::new("/foo"));
     }
 
     #[test]

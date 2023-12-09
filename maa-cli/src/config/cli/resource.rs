@@ -1,3 +1,5 @@
+use std::path::{Path, PathBuf};
+
 use serde::Deserialize;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -5,6 +7,8 @@ use serde::Deserialize;
 pub struct Config {
     #[serde(default)]
     auto_update: bool,
+    #[serde(default)]
+    backend: GitBackend,
     #[serde(default)]
     remote: Remote,
 }
@@ -14,87 +18,67 @@ impl Config {
         self.auto_update
     }
 
+    pub fn backend(&self) -> GitBackend {
+        self.backend
+    }
+
     pub fn remote(&self) -> &Remote {
         &self.remote
     }
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Deserialize, Default, Clone, Copy)]
+#[serde(rename_all = "kebab-case")]
+pub enum GitBackend {
+    #[default]
+    Git,
+    #[cfg(feature = "git2")]
+    Libgit2,
+    // TODO: Backend gitoxide
+    // The gitoxide don't not support merge yet
+    // which is required to update resource
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Clone)]
 pub struct Remote {
+    /// URL to resource repository
+    #[serde(default = "default_url")]
+    url: String,
+    /// Branch of resource repository
     #[serde(default)]
-    protocol: GitProtocol,
-    /// Public key used for SSH protocol
-    #[serde(default = "default_host")]
-    host: String,
-    #[serde(default = "default_owner")]
-    owner: String,
-    #[serde(default = "default_repo")]
-    repo: String,
+    branch: Option<String>,
+    /// SSH key to access resource repository when fetch from SSH
     #[serde(default)]
-    url: Option<String>,
-    #[serde(default = "default_branch")]
-    branch: String,
+    ssh_key: Option<PathBuf>,
 }
 
 impl Default for Remote {
     fn default() -> Self {
         Self {
-            protocol: GitProtocol::default(),
-            host: default_host(),
-            owner: default_owner(),
-            repo: default_repo(),
-            url: None,
-            branch: default_branch(),
+            url: default_url(),
+            branch: None,
+            ssh_key: None,
         }
     }
 }
 
-fn default_host() -> String {
-    String::from("github.com")
-}
-
-fn default_owner() -> String {
-    String::from("MaaAssistantArknights")
-}
-
-fn default_repo() -> String {
-    String::from("MaaResource")
-}
-
-fn default_branch() -> String {
-    String::from("main")
+fn default_url() -> String {
+    String::from("https://github.com/MaaAssistantArknights/MaaResource.git")
 }
 
 impl Remote {
-    pub fn url(&self) -> String {
-        self.url
-            .as_ref()
-            .map(|url| url.to_owned())
-            .unwrap_or(self.protocol.url(&self.host, &self.owner, &self.repo))
+    pub fn url(&self) -> &str {
+        &self.url
     }
 
-    pub fn branch(&self) -> &str {
-        &self.branch
+    pub fn branch(&self) -> Option<&str> {
+        self.branch.as_deref()
     }
-}
 
-#[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Deserialize, Default, Clone, Copy)]
-#[serde(rename_all = "kebab-case")]
-pub enum GitProtocol {
-    Http,
-    #[default]
-    Https,
-    // Ssh, // there are some problems with certificate verification
-}
-
-impl GitProtocol {
-    pub fn url(self, host: &str, owner: &str, repo: &str) -> String {
-        match self {
-            GitProtocol::Http => format!("http://{}/{}/{}.git", host, owner, repo),
-            GitProtocol::Https => format!("https://{}/{}/{}.git", host, owner, repo),
-        }
+    pub fn ssh_key(&self) -> Option<&Path> {
+        self.ssh_key.as_deref()
     }
 }
 
@@ -105,15 +89,11 @@ pub mod tests {
     pub fn example_config() -> Config {
         Config {
             auto_update: true,
+            backend: GitBackend::Git,
             remote: Remote {
-                protocol: GitProtocol::Https,
-                host: String::from("github.com"),
-                owner: String::from("MaaAssistantArknights"),
-                repo: String::from("MaaResource"),
-                branch: String::from("main"),
-                url: Some(String::from(
-                    "git@github.com:MaaAssistantArknights/MaaResource.git",
-                )),
+                url: String::from("git@github.com:MaaAssistantArknights/MaaResource.git"),
+                branch: Some(String::from("main")),
+                ssh_key: Some(PathBuf::from("~/.ssh/id_ed25519")),
             },
         }
     }
@@ -125,13 +105,11 @@ pub mod tests {
             config,
             Config {
                 auto_update: false,
+                backend: GitBackend::Git,
                 remote: Remote {
-                    protocol: GitProtocol::Https,
-                    host: String::from("github.com"),
-                    owner: String::from("MaaAssistantArknights"),
-                    repo: String::from("MaaResource"),
-                    url: None,
-                    branch: String::from("main"),
+                    url: default_url(),
+                    branch: None,
+                    ssh_key: None,
                 }
             }
         );
@@ -141,22 +119,25 @@ pub mod tests {
         use super::*;
         use serde_test::{assert_de_tokens, Token};
 
-        impl GitProtocol {
+        impl GitBackend {
             pub fn to_token(self) -> Token {
                 Token::UnitVariant {
-                    name: "GitProtocol",
+                    name: "GitBackend",
                     variant: match self {
-                        GitProtocol::Http => "http",
-                        GitProtocol::Https => "https",
+                        GitBackend::Git => "git",
+                        #[cfg(feature = "git2")]
+                        GitBackend::Libgit2 => "libgit2",
                     },
                 }
             }
         }
 
         #[test]
-        fn git_protocol() {
-            assert_de_tokens(&GitProtocol::Http, &[GitProtocol::Http.to_token()]);
-            assert_de_tokens(&GitProtocol::Https, &[GitProtocol::Https.to_token()]);
+        fn backend() {
+            assert_de_tokens(&GitBackend::Git, &[GitBackend::Git.to_token()]);
+
+            #[cfg(feature = "git2")]
+            assert_de_tokens(&GitBackend::Libgit2, &[GitBackend::Libgit2.to_token()]);
         }
 
         #[test]
@@ -168,26 +149,51 @@ pub mod tests {
 
             assert_de_tokens(
                 &Remote {
-                    protocol: GitProtocol::Http,
-                    host: String::from("gitee.com"),
-                    owner: String::from("MaaMirror"),
-                    repo: String::from("Resource"),
-                    url: Some(String::from("http://gitee.com/MaaMirror/Resource.git")),
-                    branch: String::from("main"),
+                    url: String::from("http://gitee.com/MaaMirror/Resource.git"),
+                    branch: Some(String::from("main")),
+                    ssh_key: Some(PathBuf::from("~/.ssh/id_ed25519")),
                 },
                 &[
-                    Token::Map { len: Some(6) },
-                    Token::Str("protocol"),
-                    GitProtocol::Http.to_token(),
-                    Token::Str("host"),
-                    Token::Str("gitee.com"),
-                    Token::Str("owner"),
-                    Token::Str("MaaMirror"),
-                    Token::Str("repo"),
-                    Token::Str("Resource"),
+                    Token::Map { len: Some(3) },
                     Token::Str("url"),
-                    Token::Some,
                     Token::Str("http://gitee.com/MaaMirror/Resource.git"),
+                    Token::Str("branch"),
+                    Token::Some,
+                    Token::Str("main"),
+                    Token::Str("ssh_key"),
+                    Token::Some,
+                    Token::Str("~/.ssh/id_ed25519"),
+                    Token::MapEnd,
+                ],
+            );
+        }
+
+        #[test]
+        fn config() {
+            assert_de_tokens(
+                &Config::default(),
+                &[Token::Map { len: Some(0) }, Token::MapEnd],
+            );
+
+            assert_de_tokens(
+                &super::example_config(),
+                &[
+                    Token::Map { len: Some(3) },
+                    Token::Str("auto_update"),
+                    Token::Bool(true),
+                    Token::Str("backend"),
+                    GitBackend::Git.to_token(),
+                    Token::Str("remote"),
+                    Token::Map { len: Some(3) },
+                    Token::Str("url"),
+                    Token::Str("git@github.com:MaaAssistantArknights/MaaResource.git"),
+                    Token::Str("branch"),
+                    Token::Some,
+                    Token::Str("main"),
+                    Token::Str("ssh_key"),
+                    Token::Some,
+                    Token::Str("~/.ssh/id_ed25519"),
+                    Token::MapEnd,
                     Token::MapEnd,
                 ],
             );
@@ -198,43 +204,46 @@ pub mod tests {
     fn url() {
         assert_eq!(
             Remote::default().url(),
-            String::from("https://github.com/MaaAssistantArknights/MaaResource.git"),
+            "https://github.com/MaaAssistantArknights/MaaResource.git",
         );
 
         assert_eq!(
             Remote {
-                protocol: GitProtocol::Http,
-                host: String::from("gitee.com"),
-                owner: String::from("MaaMirror"),
-                repo: String::from("Resource"),
-                url: None,
-                branch: String::from("main"),
-            }
-            .url(),
-            String::from("http://gitee.com/MaaMirror/Resource.git")
-        );
-
-        assert_eq!(
-            Remote {
-                url: Some(String::from("http://gitee.com/MaaMirror/Resource.git")),
+                url: String::from("http://gitee.com/MaaMirror/Resource.git"),
                 ..Default::default()
             }
             .url(),
-            String::from("http://gitee.com/MaaMirror/Resource.git")
+            "http://gitee.com/MaaMirror/Resource.git"
         );
     }
 
     #[test]
     fn branch() {
-        assert_eq!(Remote::default().branch(), "main");
+        assert_eq!(Remote::default().branch(), None);
 
         assert_eq!(
             Remote {
-                branch: String::from("dev"),
+                branch: Some(String::from("dev")),
                 ..Default::default()
             }
-            .branch(),
+            .branch()
+            .unwrap(),
             "dev"
+        );
+    }
+
+    #[test]
+    fn ssh_key() {
+        assert_eq!(Remote::default().ssh_key(), None);
+
+        assert_eq!(
+            Remote {
+                ssh_key: Some(PathBuf::from("~/.ssh/id_ed25519")),
+                ..Default::default()
+            }
+            .ssh_key()
+            .unwrap(),
+            Path::new("~/.ssh/id_ed25519")
         );
     }
 }

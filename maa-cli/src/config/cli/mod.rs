@@ -92,7 +92,7 @@ fn normalize_url(url: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{resource::GitProtocol, *};
+    use super::{resource::GitBackend, *};
 
     use serde_json;
     use serde_test::{assert_de_tokens, Token};
@@ -194,23 +194,20 @@ mod tests {
             &[
                 Token::Map { len: Some(1) },
                 Token::Str("resource"),
-                Token::Map { len: Some(2) },
+                Token::Map { len: Some(3) },
                 Token::Str("auto_update"),
                 Token::Bool(true),
+                Token::Str("backend"),
+                GitBackend::Git.to_token(),
                 Token::Str("remote"),
-                Token::Map { len: Some(6) },
-                Token::Str("protocol"),
-                GitProtocol::Https.to_token(),
-                Token::Str("host"),
-                Token::Str("github.com"),
-                Token::Str("owner"),
-                Token::Str("MaaAssistantArknights"),
-                Token::Str("repo"),
-                Token::Str("MaaResource"),
+                Token::Map { len: Some(3) },
                 Token::Str("branch"),
-                Token::Str("main"),
-                Token::Str("url"),
                 Token::Some,
+                Token::Str("main"),
+                Token::Str("ssh_key"),
+                Token::Some,
+                Token::Str("~/.ssh/id_ed25519"),
+                Token::Str("url"),
                 Token::Str("git@github.com:MaaAssistantArknights/MaaResource.git"),
                 Token::MapEnd,
                 Token::MapEnd,

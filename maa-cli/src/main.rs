@@ -152,6 +152,7 @@ enum SubCommand {
     Complete { shell: Shell },
 }
 
+#[cfg(feature = "cli_installer")]
 #[derive(Subcommand)]
 #[command(name = "self")]
 enum SelfCommand {
