@@ -111,7 +111,7 @@ jobs:
         run: |
           # We can't build openssl-sys on aarch64, which is required by git2
           cargo build --package maa-cli --locked \
-            --no-default-features --features core_installer cli_installer
+            --features vendored-openssl,vendored-libgit2
 
   features:
     name: Build and Test (no default features)

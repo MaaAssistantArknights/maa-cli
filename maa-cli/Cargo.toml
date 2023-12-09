@@ -14,6 +14,9 @@ core_installer = ["extract_helper"]
 cli_installer = ["extract_helper"]
 extract_helper = ["flate2", "tar", "zip"]
 
+vendored-libgit2 = ["git2/vendored-libgit2"]
+vendored-openssl = ["git2/vendored-openssl"]
+
 [[bin]]
 name = "maa"
 path = "src/main.rs"
