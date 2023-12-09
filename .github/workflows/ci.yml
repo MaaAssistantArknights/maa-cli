@@ -107,11 +107,18 @@ jobs:
           arch: aarch64
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
-      - name: Build (maa-cli)
+      - name: Build (Linux)
+        if: ${{ startsWith(matrix.os, 'ubuntu') }}
         run: |
-          # We can't build openssl-sys on aarch64, which is required by git2
           cargo build --package maa-cli --locked \
-            --features vendored-openssl,vendored-libgit2
+            --no-default-features \
+            --features git2-vendored-openssl,git2-vendored-libgit2,reqwest_rustls_tls,\
+              cli_installer,core_installer,git2
+      - name: Build (macOS)
+        if: ${{ startsWith(matrix.os, 'macos') }}
+        run: |
+          cargo build --package maa-cli --locked \
+            --features git2-vendored-openssl,git2-vendored-libgit2
 
   features:
     name: Build and Test (no default features)

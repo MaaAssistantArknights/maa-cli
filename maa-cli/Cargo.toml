@@ -9,13 +9,36 @@ repository.workspace = true
 license.workspace = true
 
 [features]
-default = ["cli_installer", "core_installer", "git2"]
-core_installer = ["extract_helper"]
-cli_installer = ["extract_helper"]
-extract_helper = ["flate2", "tar", "zip"]
+default = ["cli_installer", "core_installer", "git2", "reqwest_native_tls"]
 
-vendored-libgit2 = ["git2/vendored-libgit2"]
-vendored-openssl = ["git2/vendored-openssl"]
+# Features used to install and update MAA Core
+core_installer = ["__installer"]
+
+# Features used to install update maa-cli self
+cli_installer = ["__installer"]
+
+# Common features used to install and update MAA Core and maa-cli self
+__installer = [
+  "tokio",
+  "indicatif",
+  "futures-util",
+  "sha2",
+  "digest",
+  "semver",
+  "flate2",
+  "tar",
+  "zip",
+  "reqwest/stream",
+]
+
+# TLS backend used by reqwest (no default, must choose one when build)
+reqwest_native_tls = ["reqwest/native-tls"]
+reqwest_native_tls_vendored = ["reqwest/native-tls-vendored"]
+reqwest_rustls_tls = ["reqwest/rustls-tls"]
+
+# Use vendored libgit2 and openssl of git2-rs
+git2-vendored-libgit2 = ["git2/vendored-libgit2"]
+git2-vendored-openssl = ["git2/vendored-openssl"]
 
 [[bin]]
 name = "maa"
@@ -39,42 +62,42 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9.25"
 
+# Backend used to manipulate resource repository
+git2 = { version = "0.18.1", optional = true }
+
 # Dependencies used to donwload files
-indicatif = { version = "0.17.7" }
-futures-util = { version = "0.3.28" }
-sha2 = { version = "0.10.7" }
-digest = { version = "0.10.7" }
-semver = { version = "1.0.19", features = ["serde"] }
+indicatif = { version = "0.17.7", optional = true }
+futures-util = { version = "0.3.28", optional = true }
+sha2 = { version = "0.10.7", optional = true }
+digest = { version = "0.10.7", optional = true }
+semver = { version = "1.0.19", features = ["serde"], optional = true }
 
 # Dependencies used to extract files
 flate2 = { version = "1", optional = true }
 tar = { version = "0.4.40", optional = true }
 
-# Backend used to manipulate resource repository
-git2 = { version = "0.18.1", optional = true }
-
+# Datatime support
 [dependencies.chrono]
 version = "0.4.31"
 default-features = false
 features = ["std", "clock", "serde"]
 
-# Dependencies used to extract files
 [dependencies.zip]
 version = "0.6.6"
 optional = true
 default-features = false
 features = ["deflate"]
 
-# Dependencies used to download files
 [dependencies.tokio]
 version = "1.31"
+optional = true
 default-features = false
 features = ["rt"]
 
 [dependencies.reqwest]
 version = "0.11"
 default-features = false
-features = ["rustls-tls", "blocking", "stream", "json"]
+features = ["blocking", "json"]
 
 [dev-dependencies]
 serde_test = "1.0.176"

@@ -1,9 +1,8 @@
+#[cfg(feature = "__installer")]
 mod download;
-
-#[cfg(feature = "extract_helper")]
+#[cfg(feature = "__installer")]
 mod extract;
-
-#[cfg(any(feature = "cli_installer", feature = "core_installer"))]
+#[cfg(feature = "__installer")]
 mod version_json;
 
 #[cfg(feature = "cli_installer")]
