@@ -37,13 +37,6 @@ jobs:
           - ubuntu-latest
           - macos-latest
           - windows-latest
-        arch:
-          - x86_64
-          - aarch64
-        exclude:
-          # Failed to cross compile ring on Windows
-          - os: windows-latest
-            arch: aarch64
     env:
       MAA_EXTRA_SHARE_NAME: maa-test
     steps:
@@ -53,7 +46,7 @@ jobs:
         uses: ./.github/actions/setup
         with:
           os: ${{ matrix.os }}
-          arch: ${{ matrix.arch }}
+          arch: x86_64
           coverage: true
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
@@ -61,15 +54,12 @@ jobs:
         run: |
           cargo build --package maa-cli --locked
       - name: Lint (clippy)
-        if: matrix.arch == 'x86_64'
         run: |
           cargo clippy --all-targets --all-features -- -D warnings
       - name: Lint (rustfmt)
-        if: matrix.arch == 'x86_64'
         run: |
           cargo fmt --all -- --check
       - name: Install MaaCore
-        if: matrix.arch == 'x86_64'
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
         run: |
@@ -87,19 +77,41 @@ jobs:
           fi
           echo "MAA_CORE_INSTALLED=true" >> "$GITHUB_ENV"
       - name: Test
-        if: matrix.arch == 'x86_64'
         run: |
           cargo test
       - name: Coverage
-        if: matrix.arch == 'x86_64'
         run: |
           cargo tarpaulin --all-features --workspace --timeout 120 --out xml ${{ github.run_attempt == 1 && '--skip-clean' || '' }}
       - name: Upload to codecov.io
-        if: matrix.arch == 'x86_64'
         uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
+
+  aarch64:
+    name: Build (aarch64)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: ./.github/actions/setup
+        with:
+          os: ${{ matrix.os }}
+          arch: aarch64
+      - name: Setup Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Build (maa-cli)
+        run: |
+          # We can't build openssl-sys on aarch64, which is required by git2
+          cargo build --package maa-cli --locked \
+            --no-default-features --features core_installer cli_installer
 
   features:
     name: Build and Test (no default features)
