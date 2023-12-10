@@ -7,16 +7,16 @@ on:
     paths:
       - "maa-sys/**"
       - "Cargo.toml"
-      - "Cargo.lock"
       - ".github/workflows/ci-sys.yml"
+      - ".github/actions/setup/action.yml"
   pull_request:
     branches:
       - main
     paths:
       - "maa-sys/**"
       - "Cargo.toml"
-      - "Cargo.lock"
       - ".github/workflows/ci-sys.yml"
+      - ".github/actions/setup/action.yml"
 
 env:
   RUST_BACKTRACE: full
@@ -49,9 +49,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: Install MaaCore
         env:
-          MAA_API_URL: https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version
+          MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
         run: |
-          cargo run -- install beta -t0 --no-resource
+          cargo run -- install stable -t0 --no-resource
           MAA_CORE_DIR="$(cargo run -- dir lib)"
           ls -l "$MAA_CORE_DIR"
           echo "MAA_CORE_DIR=$MAA_CORE_DIR" >> $GITHUB_ENV
