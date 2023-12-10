@@ -107,16 +107,10 @@ jobs:
           arch: aarch64
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
-      - name: Build (Linux)
-        if: ${{ startsWith(matrix.os, 'ubuntu') }}
+      - name: Build
         run: |
           cargo build --package maa-cli --locked \
             --features git2/vendored-openssl,reqwest/native-tls-vendored
-      - name: Build (macOS)
-        if: ${{ startsWith(matrix.os, 'macos') }}
-        run: |
-          cargo build --package maa-cli --locked \
-            --features git2/vendored-openssl
 
   features:
     name: Build and Test (no default features)
