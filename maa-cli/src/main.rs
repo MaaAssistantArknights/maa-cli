@@ -150,6 +150,13 @@ enum SubCommand {
     List,
     /// Generate completion script for given shell
     Complete { shell: Shell },
+    Copilot {
+        /// A code copied from "https://prts.plus" or a json file,
+        /// such as "maa://12345" or "/your/json/path.json".
+        uri: String,
+        #[command(flatten)]
+        common: run::CommonArgs,
+    },
 }
 
 #[cfg(feature = "cli_installer")]
@@ -294,6 +301,7 @@ fn main() -> Result<()> {
         SubCommand::Complete { shell } => {
             generate(shell, &mut CLI::command(), "maa", &mut std::io::stdout());
         }
+        SubCommand::Copilot { uri, common } => run::copilot(uri, common)?,
     }
 
     Ok(())
