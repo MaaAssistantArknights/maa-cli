@@ -4,6 +4,9 @@ use message::callback;
 mod fight;
 pub use fight::fight;
 
+mod copilot;
+pub use copilot::copilot;
+
 use crate::{
     config::{
         asst::{self, AsstConfig, Connection, TouchMode},
