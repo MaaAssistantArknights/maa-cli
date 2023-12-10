@@ -138,7 +138,7 @@ jobs:
           CARGO_PROFILE_RELEASE_STRIP: true
         run: |
           cargo build --release --package maa-cli \
-            ${{ matrix.arch != 'x86_64' && "--features git2/vendored-openssl,reqwest/native-tls-vendored" || "" }}
+            ${{ matrix.arch != 'x86_64' && '--features git2/vendored-openssl,reqwest/native-tls-vendored' || '' }}
       - name: Tar Artifact
         run: |
           tar -cvf "$CARGO_BUILD_TARGET.tar" -C "target/$CARGO_BUILD_TARGET/release" maa
