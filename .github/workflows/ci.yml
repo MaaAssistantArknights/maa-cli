@@ -112,8 +112,7 @@ jobs:
         run: |
           cargo build --package maa-cli --locked \
             --no-default-features \
-            --features git2-vendored-openssl,git2-vendored-libgit2,reqwest_rustls_tls,\
-              cli_installer,core_installer,git2
+            --features git2-vendored-openssl,git2-vendored-libgit2,reqwest_rustls_tls,cli_installer,core_installer,git2
       - name: Build (macOS)
         if: ${{ startsWith(matrix.os, 'macos') }}
         run: |
