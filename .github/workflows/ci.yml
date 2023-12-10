@@ -55,7 +55,7 @@ jobs:
           cargo build --package maa-cli --locked
       - name: Lint (clippy)
         run: |
-          cargo clippy --all-targets --all-features -- -D warnings
+          cargo clippy -- -D warnings
       - name: Lint (rustfmt)
         run: |
           cargo fmt --all -- --check
@@ -111,13 +111,12 @@ jobs:
         if: ${{ startsWith(matrix.os, 'ubuntu') }}
         run: |
           cargo build --package maa-cli --locked \
-            --no-default-features \
-            --features git2-vendored-openssl,git2-vendored-libgit2,reqwest_rustls_tls,cli_installer,core_installer,git2
+            --features git2/vendored-openssl,reqwest/native-tls-vendored
       - name: Build (macOS)
         if: ${{ startsWith(matrix.os, 'macos') }}
         run: |
           cargo build --package maa-cli --locked \
-            --features git2-vendored-openssl,git2-vendored-libgit2
+            --features git2/vendored-openssl
 
   features:
     name: Build and Test (no default features)

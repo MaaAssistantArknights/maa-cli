@@ -9,7 +9,7 @@ repository.workspace = true
 license.workspace = true
 
 [features]
-default = ["cli_installer", "core_installer", "git2", "reqwest_native_tls"]
+default = ["cli_installer", "core_installer", "git2"]
 
 # Features used to install and update MAA Core
 core_installer = ["__installer"]
@@ -30,15 +30,6 @@ __installer = [
   "zip",
   "reqwest/stream",
 ]
-
-# TLS backend used by reqwest (no default, must choose one when build)
-reqwest_native_tls = ["reqwest/native-tls"]
-reqwest_native_tls_vendored = ["reqwest/native-tls-vendored"]
-reqwest_rustls_tls = ["reqwest/rustls-tls"]
-
-# Use vendored libgit2 and openssl of git2-rs
-git2-vendored-libgit2 = ["git2/vendored-libgit2"]
-git2-vendored-openssl = ["git2/vendored-openssl"]
 
 [[bin]]
 name = "maa"
@@ -96,7 +87,6 @@ features = ["rt"]
 
 [dependencies.reqwest]
 version = "0.11"
-default-features = false
 features = ["blocking", "json"]
 
 [dev-dependencies]
