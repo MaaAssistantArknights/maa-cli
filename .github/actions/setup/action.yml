@@ -52,13 +52,6 @@ runs:
         echo "AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar" >> $GITHUB_ENV
         echo "CFLAGS_aarch64_unknown_linux_gnu=--sysroot=/usr/aarch64-linux-gnu" >> $GITHUB_ENV
         echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-    - name: Setup Cross Compiling Toolchain (macOS x86_64 to aarch64)
-      if: inputs.arch == 'aarch64' && startsWith(inputs.os, 'macos')
-      shell: bash
-      run: |
-        which cc
-        cc --version
-        echo "CC_aarch64_apple_darwin=(brew --prefix llvm@15)/bin/clang" >> $GITHUB_ENV
     - name: Install Cargo tarpaulin
       if: fromJson(inputs.coverage)
       uses: taiki-e/install-action@v2
