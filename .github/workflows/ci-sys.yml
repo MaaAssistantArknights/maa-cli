@@ -52,7 +52,7 @@ jobs:
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
         run: |
-          cargo run --no-default-features --features core_installer -- install stable -t0
+          cargo run -- install stable -t0
           MAA_CORE_DIR="$(cargo run -- dir lib)"
           ls -l "$MAA_CORE_DIR"
           echo "MAA_CORE_DIR=$MAA_CORE_DIR" >> $GITHUB_ENV
