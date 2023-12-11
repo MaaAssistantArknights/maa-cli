@@ -193,11 +193,11 @@ impl TaskConfig {
                         }
 
                         match (params.get("client_type"), client_type) {
-                            // If client type is set, set client type automatically
+                            // If client_type in task is set, set client type in config automatically
                             (Some(t), None) => {
                                 client_type = Some(t.as_string()?.parse()?);
                             }
-                            // If client type is set manually, set client type automatically
+                            // If client type in config is set, set client_type in task automatically
                             (None, Some(t)) => {
                                 params.insert("client_type", t.to_string());
                             }
@@ -690,13 +690,47 @@ mod tests {
 
             assert_eq!(
                 TaskConfig {
+                    client_type: Some(ClientType::Official),
+                    startup: Some(true),
+                    closedown: Some(true),
+                    tasks: vec![
+                        Task::new_with_default(
+                            MAATask::StartUp,
+                            object!( "start_game_enabled" => false)
+                        ),
+                        Task::new_with_default(MAATask::Fight, object!("stage" => "1-7"))
+                    ],
+                }
+                .init()
+                .unwrap(),
+                InitializedTaskConfig {
+                    client_type: Some(ClientType::Official),
+                    start_app: true,
+                    close_app: true,
+                    tasks: vec![
+                        (
+                            MAATask::StartUp.into(),
+                            object!(
+                                "enable" => true,
+                                "client_type" => "Official",
+                                "start_game_enabled" => true,
+                            )
+                        ),
+                        (MAATask::Fight.into(), object!("stage" => "1-7")),
+                        (MAATask::CloseDown.into(), object!()),
+                    ]
+                },
+            );
+
+            assert_eq!(
+                TaskConfig {
                     client_type: None,
                     startup: Some(true),
                     closedown: Some(true),
                     tasks: vec![Task::new_with_default(
                         MAATask::Fight,
                         object!("stage" => "1-7")
-                    ),],
+                    )],
                 }
                 .init()
                 .unwrap(),
@@ -726,7 +760,7 @@ mod tests {
                     tasks: vec![Task::new_with_default(
                         MAATask::Fight,
                         object!("stage" => "1-7")
-                    ),],
+                    )],
                 }
                 .init()
                 .unwrap(),

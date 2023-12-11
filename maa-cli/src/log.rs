@@ -61,7 +61,11 @@ impl<T: Into<LogLevel>> From<T> for Logger {
     }
 }
 
-static mut LOGGER: Logger = Logger::new(LogLevel::Normal);
+static mut LOGGER: Logger = if cfg!(test) {
+    Logger::new(LogLevel::Trace)
+} else {
+    Logger::new(LogLevel::Normal)
+};
 
 pub unsafe fn set_level(level: impl Into<LogLevel>) {
     LOGGER.set_level(level);

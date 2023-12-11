@@ -782,9 +782,9 @@ mod tests {
 
             assert_matches!(
                 ConnectionConfig::PlayTools {
-                    address: "localhost:7777".to_owned(),
+                    address: default_playcover_address(),
                     config: default_config(),
-                },
+                }.set_address("localhost:7777"),
                 ConnectionConfig::PlayTools {
                     address,
                     ..
