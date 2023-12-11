@@ -191,10 +191,12 @@ jobs:
         if: ${{ !startsWith(matrix.os, 'windows') }}
         run: cargo test --package maa-sys
       - name: Coverage
+        if: ${{ !startsWith(matrix.os, 'windows') }}
         run: |
           cargo tarpaulin --packages maa-sys --timeout 120 --out xml \
             ${{ github.run_attempt == 1 && '--skip-clean' || '' }}
       - name: Upload to codecov.io
+        if: ${{ !startsWith(matrix.os, 'windows') }}
         uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
