@@ -96,20 +96,25 @@ mod tests {
         StaticOptionKey::CpuOCR.apply(true).unwrap();
         // StaticOptionKey::GpuOCR.apply(1).unwrap();
 
-        // Apply instance options
-        let asst = Assistant::new(None, None);
-        InstanceOptionKey::TouchMode
-            .apply_to(&asst, TouchMode::MaaTouch)
-            .unwrap();
-        InstanceOptionKey::DeploymentWithPause
-            .apply_to(&asst, false)
-            .unwrap();
-        InstanceOptionKey::AdbLiteEnabled
-            .apply_to(&asst, false)
-            .unwrap();
-        InstanceOptionKey::KillAdbOnExit
-            .apply_to(&asst, false)
-            .unwrap();
+        use std::{env, path::Path};
+        if let Some(path) = env::var_os("MAA_RESOURCE_DIR") {
+            Assistant::load_resource(Path::new(&path)).unwrap();
+
+            // Apply instance options
+            let asst = Assistant::new(None, None);
+            InstanceOptionKey::TouchMode
+                .apply_to(&asst, TouchMode::MaaTouch)
+                .unwrap();
+            InstanceOptionKey::DeploymentWithPause
+                .apply_to(&asst, false)
+                .unwrap();
+            InstanceOptionKey::AdbLiteEnabled
+                .apply_to(&asst, false)
+                .unwrap();
+            InstanceOptionKey::KillAdbOnExit
+                .apply_to(&asst, false)
+                .unwrap();
+        }
     }
 
     mod to_cstring {

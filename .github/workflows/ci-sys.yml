@@ -54,8 +54,11 @@ jobs:
         run: |
           cargo run -- install stable -t0
           MAA_CORE_DIR="$(cargo run -- dir lib)"
+          MAA_RESOURCE_DIR="$(cargo run -- dir resource)"
           ls -l "$MAA_CORE_DIR"
+          ls -l "$MAA_RESOURCE_DIR"
           echo "MAA_CORE_DIR=$MAA_CORE_DIR" >> $GITHUB_ENV
+          echo "MAA_RESOURCE_DIR=$MAA_RESOURCE_DIR" >> $GITHUB_ENV
       - name: Build
         run: cargo build --package maa-sys --locked
       - name: Lint (clippy)
