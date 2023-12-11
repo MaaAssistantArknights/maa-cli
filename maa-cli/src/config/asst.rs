@@ -394,25 +394,25 @@ impl InstanceOptions {
         if let Some(touch_mode) = self.touch_mode {
             debug!("Setting touch mode to", touch_mode);
             InstanceOptionKey::TouchMode
-                .apply(asst, touch_mode)
+                .apply_to(asst, touch_mode)
                 .with_context(|| format!("Failed to set touch mode to {}", touch_mode))?;
         }
         if let Some(deployment_with_pause) = self.deployment_with_pause {
             debug!("Setting deployment with pause to", deployment_with_pause);
             InstanceOptionKey::DeploymentWithPause
-                .apply(asst, deployment_with_pause)
+                .apply_to(asst, deployment_with_pause)
                 .context("Failed to set deployment with pause")?;
         }
         if let Some(adb_lite_enabled) = self.adb_lite_enabled {
             debug!("Setting adb lite enabled to", adb_lite_enabled);
             InstanceOptionKey::AdbLiteEnabled
-                .apply(asst, adb_lite_enabled)
+                .apply_to(asst, adb_lite_enabled)
                 .context("Failed to set adb lite enabled")?;
         }
         if let Some(kill_adb_on_exit) = self.kill_adb_on_exit {
             debug!(format!("Setting kill adb on exit to {}", kill_adb_on_exit));
             InstanceOptionKey::KillAdbOnExit
-                .apply(asst, kill_adb_on_exit)
+                .apply_to(asst, kill_adb_on_exit)
                 .context("Failed to set kill adb on exit")?;
         }
         Ok(())
