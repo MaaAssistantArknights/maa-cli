@@ -131,14 +131,14 @@ impl Dirs {
         &self.config
     }
 
-    /// Find a file in the config directory.
+    /// Get absolute path in config directory.
     ///
-    /// If the path is absolute, return None.
+    /// If the given path is absolute, return `None`.
     /// Otherwise, return the path in the config directory.
     /// The `sub_dir` is the sub directory of the config directory.
     /// If `sub_dir` is `None`, the path is relative to the config directory.
     /// Otherwise, the path is relative to the `sub_dir` directory.
-    pub fn config_path<P: AsRef<Path>, D: AsRef<Path>>(
+    pub fn abs_config<P: AsRef<Path>, D: AsRef<Path>>(
         &self,
         path: P,
         sub_dir: Option<D>,
@@ -247,8 +247,8 @@ pub fn config() -> &'static Path {
     DIRS.config()
 }
 
-pub fn config_path<P: AsRef<Path>, D: AsRef<Path>>(path: P, sub_dir: Option<D>) -> Option<PathBuf> {
-    DIRS.config_path(path, sub_dir)
+pub fn abs_config<P: AsRef<Path>, D: AsRef<Path>>(path: P, sub_dir: Option<D>) -> Option<PathBuf> {
+    DIRS.abs_config(path, sub_dir)
 }
 
 pub fn cache() -> &'static Path {
@@ -574,7 +574,7 @@ mod tests {
         }
 
         #[test]
-        fn config_dir() {
+        fn config_relative() {
             env::remove_var("XDG_CONFIG_HOME");
             let project = ProjectDirs::from("com", "loong", "maa");
             if cfg!(target_os = "macos") {
@@ -586,23 +586,23 @@ mod tests {
                 assert_eq!(TEST_DIRS.config(), HOME.join(".config/maa"));
             }
             assert_eq!(
-                TEST_DIRS.config_path::<&str, &str>("foo", None).unwrap(),
+                TEST_DIRS.abs_config::<&str, &str>("foo", None).unwrap(),
                 TEST_DIRS.config().join("foo")
             );
             assert_eq!(
-                TEST_DIRS.config_path("foo", Some("bar")).unwrap(),
+                TEST_DIRS.abs_config("foo", Some("bar")).unwrap(),
                 TEST_DIRS.config().join("bar").join("foo")
             );
 
             #[cfg(unix)]
             {
-                assert_eq!(TEST_DIRS.config_path::<&str, &str>("/tmp", None), None);
-                assert_eq!(TEST_DIRS.config_path("/tmp", Some("bar")), None);
+                assert_eq!(TEST_DIRS.abs_config::<&str, &str>("/tmp", None), None);
+                assert_eq!(TEST_DIRS.abs_config("/tmp", Some("bar")), None);
             }
 
             assert_eq!(config(), TEST_DIRS.config());
             assert_eq!(
-                config_path("foo", Some("bar")).unwrap(),
+                abs_config("foo", Some("bar")).unwrap(),
                 config().join("bar").join("foo")
             );
 

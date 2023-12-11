@@ -10,11 +10,9 @@ pub use client_type::ClientType;
 mod condition;
 use condition::Condition;
 
-use super::FindFile;
-
 use crate::{dirs, object};
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use anyhow::Context;
 use serde::Deserialize;
@@ -158,15 +156,6 @@ impl TaskConfig {
         }
     }
 
-    pub fn from_file(path: impl AsRef<Path>) -> Result<Self, super::Error> {
-        let path = path.as_ref();
-        if let Some(abs_path) = dirs::config_path(path, Some("tasks")) {
-            TaskConfig::find_file(abs_path)
-        } else {
-            TaskConfig::find_file(path)
-        }
-    }
-
     pub fn push(&mut self, task: Task) {
         self.tasks.push(task);
     }
@@ -240,7 +229,7 @@ impl TaskConfig {
                         if let Some(v) = params.get("filename") {
                             let file = PathBuf::from(v.as_string()?);
                             let sub_dir = task_type.as_ref().to_lowercase();
-                            if let Some(path) = dirs::config_path(file, Some(sub_dir)) {
+                            if let Some(path) = dirs::abs_config(file, Some(sub_dir)) {
                                 params.insert("filename", path.to_str().context("Invilid UTF-8")?)
                             }
                         }
@@ -251,15 +240,20 @@ impl TaskConfig {
         }
 
         if prepend_startup {
-            let mut params = object!("enable" => true, "start_game_enabled" => true);
-            if let Some(client_type) = self.client_type {
-                params.insert("client_type", client_type.to_string());
-            };
-            tasks.insert(0, (MAATask::StartUp.into(), params))
+            tasks.insert(
+                0,
+                (
+                    MAATask::StartUp.into(),
+                    object!(
+                        "start_game_enabled" => true,
+                        "client_type" => self.client_type.unwrap_or_default().to_string(),
+                    ),
+                ),
+            );
         }
 
         if append_closedown {
-            tasks.push((MAATask::CloseDown.into(), object!("enable" => true)));
+            tasks.push((MAATask::CloseDown.into(), object!()));
         }
 
         Ok(InitializedTaskConfig {
@@ -273,29 +267,12 @@ impl TaskConfig {
 
 impl super::FromFile for TaskConfig {}
 
+#[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct InitializedTaskConfig {
-    client_type: Option<ClientType>,
-    start_app: bool,
-    close_app: bool,
-    tasks: Vec<(TaskOrUnknown, Value)>,
-}
-
-impl InitializedTaskConfig {
-    pub fn client_type(&self) -> Option<ClientType> {
-        self.client_type
-    }
-
-    pub fn start_app(&self) -> bool {
-        self.start_app
-    }
-
-    pub fn close_app(&self) -> bool {
-        self.close_app
-    }
-
-    pub fn tasks(&self) -> &[(TaskOrUnknown, Value)] {
-        &self.tasks
-    }
+    pub client_type: Option<ClientType>,
+    pub start_app: bool,
+    pub close_app: bool,
+    pub tasks: Vec<(TaskOrUnknown, Value)>,
 }
 
 #[cfg(test)]
@@ -531,35 +508,45 @@ mod tests {
         }
     }
 
-    mod deserialize_example {
+    mod task_config {
         use super::*;
 
-        use value::input::{BoolInput, Input, Select};
+        mod serde {
+            use super::*;
 
-        use chrono::{NaiveDateTime, NaiveTime, TimeZone, Weekday};
+            use value::input::{BoolInput, Input, Select};
 
-        fn naive_local_datetime(y: i32, m: u32, d: u32, h: u32, mi: u32, s: u32) -> NaiveDateTime {
-            chrono::Local
-                .with_ymd_and_hms(y, m, d, h, mi, s)
-                .unwrap()
-                .naive_local()
-        }
+            use chrono::{NaiveDateTime, NaiveTime, TimeZone, Weekday};
 
-        fn example_task_config() -> TaskConfig {
-            let mut task_list = TaskConfig::new();
+            fn naive_local_datetime(
+                y: i32,
+                m: u32,
+                d: u32,
+                h: u32,
+                mi: u32,
+                s: u32,
+            ) -> NaiveDateTime {
+                chrono::Local
+                    .with_ymd_and_hms(y, m, d, h, mi, s)
+                    .unwrap()
+                    .naive_local()
+            }
 
-            task_list.push(Task::new_with_default(
-                MAATask::StartUp,
-                object!(
-                    "client_type" => "Official",
-                    "start_game_enabled" => BoolInput::new(
-                        Some(true),
-                        Some("start the game"),
+            fn example_task_config() -> TaskConfig {
+                let mut task_list = TaskConfig::new();
+
+                task_list.push(Task::new_with_default(
+                    MAATask::StartUp,
+                    object!(
+                        "client_type" => "Official",
+                        "start_game_enabled" => BoolInput::new(
+                            Some(true),
+                            Some("start the game"),
+                        ),
                     ),
-                ),
-            ));
+                ));
 
-            task_list.push(Task::new(
+                task_list.push(Task::new(
                 MAATask::Fight,
                 object!(),
                 Strategy::Merge,
@@ -604,61 +591,162 @@ mod tests {
                 ],
             ));
 
-            task_list.push(Task::new(
-                MAATask::Mall,
-                object!(
-                    "shopping" => true,
-                    "credit_fight" => true,
-                    "buy_first" => [
-                        "招聘许可",
-                        "龙门币",
+                task_list.push(Task::new(
+                    MAATask::Mall,
+                    object!(
+                        "shopping" => true,
+                        "credit_fight" => true,
+                        "buy_first" => [
+                            "招聘许可",
+                            "龙门币",
+                        ],
+                        "blacklist" => [
+                            "碳",
+                            "家具",
+                            "加急许可",
+                        ],
+                    ),
+                    Strategy::default(),
+                    vec![TaskVariant {
+                        condition: Condition::Time {
+                            start: Some(NaiveTime::from_hms_opt(16, 0, 0).unwrap()),
+                            end: None,
+                        },
+                        params: object!(),
+                    }],
+                ));
+
+                task_list.push(Task::new_with_default(MAATask::CloseDown, object!()));
+
+                task_list
+            }
+
+            #[test]
+            fn json() {
+                let task_config: TaskConfig = serde_json::from_reader(
+                    std::fs::File::open("../config_examples/tasks/daily.json").unwrap(),
+                )
+                .unwrap();
+                assert_eq!(task_config.tasks, example_task_config().tasks)
+            }
+
+            #[test]
+            fn toml() {
+                let task_config: TaskConfig = toml::from_str(
+                    &std::fs::read_to_string("../config_examples/tasks/daily.toml").unwrap(),
+                )
+                .unwrap();
+                assert_eq!(task_config.tasks, example_task_config().tasks)
+            }
+
+            #[test]
+            fn yaml() {
+                let task_config: TaskConfig = serde_yaml::from_reader(
+                    std::fs::File::open("../config_examples/tasks/daily.yml").unwrap(),
+                )
+                .unwrap();
+                assert_eq!(task_config.tasks, example_task_config().tasks)
+            }
+        }
+
+        #[test]
+        fn init() {
+            assert_eq!(
+                TaskConfig {
+                    client_type: None,
+                    startup: None,
+                    closedown: None,
+                    tasks: vec![
+                        Task::new_with_default(
+                            MAATask::StartUp,
+                            object!(
+                                "client_type" => "Official",
+                                "start_game_enabled" => true,
+                            ),
+                        ),
+                        Task::new_with_default(MAATask::Fight, object!("stage" => "1-7")),
+                        Task::new_with_default(MAATask::CloseDown, object!()),
                     ],
-                    "blacklist" => [
-                        "碳",
-                        "家具",
-                        "加急许可",
-                    ],
-                ),
-                Strategy::default(),
-                vec![TaskVariant {
-                    condition: Condition::Time {
-                        start: Some(NaiveTime::from_hms_opt(16, 0, 0).unwrap()),
-                        end: None,
-                    },
-                    params: object!(),
-                }],
-            ));
+                }
+                .init()
+                .unwrap(),
+                InitializedTaskConfig {
+                    client_type: Some(ClientType::Official),
+                    start_app: true,
+                    close_app: true,
+                    tasks: vec![
+                        (
+                            MAATask::StartUp.into(),
+                            object!(
+                                "client_type" => "Official",
+                                "start_game_enabled" => true,
+                            )
+                        ),
+                        (MAATask::Fight.into(), object!("stage" => "1-7")),
+                        (MAATask::CloseDown.into(), object!()),
+                    ]
+                }
+            );
 
-            task_list.push(Task::new_with_default(MAATask::CloseDown, object!()));
+            assert_eq!(
+                TaskConfig {
+                    client_type: None,
+                    startup: Some(true),
+                    closedown: Some(true),
+                    tasks: vec![Task::new_with_default(
+                        MAATask::Fight,
+                        object!("stage" => "1-7")
+                    ),],
+                }
+                .init()
+                .unwrap(),
+                InitializedTaskConfig {
+                    client_type: None,
+                    start_app: true,
+                    close_app: true,
+                    tasks: vec![
+                        (
+                            MAATask::StartUp.into(),
+                            object!(
+                                "client_type" => "Official",
+                                "start_game_enabled" => true,
+                            )
+                        ),
+                        (MAATask::Fight.into(), object!("stage" => "1-7")),
+                        (MAATask::CloseDown.into(), object!()),
+                    ]
+                },
+            );
 
-            task_list
-        }
-
-        #[test]
-        fn json() {
-            let task_config: TaskConfig = serde_json::from_reader(
-                std::fs::File::open("../config_examples/tasks/daily.json").unwrap(),
+            assert_eq!(
+                TaskConfig {
+                    client_type: Some(ClientType::YoStarEN),
+                    startup: Some(true),
+                    closedown: Some(true),
+                    tasks: vec![Task::new_with_default(
+                        MAATask::Fight,
+                        object!("stage" => "1-7")
+                    ),],
+                }
+                .init()
+                .unwrap(),
+                InitializedTaskConfig {
+                    client_type: Some(ClientType::YoStarEN),
+                    start_app: true,
+                    close_app: true,
+                    tasks: vec![
+                        (
+                            MAATask::StartUp.into(),
+                            object!(
+                                "client_type" => "YoStarEN",
+                                "start_game_enabled" => true,
+                            )
+                        ),
+                        (MAATask::Fight.into(), object!("stage" => "1-7")),
+                        (MAATask::CloseDown.into(), object!()),
+                    ]
+                }
             )
-            .unwrap();
-            assert_eq!(task_config.tasks, example_task_config().tasks)
-        }
-
-        #[test]
-        fn toml() {
-            let task_config: TaskConfig = toml::from_str(
-                &std::fs::read_to_string("../config_examples/tasks/daily.toml").unwrap(),
-            )
-            .unwrap();
-            assert_eq!(task_config.tasks, example_task_config().tasks)
-        }
-
-        #[test]
-        fn yaml() {
-            let task_config: TaskConfig = serde_yaml::from_reader(
-                std::fs::File::open("../config_examples/tasks/daily.yml").unwrap(),
-            )
-            .unwrap();
-            assert_eq!(task_config.tasks, example_task_config().tasks)
         }
     }
 }

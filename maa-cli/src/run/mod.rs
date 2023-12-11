@@ -13,13 +13,13 @@ pub use copilot::copilot;
 use crate::{
     config::{
         asst::{with_asst_config, with_mut_asst_config, AsstConfig},
-        task::{InitializedTaskConfig, TaskConfig},
+        task::TaskConfig,
     },
     consts::MAA_CORE_LIB,
+    debug,
     dirs::{self, Ensure},
     installer::resource,
     log::{set_level, LogLevel},
-    {debug, warning},
 };
 
 use std::sync::{atomic, Arc};
@@ -97,7 +97,7 @@ where
     with_mut_asst_config(|config| args.apply_to(config));
     let task = with_asst_config(f)?;
     let task_config = task.init()?;
-    if let Some(client_type) = task_config.client_type() {
+    if let Some(client_type) = task_config.client_type {
         debug!("Detected client type:", client_type.as_ref());
         if let Some(resource) = client_type.resource() {
             with_mut_asst_config(|config| {
@@ -121,7 +121,7 @@ where
 
     with_asst_config(|config| config.instance_options.apply_to(&asst))?;
 
-    for (task_type, params) in task_config.tasks() {
+    for (task_type, params) in task_config.tasks.iter() {
         debug!(
             format!("Adding task {} with params:", task_type.as_ref()),
             serde_json::to_string_pretty(params)?
@@ -129,13 +129,16 @@ where
         asst.append_task(task_type, serde_json::to_string(params)?)?;
     }
 
-    let playcover = PlayCoverAppConfig::from(&task_config);
+    let playcover = PlayCoverApp::from(&task_config);
 
     if let Some(app) = playcover.as_ref() {
         app.open()?;
     }
 
-    with_asst_config(|config| config.connection.connect(&asst))?;
+    with_asst_config(|config| {
+        let (adb, addr, config) = config.connection.connect_args();
+        asst.async_connect(adb, addr, config, true)
+    })?;
 
     asst.start()?;
 
@@ -158,14 +161,32 @@ where
     Ok(())
 }
 
-pub fn run_custom(task: impl AsRef<std::path::Path>, args: CommonArgs) -> Result<()> {
-    run(|_| TaskConfig::from_file(task).map_err(Into::into), args)
+pub fn run_custom(path: impl AsRef<std::path::Path>, args: CommonArgs) -> Result<()> {
+    run(
+        |_| {
+            use crate::config::FindFile;
+
+            let path = path.as_ref();
+            if let Some(abs_path) = dirs::abs_config(path, Some("tasks")) {
+                TaskConfig::find_file(abs_path)
+            } else {
+                TaskConfig::find_file(path)
+            }
+            .context("Failed to find task file!")
+        },
+        args,
+    )
 }
 
-pub fn core_version<'a>() -> Result<&'a str> {
+pub fn core_version<'a>() -> Result<&'a str, maa_sys::Error> {
     load_core();
 
-    Ok(Assistant::get_version()?)
+    Assistant::get_version()
+
+    // BUG:
+    // if we call maa_sys::binding::unload() here,
+    // program will crash with signal SIGSEGV (Address boundary error)
+    // So we don't unload MaaCore
 }
 
 fn load_core() {
@@ -200,52 +221,6 @@ fn setup_core(config: &AsstConfig) -> Result<()> {
     config.resource.load()?;
 
     Ok(())
-}
-
-struct PlayCoverAppConfig<'a> {
-    app: PlayCoverApp<'a>,
-    start_app: bool,
-    close_app: bool,
-}
-
-impl PlayCoverAppConfig<'_> {
-    fn from(task_config: &InitializedTaskConfig) -> Option<Self> {
-        if task_config.start_app() || task_config.close_app() {
-            let app = if let Some(client_type) = task_config.client_type() {
-                let app = PlayCoverApp::from(client_type);
-                debug!("PlayCover app:", app.name());
-                app
-            } else {
-                let app = PlayCoverApp::default();
-                warning!(
-                    "No client type specified,",
-                    format!("using default app name {}", app.name())
-                );
-                app
-            };
-            Some(Self {
-                app,
-                start_app: task_config.start_app(),
-                close_app: task_config.close_app(),
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn open(&self) -> Result<()> {
-        if self.start_app {
-            self.app.open()?;
-        }
-        Ok(())
-    }
-
-    pub fn close(&self) -> Result<()> {
-        if self.close_app {
-            self.app.close()?;
-        }
-        Ok(())
-    }
 }
 
 #[cfg(test)]

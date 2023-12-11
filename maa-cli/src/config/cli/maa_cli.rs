@@ -32,7 +32,7 @@ impl Config {
         self.channel
     }
 
-    pub fn set_channel(&mut self, channel: Channel) -> &Self {
+    pub fn set_channel(&mut self, channel: Channel) -> &mut Self {
         self.channel = channel;
         self
     }
@@ -41,7 +41,7 @@ impl Config {
         format!("{}{}.json", normalize_url(&self.api_url), self.channel())
     }
 
-    pub fn set_api_url(&mut self, api_url: impl ToString) -> &Self {
+    pub fn set_api_url(&mut self, api_url: impl ToString) -> &mut Self {
         self.api_url = api_url.to_string();
         self
     }
@@ -50,7 +50,7 @@ impl Config {
         format!("{}{}/{}", normalize_url(&self.download_url), tag, name)
     }
 
-    pub fn set_download_url(&mut self, download_url: impl ToString) -> &Self {
+    pub fn set_download_url(&mut self, download_url: impl ToString) -> &mut Self {
         self.download_url = download_url.to_string();
         self
     }
@@ -206,6 +206,13 @@ pub mod tests {
             );
 
             assert_eq!(
+                Config::default()
+                    .set_api_url("https://foo.bar/cli/")
+                    .api_url(),
+                "https://foo.bar/cli/stable.json",
+            );
+
+            assert_eq!(
                 Config {
                     channel: Channel::Alpha,
                     api_url: "https://foo.bar/cli/".to_string(),
@@ -245,6 +252,32 @@ pub mod tests {
                 }
                 .components(),
                 &CLIComponents { binary: false },
+            );
+        }
+
+        #[test]
+        fn with_args() {
+            assert_eq!(
+                Config::default().with_args(&CommonArgs {
+                    channel: None,
+                    api_url: None,
+                    download_url: None,
+                }),
+                Config::default(),
+            );
+
+            assert_eq!(
+                Config::default().with_args(&CommonArgs {
+                    channel: Some(Channel::Alpha),
+                    api_url: Some("https://foo.bar/api/".to_string()),
+                    download_url: Some("https://foo.bar/download/".to_string()),
+                }),
+                Config {
+                    channel: Channel::Alpha,
+                    api_url: "https://foo.bar/api/".to_string(),
+                    download_url: "https://foo.bar/download/".to_string(),
+                    ..Default::default()
+                },
             );
         }
     }

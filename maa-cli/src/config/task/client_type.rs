@@ -1,15 +1,23 @@
 use serde::Deserialize;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Clone, Copy, Deserialize)]
+#[derive(Clone, Copy, Default)]
 pub enum ClientType {
+    #[default]
     Official,
     Bilibili,
-    #[serde(alias = "txwy", alias = "TXWY")]
     Txwy,
     YoStarEN,
     YoStarJP,
     YoStarKR,
+}
+
+impl<'de> Deserialize<'de> for ClientType {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        String::deserialize(deserializer)?
+            .parse()
+            .map_err(serde::de::Error::custom)
+    }
 }
 
 impl ClientType {
@@ -20,6 +28,15 @@ impl ClientType {
             ClientType::YoStarJP => Some("YoStarJP"),
             ClientType::YoStarKR => Some("YoStarKR"),
             _ => None,
+        }
+    }
+
+    pub fn app(self) -> &'static str {
+        match self {
+            ClientType::Official | ClientType::Bilibili | ClientType::Txwy => "明日方舟",
+            ClientType::YoStarEN => "Arknights",
+            ClientType::YoStarJP => "アークナイツ",
+            ClientType::YoStarKR => "명일방주",
         }
     }
 }
@@ -50,12 +67,20 @@ impl std::str::FromStr for ClientType {
         match s {
             "Official" | "" => Ok(ClientType::Official),
             "Bilibili" => Ok(ClientType::Bilibili),
-            "txwy" => Ok(ClientType::Txwy),
+            "Txwy" | "TXWY" | "txwy" => Ok(ClientType::Txwy),
             "YoStarEN" => Ok(ClientType::YoStarEN),
             "YoStarJP" => Ok(ClientType::YoStarJP),
             "YoStarKR" => Ok(ClientType::YoStarKR),
             _ => Err(Error::UnknownClientType),
         }
+    }
+}
+
+impl TryFrom<&str> for ClientType {
+    type Error = Error;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        s.parse()
     }
 }
 
@@ -76,17 +101,65 @@ impl std::error::Error for Error {}
 
 #[cfg(test)]
 mod tests {
+    use crate::assert_matches;
+
     use super::*;
 
+    use serde_test::{assert_de_tokens, Token};
+
+    impl ClientType {
+        fn to_token(self) -> Token {
+            match self {
+                ClientType::Official => Token::Str("Official"),
+                ClientType::Bilibili => Token::Str("Bilibili"),
+                ClientType::Txwy => Token::Str("txwy"),
+                ClientType::YoStarEN => Token::Str("YoStarEN"),
+                ClientType::YoStarJP => Token::Str("YoStarJP"),
+                ClientType::YoStarKR => Token::Str("YoStarKR"),
+            }
+        }
+    }
+
     #[test]
-    fn parse_client() {
-        assert_eq!(ClientType::Official, "Official".parse().unwrap());
-        assert_eq!(ClientType::Official, "".parse().unwrap());
-        assert_eq!(ClientType::Bilibili, "Bilibili".parse().unwrap());
-        assert_eq!(ClientType::Txwy, "txwy".parse().unwrap());
-        assert_eq!(ClientType::YoStarEN, "YoStarEN".parse().unwrap());
-        assert_eq!(ClientType::YoStarJP, "YoStarJP".parse().unwrap());
-        assert_eq!(ClientType::YoStarKR, "YoStarKR".parse().unwrap());
+    fn deserialize() {
+        assert_de_tokens(&ClientType::Official, &[ClientType::Official.to_token()]);
+        assert_de_tokens(&ClientType::Bilibili, &[ClientType::Bilibili.to_token()]);
+        assert_de_tokens(&ClientType::Txwy, &[ClientType::Txwy.to_token()]);
+        assert_de_tokens(&ClientType::YoStarEN, &[ClientType::YoStarEN.to_token()]);
+        assert_de_tokens(&ClientType::YoStarJP, &[ClientType::YoStarJP.to_token()]);
+        assert_de_tokens(&ClientType::YoStarKR, &[ClientType::YoStarKR.to_token()]);
+    }
+
+    #[test]
+    fn parse() {
+        assert_matches!("".parse::<ClientType>().unwrap(), ClientType::Official);
+        assert_matches!(
+            "Official".parse::<ClientType>().unwrap(),
+            ClientType::Official
+        );
+        assert_matches!(
+            "Bilibili".parse::<ClientType>().unwrap(),
+            ClientType::Bilibili
+        );
+        assert_matches!("txwy".parse::<ClientType>().unwrap(), ClientType::Txwy);
+        assert_matches!("TXWY".parse::<ClientType>().unwrap(), ClientType::Txwy);
+        assert_matches!(
+            "YoStarEN".parse::<ClientType>().unwrap(),
+            ClientType::YoStarEN
+        );
+        assert_matches!(
+            "YoStarJP".parse::<ClientType>().unwrap(),
+            ClientType::YoStarJP
+        );
+        assert_matches!(
+            "YoStarKR".parse::<ClientType>().unwrap(),
+            ClientType::YoStarKR
+        );
+
+        assert_matches!(
+            "UnknownClientType".parse::<ClientType>().unwrap_err(),
+            Error::UnknownClientType,
+        );
     }
 
     #[test]
@@ -97,5 +170,25 @@ mod tests {
         assert_eq!(ClientType::YoStarEN.resource(), Some("YoStarEN"));
         assert_eq!(ClientType::YoStarJP.resource(), Some("YoStarJP"));
         assert_eq!(ClientType::YoStarKR.resource(), Some("YoStarKR"));
+    }
+
+    #[test]
+    fn client_to_app() {
+        assert_eq!(ClientType::Official.app(), "明日方舟");
+        assert_eq!(ClientType::Bilibili.app(), "明日方舟");
+        assert_eq!(ClientType::Txwy.app(), "明日方舟");
+        assert_eq!(ClientType::YoStarEN.app(), "Arknights");
+        assert_eq!(ClientType::YoStarJP.app(), "アークナイツ");
+        assert_eq!(ClientType::YoStarKR.app(), "명일방주");
+    }
+
+    #[test]
+    fn client_to_string() {
+        assert_eq!(ClientType::Official.to_string(), "Official");
+        assert_eq!(ClientType::Bilibili.to_string(), "Bilibili");
+        assert_eq!(ClientType::Txwy.to_string(), "txwy");
+        assert_eq!(ClientType::YoStarEN.to_string(), "YoStarEN");
+        assert_eq!(ClientType::YoStarJP.to_string(), "YoStarJP");
+        assert_eq!(ClientType::YoStarKR.to_string(), "YoStarKR");
     }
 }
