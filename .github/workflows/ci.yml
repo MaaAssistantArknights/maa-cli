@@ -88,7 +88,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
 
-  aarch64:
+  build-aarch64:
     name: Build (aarch64)
     runs-on: ${{ matrix.os }}
     strategy:
@@ -112,7 +112,7 @@ jobs:
           cargo build --package maa-cli --locked \
             --features git2/vendored-openssl,reqwest/native-tls-vendored
 
-  features:
+  build-no-default-features:
     name: Build and Test (no default features)
     runs-on: ${{ matrix.os }}
     strategy:
@@ -123,9 +123,8 @@ jobs:
           - macos-latest
           - windows-latest
         features:
-          - --features core_installer
-          - --features cli_installer
-          - ""
+          - core_installer,git2 # disabled cli_installer, used by package manager
+          - git2 # disabled both cli_installer and core_installer, used by appimage
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -137,10 +136,11 @@ jobs:
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
         with:
-          key: feature-${{ matrix.features }}
+          key: ${{ matrix.features }}
       - name: Build
         run: |
-          cargo build --package maa-cli --no-default-features ${{ matrix.features }} --locked
+          cargo build --package maa-cli --locked \
+            --no-default-features --features ${{ matrix.features }}
       - name: Test
         run: |
           cargo test
