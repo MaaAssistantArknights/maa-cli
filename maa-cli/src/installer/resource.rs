@@ -1,12 +1,12 @@
 use crate::{
-    config::{cli::resource::GitBackend, installer_config},
-    dirs,
+    config::cli::{cli_config, resource::GitBackend},
+    debug, dirs,
 };
 
 use anyhow::Result;
 
 pub fn update(is_auto: bool) -> Result<()> {
-    let config = installer_config().resource_config();
+    let config = cli_config().resource_config();
 
     // Skip auto update if auto update is disabled
     if is_auto && !config.auto_update() {
@@ -20,12 +20,14 @@ pub fn update(is_auto: bool) -> Result<()> {
     let dest = dirs::hot_update();
 
     if dest.exists() {
+        debug!("Fetching resource repository...");
         match backend {
             GitBackend::Git => git::pull(dest, branch, ssh_key.as_deref())?,
             #[cfg(feature = "git2")]
             GitBackend::Libgit2 => git2::pull(dest, branch, ssh_key.as_deref())?,
         }
     } else {
+        debug!("Cloning resource repository...");
         match backend {
             GitBackend::Git => git::clone(url, branch, dest, ssh_key.as_deref())?,
             #[cfg(feature = "git2")]
@@ -37,6 +39,8 @@ pub fn update(is_auto: bool) -> Result<()> {
 }
 
 mod git {
+    use crate::log;
+
     use std::path::Path;
 
     use anyhow::{bail, Context, Result};
@@ -59,6 +63,8 @@ mod git {
         if let Some(branch) = branch {
             cmd.args(["--branch", branch]);
         }
+
+        cmd.arg(unsafe { log::level().to_git_flag() });
 
         if let Some(ssh_key) = ssh_key {
             cmd.env(
@@ -86,6 +92,10 @@ mod git {
         if let Some(branch) = branch {
             cmd.arg(branch);
         }
+
+        cmd.arg("--ff-only");
+
+        cmd.arg(unsafe { log::level().to_git_flag() });
 
         if let Some(ssh_key) = ssh_key {
             cmd.env(
@@ -164,7 +174,6 @@ mod git2 {
             fetch_options
         });
 
-        debug!("Fetching from remote 'origin'");
         repo.find_remote("origin")
             .context("Failed to find remote 'origin'")?
             .fetch(&[branch], fetch_options.as_mut(), None)?;

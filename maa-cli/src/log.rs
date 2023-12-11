@@ -22,6 +22,19 @@ impl<T: Into<u8>> From<T> for LogLevel {
     }
 }
 
+impl LogLevel {
+    pub fn to_git_flag(&self) -> &str {
+        match self {
+            Self::Error => "-qq",
+            Self::Warning => "-q",
+            Self::Normal => "",
+            Self::Info => "-v",
+            Self::Debug => "-vv",
+            Self::Trace => "-vvv",
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Logger {
     level: LogLevel,

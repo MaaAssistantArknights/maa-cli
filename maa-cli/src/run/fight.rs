@@ -7,9 +7,9 @@ use crate::{
     object,
 };
 
-use super::{run, CommonArgs, Result};
+use anyhow::Result;
 
-pub fn fight(startup: bool, closedown: bool, common: CommonArgs) -> Result<()> {
+pub fn fight(startup: bool, closedown: bool) -> Result<TaskConfig> {
     let mut task_config = TaskConfig::new();
 
     if startup {
@@ -38,5 +38,5 @@ pub fn fight(startup: bool, closedown: bool, common: CommonArgs) -> Result<()> {
         task_config.push(Task::new_with_default(MAATask::CloseDown, Value::default()));
     }
 
-    run(task_config, common)
+    Ok(task_config)
 }

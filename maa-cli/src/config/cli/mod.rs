@@ -16,7 +16,7 @@ use serde::Deserialize;
 /// Configuration for the CLI (cli.toml)
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Default)]
-pub struct InstallerConfig {
+pub struct CLIConfig {
     /// MaaCore configuration
     #[cfg(feature = "core_installer")]
     #[serde(default)]
@@ -28,7 +28,7 @@ pub struct InstallerConfig {
     resource: resource::Config,
 }
 
-impl InstallerConfig {
+impl CLIConfig {
     #[cfg(feature = "core_installer")]
     pub fn core_config(&self) -> maa_core::Config {
         self.core.clone()
@@ -44,15 +44,15 @@ impl InstallerConfig {
     }
 }
 
-impl super::FromFile for InstallerConfig {}
+impl super::FromFile for CLIConfig {}
 
 lazy_static! {
-    static ref INSTALLER_CONFIG: InstallerConfig =
-        InstallerConfig::find_file_or_default(&dirs::config().join("cli"))
+    static ref INSTALLER_CONFIG: CLIConfig =
+        CLIConfig::find_file_or_default(&dirs::config().join("cli"))
             .expect("Failed to load installer config");
 }
 
-pub fn installer_config() -> &'static InstallerConfig {
+pub fn cli_config() -> &'static CLIConfig {
     &INSTALLER_CONFIG
 }
 
@@ -128,13 +128,13 @@ mod tests {
     #[test]
     fn deserialize_installer_config() {
         assert_de_tokens(
-            &InstallerConfig::default(),
+            &CLIConfig::default(),
             &[Token::Map { len: Some(0) }, Token::MapEnd],
         );
 
         #[cfg(feature = "core_installer")]
         assert_de_tokens(
-            &InstallerConfig {
+            &CLIConfig {
                 core: maa_core::tests::example_config(),
                 ..Default::default()
             },
@@ -162,7 +162,7 @@ mod tests {
 
         #[cfg(feature = "cli_installer")]
         assert_de_tokens(
-            &InstallerConfig {
+            &CLIConfig {
                 cli: maa_cli::tests::example_config(),
                 ..Default::default()
             },
@@ -187,7 +187,7 @@ mod tests {
         );
 
         assert_de_tokens(
-            &InstallerConfig {
+            &CLIConfig {
                 resource: resource::tests::example_config(),
                 ..Default::default()
             },
@@ -217,11 +217,11 @@ mod tests {
 
     #[test]
     fn deserialize_example() {
-        let config: InstallerConfig =
+        let config: CLIConfig =
             toml::from_str(&std::fs::read_to_string("../config_examples/cli.toml").unwrap())
                 .unwrap();
 
-        let expect = InstallerConfig {
+        let expect = CLIConfig {
             #[cfg(feature = "core_installer")]
             core: maa_core::tests::example_config(),
             #[cfg(feature = "cli_installer")]
@@ -236,12 +236,12 @@ mod tests {
     #[test]
     fn get_core_config() {
         assert_eq!(
-            InstallerConfig::default().core_config(),
+            CLIConfig::default().core_config(),
             maa_core::Config::default()
         );
 
         assert_eq!(
-            &InstallerConfig {
+            &CLIConfig {
                 core: {
                     let mut config = maa_core::Config::default();
                     config.set_channel(Channel::Beta);
@@ -258,7 +258,7 @@ mod tests {
     #[test]
     fn get_cli_config() {
         assert_eq!(
-            InstallerConfig {
+            CLIConfig {
                 cli: Default::default(),
                 ..Default::default()
             }
@@ -267,7 +267,7 @@ mod tests {
         );
 
         assert_eq!(
-            InstallerConfig {
+            CLIConfig {
                 cli: maa_cli::tests::example_config(),
                 ..Default::default()
             }
@@ -279,7 +279,7 @@ mod tests {
     #[test]
     fn get_resource_config() {
         assert_eq!(
-            InstallerConfig {
+            CLIConfig {
                 resource: Default::default(),
                 ..Default::default()
             }

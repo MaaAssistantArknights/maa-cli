@@ -158,6 +158,15 @@ impl TaskConfig {
         }
     }
 
+    pub fn from_file(path: impl AsRef<Path>) -> Result<Self, super::Error> {
+        let path = path.as_ref();
+        if let Some(abs_path) = dirs::config_path(path, Some("tasks")) {
+            TaskConfig::find_file(abs_path)
+        } else {
+            TaskConfig::find_file(path)
+        }
+    }
+
     pub fn push(&mut self, task: Task) {
         self.tasks.push(task);
     }
@@ -263,34 +272,6 @@ impl TaskConfig {
 }
 
 impl super::FromFile for TaskConfig {}
-
-impl TryFrom<&Path> for TaskConfig {
-    type Error = super::Error;
-
-    fn try_from(path: &Path) -> Result<Self, Self::Error> {
-        if let Some(abs_path) = dirs::config_path(path, Some("tasks")) {
-            TaskConfig::find_file(abs_path.as_path())
-        } else {
-            TaskConfig::find_file(path)
-        }
-    }
-}
-
-impl TryFrom<&str> for TaskConfig {
-    type Error = super::Error;
-
-    fn try_from(path: &str) -> Result<Self, Self::Error> {
-        Path::new(path).try_into()
-    }
-}
-
-impl TryFrom<String> for TaskConfig {
-    type Error = super::Error;
-
-    fn try_from(path: String) -> Result<Self, Self::Error> {
-        path.as_str().try_into()
-    }
-}
 
 pub struct InitializedTaskConfig {
     client_type: Option<ClientType>,

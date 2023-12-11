@@ -54,7 +54,8 @@ impl From<serde_yaml::Error> for Error {
 const SUPPORTED_EXTENSION: [&str; 4] = ["json", "yaml", "yml", "toml"];
 
 pub trait FromFile: Sized + serde::de::DeserializeOwned {
-    fn from_file(path: &Path) -> Result<Self, Error> {
+    fn from_file(path: impl AsRef<Path>) -> Result<Self, Error> {
+        let path = path.as_ref();
         if !path.exists() {
             return Err(Error::FileNotFound(path.to_str().unwrap().to_string()));
         }
@@ -82,7 +83,8 @@ pub trait FromFile: Sized + serde::de::DeserializeOwned {
 }
 
 pub trait FindFile: FromFile {
-    fn find_file(path: &Path) -> Result<Self, Error> {
+    fn find_file(path: impl AsRef<Path>) -> Result<Self, Error> {
+        let path = path.as_ref();
         for filetype in SUPPORTED_EXTENSION.iter() {
             let path = path.with_extension(filetype);
             if path.exists() {
@@ -110,9 +112,7 @@ impl<T> FindFile for T where T: FromFile {}
 impl<T> FindFileOrDefault for T where T: FromFile + Default {}
 
 pub mod asst;
-pub use asst::asst_config;
 
 pub mod cli;
-pub use cli::installer_config;
 
 pub mod task;

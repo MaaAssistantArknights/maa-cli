@@ -1,180 +1,206 @@
-use super::{run, CommonArgs};
 use crate::{
     config::task::{
-        task_type::TaskType,
+        task_type::MAATask,
         value::input::{BoolInput, Input},
         Task, TaskConfig, Value,
     },
     debug,
-    dirs::{self, find_resource},
-    normal, object, warning,
+    dirs::{self, Ensure},
+    info, object, warning,
 };
-use anyhow::{anyhow, bail, Context, Error, Result};
-use prettytable::{format, row, Table};
-use reqwest::blocking::Client;
-use serde_json::{from_str, Value as JsonValue};
+
 use std::{
     fs::{self, File},
-    io::{BufReader, Write},
+    io::Write,
     path::{Path, PathBuf},
 };
 
-const API: &str = "https://prts.maa.plus/copilot/get/";
-const JSON_ERR: &str = "JSON Parse Error";
+use anyhow::{bail, Context, Result};
+use prettytable::{format, row, Table};
+use serde_json::Value as JsonValue;
 
-pub fn copilot(uri: String, common: CommonArgs) -> Result<()> {
-    let results = json_reader(&uri)?;
-    let value = results.0;
+const MAA_COPILOT_API: &str = "https://prts.maa.plus/copilot/get/";
+
+pub fn copilot(uri: impl AsRef<str>, resource_dirs: &Vec<PathBuf>) -> Result<TaskConfig> {
+    let (value, path) = CopilotJson::new(uri.as_ref())?.get_json_and_file()?;
 
     // Determine type of stage
     let task_type = match value["type"].as_str() {
-        Some("SSS") => "SSSCopilot",
-        _ => "Copilot",
+        Some("SSS") => CopilotType::SSSCopilot,
+        _ => CopilotType::Copilot,
     };
 
     // Print stage info
-    let mut stage_dir = find_resource().context("Failed to find resource!")?;
-    stage_dir.push("Arknights-Tile-Pos");
-    if task_type == "Copilot" {
-        let stage_code_name = value["stage_name"].as_str().context(JSON_ERR)?;
-        let result = find_json(stage_code_name, stage_dir).unwrap_or_else(|_| {
-            warning!(
-                "Unable to find target map. This may be because your Maacore version is too old."
-            );
-            let json_string = r#"{ "code" : " ", "name" : "Unknown" }"#;
-            from_str(json_string).unwrap()
-        });
-        let stage_name = format!(
-            "{} {}",
-            result["code"].as_str().context(JSON_ERR)?,
-            result["name"].as_str().context(JSON_ERR)?
-        );
-        normal!("Stage info:\n", stage_name);
-    } else {
-        let stage_name = value["stage_name"].as_str().context(JSON_ERR)?;
-        normal!("Stage info:\n", stage_name);
-    }
+    let stage_id = value["stage_name"].as_str().unwrap();
+    let stage_name = task_type.get_stage_name(resource_dirs, stage_id)?;
+
+    info!("Stage:", stage_name);
 
     // Print operators info
-    let opers = value["opers"].as_array().context(JSON_ERR)?;
-    let groups = value["groups"].as_array().context(JSON_ERR)?;
+    info!("Operators:\n", {
+        let opers = value["opers"].as_array().unwrap();
+        let groups = value["groups"].as_array().unwrap();
 
-    let mut table = Table::new();
-    table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
-    table.set_titles(row!["NAME", "SKILL"]);
-    for operator in opers {
-        let name = operator["name"].as_str().context(JSON_ERR)?;
-        let skill = operator["skill"].as_u64().context(JSON_ERR)?;
-        table.add_row(row![name, skill]);
-    }
+        let mut table = Table::new();
+        table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
+        table.set_titles(row!["NAME", "SKILL"]);
+        for operator in opers {
+            let name = operator["name"].as_str().unwrap();
+            let skill = operator["skill"].as_u64().unwrap();
+            table.add_row(row![name, skill]);
+        }
 
-    for group in groups {
-        let name: String = "[".to_string() + group["name"].as_str().context(JSON_ERR)? + "]";
-        let skill = "X";
-        table.add_row(row![name, skill]);
-    }
-    normal!("Operator lists:\n", table.to_string());
-
-    // Get input of user
-    let formation = BoolInput::new(Some(true), Some("self-formation?"));
-    let loop_times: Input<i64> = Input::new(Some(1), Some("loop times:"));
+        for group in groups {
+            table.add_row(row![format!("[{}]", group["name"].as_str().unwrap()), "X"]);
+        }
+        table
+    });
 
     // Append task
-    let mut task_list = TaskConfig::new();
-    let json_path_str = results.1.display().to_string();
-    if task_type == "Copilot" {
-        task_list.push(Task::new_with_default(
-            TaskType::Copilot,
-            object!(
-                "filename" => json_path_str,
-                "formation" => formation,
-            ),
-        ));
-        task_list.push(Task::new_with_default(TaskType::Copilot, object!()));
-    } else {
-        task_list.push(Task::new_with_default(
-            TaskType::SSSCopilot,
-            object!(
-                "filename" => json_path_str,
-                "loop_times" => loop_times,
-            ),
-        ));
-    };
+    let mut task_config = TaskConfig::new();
 
-    run(task_list, common)
+    task_config.push(task_type.to_task(path.to_str().unwrap()));
+
+    Ok(task_config)
 }
 
-fn json_reader(uri: &String) -> Result<(JsonValue, PathBuf)> {
-    let cache_dir = dirs::cache().to_path_buf();
+enum CopilotJson<'a> {
+    URL(&'a str),
+    File(&'a Path),
+}
 
-    let uri_: (&str, bool) = {
+impl CopilotJson<'_> {
+    pub fn new(uri: &str) -> Result<CopilotJson> {
         let trimed = uri.trim();
-        if trimed.starts_with("maa://") && trimed.parse::<f64>().is_err() {
-            (&uri[uri.len() - 5..], false)
-        } else if Path::new(trimed).is_file() {
-            (trimed, true)
-        } else {
-            bail!("Code Invalid");
-        }
-    };
-
-    if !uri_.1 {
-        // Load via server's API.
-
-        // Cache decision
-        match find_json(uri_.0, cache_dir.clone()) {
-            Result::Ok(value) => {
-                let json_path = cache_dir.join(uri_.0).with_extension("json");
-                return Ok((value, json_path));
+        if let Some(code_str) = trimed.strip_prefix("maa://") {
+            // just check if it's a number
+            if code_str.parse::<i64>().is_ok() {
+                return Ok(CopilotJson::URL(code_str));
+            } else {
+                bail!("Invalid code: {}", code_str);
             }
-            Err(_error) => {
-                debug!("Cache miss")
-            }
-        };
-
-        let url = API.to_owned() + uri_.0;
-
-        let client = Client::new();
-        let response = client.get(url).send().context("Request Error")?;
-        let json: JsonValue = response.json().context(JSON_ERR)?;
-        let status_code = json["status_code"].clone().to_string();
-        if status_code == "200" {
-            let context = json["data"]["content"].as_str().context(JSON_ERR)?;
-            let value: JsonValue = serde_json::from_str(context).context(JSON_ERR)?;
-
-            // Save json file
-            let json_path = cache_dir.join(uri_.0).with_extension("json");
-            let mut file = File::create(json_path.clone())?;
-            file.write_all(context.as_bytes())?;
-
-            Ok((value, json_path))
         } else {
-            Err(anyhow!("Request Error"))
+            Ok(CopilotJson::File(Path::new(trimed)))
         }
-    } else {
-        // Load via file.
-        let content = fs::read_to_string(uri_.0)?;
-        let json: JsonValue = serde_json::from_str(&content)?;
-        Ok((json, PathBuf::from(uri_.0)))
+    }
+
+    pub fn get_json_and_file(&self) -> Result<(JsonValue, PathBuf)> {
+        match self {
+            CopilotJson::URL(code) => {
+                let json_file = dirs::copilot().ensure()?.join(code).with_extension("json");
+
+                if json_file.is_file() {
+                    debug!("Found cached json file:", json_file.display());
+                    return Ok((copilot_json_from_file(&json_file)?, json_file));
+                }
+
+                let url = format!("{}{}", MAA_COPILOT_API, code);
+                debug!("Cache miss, downloading from", url);
+                let resp: JsonValue = reqwest::blocking::get(url)
+                    .context("Failed to send request")?
+                    .json()
+                    .context("Failed to parse response")?;
+
+                if resp["status_code"].as_i64().unwrap() == 200 {
+                    let context = resp["data"]["content"].as_str().unwrap();
+                    let value: JsonValue =
+                        serde_json::from_str(context).context("Failed to parse context")?;
+
+                    // Save json file
+                    let mut file = File::create(&json_file).with_context(|| {
+                        format!("Failed to create json file: {}", json_file.display())
+                    })?;
+
+                    file.write_all(context.as_bytes())
+                        .context("Failed to write json file")?;
+
+                    Ok((value, json_file))
+                } else {
+                    bail!("Request Error, code: {}", code);
+                }
+            }
+            CopilotJson::File(file) => {
+                if file.is_absolute() {
+                    Ok((copilot_json_from_file(file)?, file.to_path_buf()))
+                } else {
+                    let path = dirs::copilot().join(file);
+                    Ok((copilot_json_from_file(&path)?, path))
+                }
+            }
+        }
     }
 }
 
-fn find_json(json_file_name: &str, mut dir_path: PathBuf) -> Result<JsonValue> {
-    let json_file_name = fs::read_dir(dir_path.clone())
-        .map_err(Error::msg)?
-        .filter_map(|entry| {
-            entry
-                .ok()
-                .and_then(|e| e.file_name().to_str().map(String::from))
-        })
-        .find(|file_name| file_name.starts_with(json_file_name))
-        .ok_or(anyhow!("File not found"))?;
+fn copilot_json_from_file(path: impl AsRef<Path>) -> Result<JsonValue> {
+    Ok(serde_json::from_reader(File::open(path)?)?)
+}
 
-    dir_path.push(json_file_name);
+#[derive(Clone, Copy)]
+enum CopilotType {
+    Copilot,
+    SSSCopilot,
+}
 
-    let file_result = File::open(dir_path).map_err(Error::msg)?;
-    let reader = BufReader::new(file_result);
-    let json_value: JsonValue = serde_json::from_reader(reader).map_err(Error::msg)?;
+impl CopilotType {
+    pub fn get_stage_name(self, base_dirs: &Vec<PathBuf>, stage_id: &str) -> Result<String> {
+        match self {
+            CopilotType::Copilot => {
+                let stage_files = dirs::global_find(base_dirs, |dir| {
+                    let dir = dir.join("Arknights-Tile-Pos");
+                    debug!("Searching in", dir.display());
+                    fs::read_dir(dir)
+                        .map(|entries| {
+                            entries
+                                .filter_map(|entry| entry.map(|e| e.path()).ok())
+                                .find(|file_path| {
+                                    file_path.file_name().map_or(false, |file_name| {
+                                        file_name.to_str().map_or(false, |file_name| {
+                                            file_name.starts_with(stage_id)
+                                                && file_name.ends_with("json")
+                                        })
+                                    })
+                                })
+                        })
+                        .unwrap_or(None)
+                });
 
-    Ok(json_value)
+                if let Some(stage_file) = stage_files.last() {
+                    let stage_info: JsonValue = serde_json::from_reader(File::open(stage_file)?)?;
+                    Ok(format!("{} {}", stage_info["code"], stage_info["name"]))
+                } else {
+                    warning!("Failed to find stage file, maybe you resouces are outdated?");
+                    Ok(stage_id.to_string())
+                }
+            }
+            CopilotType::SSSCopilot => Ok(stage_id.to_string()),
+        }
+    }
+
+    pub fn to_task(self, filename: impl AsRef<str>) -> Task {
+        match self {
+            CopilotType::Copilot => Task::new_with_default(
+                MAATask::Copilot,
+                object!(
+                    "filename" => filename.as_ref(),
+                    "formation" => BoolInput::new(Some(true), Some("self-formation?"))
+                ),
+            ),
+            CopilotType::SSSCopilot => Task::new_with_default(
+                MAATask::SSSCopilot,
+                object!(
+                    "filename" => filename.as_ref(),
+                    "loop_times" => Input::<i64>::new(Some(1), Some("loop times:"))
+                ),
+            ),
+        }
+    }
+}
+
+impl AsRef<str> for CopilotType {
+    fn as_ref(&self) -> &str {
+        match self {
+            CopilotType::Copilot => "Copilot",
+            CopilotType::SSSCopilot => "SSSCopilot",
+        }
+    }
 }

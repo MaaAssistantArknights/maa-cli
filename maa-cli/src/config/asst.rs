@@ -5,7 +5,7 @@ use crate::{
     {debug, info, warning},
 };
 
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Mutex};
 
 use anyhow::{Context, Result};
 use lazy_static::lazy_static;
@@ -13,28 +13,65 @@ use maa_sys::{Assistant, InstanceOptionKey, StaticOptionKey, TouchMode};
 use serde::Deserialize;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Deserialize, Default, Clone)]
+#[derive(Default, Clone)]
 pub struct AsstConfig {
-    #[serde(default)]
     pub connection: ConnectionConfig,
-    #[serde(default)]
     pub resource: ResourceConfig,
-    #[serde(default)]
     pub static_options: StaticOptions,
-    #[serde(default)]
     pub instance_options: InstanceOptions,
+}
+
+impl<'de> Deserialize<'de> for AsstConfig {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct AsstConfigHelper {
+            #[serde(default)]
+            connection: ConnectionConfig,
+            #[serde(default)]
+            resource: ResourceConfig,
+            #[serde(default)]
+            static_options: StaticOptions,
+            #[serde(default)]
+            instance_options: InstanceOptions,
+        }
+
+        let mut config = AsstConfigHelper::deserialize(deserializer)?;
+
+        if matches!(config.connection, ConnectionConfig::PlayTools { .. }) {
+            info!("Detected connection with PlayTools");
+            config.instance_options.force_playtools();
+            config.resource.use_platform_diff_resource("iOS");
+        }
+
+        Ok(Self {
+            connection: config.connection,
+            resource: config.resource,
+            static_options: config.static_options,
+            instance_options: config.instance_options,
+        })
+    }
 }
 
 impl super::FromFile for AsstConfig {}
 
 lazy_static! {
-    static ref ASST_CONFIG: AsstConfig =
+    static ref ASST_CONFIG: Mutex<AsstConfig> = Mutex::new(
         AsstConfig::find_file_or_default(&dirs::config().join("asst"))
-            .expect("Failed to load asst config");
+            .expect("Failed to load asst config")
+    );
 }
 
-pub fn asst_config() -> &'static AsstConfig {
-    &ASST_CONFIG
+pub fn with_asst_config<R>(f: impl FnOnce(&AsstConfig) -> R) -> R {
+    let asst_config = ASST_CONFIG.lock().unwrap();
+    f(&asst_config)
+}
+
+pub fn with_mut_asst_config<R>(f: impl FnOnce(&mut AsstConfig) -> R) -> R {
+    let mut asst_config = ASST_CONFIG.lock().unwrap();
+    f(&mut asst_config)
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -99,21 +136,50 @@ impl ConnectionConfig {
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Deserialize, Clone)]
+#[derive(Clone)]
 pub struct ResourceConfig {
-    /// Resource base directories, a list of directories containing resource directories
-    #[serde(default = "default_resource_base_dirs")]
-    resource_base_dirs: Vec<PathBuf>,
     /// Resources used by global arknights client, subdirectories of `resource_base_dirs`, e.g. `global/YostarEN`
-    #[serde(default)]
     global_resource: Option<PathBuf>,
     /// Resources used by platform diff, subdirectories of `resource_base_dirs`, e.g. `platform_diff/iOS`
-    #[serde(default)]
     platform_diff_resource: Option<PathBuf>,
     /// Whether to load resources from user config directory, when enabled, the `MAA_CONFIG_DIR/resource`
     /// will be appended to `resource_base_dirs` as the last element
-    #[serde(default)]
     user_resource: bool,
+    /// Resource base directories, a list of directories containing resource directories
+    /// Not deserialized from config file
+    resource_base_dirs: Vec<PathBuf>,
+}
+
+impl<'de> Deserialize<'de> for ResourceConfig {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct ResourceConfigHelper {
+            #[serde(default)]
+            global_resource: Option<PathBuf>,
+            #[serde(default)]
+            platform_diff_resource: Option<PathBuf>,
+            #[serde(default)]
+            user_resource: bool,
+        }
+
+        let helper = ResourceConfigHelper::deserialize(deserializer)?;
+
+        let mut resource_base_dirs = default_resource_base_dirs();
+
+        if helper.user_resource {
+            push_user_resource(&mut resource_base_dirs);
+        }
+
+        Ok(Self {
+            resource_base_dirs,
+            global_resource: helper.global_resource,
+            platform_diff_resource: helper.platform_diff_resource,
+            user_resource: helper.user_resource,
+        })
+    }
 }
 
 impl Default for ResourceConfig {
@@ -154,46 +220,63 @@ fn default_resource_base_dirs() -> Vec<PathBuf> {
 
 impl ResourceConfig {
     pub fn use_user_resource(&mut self) -> &mut Self {
-        self.user_resource = true;
+        if !self.user_resource {
+            self.user_resource = true;
+            push_user_resource(&mut self.resource_base_dirs);
+        }
         self
     }
 
     pub fn use_global_resource(&mut self, resource: impl Into<PathBuf>) -> &mut Self {
-        self.global_resource = Some(resource.into());
+        match self.global_resource.as_ref() {
+            Some(global_resource) => {
+                warning!(format!(
+                    "Global resource {} already set, ignoring {}",
+                    global_resource.display(),
+                    resource.into().display(),
+                ));
+            }
+            None => {
+                let resource = resource.into();
+                info!("Using global resource:", resource.display());
+                self.global_resource = Some(resource);
+            }
+        }
         self
     }
 
     pub fn use_platform_diff_resource(&mut self, resource: impl Into<PathBuf>) -> &mut Self {
-        self.platform_diff_resource = Some(resource.into());
+        match self.platform_diff_resource.as_ref() {
+            Some(platform_diff_resource) => {
+                warning!(format!(
+                    "Platform diff resource {} already set, ignoring {}",
+                    platform_diff_resource.display(),
+                    resource.into().display(),
+                ));
+            }
+            None => {
+                let resource = resource.into();
+                info!("Using platform diff resource:", resource.display());
+                self.platform_diff_resource = Some(resource);
+            }
+        }
         self
     }
 
-    /// Get all resource directories
-    pub fn resource_base_dirs(&self) -> Vec<PathBuf> {
-        let mut resource_dirs = self.resource_base_dirs.clone();
-        if self.user_resource {
-            let user_resource_dir = dirs::config().join("resource");
-            if !user_resource_dir.exists() {
-                warning!(format!(
-                    "User resource directory {} not found",
-                    user_resource_dir.display(),
-                ));
-            } else {
-                resource_dirs.push(user_resource_dir);
-            }
-        }
-        resource_dirs
+    /// Get base resource directories
+    pub fn base_dirs(&self) -> &Vec<PathBuf> {
+        &self.resource_base_dirs
     }
 
     /// Get all resource directories, including global and platform diff resources
     pub fn resource_dirs(&self) -> Result<Vec<PathBuf>> {
-        let base_dirs = self.resource_base_dirs();
+        let base_dirs = &self.resource_base_dirs;
         let mut resource_dirs = base_dirs.clone();
         if let Some(global_resource) = self.global_resource.as_ref() {
             let global_resource_dir = PathBuf::from("global")
                 .join(global_resource)
                 .join("resource");
-            let full_paths = global_path(&base_dirs, &global_resource_dir);
+            let full_paths = global_path(base_dirs, &global_resource_dir);
             if full_paths.is_empty() {
                 warning!(format!(
                     "Global resource {} not found",
@@ -207,7 +290,7 @@ impl ResourceConfig {
             let platform_diff_resource_dir = PathBuf::from("platform_diff")
                 .join(platform_diff_resource)
                 .join("resource");
-            let full_paths = global_path(&base_dirs, &platform_diff_resource_dir);
+            let full_paths = global_path(base_dirs, &platform_diff_resource_dir);
             if full_paths.is_empty() {
                 warning!(format!(
                     "Platform diff resource {} not found",
@@ -230,6 +313,20 @@ impl ResourceConfig {
 
         Ok(())
     }
+}
+
+fn push_user_resource(resource_dirs: &mut Vec<PathBuf>) -> &mut Vec<PathBuf> {
+    let user_resource_dir = dirs::config().join("resource");
+    if !user_resource_dir.exists() {
+        warning!(format!(
+            "User resource directory {} not found, ignoring",
+            user_resource_dir.display(),
+        ));
+    } else {
+        resource_dirs.push(user_resource_dir);
+    }
+
+    resource_dirs
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -293,7 +390,7 @@ impl InstanceOptions {
         self
     }
 
-    pub fn apply(&self, asst: &Assistant) -> Result<()> {
+    pub fn apply_to(&self, asst: &Assistant) -> Result<()> {
         if let Some(touch_mode) = self.touch_mode {
             debug!("Setting touch mode to", touch_mode);
             InstanceOptionKey::TouchMode
@@ -376,7 +473,11 @@ mod tests {
                         config: String::from("CompatMac"),
                     },
                     resource: ResourceConfig {
-                        resource_base_dirs: vec![PathBuf::from("/usr/local/share/maa")],
+                        resource_base_dirs: {
+                            let mut base_dirs = default_resource_base_dirs();
+                            push_user_resource(&mut base_dirs);
+                            base_dirs
+                        },
                         global_resource: Some(PathBuf::from("YoStarEN")),
                         platform_diff_resource: Some(PathBuf::from("iOS")),
                         user_resource: true,

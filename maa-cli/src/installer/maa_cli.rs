@@ -5,7 +5,7 @@ use super::{
 };
 
 use crate::{
-    config::{cli::maa_cli::CommonArgs, installer_config},
+    config::cli::{cli_config, maa_cli::CommonArgs},
     consts::{MAA_CLI_EXE, MAA_CLI_VERSION},
     dirs::{self, Ensure},
     normal,
@@ -27,7 +27,7 @@ pub fn version() -> Result<Version> {
 }
 
 pub fn update(args: &CommonArgs) -> Result<()> {
-    let config = installer_config().cli_config().with_args(args);
+    let config = cli_config().cli_config().clone().with_args(args);
 
     normal!("Fetching maa-cli version info...");
     let version_json: VersionJSON<Details> = reqwest::blocking::get(config.api_url())

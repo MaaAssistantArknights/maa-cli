@@ -213,10 +213,16 @@ pub enum Dir {
 fn main() -> Result<()> {
     let cli = CLI::parse();
 
-    let level_diff = cli.verbose - cli.quiet;
-    if level_diff != 0 {
-        unsafe { set_level(level() as u8 + level_diff) };
+    if cli.verbose != cli.quiet {
+        unsafe {
+            set_level(
+                (level() as u8 + cli.verbose)
+                    .checked_sub(cli.quiet)
+                    .unwrap_or(0),
+            )
+        };
     }
+
     if cli.batch {
         unsafe { enable_batch_mode() };
     }
@@ -272,18 +278,16 @@ fn main() -> Result<()> {
                 println!("MaaCore {}", run::core_version()?);
             }
         },
-        SubCommand::Run { task, common } => {
-            run::prepare()?;
-            run::run(task, common)?
-        }
+        SubCommand::Run { task, common } => run::run_custom(task, common)?,
         SubCommand::Fight {
             startup,
             closedown,
             common,
-        } => {
-            run::prepare()?;
-            run::fight(startup, closedown, common)?
-        }
+        } => run::run(|_| run::fight(startup, closedown), common)?,
+        SubCommand::Copilot { uri, common } => run::run(
+            |config| run::copilot(uri, config.resource.base_dirs()),
+            common,
+        )?,
         SubCommand::List => {
             let task_dir = dirs::config().join("tasks");
             if !task_dir.exists() {
@@ -301,7 +305,6 @@ fn main() -> Result<()> {
         SubCommand::Complete { shell } => {
             generate(shell, &mut CLI::command(), "maa", &mut std::io::stdout());
         }
-        SubCommand::Copilot { uri, common } => run::copilot(uri, common)?,
     }
 
     Ok(())

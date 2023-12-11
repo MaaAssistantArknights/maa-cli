@@ -60,6 +60,7 @@ pub struct Dirs {
     library: PathBuf,
     config: PathBuf,
     cache: PathBuf,
+    copilot: PathBuf,
     resource: PathBuf,
     hot_update: PathBuf,
     state: PathBuf,
@@ -70,10 +71,12 @@ impl Dirs {
     pub fn new(proj: Option<ProjectDirs>) -> Self {
         let data_dir = get_data_dir(&proj);
         let state_dir = get_state_dir(&proj);
+        let cache_dir = get_cache_dir(&proj);
 
         Self {
             data: data_dir.clone(),
-            cache: get_cache_dir(&proj),
+            cache: cache_dir.clone(),
+            copilot: cache_dir.join("copilot"),
             config: get_config_dir(&proj),
             library: data_dir.join("lib"),
             resource: data_dir.join("resource"),
@@ -156,6 +159,11 @@ impl Dirs {
     /// Get cache directory.
     pub fn cache(&self) -> &Path {
         &self.cache
+    }
+
+    /// Get copilot cache directory.
+    pub fn copilot(&self) -> &Path {
+        &self.copilot
     }
 
     /// Get resource directory.
@@ -245,6 +253,10 @@ pub fn config_path<P: AsRef<Path>, D: AsRef<Path>>(path: P, sub_dir: Option<D>) 
 
 pub fn cache() -> &'static Path {
     DIRS.cache()
+}
+
+pub fn copilot() -> &'static Path {
+    DIRS.copilot()
 }
 
 pub fn resource() -> &'static Path {
@@ -338,16 +350,32 @@ impl Ensure for &Path {
 }
 
 /// Similar to `globpath` of vim
-pub fn global_path<I, D>(base_dirs: D, path: &Path) -> Vec<PathBuf>
+pub fn global_path<I, D>(base_dirs: D, path: impl AsRef<Path>) -> Vec<PathBuf>
 where
     I: AsRef<Path>,
     D: IntoIterator<Item = I>,
 {
+    let path = path.as_ref();
     let mut paths = Vec::new();
     for base_dir in base_dirs {
         let full_path = base_dir.as_ref().join(path);
         if full_path.exists() {
             paths.push(full_path);
+        }
+    }
+    paths
+}
+
+pub fn global_find<I, D, F>(base_dirs: D, finder: F) -> Vec<PathBuf>
+where
+    I: AsRef<Path>,
+    D: IntoIterator<Item = I>,
+    F: Fn(&Path) -> Option<PathBuf>,
+{
+    let mut paths = Vec::new();
+    for base_dir in base_dirs {
+        if let Some(path) = finder(base_dir.as_ref()) {
+            paths.push(path);
         }
     }
     paths
@@ -370,19 +398,18 @@ mod tests {
         fn state_relative() {
             env::remove_var("XDG_STATE_HOME");
             let project = ProjectDirs::from("com", "loong", "maa");
-            let home_dir = PathBuf::from(env::var_os("HOME").unwrap());
             if cfg!(target_os = "macos") {
                 assert_eq!(
                     TEST_DIRS.state(),
-                    home_dir.join("Library/Application Support/com.loong.maa")
+                    HOME.join("Library/Application Support/com.loong.maa")
                 );
                 assert_eq!(
                     TEST_DIRS.log(),
-                    home_dir.join("Library/Application Support/com.loong.maa/debug")
+                    HOME.join("Library/Application Support/com.loong.maa/debug")
                 );
             } else if cfg!(target_os = "linux") {
-                assert_eq!(TEST_DIRS.state(), home_dir.join(".local/state/maa"));
-                assert_eq!(TEST_DIRS.log(), home_dir.join(".local/state/maa/debug"));
+                assert_eq!(TEST_DIRS.state(), HOME.join(".local/state/maa"));
+                assert_eq!(TEST_DIRS.log(), HOME.join(".local/state/maa/debug"));
             }
             assert_eq!(state(), TEST_DIRS.state());
             assert_eq!(log(), TEST_DIRS.log());
@@ -404,27 +431,23 @@ mod tests {
         fn data_relative() {
             env::remove_var("XDG_DATA_HOME");
             let project = ProjectDirs::from("com", "loong", "maa");
-            let home_dir = PathBuf::from(env::var_os("HOME").unwrap());
             if cfg!(target_os = "macos") {
                 assert_eq!(
                     TEST_DIRS.data(),
-                    home_dir.join("Library/Application Support/com.loong.maa")
+                    HOME.join("Library/Application Support/com.loong.maa")
                 );
                 assert_eq!(
                     TEST_DIRS.library(),
-                    home_dir.join("Library/Application Support/com.loong.maa/lib")
+                    HOME.join("Library/Application Support/com.loong.maa/lib")
                 );
                 assert_eq!(
                     TEST_DIRS.resource(),
-                    home_dir.join("Library/Application Support/com.loong.maa/resource")
+                    HOME.join("Library/Application Support/com.loong.maa/resource")
                 );
             } else if cfg!(target_os = "linux") {
-                assert_eq!(TEST_DIRS.data(), home_dir.join(".local/share/maa"));
-                assert_eq!(TEST_DIRS.library(), home_dir.join(".local/share/maa/lib"));
-                assert_eq!(
-                    TEST_DIRS.resource(),
-                    home_dir.join(".local/share/maa/resource")
-                );
+                assert_eq!(TEST_DIRS.data(), HOME.join(".local/share/maa"));
+                assert_eq!(TEST_DIRS.library(), HOME.join(".local/share/maa/lib"));
+                assert_eq!(TEST_DIRS.resource(), HOME.join(".local/share/maa/resource"));
             }
             assert_eq!(data(), TEST_DIRS.data());
             assert_eq!(library(), TEST_DIRS.library());
@@ -554,14 +577,13 @@ mod tests {
         fn config_dir() {
             env::remove_var("XDG_CONFIG_HOME");
             let project = ProjectDirs::from("com", "loong", "maa");
-            let home_dir = PathBuf::from(env::var_os("HOME").unwrap());
             if cfg!(target_os = "macos") {
                 assert_eq!(
                     TEST_DIRS.config(),
-                    home_dir.join("Library/Application Support/com.loong.maa/config")
+                    HOME.join("Library/Application Support/com.loong.maa/config")
                 );
             } else if cfg!(target_os = "linux") {
-                assert_eq!(TEST_DIRS.config(), home_dir.join(".config/maa"));
+                assert_eq!(TEST_DIRS.config(), HOME.join(".config/maa"));
             }
             assert_eq!(
                 TEST_DIRS.config_path::<&str, &str>("foo", None).unwrap(),
@@ -594,27 +616,31 @@ mod tests {
         }
 
         #[test]
-        fn cache_dir() {
+        fn cache_relative() {
             env::remove_var("XDG_CACHE_HOME");
             let project = ProjectDirs::from("com", "loong", "maa");
-            let home_dir = PathBuf::from(env::var_os("HOME").unwrap());
             if cfg!(target_os = "macos") {
+                assert_eq!(TEST_DIRS.cache(), HOME.join("Library/Caches/com.loong.maa"));
                 assert_eq!(
-                    TEST_DIRS.cache(),
-                    home_dir.join("Library/Caches/com.loong.maa")
+                    TEST_DIRS.copilot(),
+                    HOME.join("Library/Caches/com.loong.maa/copilot")
                 );
             } else if cfg!(target_os = "linux") {
-                assert_eq!(TEST_DIRS.cache(), home_dir.join(".cache/maa"));
+                assert_eq!(TEST_DIRS.cache(), HOME.join(".cache/maa"));
+                assert_eq!(TEST_DIRS.copilot(), HOME.join(".cache/maa/copilot"));
             }
             assert_eq!(cache(), TEST_DIRS.cache());
+            assert_eq!(copilot(), TEST_DIRS.copilot());
 
             env::set_var("XDG_CACHE_HOME", "/xdg");
             let dirs = Dirs::new(project.clone());
             assert_eq!(dirs.cache(), PathBuf::from("/xdg/maa"));
+            assert_eq!(dirs.copilot(), PathBuf::from("/xdg/maa/copilot"));
 
             env::set_var("MAA_CACHE_DIR", "/maa");
             let dirs = Dirs::new(project.clone());
             assert_eq!(dirs.cache(), PathBuf::from("/maa"));
+            assert_eq!(dirs.copilot(), PathBuf::from("/maa/copilot"));
         }
     }
 

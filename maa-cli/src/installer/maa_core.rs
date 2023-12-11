@@ -7,9 +7,9 @@ use super::{
 };
 
 use crate::{
-    config::{
-        cli::maa_core::{CommonArgs, Components, Config},
-        installer_config,
+    config::cli::{
+        cli_config,
+        maa_core::{CommonArgs, Components, Config},
     },
     consts::MAA_CORE_LIB,
     debug,
@@ -79,7 +79,7 @@ pub fn version() -> Result<Version> {
 }
 
 pub fn install(force: bool, args: &CommonArgs) -> Result<()> {
-    let config = installer_config().core_config().apply_args(args);
+    let config = cli_config().core_config().apply_args(args);
 
     let lib_dir = dirs::library();
 
@@ -122,7 +122,7 @@ pub fn install(force: bool, args: &CommonArgs) -> Result<()> {
 }
 
 pub fn update(args: &CommonArgs) -> Result<()> {
-    let config = installer_config().core_config().apply_args(args);
+    let config = cli_config().core_config().apply_args(args);
 
     let components = config.components();
     // Check if any component is specified
