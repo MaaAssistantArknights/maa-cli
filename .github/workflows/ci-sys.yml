@@ -27,8 +27,8 @@ defaults:
     shell: bash
 
 jobs:
-  build:
-    name: Build and test
+  build-sys:
+    name: Build and test (maa-sys, static)
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false

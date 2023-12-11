@@ -112,7 +112,7 @@ jobs:
           cargo build --package maa-cli --locked \
             --features git2/vendored-openssl,reqwest/native-tls-vendored
 
-  build-no-default-features:
+  build-feature:
     name: Build and Test (no default features)
     runs-on: ${{ matrix.os }}
     strategy:
@@ -122,8 +122,8 @@ jobs:
           - ubuntu-latest
           - macos-latest
           - windows-latest
-        features:
-          - core_installer,git2 # disabled cli_installer, used by package manager
+        feature:
+          - core_installer # disabled cli_installer and git2, used by package manager
           - git2 # disabled both cli_installer and core_installer, used by appimage
     steps:
       - name: Checkout repository
@@ -136,11 +136,11 @@ jobs:
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
         with:
-          key: ${{ matrix.features }}
+          key: ${{ matrix.feature }}
       - name: Build
         run: |
           cargo build --package maa-cli --locked \
-            --no-default-features --features ${{ matrix.features }}
+            --no-default-features --features ${{ matrix.feature }}
       - name: Test
         run: |
           cargo test
