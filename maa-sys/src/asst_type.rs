@@ -97,8 +97,10 @@ mod tests {
         // StaticOptionKey::GpuOCR.apply(1).unwrap();
 
         use std::{env, path::Path};
-        if let Some(path) = env::var_os("MAA_RESOURCE_DIR") {
-            Assistant::load_resource(Path::new(&path)).unwrap();
+        if let Some(Some(path)) =
+            env::var_os("MAA_RESOURCE_DIR").map(|s| Path::new(&s).parent().map(|p| p.to_owned()))
+        {
+            Assistant::load_resource(path).unwrap();
 
             // Apply instance options
             let asst = Assistant::new(None, None);
