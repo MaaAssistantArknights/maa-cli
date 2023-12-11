@@ -45,6 +45,7 @@ jobs:
         with:
           os: ${{ matrix.os }}
           arch: x86_64
+          coverage: true
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
       - name: Install MaaCore
@@ -58,7 +59,7 @@ jobs:
       - name: Build
         run: cargo build --package maa-sys --locked
       - name: Lint (clippy)
-        run: cargo clippy --package maa-sys --locked -- -D warnings
+        run: cargo clippy --package maa-sys -- -D warnings
       - name: Lint (fmt)
         run: cargo fmt --package maa-sys -- --check
       - name: Test
@@ -66,4 +67,13 @@ jobs:
         # Without this, we can not link maa-sys to MaaCore on Windows.
         # https://stackoverflow.com/questions/63394094/rust-linker-seeks-a-lib-rather-than-a-dll
         if: ${{ !startsWith(matrix.os, 'windows') }}
-        run: cargo test --package maa-sys --locked
+        run: cargo test --package maa-sys
+      - name: Coverage
+        run: |
+          cargo tarpaulin --package maa-sys --timeout 120 --out xml \
+            ${{ github.run_attempt == 1 && '--skip-clean' || '' }}
+      - name: Upload to codecov.io
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
