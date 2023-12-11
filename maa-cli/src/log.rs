@@ -23,7 +23,7 @@ impl<T: Into<u8>> From<T> for LogLevel {
 }
 
 impl LogLevel {
-    pub fn to_git_flag(&self) -> &str {
+    pub fn to_git_flag(self) -> &'static str {
         match self {
             Self::Error => "-qq",
             Self::Warning => "-q",

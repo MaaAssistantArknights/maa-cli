@@ -65,7 +65,7 @@ pub fn copilot(uri: impl AsRef<str>, resource_dirs: &Vec<PathBuf>) -> Result<Tas
 }
 
 enum CopilotJson<'a> {
-    URL(&'a str),
+    Code(&'a str),
     File(&'a Path),
 }
 
@@ -75,7 +75,7 @@ impl CopilotJson<'_> {
         if let Some(code_str) = trimed.strip_prefix("maa://") {
             // just check if it's a number
             if code_str.parse::<i64>().is_ok() {
-                return Ok(CopilotJson::URL(code_str));
+                return Ok(CopilotJson::Code(code_str));
             } else {
                 bail!("Invalid code: {}", code_str);
             }
@@ -86,7 +86,7 @@ impl CopilotJson<'_> {
 
     pub fn get_json_and_file(&self) -> Result<(JsonValue, PathBuf)> {
         match self {
-            CopilotJson::URL(code) => {
+            CopilotJson::Code(code) => {
                 let json_file = dirs::copilot().ensure()?.join(code).with_extension("json");
 
                 if json_file.is_file() {

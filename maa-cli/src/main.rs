@@ -214,13 +214,7 @@ fn main() -> Result<()> {
     let cli = CLI::parse();
 
     if cli.verbose != cli.quiet {
-        unsafe {
-            set_level(
-                (level() as u8 + cli.verbose)
-                    .checked_sub(cli.quiet)
-                    .unwrap_or(0),
-            )
-        };
+        unsafe { set_level((level() as u8 + cli.verbose).saturating_sub(cli.quiet)) };
     }
 
     if cli.batch {

@@ -276,7 +276,7 @@ impl ResourceConfig {
             let global_resource_dir = PathBuf::from("global")
                 .join(global_resource)
                 .join("resource");
-            let full_paths = global_path(base_dirs, &global_resource_dir);
+            let full_paths = global_path(base_dirs, global_resource_dir);
             if full_paths.is_empty() {
                 warning!(format!(
                     "Global resource {} not found",
@@ -290,7 +290,7 @@ impl ResourceConfig {
             let platform_diff_resource_dir = PathBuf::from("platform_diff")
                 .join(platform_diff_resource)
                 .join("resource");
-            let full_paths = global_path(base_dirs, &platform_diff_resource_dir);
+            let full_paths = global_path(base_dirs, platform_diff_resource_dir);
             if full_paths.is_empty() {
                 warning!(format!(
                     "Platform diff resource {} not found",
