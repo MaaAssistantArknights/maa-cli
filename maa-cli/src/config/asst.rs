@@ -460,16 +460,27 @@ impl InstanceOptions {
 mod tests {
     use super::*;
 
+    use std::sync::Once;
+
+    static INIT_RESOURCE_DIR: Once = Once::new();
+
+    fn init_resource_dir() -> PathBuf {
+        let user_resource_dir = dirs::config().join("resource");
+        INIT_RESOURCE_DIR.call_once(|| {
+            use crate::dirs::Ensure;
+            user_resource_dir.ensure().unwrap();
+        });
+        user_resource_dir
+    }
+
     mod serde {
         use super::*;
-
-        use crate::dirs::Ensure;
 
         use serde_test::{assert_de_tokens, Token};
 
         #[test]
         fn deserialize_example() {
-            dirs::config().join("resource").ensure().unwrap();
+            init_resource_dir();
 
             let config: AsstConfig =
                 toml::from_str(&std::fs::read_to_string("../config_examples/asst.toml").unwrap())
@@ -586,8 +597,7 @@ mod tests {
                 &[Token::Map { len: Some(0) }, Token::MapEnd],
             );
 
-            let user_resource_dir = dirs::config().join("resource");
-            user_resource_dir.ensure().unwrap();
+            let user_resource_dir = init_resource_dir();
 
             assert_de_tokens(
                 &ResourceConfig {
