@@ -99,7 +99,7 @@ mod tests {
         // Apply instance options
         let asst = Assistant::new(None, None);
         InstanceOptionKey::TouchMode
-            .apply_to(&asst, TouchMode::ADB)
+            .apply_to(&asst, TouchMode::MaaTouch)
             .unwrap();
         InstanceOptionKey::DeploymentWithPause
             .apply_to(&asst, false)
