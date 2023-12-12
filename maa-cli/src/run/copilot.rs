@@ -232,7 +232,7 @@ fn operator_table(value: &JsonValue) -> Result<Table> {
     Ok(table)
 }
 
-fn get_str_key<'a>(value: &'a JsonValue, key: impl AsRef<str>) -> Result<&'a str> {
+fn get_str_key(value: &JsonValue, key: impl AsRef<str>) -> Result<&str> {
     let key = key.as_ref();
     value[key]
         .as_str()
@@ -313,7 +313,7 @@ mod tests {
             let test_file = arknights_tile_pos
                 .join("act30side_01-activities-act30side-level_act30side_01.json");
 
-            fs::File::create(&test_file)
+            fs::File::create(test_file)
                 .unwrap()
                 .write_all(r#"{ "code": "RS-1", "name": "注意事项" }"#.as_bytes())
                 .unwrap();

@@ -675,16 +675,16 @@ mod tests {
         std::fs::File::create(&test_file).unwrap();
 
         assert_eq!(
-            global_path(&[&test_dir1, &test_dir2], "test"),
+            global_path([&test_dir1, &test_dir2], "test"),
             vec![test_file.clone()]
         );
         assert_eq!(
-            global_path(&[&test_dir1, &test_dir2], "not_exist"),
+            global_path([&test_dir1, &test_dir2], "not_exist"),
             Vec::<PathBuf>::new()
         );
 
         assert_eq!(
-            global_find(&[&test_dir1, &test_dir2], |dir| {
+            global_find([&test_dir1, &test_dir2], |dir| {
                 if dir.join("test").exists() {
                     Some(dir.join("test"))
                 } else {
@@ -695,7 +695,7 @@ mod tests {
         );
 
         assert_eq!(
-            global_find(&[&test_dir1, &test_dir2], |dir| {
+            global_find([&test_dir1, &test_dir2], |dir| {
                 if dir.join("not_exist").exists() {
                     Some(dir.join("not_exist"))
                 } else {

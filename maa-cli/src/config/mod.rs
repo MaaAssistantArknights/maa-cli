@@ -128,19 +128,10 @@ mod tests {
 
     #[test]
     fn find_file() {
-        #[derive(Deserialize, PartialEq, Debug)]
+        #[derive(Deserialize, PartialEq, Debug, Default)]
         struct TestConfig {
             a: i32,
             b: String,
-        }
-
-        impl Default for TestConfig {
-            fn default() -> Self {
-                Self {
-                    a: 0,
-                    b: String::new(),
-                }
-            }
         }
 
         impl FromFile for TestConfig {}
@@ -152,7 +143,7 @@ mod tests {
         let non_exist_file = test_root.join("not_exist");
 
         std::fs::write(
-            &test_file.with_extension("json"),
+            test_file.with_extension("json"),
             r#"{
                 "a": 1,
                 "b": "test"
