@@ -10,9 +10,9 @@ macro_rules! link {
 
         #[allow(non_snake_case)]
         struct SharedLibrary {
-            handle: Library,
+            _handle: Library,
             $(
-                $name: Option<extern "C" fn($($pname: $pty), *) $(-> $ret)*>,
+                $name: extern "C" fn($($pname: $pty), *) $(-> $ret)*,
             )+
         }
 
@@ -20,28 +20,23 @@ macro_rules! link {
         impl SharedLibrary {
             pub fn new(path: impl AsRef<std::ffi::OsStr>) -> Result<Self, libloading::Error> {
                 let handle = unsafe { libloading::Library::new(path)? };
-                let mut lib = Self {
-                    handle,
+                let lib = Self {
                     $(
-                        $name: None,
+                        $name: unsafe {
+                            let symbol: Symbol<extern "C" fn($($pname: $pty), *) $(-> $ret)*> = handle.get(stringify!($name).as_bytes())?;
+                            *symbol
+                        },
                     )+
+                    // We need to keep the handle alive, even though we don't use it.
+                    _handle: handle,
                 };
-                unsafe {
-                    $(
-                        let symbol: Symbol<extern "C" fn($($pname: $pty), *) $(-> $ret)*> = lib.handle.get(stringify!($name).as_bytes())?;
-                        lib.$name = Some(*symbol);
-                    )+
-                }
                 Ok(lib)
             }
 
             $(
                 #[allow(non_snake_case)]
                 pub fn $name(&self, $($pname: $pty), *) $(-> $ret)* {
-                    match self.$name {
-                        Some(f) => f($($pname), *),
-                        None => panic!("Function {} is not loaded.", stringify!($name)),
-                    }
+                    (self.$name)($($pname), *)
                 }
             )+
         }
@@ -63,6 +58,12 @@ macro_rules! link {
             SHARED_LIBRARY.with(|lib| {
                 *lib.borrow_mut() = None;
             });
+        }
+
+        pub fn loaded() -> bool {
+            SHARED_LIBRARY.with(|lib| {
+                lib.borrow().is_some()
+            })
         }
 
         $(

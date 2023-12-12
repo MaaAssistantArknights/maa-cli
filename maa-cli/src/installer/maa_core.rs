@@ -7,12 +7,9 @@ use super::{
 };
 
 use crate::{
-    config::{
-        cli::{
-            maa_core::{CommonArgs, Components, Config},
-            InstallerConfig,
-        },
-        Error as ConfigError, FindFile,
+    config::cli::{
+        cli_config,
+        maa_core::{CommonArgs, Components, Config},
     },
     consts::MAA_CORE_LIB,
     debug,
@@ -81,20 +78,8 @@ pub fn version() -> Result<Version> {
     Version::parse(&ver_str[1..]).context("Failed to parse version")
 }
 
-fn get_config(args: &CommonArgs) -> Result<Config, ConfigError> {
-    match InstallerConfig::find_file(&dirs::config().join("cli")) {
-        Ok(config) => {
-            let mut config = config.core_config();
-            config.apply_args(args);
-            Ok(config)
-        }
-        Err(ConfigError::FileNotFound(_)) => Ok(Config::default()),
-        Err(e) => Err(e),
-    }
-}
-
 pub fn install(force: bool, args: &CommonArgs) -> Result<()> {
-    let config = get_config(args)?;
+    let config = cli_config().core_config().apply_args(args);
 
     let lib_dir = dirs::library();
 
@@ -137,7 +122,7 @@ pub fn install(force: bool, args: &CommonArgs) -> Result<()> {
 }
 
 pub fn update(args: &CommonArgs) -> Result<()> {
-    let config = get_config(args)?;
+    let config = cli_config().core_config().apply_args(args);
 
     let components = config.components();
     // Check if any component is specified

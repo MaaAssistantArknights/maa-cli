@@ -1,88 +1,19 @@
 pub mod binding;
 
+mod error;
+pub use error::{Error, Result};
+
+mod asst_type;
+pub use asst_type::{InstanceOptionKey, StaticOptionKey, TouchMode};
+
+mod to_cstring;
+pub use to_cstring::ToCString;
+
 mod link;
 
-use std::ffi::{CStr, CString, NulError};
-use std::path::{Path, PathBuf};
-use std::str::Utf8Error;
+use std::ffi::CStr;
 
 use binding::{AsstAsyncCallId, AsstSize, AsstTaskId};
-
-#[derive(Debug, Clone)]
-pub enum Error {
-    MAAError,
-    BufferTooSmall,
-    NulError(NulError),
-    Utf8Error(Utf8Error),
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Error::MAAError => write!(f, "MAAError"),
-            Error::BufferTooSmall => write!(f, "BufferTooSmall"),
-            Error::NulError(err) => write!(f, "{}", err),
-            Error::Utf8Error(err) => write!(f, "{}", err),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
-
-impl From<NulError> for Error {
-    fn from(err: NulError) -> Self {
-        Error::NulError(err)
-    }
-}
-
-impl From<Utf8Error> for Error {
-    fn from(err: Utf8Error) -> Self {
-        Error::Utf8Error(err)
-    }
-}
-
-pub type Result<T> = std::result::Result<T, Error>;
-
-pub trait ToCString {
-    fn to_cstring(self) -> Result<CString>;
-}
-
-impl ToCString for &str {
-    fn to_cstring(self) -> Result<CString> {
-        Ok(CString::new(self)?)
-    }
-}
-
-impl ToCString for String {
-    fn to_cstring(self) -> Result<CString> {
-        Ok(CString::new(self)?)
-    }
-}
-
-impl ToCString for &Path {
-    fn to_cstring(self) -> Result<CString> {
-        self.to_str().unwrap().to_cstring()
-    }
-}
-
-impl ToCString for PathBuf {
-    fn to_cstring(self) -> Result<CString> {
-        self.to_str().unwrap().to_cstring()
-    }
-}
-
-impl ToCString for &PathBuf {
-    fn to_cstring(self) -> Result<CString> {
-        self.to_str().unwrap().to_cstring()
-    }
-}
-
-// Used in set_instance_option
-impl ToCString for bool {
-    fn to_cstring(self) -> Result<CString> {
-        if self { "1" } else { "0" }.to_cstring()
-    }
-}
 
 fn handle_asst(code: binding::AsstBool) -> Result<()> {
     if code == 1 {
@@ -118,13 +49,33 @@ impl Assistant {
         }
     }
 
-    /* Static Methods */
+    /*------------------------- Static Methods -------------------------*/
+
+    /// Set the user directory of the assistant.
+    ///
+    /// The user directory is used to store the log file and some cache files.
+    ///
+    /// Must by called before `set_static_option` and `load_resource`.
+    /// If user directory is not set, the first load resource directory will be used.
+    ///
+    /// # Errors
+    ///
+    /// This function will raise and error if the path is not a valid UTF-8 string.
+    /// And raise an error if set the user directory failed.
     pub fn set_user_dir(path: impl ToCString) -> Result<()> {
         handle_asst(unsafe { binding::AsstSetUserDir(path.to_cstring()?.as_ptr()) })
     }
-    pub fn load_resource(path: impl ToCString) -> Result<()> {
-        handle_asst(unsafe { binding::AsstLoadResource(path.to_cstring()?.as_ptr()) })
-    }
+
+    /// Set the static option of the assistant.
+    ///
+    /// The static option is used to set the global configuration of the assistant.
+    /// Available options are defined in `StaticOptionKey`.
+    ///
+    /// This function must be called before `load_resource`.
+    ///
+    /// # Errors
+    ///
+    /// This function will raise and error if the value is not a valid UTF-8 string.
     pub fn set_static_option(
         key: binding::AsstStaticOptionKey,
         value: impl ToCString,
@@ -132,7 +83,28 @@ impl Assistant {
         handle_asst(unsafe { binding::AsstSetStaticOption(key, value.to_cstring()?.as_ptr()) })
     }
 
-    /* Instance Methods */
+    pub fn load_resource(path: impl ToCString) -> Result<()> {
+        handle_asst(unsafe { binding::AsstLoadResource(path.to_cstring()?.as_ptr()) })
+    }
+
+    pub fn get_null_size() -> AsstSize {
+        unsafe { binding::AsstGetNullSize() }
+    }
+
+    pub fn get_version<'a>() -> Result<&'a str> {
+        unsafe {
+            let c_str = binding::AsstGetVersion();
+            let version = CStr::from_ptr(c_str).to_str()?;
+            Ok(version)
+        }
+    }
+
+    pub fn log(level: impl ToCString, msg: impl ToCString) -> Result<()> {
+        unsafe { binding::AsstLog(level.to_cstring()?.as_ptr(), msg.to_cstring()?.as_ptr()) };
+        Ok(())
+    }
+
+    /*------------------------ Instance Methods ------------------------*/
     pub fn set_instance_option(
         &self,
         key: binding::AsstInstanceOptionKey,
@@ -231,40 +203,13 @@ impl Assistant {
             )
         })
     }
-    pub fn get_null_size() -> AsstSize {
-        unsafe { binding::AsstGetNullSize() }
-    }
-
-    pub fn get_version<'a>() -> Result<&'a str> {
-        unsafe {
-            let c_str = binding::AsstGetVersion();
-            let version = CStr::from_ptr(c_str).to_str()?;
-            Ok(version)
-        }
-    }
-    pub fn log(level: impl ToCString, msg: impl ToCString) -> Result<()> {
-        unsafe { binding::AsstLog(level.to_cstring()?.as_ptr(), msg.to_cstring()?.as_ptr()) };
-        Ok(())
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use std::path::Path;
-
-    #[test]
-    fn to_cstring() {
-        assert_eq!("/tmp".to_cstring().unwrap(), CString::new("/tmp").unwrap());
-        assert_eq!(
-            Path::new("/tmp").to_cstring().unwrap(),
-            CString::new("/tmp").unwrap()
-        );
-    }
-
     #[cfg(not(feature = "runtime"))]
     #[test]
     fn get_version() {
-        assert!(Assistant::get_version().is_ok());
+        assert!(super::Assistant::get_version().is_ok());
     }
 }

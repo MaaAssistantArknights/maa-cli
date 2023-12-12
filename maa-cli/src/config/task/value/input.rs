@@ -481,6 +481,8 @@ mod tests {
     mod get {
         use super::*;
 
+        use crate::assert_matches;
+
         const INPUT_YES: &[u8] = b"y\n";
         const INPUT_NO: &[u8] = b"n\n";
         const INPUT_ONE: &[u8] = b"1\n";
@@ -502,12 +504,6 @@ mod tests {
             };
             ($output:ident) => {
                 assert_eq!(&$output, b"");
-            };
-        }
-
-        macro_rules! assert_matches {
-            ($value:expr, $pattern:pat) => {
-                assert!(matches!($value, $pattern));
             };
         }
 

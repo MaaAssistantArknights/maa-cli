@@ -22,6 +22,16 @@ impl<T: Into<u8>> From<T> for LogLevel {
     }
 }
 
+impl LogLevel {
+    pub fn to_git_flag(self) -> &'static str {
+        match self {
+            Self::Error | Self::Warning | Self::Normal => "-q",
+            Self::Info => "",
+            Self::Debug | Self::Trace => "-v",
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Logger {
     level: LogLevel,
@@ -48,7 +58,11 @@ impl<T: Into<LogLevel>> From<T> for Logger {
     }
 }
 
-static mut LOGGER: Logger = Logger::new(LogLevel::Normal);
+static mut LOGGER: Logger = if cfg!(test) {
+    Logger::new(LogLevel::Trace)
+} else {
+    Logger::new(LogLevel::Normal)
+};
 
 pub unsafe fn set_level(level: impl Into<LogLevel>) {
     LOGGER.set_level(level);
@@ -186,4 +200,37 @@ macro_rules! trace {
             }
         }
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::assert_matches;
+
+    #[test]
+    fn log_level() {
+        assert_matches!(LogLevel::from(0), LogLevel::Error);
+        assert_matches!(LogLevel::from(1), LogLevel::Warning);
+        assert_matches!(LogLevel::from(2), LogLevel::Normal);
+        assert_matches!(LogLevel::from(3), LogLevel::Info);
+        assert_matches!(LogLevel::from(4), LogLevel::Debug);
+        assert_matches!(LogLevel::from(5), LogLevel::Trace);
+        assert_matches!(LogLevel::from(6), LogLevel::Trace);
+
+        assert_eq!(LogLevel::Error.to_git_flag(), "-q");
+        assert_eq!(LogLevel::Warning.to_git_flag(), "-q");
+        assert_eq!(LogLevel::Normal.to_git_flag(), "-q");
+        assert_eq!(LogLevel::Info.to_git_flag(), "");
+        assert_eq!(LogLevel::Debug.to_git_flag(), "-v");
+        assert_eq!(LogLevel::Trace.to_git_flag(), "-v");
+    }
+
+    #[test]
+    fn logger() {
+        let mut logger = Logger::new(LogLevel::Error);
+        assert_matches!(logger.level(), LogLevel::Error);
+        logger.set_level(LogLevel::Warning);
+        assert_matches!(logger.level(), LogLevel::Warning);
+    }
 }

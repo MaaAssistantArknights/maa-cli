@@ -37,10 +37,10 @@ runs:
         esac
         echo "CARGO_BUILD_TARGET=$target" >> $GITHUB_ENV
     - name: Install Target
-      if: inputs.arch == 'aarch64'
+      if: inputs.arch != 'x86_64'
       shell: bash
       run: rustup target add $CARGO_BUILD_TARGET
-    - name: Cross Compile Dependencies (Linux)
+    - name: Setup Cross Compiling Toolchain (Linux x86_64 to aarch64)
       if: inputs.arch == 'aarch64' && startsWith(inputs.os, 'ubuntu')
       shell: bash
       run: |

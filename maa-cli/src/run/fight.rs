@@ -1,20 +1,20 @@
 use crate::{
     config::task::{
-        task_type::TaskType,
+        task_type::MAATask,
         value::input::{BoolInput, Input, Select},
         Task, TaskConfig, Value,
     },
     object,
 };
 
-use super::{run, CommonArgs, Result};
+use anyhow::Result;
 
-pub fn fight(startup: bool, closedown: bool, common: CommonArgs) -> Result<()> {
+pub fn fight(startup: bool, closedown: bool) -> Result<TaskConfig> {
     let mut task_config = TaskConfig::new();
 
     if startup {
         task_config.push(Task::new_with_default(
-            TaskType::StartUp,
+            MAATask::StartUp,
             object!(
                 "start_game_enabled" => BoolInput::new(Some(true), Some("start game")),
                 "client_type" => Select::<String>::new(
@@ -27,7 +27,7 @@ pub fn fight(startup: bool, closedown: bool, common: CommonArgs) -> Result<()> {
     }
 
     task_config.push(Task::new_with_default(
-        TaskType::Fight,
+        MAATask::Fight,
         object!(
             "stage" => Input::<String>::new(Some("1-7"), Some("a stage to fight")),
             "medicine" => Input::<i64>::new(Some(0), Some("medicine to use")),
@@ -35,11 +35,8 @@ pub fn fight(startup: bool, closedown: bool, common: CommonArgs) -> Result<()> {
     ));
 
     if closedown {
-        task_config.push(Task::new_with_default(
-            TaskType::CloseDown,
-            Value::default(),
-        ));
+        task_config.push(Task::new_with_default(MAATask::CloseDown, Value::default()));
     }
 
-    run(task_config, common)
+    Ok(task_config)
 }
