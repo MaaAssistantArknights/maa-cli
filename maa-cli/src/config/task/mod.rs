@@ -698,7 +698,8 @@ mod tests {
                             MAATask::StartUp,
                             object!( "start_game_enabled" => false)
                         ),
-                        Task::new_with_default(MAATask::Fight, object!("stage" => "1-7"))
+                        Task::new_with_default(MAATask::Fight, object!("stage" => "1-7")),
+                        Task::new_with_default(MAATask::CloseDown, object!("enable" => false)),
                     ],
                 }
                 .init()
@@ -717,7 +718,7 @@ mod tests {
                             )
                         ),
                         (MAATask::Fight.into(), object!("stage" => "1-7")),
-                        (MAATask::CloseDown.into(), object!()),
+                        (MAATask::CloseDown.into(), object!("enable" => true)),
                     ]
                 },
             );

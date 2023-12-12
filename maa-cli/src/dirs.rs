@@ -659,5 +659,52 @@ mod tests {
         assert!(!test_dir.exists());
         assert_eq!(test_dir.ensure().unwrap(), test_dir);
         assert!(test_dir.exists());
+        remove_dir_all(&test_root).unwrap();
+    }
+
+    #[test]
+    fn global_path_and_find() {
+        let test_root = temp_dir().join("maa-test-global-path");
+        let test_dir1 = test_root.join("test1");
+        let test_dir2 = test_root.join("test2");
+        let test_file = test_dir1.join("test");
+
+        test_dir1.ensure_clean().unwrap();
+        test_dir2.ensure_clean().unwrap();
+
+        std::fs::File::create(&test_file).unwrap();
+
+        assert_eq!(
+            global_path(&[&test_dir1, &test_dir2], "test"),
+            vec![test_file.clone()]
+        );
+        assert_eq!(
+            global_path(&[&test_dir1, &test_dir2], "not_exist"),
+            Vec::<PathBuf>::new()
+        );
+
+        assert_eq!(
+            global_find(&[&test_dir1, &test_dir2], |dir| {
+                if dir.join("test").exists() {
+                    Some(dir.join("test"))
+                } else {
+                    None
+                }
+            }),
+            vec![test_file.clone()]
+        );
+
+        assert_eq!(
+            global_find(&[&test_dir1, &test_dir2], |dir| {
+                if dir.join("not_exist").exists() {
+                    Some(dir.join("not_exist"))
+                } else {
+                    None
+                }
+            }),
+            Vec::<PathBuf>::new()
+        );
+
+        remove_dir_all(&test_root).unwrap();
     }
 }

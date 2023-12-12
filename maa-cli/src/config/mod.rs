@@ -116,3 +116,76 @@ pub mod asst;
 pub mod cli;
 
 pub mod task;
+
+#[cfg(test)]
+mod tests {
+    use crate::assert_matches;
+
+    use super::*;
+    use std::env::temp_dir;
+
+    use serde::Deserialize;
+
+    #[test]
+    fn find_file() {
+        #[derive(Deserialize, PartialEq, Debug)]
+        struct TestConfig {
+            a: i32,
+            b: String,
+        }
+
+        impl Default for TestConfig {
+            fn default() -> Self {
+                Self {
+                    a: 0,
+                    b: String::new(),
+                }
+            }
+        }
+
+        impl FromFile for TestConfig {}
+
+        let test_root = temp_dir().join("find_file");
+        std::fs::create_dir_all(&test_root).unwrap();
+
+        let test_file = test_root.join("test");
+        let non_exist_file = test_root.join("not_exist");
+
+        std::fs::write(
+            &test_file.with_extension("json"),
+            r#"{
+                "a": 1,
+                "b": "test"
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            TestConfig::find_file(&test_file).unwrap(),
+            TestConfig {
+                a: 1,
+                b: "test".to_string()
+            }
+        );
+
+        assert_matches!(
+            TestConfig::find_file(&non_exist_file).unwrap_err(),
+            Error::FileNotFound(s) if s == non_exist_file.to_str().unwrap()
+        );
+
+        assert_eq!(
+            TestConfig::find_file_or_default(&test_file).unwrap(),
+            TestConfig {
+                a: 1,
+                b: "test".to_string()
+            }
+        );
+
+        assert_eq!(
+            TestConfig::find_file_or_default(&non_exist_file).unwrap(),
+            TestConfig::default()
+        );
+
+        std::fs::remove_dir_all(&test_root).unwrap();
+    }
+}

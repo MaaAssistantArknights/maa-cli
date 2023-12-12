@@ -460,6 +460,8 @@ impl InstanceOptions {
 mod tests {
     use super::*;
 
+    use crate::assert_matches;
+
     mod serde {
         use super::*;
 
@@ -754,8 +756,6 @@ mod tests {
     mod connection_config {
         use super::*;
 
-        use crate::assert_matches;
-
         #[test]
         fn default() {
             assert_matches!(
@@ -818,7 +818,7 @@ mod tests {
     mod resource_config {
         use super::*;
 
-        use crate::{assert_matches, dirs::Ensure};
+        use crate::dirs::Ensure;
 
         use std::{env::temp_dir, fs};
 
@@ -889,6 +889,17 @@ mod tests {
                     ..
                 } if *path == PathBuf::from("iOS")
             );
+
+            assert_matches!(
+                ResourceConfig {
+                    platform_diff_resource: Some(PathBuf::from("iOS")),
+                    ..Default::default()
+                }.use_platform_diff_resource("Other"),
+                ResourceConfig {
+                    platform_diff_resource: Some(path),
+                    ..
+                } if *path == PathBuf::from("iOS")
+            );
         }
 
         #[test]
@@ -901,6 +912,28 @@ mod tests {
                 .base_dirs(),
                 [PathBuf::from("resource")]
             );
+        }
+
+        #[test]
+        fn test_push_resource() {
+            let test_root = temp_dir().join("push_resource");
+
+            let resource_dir = test_root.join("resource");
+            let unexists_resource_dir = test_root.join("unexists_resource");
+
+            resource_dir.ensure().unwrap();
+
+            assert_eq!(
+                push_resource(&mut Vec::new(), resource_dir.clone()),
+                &[resource_dir.clone()]
+            );
+
+            assert_eq!(
+                push_resource(&mut Vec::new(), unexists_resource_dir.clone()),
+                &Vec::<PathBuf>::new()
+            );
+
+            fs::remove_dir_all(test_root).unwrap();
         }
 
         #[test]
@@ -970,5 +1003,32 @@ mod tests {
 
             fs::remove_dir_all(test_root).unwrap();
         }
+    }
+
+    #[test]
+    fn instance_options() {
+        assert_matches!(
+            InstanceOptions {
+                touch_mode: None,
+                ..Default::default()
+            }
+            .force_playtools(),
+            InstanceOptions {
+                touch_mode: Some(TouchMode::MacPlayTools),
+                ..
+            }
+        );
+
+        assert_matches!(
+            InstanceOptions {
+                touch_mode: Some(TouchMode::ADB),
+                ..Default::default()
+            }
+            .force_playtools(),
+            InstanceOptions {
+                touch_mode: Some(TouchMode::MacPlayTools),
+                ..
+            }
+        );
     }
 }
