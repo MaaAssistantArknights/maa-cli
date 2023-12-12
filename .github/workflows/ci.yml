@@ -111,7 +111,7 @@ jobs:
       - name: Build
         run: |
           cargo build --package maa-cli --locked \
-            --features git2/vendored-openssl,reqwest/native-tls-vendored
+            --features vendored-openssl
 
   build-feature:
     name: Build and Test (no default features)
