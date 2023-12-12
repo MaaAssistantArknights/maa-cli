@@ -151,4 +151,22 @@ mod tests {
         assert_eq!(TaskOrUnknown::MAATask(MAATask::StartUp).as_ref(), "StartUp");
         assert_eq!(TaskOrUnknown::Unknown("Other".into()).as_ref(), "Other");
     }
+
+    #[test]
+    fn to_cstring() {
+        use maa_sys::ToCString;
+        use std::ffi::CString;
+
+        assert_eq!(
+            TaskOrUnknown::MAATask(MAATask::StartUp)
+                .to_cstring()
+                .unwrap(),
+            CString::new("StartUp").unwrap(),
+        );
+
+        assert_eq!(
+            TaskOrUnknown::Unknown("Other".into()).to_cstring().unwrap(),
+            CString::new("Other").unwrap(),
+        );
+    }
 }
