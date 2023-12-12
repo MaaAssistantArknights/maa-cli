@@ -17,6 +17,9 @@ core_installer = ["__installer"]
 # Features used to install update maa-cli self
 cli_installer = ["__installer"]
 
+# Vendored openssl
+vendored-openssl = ["git2?/vendored-openssl", "reqwest/native-tls-vendored"]
+
 # Common features used to install and update MAA Core and maa-cli self
 __installer = [
   "tokio",
