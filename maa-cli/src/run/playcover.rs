@@ -42,7 +42,7 @@ impl<'n> PlayCoverApp<'n> {
             return Ok(());
         }
 
-        info!("Starting app: {}", self.name);
+        info!("Starting app:", self.name);
         std::process::Command::new("open")
             .arg("-a")
             .arg(self.name)
