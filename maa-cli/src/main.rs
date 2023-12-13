@@ -137,6 +137,8 @@ enum SubCommand {
     },
     /// Run fight task
     Fight {
+        /// Stage to fight
+        stage: Option<String>,
         /// Run startup task before the fight
         #[arg(long)]
         startup: bool,
@@ -146,10 +148,7 @@ enum SubCommand {
         #[command(flatten)]
         common: run::CommonArgs,
     },
-    /// List all available tasks
-    List,
-    /// Generate completion script for given shell
-    Complete { shell: Shell },
+    /// Run copilot task
     Copilot {
         /// A code copied from "https://prts.plus" or a json file,
         /// such as "maa://12345" or "/your/json/path.json".
@@ -157,6 +156,10 @@ enum SubCommand {
         #[command(flatten)]
         common: run::CommonArgs,
     },
+    /// List all available tasks
+    List,
+    /// Generate completion script for given shell
+    Complete { shell: Shell },
 }
 
 #[cfg(feature = "cli_installer")]
@@ -274,10 +277,11 @@ fn main() -> Result<()> {
         },
         SubCommand::Run { task, common } => run::run_custom(task, common)?,
         SubCommand::Fight {
+            stage,
             startup,
             closedown,
             common,
-        } => run::run(|_| run::fight(startup, closedown), common)?,
+        } => run::run(|_| run::fight(stage, startup, closedown), common)?,
         SubCommand::Copilot { uri, common } => run::run(
             |config| run::copilot(uri, config.resource.base_dirs()),
             common,
@@ -568,10 +572,19 @@ mod test {
             assert!(matches!(
                 CLI::parse_from(["maa", "fight"]).command,
                 SubCommand::Fight {
+                    stage: None,
                     startup: false,
                     closedown: false,
                     ..
                 }
+            ));
+
+            assert!(matches!(
+                CLI::parse_from(["maa", "fight", "1-7"]).command,
+                SubCommand::Fight {
+                    stage: Some(stage),
+                    ..
+                } if stage == "1-7"
             ));
 
             assert!(matches!(
