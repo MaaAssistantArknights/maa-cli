@@ -33,7 +33,7 @@ pub fn roguelike(theme: Option<Theme>) -> Result<TaskConfig> {
     let theme = if let Some(theme) = theme {
         Value::String(theme.to_str().into())
     } else {
-        Value::InputString(Input::<String>::new(Some("Phantom"), Some("theme")).into())
+        Value::InputString(Input::<String>::new(Some("Sami"), Some("theme")).into())
     };
 
     // TODO: better prompt and options
@@ -51,3 +51,47 @@ pub fn roguelike(theme: Option<Theme>) -> Result<TaskConfig> {
     Ok(task_config)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::config::task::task_type::TaskOrUnknown;
+
+    #[test]
+    fn theme_to_str() {
+        assert_eq!(Theme::Phantom.to_str(), "Phantom");
+        assert_eq!(Theme::Mizuki.to_str(), "Mizuki");
+        assert_eq!(Theme::Sami.to_str(), "Sami");
+    }
+
+    #[test]
+    fn test_roguelike() {
+        assert_eq!(
+            roguelike(None).unwrap().tasks()[0],
+            Task::new_with_default(
+                TaskOrUnknown::MAATask(MAATask::Roguelike),
+                object!(
+                    "theme" => Value::InputString(Input::<String>::new(Some("Sami"), Some("theme")).into()),
+                    "mode" => Input::<i64>::new(Some(0), Some("mode")),
+                    "squad" => Input::<String>::new::<String, &str>(None, Some("a squad name")),
+                    "core_char" => Input::<String>::new::<String, &str>(None, Some("a operator name")),
+                    "use_support" => BoolInput::new(Some(true), Some("use support")),
+                ),
+            )
+        );
+
+        assert_eq!(
+            roguelike(Some(Theme::Phantom)).unwrap().tasks()[0],
+            Task::new_with_default(
+                TaskOrUnknown::MAATask(MAATask::Roguelike),
+                object!(
+                    "theme" => Value::String("Phantom".into()),
+                    "mode" => Input::<i64>::new(Some(0), Some("mode")),
+                    "squad" => Input::<String>::new::<String, &str>(None, Some("a squad name")),
+                    "core_char" => Input::<String>::new::<String, &str>(None, Some("a operator name")),
+                    "use_support" => BoolInput::new(Some(true), Some("use support")),
+                ),
+            )
+        );
+    }
+}

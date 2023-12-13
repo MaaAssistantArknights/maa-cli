@@ -511,6 +511,12 @@ mod tests {
     mod task_config {
         use super::*;
 
+        impl TaskConfig {
+            pub fn tasks(&self) -> &[Task] {
+                &self.tasks
+            }
+        }
+
         mod serde {
             use super::*;
 
