@@ -1,6 +1,3 @@
-user_resource = true
-resources = ["platform_diff/iOS"]
-
 # connection options for MAA Core
 # There are two ways to connect to Arknights
 # 1. Connect by ADB

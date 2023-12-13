@@ -2,3 +2,4 @@
 /version
 /cobertura.xml
 /tarpaulin-report.html
+.vscode/ltex*
