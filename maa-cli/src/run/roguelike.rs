@@ -18,7 +18,7 @@ pub enum Theme {
 }
 
 impl Theme {
-    pub fn to_str(&self) -> &'static str {
+    pub fn to_str(self) -> &'static str {
         match self {
             Theme::Phantom => "Phantom",
             Theme::Mizuki => "Mizuki",
