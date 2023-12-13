@@ -1,17 +1,18 @@
 # maa-cli
 
 ![CI](https://img.shields.io/github/actions/workflow/status/MaaAssistantArknights/maa-cli/ci.yml)
-![maa-cli latest release](https://img.shields.io/github/v/release/MaaAssistantArknights/maa-cli?filter=v*)
-![platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blueviolet">)
-![Codecov](https://img.shields.io/codecov/c/github/MaaAssistantArknights/maa-cli)
+![Code coverage](https://img.shields.io/codecov/c/github/MaaAssistantArknights/maa-cli)
+![Stable Release](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fgithub.com%2FMaaAssistantArknights%2Fmaa-cli%2Fraw%2Fversion%2Fstable.json&query=%24.version&prefix=v&label=stable)
+![Beta Release](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fgithub.com%2FMaaAssistantArknights%2Fmaa-cli%2Fraw%2Fversion%2Fbeta.json&query=%24.version&prefix=v&label=beta)
+![platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blueviolet)
 
 A simple CLI for [MAA](https://github.com/MaaAssistantArknights/MaaAssistantArknights) by Rust.
 
 ## Feature
 
-- Define tasks by TOML, YAML or JSON file, then run it by `maa run <task>`;
+- Run predefined or custom tasks, like `maa fight` or `maa run <task>`;
 - Install and update `MaaCore` and resources with `maa install` and `maa update`;
-- Update self with `maa self update`;
+- Update self with `maa self update`.
 
 ## Installation
 
@@ -27,13 +28,13 @@ brew install MaaAssistantArknights/tap/maa-cli
 
 #### Linux
 
-ArchLinux user can install [AUR package](https://aur.archlinux.org/packages/maa-cli/):
+Arch Linux user can install [AUR package](https://aur.archlinux.org/packages/maa-cli/):
 
 ```bash
 yay -S maa-cli
 ```
 
-For LinuxBrew user, you can install with [LinuxBrew](https://docs.brew.sh/Homebrew-on-Linux):
+For Linux Brew user, you can install with [Linux Brew](https://docs.brew.sh/Homebrew-on-Linux):
 
 ```bash
 brew install MaaAssistantArknights/tap/maa-cli
@@ -42,7 +43,7 @@ brew install MaaAssistantArknights/tap/maa-cli
 ### Prebuilt binary
 
 You can install CLI by download prebuilt binary from
-[release page](https://github.com/wangl-cc/maa-cli/releases/latest) and extract it to your favorite location. The filename for different platform is:
+[release page](https://github.com/wangl-cc/maa-cli/releases/latest) and extract it to your favourite location. The filename for different platform is:
 
 <table>
     <thead>
@@ -88,29 +89,65 @@ You can also build from source by yourself with `cargo`:
 cargo install --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --locked
 ```
 
+#### Build options
+
+When building from source, you can disable default features with `--no-default-features` option and enable specific features with `--features` option. Currently, the available features are:
+
+- `cli_installer`: Provide `maa self update` command to update self, this feature is enabled by default;
+- `core_installer`: Provide `maa install` and `maa update` commands to install and update `MaaCore` and resources, this feature is enabled by default;
+- `git2`: Provide `libgit2` resource backend, this feature is enabled by default;
+- `vendored-openssl`: Build `openssl` library by self instead of using system `openssl` library, this feature is disabled by default;
+
 ### Dependencies
 
 #### MaaCore
 
-`maa-cli` only provides a interface for MaaCore, it needs `MaaCore` and resources to run tasks, which can be installed by `maa install`:
+`maa-cli` only provides an interface for MaaCore, it needs `MaaCore` and resources to run tasks, which can be installed by `maa install`:
 
 ```bash
 maa install
 ```
 
+#### OpenSSL
+
+`git2` depends on the `openssl` library on all platforms. On Linux, it is also required by `maa-cli` itself. So you should install the `openssl` library or use the `vendored-openssl` feature when building from source.
+
 ## Usage
 
-### Commands
+### Run Tasks
 
-The main feature of `maa-cli` is to run tasks, you can run a task by `maa run <task>`. Here `<task>` is the name of a task, you can list all available tasks by `maa list`.
+The main feature of `maa-cli` is to run tasks, including predefined tasks and custom tasks.
 
-More details can be found by `maa help`.
+#### Predefined tasks
+
+- `maa fight`: run a fight task, the stage to fight can be queried from user;
+- `maa copilot <maa_uri>`: run a copilot task, the `maa_uri` is the URI of a copilot task, it can be `maa://1234` or local file path;
+
+#### Custom tasks
+
+You can run a custom task by `maa run <task>`. Here `<task>` is the name of a task, you can list all available tasks by `maa list`.
+
+### Install and update
+
+#### Install and update for MaaCore and resources
+
+You can install and update `MaaCore` and resources by `maa install` and `maa update`. See `maa help install` and `maa help update` for more details.
+
+#### Resource hot update
+
+You can hot update resources by `maa  hot-update`. It can be configured to run every time before running in config file.
+
+#### Self update
+
+You can update `maa-cli` by `maa self update`. For users who install `maa-cli` with package manager, this feature is disabled, you should update `maa-cli` with package manager.
+
+More other commands can be found by `maa help`.
 
 ## Configurations
 
 ### Configuration directory
 
-All configurations of `maa-cli` is located in a specific configuration directory, which can be get by `maa dir config`.
+All configurations of `maa-cli` are located in a specific configuration directory, which can be got by `maa dir config`.
 The configuration directory can be changed by environment variable `MAA_CONFIG_DIR`. In below examples, we will use `$MAA_CONFIG_DIR` to represent the configuration directory.
 
 All configuration files can be written in TOML, YAML or JSON format. In below examples, we will use TOML format and `.toml` as file extension. But you can mix these three formats as long as the file extension is correct.
@@ -142,11 +179,11 @@ type = "StartUp" # the type of maa task
 params = { client_type = "Official", start_game_enabled = true } # the params of given task
 ```
 
-See documentation of [MAA](https://maa.plus/docs/en-us/3.1-INTEGRATION.html#asstappendtask) for all available task types and params.
+See documentation of [MAA](https://maa.plus/docs/en-us/3.1-INTEGRATION.html#asstappendtask) for all available task types and parameters.
 
 #### Task variants and conditions
 
-In some case, you may want to run a task with different params in different conditions. You can define multiple variants for a task, and use `condition` field to determine whether the variant should be used. For example, you may want to use different infrast plan in different time period of a day:
+In some cases, you may want to run a task with different parameters in different conditions. You can define multiple variants for a task, and use the `condition` field to determine whether the variant should be used. For example, you may want to use a different infrastructure plan in different time periods of a day:
 
 ```toml
 [[tasks]]
@@ -173,9 +210,9 @@ params = { plan_index = 0 }
 ```
 
 The `condition` field is used to determine whether the variant should be used,
-and the `params` field of matched variant will be merged into the params of the task.
+and the `params` field of matched variant will be merged into the parameters of the task.
 
-**Note**: If the `filename` field is a relative path, it will be relative to `$MAA_CONFIG_DIR/infrast`. Besides, the custom infrast plan file will not be read by `maa-cli` but `MaaCore`. So the format of the file must be `JSON` and time period defined in the file will not be used to select the corresponding sub-plan. So you must specify the `plan_index` field in the params of the task to use the correct infrast plan in the corresponding time period. This will ensure that the correct infrast plan is used in the appropriate time period.
+**Note**: If the `filename` field is a relative path, it will be relative to `$MAA_CONFIG_DIR/infrast`. Besides, the custom infrastructure plan file will not be read by `maa-cli` but `MaaCore`. So the format of the file must be `JSON` and time period defined in the file will not be used to select the corresponding sub-plan. So you must specify the `plan_index` field in the parameters of the task to use the correct infrastructure plan in the corresponding time period. This will ensure that the correct infrastructure plan is used in the appropriate time period.
 
 Besides of `Time` condition, there are also `DateTime`, `Weakday`, and `Combined` conditions. `DateTime` condition is used to specify a specific datetime period, `Weekday` condition is used to specify some days in a week, `Combined` condition is used to specify a combination of multiple conditions.
 
@@ -231,7 +268,7 @@ condition = { type = "DateTime", start = "2023-08-01T16:00:00", end = "2023-08-2
 ```
 
 The outcome stage of this example should be identical to the previous one, but expiring medicine will be used on Sunday night additionally.
-With the `merge` strategy, if multiple variants are matched, the params of all matched variants will be merged. If multiple variants have the same param, the last one will be used.
+With the `merge` strategy, if multiple variants are matched, the parameters of all matched variants will be merged. If multiple variants have the same parameters, the last one will be used.
 
 If no variant is matched, the task will not be executed,
 which is useful when you want to only run a task in some conditions:
@@ -276,23 +313,29 @@ default = "1-7" # default value of stage, optional (if not given, user can input
 description = "a stage to fight" # description of the input, optional
 ```
 
-For `Input` type, a prompt will be shown to ask user to input a value. If the default value is given, it will be used if user input empty value, otherwise it will re-prompt. For `Select` type, a prompt will be shown to ask user to select a value from alternatives (by index). If user input is not a valid index, it will re-prompt. The promote and input can be disabled by `--batch` option, which is useful for running tasks in Schedule.
+For `Input` type, a prompt will be shown to ask user to input a value. If the default value is given, it will be used if user input empty value, otherwise it will re-prompt. For `Select` type, a prompt will be shown to ask user to select a value from alternatives (by index). If user input is not a valid index, it will re-prompt. To promote and input can be disabled by `--batch` option, which is useful for running tasks in Schedule.
 
-Example of config file can be found at [`config_examples` directory](./config_examples). Anothor example can be found at my [dotfiles](https://github.com/wangl-cc/dotfiles/tree/master/.config/maa).
+Example of config file can be found at [`config_examples` directory](./config_examples). Another example can be found at my [dotfiles](https://github.com/wangl-cc/dotfiles/tree/master/.config/maa).
 
 ### `MaaCore` related configurations
 
 The related configurations of `MaaCore` is located in `$MAA_CONFIG_DIR/asst.toml`. The current available configurations are:
 
 ```toml
-user_resource = true
-resources = ["platform_diff/iOS"]
-
 [connection]
 type = "ADB"
 adb_path = "adb"
 device = "emulator-5554"
 config = "CompatMac"
+
+[resource]
+global_resource = "YoStarEN"
+platform_diff_resource = "iOS"
+user_resource = true
+
+[static_options]
+cpu_ocr = false
+gpu_ocr = 1
 
 [instance_options]
 touch_mode = "MAATouch"
@@ -301,10 +344,7 @@ adb_lite_enabled = false
 kill_adb_on_exit = false
 ```
 
-The field `user_resource` is used to specify whether load user resource, which is a boolean value. If it is `true`, additional resources in `$MAA_CONFIG_DIR/resource` directory will be loaded at last (after all other resources). This is identical to the `--user-resource` command line option.
-See `maa help run` for more information.
-
-The `resources` field is used to specify additional resources, which is a list of resource directories (if relative path is given, it will be relative to `$(maa dir resource)/resource` directory):
+#### Connection
 
 The `connection` section is used to specify how to connect to the game. Currently, there are two types of connection: `ADB` and `PlayTools`.
 
@@ -318,8 +358,10 @@ device = "emulator-5554" # the serial of your android device
 config = "General" # the config of maa
 ```
 
-and if you use `PlayTools`, you should set `address`
-which is the address of MaaTools set in PlayCover,
+Note, the `device` field is any valid input of `-s` option of `adb` command, like `emulator-5554` or `127.0.0.1:5555`.
+
+If you use `PlayTools`, you should set `address`
+which is the address of `MaaTools` set in `PlayCover`,
 more details can be found at
 [here](https://maa.plus/docs/en-us/1.4-EMULATOR_SUPPORTS_FOR_MAC.html#✅-playcover-the-software-runs-most-fluently-for-its-nativity-🚀):
 
@@ -330,9 +372,36 @@ address = "localhost:1717" # the address of MaaTools
 config = "CompatMac" # the same as above
 ```
 
-Both `ADB` and `PlayTools` share the `config` field, which is a parameter of `connect` function of maa.It's default value is `CompatMac` on macOS, `CompatPOSIXShell` on Linux and `General` on other platforms.More optional configs can be found in `config.json` in resource directory.
+Both `ADB` and `PlayTools` share the `config` field, which is a parameter of `connect` function of MAA. Its default value is `CompatMac` on macOS, `CompatPOSIXShell` on Linux and `General` on other platforms. More optional configs can be found in `config.json` in resource directory.
 
-The `instance_options` section is used to configure maa [instance options](https://maa.plus/docs/en-us/3.1-INTEGRATION.html#asstsetinstanceoption):
+#### Resource
+
+The `resource` section is used to specify the resource to use:
+
+```toml
+[resource]
+global_resource = "YoStarEN" # the global resource to use
+platform_diff_resource = "iOS" # the platform diff resource to use
+user_resource = true # whether use user resource
+```
+
+When your game is not in Simplified Chinese, you should set `global_resource` to non-Chinese resource. If you connect to the game with `PlayCover`, you should set `platform_diff_resource` to `iOS`.
+Leave those two fields to empty if you don't want to use global resource or platform diff resource. Besides, those two fields will also be setup automatically by `maa-cli` based on your task and connection type.
+Lastly, if you want to use user resource, you should set `user_resource` to `true`. When `user_resource` is `true`, `maa-cli` will try to find user resource in `$MAA_CONFIG_DIR/resource` directory.
+
+#### Static options
+
+The `static_options` section is used to configure MAA [static options](https://maa.plus/docs/en-us/3.1-INTEGRATION.html#asstsetstaticoption):
+
+```toml
+[static_options]
+cpu_ocr = false # whether use CPU OCR, CPU OCR is enabled by default
+gpu_ocr = 1 # the ID of your GPU, leave it to empty if you don't want to use GPU OCR
+```
+
+#### Instance options
+
+The `instance_options` section is used to configure MAA [instance options](https://maa.plus/docs/en-us/3.1-INTEGRATION.html#asstsetinstanceoption):
 
 ```toml
 [instance_options]
@@ -349,10 +418,46 @@ Note: If you connect to the game with `PlayCover`, the `touch_mode` will be igno
 The `maa-cli` related configurations should be located in `$MAA_CONFIG_DIR/cli.toml`. Currently, it only contains one section: `core`:
 
 ```toml
+# MaaCore install and update  configurations
 [core]
-channel = "beta"
+channel = "Stable" # update channel, can be "Stable", "Beta" or "Alpha"
+test_time = 0 # the time to test download mirrors in seconds, 0 to skip
+# the url to query the latest version of MaaCore, leave it to empty to use default url
+apit_url = "https://github.com/MaaAssistantArknights/maa-cli/raw/version/"
 [core.components]
-resource = false
+library = true # whether install MaaCore library
+resource = false # whether install resoruce resource
+
+# CLI update configurations
+[cli]
+channel = "Stable" # update channel, can be "Stable", "Beta" or "Alpha"
+# the url to query the latest version of maa-cli, leave it to empty to use default url
+api_url = "https://github.com/MaaAssistantArknights/maa-cli/raw/version/"
+# the url to download prebuilt binary, leave it to empty to use default url
+download_url = "https://github.com/MaaAssistantArknights/maa-cli/releases/download/"
+
+[cli.components]
+binary = true # whether install maa-cli binary
+
+
+# hot update resource configurations
+[resource]
+auto_update = true # whether auto update resource before running task
+backend = "libgit2" # the backend of resource, can be "libgit2" or "git"
+
+# the remote of resource
+[resource.remote]
+branch = "main" # the branch of remote repository
+# the url of remote repository, when using ssh, you should set ssh_key field
+url = "https://github.com/MaaAssistantArknights/MaaResource.git"
+# url = "git@github.com:MaaAssistantArknights/MaaResource.git"
+# ssh_key = "~/.ssh/id_ed25519" # path to ssh key
 ```
 
-The `channel` field is used to specify the channel of `MaaCore` to install, which can be `stable`, `beta` or `alpha`. The components of `MaaCore` to install can be specified by `components` field, which is a table of boolean values. Currently, only `resource` component is supported.
+**NOTE**:
+
+- The `Alpha` channel of `MaaCore` is only available on Windows;
+- The hot update resource can not work separately, it should be used with basic resource that installed with `MaaCore`;
+- If you want to use `git` backend, `git` command is required;
+- If you want to fetch resource with ssh, the `ssh_key` is required;
+- The `resource.remote.url` only effect for first time installation, it will be ignored when updating resource. If you want to change the remote url, you should change it manually or delete the resource directory and reinstall resource. The directory of repository can be located by `maa dir hot-update`.
