@@ -96,8 +96,10 @@ impl Details {
 
 #[derive(Deserialize)]
 struct Assets {
-    #[serde(rename = "universal-apple-darwin")]
-    universal_apple_darwin: Asset,
+    #[serde(rename = "x86_64-apple-darwin")]
+    x86_64_apple_darwin: Asset,
+    #[serde(rename = "aarch64-apple-darwin")]
+    aarch64_apple_darwin: Asset,
     #[serde(rename = "x86_64-unknown-linux-gnu")]
     x86_64_unknown_linux_gnu: Asset,
     #[serde(rename = "aarch64-unknown-linux-gnu")]
@@ -109,7 +111,11 @@ struct Assets {
 impl Assets {
     fn asset(&self) -> Result<&Asset> {
         match consts::OS {
-            "macos" => Ok(&self.universal_apple_darwin),
+            "macos" => match consts::ARCH {
+                "x86_64" => Ok(&self.x86_64_apple_darwin),
+                "aarch64" => Ok(&self.aarch64_apple_darwin),
+                _ => bail!("Unsupported architecture: {}", consts::ARCH),
+            },
             "linux" => match consts::ARCH {
                 "x86_64" => Ok(&self.x86_64_unknown_linux_gnu),
                 "aarch64" => Ok(&self.aarch64_unknown_linux_gnu),
@@ -156,7 +162,12 @@ mod tests {
     "details": {
         "tag": "v0.1.0",
         "assets": {
-            "universal-apple-darwin": {
+            "x86_64-apple-darwin": {
+                "name": "maa-cli.zip",
+                "size": 123456,
+                "sha256sum": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+            },
+            "aarch64-apple-darwin": {
                 "name": "maa-cli.zip",
                 "size": 123456,
                 "sha256sum": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
