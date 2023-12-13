@@ -10,6 +10,9 @@ pub use fight::fight;
 mod copilot;
 pub use copilot::copilot;
 
+mod roguelike;
+pub use roguelike::{roguelike, Theme as RoguelikeTheme};
+
 use crate::{
     config::{
         asst::{with_asst_config, with_mut_asst_config, AsstConfig},

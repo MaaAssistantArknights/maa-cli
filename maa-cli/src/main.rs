@@ -156,6 +156,16 @@ enum SubCommand {
         #[command(flatten)]
         common: run::CommonArgs,
     },
+    /// Run rouge-like task
+    Roguelike {
+        /// Theme of the game
+        ///
+        /// The theme of the game, can be one of "Phantom", "Mizuki" and "Sami".
+        /// If not specified, it will be asked in the game.
+        theme: Option<run::RoguelikeTheme>,
+        #[command(flatten)]
+        common: run::CommonArgs,
+    },
     /// List all available tasks
     List,
     /// Generate completion script for given shell
@@ -286,6 +296,7 @@ fn main() -> Result<()> {
             |config| run::copilot(uri, config.resource.base_dirs()),
             common,
         )?,
+        SubCommand::Roguelike { theme, common } => run::run(|_| run::roguelike(theme), common)?,
         SubCommand::List => {
             let task_dir = dirs::config().join("tasks");
             if !task_dir.exists() {
@@ -601,19 +612,51 @@ mod test {
         }
 
         #[test]
+        fn copilot() {
+            assert_matches!(
+                CLI::parse_from(["maa", "copilot", "maa://12345"]).command,
+                SubCommand::Copilot {
+                    uri,
+                    ..
+                } if uri == "maa://12345"
+            );
+
+            assert_matches!(
+                CLI::parse_from(["maa", "copilot", "/your/json/path.json"]).command,
+                SubCommand::Copilot {
+                    uri,
+                    common: run::CommonArgs { .. },
+                } if uri == "/your/json/path.json"
+            );
+        }
+
+        #[test]
+        fn rougelike() {
+            assert_matches!(
+                CLI::parse_from(["maa", "roguelike"]).command,
+                SubCommand::Roguelike { theme: None, .. }
+            );
+
+            assert_matches!(
+                CLI::parse_from(["maa", "roguelike", "phantom"]).command,
+                SubCommand::Roguelike {
+                    theme: Some(theme),
+                    ..
+                } if matches!(theme, run::RoguelikeTheme::Phantom)
+            );
+        }
+
+        #[test]
         fn list() {
-            assert!(matches!(
-                CLI::parse_from(["maa", "list"]).command,
-                SubCommand::List
-            ));
+            assert_matches!(CLI::parse_from(["maa", "list"]).command, SubCommand::List);
         }
 
         #[test]
         fn complete() {
-            assert!(matches!(
+            assert_matches!(
                 CLI::parse_from(["maa", "complete", "bash"]).command,
                 SubCommand::Complete { shell: Shell::Bash }
-            ));
+            );
         }
     }
 }
