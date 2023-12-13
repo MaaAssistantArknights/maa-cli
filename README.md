@@ -121,8 +121,9 @@ OpenSSL 库是 `git2` 在所有平台和 `reqwest` 在 Linux 上的依赖。如�
 
 #### 预定义任务
 
-- `maa fight [stage]`: 运行战斗任务， `<stage>` 是关卡名称，例如 `1-7`；如果 `stage` 为空，那么 `maa` 将询问你要刷的关卡，然后运行战斗任务；
+- `maa fight [stage]`: 运行战斗任务，`[stage]` 是关卡名称，例如 `1-7`；如果 `stage` 为空，那么 `maa` 将询问你要刷的关卡，然后运行战斗任务；
 - `maa copilot <maa_uri>`: 运行自动战斗任务，其中 `<maa_uri>` 是作业的 URI, 其可以是 `maa://1234` 或者本地文件路径 `./1234.json`；
+- `maa roguelike [theme]`: 运行 roguelike 模式的战斗任务，`[theme]` 是 roguelike 模式的主题，可选值为 `phantom`, `mizuki` 以及 `sami`，如果留空，那么你将需要在 `maa` 询问后手动输入主题，
 
 #### 自定义任务
 
