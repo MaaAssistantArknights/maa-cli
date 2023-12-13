@@ -9,13 +9,13 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
-pub enum Value {
-    Array(Vec<Value>),
+pub enum MAAValue {
+    Array(Vec<MAAValue>),
     InputString(UserInput<String>),
     InputBool(BoolInput),
     InputInt(UserInput<i64>),
     InputFloat(UserInput<f64>),
-    Object(Map<Value>),
+    Object(Map<MAAValue>),
     String(String),
     Bool(bool),
     Int(i64),
@@ -23,115 +23,115 @@ pub enum Value {
     Null,
 }
 
-impl Default for Value {
+impl Default for MAAValue {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl From<bool> for Value {
+impl From<bool> for MAAValue {
     fn from(value: bool) -> Self {
         Self::Bool(value)
     }
 }
 
-impl From<BoolInput> for Value {
+impl From<BoolInput> for MAAValue {
     fn from(value: BoolInput) -> Self {
         Self::InputBool(value)
     }
 }
 
-impl From<i64> for Value {
+impl From<i64> for MAAValue {
     fn from(value: i64) -> Self {
         Self::Int(value)
     }
 }
 
-impl From<UserInput<i64>> for Value {
+impl From<UserInput<i64>> for MAAValue {
     fn from(value: UserInput<i64>) -> Self {
         Self::InputInt(value)
     }
 }
 
-impl From<Input<i64>> for Value {
+impl From<Input<i64>> for MAAValue {
     fn from(value: Input<i64>) -> Self {
         Self::InputInt(UserInput::Input(value))
     }
 }
 
-impl From<Select<i64>> for Value {
+impl From<Select<i64>> for MAAValue {
     fn from(value: Select<i64>) -> Self {
         Self::InputInt(UserInput::Select(value))
     }
 }
 
-impl From<f64> for Value {
+impl From<f64> for MAAValue {
     fn from(value: f64) -> Self {
         Self::Float(value)
     }
 }
 
-impl From<UserInput<f64>> for Value {
+impl From<UserInput<f64>> for MAAValue {
     fn from(value: UserInput<f64>) -> Self {
         Self::InputFloat(value)
     }
 }
 
-impl From<Input<f64>> for Value {
+impl From<Input<f64>> for MAAValue {
     fn from(value: Input<f64>) -> Self {
         Self::InputFloat(UserInput::Input(value))
     }
 }
 
-impl From<Select<f64>> for Value {
+impl From<Select<f64>> for MAAValue {
     fn from(value: Select<f64>) -> Self {
         Self::InputFloat(UserInput::Select(value))
     }
 }
 
-impl From<String> for Value {
+impl From<String> for MAAValue {
     fn from(value: String) -> Self {
         Self::String(value)
     }
 }
 
-impl From<UserInput<String>> for Value {
+impl From<UserInput<String>> for MAAValue {
     fn from(value: UserInput<String>) -> Self {
         Self::InputString(value)
     }
 }
 
-impl From<Input<String>> for Value {
+impl From<Input<String>> for MAAValue {
     fn from(value: Input<String>) -> Self {
         Self::InputString(UserInput::Input(value))
     }
 }
 
-impl From<Select<String>> for Value {
+impl From<Select<String>> for MAAValue {
     fn from(value: Select<String>) -> Self {
         Self::InputString(UserInput::Select(value))
     }
 }
 
-impl From<&str> for Value {
+impl From<&str> for MAAValue {
     fn from(value: &str) -> Self {
         Self::String(value.into())
     }
 }
 
-impl<const N: usize, S: Into<String>, V: Into<Value>> From<[(S, V); N]> for Value {
+impl<const N: usize, S: Into<String>, V: Into<MAAValue>> From<[(S, V); N]> for MAAValue {
     fn from(value: [(S, V); N]) -> Self {
         Self::Object(Map::from(value.map(|(k, v)| (k.into(), v.into()))))
     }
 }
 
-impl<const N: usize, T: Into<Value>> From<[T; N]> for Value {
+impl<const N: usize, T: Into<MAAValue>> From<[T; N]> for MAAValue {
     fn from(value: [T; N]) -> Self {
         Self::Array(Vec::from(value.map(|v| v.into())))
     }
 }
 
-impl Value {
+impl MAAValue {
     /// Create a new empty object
     pub fn new() -> Self {
         Self::Object(Map::new())
@@ -293,43 +293,43 @@ impl Value {
 #[macro_export]
 macro_rules! object {
     () => {
-        Value::new()
+        MAAValue::new()
     };
     ($($key:expr => $value:expr),* $(,)?) => {{
-        let mut value = Value::new();
+        let mut value = MAAValue::new();
         $(value.insert($key, $value);)*
         value
     }};
 }
 
-impl TryFrom<&Value> for bool {
+impl TryFrom<&MAAValue> for bool {
     type Error = TryFromError;
 
-    fn try_from(value: &Value) -> Result<Self, Self::Error> {
+    fn try_from(value: &MAAValue) -> Result<Self, Self::Error> {
         value.as_bool()
     }
 }
 
-impl TryFrom<&Value> for i64 {
+impl TryFrom<&MAAValue> for i64 {
     type Error = TryFromError;
 
-    fn try_from(value: &Value) -> Result<Self, Self::Error> {
+    fn try_from(value: &MAAValue) -> Result<Self, Self::Error> {
         value.as_int()
     }
 }
 
-impl TryFrom<&Value> for f64 {
+impl TryFrom<&MAAValue> for f64 {
     type Error = TryFromError;
 
-    fn try_from(value: &Value) -> Result<Self, Self::Error> {
+    fn try_from(value: &MAAValue) -> Result<Self, Self::Error> {
         value.as_float()
     }
 }
 
-impl TryFrom<&Value> for String {
+impl TryFrom<&MAAValue> for String {
     type Error = TryFromError;
 
-    fn try_from(value: &Value) -> Result<Self, Self::Error> {
+    fn try_from(value: &MAAValue) -> Result<Self, Self::Error> {
         value.as_string()
     }
 }
@@ -472,7 +472,7 @@ mod tests {
                 "bool" => true,
                 "float" => 1.0,
                 "int" => 1,
-                "null" => Value::Null,
+                "null" => MAAValue::Null,
                 "object" => [("key", "value")],
                 "string" => "string",
             );
@@ -508,13 +508,13 @@ mod tests {
 
         #[test]
         fn array() {
-            let value = Value::Array(vec![
-                Value::Bool(true),
-                Value::Int(1_i64),
-                Value::Float(1.0),
-                Value::String("string".to_string()),
-                Value::from([1, 2]),
-                Value::from([("key", "value")]),
+            let value = MAAValue::Array(vec![
+                MAAValue::Bool(true),
+                MAAValue::Int(1_i64),
+                MAAValue::Float(1.0),
+                MAAValue::String("string".to_string()),
+                MAAValue::from([1, 2]),
+                MAAValue::from([("key", "value")]),
             ]);
 
             assert_tokens(
@@ -540,31 +540,31 @@ mod tests {
 
         #[test]
         fn bool() {
-            let boolean = Value::Bool(true);
+            let boolean = MAAValue::Bool(true);
             assert_tokens(&boolean, &[Token::Bool(true)]);
         }
 
         #[test]
         fn int() {
-            let integer = Value::Int(1);
+            let integer = MAAValue::Int(1);
             assert_tokens(&integer, &[Token::I64(1)]);
         }
 
         #[test]
         fn float() {
-            let float = Value::Float(1.0);
+            let float = MAAValue::Float(1.0);
             assert_tokens(&float, &[Token::F64(1.0)]);
         }
 
         #[test]
         fn string() {
-            let string = Value::String("string".to_string());
+            let string = MAAValue::String("string".to_string());
             assert_tokens(&string, &[Token::Str("string")]);
         }
 
         #[test]
         fn null() {
-            let null = Value::Null;
+            let null = MAAValue::Null;
             assert_tokens(&null, &[Token::Unit]);
         }
     }
@@ -589,7 +589,7 @@ mod tests {
         });
 
         let mut value = object!(
-            "null" => Value::Null,
+            "null" => MAAValue::Null,
             "bool" => input_bool.clone(),
             "int" => input_int.clone(),
             "float" => input_float.clone(),
@@ -598,54 +598,57 @@ mod tests {
             "object" => [("int", input_int.clone())],
         );
 
-        assert_eq!(value.get("null").unwrap(), &Value::Null);
-        assert_eq!(value.get("bool").unwrap(), &Value::InputBool(input_bool));
+        assert_eq!(value.get("null").unwrap(), &MAAValue::Null);
+        assert_eq!(value.get("bool").unwrap(), &MAAValue::InputBool(input_bool));
         assert_eq!(
             value.get("int").unwrap(),
-            &Value::InputInt(input_int.clone())
+            &MAAValue::InputInt(input_int.clone())
         );
-        assert_eq!(value.get("float").unwrap(), &Value::InputFloat(input_float));
+        assert_eq!(
+            value.get("float").unwrap(),
+            &MAAValue::InputFloat(input_float)
+        );
         assert_eq!(
             value.get("string").unwrap(),
-            &Value::InputString(input_string)
+            &MAAValue::InputString(input_string)
         );
         assert_eq!(
             value.get("array").unwrap(),
-            &Value::Array(vec![Value::InputInt(input_int.clone())])
+            &MAAValue::Array(vec![MAAValue::InputInt(input_int.clone())])
         );
         assert_eq!(
             value.get("object").unwrap(),
-            &Value::Object(Map::from([(
+            &MAAValue::Object(Map::from([(
                 "int".to_string(),
-                Value::InputInt(input_int.clone())
+                MAAValue::InputInt(input_int.clone())
             )]))
         );
 
         value.init().unwrap();
 
-        assert_eq!(value.get("null").unwrap(), &Value::Null);
-        assert_eq!(value.get("bool").unwrap(), &Value::Bool(true));
-        assert_eq!(value.get("int").unwrap(), &Value::Int(1));
-        assert_eq!(value.get("float").unwrap(), &Value::Float(1.0));
+        assert_eq!(value.get("null").unwrap(), &MAAValue::Null);
+        assert_eq!(value.get("bool").unwrap(), &MAAValue::Bool(true));
+        assert_eq!(value.get("int").unwrap(), &MAAValue::Int(1));
+        assert_eq!(value.get("float").unwrap(), &MAAValue::Float(1.0));
         assert_eq!(
             value.get("string").unwrap(),
-            &Value::String("string".to_string())
+            &MAAValue::String("string".to_string())
         );
         assert_eq!(
             value.get("array").unwrap(),
-            &Value::Array(vec![Value::Int(1)])
+            &MAAValue::Array(vec![MAAValue::Int(1)])
         );
         assert_eq!(
             value.get("object").unwrap(),
-            &Value::Object(Map::from([("int".to_string(), Value::Int(1))]))
+            &MAAValue::Object(Map::from([("int".to_string(), MAAValue::Int(1))]))
         );
     }
 
     #[test]
     fn get() {
-        let value = Value::from([("int", 1)]);
+        let value = MAAValue::from([("int", 1)]);
 
-        assert_eq!(value.get("int").unwrap(), &Value::Int(1.into()));
+        assert_eq!(value.get("int").unwrap(), &MAAValue::Int(1.into()));
         assert!(value.get("float").is_none());
 
         assert_eq!(value.get_or("int", 2).unwrap(), 1);
@@ -655,13 +658,13 @@ mod tests {
     #[test]
     #[should_panic]
     fn get_panic() {
-        let value = Value::Null;
+        let value = MAAValue::Null;
         value.get("int");
     }
 
     #[test]
     fn insert() {
-        let mut value = Value::Object(Map::new());
+        let mut value = MAAValue::Object(Map::new());
         assert_eq!(value.get_or("int", 2).unwrap(), 2);
         value.insert("int", 1);
         assert_eq!(value.get_or("int", 2).unwrap(), 1);
@@ -670,33 +673,33 @@ mod tests {
     #[test]
     #[should_panic]
     fn insert_panic() {
-        let mut value = Value::Null;
+        let mut value = MAAValue::Null;
         value.insert("int", 1);
     }
 
     #[test]
     fn is_sth() {
-        assert!(Value::Null.is_null());
-        assert!(Value::from(true).is_bool());
-        assert!(Value::from(1).is_int());
-        assert!(Value::from(1.0).is_float());
-        assert!(Value::from(String::from("string")).is_string());
-        assert!(Value::from("string").is_string());
-        assert!(Value::from([1, 2]).is_array());
-        assert!(Value::from([("key", "value")]).is_object());
+        assert!(MAAValue::Null.is_null());
+        assert!(MAAValue::from(true).is_bool());
+        assert!(MAAValue::from(1).is_int());
+        assert!(MAAValue::from(1.0).is_float());
+        assert!(MAAValue::from(String::from("string")).is_string());
+        assert!(MAAValue::from("string").is_string());
+        assert!(MAAValue::from([1, 2]).is_array());
+        assert!(MAAValue::from([("key", "value")]).is_object());
     }
 
     #[test]
     #[allow(clippy::bool_assert_comparison)]
     fn try_from() {
         // Bool
-        let bool_value = Value::from(true);
+        let bool_value = MAAValue::from(true);
         assert_eq!(bool::try_from(&bool_value).unwrap(), true);
         assert!(matches!(
             i64::try_from(&bool_value),
             Err(TryFromError::TypeMismatch)
         ));
-        let bool_input_value = Value::InputBool(BoolInput {
+        let bool_input_value = MAAValue::InputBool(BoolInput {
             default: Some(true),
             description: None,
         });
@@ -707,13 +710,13 @@ mod tests {
         ));
 
         // Int
-        let int_value = Value::from(1);
+        let int_value = MAAValue::from(1);
         assert_eq!(i64::try_from(&int_value).unwrap(), 1);
         assert!(matches!(
             f64::try_from(&int_value),
             Err(TryFromError::TypeMismatch)
         ));
-        let int_input_value = Value::InputInt(UserInput::Input(Input {
+        let int_input_value = MAAValue::InputInt(UserInput::Input(Input {
             default: Some(1),
             description: None,
         }));
@@ -724,13 +727,13 @@ mod tests {
         ));
 
         // Float
-        let float_value = Value::from(1.0);
+        let float_value = MAAValue::from(1.0);
         assert_eq!(f64::try_from(&float_value).unwrap(), 1.0);
         assert!(matches!(
             String::try_from(&float_value),
             Err(TryFromError::TypeMismatch)
         ));
-        let float_input_value = Value::InputFloat(UserInput::Input(Input {
+        let float_input_value = MAAValue::InputFloat(UserInput::Input(Input {
             default: Some(1.0),
             description: None,
         }));
@@ -741,13 +744,13 @@ mod tests {
         ));
 
         // String
-        let string_value = Value::from("string");
+        let string_value = MAAValue::from("string");
         assert_eq!(String::try_from(&string_value).unwrap(), "string");
         assert!(matches!(
             bool::try_from(&string_value),
             Err(TryFromError::TypeMismatch)
         ));
-        let string_input_value = Value::InputString(UserInput::Input(Input {
+        let string_input_value = MAAValue::InputString(UserInput::Input(Input {
             default: Some("string".to_string()),
             description: None,
         }));

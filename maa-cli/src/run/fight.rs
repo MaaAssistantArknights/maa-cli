@@ -2,7 +2,7 @@ use crate::{
     config::task::{
         task_type::MAATask,
         value::input::{BoolInput, Input, Select},
-        Task, TaskConfig, Value,
+        Task, TaskConfig, MAAValue,
     },
     object,
 };
@@ -30,7 +30,7 @@ where
     }
 
     let stage = if let Some(stage) = stage {
-        Value::String(stage.into())
+        MAAValue::String(stage.into())
     } else {
         Input::<String>::new(Some("1-7"), Some("a stage to fight")).into()
     };
@@ -44,7 +44,7 @@ where
     ));
 
     if closedown {
-        task_config.push(Task::new_with_default(MAATask::CloseDown, Value::default()));
+        task_config.push(Task::new_with_default(MAATask::CloseDown, MAAValue::default()));
     }
 
     Ok(task_config)

@@ -2,7 +2,7 @@ use crate::{
     config::task::{
         task_type::MAATask,
         value::input::{BoolInput, Input},
-        Task, TaskConfig, Value,
+        Task, TaskConfig, MAAValue,
     },
     object,
 };
@@ -31,9 +31,9 @@ pub fn roguelike(theme: Option<Theme>) -> Result<TaskConfig> {
     let mut task_config = TaskConfig::new();
 
     let theme = if let Some(theme) = theme {
-        Value::String(theme.to_str().into())
+        MAAValue::String(theme.to_str().into())
     } else {
-        Value::InputString(Input::<String>::new(Some("Sami"), Some("theme")).into())
+        MAAValue::InputString(Input::<String>::new(Some("Sami"), Some("theme")).into())
     };
 
     // TODO: better prompt and options
@@ -71,7 +71,7 @@ mod tests {
             Task::new_with_default(
                 TaskOrUnknown::MAATask(MAATask::Roguelike),
                 object!(
-                    "theme" => Value::InputString(Input::<String>::new(Some("Sami"), Some("theme")).into()),
+                    "theme" => MAAValue::InputString(Input::<String>::new(Some("Sami"), Some("theme")).into()),
                     "mode" => Input::<i64>::new(Some(0), Some("mode")),
                     "squad" => Input::<String>::new::<String, &str>(None, Some("a squad name")),
                     "core_char" => Input::<String>::new::<String, &str>(None, Some("a operator name")),
@@ -85,7 +85,7 @@ mod tests {
             Task::new_with_default(
                 TaskOrUnknown::MAATask(MAATask::Roguelike),
                 object!(
-                    "theme" => Value::String("Phantom".into()),
+                    "theme" => MAAValue::String("Phantom".into()),
                     "mode" => Input::<i64>::new(Some(0), Some("mode")),
                     "squad" => Input::<String>::new::<String, &str>(None, Some("a squad name")),
                     "core_char" => Input::<String>::new::<String, &str>(None, Some("a operator name")),

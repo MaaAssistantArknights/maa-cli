@@ -1,5 +1,5 @@
 pub mod value;
-pub use value::Value;
+pub use value::MAAValue;
 
 pub mod task_type;
 use task_type::{MAATask, TaskOrUnknown};
@@ -24,7 +24,7 @@ pub struct TaskVariant {
     #[serde(default)]
     condition: Condition,
     #[serde(default)]
-    params: Value,
+    params: MAAValue,
 }
 
 impl TaskVariant {
@@ -39,7 +39,7 @@ impl TaskVariant {
         self.condition.is_active()
     }
 
-    pub fn params(&self) -> &Value {
+    pub fn params(&self) -> &MAAValue {
         &self.params
     }
 }
@@ -70,7 +70,7 @@ pub struct Task {
     #[serde(rename = "type")]
     task_type: TaskOrUnknown,
     #[serde(default)]
-    params: Value,
+    params: MAAValue,
     #[serde(default)]
     strategy: Strategy,
     #[serde(default = "default_variants")]
@@ -81,7 +81,7 @@ impl Task {
     pub fn new<T, V, S>(task_type: T, params: V, strategy: Strategy, variants: S) -> Self
     where
         T: Into<TaskOrUnknown>,
-        V: Into<Value>,
+        V: Into<MAAValue>,
         S: IntoIterator<Item = TaskVariant>,
     {
         Self {
@@ -95,7 +95,7 @@ impl Task {
     pub fn new_with_default<T, V>(task_type: T, params: V) -> Self
     where
         T: Into<TaskOrUnknown>,
-        V: Into<Value>,
+        V: Into<MAAValue>,
     {
         Self::new(task_type, params, Strategy::default(), default_variants())
     }
@@ -113,7 +113,7 @@ impl Task {
         &self.task_type
     }
 
-    pub fn params(&self) -> Value {
+    pub fn params(&self) -> MAAValue {
         let mut params = self.params.clone();
         match self.strategy {
             // Merge params from the first active variant
@@ -168,7 +168,7 @@ impl TaskConfig {
         let mut prepend_startup = startup.is_some_and(|v| v);
         let mut append_closedown = closedown.is_some_and(|v| v);
 
-        let mut tasks: Vec<(TaskOrUnknown, Value)> = Vec::new();
+        let mut tasks: Vec<(TaskOrUnknown, MAAValue)> = Vec::new();
 
         for task in self.tasks.iter() {
             if task.is_active() {
@@ -272,7 +272,7 @@ pub struct InitializedTaskConfig {
     pub client_type: Option<ClientType>,
     pub start_app: bool,
     pub close_app: bool,
-    pub tasks: Vec<(TaskOrUnknown, Value)>,
+    pub tasks: Vec<(TaskOrUnknown, MAAValue)>,
 }
 
 #[cfg(test)]
@@ -290,52 +290,52 @@ mod tests {
         fn is_active() {
             assert!(Task::new(
                 MAATask::StartUp,
-                Value::default(),
+                MAAValue::default(),
                 Strategy::default(),
                 vec![TaskVariant {
                     condition: Condition::Always,
-                    params: Value::default(),
+                    params: MAAValue::default(),
                 }]
             )
             .is_active());
             assert!(!Task::new(
                 MAATask::StartUp,
-                Value::default(),
+                MAAValue::default(),
                 Strategy::default(),
                 vec![TaskVariant {
                     condition: Condition::Never,
-                    params: Value::default(),
+                    params: MAAValue::default(),
                 }]
             )
             .is_active());
             assert!(Task::new(
                 MAATask::StartUp,
-                Value::default(),
+                MAAValue::default(),
                 Strategy::default(),
                 vec![
                     TaskVariant {
                         condition: Condition::Never,
-                        params: Value::default(),
+                        params: MAAValue::default(),
                     },
                     TaskVariant {
                         condition: Condition::Always,
-                        params: Value::default(),
+                        params: MAAValue::default(),
                     },
                 ]
             )
             .is_active());
             assert!(!Task::new(
                 MAATask::StartUp,
-                Value::default(),
+                MAAValue::default(),
                 Strategy::default(),
                 vec![
                     TaskVariant {
                         condition: Condition::Never,
-                        params: Value::default(),
+                        params: MAAValue::default(),
                     },
                     TaskVariant {
                         condition: Condition::Never,
-                        params: Value::default(),
+                        params: MAAValue::default(),
                     },
                 ]
             )
@@ -347,7 +347,7 @@ mod tests {
             assert_eq!(
                 Task::new(
                     MAATask::StartUp,
-                    Value::default(),
+                    MAAValue::default(),
                     Strategy::default(),
                     vec![]
                 )
@@ -387,7 +387,7 @@ mod tests {
             assert_eq!(
                 Task::new(
                     MAATask::StartUp,
-                    Value::default(),
+                    MAAValue::default(),
                     Strategy::First,
                     vec![TaskVariant {
                         condition: Condition::Always,

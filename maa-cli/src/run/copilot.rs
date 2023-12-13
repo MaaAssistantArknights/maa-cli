@@ -2,7 +2,7 @@ use crate::{
     config::task::{
         task_type::MAATask,
         value::input::{BoolInput, Input},
-        Task, TaskConfig, Value,
+        Task, TaskConfig, MAAValue,
     },
     debug,
     dirs::{self, Ensure},
