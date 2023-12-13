@@ -15,7 +15,7 @@ pub use roguelike::{roguelike, Theme as RoguelikeTheme};
 
 use crate::{
     config::{
-        asst::{with_asst_config, with_mut_asst_config, AsstConfig},
+        asst::{with_asst_config, with_mut_asst_config, AsstConfig, ConnectionConfig},
         task::TaskConfig,
     },
     consts::MAA_CORE_LIB,
@@ -132,7 +132,13 @@ where
         asst.append_task(task_type, serde_json::to_string(params)?)?;
     }
 
-    let playcover = PlayCoverApp::from(&task_config);
+    let playcover = with_asst_config(|config| {
+        if matches!(config.connection, ConnectionConfig::PlayTools { .. }) {
+            PlayCoverApp::from(&task_config)
+        } else {
+            None
+        }
+    });
 
     if let Some(app) = playcover.as_ref() {
         app.open()?;
