@@ -2,7 +2,7 @@ use crate::{
     config::task::{
         task_type::MAATask,
         value::input::{BoolInput, Input, Select},
-        Task, TaskConfig, MAAValue,
+        MAAValue, Task, TaskConfig,
     },
     object,
 };
@@ -44,7 +44,10 @@ where
     ));
 
     if closedown {
-        task_config.push(Task::new_with_default(MAATask::CloseDown, MAAValue::default()));
+        task_config.push(Task::new_with_default(
+            MAATask::CloseDown,
+            MAAValue::default(),
+        ));
     }
 
     Ok(task_config)
