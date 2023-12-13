@@ -169,14 +169,14 @@ impl CopilotType {
                 MAATask::Copilot,
                 object!(
                     "filename" => filename.as_ref(),
-                    "formation" => BoolInput::new(Some(true), Some("self-formation?"))
+                    "formation" => BoolInput::new(Some(true), Some("auto formation"))
                 ),
             ),
             CopilotType::SSSCopilot => Task::new_with_default(
                 MAATask::SSSCopilot,
                 object!(
                     "filename" => filename.as_ref(),
-                    "loop_times" => Input::<i64>::new(Some(1), Some("loop times:"))
+                    "loop_times" => Input::<i64>::new(Some(1), Some("loop times"))
                 ),
             ),
         }
@@ -343,7 +343,7 @@ mod tests {
                     MAATask::Copilot,
                     object!(
                         "filename" => "filename",
-                        "formation" => BoolInput::new(Some(true), Some("self-formation?"))
+                        "formation" => BoolInput::new(Some(true), Some("auto formation"))
                     )
                 )
             );
@@ -354,7 +354,7 @@ mod tests {
                     MAATask::SSSCopilot,
                     object!(
                         "filename" => "filename",
-                        "loop_times" => Input::<i64>::new(Some(1), Some("loop times:"))
+                        "loop_times" => Input::<i64>::new(Some(1), Some("loop times"))
                     )
                 )
             );
