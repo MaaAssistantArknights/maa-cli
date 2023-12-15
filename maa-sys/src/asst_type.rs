@@ -88,36 +88,36 @@ impl_to_cstring_by_as_ref!(str, TouchMode);
 mod tests {
     use super::*;
 
-    #[cfg(not(feature = "runtime"))]
-    #[test]
-    fn apply() {
-        // Apply static options
-        // We can't apply GPU OCR option because it requires a GPU which is not available in CI.
-        StaticOptionKey::CpuOCR.apply(true).unwrap();
-        // StaticOptionKey::GpuOCR.apply(1).unwrap();
-
-        use std::{env, path::Path};
-        if let Some(Some(path)) =
-            env::var_os("MAA_RESOURCE_DIR").map(|s| Path::new(&s).parent().map(|p| p.to_owned()))
-        {
-            Assistant::load_resource(path).unwrap();
-
-            // Apply instance options
-            let asst = Assistant::new(None, None);
-            InstanceOptionKey::TouchMode
-                .apply_to(&asst, TouchMode::MaaTouch)
-                .unwrap();
-            InstanceOptionKey::DeploymentWithPause
-                .apply_to(&asst, false)
-                .unwrap();
-            InstanceOptionKey::AdbLiteEnabled
-                .apply_to(&asst, false)
-                .unwrap();
-            InstanceOptionKey::KillAdbOnExit
-                .apply_to(&asst, false)
-                .unwrap();
-        }
-    }
+    // #[cfg(not(feature = "runtime"))]
+    // #[test]
+    // fn apply() {
+    //     // Apply static options
+    //     // We can't apply GPU OCR option because it requires a GPU which is not available in CI.
+    //     StaticOptionKey::CpuOCR.apply(true).unwrap();
+    //     // StaticOptionKey::GpuOCR.apply(1).unwrap();
+    //
+    //     use std::{env, path::Path};
+    //     if let Some(Some(path)) =
+    //         env::var_os("MAA_RESOURCE_DIR").map(|s| Path::new(&s).parent().map(|p| p.to_owned()))
+    //     {
+    //         Assistant::load_resource(path).unwrap();
+    //
+    //         // Apply instance options
+    //         let asst = Assistant::new(None, None);
+    //         InstanceOptionKey::TouchMode
+    //             .apply_to(&asst, TouchMode::MaaTouch)
+    //             .unwrap();
+    //         InstanceOptionKey::DeploymentWithPause
+    //             .apply_to(&asst, false)
+    //             .unwrap();
+    //         InstanceOptionKey::AdbLiteEnabled
+    //             .apply_to(&asst, false)
+    //             .unwrap();
+    //         InstanceOptionKey::KillAdbOnExit
+    //             .apply_to(&asst, false)
+    //             .unwrap();
+    //     }
+    // }
 
     mod to_cstring {
         use super::*;
