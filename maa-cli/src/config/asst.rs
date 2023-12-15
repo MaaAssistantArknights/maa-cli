@@ -465,62 +465,7 @@ mod tests {
     mod serde {
         use super::*;
 
-        use std::sync::atomic::{AtomicBool, Ordering};
-
         use serde_test::{assert_de_tokens, Token};
-
-        static USER_RESOURCE_LOCKED: AtomicBool = AtomicBool::new(false);
-        static USER_RESOURCE_CREATED: AtomicBool = AtomicBool::new(false);
-
-        fn create_user_resource() -> PathBuf {
-            let user_resource_dir = dirs::config().join("resource");
-            USER_RESOURCE_LOCKED.store(true, Ordering::SeqCst);
-            if !user_resource_dir.exists() {
-                std::fs::create_dir_all(&user_resource_dir).unwrap();
-            }
-            USER_RESOURCE_CREATED.store(true, Ordering::SeqCst);
-            user_resource_dir
-        }
-
-        #[test]
-        fn deserialize_example() {
-            create_user_resource();
-
-            let config: AsstConfig =
-                toml::from_str(&std::fs::read_to_string("../config_examples/asst.toml").unwrap())
-                    .unwrap();
-
-            assert_eq!(
-                config,
-                AsstConfig {
-                    connection: ConnectionConfig::ADB {
-                        adb_path: String::from("adb"),
-                        device: String::from("emulator-5554"),
-                        config: String::from("CompatMac"),
-                    },
-                    resource: ResourceConfig {
-                        resource_base_dirs: {
-                            let mut base_dirs = default_resource_base_dirs();
-                            push_user_resource(&mut base_dirs);
-                            base_dirs
-                        },
-                        global_resource: Some(PathBuf::from("YoStarEN")),
-                        platform_diff_resource: Some(PathBuf::from("iOS")),
-                        user_resource: true,
-                    },
-                    static_options: StaticOptions {
-                        cpu_ocr: Some(false),
-                        gpu_ocr: Some(1),
-                    },
-                    instance_options: InstanceOptions {
-                        touch_mode: Some(TouchMode::MaaTouch),
-                        deployment_with_pause: Some(false),
-                        adb_lite_enabled: Some(false),
-                        kill_adb_on_exit: Some(false),
-                    },
-                }
-            );
-        }
 
         #[test]
         fn connection_config() {
@@ -601,7 +546,10 @@ mod tests {
                 &[Token::Map { len: Some(0) }, Token::MapEnd],
             );
 
-            let user_resource_dir = create_user_resource();
+            let user_resource_dir = dirs::config().join("resource");
+            if !user_resource_dir.exists() {
+                std::fs::create_dir_all(&user_resource_dir).unwrap();
+            }
 
             assert_de_tokens(
                 &ResourceConfig {
@@ -626,6 +574,41 @@ mod tests {
                     Token::Bool(true),
                     Token::MapEnd,
                 ],
+            );
+
+            let config: AsstConfig =
+                toml::from_str(&std::fs::read_to_string("../config_examples/asst.toml").unwrap())
+                    .unwrap();
+
+            assert_eq!(
+                config,
+                AsstConfig {
+                    connection: ConnectionConfig::ADB {
+                        adb_path: String::from("adb"),
+                        device: String::from("emulator-5554"),
+                        config: String::from("CompatMac"),
+                    },
+                    resource: ResourceConfig {
+                        resource_base_dirs: {
+                            let mut base_dirs = default_resource_base_dirs();
+                            push_user_resource(&mut base_dirs);
+                            base_dirs
+                        },
+                        global_resource: Some(PathBuf::from("YoStarEN")),
+                        platform_diff_resource: Some(PathBuf::from("iOS")),
+                        user_resource: true,
+                    },
+                    static_options: StaticOptions {
+                        cpu_ocr: Some(false),
+                        gpu_ocr: Some(1),
+                    },
+                    instance_options: InstanceOptions {
+                        touch_mode: Some(TouchMode::MaaTouch),
+                        deployment_with_pause: Some(false),
+                        adb_lite_enabled: Some(false),
+                        kill_adb_on_exit: Some(false),
+                    },
+                }
             );
         }
 
