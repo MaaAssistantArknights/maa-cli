@@ -2,7 +2,7 @@ pub mod input;
 
 use std::fmt::Display;
 
-use input::{BoolInput, Input, Select, UserInput};
+use input::{BoolInput, Input, InputOrSelect, Select};
 
 use serde::{Deserialize, Serialize};
 
@@ -11,10 +11,10 @@ use serde::{Deserialize, Serialize};
 #[serde(untagged)]
 pub enum MAAValue {
     Array(Vec<MAAValue>),
-    InputString(UserInput<String>),
+    InputString(InputOrSelect<String>),
     InputBool(BoolInput),
-    InputInt(UserInput<i64>),
-    InputFloat(UserInput<f64>),
+    InputInt(InputOrSelect<i64>),
+    InputFloat(InputOrSelect<f64>),
     Object(Map<MAAValue>),
     String(String),
     Bool(bool),
@@ -47,21 +47,21 @@ impl From<i64> for MAAValue {
     }
 }
 
-impl From<UserInput<i64>> for MAAValue {
-    fn from(value: UserInput<i64>) -> Self {
+impl From<InputOrSelect<i64>> for MAAValue {
+    fn from(value: InputOrSelect<i64>) -> Self {
         Self::InputInt(value)
     }
 }
 
 impl From<Input<i64>> for MAAValue {
     fn from(value: Input<i64>) -> Self {
-        Self::InputInt(UserInput::Input(value))
+        Self::InputInt(InputOrSelect::Input(value))
     }
 }
 
 impl From<Select<i64>> for MAAValue {
     fn from(value: Select<i64>) -> Self {
-        Self::InputInt(UserInput::Select(value))
+        Self::InputInt(InputOrSelect::Select(value))
     }
 }
 
@@ -71,21 +71,21 @@ impl From<f64> for MAAValue {
     }
 }
 
-impl From<UserInput<f64>> for MAAValue {
-    fn from(value: UserInput<f64>) -> Self {
+impl From<InputOrSelect<f64>> for MAAValue {
+    fn from(value: InputOrSelect<f64>) -> Self {
         Self::InputFloat(value)
     }
 }
 
 impl From<Input<f64>> for MAAValue {
     fn from(value: Input<f64>) -> Self {
-        Self::InputFloat(UserInput::Input(value))
+        Self::InputFloat(InputOrSelect::Input(value))
     }
 }
 
 impl From<Select<f64>> for MAAValue {
     fn from(value: Select<f64>) -> Self {
-        Self::InputFloat(UserInput::Select(value))
+        Self::InputFloat(InputOrSelect::Select(value))
     }
 }
 
@@ -95,21 +95,21 @@ impl From<String> for MAAValue {
     }
 }
 
-impl From<UserInput<String>> for MAAValue {
-    fn from(value: UserInput<String>) -> Self {
+impl From<InputOrSelect<String>> for MAAValue {
+    fn from(value: InputOrSelect<String>) -> Self {
         Self::InputString(value)
     }
 }
 
 impl From<Input<String>> for MAAValue {
     fn from(value: Input<String>) -> Self {
-        Self::InputString(UserInput::Input(value))
+        Self::InputString(InputOrSelect::Input(value))
     }
 }
 
 impl From<Select<String>> for MAAValue {
     fn from(value: Select<String>) -> Self {
-        Self::InputString(UserInput::Select(value))
+        Self::InputString(InputOrSelect::Select(value))
     }
 }
 
@@ -575,15 +575,15 @@ mod tests {
             default: Some(true),
             description: None,
         };
-        let input_int = UserInput::Input(Input {
+        let input_int = InputOrSelect::Input(Input {
             default: Some(1),
             description: None,
         });
-        let input_float = UserInput::Input(Input {
+        let input_float = InputOrSelect::Input(Input {
             default: Some(1.0),
             description: None,
         });
-        let input_string = UserInput::Input(Input {
+        let input_string = InputOrSelect::Input(Input {
             default: Some("string".to_string()),
             description: None,
         });
@@ -716,7 +716,7 @@ mod tests {
             f64::try_from(&int_value),
             Err(TryFromError::TypeMismatch)
         ));
-        let int_input_value = MAAValue::InputInt(UserInput::Input(Input {
+        let int_input_value = MAAValue::InputInt(InputOrSelect::Input(Input {
             default: Some(1),
             description: None,
         }));
@@ -733,7 +733,7 @@ mod tests {
             String::try_from(&float_value),
             Err(TryFromError::TypeMismatch)
         ));
-        let float_input_value = MAAValue::InputFloat(UserInput::Input(Input {
+        let float_input_value = MAAValue::InputFloat(InputOrSelect::Input(Input {
             default: Some(1.0),
             description: None,
         }));
@@ -750,7 +750,7 @@ mod tests {
             bool::try_from(&string_value),
             Err(TryFromError::TypeMismatch)
         ));
-        let string_input_value = MAAValue::InputString(UserInput::Input(Input {
+        let string_input_value = MAAValue::InputString(InputOrSelect::Input(Input {
             default: Some("string".to_string()),
             description: None,
         }));
