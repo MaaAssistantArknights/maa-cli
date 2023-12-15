@@ -140,28 +140,30 @@ where
         }
     });
 
-    if let Some(app) = playcover.as_ref() {
-        app.open()?;
-    }
-
-    with_asst_config(|config| {
-        let (adb, addr, config) = config.connection.connect_args();
-        asst.async_connect(adb, addr, config, true)
-    })?;
-
-    asst.start()?;
-
-    while asst.running() {
-        if stop_bool.load(atomic::Ordering::Relaxed) {
-            bail!("Interrupted by user!");
+    if !args.dry_run {
+        if let Some(app) = playcover.as_ref() {
+            app.open()?;
         }
-        std::thread::sleep(std::time::Duration::from_millis(500));
-    }
 
-    asst.stop()?;
+        with_asst_config(|config| {
+            let (adb, addr, config) = config.connection.connect_args();
+            asst.async_connect(adb, addr, config, true)
+        })?;
 
-    if let Some(app) = playcover.as_ref() {
-        app.close()?;
+        asst.start()?;
+
+        while asst.running() {
+            if stop_bool.load(atomic::Ordering::Relaxed) {
+                bail!("Interrupted by user!");
+            }
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+
+        asst.stop()?;
+
+        if let Some(app) = playcover.as_ref() {
+            app.close()?;
+        }
     }
 
     // TODO: Better ways to restore signal handlers?
