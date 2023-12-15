@@ -465,22 +465,26 @@ mod tests {
     mod serde {
         use super::*;
 
-        use lazy_static::lazy_static;
+        use std::sync::atomic::{AtomicBool, Ordering};
+
         use serde_test::{assert_de_tokens, Token};
 
-        lazy_static! {
-            static ref USER_RESOURCE_DIR: PathBuf = {
-                let user_resource_dir = dirs::config().join("resource");
-                if !user_resource_dir.exists() {
-                    std::fs::create_dir_all(&user_resource_dir).unwrap();
-                }
-                user_resource_dir
-            };
+        static USER_RESOURCE_LOCKED: AtomicBool = AtomicBool::new(false);
+        static USER_RESOURCE_CREATED: AtomicBool = AtomicBool::new(false);
+
+        fn create_user_resource() -> PathBuf {
+            let user_resource_dir = dirs::config().join("resource");
+            USER_RESOURCE_LOCKED.store(true, Ordering::SeqCst);
+            if !user_resource_dir.exists() {
+                std::fs::create_dir_all(&user_resource_dir).unwrap();
+            }
+            USER_RESOURCE_CREATED.store(true, Ordering::SeqCst);
+            user_resource_dir
         }
 
         #[test]
         fn deserialize_example() {
-            let _ = USER_RESOURCE_DIR.clone();
+            create_user_resource();
 
             let config: AsstConfig =
                 toml::from_str(&std::fs::read_to_string("../config_examples/asst.toml").unwrap())
@@ -597,7 +601,7 @@ mod tests {
                 &[Token::Map { len: Some(0) }, Token::MapEnd],
             );
 
-            let user_resource_dir = USER_RESOURCE_DIR.clone();
+            let user_resource_dir = create_user_resource();
 
             assert_de_tokens(
                 &ResourceConfig {
