@@ -75,10 +75,7 @@ fn default_url() -> String {
 
 /// Check if locale is zh-CN
 fn check_zh_cn(locale: impl AsRef<str>) -> bool {
-    match locale.as_ref() {
-        "zh-CN" | "zh-Hans" | "zh-Hans-CN" => true,
-        _ => false,
-    }
+    matches!(locale.as_ref(), "zh-CN" | "zh-Hans" | "zh-Hans-CN")
 }
 
 impl Remote {
