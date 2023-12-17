@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
+use sys_locale::get_locale;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Default, Clone)]
@@ -65,7 +66,16 @@ impl Default for Remote {
 }
 
 fn default_url() -> String {
-    String::from("https://github.com/MaaAssistantArknights/MaaResource.git")
+    if get_locale().is_some_and(check_zh_cn) {
+        String::from("https://git.maa-org.net/MAA/MaaResource.git")
+    } else {
+        String::from("https://github.com/MaaAssistantArknights/MaaResource.git")
+    }
+}
+
+/// Check if locale is zh-CN
+fn check_zh_cn(locale: impl AsRef<str>) -> bool {
+    matches!(locale.as_ref(), "zh-CN" | "zh-Hans" | "zh-Hans-CN")
 }
 
 impl Remote {
@@ -210,10 +220,7 @@ pub mod tests {
 
     #[test]
     fn url() {
-        assert_eq!(
-            Remote::default().url(),
-            "https://github.com/MaaAssistantArknights/MaaResource.git",
-        );
+        assert_eq!(Remote::default().url(), default_url());
 
         assert_eq!(
             Remote {
@@ -253,5 +260,14 @@ pub mod tests {
             .unwrap(),
             Path::new("~/.ssh/id_ed25519")
         );
+    }
+
+    #[test]
+    fn test_check_zh_cn() {
+        assert!(check_zh_cn("zh-CN"));
+        assert!(check_zh_cn("zh-Hans"));
+        assert!(check_zh_cn("zh-Hans-CN"));
+        assert!(!check_zh_cn("zh-TW"));
+        assert!(!check_zh_cn("en-US"));
     }
 }
