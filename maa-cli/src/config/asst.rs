@@ -462,25 +462,25 @@ mod tests {
 
     use crate::assert_matches;
 
+    lazy_static! {
+        static ref USER_RESOURCE_DIR: PathBuf = {
+            let user_resource_dir = dirs::config().join("resource");
+            if !user_resource_dir.exists() {
+                std::fs::create_dir_all(&user_resource_dir).unwrap();
+            }
+            user_resource_dir
+        };
+    }
+
     mod serde {
         use super::*;
 
-        use lazy_static::lazy_static;
         use serde_test::{assert_de_tokens, Token};
 
-        lazy_static! {
-            static ref USER_RESOURCE_DIR: PathBuf = {
-                let user_resource_dir = dirs::config().join("resource");
-                if !user_resource_dir.exists() {
-                    std::fs::create_dir_all(&user_resource_dir).unwrap();
-                }
-                user_resource_dir
-            };
-        }
-
         #[test]
+        #[ignore = "attempt to create a directory in user space"]
         fn deserialize_example() {
-            let _ = USER_RESOURCE_DIR.clone();
+            let user_resource_dir = USER_RESOURCE_DIR.clone();
 
             let config: AsstConfig =
                 toml::from_str(&std::fs::read_to_string("../config_examples/asst.toml").unwrap())
@@ -497,7 +497,7 @@ mod tests {
                     resource: ResourceConfig {
                         resource_base_dirs: {
                             let mut base_dirs = default_resource_base_dirs();
-                            push_user_resource(&mut base_dirs);
+                            base_dirs.push(user_resource_dir);
                             base_dirs
                         },
                         global_resource: Some(PathBuf::from("YoStarEN")),
@@ -586,6 +586,7 @@ mod tests {
         }
 
         #[test]
+        #[ignore = "attempt to create a directory in user space"]
         fn resource_config() {
             assert_de_tokens(
                 &ResourceConfig {
@@ -836,9 +837,9 @@ mod tests {
         }
 
         #[test]
+        #[ignore = "attempt to create a directory in user space"]
         fn use_user_resource() {
-            let user_resource_dir = dirs::config().join("resource");
-            user_resource_dir.ensure().unwrap();
+            let user_resource_dir = USER_RESOURCE_DIR.clone();
 
             assert_eq!(
                 *ResourceConfig::default().use_user_resource(),
