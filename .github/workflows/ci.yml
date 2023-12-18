@@ -78,7 +78,7 @@ jobs:
           echo "MAA_CORE_INSTALLED=true" >> "$GITHUB_ENV"
       - name: Test
         run: |
-          cargo test
+          cargo test -- --include-ignored
       - name: Coverage
         run: |
           cargo tarpaulin --packages maa-cli --timeout 120 --out xml \
