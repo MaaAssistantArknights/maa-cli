@@ -274,6 +274,7 @@ jobs:
               exit 1
             fi
           fi
+          sleep 5 # wait to avoid the release becames draft
       - name: Create Release
         uses: softprops/action-gh-release@v1
         if: ${{ fromJson(needs.meta.outputs.publish) }}
