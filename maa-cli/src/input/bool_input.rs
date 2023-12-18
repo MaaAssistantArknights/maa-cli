@@ -1,8 +1,8 @@
-use super::UserInput;
+use super::{Result, UserInput};
 
-use std::io::{Result, Write};
+use std::io::Write;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// A struct that represents a user input that queries the user for boolean input.
 #[cfg_attr(test, derive(PartialEq))]
@@ -57,12 +57,18 @@ impl UserInput for BoolInput {
         write!(writer, "Default value not set, please input y/n: ")
     }
 
-    fn parse(&self, trimmed: &str) -> std::result::Result<Self::Value, String> {
+    fn parse(&self, trimmed: &str) -> Result<Self::Value, String> {
         match trimmed {
             "y" | "Y" | "yes" | "Yes" | "YES" => Ok(true),
             "n" | "N" | "no" | "No" | "NO" => Ok(false),
             _ => Err(String::from("Invalid input, please input y/n: ")),
         }
+    }
+}
+
+impl Serialize for BoolInput {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        super::serialize_userinput(self, serializer)
     }
 }
 
@@ -72,10 +78,10 @@ mod tests {
 
     use crate::assert_matches;
 
-    use serde_test::{assert_de_tokens, Token};
+    use serde_test::{assert_de_tokens, assert_ser_tokens_error, Token};
 
     #[test]
-    fn deserialize() {
+    fn serde() {
         let values = vec![
             BoolInput::new(Some(true), Some("do something")),
             BoolInput::new::<&str>(Some(false), None),
@@ -109,6 +115,17 @@ mod tests {
                 Token::MapEnd,
                 Token::SeqEnd,
             ],
+        );
+
+        // Only input with default value can be serialized
+        assert_ser_tokens_error(
+            &values,
+            &[
+                Token::Seq { len: Some(4) },
+                Token::Bool(true),
+                Token::Bool(false),
+            ],
+            "can not get default value in batch mode",
         );
     }
 

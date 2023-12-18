@@ -1,13 +1,20 @@
 use crate::{
-    config::task::{
-        task_type::MAATask,
-        value::input::{BoolInput, Input, Select},
-        MAAValue, Task, TaskConfig,
-    },
+    config::task::{task_type::MAATask, ClientType, MAAValue, Task, TaskConfig},
+    input::{BoolInput, Input, SelectD, ValueWithDesc},
     object,
 };
 
 use anyhow::Result;
+
+impl From<ClientType> for ValueWithDesc<String> {
+    fn from(client: ClientType) -> Self {
+        Self::WithDesc {
+            value: client.to_string(),
+            // TODO: localized description
+            desc: client.to_string(),
+        }
+    }
+}
 
 pub fn fight<S>(stage: Option<S>, startup: bool, closedown: bool) -> Result<TaskConfig>
 where
@@ -16,14 +23,16 @@ where
     let mut task_config = TaskConfig::new();
 
     if startup {
+        use ClientType::*;
         task_config.push(Task::new_with_default(
             MAATask::StartUp,
             object!(
                 "start_game_enabled" => BoolInput::new(Some(true), Some("start game")),
-                "client_type" => Select::<String>::new(
-                    // TODO: a select type that accepts a enum (maybe a trait)
-                    vec!["Official", "Bilibili", "Txwy", "YoStarEN", "YoStarJP", "YoStarKR"],
+                "client_type" => SelectD::<String>::new(
+                    vec![Official, Bilibili, Txwy, YoStarEN, YoStarJP, YoStarKR],
+                    Some(1),
                     Some("client type"),
+                    true,
                 ),
             ),
         ));

@@ -501,7 +501,7 @@ mod tests {
         mod serde {
             use super::*;
 
-            use value::input::{BoolInput, Input, Select};
+            use crate::input::{BoolInput, Input, SelectD};
 
             use chrono::{NaiveDateTime, NaiveTime, TimeZone, Weekday};
 
@@ -534,50 +534,52 @@ mod tests {
                 ));
 
                 task_list.push(Task::new(
-                Some("Fight Daily".to_string()),
-                MAATask::Fight,
-                object!(),
-                Strategy::Merge,
-                vec![
-                    TaskVariant {
-                        condition: Condition::Weekday {
-                            weekdays: vec![Weekday::Sun],
+                    Some("Fight Daily".to_string()),
+                    MAATask::Fight,
+                    object!(),
+                    Strategy::Merge,
+                    vec![
+                        TaskVariant {
+                            condition: Condition::Weekday {
+                                weekdays: vec![Weekday::Sun],
+                            },
+                            params: object!("expiring_medicine" => 5),
                         },
-                        params: object!("expiring_medicine" => 5),
-                    },
-                    TaskVariant {
-                        condition: Condition::Always,
-                        params: object!(
-                            "stage" => Input {
-                                default: Some("1-7".to_string()),
-                                description: Some("a stage to fight".to_string())
-                            }
-                        ),
-                    },
-                    TaskVariant {
-                        condition: Condition::Weekday {
-                            weekdays: vec![Weekday::Tue, Weekday::Thu, Weekday::Sat],
+                        TaskVariant {
+                            condition: Condition::Always,
+                            params: object!(
+                                "stage" => Input::<String>::new(
+                                    Some("1-7"),
+                                    Some("a stage to fight"),
+                                ),
+                            ),
                         },
-                        params: object!("stage" => "CE-6"),
-                    },
-                    TaskVariant {
-                        condition: Condition::DateTime {
-                            start: Some(naive_local_datetime(2023, 8, 1, 16, 0, 0)),
-                            end: Some(naive_local_datetime(2023, 8, 21, 3, 59, 59)),
+                        TaskVariant {
+                            condition: Condition::Weekday {
+                                weekdays: vec![Weekday::Tue, Weekday::Thu, Weekday::Sat],
+                            },
+                            params: object!("stage" => "CE-6"),
                         },
-                        params: object!(
-                            "stage" => Select {
-                                alternatives: vec![
-                                    "SL-6".to_string(),
-                                    "SL-7".to_string(),
-                                    "SL-8".to_string(),
-                                ],
-                                description: Some("a stage to fight in summer event".to_string()),
-                            }
-                        ),
-                    },
-                ],
-            ));
+                        TaskVariant {
+                            condition: Condition::DateTime {
+                                start: Some(naive_local_datetime(2023, 8, 1, 16, 0, 0)),
+                                end: Some(naive_local_datetime(2023, 8, 21, 3, 59, 59)),
+                            },
+                            params: object!(
+                                "stage" => SelectD::<String>::new(
+                                    [
+                                        "SL-6",
+                                        "SL-7",
+                                        "SL-8",
+                                    ],
+                                    None,
+                                    Some("a stage to fight in summer event"),
+                                    true,
+                                )
+                            ),
+                        },
+                    ],
+                ));
 
                 task_list.push(Task::new(
                     None,

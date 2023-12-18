@@ -1,12 +1,8 @@
-use super::{indefinite_article, UserInput};
+use super::{Result, UserInput};
 
-use std::{
-    fmt::Display,
-    io::{self, Write},
-    str::FromStr,
-};
+use std::{fmt::Display, io::Write, str::FromStr};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Deserialize, Debug, Clone)]
@@ -45,14 +41,12 @@ impl<F: FromStr + Display> UserInput for Input<F> {
         self.default
     }
 
-    fn prompt(&self, mut writer: impl Write) -> io::Result<()> {
+    fn prompt(&self, mut writer: impl Write) -> Result<()> {
         write!(writer, "Please input")?;
         if let Some(description) = self.description {
             write!(writer, " {}", description)?;
         } else {
-            let type_name = std::any::type_name::<F>();
-            let article = indefinite_article(type_name);
-            write!(writer, " {} {}", article, type_name)?;
+            write!(writer, " a {}", std::any::type_name::<F>())?;
         }
         if let Some(default) = &self.default {
             write!(writer, " [default: {}]", default)?;
@@ -61,7 +55,7 @@ impl<F: FromStr + Display> UserInput for Input<F> {
         Ok(())
     }
 
-    fn prompt_no_default(&self, mut writer: impl Write) -> io::Result<()> {
+    fn prompt_no_default(&self, mut writer: impl Write) -> Result<()> {
         write!(writer, "Default value not set, please input")
     }
 
@@ -73,21 +67,27 @@ impl<F: FromStr + Display> UserInput for Input<F> {
     }
 }
 
+impl<F: FromStr + Display + Serialize> Serialize for Input<F> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        super::serialize_userinput(self, serializer)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     use crate::assert_matches;
 
-    use serde_test::{assert_de_tokens, Token};
+    use serde_test::{assert_de_tokens, assert_ser_tokens_error, Token};
 
     #[test]
-    fn deserialize() {
-        let values = vec![
-            Input::<i64>::new(Some(0), Some("how many medicine to use")),
-            Input::<i64>::new(None::<i64>, Some("how many medicine to use")),
-            Input::<i64>::new(Some(0), None::<&str>),
-            Input::<i64>::new(None::<i64>, None::<&str>),
+    fn serde() {
+        let values: Vec<Input<i64>> = vec![
+            Input::new(Some(0), Some("how many medicine to use")),
+            Input::new(Some(0), None::<&str>),
+            Input::new(None::<i64>, Some("how many medicine to use")),
+            Input::new(None::<i64>, None::<&str>),
         ];
 
         assert_de_tokens(
@@ -101,16 +101,24 @@ mod tests {
                 Token::Str("how many medicine to use"),
                 Token::MapEnd,
                 Token::Map { len: Some(1) },
+                Token::Str("default"),
+                Token::I64(0),
+                Token::MapEnd,
+                Token::Map { len: Some(1) },
                 Token::Str("description"),
                 Token::Str("how many medicine to use"),
                 Token::MapEnd,
-                Token::Map { len: Some(1) },
-                Token::Str("default"),
-                Token::None,
+                Token::Map { len: Some(0) },
                 Token::MapEnd,
                 Token::SeqEnd,
             ],
         );
+
+        assert_ser_tokens_error(
+            &values,
+            &[Token::Seq { len: Some(4) }, Token::I64(0), Token::I64(0)],
+            "can not get default value in batch mode",
+        )
     }
 
     #[test]

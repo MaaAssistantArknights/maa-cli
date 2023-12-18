@@ -7,7 +7,7 @@ use std::{
     str::FromStr,
 };
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
@@ -143,9 +143,10 @@ impl<S: Selectable> UserInput for Select<S> {
 
     fn prompt(&self, mut writer: impl Write) -> io::Result<()> {
         for (i, alternative) in self.alternatives.iter().enumerate() {
-            write!(writer, "{}. {}", i + 1, alternative.display())?;
+            write!(writer, "{}. ", i + 1);
+            alternative.desc(writer)?;
             if self.default_index.is_some_and(|d| d == i + 1) {
-                writeln!(writer, " (default)")?;
+                writeln!(writer, " [default]")?;
             } else {
                 writeln!(writer)?;
             }
@@ -205,216 +206,299 @@ impl<S: Selectable> UserInput for Select<S> {
     }
 }
 
+impl<S> Serialize for Select<S>
+where
+    S: Selectable + Serialize,
+    S::Value: Serialize,
+{
+    fn serialize<Se: serde::Serializer>(&self, serializer: Se) -> Result<Se::Ok, Se::Error> {
+        self.value()
+            .map_err(serde::ser::Error::custom)?
+            .serialize(serializer)
+    }
+}
+
 pub trait Selectable {
     type Value;
-    type Display: Display + ?Sized;
     type Error;
 
     /// Get the value of this element, consum self.
     fn value(self) -> Self::Value;
 
-    /// Get the description of this element, not consum self.
-    fn display(&self) -> &Self::Display;
+    /// Return the description of this element.
+    fn desc(&self, writer: impl Write) -> io::Result<()>;
 
     /// Parse a string to value of this element.
+    ///
+    /// This function parse a string to value of this element
+    /// instead of the element itself to allow custom input.
     fn parse(input: &str) -> Result<Self::Value, Self::Error>;
 }
 
-impl Selectable for i64 {
-    type Value = Self;
-    type Display = Self;
+#[cfg_attr(test, derive(PartialEq, Debug))]
+#[derive(Deserialize, Clone)]
+#[serde(untagged)]
+pub enum ValueWithDesc<T> {
+    Value(T),
+    WithDesc { value: T, desc: String },
+}
+
+impl<T: Display> ValueWithDesc<T> {
+    pub fn new<V, D>(value: V, description: Option<D>) -> Self
+    where
+        V: Into<T>,
+        D: Into<String>,
+    {
+        match description {
+            Some(description) => ValueWithDesc::WithDesc {
+                value: value.into(),
+                desc: description.into(),
+            },
+            None => ValueWithDesc::Value(value.into()),
+        }
+    }
+
+    fn value(self) -> T {
+        match self {
+            ValueWithDesc::Value(value) => value,
+            ValueWithDesc::WithDesc { value, .. } => value,
+        }
+    }
+
+    fn desc(&self, mut writer: impl Write) -> io::Result<()> {
+        match self {
+            ValueWithDesc::Value(value) => write!(writer, "{}", value),
+            ValueWithDesc::WithDesc { desc, .. } => write!(writer, "{}", desc),
+        }
+    }
+}
+
+impl<T> From<T> for ValueWithDesc<T> {
+    fn from(value: T) -> Self {
+        ValueWithDesc::Value(value)
+    }
+}
+
+impl From<&str> for ValueWithDesc<String> {
+    fn from(value: &str) -> Self {
+        Self::from(String::from(value))
+    }
+}
+
+impl<S: Serialize> Serialize for ValueWithDesc<S> {
+    fn serialize<Se: serde::Serializer>(&self, serializer: Se) -> Result<Se::Ok, Se::Error> {
+        match self {
+            ValueWithDesc::Value(value) => value.serialize(serializer),
+            ValueWithDesc::WithDesc { value, .. } => value.serialize(serializer),
+        }
+    }
+}
+
+impl Selectable for ValueWithDesc<i64> {
+    type Value = i64;
     type Error = <i64 as FromStr>::Err;
 
-    fn value(self) -> Self::Value {
-        self
+    fn value(self) -> i64 {
+        self.value()
     }
 
-    fn display(&self) -> &Self::Display {
-        self
+    fn desc(&self, mut f: impl Write) -> io::Result<()> {
+        self.desc(&mut f)
     }
 
-    fn parse(input: &str) -> Result<Self::Value, Self::Error> {
+    fn parse(input: &str) -> Result<i64, Self::Error> {
         input.parse()
     }
 }
 
-impl Selectable for f64 {
-    type Value = Self;
-    type Display = Self;
+impl Selectable for ValueWithDesc<f64> {
+    type Value = f64;
     type Error = <f64 as FromStr>::Err;
 
-    fn value(self) -> Self::Value {
-        self
+    fn value(self) -> f64 {
+        self.value()
     }
 
-    fn display(&self) -> &Self::Display {
-        self
+    fn desc(&self, writer: impl Write) -> io::Result<()> {
+        self.desc(writer)
     }
 
-    fn parse(input: &str) -> Result<Self::Value, Self::Error> {
+    fn parse(input: &str) -> Result<f64, Self::Error> {
         input.parse()
     }
 }
 
-impl Selectable for String {
-    type Value = Self;
-    type Display = str;
-    type Error = Infallible;
-
-    fn value(self) -> Self::Value {
-        self
-    }
-
-    fn display(&self) -> &Self::Display {
-        self
-    }
-
-    fn parse(input: &str) -> Result<Self::Value, Self::Error> {
-        Ok(input.to_owned())
-    }
-}
-
-use crate::run::RoguelikeTheme;
-
-impl Selectable for RoguelikeTheme {
+impl Selectable for ValueWithDesc<String> {
     type Value = String;
-    type Display = str;
     type Error = Infallible;
 
-    fn value(self) -> Self::Value {
-        self.to_str().to_owned()
+    fn value(self) -> String {
+        self.value()
     }
 
-    fn display(&self) -> &Self::Display {
-        self.to_str()
+    fn desc(&self, mut writer: impl Write) -> io::Result<()> {
+        self.desc(writer)
     }
 
-    fn parse(input: &str) -> Result<Self::Value, Self::Error> {
+    fn parse(input: &str) -> Result<String, Self::Error> {
         Ok(input.to_owned())
     }
 }
+
+/// A type alias for `Select<ValueWithDescription<T>>`.
+///
+/// The `SelectD` type is a `Select` with optional description for each alternative.
+/// Value of `SelectD<T>` is the same as `Select<T>`.
+pub type SelectD<T> = Select<ValueWithDesc<T>>;
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     use crate::assert_matches;
 
-    use super::*;
+    use serde_test::{assert_de_tokens, assert_ser_tokens_error, Token};
+
+    // Use this function to get a Select with most fields set to Some.
+    fn test_full() -> SelectD<String> {
+        SelectD::<String>::new(
+            vec![
+                ValueWithDesc::new("CE-5", Some("LMB stage 5")),
+                ValueWithDesc::new("CE-6", Some("LMB stage 6")),
+            ],
+            Some(2),
+            Some("stage to fight"),
+            true,
+        )
+    }
+
+    // Use this function to get a Select with most fields set to None.
+    fn test_none() -> SelectD<String> {
+        SelectD::<String>::new(vec!["CE-5", "CE-6"], None, None::<&str>, false)
+    }
+
+    #[test]
+    fn serde() {
+        let values = [test_full(), test_none()];
+
+        assert_de_tokens(
+            &values,
+            &[
+                Token::Seq { len: Some(2) },
+                Token::Map { len: Some(4) },
+                Token::Str("alternatives"),
+                Token::Seq { len: Some(2) },
+                Token::Map { len: Some(2) },
+                Token::Str("value"),
+                Token::Str("CE-5"),
+                Token::Str("description"),
+                Token::Str("LMB stage 5"),
+                Token::MapEnd,
+                Token::Map { len: Some(2) },
+                Token::Str("value"),
+                Token::Str("CE-6"),
+                Token::Str("description"),
+                Token::Str("LMB stage 6"),
+                Token::MapEnd,
+                Token::SeqEnd,
+                Token::Str("default_index"),
+                Token::Some,
+                Token::U64(2),
+                Token::Str("description"),
+                Token::Some,
+                Token::Str("stage to fight"),
+                Token::Str("allow_custom"),
+                Token::Bool(true),
+                Token::MapEnd,
+                Token::Map { len: Some(1) },
+                Token::Str("alternatives"),
+                Token::Seq { len: Some(2) },
+                Token::Str("CE-5"),
+                Token::Str("CE-6"),
+                Token::SeqEnd,
+                Token::MapEnd,
+                Token::SeqEnd,
+            ],
+        );
+
+        assert_ser_tokens_error(
+            &values,
+            &[Token::Seq { len: Some(2) }, Token::String("CE-6")],
+            "can not get default value in batch mode",
+        );
+    }
 
     #[test]
     fn construct() {
         assert_matches!(
-            Select::<String>::new(
-                vec!["CE-5", "CE-6"],
-                Some(2),
-                Some("stage to fight"),
-                true,
-            ),
-            Select {
+            test_full(),
+            SelectD {
                 alternatives,
                 default_index: Some(1),
                 description: Some(description),
                 allow_custom: true,
-            } if alternatives == vec![String::from("CE-5"), String::from("CE-6")]
+            } if alternatives == ["CE-5", "CE-6"].into_iter().map(|s| s.into()).collect::<Vec<_>>()
                 && description == "a number"
         );
 
         assert_matches!(
-            Select::<String>::new(
-                vec!["CE-5", "CE-6"],
-                None,
-                None::<String>,
-                false,
-            ),
-            Select {
+            test_none(),
+            SelectD {
                 alternatives,
                 default_index: None,
                 description: None,
                 allow_custom: false,
-            } if alternatives == vec![String::from("CE-5"), String::from("CE-6")]
+            } if alternatives == vec!["CE-5", "CE-6"].into_iter().map(|s| s.into()).collect::<Vec<_>>()
         )
     }
 
     #[test]
     fn default() {
-        assert_eq!(
-            Select::<String>::new(vec!["CE-5", "CE-6"], Some(2), Some("stage to fight"), true,)
-                .default(),
-            Some(String::from("CE-6"))
-        );
-
-        assert_eq!(
-            Select::<String>::new(vec!["CE-5", "CE-6"], None, None::<String>, false,).default(),
-            None
-        )
+        assert_eq!(test_full().default().unwrap(), "CE-6");
+        assert_eq!(test_none().default(), None)
     }
 
     #[test]
     fn batch_default() {
-        assert_eq!(
-            Select::<String>::new(vec!["CE-5", "CE-6"], Some(2), Some("stage to fight"), true,)
-                .batch_default(),
-            Some(String::from("CE-5"))
-        );
-
-        assert_eq!(
-            Select::<String>::new(vec!["CE-5", "CE-6"], None, None::<String>, false,)
-                .batch_default(),
-            Some(String::from("CE-5"))
-        )
+        assert_eq!(test_full().batch_default().unwrap(), "CE-6");
+        assert_eq!(test_none().batch_default().unwrap(), "CE-5")
     }
 
     #[test]
     fn prompt() {
         let mut buffer = Vec::new();
 
-        Select::<String>::new(
-            vec!["CE-5", "CE-6"],
-            Some(2),
-            Some("a stage to fight"),
-            true,
-        )
-        .prompt(&mut buffer)
-        .unwrap();
+        test_full().prompt(&mut buffer).unwrap();
         assert_eq!(
             String::from_utf8(buffer).unwrap(),
-            "1. CE-5\n\
-             2. CE-6 (default)\n\
+            "1. LMB stage 5\n\
+             2. LMB stage 6 [default]\n\
              Please select a stage to fight or input a custom value (empty for default): "
         );
         buffer.clear();
 
-        Select::<String>::new(vec!["CE-5", "CE-6"], None, None::<String>, false)
-            .prompt(&mut buffer)
-            .unwrap();
+        test_none().prompt(&mut buffer).unwrap();
         assert_eq!(
             String::from_utf8(buffer).unwrap(),
             "1. CE-5\n\
              2. CE-6\n\
              Please select one of the alternatives: "
         );
+        buffer.clear();
     }
 
     #[test]
     fn prompt_no_default() {
         let mut buffer = Vec::new();
 
-        Select::<String>::new(
-            vec!["CE-5", "CE-6"],
-            Some(2),
-            Some("a stage to fight"),
-            true,
-        )
-        .prompt_no_default(&mut buffer)
-        .unwrap();
+        test_full().prompt_no_default(&mut buffer).unwrap();
         assert_eq!(
             String::from_utf8(buffer).unwrap(),
             "Default not set, please select a stage to fight or input a custom value: "
         );
         buffer.clear();
 
-        Select::<String>::new(vec!["CE-5", "CE-6"], None, None::<String>, false)
-            .prompt_no_default(&mut buffer)
-            .unwrap();
+        test_none().prompt_no_default(&mut buffer).unwrap();
         assert_eq!(
             String::from_utf8(buffer).unwrap(),
             "Default not set, please select one of the alternatives: "
@@ -423,12 +507,8 @@ mod tests {
 
     #[test]
     fn parse() {
-        let select = Select::<String>::new(
-            vec!["CE-5", "CE-6"],
-            Some(2),
-            Some("a stage to fight"),
-            true,
-        );
+        let select =
+            SelectD::<String>::new(["CE-5", "CE-6"], Some(2), Some("a stage to fight"), true);
 
         assert_eq!(select.parse("").unwrap(), "CE-6");
         assert_eq!(select.parse("1").unwrap(), "CE-5");
@@ -438,24 +518,40 @@ mod tests {
             "Index 3 out of range, please try again (1 - 2): "
         );
 
-        let select = Select::<RoguelikeTheme>::new(
-            vec![
-                RoguelikeTheme::Phantom,
-                RoguelikeTheme::Mizuki,
-                RoguelikeTheme::Sami,
-            ],
-            Some(3),
-            Some("a roguelike theme"),
-            false,
-        );
+        let select = SelectD::<f64>::new([1.0, 2.0], Some(2), Some("a float"), false);
 
-        assert_eq!(select.parse("").unwrap(), "Sami");
-        assert_eq!(select.parse("1").unwrap(), "Phantom");
+        assert_eq!(select.parse("").unwrap(), 2.0);
+        assert_eq!(select.parse("1").unwrap(), 1.0);
         assert_eq!(
-            select.parse("Mizuki").unwrap_err(),
-            "Invalid index \"Mizuki\", please input an index number (1 - 3)"
+            select.parse("Invalid").unwrap_err(),
+            "Invalid index \"Invalid\", please input an index number (1 - 2)"
         );
     }
 
-    mod selectable {}
+    mod selectable {
+        use super::*;
+
+        #[test]
+        fn int() {
+            let value = ValueWithDesc::<i64>::new(1, None::<&str>);
+            assert_eq!(value.value(), 1);
+            assert_eq!(ValueWithDesc::<i64>::parse("1").unwrap(), 1);
+            assert!(ValueWithDesc::<i64>::parse("a").is_err())
+        }
+
+        #[test]
+        fn float() {
+            let value = ValueWithDesc::<f64>::new(1.0, None::<&str>);
+            assert_eq!(value.value(), 1.0);
+            assert_eq!(ValueWithDesc::<f64>::parse("1.0").unwrap(), 1.0);
+            assert!(ValueWithDesc::<f64>::parse("a").is_err())
+        }
+
+        #[test]
+        fn string() {
+            let value = ValueWithDesc::<String>::new("a", None::<&str>);
+            assert_eq!(value.value(), "a");
+            assert_eq!(ValueWithDesc::<String>::parse("a").unwrap(), "a");
+        }
+    }
 }

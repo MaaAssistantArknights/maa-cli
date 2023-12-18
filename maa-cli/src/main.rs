@@ -2,14 +2,11 @@ mod activity;
 mod config;
 mod consts;
 mod dirs;
+mod input;
 mod installer;
 mod run;
 
-use crate::{
-    config::{cli, task::value::input::enable_batch_mode},
-    dirs::Ensure,
-    installer::resource,
-};
+use crate::{config::cli, dirs::Ensure, input::enable_batch_mode, installer::resource};
 
 #[cfg(feature = "cli_installer")]
 use crate::installer::maa_cli;
