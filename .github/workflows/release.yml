@@ -285,7 +285,7 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             maa_cli-v${{ needs.meta.outputs.version }}-*-unknown-linux-gnu.tar.gz*
-            maa_cli-v${{ needs.meta.outputs.version }}-universal-apple-darwin.zip*
+            maa_cli-v${{ needs.meta.outputs.version }}-*-apple-darwin.zip*
             maa_cli-v${{ needs.meta.outputs.version }}-*-pc-windows-msvc.zip*
       - name: Commit version.json and Push
         working-directory: version
