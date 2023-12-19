@@ -143,7 +143,7 @@ jobs:
         run: |
           tar -cvf "$CARGO_BUILD_TARGET.tar" -C "target/$CARGO_BUILD_TARGET/release" maa
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: maa_cli-${{ env.CARGO_BUILD_TARGET }}
           path: ${{ env.CARGO_BUILD_TARGET }}.tar
@@ -159,7 +159,7 @@ jobs:
       # download all artifacts, even if not all are used,
       # because this action don't support wildcards
       - name: Download Artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
       - name: Create universal binaries
         run: |
           for arch in x86_64 aarch64; do
@@ -170,7 +170,7 @@ jobs:
           lipo -create -output maa maa_cli-x86_64-apple-darwin/maa maa_cli-aarch64-apple-darwin/maa
           tar -cvf "universal-apple-darwin.tar" maa
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: maa_cli-universal-apple-darwin
           path: universal-apple-darwin.tar
@@ -193,7 +193,7 @@ jobs:
       COMMIT: ${{ needs.meta.outputs.commit }}
     steps:
       - name: Download Artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
       - name: Checkout version branch
         uses: actions/checkout@v4
         with:
