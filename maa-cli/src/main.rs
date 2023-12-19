@@ -38,7 +38,7 @@ struct CLI {
     /// See documentation of log level for more information.
     #[arg(short, long, verbatim_doc_comment, action = clap::ArgAction::Count, global = true)]
     quiet: u8,
-    /// Enable touch mode
+    /// Enable batch mode
     ///
     /// If there are some input parameters in the task file,
     /// some prompts will be displayed to ask for input.
@@ -114,7 +114,7 @@ enum SubCommand {
         #[arg(default_value_t = Component::All)]
         component: Component,
     },
-    /// Run a predefined task
+    /// Run a custom task
     ///
     /// All arguments will be passed to maa-run,
     /// type --help to get more information.
@@ -190,7 +190,9 @@ enum SelfCommand {
 enum Component {
     #[default]
     All,
+    #[value(alias("cli"))]
     MaaCLI,
+    #[value(alias("core"))]
     MaaCore,
 }
 
@@ -506,30 +508,42 @@ mod test {
 
         #[test]
         fn version() {
-            assert!(matches!(
+            assert_matches!(
                 CLI::parse_from(["maa", "version"]).command,
                 SubCommand::Version {
                     component: Component::All
                 }
-            ));
-            assert!(matches!(
+            );
+            assert_matches!(
                 CLI::parse_from(["maa", "version", "all"]).command,
                 SubCommand::Version {
                     component: Component::All
                 }
-            ));
-            assert!(matches!(
+            );
+            assert_matches!(
                 CLI::parse_from(["maa", "version", "maa-cli"]).command,
                 SubCommand::Version {
                     component: Component::MaaCLI
                 }
-            ));
-            assert!(matches!(
+            );
+            assert_matches!(
+                CLI::parse_from(["maa", "version", "cli"]).command,
+                SubCommand::Version {
+                    component: Component::MaaCLI
+                }
+            );
+            assert_matches!(
                 CLI::parse_from(["maa", "version", "maa-core"]).command,
                 SubCommand::Version {
                     component: Component::MaaCore
                 }
-            ));
+            );
+            assert_matches!(
+                CLI::parse_from(["maa", "version", "core"]).command,
+                SubCommand::Version {
+                    component: Component::MaaCore
+                }
+            );
         }
 
         #[test]
@@ -580,7 +594,7 @@ mod test {
 
         #[test]
         fn fight() {
-            assert!(matches!(
+            assert_matches!(
                 CLI::parse_from(["maa", "fight"]).command,
                 SubCommand::Fight {
                     stage: None,
@@ -588,27 +602,27 @@ mod test {
                     closedown: false,
                     ..
                 }
-            ));
+            );
 
-            assert!(matches!(
+            assert_matches!(
                 CLI::parse_from(["maa", "fight", "1-7"]).command,
                 SubCommand::Fight {
                     stage: Some(stage),
                     ..
                 } if stage == "1-7"
-            ));
+            );
 
-            assert!(matches!(
+            assert_matches!(
                 CLI::parse_from(["maa", "fight", "--startup"]).command,
                 SubCommand::Fight { startup: true, .. }
-            ));
-            assert!(matches!(
+            );
+            assert_matches!(
                 CLI::parse_from(["maa", "fight", "--closedown"]).command,
                 SubCommand::Fight {
                     closedown: true,
                     ..
                 }
-            ));
+            );
         }
 
         #[test]
