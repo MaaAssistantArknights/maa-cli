@@ -38,7 +38,7 @@ complete -c maa -n "__fish_seen_subcommand_from install update" -l no-resource -
 complete -c maa -n "__fish_seen_subcommand_from install" -s f -l force -d 'Force to install even if the maa and resource already exists'
 
 # MaaCLI self update options
-complete -c maa -n "__fish_seen_subcommand_from self" -f -a "update" -d 'Update maa-cli self'
+complete -c maa -n "__fish_seen_subcommand_from self; and not __fish_seen_subcommand_from update" -f -a "update" -d 'Install maa-cli self'
 complete -c maa -n "__fish_seen_subcommand_from self; and __fish_seen_subcommand_from update" -a "$channels" -d 'Channel of maa-cli to install'
 complete -c maa -n "__fish_seen_subcommand_from self; and __fish_seen_subcommand_from update" -l api-url -d 'URL of api to get version information of maa-cli' -r
 complete -c maa -n "__fish_seen_subcommand_from self; and __fish_seen_subcommand_from update" -l download-url -d 'URL of maa-cli to download' -r
