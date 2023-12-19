@@ -78,11 +78,12 @@ jobs:
           echo "MAA_CORE_INSTALLED=true" >> "$GITHUB_ENV"
       - name: Test
         run: |
-          cargo test
+          cargo test -- --include-ignored
       - name: Coverage
         run: |
           cargo tarpaulin --packages maa-cli --timeout 120 --out xml \
-            ${{ github.run_attempt == 1 && '--skip-clean' || '' }}
+            ${{ github.run_attempt == 1 && '--skip-clean' || '' }} \
+            -- --include-ignored
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v3
         with:
@@ -144,7 +145,7 @@ jobs:
             --no-default-features --features ${{ matrix.feature }}
       - name: Test
         run: |
-          cargo test
+          cargo test -- --include-ignored
 
   build-sys:
     name: Build and test (maa-sys, static)
