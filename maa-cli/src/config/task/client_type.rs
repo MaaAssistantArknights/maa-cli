@@ -31,6 +31,7 @@ impl ClientType {
         }
     }
 
+    #[cfg(target_os = "macos")]
     pub fn app(self) -> &'static str {
         match self {
             ClientType::Official | ClientType::Bilibili | ClientType::Txwy => "明日方舟",
