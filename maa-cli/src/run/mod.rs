@@ -1,8 +1,8 @@
 mod message;
 use message::callback;
 
+#[cfg(target_os = "macos")]
 mod playcover;
-use playcover::PlayCoverApp;
 
 mod fight;
 pub use fight::fight;
@@ -132,9 +132,10 @@ where
         asst.append_task(task_type, serde_json::to_string(params)?)?;
     }
 
+    #[cfg(target_os = "macos")]
     let playcover = with_asst_config(|config| {
         if matches!(config.connection, ConnectionConfig::PlayTools { .. }) {
-            PlayCoverApp::from(&task_config)
+            playcover::PlayCoverApp::from(&task_config)
         } else {
             None
         }
@@ -161,6 +162,7 @@ where
 
         asst.stop()?;
 
+        #[cfg(target_os = "macos")]
         if let Some(app) = playcover.as_ref() {
             app.close()?;
         }
