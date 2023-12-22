@@ -31,6 +31,7 @@ impl ClientType {
         }
     }
 
+    #[cfg(target_os = "macos")]
     pub fn app(self) -> &'static str {
         match self {
             ClientType::Official | ClientType::Bilibili | ClientType::Txwy => "明日方舟",
@@ -173,6 +174,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "macos")]
     fn client_to_app() {
         assert_eq!(ClientType::Official.app(), "明日方舟");
         assert_eq!(ClientType::Bilibili.app(), "明日方舟");

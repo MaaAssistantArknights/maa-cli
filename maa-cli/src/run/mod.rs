@@ -1,8 +1,8 @@
 mod message;
 use message::callback;
 
+#[cfg(target_os = "macos")]
 mod playcover;
-use playcover::PlayCoverApp;
 
 mod fight;
 pub use fight::fight;
@@ -15,7 +15,7 @@ pub use roguelike::{roguelike, Theme as RoguelikeTheme};
 
 use crate::{
     config::{
-        asst::{with_asst_config, with_mut_asst_config, AsstConfig, ConnectionConfig},
+        asst::{with_asst_config, with_mut_asst_config, AsstConfig},
         task::TaskConfig,
     },
     consts::MAA_CORE_LIB,
@@ -132,16 +132,19 @@ where
         asst.append_task(task_type, serde_json::to_string(params)?)?;
     }
 
-    let playcover = with_asst_config(|config| {
+    #[cfg(target_os = "macos")]
+    let app = with_asst_config(|config| {
+        use crate::config::asst::ConnectionConfig;
         if matches!(config.connection, ConnectionConfig::PlayTools { .. }) {
-            PlayCoverApp::from(&task_config)
+            playcover::PlayCoverApp::from(&task_config)
         } else {
             None
         }
     });
 
     if !args.dry_run {
-        if let Some(app) = playcover.as_ref() {
+        #[cfg(target_os = "macos")]
+        if let Some(app) = app.as_ref() {
             app.open()?;
         }
 
@@ -161,7 +164,8 @@ where
 
         asst.stop()?;
 
-        if let Some(app) = playcover.as_ref() {
+        #[cfg(target_os = "macos")]
+        if let Some(app) = app.as_ref() {
             app.close()?;
         }
     }
