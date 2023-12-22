@@ -174,6 +174,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "macos")]
     fn client_to_app() {
         assert_eq!(ClientType::Official.app(), "明日方舟");
         assert_eq!(ClientType::Bilibili.app(), "明日方舟");
