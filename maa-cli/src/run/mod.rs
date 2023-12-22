@@ -15,7 +15,7 @@ pub use roguelike::{roguelike, Theme as RoguelikeTheme};
 
 use crate::{
     config::{
-        asst::{with_asst_config, with_mut_asst_config, AsstConfig, ConnectionConfig},
+        asst::{with_asst_config, with_mut_asst_config, AsstConfig},
         task::TaskConfig,
     },
     consts::MAA_CORE_LIB,
@@ -133,7 +133,8 @@ where
     }
 
     #[cfg(target_os = "macos")]
-    let playcover = with_asst_config(|config| {
+    let app = with_asst_config(|config| {
+        use crate::config::asst::ConnectionConfig;
         if matches!(config.connection, ConnectionConfig::PlayTools { .. }) {
             playcover::PlayCoverApp::from(&task_config)
         } else {
@@ -142,7 +143,8 @@ where
     });
 
     if !args.dry_run {
-        if let Some(app) = playcover.as_ref() {
+        #[cfg(target_os = "macos")]
+        if let Some(app) = app.as_ref() {
             app.open()?;
         }
 
@@ -163,7 +165,7 @@ where
         asst.stop()?;
 
         #[cfg(target_os = "macos")]
-        if let Some(app) = playcover.as_ref() {
+        if let Some(app) = app.as_ref() {
             app.close()?;
         }
     }
