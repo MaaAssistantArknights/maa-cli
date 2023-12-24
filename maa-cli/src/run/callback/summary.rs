@@ -6,7 +6,6 @@ pub use std::collections::BTreeMap as Map;
 use std::sync::Mutex;
 
 use chrono;
-use humantime::{self, format_duration};
 use lazy_static::lazy_static;
 use maa_sys::binding::AsstTaskId;
 
@@ -150,7 +149,7 @@ impl std::fmt::Display for TaskSummary {
                 " {} - {} ({})",
                 start.format("%H:%M:%S"),
                 end.format("%H:%M:%S"),
-                format_duration((end - start).to_std().unwrap_or_default())
+                fmt_duration(end - start)
             ),
             (Some(start), None) => write!(f, " {} - ", start.format("%H:%M:%S")),
             (None, Some(end)) => write!(f, " - {}", end.format("%H:%M:%S")),
@@ -163,6 +162,12 @@ impl std::fmt::Display for TaskSummary {
 
         Ok(())
     }
+}
+
+fn fmt_duration(duration: chrono::Duration) -> humantime::FormattedDuration {
+    let seconds = duration.num_seconds();
+    let seconds = if seconds < 0 { 0 } else { seconds as u64 };
+    humantime::format_duration(std::time::Duration::new(seconds, 0))
 }
 
 pub enum Detail {
@@ -264,13 +269,16 @@ impl std::fmt::Display for InfrastRoomInfo {
         write!(
             f,
             " operators: {}",
-            self.operators.iter().join(", ", "none")
+            self.operators
+                .iter()
+                .join(", ")
+                .unwrap_or_else(|| "unknown".to_owned())
         )?;
         if !self.candidates.is_empty() {
             write!(
                 f,
                 " candidates: {}",
-                self.candidates.iter().join(", ", "none")
+                self.candidates.iter().join(", ").unwrap() // safe to unwrap, because it's not empty
             )?;
         }
         Ok(())
@@ -530,7 +538,9 @@ impl std::fmt::Display for RecruitDetail {
                     f,
                     "- {} {}",
                     "★".repeat(*level as usize),
-                    tags.iter().join(", ", "unknown"),
+                    tags.iter()
+                        .join(", ")
+                        .unwrap_or_else(|| "unknown".to_owned())
                 )?;
                 match state {
                     RecruitState::Refreshed => write!(f, " refreshed;")?,

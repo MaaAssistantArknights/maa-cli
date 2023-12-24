@@ -364,7 +364,8 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
                 all_drops
                     .iter()
                     .map(|(item, count)| format!("{} × {}", item, count))
-                    .join(", ", "none")
+                    .join(", ")
+                    .unwrap_or_else(|| "none".to_owned())
             );
 
             edit_current_task_detail(|detail| {
@@ -436,7 +437,8 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
                     .as_array()?
                     .iter()
                     .filter_map(|x| x.as_str())
-                    .join(", ", "none")
+                    .join(", ")
+                    .unwrap_or_else(|| "none".to_owned())
             )
         }
 
@@ -461,7 +463,10 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
                 "{}: {} {}",
                 "RecruitResult",
                 "★".repeat(level as usize),
-                tags.iter().filter_map(|x| x.as_str()).join(", ", "none")
+                tags.iter()
+                    .filter_map(|x| x.as_str())
+                    .join(", ")
+                    .unwrap_or_else(|| "none".to_owned())
             )
         }
         "RecruitTagsSelected" => info!("{}: {}", "RecruitTagsSelected", {
@@ -470,7 +475,8 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
                 .as_array()?
                 .iter()
                 .filter_map(|x| x.as_str())
-                .join(", ", "none")
+                .join(", ")
+                .unwrap_or_else(|| "none".to_owned())
         }),
         "RecruitTagsRefreshed" => info!("{}: {}", "RecruitTagsRefreshed", {
             let count = details.get("count")?.as_i64()?;
@@ -488,7 +494,8 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
                 .as_array()?
                 .iter()
                 .filter_map(|x| x.as_str())
-                .join(", ", "none")
+                .join(", ")
+                .unwrap_or_else(|| "none".to_owned())
         ),
         "BattleFormationSelected" => info!(
             "{} {}",
@@ -519,25 +526,22 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
 }
 
 trait IterJoin: Iterator {
-    fn join(&mut self, sep: &str, default: &str) -> String
+    fn join(&mut self, sep: &str) -> Option<String>
     where
         Self: Sized,
         Self::Item: std::fmt::Display,
     {
-        match self.next() {
-            None => String::from(default),
-            Some(first_item) => {
-                // estimate lower bound of capacity needed
-                let (lower, _) = self.size_hint();
-                let mut result = String::with_capacity(sep.len() * lower);
-                write!(&mut result, "{}", first_item).unwrap();
-                self.for_each(|elt| {
-                    result.push_str(sep);
-                    write!(&mut result, "{}", elt).unwrap();
-                });
-                result
-            }
-        }
+        self.next().map(|first_item| {
+            // estimate lower bound of capacity needed
+            let (lower, _) = self.size_hint();
+            let mut result = String::with_capacity(sep.len() * lower);
+            write!(&mut result, "{}", first_item).unwrap();
+            self.for_each(|elt| {
+                result.push_str(sep);
+                write!(&mut result, "{}", elt).unwrap();
+            });
+            result
+        })
     }
 }
 
