@@ -2,7 +2,7 @@
 // use message::callback;
 //
 mod callback;
-use callback::summary::{self, TaskSummary};
+use callback::summary;
 
 mod playcover;
 use playcover::PlayCoverApp;
@@ -74,6 +74,12 @@ pub struct CommonArgs {
     /// it will print the error message and exit.
     #[arg(long, verbatim_doc_comment)]
     pub dry_run: bool,
+    /// Do not display task summary
+    ///
+    /// By default, maa will display task summary after all tasks are finished.
+    /// If you want to disable this behavior, you can use this option.
+    #[arg(long, verbatim_doc_comment)]
+    pub no_summary: bool,
 }
 
 impl CommonArgs {
@@ -122,7 +128,7 @@ where
 
     with_asst_config(|config| config.instance_options.apply_to(&asst))?;
 
-    let mut task_summarys = summary::Map::new();
+    let mut summarys = (!args.no_summary).then(summary::Summary::new);
     for (task_type, params) in task_config.tasks.iter() {
         debug!(
             "Adding task {} with params: {}",
@@ -131,9 +137,13 @@ where
         );
         let id = asst.append_task(task_type, serde_json::to_string(params)?)?;
 
-        task_summarys.insert(id, TaskSummary::new(task_type.to_owned()));
+        if let Some(s) = summarys.as_mut() {
+            s.insert(id, task_type.clone());
+        }
     }
-    summary::init(task_summarys);
+    if let Some(s) = summarys {
+        summary::init(s);
+    }
 
     let playcover = with_asst_config(|config| {
         if matches!(config.connection, ConnectionConfig::PlayTools { .. }) {

@@ -252,7 +252,7 @@ fn main() -> Result<()> {
         let file = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
-            .open(&log_file)?;
+            .open(log_file)?;
 
         builder.target(env_logger::Target::Pipe(Box::new(file)));
     }

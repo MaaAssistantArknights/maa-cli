@@ -18,8 +18,8 @@ lazy_static! {
 // there is no function that can panic inside the lock, unless the print!, which is
 // not a problem.
 
-pub fn init(task_summarys: Map<AsstTaskId, TaskSummary>) {
-    *SUMMARY.lock().unwrap() = Some(Summary::new(task_summarys));
+pub fn init(summary: Summary) {
+    *SUMMARY.lock().unwrap() = Some(summary);
 }
 
 pub fn with_summary<T>(f: impl FnOnce(&Summary) -> T) -> Option<T> {
@@ -65,11 +65,15 @@ pub struct Summary {
 }
 
 impl Summary {
-    pub fn new(task_summarys: Map<AsstTaskId, TaskSummary>) -> Self {
+    pub fn new() -> Self {
         Self {
-            task_summarys,
+            task_summarys: Map::new(),
             current_task: None,
         }
+    }
+
+    pub fn insert(&mut self, id: AsstTaskId, task: TaskOrUnknown) {
+        self.task_summarys.insert(id, TaskSummary::new(task));
     }
 
     fn current_mut(&mut self) -> Option<&mut TaskSummary> {
