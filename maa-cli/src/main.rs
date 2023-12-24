@@ -46,9 +46,10 @@ struct CLI {
     batch: bool,
     /// Redirect log to file instead of stderr
     ///
-    /// If this flag is set, the log will be redirected to a file.
-    #[arg(long, verbatim_doc_comment, global = true)]
-    log_to_file: bool,
+    /// If no log file is specified, the log will be written to
+    /// `$(maa dir log)/YYYY/MM/DD/HH:MM:SS.log`.
+    #[arg(long, verbatim_doc_comment, global = true, require_equals = true)]
+    log_file: Option<Option<std::path::PathBuf>>,
     #[command(flatten)]
     verbose: Verbosity<EnvLevel>,
 }
@@ -237,19 +238,23 @@ fn main() -> Result<()> {
 
     builder.filter_level(cli.verbose.log_level_filter());
 
-    if cli.log_to_file {
+    if let Some(opt) = cli.log_file {
         let now = chrono::Local::now();
-        let log_file = dirs::log()
-            .join(now.format("%Y").to_string())
-            .join(now.format("%m").to_string())
-            .join(now.format("%d").to_string())
-            .join(format!("{}.log", now.format("%H:%M:%S")));
+        let log_file = opt.unwrap_or_else(|| {
+            let dir = dirs::log()
+                .join(now.format("%Y").to_string())
+                .join(now.format("%m").to_string())
+                .join(now.format("%d").to_string());
+            dir.ensure().unwrap();
+            dir.join(format!("{}.log", now.format("%H:%M:%S")))
+        });
 
-        log_file.parent().unwrap().ensure()?;
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&log_file)?;
 
-        let buf_writer = Box::new(std::fs::File::create(log_file)?);
-
-        builder.target(env_logger::Target::Pipe(buf_writer));
+        builder.target(env_logger::Target::Pipe(Box::new(file)));
     }
 
     builder.init();
