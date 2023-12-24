@@ -127,6 +127,10 @@ The main feature of `maa-cli` is to run tasks, including predefined tasks and cu
 
 You can run a custom task by `maa run <task>`. Here `<task>` is the name of a task, you can list all available tasks by `maa list`.
 
+#### Task Summary
+
+`maa-cli` will print a summary of each task to stdout when finished. The summary can be disabled by `--no-summary` option.
+
 ### Install and update
 
 #### Install and update for MaaCore and resources
