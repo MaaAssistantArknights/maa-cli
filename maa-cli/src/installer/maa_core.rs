@@ -12,9 +12,8 @@ use crate::{
         maa_core::{CommonArgs, Components, Config},
     },
     consts::MAA_CORE_LIB,
-    debug,
     dirs::{self, Ensure},
-    normal, run,
+    run,
 };
 
 use std::{
@@ -24,6 +23,7 @@ use std::{
 };
 
 use anyhow::{anyhow, bail, Context, Result};
+use log::debug;
 use semver::Version;
 use serde::Deserialize;
 use tokio::runtime::Runtime;
@@ -34,7 +34,7 @@ fn extract_mapper(
     resource_dir: &Path,
     config: &Components,
 ) -> Option<PathBuf> {
-    debug!("Extracting file:", src.display());
+    debug!("Extracting file: {}", src.display());
     let mut path_components = src.components();
     for c in path_components.by_ref() {
         match c {
@@ -47,20 +47,14 @@ fn extract_mapper(
                     for c in path_components.by_ref() {
                         dest.push(c);
                     }
-                    debug!(
-                        "Extracting",
-                        format!("{} => {}", src.display(), dest.display())
-                    );
+                    debug!( "Extracting {} => {}", src.display(), dest.display());
                     return Some(dest);
                 } else if config.library && c
                     .to_str() // The DLL suffix may not the last part of the file name
                     .is_some_and(|s| s.starts_with(DLL_PREFIX) && s.contains(DLL_SUFFIX))
                 {
                     let dest = lib_dir.join(src.file_name()?);
-                    debug!(
-                        "Extracting",
-                        format!("{} => {}", src.display(), dest.display())
-                    );
+                    debug!( "Extracting {} => {}", src.display(), dest.display());
                     return Some(dest);
                 } else {
                     continue;
@@ -69,7 +63,7 @@ fn extract_mapper(
             _ => continue,
         }
     }
-    debug!("Ignore file:", src.display());
+    debug!("Ignored file {}", src.display());
     None
 }
 
@@ -87,16 +81,16 @@ pub fn install(force: bool, args: &CommonArgs) -> Result<()> {
         bail!("MaaCore already exists, use `maa update` to update it or `maa install --force` to force reinstall")
     }
 
-    normal!(format!(
+    println!(
         "Fetching MaaCore version info (channel: {})...",
         config.channel()
-    ));
+    );
     let version_json = get_version_json(&config)?;
     let asset_version = version_json.version();
     let asset_name = name(asset_version)?;
     let asset = version_json.details().asset(&asset_name)?;
 
-    normal!(format!("Downloading MaaCore {}...", asset_version));
+    println!("Downloading MaaCore {}...", asset_version);
     let cache_dir = dirs::cache().ensure()?;
     let archive = download(
         &cache_dir.join(asset_name),
@@ -105,7 +99,7 @@ pub fn install(force: bool, args: &CommonArgs) -> Result<()> {
         &config,
     )?;
 
-    normal!("Installing MaaCore...");
+    println!("Installing MaaCore...");
     let components = config.components();
     if components.library {
         debug!("Cleaning library directory");
@@ -147,10 +141,10 @@ pub fn update(args: &CommonArgs) -> Result<()> {
         _ => {}
     }
 
-    normal!(format!(
+    println!(
         "Fetching MaaCore version info (channel: {})...",
         config.channel()
-    ));
+    );
     let version_json = get_version_json(&config)?;
     let asset_version = version_json.version();
     let current_version = version()?;
@@ -160,12 +154,12 @@ pub fn update(args: &CommonArgs) -> Result<()> {
     let asset_name = name(asset_version)?;
     let asset = version_json.details().asset(&asset_name)?;
 
-    normal!(format!("Downloading MaaCore {}...", asset_version));
+    println!("Downloading MaaCore {}...", asset_version);
     let cache_dir = dirs::cache().ensure()?;
     let asset_path = cache_dir.join(asset_name);
     let archive = download(&asset_path, asset.size(), asset.download_links(), &config)?;
 
-    normal!("Installing MaaCore...");
+    println!("Installing MaaCore...");
     if components.library {
         debug!("Cleaning library directory");
         lib_dir.ensure_clean()?;
@@ -248,7 +242,7 @@ impl Asset {
 
 pub fn download(path: &Path, size: u64, links: Vec<String>, config: &Config) -> Result<Archive> {
     if check_file_exists(path, size) {
-        normal!("Already downloaded, skip downloading");
+        println!("Already downloaded, skip downloading");
         return Archive::try_from(path);
     }
 

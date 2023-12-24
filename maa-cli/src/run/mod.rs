@@ -1,5 +1,8 @@
-mod message;
-use message::callback;
+// mod message;
+// use message::callback;
+//
+mod callback;
+use callback::summary::{self, TaskSummary};
 
 mod playcover;
 use playcover::PlayCoverApp;
@@ -19,16 +22,15 @@ use crate::{
         task::TaskConfig,
     },
     consts::MAA_CORE_LIB,
-    debug,
     dirs::{self, Ensure},
     installer::resource,
-    log::{set_level, LogLevel},
 };
 
 use std::sync::{atomic, Arc};
 
 use anyhow::{bail, Context, Result};
 use clap::Args;
+use log::debug;
 use maa_sys::Assistant;
 use signal_hook::consts::TERM_SIGNALS;
 
@@ -86,14 +88,10 @@ impl CommonArgs {
     }
 }
 
-pub fn run<F>(f: F, args: CommonArgs) -> Result<()>
+fn run_core<F>(f: F, args: CommonArgs) -> Result<()>
 where
     F: FnOnce(&AsstConfig) -> Result<TaskConfig>,
 {
-    if args.dry_run {
-        unsafe { set_level(LogLevel::Debug) };
-    }
-
     resource::update(true)?;
 
     // Prepare config
@@ -101,7 +99,7 @@ where
     let task = with_asst_config(f)?;
     let task_config = task.init()?;
     if let Some(client_type) = task_config.client_type {
-        debug!("Detected client type:", client_type.as_ref());
+        debug!("Detected client type: {}", client_type.as_ref());
         if let Some(resource) = client_type.resource() {
             with_mut_asst_config(|config| {
                 config.resource.use_global_resource(resource);
@@ -120,17 +118,22 @@ where
             .context("Failed to register signal handler!")?;
     }
 
-    let asst = Assistant::new(Some(callback), None);
+    let asst = Assistant::new(Some(callback::default_callback), None);
 
     with_asst_config(|config| config.instance_options.apply_to(&asst))?;
 
+    let mut task_summarys = summary::Map::new();
     for (task_type, params) in task_config.tasks.iter() {
         debug!(
-            format!("Adding task {} with params:", task_type.as_ref()),
+            "Adding task {} with params: {}",
+            task_type.as_ref(),
             serde_json::to_string_pretty(params)?
         );
-        asst.append_task(task_type, serde_json::to_string(params)?)?;
+        let id = asst.append_task(task_type, serde_json::to_string(params)?)?;
+
+        task_summarys.insert(id, TaskSummary::new(task_type.to_owned()));
     }
+    summary::init(task_summarys);
 
     let playcover = with_asst_config(|config| {
         if matches!(config.connection, ConnectionConfig::PlayTools { .. }) {
@@ -172,6 +175,17 @@ where
     Ok(())
 }
 
+// Wrapper for run_core, always try to display summary even if error occurred
+// It's safe to display summary even if summary is not initialized
+pub fn run<F>(f: F, args: CommonArgs) -> Result<()>
+where
+    F: FnOnce(&AsstConfig) -> Result<TaskConfig>,
+{
+    let ret = run_core(f, args);
+    summary::display();
+    ret
+}
+
 pub fn run_custom(path: impl AsRef<std::path::Path>, args: CommonArgs) -> Result<()> {
     run(
         |_| {
@@ -207,7 +221,7 @@ fn load_core() {
     }
 
     if let Some(lib_dir) = dirs::find_library() {
-        debug!("Loading MaaCore from:", lib_dir.display());
+        debug!("Loading MaaCore from: {}", lib_dir.display());
         // Set DLL directory on Windows
         #[cfg(target_os = "windows")]
         {
@@ -225,7 +239,7 @@ fn load_core() {
 }
 
 fn setup_core(config: &AsstConfig) -> Result<()> {
-    debug!("Setting user directory:", dirs::state().display());
+    debug!("Setting user directory: {}", dirs::state().display());
     Assistant::set_user_dir(dirs::state().ensure()?).context("Failed to set user directory!")?;
 
     config.static_options.apply()?;

@@ -4,9 +4,8 @@ use crate::{
         value::input::{BoolInput, Input},
         MAAValue, Task, TaskConfig,
     },
-    debug,
     dirs::{self, Ensure},
-    info, object, warning,
+    object,
 };
 
 use std::{
@@ -16,6 +15,7 @@ use std::{
 };
 
 use anyhow::{bail, Context, Result};
+use log::{debug, info, trace, warn};
 use prettytable::{format, row, Table};
 use serde_json::Value as JsonValue;
 
@@ -37,10 +37,10 @@ pub fn copilot(uri: impl AsRef<str>, resource_dirs: &Vec<PathBuf>) -> Result<Tas
         .context("Failed to get stage ID")?;
     let stage_name = task_type.get_stage_name(resource_dirs, stage_id)?;
 
-    info!("Stage:", stage_name);
+    info!("Copilot Stage: {}", stage_name);
 
     // Print operators info
-    info!("Operators:\n", operator_table(&value)?);
+    info!("Operators:\n{}", operator_table(&value)?);
 
     // Append task
     let mut task_config = TaskConfig::new();
@@ -77,12 +77,12 @@ impl CopilotJson<'_> {
                 let json_file = dir.as_ref().join(code).with_extension("json");
 
                 if json_file.is_file() {
-                    debug!("Found cached json file:", json_file.display());
+                    debug!("Cache hit, using cached json file {}", json_file.display());
                     return Ok((json_from_file(&json_file)?, json_file));
                 }
 
                 let url = format!("{}{}", MAA_COPILOT_API, code);
-                debug!("Cache miss, downloading from", url);
+                debug!("Cache miss, downloading from {}", url);
                 let resp: JsonValue = reqwest::blocking::get(url)
                     .context("Failed to send request")?
                     .json()
@@ -130,7 +130,7 @@ impl CopilotType {
             CopilotType::Copilot => {
                 let stage_files = dirs::global_find(base_dirs, |dir| {
                     let dir = dir.join("Arknights-Tile-Pos");
-                    debug!("Searching in", dir.display());
+                    trace!("Searching stage file in {}", dir.display());
                     fs::read_dir(dir)
                         .map(|entries| {
                             entries
@@ -155,7 +155,10 @@ impl CopilotType {
                         get_str_key(&stage_info, "name")?
                     ))
                 } else {
-                    warning!("Failed to find stage file, maybe you resouces are outdated?");
+                    warn!(
+                        "Failed to find stage file for {}, your resources may be outdated",
+                        stage_id
+                    );
                     Ok(stage_id.to_string())
                 }
             }

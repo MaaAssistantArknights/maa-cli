@@ -52,6 +52,7 @@ prettytable = { version = "0.10.0", default-features = false }
 
 clap = { version = "4.4", features = ["derive"] }
 clap_complete = { version = "4.4" }
+clap-verbosity-flag = "2.1"
 
 toml = "0.8"
 serde = { version = "1", features = ["derive"] }
@@ -71,6 +72,14 @@ semver = { version = "1.0.19", features = ["serde"], optional = true }
 # Dependencies used to extract files
 flate2 = { version = "1", optional = true }
 tar = { version = "0.4.40", optional = true }
+
+# Logging support
+log = "0.4.20"
+humantime = "2.1.0"
+[dependencies.env_logger]
+version = "0.10.1"
+default-features = false
+features = ["auto-color", "humantime"]
 
 # Datatime support
 [dependencies.chrono]

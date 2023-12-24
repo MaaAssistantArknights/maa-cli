@@ -2,13 +2,12 @@ mod config;
 mod consts;
 mod dirs;
 mod installer;
-mod log;
 mod run;
 
 use crate::{
     config::{cli, task::value::input::enable_batch_mode},
+    dirs::Ensure,
     installer::resource,
-    log::{level, set_level},
 };
 
 #[cfg(feature = "cli_installer")]
@@ -19,6 +18,17 @@ use crate::installer::maa_core;
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::{generate, Shell};
+use clap_verbosity_flag::{LogLevel, Verbosity};
+
+struct EnvLevel;
+
+impl LogLevel for EnvLevel {
+    fn default() -> Option<log::Level> {
+        std::env::var_os("MAA_LOG")
+            .and_then(|s| s.to_str().and_then(|s| s.parse().ok()))
+            .or(Some(log::Level::Warn))
+    }
+}
 
 #[derive(Parser)]
 #[command(name = "maa", author, version)]
@@ -26,18 +36,6 @@ use clap_complete::{generate, Shell};
 struct CLI {
     #[command(subcommand)]
     command: SubCommand,
-    /// Output more information, repeat to increase verbosity
-    ///
-    /// If you want to see more information, you can use this option to increase the log level.
-    /// See documentation of log level for more information.
-    #[arg(short, long, verbatim_doc_comment, action = clap::ArgAction::Count, global = true)]
-    verbose: u8,
-    /// Output less information, repeat to increase quietness
-    ///
-    /// If you want to see less information, you can use this option to decrease the log level.
-    /// See documentation of log level for more information.
-    #[arg(short, long, verbatim_doc_comment, action = clap::ArgAction::Count, global = true)]
-    quiet: u8,
     /// Enable batch mode
     ///
     /// If there are some input parameters in the task file,
@@ -45,7 +43,14 @@ struct CLI {
     /// In batch mode, the prompts will be skipped,
     /// and parameters will be set to default values.
     #[arg(long, verbatim_doc_comment, global = true)]
-    pub batch: bool,
+    batch: bool,
+    /// Redirect log to file instead of stderr
+    ///
+    /// If this flag is set, the log will be redirected to a file.
+    #[arg(long, verbatim_doc_comment, global = true)]
+    log_to_file: bool,
+    #[command(flatten)]
+    verbose: Verbosity<EnvLevel>,
 }
 
 #[derive(Subcommand)]
@@ -228,9 +233,26 @@ pub enum Dir {
 fn main() -> Result<()> {
     let cli = CLI::parse();
 
-    if cli.verbose != cli.quiet {
-        unsafe { set_level((level() as u8 + cli.verbose).saturating_sub(cli.quiet)) };
+    let mut builder = env_logger::Builder::new();
+
+    builder.filter_level(cli.verbose.log_level_filter());
+
+    if cli.log_to_file {
+        let now = chrono::Local::now();
+        let log_file = dirs::log()
+            .join(now.format("%Y").to_string())
+            .join(now.format("%m").to_string())
+            .join(now.format("%d").to_string())
+            .join(format!("{}.log", now.format("%H:%M:%S")));
+
+        log_file.parent().unwrap().ensure()?;
+
+        let buf_writer = Box::new(std::fs::File::create(log_file)?);
+
+        builder.target(env_logger::Target::Pipe(buf_writer));
     }
+
+    builder.init();
 
     if cli.batch {
         unsafe { enable_batch_mode() };
@@ -336,19 +358,55 @@ mod test {
         use super::*;
 
         use crate::config::cli::Channel;
+        use std::env;
 
         #[test]
         fn log_level() {
-            assert_eq!(CLI::parse_from(["maa", "list"]).verbose, 0);
-            assert_eq!(CLI::parse_from(["maa", "-v", "list"]).verbose, 1);
-            assert_eq!(CLI::parse_from(["maa", "list", "-v"]).verbose, 1);
-            assert_eq!(CLI::parse_from(["maa", "list", "--verbose"]).verbose, 1);
-            assert_eq!(CLI::parse_from(["maa", "list", "-vv"]).verbose, 2);
+            env::remove_var("MAA_LOG");
 
-            assert_eq!(CLI::parse_from(["maa", "list"]).quiet, 0);
-            assert_eq!(CLI::parse_from(["maa", "list", "-q"]).quiet, 1);
-            assert_eq!(CLI::parse_from(["maa", "list", "--quiet"]).quiet, 1);
-            assert_eq!(CLI::parse_from(["maa", "list", "-qq"]).quiet, 2);
+            assert_eq!(
+                CLI::parse_from(["maa", "list"]).verbose.log_level_filter(),
+                log::LevelFilter::Warn
+            );
+            assert_eq!(
+                CLI::parse_from(["maa", "-v", "list"])
+                    .verbose
+                    .log_level_filter(),
+                log::LevelFilter::Info
+            );
+            assert_eq!(
+                CLI::parse_from(["maa", "list", "-v"])
+                    .verbose
+                    .log_level_filter(),
+                log::LevelFilter::Info
+            );
+            assert_eq!(
+                CLI::parse_from(["maa", "list", "--verbose"])
+                    .verbose
+                    .log_level_filter(),
+                log::LevelFilter::Info
+            );
+
+            assert_eq!(
+                CLI::parse_from(["maa", "list", "-vv"])
+                    .verbose
+                    .log_level_filter(),
+                log::LevelFilter::Debug
+            );
+
+            assert_eq!(
+                CLI::parse_from(["maa", "list", "-q"])
+                    .verbose
+                    .log_level_filter(),
+                log::LevelFilter::Error
+            );
+
+            env::set_var("MAA_LOG", "Info");
+            assert_eq!(
+                CLI::parse_from(["maa", "list"]).verbose.log_level_filter(),
+                log::LevelFilter::Info
+            );
+            env::remove_var("MAA_LOG");
 
             assert!(!CLI::parse_from(["maa", "list"]).batch);
             assert!(CLI::parse_from(["maa", "list", "--batch"]).batch);
