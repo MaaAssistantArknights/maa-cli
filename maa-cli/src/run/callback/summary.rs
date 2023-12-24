@@ -224,7 +224,7 @@ impl std::fmt::Display for Detail {
 pub struct InfrastDetail(Map<Facility, Map<i64, InfrastRoomInfo>>);
 
 struct InfrastRoomInfo {
-    info: Option<String>,
+    product: Option<String>,
     operators: Vec<String>,
     candidates: Vec<String>,
 }
@@ -232,7 +232,7 @@ struct InfrastRoomInfo {
 impl InfrastRoomInfo {
     fn new_with_info(info: &str) -> Self {
         Self {
-            info: Some(info.to_owned()),
+            product: Some(info.to_owned()),
             operators: Vec::new(),
             candidates: Vec::new(),
         }
@@ -240,14 +240,14 @@ impl InfrastRoomInfo {
 
     fn new_with_operators(operators: &Vec<String>, candidates: &Vec<String>) -> Self {
         Self {
-            info: None,
+            product: None,
             operators: operators.to_owned(),
             candidates: candidates.to_owned(),
         }
     }
 
-    fn set_info(&mut self, info: &str) {
-        self.info = Some(info.to_owned());
+    fn set_product(&mut self, product: &str) {
+        self.product = Some(product.to_owned());
     }
 
     fn set_operators(&mut self, operators: &Vec<String>, candidates: &Vec<String>) {
@@ -258,7 +258,7 @@ impl InfrastRoomInfo {
 
 impl std::fmt::Display for InfrastRoomInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(info) = self.info.as_ref() {
+        if let Some(info) = self.product.as_ref() {
             write!(f, "({})", info)?;
         }
         write!(
@@ -282,13 +282,17 @@ impl InfrastDetail {
         Self(Map::new())
     }
 
-    pub(super) fn set_info(&mut self, facility: Facility, id: i64, info: &str) {
-        self.0
-            .entry(facility)
-            .or_default()
-            .entry(id)
-            .and_modify(|room_info| room_info.set_info(info))
-            .or_insert_with(|| InfrastRoomInfo::new_with_info(info));
+    pub(super) fn set_product(&mut self, facility: Facility, id: i64, info: &str) {
+        use Facility::*;
+        // only the product of Mfg and Trade is useful
+        if matches!(facility, Mfg | Trade) {
+            self.0
+                .entry(facility)
+                .or_default()
+                .entry(id)
+                .and_modify(|room_info| room_info.set_product(info))
+                .or_insert_with(|| InfrastRoomInfo::new_with_info(info));
+        }
     }
 
     pub(super) fn set_operators(
@@ -448,8 +452,8 @@ impl std::fmt::Display for FightDetail {
         if !self.drops.is_empty() {
             writeln!(f, ", drops:")?;
             let mut total_drop = Map::new();
-            for drop in self.drops.iter() {
-                write!(f, "-")?;
+            for (i, drop) in self.drops.iter().enumerate() {
+                write!(f, "{}. ", i + 1)?;
                 if drop.is_empty() {
                     write!(f, " no drop or unrecognized")?;
                 }
@@ -459,7 +463,7 @@ impl std::fmt::Display for FightDetail {
                 }
                 writeln!(f)?;
             }
-            write!(f, "total:")?;
+            write!(f, "total drops:")?;
             for (item, count) in total_drop {
                 write!(f, " {} × {}", item, count)?;
             }

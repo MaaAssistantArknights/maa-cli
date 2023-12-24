@@ -399,7 +399,7 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
 
             edit_current_task_detail(|detail| {
                 if let Some(detail) = detail.as_infrast_mut() {
-                    detail.set_info(facility.parse().unwrap(), index, product);
+                    detail.set_product(facility.parse().unwrap(), index, product);
                 }
             });
 
