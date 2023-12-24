@@ -366,7 +366,7 @@ mod test {
         use std::env;
 
         #[test]
-        fn log_level() {
+        fn global_options() {
             env::remove_var("MAA_LOG");
 
             assert_eq!(
@@ -415,6 +415,14 @@ mod test {
 
             assert!(!CLI::parse_from(["maa", "list"]).batch);
             assert!(CLI::parse_from(["maa", "list", "--batch"]).batch);
+
+            assert!(CLI::parse_from(["maa", "list"]).log_file.is_none());
+            assert!(CLI::parse_from(["maa", "list", "--log-file"])
+                .log_file
+                .is_some_and(|x| x.is_none()));
+            assert!(CLI::parse_from(["maa", "list", "--log-file=path"])
+                .log_file
+                .is_some_and(|x| x.is_some_and(|x| x == std::path::PathBuf::from("path"))));
         }
 
         #[cfg(feature = "core_installer")]
