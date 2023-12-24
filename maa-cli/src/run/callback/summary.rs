@@ -284,7 +284,7 @@ impl InfrastDetail {
     pub(super) fn set_info(&mut self, facility: Facility, id: i64, info: &str) {
         self.0
             .entry(facility)
-            .or_insert_with(Map::new)
+            .or_default()
             .entry(id)
             .and_modify(|room_info| room_info.set_info(info))
             .or_insert_with(|| InfrastRoomInfo::new_with_info(info));
@@ -299,7 +299,7 @@ impl InfrastDetail {
     ) {
         self.0
             .entry(facility)
-            .or_insert_with(Map::new)
+            .or_default()
             .entry(id)
             .and_modify(|room_info| room_info.set_operators(operators, candidates))
             .or_insert_with(|| InfrastRoomInfo::new_with_operators(operators, candidates));
