@@ -31,15 +31,17 @@ pub fn with_summary_mut<T>(f: impl FnOnce(&mut Summary) -> T) -> Option<T> {
     SUMMARY.lock().unwrap().as_mut().map(f)
 }
 
+const LINE_SEP: &str = "----------------------------------------\n";
+
 // we print literal but it will be replace by a localizable string, so it's fine
 #[allow(clippy::print_literal)]
 pub(crate) fn display() -> Option<()> {
     with_summary(|summary| {
         if !summary.task_summarys.is_empty() {
-            println!("# {}", "Summary");
+            println!("{}", "Summary");
             for (_, task_summary) in summary.task_summarys.iter() {
                 if task_summary.has_started() {
-                    println!("\n## {}", task_summary);
+                    println!("{}{}", LINE_SEP, task_summary);
                 }
             }
         }
@@ -219,7 +221,6 @@ impl std::fmt::Display for Detail {
     }
 }
 
-/// (facility) -> (id -> (info, operators, candidates))
 pub struct InfrastDetail(Map<Facility, Map<i64, InfrastRoomInfo>>);
 
 struct InfrastRoomInfo {
