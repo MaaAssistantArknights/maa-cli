@@ -338,7 +338,7 @@ impl InfrastDetail {
 impl std::fmt::Display for InfrastDetail {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (facility, map) in &self.0 {
-            for (_, room_info) in map {
+            for room_info in map.values() {
                 writeln!(f, "{}{}", facility, room_info)?;
             }
         }
