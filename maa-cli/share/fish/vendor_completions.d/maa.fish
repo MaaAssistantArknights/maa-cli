@@ -4,6 +4,7 @@
 complete -c maa -s v -l verbose -d 'Output more information, repeat to increase verbosity'
 complete -c maa -s q -l quiet -d 'Output less information, repeat to increase quietness'
 complete -c maa -l batch -d 'Enable touch mode'
+complete -c maa -l log-file -d 'Log to file instead of stderr'
 
 # help
 set -l subcommands install update self hot-update dir version run fight copilot roguelike list complete
@@ -32,8 +33,8 @@ complete -c maa -n "__fish_use_subcommand" -f -a "complete" -d 'Generate complet
 set -l channels alpha beta stable
 # MaaCore installer options
 complete -c maa -n "__fish_seen_subcommand_from install update" -f -a "$channels" -d 'Channel of MaaCore to install'
-complete -c maa -n "__fish_seen_subcommand_from install update" -s t -l test-time -d 'Time to test download speed' -r
-complete -c maa -n "__fish_seen_subcommand_from install update" -l api-url -d 'URL of api to get version information of MaaCore' -r
+complete -c maa -n "__fish_seen_subcommand_from install update" -f -s t -l test-time -d 'Time to test download speed' -r
+complete -c maa -n "__fish_seen_subcommand_from install update" -f -l api-url -d 'URL of api to get version information of MaaCore' -r
 complete -c maa -n "__fish_seen_subcommand_from install update" -l no-resource -d 'Do not install resource of MaaCore'
 complete -c maa -n "__fish_seen_subcommand_from install" -s f -l force -d 'Force to install even if the maa and resource already exists'
 
@@ -58,6 +59,7 @@ set -l run_commands run fight copilot roguelike
 complete -c maa -n "__fish_seen_subcommand_from $run_commands" -s a -l addr -d 'ADB serial number of device or MaaTools address set in PlayCover' -r
 complete -c maa -n "__fish_seen_subcommand_from $run_commands" -l user-resource -d 'Load resources from the config directory'
 complete -c maa -n "__fish_seen_subcommand_from $run_commands" -l dry-run -d 'Parse the your config but do not connect to the game'
+complete -c maa -n "__fish_seen_subcommand_from $run_commands" -l no-summary -d 'Do not print summary when finnish'
 ## command specific options
 complete -c maa -n "__fish_seen_subcommand_from run" -f -a "$(maa list)"
 complete -c maa -n "__fish_seen_subcommand_from fight" -l startup -d 'Whether to start the game'
