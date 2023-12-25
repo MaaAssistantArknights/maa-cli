@@ -190,10 +190,11 @@ ln -s "$HOME/.config/maa" "$(maa dir config)"
 
 #### 基本结构
 
-一个任务文件包含多个子任务，每一个子任务是一个 [MAA 任务](https://maa.plus/docs/3.1-集成文档.html#asstappendtask)：
+一个任务文件包含多个子任务，每一个子任务是一个 [MAA 任务](https://maa.plus/docs/3.1-集成文档.html#asstappendtask)，其包含一下几个选项：
 
 ```toml
 [[tasks]]
+name = "启动游戏" # 任务的名字，可选，默认为任务类型
 type = "StartUp" # maa任务的类型
 params = { client_type = "Official", start_game_enabled = true } # maa任务的参数
 ```
@@ -204,6 +205,7 @@ params = { client_type = "Official", start_game_enabled = true } # maa任务的�
 
 ```toml
 [[tasks]]
+name = "基建换班"
 type = "Infrast"
 
 [tasks.params]

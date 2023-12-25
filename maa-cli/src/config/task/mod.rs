@@ -768,5 +768,17 @@ mod tests {
                 }
             )
         }
+
+        #[test]
+        fn initialized_task() {
+            let task = InitializedTask::new(
+                Some("Fight Daily".to_string()),
+                MAATask::Fight,
+                object!("stage" => "1-7"),
+            );
+            assert_eq!(task.name(), Some("Fight Daily"));
+            assert_eq!(task.task_type(), &MAATask::Fight.into());
+            assert_eq!(task.params(), &object!("stage" => "1-7"));
+        }
     }
 }

@@ -175,10 +175,11 @@ A `maa-cli` task should be defined in a single file, which should be located in 
 
 #### Basic structure
 
-A `maa-cli` task is a sequence of `MAA` tasks, each `MAA` task is defined by `type` and `params` fields:
+A `maa-cli` task is a sequence of `MAA` tasks, each `MAA` task is defined by `name`, `type` and `params` fields:
 
 ```toml
 [[tasks]]
+name = "Start Game" # the name this task, default to the type of the task
 type = "StartUp" # the type of maa task
 params = { client_type = "Official", start_game_enabled = true } # the params of given task
 ```
