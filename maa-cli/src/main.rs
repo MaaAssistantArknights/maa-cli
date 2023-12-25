@@ -31,7 +31,7 @@ impl LogLevel for EnvLevel {
 }
 
 #[derive(Parser)]
-#[command(name = "maa", author, version)]
+#[command(name = "maa", author, version, about = "A tool for Arknights.")]
 #[allow(clippy::upper_case_acronyms)]
 struct CLI {
     #[command(subcommand)]

@@ -30,21 +30,8 @@ fn with_summary_mut<T>(f: impl FnOnce(&mut Summary) -> T) -> Option<T> {
     SUMMARY.lock().unwrap().as_mut().map(f)
 }
 
-const LINE_SEP: &str = "----------------------------------------\n";
-
-// we print literal but it will be replace by a localizable string, so it's fine
-#[allow(clippy::print_literal)]
 pub(crate) fn display() -> Option<()> {
-    with_summary(|summary| {
-        if !summary.task_summarys.is_empty() {
-            println!("{}", "Summary");
-            for (_, task_summary) in summary.task_summarys.iter() {
-                if task_summary.has_started() {
-                    print!("{}{}", LINE_SEP, task_summary);
-                }
-            }
-        }
-    })
+    with_summary(|summary| print!("{}", summary))
 }
 
 pub(super) fn start_task(id: AsstTaskId) -> Option<()> {
@@ -99,6 +86,22 @@ impl Summary {
     }
 }
 
+const LINE_SEP: &str = "----------------------------------------";
+
+impl std::fmt::Display for Summary {
+    // we print literal but it will be replace by a localizable string, so it's fine
+    #[allow(clippy::print_literal)]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if !self.task_summarys.is_empty() {
+            writeln!(f, "{}", "Summary")?;
+            for task_summary in self.task_summarys.values() {
+                write!(f, "{LINE_SEP}\n{task_summary}")?;
+            }
+        }
+        Ok(())
+    }
+}
+
 pub struct TaskSummary {
     task: TaskOrUnknown,
     detail: Detail,
@@ -128,10 +131,6 @@ impl TaskSummary {
         }
     }
 
-    fn has_started(&self) -> bool {
-        self.start_time.is_some() || self.end_time.is_some()
-    }
-
     fn start(&mut self) {
         self.start_time = Some(chrono::Local::now());
         self.reason = Reason::Unfinished;
@@ -159,7 +158,7 @@ impl std::fmt::Display for TaskSummary {
                 end.format("%H:%M:%S"),
                 FormattedDuration::from(end - start)
             ),
-            (Some(start), None) => write!(f, " {} - ", start.format("%H:%M:%S")),
+            (Some(start), None) => write!(f, " {} -", start.format("%H:%M:%S")),
             (None, Some(end)) => write!(f, " - {}", end.format("%H:%M:%S")),
             (None, None) => Ok(()),
         }?;
@@ -512,23 +511,20 @@ impl FightDetail {
 
 impl std::fmt::Display for FightDetail {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(times) = self.times {
-            write!(
-                f,
-                "Fight {} {} times",
-                self.stage
-                    .as_ref()
-                    .map_or("unknown", |stage| stage.as_str()),
-                times
-            )?;
+        if let Some(stage) = self.stage.as_ref() {
+            write!(f, "Fight {stage}")?;
         } else {
             return Ok(());
         }
+
+        if let Some(times) = self.times {
+            write!(f, " {times} times")?;
+        }
         if let Some(medicine) = self.medicine {
-            write!(f, ", used {} medicine", medicine)?;
+            write!(f, ", used {medicine} medicine")?;
         }
         if let Some(stone) = self.stone {
-            write!(f, ", used {} stone", stone)?;
+            write!(f, ", used {stone} stone")?;
         }
         if !self.drops.is_empty() {
             writeln!(f, ", drops:")?;
@@ -554,8 +550,8 @@ impl std::fmt::Display for FightDetail {
             for (item, count) in iter {
                 write!(f, ", {} × {}", item, count)?;
             }
-            writeln!(f)?;
         }
+        writeln!(f)?;
         Ok(())
     }
 }
@@ -617,8 +613,8 @@ impl std::fmt::Display for RecruitDetail {
                         .unwrap_or_else(|| "unknown".to_owned())
                 )?;
                 match state {
-                    RecruitState::Refreshed => write!(f, " refreshed;")?,
-                    RecruitState::Recruited => write!(f, " recruited;")?,
+                    RecruitState::Refreshed => write!(f, ", Refreshed")?,
+                    RecruitState::Recruited => write!(f, ", Recruited")?,
                     RecruitState::None => (),
                 }
                 writeln!(f)?
@@ -719,12 +715,14 @@ mod tests {
     }
 
     mod summary {
+        use regex::Regex;
+
         use super::*;
 
         use crate::assert_matches;
 
         #[test]
-        fn start_task() {
+        fn task_summary() {
             use MAATask::*;
 
             let mut summary = Summary::new();
@@ -733,12 +731,29 @@ mod tests {
             summary.insert(3, Recruit);
             summary.insert(4, Roguelike);
             summary.insert(5, CloseDown);
+
             summary.start_task(1);
+            summary.edit_current_task_detail(|detail| {
+                let detail = detail.as_fight_mut().unwrap();
+                detail.set_stage("TS-9");
+            });
             summary.end_current_task(Reason::Completed);
+
             summary.start_task(2);
+            summary.edit_current_task_detail(|detail| {
+                let detail = detail.as_infrast_mut().unwrap();
+                detail.set_product(Facility::Mfg, 1, "Product");
+            });
             summary.end_current_task(Reason::Stopped);
+
             summary.start_task(3);
+            summary.edit_current_task_detail(|detail| {
+                let detail = detail.as_recruit_mut().unwrap();
+                detail.push_recruit(3, ["A", "B"].into_iter().map(|s| s.to_owned()));
+                detail.recruit();
+            });
             summary.end_current_task(Reason::Error);
+
             summary.start_task(4);
 
             let task1 = summary.task_summarys.get(&1).unwrap();
@@ -765,11 +780,64 @@ mod tests {
             assert!(task5.start_time.is_none());
             assert!(task5.end_time.is_none());
             assert_matches!(task5.reason, Reason::Unstarted);
+
+            let re = Regex::new(
+                "Summary\n\
+                ----------------------------------------\n\
+                \\[Fight\\] \\d+:\\d+:\\d+ - \\d+:\\d+:\\d+ \\(\\d+s\\) Completed\n\
+                .+\n\
+                ----------------------------------------\n\
+                \\[Infrast\\] \\d+:\\d+:\\d+ - \\d+:\\d+:\\d+ \\(\\d+s\\) Stopped\n\
+                .+\n\
+                ----------------------------------------\n\
+                \\[Recruit\\] \\d+:\\d+:\\d+ - \\d+:\\d+:\\d+ \\(\\d+s\\) Error\n\
+                .+\n.+\n.+\n\
+                ----------------------------------------\n\
+                \\[Roguelike\\] \\d+:\\d+:\\d+ - Unfinished\n\
+                ----------------------------------------\n\
+                \\[CloseDown\\] Unstarted\n",
+            )
+            .unwrap();
+
+            assert!(re.is_match(&summary.to_string()));
         }
     }
 
     mod detail {
         use super::*;
+
+        #[test]
+        fn detail() {
+            let mut detail = Detail::None;
+            assert!(detail.as_infrast_mut().is_none());
+            assert!(detail.as_fight_mut().is_none());
+            assert!(detail.as_recruit_mut().is_none());
+            assert!(detail.as_roguelike_mut().is_none());
+
+            detail = Detail::Infrast(InfrastDetail::new());
+            assert!(detail.as_infrast_mut().is_some());
+            assert!(detail.as_fight_mut().is_none());
+            assert!(detail.as_recruit_mut().is_none());
+            assert!(detail.as_roguelike_mut().is_none());
+
+            detail = Detail::Fight(FightDetail::new());
+            assert!(detail.as_infrast_mut().is_none());
+            assert!(detail.as_fight_mut().is_some());
+            assert!(detail.as_recruit_mut().is_none());
+            assert!(detail.as_roguelike_mut().is_none());
+
+            detail = Detail::Recruit(RecruitDetail::new());
+            assert!(detail.as_infrast_mut().is_none());
+            assert!(detail.as_fight_mut().is_none());
+            assert!(detail.as_recruit_mut().is_some());
+            assert!(detail.as_roguelike_mut().is_none());
+
+            detail = Detail::Roguelike(RoguelikeDetail::new());
+            assert!(detail.as_infrast_mut().is_none());
+            assert!(detail.as_fight_mut().is_none());
+            assert!(detail.as_recruit_mut().is_none());
+            assert!(detail.as_roguelike_mut().is_some());
+        }
 
         #[test]
         fn facility() {
@@ -843,6 +911,14 @@ mod tests {
                  2. A × 1, C × 3\n\
                  total drops: A × 2, B × 2, C × 3\n",
             );
+
+            let mut detail = FightDetail::new();
+            detail.set_stage("TS-9");
+            detail.set_times(1);
+            assert_eq!(detail.to_string(), "Fight TS-9 1 times\n");
+
+            let detail = FightDetail::new();
+            assert_eq!(detail.to_string(), "");
         }
 
         #[test]
@@ -860,13 +936,34 @@ mod tests {
             assert_eq!(
                 detail.to_string(),
                 "Detected tags:\n\
-                 1. ★★★ A, B refreshed;\n\
-                 2. ★★★★ C, D recruited;\n\
-                 3. ★★★ E, F refreshed;\n\
-                 4. ★★★★ G, H recruited;\n\
+                 1. ★★★ A, B, Refreshed\n\
+                 2. ★★★★ C, D, Recruited\n\
+                 3. ★★★ E, F, Refreshed\n\
+                 4. ★★★★ G, H, Recruited\n\
                  5. ★★★★★ I, J\n\
                  Recruited 2 times\n\
                  Refreshed 2 times\n",
+            );
+
+            let mut detail = RecruitDetail::new();
+            detail.push_recruit(3, ["A", "B"].into_iter().map(|s| s.to_owned()));
+            detail.recruit();
+            assert_eq!(
+                detail.to_string(),
+                "Detected tags:\n\
+                 1. ★★★ A, B, Recruited\n\
+                 Recruited 1 times\n",
+            );
+            let mut detail = RecruitDetail::new();
+            detail.push_recruit(3, ["A", "B"].into_iter().map(|s| s.to_owned()));
+            detail.refresh();
+            detail.push_recruit(4, ["C", "D"].into_iter().map(|s| s.to_owned()));
+            assert_eq!(
+                detail.to_string(),
+                "Detected tags:\n\
+                 1. ★★★ A, B, Refreshed\n\
+                 2. ★★★★ C, D\n\
+                 Refreshed 1 times\n",
             );
         }
 

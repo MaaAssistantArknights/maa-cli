@@ -107,4 +107,5 @@ version = "0.48.0"
 features = ["Win32_System_LibraryLoader"]
 
 [dev-dependencies]
+regex = "1.10.2"
 serde_test = "1"

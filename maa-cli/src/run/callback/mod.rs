@@ -166,10 +166,6 @@ fn process_connection_info(message: &Map<String, Value>) -> Option<()> {
 fn process_taskchain(code: AsstMsg, message: &Map<String, Value>) -> Option<()> {
     let taskchain = message.get("taskchain")?.as_str()?;
 
-    if taskchain == "CloseDown" {
-        return Some(());
-    }
-
     use AsstMsg::*;
 
     match code {
