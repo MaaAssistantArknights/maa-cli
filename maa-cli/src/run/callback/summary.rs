@@ -18,15 +18,15 @@ lazy_static! {
 // there is no function that can panic inside the lock, unless the print!, which is
 // not a problem.
 
-pub fn init(summary: Summary) {
+pub(crate) fn init(summary: Summary) {
     *SUMMARY.lock().unwrap() = Some(summary);
 }
 
-pub fn with_summary<T>(f: impl FnOnce(&Summary) -> T) -> Option<T> {
+fn with_summary<T>(f: impl FnOnce(&Summary) -> T) -> Option<T> {
     SUMMARY.lock().unwrap().as_ref().map(f)
 }
 
-pub fn with_summary_mut<T>(f: impl FnOnce(&mut Summary) -> T) -> Option<T> {
+fn with_summary_mut<T>(f: impl FnOnce(&mut Summary) -> T) -> Option<T> {
     SUMMARY.lock().unwrap().as_mut().map(f)
 }
 
@@ -40,7 +40,7 @@ pub(crate) fn display() -> Option<()> {
             println!("{}", "Summary");
             for (_, task_summary) in summary.task_summarys.iter() {
                 if task_summary.has_started() {
-                    println!("{}{}", LINE_SEP, task_summary);
+                    print!("{}{}", LINE_SEP, task_summary);
                 }
             }
         }
@@ -51,8 +51,8 @@ pub(super) fn start_task(id: AsstTaskId) -> Option<()> {
     with_summary_mut(|summary| summary.start_task(id)).flatten()
 }
 
-pub(super) fn end_current_task() -> Option<()> {
-    with_summary_mut(|summary| summary.end_curent_task()).flatten()
+pub(super) fn end_current_task(reason: Reason) -> Option<()> {
+    with_summary_mut(|summary| summary.end_current_task(reason)).flatten()
 }
 
 pub(super) fn edit_current_task_detail(f: impl FnOnce(&mut Detail)) -> Option<()> {
@@ -81,20 +81,20 @@ impl Summary {
             .and_then(|id| self.task_summarys.get_mut(&id))
     }
 
-    pub fn start_task(&mut self, id: AsstTaskId) -> Option<()> {
+    fn start_task(&mut self, id: AsstTaskId) -> Option<()> {
         self.task_summarys.get_mut(&id).map(|summary| {
             self.current_task = Some(id);
             summary.start();
         })
     }
 
-    pub fn end_curent_task(&mut self) -> Option<()> {
-        self.current_mut().map(|summary| summary.end()).map(|_| {
-            self.current_task = None;
-        })
+    fn end_current_task(&mut self, reason: Reason) -> Option<()> {
+        self.current_mut()
+            .map(|summary| summary.end(reason))
+            .map(|_| self.current_task = None)
     }
 
-    pub fn edit_current_task_detail(&mut self, f: impl FnOnce(&mut Detail)) -> Option<()> {
+    fn edit_current_task_detail(&mut self, f: impl FnOnce(&mut Detail)) -> Option<()> {
         self.current_mut().map(|summary| summary.edit_detail(f))
     }
 }
@@ -104,6 +104,7 @@ pub struct TaskSummary {
     detail: Detail,
     start_time: Option<chrono::DateTime<chrono::Local>>,
     end_time: Option<chrono::DateTime<chrono::Local>>,
+    reason: Reason,
 }
 
 impl TaskSummary {
@@ -123,6 +124,7 @@ impl TaskSummary {
             detail,
             start_time: None,
             end_time: None,
+            reason: Reason::Unfinished,
         }
     }
 
@@ -134,8 +136,9 @@ impl TaskSummary {
         self.start_time = Some(chrono::Local::now());
     }
 
-    fn end(&mut self) {
+    fn end(&mut self, reason: Reason) {
         self.end_time = Some(chrono::Local::now());
+        self.reason = reason;
     }
 
     fn edit_detail(&mut self, f: impl FnOnce(&mut Detail)) {
@@ -160,12 +163,28 @@ impl std::fmt::Display for TaskSummary {
             (None, None) => Ok(()),
         }?;
 
+        match self.reason {
+            Reason::Completed => write!(f, " Completed")?,
+            Reason::Stopped => write!(f, " Stopped")?,
+            Reason::Error => write!(f, " Error")?,
+            Reason::Unfinished => write!(f, " Unfinished")?,
+        }
+
+        writeln!(f)?;
+
         if !matches!(self.detail, Detail::None) {
-            write!(f, "\n{}", self.detail)?;
+            write!(f, "{}", self.detail)?;
         }
 
         Ok(())
     }
+}
+
+pub(super) enum Reason {
+    Completed,
+    Stopped,
+    Error,
+    Unfinished,
 }
 
 fn fmt_duration(duration: chrono::Duration) -> humantime::FormattedDuration {
@@ -238,57 +257,6 @@ struct InfrastRoomInfo {
     candidates: Vec<String>,
 }
 
-impl InfrastRoomInfo {
-    fn new_with_info(info: &str) -> Self {
-        Self {
-            product: Some(info.to_owned()),
-            operators: Vec::new(),
-            candidates: Vec::new(),
-        }
-    }
-
-    fn new_with_operators(operators: &Vec<String>, candidates: &Vec<String>) -> Self {
-        Self {
-            product: None,
-            operators: operators.to_owned(),
-            candidates: candidates.to_owned(),
-        }
-    }
-
-    fn set_product(&mut self, product: &str) {
-        self.product = Some(product.to_owned());
-    }
-
-    fn set_operators(&mut self, operators: &Vec<String>, candidates: &Vec<String>) {
-        self.operators = operators.to_owned();
-        self.candidates = candidates.to_owned();
-    }
-}
-
-impl std::fmt::Display for InfrastRoomInfo {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(info) = self.product.as_ref() {
-            write!(f, "({})", info)?;
-        }
-        write!(
-            f,
-            " operators: {}",
-            self.operators
-                .iter()
-                .join(", ")
-                .unwrap_or_else(|| "unknown".to_owned())
-        )?;
-        if !self.candidates.is_empty() {
-            write!(
-                f,
-                " candidates: {}",
-                self.candidates.iter().join(", ").unwrap() // safe to unwrap, because it's not empty
-            )?;
-        }
-        Ok(())
-    }
-}
-
 impl InfrastDetail {
     pub fn new() -> Self {
         Self(Map::new())
@@ -311,23 +279,27 @@ impl InfrastDetail {
         &mut self,
         facility: Facility,
         id: i64,
-        operators: &Vec<String>,
-        candidates: &Vec<String>,
+        operators: Vec<String>,
+        candidates: Vec<String>,
     ) {
-        self.0
-            .entry(facility)
-            .or_default()
-            .entry(id)
-            .and_modify(|room_info| room_info.set_operators(operators, candidates))
-            .or_insert_with(|| InfrastRoomInfo::new_with_operators(operators, candidates));
+        let map = self.0.entry(facility).or_default();
+
+        if let Some(room_info) = map.get_mut(&id) {
+            room_info.set_operators(operators, candidates);
+        } else {
+            map.insert(
+                id,
+                InfrastRoomInfo::new_with_operators(operators, candidates),
+            );
+        }
     }
 }
 
 impl std::fmt::Display for InfrastDetail {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (facility, map) in &self.0 {
-            for (id, room_info) in map {
-                writeln!(f, "{} #{} {}", facility, id, room_info)?;
+            for (_, room_info) in map {
+                writeln!(f, "{}{}", facility, room_info)?;
             }
         }
 
@@ -335,6 +307,7 @@ impl std::fmt::Display for InfrastDetail {
     }
 }
 
+#[cfg_attr(test, derive(Debug))]
 #[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq)]
 pub(super) enum Facility {
     Control,
@@ -388,6 +361,57 @@ impl std::str::FromStr for Facility {
 impl std::fmt::Display for Facility {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.to_str())
+    }
+}
+
+impl InfrastRoomInfo {
+    fn new_with_info(info: &str) -> Self {
+        Self {
+            product: Some(info.to_owned()),
+            operators: Vec::new(),
+            candidates: Vec::new(),
+        }
+    }
+
+    fn new_with_operators(operators: Vec<String>, candidates: Vec<String>) -> Self {
+        Self {
+            product: None,
+            operators,
+            candidates,
+        }
+    }
+
+    fn set_product(&mut self, product: &str) {
+        self.product = Some(product.to_owned());
+    }
+
+    fn set_operators(&mut self, operators: Vec<String>, candidates: Vec<String>) {
+        self.operators = operators;
+        self.candidates = candidates;
+    }
+}
+
+impl std::fmt::Display for InfrastRoomInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(info) = self.product.as_ref() {
+            write!(f, "({})", info)?;
+        }
+        write!(
+            f,
+            " with operators: {}",
+            self.operators
+                .iter()
+                .join(", ")
+                .unwrap_or_else(|| "unknown".to_owned())
+        )?;
+        if !self.candidates.is_empty() {
+            write!(
+                f,
+                ", [{}]",
+                self.candidates.iter().join(", ").unwrap() // safe to unwrap, because it's not empty
+            )?;
+        }
+        Ok(())
     }
 }
 
@@ -465,20 +489,27 @@ impl std::fmt::Display for FightDetail {
             writeln!(f, ", drops:")?;
             let mut total_drop = Map::new();
             for (i, drop) in self.drops.iter().enumerate() {
-                write!(f, "{}. ", i + 1)?;
-                if drop.is_empty() {
-                    write!(f, " no drop or unrecognized")?;
-                }
-                for (item, count) in drop {
+                write!(f, "{}.", i + 1)?;
+                let mut iter = drop.iter();
+                if let Some((item, count)) = iter.next() {
                     write!(f, " {} × {}", item, count)?;
+                    insert_or_add_by_ref(&mut total_drop, item, *count);
+                }
+                for (item, count) in iter {
+                    write!(f, ", {} × {}", item, count)?;
                     insert_or_add_by_ref(&mut total_drop, item, *count);
                 }
                 writeln!(f)?;
             }
             write!(f, "total drops:")?;
-            for (item, count) in total_drop {
+            let mut iter = total_drop.iter();
+            if let Some((item, count)) = iter.next() {
                 write!(f, " {} × {}", item, count)?;
             }
+            for (item, count) in iter {
+                write!(f, ", {} × {}", item, count)?;
+            }
+            writeln!(f)?;
         }
         Ok(())
     }
@@ -528,19 +559,13 @@ impl RecruitDetail {
 
 impl std::fmt::Display for RecruitDetail {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Recruit:")?;
-        if let Some(times) = self.recruit_times {
-            writeln!(f, ", recruit {} times", times)?;
-        }
-        if let Some(times) = self.refresh_times {
-            writeln!(f, ", refresh {} times", times)?;
-        }
         if !self.record.is_empty() {
-            writeln!(f, ", detected tags:")?;
-            for (level, tags, state) in self.record.iter() {
+            writeln!(f, "Detected tags:")?;
+            for (i, (level, tags, state)) in self.record.iter().enumerate() {
                 write!(
                     f,
-                    "- {} {}",
+                    "{}. {} {}",
+                    i + 1,
                     "★".repeat(*level as usize),
                     tags.iter()
                         .join(", ")
@@ -552,6 +577,12 @@ impl std::fmt::Display for RecruitDetail {
                     RecruitState::None => (),
                 }
                 writeln!(f)?
+            }
+            if let Some(times) = self.recruit_times {
+                writeln!(f, "Recruited {} times", times)?;
+            }
+            if let Some(times) = self.refresh_times {
+                writeln!(f, "Refreshed {} times", times)?;
             }
         }
         Ok(())
@@ -599,5 +630,163 @@ pub fn insert_or_add_by_ref(map: &mut Map<String, i64>, key: &str, value: i64) {
         *old += value;
     } else {
         map.insert(key.to_owned(), value);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod summary {
+        use super::*;
+
+        use crate::assert_matches;
+
+        #[test]
+        fn start_task() {
+            let mut summary = Summary::new();
+            summary.insert(1, TaskOrUnknown::MAATask(MAATask::Fight));
+            summary.insert(2, TaskOrUnknown::MAATask(MAATask::Infrast));
+            summary.insert(3, TaskOrUnknown::MAATask(MAATask::Recruit));
+            summary.insert(4, TaskOrUnknown::MAATask(MAATask::Roguelike));
+            summary.start_task(1);
+            summary.end_current_task(Reason::Completed);
+            summary.start_task(2);
+            summary.end_current_task(Reason::Stopped);
+            summary.start_task(3);
+            summary.end_current_task(Reason::Error);
+            summary.start_task(4);
+
+            let task1 = summary.task_summarys.get(&1).unwrap();
+            assert!(task1.start_time.is_some());
+            assert!(task1.end_time.is_some());
+            assert_matches!(task1.reason, Reason::Completed);
+
+            let task2 = summary.task_summarys.get(&2).unwrap();
+            assert!(task2.start_time.is_some());
+            assert!(task2.end_time.is_some());
+            assert_matches!(task2.reason, Reason::Stopped);
+
+            let task3 = summary.task_summarys.get(&3).unwrap();
+            assert!(task3.start_time.is_some());
+            assert!(task3.end_time.is_some());
+            assert_matches!(task3.reason, Reason::Error);
+
+            let task4 = summary.task_summarys.get(&4).unwrap();
+            assert!(task4.start_time.is_some());
+            assert!(task4.end_time.is_none());
+            assert_matches!(task4.reason, Reason::Unfinished);
+        }
+    }
+
+    mod detail {
+        use super::*;
+
+        #[test]
+        fn facility() {
+            use Facility::*;
+            assert_eq!(Control.to_string(), "Control");
+            assert_eq!(Mfg.to_string(), "Mfg");
+            assert_eq!(Trade.to_string(), "Trade");
+            assert_eq!(Power.to_string(), "Power");
+            assert_eq!(Office.to_string(), "Office");
+            assert_eq!(Reception.to_string(), "Reception");
+            assert_eq!(Dorm.to_string(), "Dorm");
+            assert_eq!(Processing.to_string(), "Processing");
+            assert_eq!(Training.to_string(), "Training");
+            assert_eq!(Unknown.to_string(), "Unknown");
+
+            assert_eq!("Control".parse::<Facility>().unwrap(), Control);
+            assert_eq!("Mfg".parse::<Facility>().unwrap(), Mfg);
+            assert_eq!("Trade".parse::<Facility>().unwrap(), Trade);
+            assert_eq!("Power".parse::<Facility>().unwrap(), Power);
+            assert_eq!("Office".parse::<Facility>().unwrap(), Office);
+            assert_eq!("Reception".parse::<Facility>().unwrap(), Reception);
+            assert_eq!("Dorm".parse::<Facility>().unwrap(), Dorm);
+            assert_eq!("Processing".parse::<Facility>().unwrap(), Processing);
+            assert_eq!("Training".parse::<Facility>().unwrap(), Training);
+            assert_eq!("Unknown".parse::<Facility>().unwrap(), Unknown);
+            assert_eq!("Other".parse::<Facility>().unwrap(), Unknown);
+        }
+
+        #[test]
+        fn infrast() {
+            let mut detail = InfrastDetail::new();
+            detail.set_product(Facility::Mfg, 1, "Product");
+            detail.set_operators(
+                Facility::Mfg,
+                1,
+                ["A", "B"].into_iter().map(|s| s.to_owned()).collect(),
+                ["C", "D"].into_iter().map(|s| s.to_owned()).collect(),
+            );
+            detail.set_product(Facility::Office, 1, "Product");
+            detail.set_operators(Facility::Office, 1, Vec::new(), Vec::new());
+            assert_eq!(
+                detail.to_string(),
+                "Mfg(Product) with operators: A, B, [C, D]\n\
+                 Office with operators: unknown\n",
+            );
+        }
+
+        #[test]
+        fn fight() {
+            let mut detail = FightDetail::new();
+            detail.set_stage("TS-9");
+            detail.set_times(2);
+            detail.set_medicine(1);
+            detail.set_stone(1);
+            detail.push_drop(
+                [("A", 1), ("B", 2)]
+                    .into_iter()
+                    .map(|(k, v)| (k.to_owned(), v))
+                    .collect(),
+            );
+            detail.push_drop(
+                [("A", 1), ("C", 3)]
+                    .into_iter()
+                    .map(|(k, v)| (k.to_owned(), v))
+                    .collect(),
+            );
+            assert_eq!(
+                detail.to_string(),
+                "Fight TS-9 2 times, used 1 medicine, used 1 stone, drops:\n\
+                 1. A × 1, B × 2\n\
+                 2. A × 1, C × 3\n\
+                 total drops: A × 2, B × 2, C × 3\n",
+            );
+        }
+
+        #[test]
+        fn recruit() {
+            let mut detail = RecruitDetail::new();
+            detail.push_recruit(3, ["A", "B"].into_iter().map(|s| s.to_owned()));
+            detail.refresh();
+            detail.push_recruit(4, ["C", "D"].into_iter().map(|s| s.to_owned()));
+            detail.recruit();
+            detail.push_recruit(3, ["E", "F"].into_iter().map(|s| s.to_owned()));
+            detail.refresh();
+            detail.push_recruit(4, ["G", "H"].into_iter().map(|s| s.to_owned()));
+            detail.recruit();
+            detail.push_recruit(5, ["I", "J"].into_iter().map(|s| s.to_owned()));
+            assert_eq!(
+                detail.to_string(),
+                "Detected tags:\n\
+                 1. ★★★ A, B refreshed;\n\
+                 2. ★★★★ C, D recruited;\n\
+                 3. ★★★ E, F refreshed;\n\
+                 4. ★★★★ G, H recruited;\n\
+                 5. ★★★★★ I, J\n\
+                 Recruited 2 times\n\
+                 Refreshed 2 times\n",
+            );
+        }
+
+        #[test]
+        fn roguelike() {
+            let mut detail = RoguelikeDetail::new();
+            detail.set_times(2);
+            detail.set_invest(1);
+            assert_eq!(detail.to_string(), "Explore 2 times invest 1 times");
+        }
     }
 }

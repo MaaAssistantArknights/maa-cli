@@ -183,16 +183,22 @@ fn process_taskchain(code: AsstMsg, message: &Map<String, Value>) -> Option<()> 
     use AsstMsg::*;
 
     match code {
-        TaskChainError => error!("{} {}", taskchain, "Error"),
         TaskChainStart => {
             info!("{} {}", taskchain, "Start");
             start_task(message.get("taskid")?.as_i64()? as AsstTaskId);
         }
         TaskChainCompleted => {
-            info!("CompleteTask {}", taskchain);
-            end_current_task();
+            info!("{} {}", taskchain, "Completed");
+            end_current_task(summary::Reason::Completed);
         }
-        TaskChainStopped => warn!("{} {}", taskchain, "Stopped"),
+        TaskChainStopped => {
+            warn!("{} {}", taskchain, "Stopped");
+            end_current_task(summary::Reason::Stopped);
+        }
+        TaskChainError => {
+            error!("{} {}", taskchain, "Error");
+            end_current_task(summary::Reason::Error);
+        }
         TaskChainExtraInfo => {}
 
         _ => {} // unreachable
@@ -417,11 +423,11 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
                     detail.set_operators(
                         facility.parse().unwrap(),
                         index,
-                        &operators
+                        operators
                             .iter()
                             .filter_map(|x| x.as_str().map(|x| x.to_owned()))
                             .collect(),
-                        &candidates
+                        candidates
                             .iter()
                             .filter_map(|x| x.as_str().map(|x| x.to_owned()))
                             .collect(),
