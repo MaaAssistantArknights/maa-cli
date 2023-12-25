@@ -129,7 +129,9 @@ where
     with_asst_config(|config| config.instance_options.apply_to(&asst))?;
 
     let mut summarys = (!args.no_summary).then(summary::Summary::new);
-    for (task_type, params) in task_config.tasks.iter() {
+    for task in task_config.tasks.iter() {
+        let task_type = task.task_type();
+        let params = task.params();
         debug!(
             "Adding task {} with params: {}",
             task_type.as_ref(),
@@ -138,7 +140,7 @@ where
         let id = asst.append_task(task_type, serde_json::to_string(params)?)?;
 
         if let Some(s) = summarys.as_mut() {
-            s.insert(id, task_type.clone());
+            s.insert(id, task.name().map(|s| s.to_owned()), task_type.clone());
         }
     }
     if let Some(s) = summarys {

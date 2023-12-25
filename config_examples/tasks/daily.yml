@@ -6,6 +6,7 @@ tasks:
         default: true
         description: start the game
   - type: Fight
+    name: Fight Daily
     strategy: merge
     variants:
       - condition:

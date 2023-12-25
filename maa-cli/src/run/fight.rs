@@ -72,10 +72,10 @@ mod tests {
                 close_app: true,
                 tasks
             } if tasks.len() == 3 && {
-                let fight = tasks[1].clone();
-                fight.0 == TaskOrUnknown::MAATask(MAATask::Fight)
-                    && fight.1.get("stage").unwrap().as_string().unwrap() == "1-7"
-                    && fight.1.get("medicine").unwrap().as_int().unwrap() == 0
+                let fight = &tasks[1];
+                fight.task_type() == &TaskOrUnknown::MAATask(MAATask::Fight)
+                    && fight.params().get("stage").unwrap().as_string().unwrap() == "1-7"
+                    && fight.params().get("medicine").unwrap().as_int().unwrap() == 0
             }
         );
 
@@ -87,10 +87,10 @@ mod tests {
                 close_app: false,
                 tasks
             } if tasks.len() == 1 && {
-                let fight = tasks[0].clone();
-                fight.0 == TaskOrUnknown::MAATask(MAATask::Fight)
-                    && fight.1.get("stage").unwrap().as_string().unwrap() == "CE-6"
-                    && fight.1.get("medicine").unwrap().as_int().unwrap() == 0
+                let fight = &tasks[0];
+                fight.task_type() == &TaskOrUnknown::MAATask(MAATask::Fight)
+                    && fight.params().get("stage").unwrap().as_string().unwrap() == "CE-6"
+                    && fight.params().get("medicine").unwrap().as_int().unwrap() == 0
             }
         )
     }
