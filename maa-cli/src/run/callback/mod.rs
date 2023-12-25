@@ -7,16 +7,6 @@ use log::{debug, error, info, trace, warn};
 use maa_sys::binding::{AsstMsgId, AsstTaskId};
 use serde_json::{Map, Value};
 
-// pub unsafe extern "C" fn raw_callback(
-//     code: maa_sys::binding::AsstMsgId,
-//     json_raw: *const ::std::os::raw::c_char,
-//     _: *mut ::std::os::raw::c_void,
-// ) {
-//     let json_str = unsafe { std::ffi::CStr::from_ptr(json_raw).to_str().unwrap() };
-//     let json: serde_json::Value = serde_json::from_str(json_str).unwrap();
-//     println!("{}: {}", code, serde_json::to_string_pretty(&json).unwrap());
-// }
-
 pub unsafe extern "C" fn default_callback(
     code: maa_sys::binding::AsstMsgId,
     json_raw: *const ::std::os::raw::c_char,
@@ -552,3 +542,14 @@ trait IterJoin: Iterator {
 }
 
 impl<I> IterJoin for I where I: Iterator {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn iter_join() {
+        assert_eq!([1, 2, 3].iter().join(","), Some("1,2,3".to_owned()));
+        assert_eq!(Vec::<i32>::new().iter().join(","), None);
+    }
+}

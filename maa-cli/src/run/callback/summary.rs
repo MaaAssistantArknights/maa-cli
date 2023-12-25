@@ -72,8 +72,8 @@ impl Summary {
         }
     }
 
-    pub fn insert(&mut self, id: AsstTaskId, task: TaskOrUnknown) {
-        self.task_summarys.insert(id, TaskSummary::new(task));
+    pub fn insert(&mut self, id: AsstTaskId, task: impl Into<TaskOrUnknown>) {
+        self.task_summarys.insert(id, TaskSummary::new(task.into()));
     }
 
     fn current_mut(&mut self) -> Option<&mut TaskSummary> {
@@ -124,7 +124,7 @@ impl TaskSummary {
             detail,
             start_time: None,
             end_time: None,
-            reason: Reason::Unfinished,
+            reason: Reason::Unstarted,
         }
     }
 
@@ -134,6 +134,7 @@ impl TaskSummary {
 
     fn start(&mut self) {
         self.start_time = Some(chrono::Local::now());
+        self.reason = Reason::Unfinished;
     }
 
     fn end(&mut self, reason: Reason) {
@@ -168,6 +169,7 @@ impl std::fmt::Display for TaskSummary {
             Reason::Stopped => write!(f, " Stopped")?,
             Reason::Error => write!(f, " Error")?,
             Reason::Unfinished => write!(f, " Unfinished")?,
+            Reason::Unstarted => write!(f, " Unstarted")?,
         }
 
         writeln!(f)?;
@@ -184,6 +186,7 @@ pub(super) enum Reason {
     Completed,
     Stopped,
     Error,
+    Unstarted,
     Unfinished,
 }
 
@@ -364,17 +367,18 @@ pub(super) enum Facility {
 
 impl Facility {
     fn to_str(self) -> &'static str {
+        use Facility::*;
         match self {
-            Facility::Control => "Control",
-            Facility::Mfg => "Mfg",
-            Facility::Trade => "Trade",
-            Facility::Power => "Power",
-            Facility::Office => "Office",
-            Facility::Reception => "Reception",
-            Facility::Dorm => "Dorm",
-            Facility::Processing => "Processing",
-            Facility::Training => "Training",
-            Facility::Unknown => "Unknown",
+            Control => "Control",
+            Mfg => "Mfg",
+            Trade => "Trade",
+            Power => "Power",
+            Office => "Office",
+            Reception => "Reception",
+            Dorm => "Dorm",
+            Processing => "Processing",
+            Training => "Training",
+            Unknown => "Unknown",
         }
     }
 }
@@ -383,17 +387,18 @@ impl std::str::FromStr for Facility {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use Facility::*;
         match s {
-            "Control" => Ok(Facility::Control),
-            "Mfg" => Ok(Facility::Mfg),
-            "Trade" => Ok(Facility::Trade),
-            "Power" => Ok(Facility::Power),
-            "Office" => Ok(Facility::Office),
-            "Reception" => Ok(Facility::Reception),
-            "Dorm" => Ok(Facility::Dorm),
-            "Processing" => Ok(Facility::Processing),
-            "Training" => Ok(Facility::Training),
-            _ => Ok(Facility::Unknown),
+            "Control" => Ok(Control),
+            "Mfg" => Ok(Mfg),
+            "Trade" => Ok(Trade),
+            "Power" => Ok(Power),
+            "Office" => Ok(Office),
+            "Reception" => Ok(Reception),
+            "Dorm" => Ok(Dorm),
+            "Processing" => Ok(Processing),
+            "Training" => Ok(Training),
+            _ => Ok(Unknown),
         }
     }
 }
@@ -720,11 +725,14 @@ mod tests {
 
         #[test]
         fn start_task() {
+            use MAATask::*;
+
             let mut summary = Summary::new();
-            summary.insert(1, TaskOrUnknown::MAATask(MAATask::Fight));
-            summary.insert(2, TaskOrUnknown::MAATask(MAATask::Infrast));
-            summary.insert(3, TaskOrUnknown::MAATask(MAATask::Recruit));
-            summary.insert(4, TaskOrUnknown::MAATask(MAATask::Roguelike));
+            summary.insert(1, Fight);
+            summary.insert(2, Infrast);
+            summary.insert(3, Recruit);
+            summary.insert(4, Roguelike);
+            summary.insert(5, CloseDown);
             summary.start_task(1);
             summary.end_current_task(Reason::Completed);
             summary.start_task(2);
@@ -752,6 +760,11 @@ mod tests {
             assert!(task4.start_time.is_some());
             assert!(task4.end_time.is_none());
             assert_matches!(task4.reason, Reason::Unfinished);
+
+            let task5 = summary.task_summarys.get(&5).unwrap();
+            assert!(task5.start_time.is_none());
+            assert!(task5.end_time.is_none());
+            assert_matches!(task5.reason, Reason::Unstarted);
         }
     }
 
