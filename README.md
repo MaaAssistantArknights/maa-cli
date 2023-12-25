@@ -163,6 +163,14 @@ OpenSSL 库是 `git2` 在所有平台和 `reqwest` 在 Linux 上的依赖。如�
 
 更多其他的命令可以通过 `maa help` 获取。
 
+### 其他子命令
+
+- `maa list`: 列出所有可用的任务；
+- `maa dir <dir>`: 获取特定目录的路径，比如 `maa dir config` 可以用来获取配置目录的路径;
+- `maa version`: 获取 `maa-cli` 以及 `MaaCore` 的版本信息；
+- `maa convert <input> [output]`: 将 `JSON`, `YAML` 或者 `TOML` 格式的文件转换为其他格式;
+- `maa complete <shell>`: 生成自动补全脚本;
+
 ## 配置
 
 ### 配置目录

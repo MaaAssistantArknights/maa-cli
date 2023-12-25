@@ -15,6 +15,8 @@ use crate::installer::maa_cli;
 #[cfg(feature = "core_installer")]
 use crate::installer::maa_core;
 
+use std::path::PathBuf;
+
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::{generate, Shell};
@@ -42,14 +44,14 @@ struct CLI {
     /// some prompts will be displayed to ask for input.
     /// In batch mode, the prompts will be skipped,
     /// and parameters will be set to default values.
-    #[arg(long, verbatim_doc_comment, global = true)]
+    #[arg(long, global = true)]
     batch: bool,
     /// Redirect log to file instead of stderr
     ///
     /// If no log file is specified, the log will be written to
     /// `$(maa dir log)/YYYY/MM/DD/HH:MM:SS.log`.
-    #[arg(long, verbatim_doc_comment, global = true, require_equals = true)]
-    log_file: Option<Option<std::path::PathBuf>>,
+    #[arg(long, global = true, require_equals = true)]
+    log_file: Option<Option<PathBuf>>,
     #[command(flatten)]
     verbose: Verbosity<EnvLevel>,
 }
@@ -136,7 +138,6 @@ enum SubCommand {
         /// The task name is the name of the task file without the extension.
         /// The task file must be in the `tasks` directory of the config directory.
         /// The task file must be in the TOML, YAML or JSON format.
-        #[arg(verbatim_doc_comment)]
         task: String,
         #[command(flatten)]
         common: run::CommonArgs,
@@ -171,6 +172,26 @@ enum SubCommand {
         theme: Option<run::RoguelikeTheme>,
         #[command(flatten)]
         common: run::CommonArgs,
+    },
+    /// Convert file format between TOML, YAML and JSON
+    ///
+    /// This command will convert a file from TOML, YAML or JSON format to another format.
+    /// This is useful when you want to write your infrastructure configuration
+    /// in TOML or YAML format, and use it in MaaCore, which only supports JSON format.
+    ///
+    /// It may also be useful when you want to migrate your cli configuration from
+    /// one format to another format.
+    Convert {
+        /// Path of the input file
+        input: PathBuf,
+        /// Path of the output file, if not specified, the output will be printed to stdout
+        output: Option<PathBuf>,
+        /// Format of the output file, can be one of "toml", "yaml" and "json"
+        ///
+        /// If not specified, the format will be guessed from the file extension of the output file.
+        /// If output file is not specified, the output will be default to "json".
+        #[arg(short, long)]
+        format: Option<config::Filetype>,
     },
     /// List all available tasks
     List,
@@ -336,6 +357,11 @@ fn main() -> Result<()> {
             common,
         )?,
         SubCommand::Roguelike { theme, common } => run::run(|_| run::roguelike(theme), common)?,
+        SubCommand::Convert {
+            input: task,
+            output,
+            format,
+        } => config::convert(&task, output.as_deref(), format)?,
         SubCommand::List => {
             let task_dir = dirs::config().join("tasks");
             if !task_dir.exists() {
@@ -432,7 +458,7 @@ mod test {
                 .is_some_and(|x| x.is_none()));
             assert!(CLI::parse_from(["maa", "list", "--log-file=path"])
                 .log_file
-                .is_some_and(|x| x.is_some_and(|x| x == std::path::PathBuf::from("path"))));
+                .is_some_and(|x| x.is_some_and(|x| x == PathBuf::from("path"))));
         }
 
         #[cfg(feature = "core_installer")]
@@ -738,6 +764,43 @@ mod test {
                     theme: Some(theme),
                     ..
                 } if matches!(theme, run::RoguelikeTheme::Phantom)
+            );
+        }
+
+        #[test]
+        fn convert() {
+            assert_matches!(
+                CLI::parse_from(["maa", "convert", "input.toml"]).command,
+                SubCommand::Convert {
+                    input,
+                    output: None,
+                    format: None,
+                } if input == PathBuf::from("input.toml")
+            );
+
+            assert_matches!(
+                CLI::parse_from(["maa", "convert", "input.toml", "output.json"]).command,
+                SubCommand::Convert {
+                    output: Some(output),
+                    ..
+                } if output == PathBuf::from("output.json")
+            );
+
+            assert_matches!(
+                CLI::parse_from(["maa", "convert", "input.toml", "--format", "json"]).command,
+                SubCommand::Convert {
+                    format: Some(config::Filetype::Json),
+                    ..
+                }
+            );
+
+            assert_matches!(
+                CLI::parse_from(["maa", "convert", "input.toml", "output.json", "-fy"]).command,
+                SubCommand::Convert {
+                    output: Some(output),
+                    format: Some(config::Filetype::Yaml),
+                    ..
+                } if output == PathBuf::from("output.json")
             );
         }
 
