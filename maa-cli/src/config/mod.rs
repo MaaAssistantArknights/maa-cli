@@ -94,7 +94,7 @@ impl Filetype {
         path.as_ref()
             .extension()
             .and_then(|ext| ext.to_str())
-            .and_then(|ext| Self::parse_extension(ext))
+            .and_then(Self::parse_extension)
     }
 
     fn parse_extension(ext: &str) -> Option<Self> {
@@ -131,7 +131,7 @@ impl Filetype {
         Ok(())
     }
 
-    fn to_str(&self) -> &'static str {
+    fn to_str(self) -> &'static str {
         use Filetype::*;
         match self {
             Json => "json",
@@ -192,7 +192,7 @@ pub fn convert(file: &Path, out: Option<&Path>, ft: Option<Filetype>) -> Result<
     let ft = ft.or_else(|| {
         out.and_then(|path| path.extension())
             .and_then(|ext| ext.to_str())
-            .and_then(|ext| Filetype::parse_extension(ext))
+            .and_then(Filetype::parse_extension)
     });
 
     let value = JsonValue::from_file(file)?;
@@ -232,13 +232,13 @@ mod tests {
     fn filetype() {
         use Filetype::*;
         assert_matches!(Filetype::parse_filetype("test.toml"), Some(Toml));
-        assert_matches!(Filetype::parse_filetype("test"), None);
+        assert!(Filetype::parse_filetype("test").is_none());
 
         assert_matches!(Filetype::parse_extension("toml"), Some(Toml));
         assert_matches!(Filetype::parse_extension("yml"), Some(Yaml));
         assert_matches!(Filetype::parse_extension("yaml"), Some(Yaml));
         assert_matches!(Filetype::parse_extension("json"), Some(Json));
-        assert_matches!(Filetype::parse_extension("txt"), None);
+        assert!(Filetype::parse_extension("txt").is_none());
 
         assert_eq!(Toml.to_str(), "toml");
         assert_eq!(Yaml.to_str(), "yaml");
