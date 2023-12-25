@@ -1,14 +1,12 @@
 use super::FindFileOrDefault;
 
-use crate::{
-    dirs::{self, global_path},
-    {debug, info, warning},
-};
+use crate::dirs::{self, global_path};
 
 use std::{path::PathBuf, sync::Mutex};
 
 use anyhow::{Context, Result};
 use lazy_static::lazy_static;
+use log::{debug, info, warn};
 use maa_sys::{Assistant, InstanceOptionKey, StaticOptionKey, TouchMode};
 use serde::Deserialize;
 
@@ -119,17 +117,17 @@ impl ConnectionConfig {
                 device,
                 config,
             } => {
-                debug!(format!(
+                debug!(
                     "Connecting to {} with config {} via {}",
                     device, config, adb_path
-                ));
+                );
                 (adb_path, device, config)
             }
             ConnectionConfig::PlayTools { address, config } => {
-                debug!(format!(
+                debug!(
                     "Connecting to {} with config {} via PlayTools",
                     address, config
-                ));
+                );
                 (EMPTY_STR, address, config)
             }
         }
@@ -230,22 +228,22 @@ fn default_resource_base_dirs() -> Vec<PathBuf> {
     let mut resource_dirs = Vec::new();
 
     if let Some(resource_dir) = dirs::find_resource() {
-        debug!("Found resource directory:", resource_dir.display());
+        debug!("Found resource directory: {}", resource_dir.display());
         resource_dirs.push(resource_dir);
     } else {
-        warning!("Resource directory not found!")
+        warn!("Resource directory not found!")
     }
 
     let hot_update_dir = dirs::hot_update();
     if hot_update_dir.exists() {
         debug!(
-            "Found hot update resource directory:",
+            "Found hot update resource directory: {}",
             hot_update_dir.display()
         );
         resource_dirs.push(hot_update_dir.join("resource"));
         resource_dirs.push(hot_update_dir.join("cache").join("resource"));
     } else {
-        warning!("Hot update resource directory not found!");
+        warn!("Hot update resource directory not found!");
     }
 
     resource_dirs
@@ -263,15 +261,15 @@ impl ResourceConfig {
     pub fn use_global_resource(&mut self, resource: impl Into<PathBuf>) -> &mut Self {
         match self.global_resource.as_ref() {
             Some(global_resource) => {
-                warning!(format!(
+                warn!(
                     "Global resource {} already set, ignoring {}",
                     global_resource.display(),
                     resource.into().display(),
-                ));
+                );
             }
             None => {
                 let resource = resource.into();
-                info!("Using global resource:", resource.display());
+                info!("Using global resource: {}", resource.display());
                 self.global_resource = Some(resource);
             }
         }
@@ -281,15 +279,15 @@ impl ResourceConfig {
     pub fn use_platform_diff_resource(&mut self, resource: impl Into<PathBuf>) -> &mut Self {
         match self.platform_diff_resource.as_ref() {
             Some(platform_diff_resource) => {
-                warning!(format!(
+                warn!(
                     "Platform diff resource {} already set, ignoring {}",
                     platform_diff_resource.display(),
                     resource.into().display(),
-                ));
+                );
             }
             None => {
                 let resource = resource.into();
-                info!("Using platform diff resource:", resource.display());
+                info!("Using platform diff resource: {}", resource.display());
                 self.platform_diff_resource = Some(resource);
             }
         }
@@ -311,10 +309,7 @@ impl ResourceConfig {
                 .join("resource");
             let full_paths = global_path(base_dirs, global_resource_dir);
             if full_paths.is_empty() {
-                warning!(format!(
-                    "Global resource {} not found",
-                    global_resource.display(),
-                ));
+                warn!("Global resource {} not found", global_resource.display(),);
             } else {
                 resource_dirs.extend(full_paths);
             }
@@ -325,10 +320,10 @@ impl ResourceConfig {
                 .join("resource");
             let full_paths = global_path(base_dirs, platform_diff_resource_dir);
             if full_paths.is_empty() {
-                warning!(format!(
+                warn!(
                     "Platform diff resource {} not found",
                     platform_diff_resource.display(),
-                ));
+                );
             } else {
                 resource_dirs.extend(full_paths);
             }
@@ -340,7 +335,7 @@ impl ResourceConfig {
     pub fn load(&self) -> Result<()> {
         let resource_dirs = self.resource_dirs();
         for resource_dir in resource_dirs {
-            debug!("Loading resource from", resource_dir.display());
+            debug!("Loading resource from {}", resource_dir.display());
             Assistant::load_resource(resource_dir.parent().unwrap())?;
         }
 
@@ -357,10 +352,7 @@ fn push_resource(resource_dirs: &mut Vec<PathBuf>, dir: impl Into<PathBuf>) -> &
     if dir.exists() {
         resource_dirs.push(dir);
     } else {
-        warning!(format!(
-            "Resource directory {} not found, ignoring",
-            dir.display(),
-        ));
+        warn!("Resource directory {} not found, ignoring", dir.display(),);
     }
 
     resource_dirs
@@ -380,9 +372,9 @@ impl StaticOptions {
         match (self.cpu_ocr, self.gpu_ocr) {
             (Some(cpu_ocr), Some(gpu_id)) => {
                 if cpu_ocr {
-                    warning!("Both CPU OCR and GPU OCR are enabled, CPU OCR will be ignored");
+                    warn!("Both CPU OCR and GPU OCR are enabled, CPU OCR will be ignored");
                 }
-                debug!(format!("Using GPU OCR with GPU ID {}", gpu_id));
+                debug!("Using GPU OCR with GPU ID {}", gpu_id);
                 StaticOptionKey::GpuOCR
                     .apply(gpu_id)
                     .with_context(|| format!("Failed to enable GPU OCR with GPU ID {}", gpu_id))?;
@@ -414,7 +406,7 @@ impl InstanceOptions {
     fn force_playtools(&mut self) -> &mut Self {
         match self.touch_mode {
             Some(touch_mode) if !matches!(touch_mode, TouchMode::MacPlayTools) => {
-                warning!("Connect with PlayTools force touch mode to MacPlayTools");
+                warn!("Connect with PlayTools force touch mode to MacPlayTools");
                 self.touch_mode = Some(TouchMode::MacPlayTools);
             }
             None => {
@@ -429,25 +421,25 @@ impl InstanceOptions {
 
     pub fn apply_to(&self, asst: &Assistant) -> Result<()> {
         if let Some(touch_mode) = self.touch_mode {
-            debug!("Setting touch mode to", touch_mode);
+            debug!("Setting touch mode to {}", touch_mode);
             InstanceOptionKey::TouchMode
                 .apply_to(asst, touch_mode)
                 .with_context(|| format!("Failed to set touch mode to {}", touch_mode))?;
         }
         if let Some(deployment_with_pause) = self.deployment_with_pause {
-            debug!("Setting deployment with pause to", deployment_with_pause);
+            debug!("Setting deployment with pause to {}", deployment_with_pause);
             InstanceOptionKey::DeploymentWithPause
                 .apply_to(asst, deployment_with_pause)
                 .context("Failed to set deployment with pause")?;
         }
         if let Some(adb_lite_enabled) = self.adb_lite_enabled {
-            debug!("Setting adb lite enabled to", adb_lite_enabled);
+            debug!("Setting adb lite enabled to {}", adb_lite_enabled);
             InstanceOptionKey::AdbLiteEnabled
                 .apply_to(asst, adb_lite_enabled)
                 .context("Failed to set adb lite enabled")?;
         }
         if let Some(kill_adb_on_exit) = self.kill_adb_on_exit {
-            debug!(format!("Setting kill adb on exit to {}", kill_adb_on_exit));
+            debug!("Setting kill adb on exit to {}", kill_adb_on_exit);
             InstanceOptionKey::KillAdbOnExit
                 .apply_to(asst, kill_adb_on_exit)
                 .context("Failed to set kill adb on exit")?;

@@ -1,4 +1,4 @@
-use crate::{debug, normal};
+use log::debug;
 
 use std::cmp::min;
 use std::fs::{remove_file, File};
@@ -201,8 +201,8 @@ pub async fn download_mirrors<'a>(
     let mut download_link = &mirrors[0];
 
     if t == 0 {
-        normal!("Skip speed test, downloading from first link...");
-        debug!("First link:", download_link);
+        println!("Skip speed test, downloading from first link...");
+        debug!("First link: {}", download_link);
         download(client, download_link, path, size, checker).await?;
         return Ok(());
     }
@@ -210,21 +210,23 @@ pub async fn download_mirrors<'a>(
     let test_duration = Duration::from_secs(t);
     let mut largest: u64 = 0;
 
-    normal!("Testing download speed...");
+    println!("Testing download speed...");
     for link in mirrors.iter() {
         debug!("Testing {}", link);
         if let Ok(downloaded) = try_download(client, link, test_duration).await {
             if downloaded > largest {
-                debug!("Found faster link:", link);
-                debug!("Total bytes downloaded:", downloaded);
+                debug!(
+                    "Found faster link {} with {} bytes downloaded",
+                    link, downloaded
+                );
                 download_link = link;
                 largest = downloaded;
             }
         }
     }
 
-    normal!("Downloading from fastest mirror...");
-    debug!("Fastest link:", download_link);
+    println!("Downloading from fastest mirror...");
+    debug!("Fastest link: {}", download_link);
     download(client, download_link, path, size, checker).await?;
 
     Ok(())

@@ -8,7 +8,6 @@ use crate::{
     config::cli::{cli_config, maa_cli::CommonArgs},
     consts::{MAA_CLI_EXE, MAA_CLI_VERSION},
     dirs::{self, Ensure},
-    normal,
 };
 
 use std::{
@@ -29,7 +28,7 @@ pub fn version() -> Result<Version> {
 pub fn update(args: &CommonArgs) -> Result<()> {
     let config = cli_config().cli_config().clone().with_args(args);
 
-    normal!("Fetching maa-cli version info...");
+    println!("Fetching maa-cli version info...");
     let version_json: VersionJSON<Details> = reqwest::blocking::get(config.api_url())
         .context("Failed to fetch version info")?
         .json()
@@ -48,7 +47,7 @@ pub fn update(args: &CommonArgs) -> Result<()> {
     let cache_path = dirs::cache().ensure()?.join(asset_name);
 
     if cache_path.exists() && cache_path.metadata()?.len() == asset_size {
-        normal!(format!("Found existing file: {}", cache_path.display()));
+        println!("Found existing file: {}", cache_path.display());
     } else {
         let url = config.download_url(details.tag(), asset_name);
         let client = reqwest::Client::builder()

@@ -1,9 +1,10 @@
 use crate::{
     config::cli::{cli_config, resource::GitBackend},
-    debug, dirs,
+    dirs,
 };
 
 use anyhow::Result;
+use log::debug;
 
 pub fn update(is_auto: bool) -> Result<()> {
     let config = cli_config().resource_config();
@@ -39,8 +40,6 @@ pub fn update(is_auto: bool) -> Result<()> {
 }
 
 mod git {
-    use crate::log;
-
     use std::path::Path;
 
     use anyhow::{bail, Context, Result};
@@ -63,8 +62,6 @@ mod git {
         if let Some(branch) = branch {
             cmd.args(["--branch", branch]);
         }
-
-        cmd.arg(unsafe { log::level().to_git_flag() });
 
         if let Some(ssh_key) = ssh_key {
             cmd.env(
@@ -95,8 +92,6 @@ mod git {
 
         cmd.arg("--ff-only");
 
-        cmd.arg(unsafe { log::level().to_git_flag() });
-
         if let Some(ssh_key) = ssh_key {
             cmd.env(
                 "GIT_SSH_COMMAND",
@@ -119,12 +114,11 @@ mod git {
 
 #[cfg(feature = "git2")]
 mod git2 {
-    use crate::debug;
-
     use std::path::Path;
 
     use anyhow::{bail, Context, Result};
     use git2::{build::RepoBuilder, Repository};
+    use log::debug;
 
     pub fn clone(
         url: &str,

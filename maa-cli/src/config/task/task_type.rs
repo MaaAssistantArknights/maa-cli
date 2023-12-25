@@ -1,7 +1,6 @@
 use serde::Deserialize;
 
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Deserialize, Debug, Clone, Copy)]
+#[derive(Deserialize, Debug, Clone, Copy, PartialEq)]
 pub enum MAATask {
     StartUp,
     CloseDown,
@@ -21,8 +20,8 @@ pub enum MAATask {
     VideoRecognition,
 }
 
-impl AsRef<str> for MAATask {
-    fn as_ref(&self) -> &str {
+impl MAATask {
+    fn to_str(self) -> &'static str {
         match self {
             MAATask::StartUp => "StartUp",
             MAATask::CloseDown => "CloseDown",
@@ -44,8 +43,7 @@ impl AsRef<str> for MAATask {
     }
 }
 
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum TaskOrUnknown {
     MAATask(MAATask),
@@ -61,9 +59,15 @@ impl From<MAATask> for TaskOrUnknown {
 impl AsRef<str> for TaskOrUnknown {
     fn as_ref(&self) -> &str {
         match self {
-            TaskOrUnknown::MAATask(task) => task.as_ref(),
+            TaskOrUnknown::MAATask(task) => task.to_str(),
             TaskOrUnknown::Unknown(s) => s.as_str(),
         }
+    }
+}
+
+impl std::fmt::Display for TaskOrUnknown {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_ref())
     }
 }
 
@@ -128,26 +132,26 @@ mod tests {
     }
 
     #[test]
-    fn as_str() {
-        assert_eq!(MAATask::StartUp.as_ref(), "StartUp");
-        assert_eq!(MAATask::CloseDown.as_ref(), "CloseDown");
-        assert_eq!(MAATask::Fight.as_ref(), "Fight");
-        assert_eq!(MAATask::Recruit.as_ref(), "Recruit");
-        assert_eq!(MAATask::Infrast.as_ref(), "Infrast");
-        assert_eq!(MAATask::Mall.as_ref(), "Mall");
-        assert_eq!(MAATask::Award.as_ref(), "Award");
-        assert_eq!(MAATask::Roguelike.as_ref(), "Roguelike");
-        assert_eq!(MAATask::Copilot.as_ref(), "Copilot");
-        assert_eq!(MAATask::SSSCopilot.as_ref(), "SSSCopilot");
-        assert_eq!(MAATask::Depot.as_ref(), "Depot");
-        assert_eq!(MAATask::OperBox.as_ref(), "OperBox");
+    fn to_str() {
+        assert_eq!(MAATask::StartUp.to_str(), "StartUp");
+        assert_eq!(MAATask::CloseDown.to_str(), "CloseDown");
+        assert_eq!(MAATask::Fight.to_str(), "Fight");
+        assert_eq!(MAATask::Recruit.to_str(), "Recruit");
+        assert_eq!(MAATask::Infrast.to_str(), "Infrast");
+        assert_eq!(MAATask::Mall.to_str(), "Mall");
+        assert_eq!(MAATask::Award.to_str(), "Award");
+        assert_eq!(MAATask::Roguelike.to_str(), "Roguelike");
+        assert_eq!(MAATask::Copilot.to_str(), "Copilot");
+        assert_eq!(MAATask::SSSCopilot.to_str(), "SSSCopilot");
+        assert_eq!(MAATask::Depot.to_str(), "Depot");
+        assert_eq!(MAATask::OperBox.to_str(), "OperBox");
         assert_eq!(
-            MAATask::ReclamationAlgorithm.as_ref(),
+            MAATask::ReclamationAlgorithm.to_str(),
             "ReclamationAlgorithm",
         );
-        assert_eq!(MAATask::Custom.as_ref(), "Custom");
-        assert_eq!(MAATask::SingleStep.as_ref(), "SingleStep");
-        assert_eq!(MAATask::VideoRecognition.as_ref(), "VideoRecognition");
+        assert_eq!(MAATask::Custom.to_str(), "Custom");
+        assert_eq!(MAATask::SingleStep.to_str(), "SingleStep");
+        assert_eq!(MAATask::VideoRecognition.to_str(), "VideoRecognition");
         assert_eq!(TaskOrUnknown::MAATask(MAATask::StartUp).as_ref(), "StartUp");
         assert_eq!(TaskOrUnknown::Unknown("Other".into()).as_ref(), "Other");
     }

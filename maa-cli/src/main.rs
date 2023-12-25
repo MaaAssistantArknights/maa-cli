@@ -2,13 +2,12 @@ mod config;
 mod consts;
 mod dirs;
 mod installer;
-mod log;
 mod run;
 
 use crate::{
     config::{cli, task::value::input::enable_batch_mode},
+    dirs::Ensure,
     installer::resource,
-    log::{level, set_level},
 };
 
 #[cfg(feature = "cli_installer")]
@@ -19,25 +18,24 @@ use crate::installer::maa_core;
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::{generate, Shell};
+use clap_verbosity_flag::{LogLevel, Verbosity};
+
+struct EnvLevel;
+
+impl LogLevel for EnvLevel {
+    fn default() -> Option<log::Level> {
+        std::env::var_os("MAA_LOG")
+            .and_then(|s| s.to_str().and_then(|s| s.parse().ok()))
+            .or(Some(log::Level::Warn))
+    }
+}
 
 #[derive(Parser)]
-#[command(name = "maa", author, version)]
+#[command(name = "maa", author, version, about = "A tool for Arknights.")]
 #[allow(clippy::upper_case_acronyms)]
 struct CLI {
     #[command(subcommand)]
     command: SubCommand,
-    /// Output more information, repeat to increase verbosity
-    ///
-    /// If you want to see more information, you can use this option to increase the log level.
-    /// See documentation of log level for more information.
-    #[arg(short, long, verbatim_doc_comment, action = clap::ArgAction::Count, global = true)]
-    verbose: u8,
-    /// Output less information, repeat to increase quietness
-    ///
-    /// If you want to see less information, you can use this option to decrease the log level.
-    /// See documentation of log level for more information.
-    #[arg(short, long, verbatim_doc_comment, action = clap::ArgAction::Count, global = true)]
-    quiet: u8,
     /// Enable batch mode
     ///
     /// If there are some input parameters in the task file,
@@ -45,7 +43,15 @@ struct CLI {
     /// In batch mode, the prompts will be skipped,
     /// and parameters will be set to default values.
     #[arg(long, verbatim_doc_comment, global = true)]
-    pub batch: bool,
+    batch: bool,
+    /// Redirect log to file instead of stderr
+    ///
+    /// If no log file is specified, the log will be written to
+    /// `$(maa dir log)/YYYY/MM/DD/HH:MM:SS.log`.
+    #[arg(long, verbatim_doc_comment, global = true, require_equals = true)]
+    log_file: Option<Option<std::path::PathBuf>>,
+    #[command(flatten)]
+    verbose: Verbosity<EnvLevel>,
 }
 
 #[derive(Subcommand)]
@@ -228,9 +234,40 @@ pub enum Dir {
 fn main() -> Result<()> {
     let cli = CLI::parse();
 
-    if cli.verbose != cli.quiet {
-        unsafe { set_level((level() as u8 + cli.verbose).saturating_sub(cli.quiet)) };
+    let mut builder = env_logger::Builder::new();
+
+    builder.filter_level(cli.verbose.log_level_filter());
+    builder.format(|buf, record| {
+        use std::io::Write;
+        writeln!(
+            buf,
+            "[{} {:<5}] {}",
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+            buf.default_styled_level(record.level()),
+            record.args()
+        )
+    });
+
+    if let Some(opt) = cli.log_file {
+        let now = chrono::Local::now();
+        let log_file = opt.unwrap_or_else(|| {
+            let dir = dirs::log()
+                .join(now.format("%Y").to_string())
+                .join(now.format("%m").to_string())
+                .join(now.format("%d").to_string());
+            dir.ensure().unwrap();
+            dir.join(format!("{}.log", now.format("%H:%M:%S")))
+        });
+
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(log_file)?;
+
+        builder.target(env_logger::Target::Pipe(Box::new(file)));
     }
+
+    builder.init();
 
     if cli.batch {
         unsafe { enable_batch_mode() };
@@ -336,22 +373,66 @@ mod test {
         use super::*;
 
         use crate::config::cli::Channel;
+        use std::env;
 
         #[test]
-        fn log_level() {
-            assert_eq!(CLI::parse_from(["maa", "list"]).verbose, 0);
-            assert_eq!(CLI::parse_from(["maa", "-v", "list"]).verbose, 1);
-            assert_eq!(CLI::parse_from(["maa", "list", "-v"]).verbose, 1);
-            assert_eq!(CLI::parse_from(["maa", "list", "--verbose"]).verbose, 1);
-            assert_eq!(CLI::parse_from(["maa", "list", "-vv"]).verbose, 2);
+        fn global_options() {
+            env::remove_var("MAA_LOG");
 
-            assert_eq!(CLI::parse_from(["maa", "list"]).quiet, 0);
-            assert_eq!(CLI::parse_from(["maa", "list", "-q"]).quiet, 1);
-            assert_eq!(CLI::parse_from(["maa", "list", "--quiet"]).quiet, 1);
-            assert_eq!(CLI::parse_from(["maa", "list", "-qq"]).quiet, 2);
+            assert_eq!(
+                CLI::parse_from(["maa", "list"]).verbose.log_level_filter(),
+                log::LevelFilter::Warn
+            );
+            assert_eq!(
+                CLI::parse_from(["maa", "-v", "list"])
+                    .verbose
+                    .log_level_filter(),
+                log::LevelFilter::Info
+            );
+            assert_eq!(
+                CLI::parse_from(["maa", "list", "-v"])
+                    .verbose
+                    .log_level_filter(),
+                log::LevelFilter::Info
+            );
+            assert_eq!(
+                CLI::parse_from(["maa", "list", "--verbose"])
+                    .verbose
+                    .log_level_filter(),
+                log::LevelFilter::Info
+            );
+
+            assert_eq!(
+                CLI::parse_from(["maa", "list", "-vv"])
+                    .verbose
+                    .log_level_filter(),
+                log::LevelFilter::Debug
+            );
+
+            assert_eq!(
+                CLI::parse_from(["maa", "list", "-q"])
+                    .verbose
+                    .log_level_filter(),
+                log::LevelFilter::Error
+            );
+
+            env::set_var("MAA_LOG", "Info");
+            assert_eq!(
+                CLI::parse_from(["maa", "list"]).verbose.log_level_filter(),
+                log::LevelFilter::Info
+            );
+            env::remove_var("MAA_LOG");
 
             assert!(!CLI::parse_from(["maa", "list"]).batch);
             assert!(CLI::parse_from(["maa", "list", "--batch"]).batch);
+
+            assert!(CLI::parse_from(["maa", "list"]).log_file.is_none());
+            assert!(CLI::parse_from(["maa", "list", "--log-file"])
+                .log_file
+                .is_some_and(|x| x.is_none()));
+            assert!(CLI::parse_from(["maa", "list", "--log-file=path"])
+                .log_file
+                .is_some_and(|x| x.is_some_and(|x| x == std::path::PathBuf::from("path"))));
         }
 
         #[cfg(feature = "core_installer")]
