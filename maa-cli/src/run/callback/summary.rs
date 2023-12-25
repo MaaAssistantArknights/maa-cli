@@ -90,9 +90,9 @@ const LINE_SEP: &str = "----------------------------------------";
 
 impl std::fmt::Display for Summary {
     // we print literal but it will be replace by a localizable string, so it's fine
-    #[allow(clippy::print_literal)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if !self.task_summarys.is_empty() {
+            #[allow(clippy::write_literal)]
             writeln!(f, "{}", "Summary")?;
             for task_summary in self.task_summarys.values() {
                 write!(f, "{LINE_SEP}\n{task_summary}")?;
