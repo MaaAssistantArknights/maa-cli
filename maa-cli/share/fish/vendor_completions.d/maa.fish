@@ -7,7 +7,7 @@ complete -c maa -l batch -d 'Enable touch mode'
 complete -c maa -l log-file -d 'Log to file instead of stderr'
 
 # help
-set -l subcommands install update self hot-update dir version run fight copilot roguelike list complete
+set -l subcommands install update self hot-update dir version run fight copilot roguelike list complete convert
 complete -c maa -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c maa -n "__fish_use_subcommand" -f -a "help" -d 'Print help for given subcommand'
 complete -c maa -n "__fish_seen_subcommand_from help" -f -a "$subcommands"
@@ -29,6 +29,7 @@ complete -c maa -n "__fish_use_subcommand" -f -a "copilot" -d 'Run copilot task'
 complete -c maa -n "__fish_use_subcommand" -f -a "roguelike" -d 'Run rouge-like task'
 complete -c maa -n "__fish_use_subcommand" -f -a "list" -d 'List all available tasks'
 complete -c maa -n "__fish_use_subcommand" -f -a "complete" -d 'Generate completion script for given shell'
+complete -c maa -n "__fish_use_subcommand" -f -a "convert" -d 'Convert config file to another format'
 
 set -l channels alpha beta stable
 # MaaCore installer options
@@ -65,6 +66,9 @@ complete -c maa -n "__fish_seen_subcommand_from run" -f -a "$(maa list)"
 complete -c maa -n "__fish_seen_subcommand_from fight" -l startup -d 'Whether to start the game'
 complete -c maa -n "__fish_seen_subcommand_from fight" -l closedown -d 'Whether to close the game'
 complete -c maa -n "__fish_seen_subcommand_from roguelike" -a "phantom mizuki sami"
+
+complete -c maa -n "__fish_seen_subcommand_from complete" -f -a "bash fish zsh powershell"
+complete -c maa -n "__fish_seen_subcommand_from convert" -l f -l format -a "j json y yaml t toml" -r
 
 # Subcommand don't require arguments
 complete -c maa -n "__fish_seen_subcommand_from hot-update list" -f # prevent fish complete from path

@@ -2,7 +2,7 @@ use crate::consts::MAA_CORE_LIB;
 
 use std::{
     env::{current_exe, var_os},
-    fs::{create_dir, remove_dir_all},
+    fs::{create_dir, create_dir_all, remove_dir_all},
     path::{Path, PathBuf},
 };
 
@@ -330,10 +330,7 @@ impl Ensure for &Path {
 
     fn ensure(self) -> Result<Self, Self::Error> {
         if !self.exists() {
-            if let Some(parent) = self.parent() {
-                parent.ensure()?;
-            }
-            create_dir(self)?;
+            create_dir_all(self)?;
         }
         Ok(self)
     }

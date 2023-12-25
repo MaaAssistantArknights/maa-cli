@@ -147,6 +147,14 @@ You can update `maa-cli` by `maa self update`. For users who install `maa-cli` w
 
 More other commands can be found by `maa help`.
 
+### Other subcommands
+
+- `maa list`: list all available tasks;
+- `maa dir <subcommand>`: get the path of a specific directory;
+- `maa version`: print the version of `maa-cli` and `MaaCore`;
+- `maa convert <input> [output]`: convert a configuration file to another format, like `maa convert daily.toml daily.json`;
+- `maa complete <shell>`: generate completion script for specific shell;
+
 ## Configurations
 
 ### Configuration directory
