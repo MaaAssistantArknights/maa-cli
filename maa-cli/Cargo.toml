@@ -75,11 +75,10 @@ tar = { version = "0.4.40", optional = true }
 
 # Logging support
 log = "0.4.20"
-humantime = "2.1.0"
 [dependencies.env_logger]
 version = "0.10.1"
 default-features = false
-features = ["auto-color", "humantime"]
+features = ["auto-color"]
 
 # Datatime support
 [dependencies.chrono]

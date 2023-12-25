@@ -156,7 +156,7 @@ impl std::fmt::Display for TaskSummary {
                 " {} - {} ({})",
                 start.format("%H:%M:%S"),
                 end.format("%H:%M:%S"),
-                fmt_duration(end - start)
+                FormattedDuration::from(end - start)
             ),
             (Some(start), None) => write!(f, " {} - ", start.format("%H:%M:%S")),
             (None, Some(end)) => write!(f, " - {}", end.format("%H:%M:%S")),
@@ -187,10 +187,50 @@ pub(super) enum Reason {
     Unfinished,
 }
 
-fn fmt_duration(duration: chrono::Duration) -> humantime::FormattedDuration {
-    let seconds = duration.num_seconds();
-    let seconds = if seconds < 0 { 0 } else { seconds as u64 };
-    humantime::format_duration(std::time::Duration::new(seconds, 0))
+struct FormattedDuration {
+    hours: i64,
+    minutes: i64,
+    seconds: i64,
+}
+
+impl From<chrono::Duration> for FormattedDuration {
+    fn from(duration: chrono::Duration) -> Self {
+        let total_seconds = duration.num_seconds();
+
+        let hours = total_seconds / (60 * 60);
+        let minutes = (total_seconds / 60) % 60;
+        let seconds = total_seconds % 60;
+
+        Self {
+            hours,
+            minutes,
+            seconds,
+        }
+    }
+}
+
+impl std::fmt::Display for FormattedDuration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut is_first = true;
+        if self.hours > 0 {
+            is_first = false;
+            write!(f, "{}h", self.hours)?;
+        }
+        if self.minutes > 0 {
+            if !is_first {
+                write!(f, " ")?;
+            } else {
+                is_first = false;
+            }
+            write!(f, "{}m", self.minutes)?;
+        }
+        if is_first {
+            write!(f, "{}s", self.seconds)?;
+        } else if self.seconds > 0 {
+            write!(f, " {}s", self.seconds)?;
+        }
+        Ok(())
+    }
 }
 
 pub enum Detail {
@@ -636,6 +676,42 @@ pub fn insert_or_add_by_ref(map: &mut Map<String, i64>, key: &str, value: i64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn format_duration() {
+        assert_eq!(
+            FormattedDuration::from(chrono::Duration::seconds(0)).to_string(),
+            "0s"
+        );
+        assert_eq!(
+            FormattedDuration::from(chrono::Duration::seconds(1)).to_string(),
+            "1s"
+        );
+        assert_eq!(
+            FormattedDuration::from(chrono::Duration::seconds(60)).to_string(),
+            "1m"
+        );
+        assert_eq!(
+            FormattedDuration::from(chrono::Duration::seconds(60 * 60)).to_string(),
+            "1h"
+        );
+        assert_eq!(
+            FormattedDuration::from(chrono::Duration::seconds(60 * 60 + 1)).to_string(),
+            "1h 1s"
+        );
+        assert_eq!(
+            FormattedDuration::from(chrono::Duration::seconds(60 * 60 + 60)).to_string(),
+            "1h 1m"
+        );
+        assert_eq!(
+            FormattedDuration::from(chrono::Duration::seconds(60 * 60 + 60 + 1)).to_string(),
+            "1h 1m 1s"
+        );
+        assert_eq!(
+            FormattedDuration::from(chrono::Duration::seconds(60 * 60 * 48)).to_string(),
+            "48h"
+        );
+    }
 
     mod summary {
         use super::*;

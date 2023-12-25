@@ -237,6 +237,16 @@ fn main() -> Result<()> {
     let mut builder = env_logger::Builder::new();
 
     builder.filter_level(cli.verbose.log_level_filter());
+    builder.format(|buf, record| {
+        use std::io::Write;
+        writeln!(
+            buf,
+            "[{} {:<5}] {}",
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+            buf.default_styled_level(record.level()),
+            record.args()
+        )
+    });
 
     if let Some(opt) = cli.log_file {
         let now = chrono::Local::now();
