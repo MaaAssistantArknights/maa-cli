@@ -67,6 +67,8 @@ pub enum Strategy {
 #[derive(Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct Task {
+    #[serde(default)]
+    name: Option<String>,
     #[serde(rename = "type")]
     task_type: TaskOrUnknown,
     #[serde(default)]
@@ -78,13 +80,20 @@ pub struct Task {
 }
 
 impl Task {
-    pub fn new<T, V, S>(task_type: T, params: V, strategy: Strategy, variants: S) -> Self
+    pub fn new<T, V, S>(
+        name: Option<String>,
+        task_type: T,
+        params: V,
+        strategy: Strategy,
+        variants: S,
+    ) -> Self
     where
         T: Into<TaskOrUnknown>,
         V: Into<MAAValue>,
         S: IntoIterator<Item = TaskVariant>,
     {
         Self {
+            name,
             task_type: task_type.into(),
             strategy,
             params: params.into(),
@@ -97,7 +106,13 @@ impl Task {
         T: Into<TaskOrUnknown>,
         V: Into<MAAValue>,
     {
-        Self::new(task_type, params, Strategy::default(), default_variants())
+        Self::new(
+            None,
+            task_type,
+            params,
+            Strategy::default(),
+            default_variants(),
+        )
     }
 
     pub fn is_active(&self) -> bool {
@@ -168,7 +183,7 @@ impl TaskConfig {
         let mut prepend_startup = startup.is_some_and(|v| v);
         let mut append_closedown = closedown.is_some_and(|v| v);
 
-        let mut tasks: Vec<(TaskOrUnknown, MAAValue)> = Vec::new();
+        let mut tasks: Vec<InitializedTask> = Vec::new();
 
         for task in self.tasks.iter() {
             if task.is_active() {
@@ -235,15 +250,19 @@ impl TaskConfig {
                         }
                     }
                 }
-                tasks.push((task_type.clone(), params))
+                tasks.push(InitializedTask::new(
+                    task.name.clone(),
+                    task_type.clone(),
+                    params,
+                ));
             }
         }
 
         if prepend_startup {
             tasks.insert(
                 0,
-                (
-                    MAATask::StartUp.into(),
+                InitializedTask::new_noname(
+                    MAATask::StartUp,
                     object!(
                         "start_game_enabled" => true,
                         "client_type" => self.client_type.unwrap_or_default().to_string(),
@@ -253,7 +272,7 @@ impl TaskConfig {
         }
 
         if append_closedown {
-            tasks.push((MAATask::CloseDown.into(), object!()));
+            tasks.push(InitializedTask::new_noname(MAATask::CloseDown, object!()));
         }
 
         Ok(InitializedTaskConfig {
@@ -272,7 +291,40 @@ pub struct InitializedTaskConfig {
     pub client_type: Option<ClientType>,
     pub start_app: bool,
     pub close_app: bool,
-    pub tasks: Vec<(TaskOrUnknown, MAAValue)>,
+    pub tasks: Vec<InitializedTask>,
+}
+
+#[cfg_attr(test, derive(PartialEq, Debug))]
+pub struct InitializedTask {
+    name: Option<String>,
+    task_type: TaskOrUnknown,
+    params: MAAValue,
+}
+
+impl InitializedTask {
+    fn new(name: Option<String>, task_type: impl Into<TaskOrUnknown>, params: MAAValue) -> Self {
+        Self {
+            name,
+            task_type: task_type.into(),
+            params,
+        }
+    }
+
+    fn new_noname(task_type: impl Into<TaskOrUnknown>, params: MAAValue) -> Self {
+        Self::new(None, task_type.into(), params)
+    }
+
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    pub fn task_type(&self) -> &TaskOrUnknown {
+        &self.task_type
+    }
+
+    pub fn params(&self) -> &MAAValue {
+        &self.params
+    }
 }
 
 #[cfg(test)]
@@ -288,206 +340,131 @@ mod tests {
 
         #[test]
         fn is_active() {
-            assert!(Task::new(
-                MAATask::StartUp,
-                MAAValue::default(),
-                Strategy::default(),
-                vec![TaskVariant {
+            fn test_with_veriants(variants: Vec<TaskVariant>, expected: bool) {
+                assert_eq!(
+                    Task::new(
+                        None,
+                        MAATask::StartUp,
+                        object!(),
+                        Strategy::default(),
+                        variants
+                    )
+                    .is_active(),
+                    expected
+                );
+            }
+
+            fn always_active() -> TaskVariant {
+                TaskVariant {
                     condition: Condition::Always,
                     params: MAAValue::default(),
-                }]
-            )
-            .is_active());
-            assert!(!Task::new(
-                MAATask::StartUp,
-                MAAValue::default(),
-                Strategy::default(),
-                vec![TaskVariant {
+                }
+            }
+
+            fn never_active() -> TaskVariant {
+                TaskVariant {
                     condition: Condition::Never,
                     params: MAAValue::default(),
-                }]
-            )
-            .is_active());
-            assert!(Task::new(
-                MAATask::StartUp,
-                MAAValue::default(),
-                Strategy::default(),
-                vec![
-                    TaskVariant {
-                        condition: Condition::Never,
-                        params: MAAValue::default(),
-                    },
-                    TaskVariant {
-                        condition: Condition::Always,
-                        params: MAAValue::default(),
-                    },
-                ]
-            )
-            .is_active());
-            assert!(!Task::new(
-                MAATask::StartUp,
-                MAAValue::default(),
-                Strategy::default(),
-                vec![
-                    TaskVariant {
-                        condition: Condition::Never,
-                        params: MAAValue::default(),
-                    },
-                    TaskVariant {
-                        condition: Condition::Never,
-                        params: MAAValue::default(),
-                    },
-                ]
-            )
-            .is_active());
+                }
+            }
+
+            test_with_veriants(vec![always_active()], true);
+            test_with_veriants(vec![never_active()], false);
+            test_with_veriants(vec![always_active(), never_active()], true);
+            test_with_veriants(vec![never_active(), always_active()], true);
+            test_with_veriants(vec![never_active(), never_active()], false);
         }
 
         #[test]
         fn get_type() {
             assert_eq!(
-                Task::new(
-                    MAATask::StartUp,
-                    MAAValue::default(),
-                    Strategy::default(),
-                    vec![]
-                )
-                .task_type(),
+                Task::new_with_default(MAATask::StartUp, object!()).task_type(),
                 &MAATask::StartUp.into()
             );
         }
 
         #[test]
         fn get_params() {
-            assert_eq!(
-                Task::new(
-                    MAATask::StartUp,
-                    object!("a" => 1),
-                    Strategy::First,
-                    vec![TaskVariant {
-                        condition: Condition::Always,
-                        params: object!(),
-                    }]
-                )
-                .params(),
-                object!("a" => 1)
-            );
-            assert_eq!(
-                Task::new(
-                    MAATask::StartUp,
-                    object!("a" => 1),
-                    Strategy::First,
-                    vec![TaskVariant {
-                        condition: Condition::Always,
-                        params: object!("b" => 2),
-                    }]
-                )
-                .params(),
-                object!("a" => 1, "b" => 2)
-            );
-            assert_eq!(
-                Task::new(
-                    MAATask::StartUp,
-                    MAAValue::default(),
-                    Strategy::First,
-                    vec![TaskVariant {
-                        condition: Condition::Always,
-                        params: object!("a" => 1),
-                    }]
-                )
-                .params(),
-                object!("a" => 1)
-            );
-            assert_eq!(
-                Task::new(
-                    MAATask::StartUp,
-                    object!("a" => 1),
-                    Strategy::First,
-                    vec![TaskVariant {
-                        condition: Condition::Always,
-                        params: object!("a" => 2),
-                    }]
-                )
-                .params(),
-                object!("a" => 2)
-            );
-            assert_eq!(
-                Task::new(
-                    MAATask::StartUp,
-                    object!("a" => 1),
-                    Strategy::First,
-                    vec![
-                        TaskVariant {
+            fn test_with_variants(
+                base: MAAValue,
+                strategy: Strategy,
+                variants: impl IntoIterator<Item = MAAValue>,
+                expected: MAAValue,
+            ) {
+                assert_eq!(
+                    Task::new(
+                        None,
+                        MAATask::StartUp,
+                        base,
+                        strategy,
+                        variants.into_iter().map(|v| TaskVariant {
                             condition: Condition::Always,
-                            params: object!("a" => 2),
-                        },
-                        TaskVariant {
-                            condition: Condition::Always,
-                            params: object!("a" => 3),
-                        },
-                    ]
-                )
-                .params(),
-                object!("a" => 2)
+                            params: v,
+                        })
+                    )
+                    .params(),
+                    expected
+                );
+            }
+
+            test_with_variants(
+                object!("a" => 1),
+                Strategy::First,
+                vec![object!()],
+                object!("a" => 1),
             );
-            assert_eq!(
-                Task::new(
-                    MAATask::StartUp,
-                    object!("a" => 1),
-                    Strategy::Merge,
-                    vec![
-                        TaskVariant {
-                            condition: Condition::Always,
-                            params: object!("a" => 2),
-                        },
-                        TaskVariant {
-                            condition: Condition::Always,
-                            params: object!("a" => 3),
-                        },
-                    ]
-                )
-                .params(),
-                object!("a" => 3)
+            test_with_variants(
+                object!(),
+                Strategy::First,
+                vec![object!("a" => 1)],
+                object!("a" => 1),
             );
-            assert_eq!(
-                Task::new(
-                    MAATask::StartUp,
-                    object!("a" => 1),
-                    Strategy::First,
-                    vec![
-                        TaskVariant {
-                            condition: Condition::Always,
-                            params: object!("a" => 2),
-                        },
-                        TaskVariant {
-                            condition: Condition::Always,
-                            params: object!("b" => 4),
-                        },
-                    ]
-                )
-                .params(),
+
+            test_with_variants(
+                object!("a" => 1),
+                Strategy::First,
+                vec![object!("b" => 2)],
+                object!("a" => 1, "b" => 2),
+            );
+
+            test_with_variants(
+                object!("a" => 1),
+                Strategy::First,
+                vec![object!("a" => 2)],
                 object!("a" => 2),
             );
-            assert_eq!(
-                Task::new(
-                    MAATask::StartUp,
-                    object!("a" => 1),
-                    Strategy::Merge,
-                    vec![
-                        TaskVariant {
-                            condition: Condition::Always,
-                            params: object!("a" => 2),
-                        },
-                        TaskVariant {
-                            condition: Condition::Always,
-                            params: object!("b" => 4),
-                        },
-                    ]
-                )
-                .params(),
+
+            test_with_variants(
+                object!("a" => 1),
+                Strategy::First,
+                vec![object!("a" => 2), object!("a" => 3)],
+                object!("a" => 2),
+            );
+
+            test_with_variants(
+                object!("a" => 1),
+                Strategy::Merge,
+                vec![object!("a" => 2), object!("a" => 3)],
+                object!("a" => 3),
+            );
+
+            test_with_variants(
+                object!("a" => 1),
+                Strategy::First,
+                vec![object!("a" => 2), object!("b" => 4)],
+                object!("a" => 2),
+            );
+
+            test_with_variants(
+                object!("a" => 1),
+                Strategy::Merge,
+                vec![object!("a" => 2), object!("b" => 4)],
                 object!("a" => 2, "b" => 4),
             );
+
             assert_eq!(
                 Task::new(
+                    None,
                     MAATask::StartUp,
                     object!("a" => 1, "c" => 5),
                     Strategy::First,
@@ -553,6 +530,7 @@ mod tests {
                 ));
 
                 task_list.push(Task::new(
+                Some("Fight Daily".to_string()),
                 MAATask::Fight,
                 object!(),
                 Strategy::Merge,
@@ -598,6 +576,7 @@ mod tests {
             ));
 
                 task_list.push(Task::new(
+                    None,
                     MAATask::Mall,
                     object!(
                         "shopping" => true,
@@ -681,15 +660,15 @@ mod tests {
                     start_app: true,
                     close_app: true,
                     tasks: vec![
-                        (
-                            MAATask::StartUp.into(),
+                        InitializedTask::new_noname(
+                            MAATask::StartUp,
                             object!(
                                 "client_type" => "Official",
                                 "start_game_enabled" => true,
                             )
                         ),
-                        (MAATask::Fight.into(), object!("stage" => "1-7")),
-                        (MAATask::CloseDown.into(), object!()),
+                        InitializedTask::new_noname(MAATask::Fight, object!("stage" => "1-7")),
+                        InitializedTask::new_noname(MAATask::CloseDown, object!()),
                     ]
                 }
             );
@@ -715,16 +694,16 @@ mod tests {
                     start_app: true,
                     close_app: true,
                     tasks: vec![
-                        (
-                            MAATask::StartUp.into(),
+                        InitializedTask::new_noname(
+                            MAATask::StartUp,
                             object!(
                                 "enable" => true,
                                 "client_type" => "Official",
                                 "start_game_enabled" => true,
                             )
                         ),
-                        (MAATask::Fight.into(), object!("stage" => "1-7")),
-                        (MAATask::CloseDown.into(), object!("enable" => true)),
+                        InitializedTask::new_noname(MAATask::Fight, object!("stage" => "1-7")),
+                        InitializedTask::new_noname(MAATask::CloseDown, object!("enable" => true)),
                     ]
                 },
             );
@@ -746,15 +725,15 @@ mod tests {
                     start_app: true,
                     close_app: true,
                     tasks: vec![
-                        (
-                            MAATask::StartUp.into(),
+                        InitializedTask::new_noname(
+                            MAATask::StartUp,
                             object!(
                                 "client_type" => "Official",
                                 "start_game_enabled" => true,
                             )
                         ),
-                        (MAATask::Fight.into(), object!("stage" => "1-7")),
-                        (MAATask::CloseDown.into(), object!()),
+                        InitializedTask::new_noname(MAATask::Fight, object!("stage" => "1-7")),
+                        InitializedTask::new_noname(MAATask::CloseDown, object!()),
                     ]
                 },
             );
@@ -776,18 +755,30 @@ mod tests {
                     start_app: true,
                     close_app: true,
                     tasks: vec![
-                        (
-                            MAATask::StartUp.into(),
+                        InitializedTask::new_noname(
+                            MAATask::StartUp,
                             object!(
-                                "client_type" => "YoStarEN",
                                 "start_game_enabled" => true,
+                                "client_type" => "YoStarEN",
                             )
                         ),
-                        (MAATask::Fight.into(), object!("stage" => "1-7")),
-                        (MAATask::CloseDown.into(), object!()),
+                        InitializedTask::new_noname(MAATask::Fight, object!("stage" => "1-7")),
+                        InitializedTask::new_noname(MAATask::CloseDown, object!()),
                     ]
                 }
             )
+        }
+
+        #[test]
+        fn initialized_task() {
+            let task = InitializedTask::new(
+                Some("Fight Daily".to_string()),
+                MAATask::Fight,
+                object!("stage" => "1-7"),
+            );
+            assert_eq!(task.name(), Some("Fight Daily"));
+            assert_eq!(task.task_type(), &MAATask::Fight.into());
+            assert_eq!(task.params(), &object!("stage" => "1-7"));
         }
     }
 }

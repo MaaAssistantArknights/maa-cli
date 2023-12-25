@@ -7,6 +7,7 @@ client_type = "Official"
 start_game_enabled = { default = true, description = "start the game" }
 
 [[tasks]]
+name = "Fight Daily"
 type = "Fight"
 strategy = "merge"
 

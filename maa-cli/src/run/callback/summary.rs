@@ -59,8 +59,9 @@ impl Summary {
         }
     }
 
-    pub fn insert(&mut self, id: AsstTaskId, task: impl Into<TaskOrUnknown>) {
-        self.task_summarys.insert(id, TaskSummary::new(task.into()));
+    pub fn insert(&mut self, id: AsstTaskId, name: Option<String>, task: impl Into<TaskOrUnknown>) {
+        self.task_summarys
+            .insert(id, TaskSummary::new(name, task.into()));
     }
 
     fn current_mut(&mut self) -> Option<&mut TaskSummary> {
@@ -103,6 +104,7 @@ impl std::fmt::Display for Summary {
 }
 
 pub struct TaskSummary {
+    name: Option<String>,
     task: TaskOrUnknown,
     detail: Detail,
     start_time: Option<chrono::DateTime<chrono::Local>>,
@@ -111,7 +113,7 @@ pub struct TaskSummary {
 }
 
 impl TaskSummary {
-    pub fn new(task: TaskOrUnknown) -> Self {
+    pub fn new(name: Option<String>, task: TaskOrUnknown) -> Self {
         use MAATask::*;
 
         let detail = match task {
@@ -123,6 +125,7 @@ impl TaskSummary {
         };
 
         Self {
+            name,
             task,
             detail,
             start_time: None,
@@ -148,7 +151,11 @@ impl TaskSummary {
 
 impl std::fmt::Display for TaskSummary {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{}]", self.task)?;
+        write!(
+            f,
+            "[{}]",
+            self.name.as_deref().unwrap_or(self.task.as_ref())
+        )?;
 
         match (self.start_time, self.end_time) {
             (Some(start), Some(end)) => write!(
@@ -726,11 +733,11 @@ mod tests {
             use MAATask::*;
 
             let mut summary = Summary::new();
-            summary.insert(1, Fight);
-            summary.insert(2, Infrast);
-            summary.insert(3, Recruit);
-            summary.insert(4, Roguelike);
-            summary.insert(5, CloseDown);
+            summary.insert(1, Some("Fight TS".to_owned()), Fight);
+            summary.insert(2, None, Infrast);
+            summary.insert(3, None, Recruit);
+            summary.insert(4, None, Roguelike);
+            summary.insert(5, None, CloseDown);
 
             summary.start_task(1);
             summary.edit_current_task_detail(|detail| {
@@ -784,7 +791,7 @@ mod tests {
             let re = Regex::new(
                 "Summary\n\
                 ----------------------------------------\n\
-                \\[Fight\\] \\d+:\\d+:\\d+ - \\d+:\\d+:\\d+ \\(\\d+s\\) Completed\n\
+                \\[Fight TS\\] \\d+:\\d+:\\d+ - \\d+:\\d+:\\d+ \\(\\d+s\\) Completed\n\
                 .+\n\
                 ----------------------------------------\n\
                 \\[Infrast\\] \\d+:\\d+:\\d+ - \\d+:\\d+:\\d+ \\(\\d+s\\) Stopped\n\
