@@ -218,7 +218,7 @@ mod tests {
     #[test]
     fn deserialize_example() {
         let config: CLIConfig =
-            toml::from_str(&std::fs::read_to_string("../config_examples/cli.toml").unwrap())
+            toml::from_str(&std::fs::read_to_string("./config_examples/cli.toml").unwrap())
                 .unwrap();
 
         let expect = CLIConfig {

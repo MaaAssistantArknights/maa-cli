@@ -1,0 +1,279 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["tasks"],
+  "properties": {
+    "client_type": {
+      "type": "string",
+      "description": "Game client type",
+      "default": "Official",
+      "enum": [
+        "Official",
+        "Bilibili",
+        "Txwy",
+        "YoStarEN",
+        "YoStarJP",
+        "YoStarKR"
+      ]
+    },
+    "startup": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to start game automatically"
+    },
+    "closedown": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to close game automatically"
+    },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/task"
+      }
+    }
+  },
+  "definitions": {
+    "task": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Task name" },
+        "type": {
+          "type": "string",
+          "description": "Task type",
+          "enum": [
+            "StartUp",
+            "CloseDown",
+            "Fight",
+            "Recruit",
+            "Infrast",
+            "Mall",
+            "Award",
+            "Roguelike",
+            "Copilot",
+            "SSSCopilot",
+            "Depot",
+            "OperBox",
+            "ReclamationAlgorithm",
+            "Custom",
+            "SingleStep",
+            "VideoRecognition"
+          ]
+        },
+        "strategy": {
+          "type": "string",
+          "description": "Strategy to resolve task parameters",
+          "enum": ["first", "merge"]
+        },
+        "params": { "$ref": "#/definitions/maaValue" },
+        "variants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "condition": { "$ref": "#/definitions/condition" },
+              "params": { "$ref": "#/definitions/maaValue" }
+            }
+          }
+        }
+      },
+      "required": ["type"]
+    },
+    "condition": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "Always" }
+          },
+          "required": ["type"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "Weekday" },
+            "weekdays": {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "number",
+                    "description": "Weekday in number, 0 for monday, 6 for sunday",
+                    "minimum": 0,
+                    "maximum": 6
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      "Mon",
+                      "Monday",
+                      "Tue",
+                      "Tuesday",
+                      "Wed",
+                      "Wednesday",
+                      "Thu",
+                      "Thursday",
+                      "Fri",
+                      "Friday",
+                      "Sat",
+                      "Saturday",
+                      "Sun",
+                      "Sunday"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "required": ["type", "weekdays"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "Time" },
+            "start": { "$ref": "#/definitions/time" },
+            "end": { "$ref": "#/definitions/time" }
+          },
+          "required": ["type"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "DateTime" },
+            "start": { "$ref": "#/definitions/date-time" },
+            "end": { "$ref": "#/definitions/date-time" }
+          },
+          "required": ["type"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "Combined" },
+            "conditions": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/condition" }
+            }
+          },
+          "required": ["type", "conditions"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "maaValue": {
+      "anyOf": [
+        { "$ref": "#/definitions/maaArray" },
+        { "$ref": "#/definitions/maaBool" },
+        { "$ref": "#/definitions/maaNumber" },
+        { "$ref": "#/definitions/maaString" },
+        { "$ref": "#/definitions/maaObject" },
+        { "type": "null" }
+      ]
+    },
+    "maaObject": {
+      "type": "object",
+      "description": "Task parameters",
+      "patternProperties": {
+        "^[a-zA-Z0-9_]+$": {
+          "$ref": "#/definitions/maaValue"
+        }
+      }
+    },
+    "maaArray": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/maaValue" }
+    },
+    "maaBool": {
+      "oneOf": [
+        { "type": "boolean" },
+        {
+          "type": "object",
+          "properties": {
+            "default": { "type": "boolean" },
+            "description": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "maaNumber": {
+      "oneOf": [
+        { "type": "number" },
+        {
+          "type": "object",
+          "properties": {
+            "default": { "type": "number" },
+            "description": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "alternatives": {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  { "type": "number" },
+                  {
+                    "type": "object",
+                    "required": ["value"],
+                    "properties": {
+                      "value": { "type": "number" },
+                      "display": { "type": "string" }
+                    }
+                  }
+                ]
+              }
+            },
+            "description": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "maaString": {
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "properties": {
+            "default": { "type": "string" },
+            "description": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "description": "Alternative string",
+          "properties": {
+            "alternatives": {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  { "type": "string" },
+                  {
+                    "type": "object",
+                    "required": ["value"],
+                    "properties": {
+                      "value": { "type": "string" },
+                      "display": { "type": "string" }
+                    }
+                  }
+                ]
+              }
+            },
+            "description": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "time": {
+      "type": "string",
+      "pattern": "^([0-1][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])$"
+    },
+    "date-time": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-([0][1-9]|[1][0-2])-([0-2][0-9]|3[0-1])T([0-1][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])$"
+    }
+  }
+}

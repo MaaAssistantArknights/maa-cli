@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "connection": {
+      "oneOf": [
+        { "$ref": "#/definitions/adbConnection" },
+        { "$ref": "#/definitions/playToolsConnection" }
+      ]
+    },
+    "resource": {
+      "type": "object",
+      "properties": {
+        "global_resource": { "$ref": "#/definitions/globalResource" },
+        "platform_diff_resource": {
+          "$ref": "#/definitions/platformDiffResource"
+        },
+        "user_resource": { "type": "boolean", "default": false }
+      }
+    },
+    "static_options": {
+      "type": "object",
+      "properties": {
+        "cpu_ocr": { "type": "boolean" },
+        "gpu_ocr": { "type": "integer" }
+      }
+    },
+    "instance_options": {
+      "type": "object",
+      "properties": {
+        "touch_mode": { "$ref": "#/definitions/touchMode" },
+        "deployment_with_pause": { "type": "boolean" },
+        "adb_lite_enabled": { "type": "boolean" },
+        "kill_adb_on_exit": { "type": "boolean" }
+      }
+    }
+  },
+  "definitions": {
+    "adbConnection": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "ADB" },
+        "adb_path": { "type": "string", "format": "path" },
+        "device": { "type": "string" },
+        "config": { "type": "string" }
+      },
+      "required": ["type"]
+    },
+    "playToolsConnection": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "PlayTools" },
+        "address": { "type": "string" },
+        "config": { "type": "string" }
+      },
+      "required": ["type"]
+    },
+    "globalResource": {
+      "type": "string",
+      "enum": ["txwy", "YoStarEN", "YoStarJP", "YoStarKR"]
+    },
+    "platformDiffResource": {
+      "type": "string",
+      "enum": ["iOS"]
+    },
+    "touchMode": {
+      "type": "string",
+      "enum": ["ADB", "MiniTouch", "MaaTouch", "MacPlayTools"],
+      "default": "ADB"
+    }
+  }
+}
