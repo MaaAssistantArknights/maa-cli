@@ -340,9 +340,6 @@ description = "a stage to fight" # 描述，可选
 对于 `Select` 类型，当运行任务时，你将会被提示选择一个值 （通过输入可选值的序号）。
 注意，当你的输入不是可选值时，你将会被提示重新输入。
 
-配置文件的例子可以在[`config_examples`目录](./maa-cli/config_examples)中找到。
-另一个例子是我自己的配置文件，你可以在[这里](https://github.com/wangl-cc/dotfiles/tree/master/.config/maa)找到。
-
 ### MaaCore 相关配置
 
 和 MaaCore 相关的配置需要放在 `$MAA_CONFIG_DIR/asst.toml` 中。
@@ -487,6 +484,12 @@ url = "https://github.com/MaaAssistantArknights/MaaResource.git"
 - 如果你想要使用 SSH 协议来拉取远程仓库，你必须配置 `ssh_key` 字段，这个字段应该是一个路径，指向你的 SSH 私钥。
 - 远程仓库的 `url` 设置目前只对首次安装资源有效，如果你想要更改远程仓库的地址，你需要通过 `git` 命令行工具手动更改，或者删除对应的仓库。仓库所在位置可以通过 `maa dir hot-update` 获取。
 - 远程仓库的`url` 会根据你本机的语言自动设置，如果你的语言是简体中文，那么远程仓库的 `url` 将会被设置为国内的镜像 `https://git.maa-org.net/MAA/MaaResource.git`， 在其他情况则会被设置为 Github。如果你在国内但是使用的不是简体中文，或者在国外使用简体中文，那么你可能需要手动设置以获得最佳的体验。
+
+
+### 参考配置
+
+配置文件的例子可以在 [`config_examples` 目录](./maa-cli/config_examples)中找到。
+另一个例子是我自己的配置文件，你可以在[我的 dotfiles 仓库](https://github.com/wangl-cc/dotfiles/tree/master/.config/maa)找到。
 
 ### JSON Schema
 

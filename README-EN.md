@@ -328,8 +328,6 @@ description = "a stage to fight" # description of the input, optional
 
 For `Input` type, a prompt will be shown to ask user to input a value. If the default value is given, it will be used if user input empty value, otherwise it will re-prompt. For `Select` type, a prompt will be shown to ask user to select a value from alternatives (by index). If user input is not a valid index, it will re-prompt. To promote and input can be disabled by `--batch` option, which is useful for running tasks in Schedule.
 
-Example of config file can be found at [`config_examples` directory](./maa-cli/config_examples). Another example can be found at my [dotfiles](https://github.com/wangl-cc/dotfiles/tree/master/.config/maa).
-
 ### `MaaCore` related configurations
 
 The related configurations of `MaaCore` is located in `$MAA_CONFIG_DIR/asst.toml`. The current available configurations are:
@@ -474,6 +472,10 @@ url = "https://github.com/MaaAssistantArknights/MaaResource.git"
 - If you want to use `git` backend, `git` command is required;
 - If you want to fetch resource with ssh, the `ssh_key` is required;
 - The `resource.remote.url` only effect for first time installation, it will be ignored when updating resource. If you want to change the remote url, you should change it manually or delete the resource directory and reinstall resource. The directory of repository can be located by `maa dir hot-update`.
+
+### Example of config file
+
+Example of config file can be found at [`config_examples` directory](./maa-cli/config_examples). Another example can be found at my [dotfiles](https://github.com/wangl-cc/dotfiles/tree/master/.config/maa).
 
 ### JSON schema
 
