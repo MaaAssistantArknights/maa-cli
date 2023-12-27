@@ -169,7 +169,7 @@ fn default_config() -> String {
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Clone)]
 pub struct ResourceConfig {
-    /// Resources used by global arknights client, subdirectories of `resource_base_dirs`, e.g. `global/YostarEN`
+    /// Resources used by global arknights client, e.g. `YostarEN`
     global_resource: Option<PathBuf>,
     /// Resources used by platform diff, subdirectories of `resource_base_dirs`, e.g. `platform_diff/iOS`
     platform_diff_resource: Option<PathBuf>,
@@ -475,7 +475,7 @@ mod tests {
             let user_resource_dir = USER_RESOURCE_DIR.clone();
 
             let config: AsstConfig =
-                toml::from_str(&std::fs::read_to_string("../config_examples/asst.toml").unwrap())
+                toml::from_str(&std::fs::read_to_string("./config_examples/asst.toml").unwrap())
                     .unwrap();
 
             assert_eq!(

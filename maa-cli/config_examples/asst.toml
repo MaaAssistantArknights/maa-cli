@@ -1,3 +1,5 @@
+"$schema" = "../schemas/asst.schema.json"
+
 # connection options for MAA Core
 # There are two ways to connect to Arknights
 # 1. Connect by ADB
@@ -45,7 +47,7 @@ gpu_ocr = 1     # set the gpu_id to use gpu ocr (not set by default)
 # instance options for MAA Core
 # See `https://maa.plus/docs/3.1-集成文档.html#asstsetinstanceoption` for more details
 [instance_options]
-touch_mode = "MAATouch"
+touch_mode = "MaaTouch"
 deployment_with_pause = false
 adb_lite_enabled = false
 kill_adb_on_exit = false

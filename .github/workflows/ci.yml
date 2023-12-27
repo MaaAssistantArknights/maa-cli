@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
     paths:
       - "maa-cli/**"
       - "maa-sys/**"
@@ -10,7 +10,7 @@ on:
       - "Cargo.lock"
       - ".github/workflows/ci.yml"
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
     paths:
       - "maa-cli/**"
       - "maa-sys/**"
@@ -61,7 +61,7 @@ jobs:
           cargo fmt --all -- --check
       - name: Install MaaCore
         env:
-          MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
+          MAA_CONFIG_DIR: ${{ github.workspace }}/maa-cli/config_examples
         run: |
           cargo run -- install stable
           ls -l "$(cargo run -- dir library)"
@@ -170,7 +170,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: Install MaaCore
         env:
-          MAA_CONFIG_DIR: ${{ github.workspace }}/config_examples
+          MAA_CONFIG_DIR: ${{ github.workspace }}/maa-cli/config_examples
         run: |
           cargo run -- install stable -t0
           MAA_CORE_DIR="$(cargo run -- dir lib)"
