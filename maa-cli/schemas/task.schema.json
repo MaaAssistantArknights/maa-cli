@@ -1,5 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/MaaAssistantArknights/maa-cli/raw/v0.4.0/maa-cli/schemas/task.schema.json",
   "type": "object",
   "required": ["tasks"],
   "properties": {
