@@ -264,6 +264,18 @@ mod tests {
             }
             .is_active());
 
+            assert!(!Condition::Or {
+                conditions: vec![
+                    Condition::Not {
+                        condition: Box::new(Condition::Always)
+                    },
+                    Condition::Not {
+                        condition: Box::new(Condition::Always)
+                    }
+                ]
+            }
+            .is_active());
+
             assert!(!Condition::Not {
                 condition: Box::new(Condition::Always)
             }
