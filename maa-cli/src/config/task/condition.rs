@@ -13,9 +13,6 @@ pub enum Condition {
     /// The task is always active
     #[default]
     Always,
-    /// The task is never active, only used for testing
-    #[cfg(test)]
-    Never,
     /// The task is active on the specified weekdays
     Weekday { weekdays: Vec<Weekday> },
     /// The task is active on the specified time range
@@ -43,7 +40,12 @@ pub enum Condition {
         client: ClientType,
     },
     /// The task is active if all the sub-conditions are met
-    Combined { conditions: Vec<Condition> },
+    #[serde(alias = "Combined")]
+    And { conditions: Vec<Condition> },
+    /// The task is active if any of the sub-conditions is met
+    Or { conditions: Vec<Condition> },
+    /// The task is active if the inner condition is not met
+    Not { condition: Box<Condition> },
 }
 
 fn deserialize_from_str<'de, S, D>(deserializer: D) -> Result<Option<S>, D::Error>
@@ -66,8 +68,6 @@ impl Condition {
     pub fn is_active(&self) -> bool {
         match self {
             Condition::Always => true,
-            #[cfg(test)]
-            Condition::Never => false,
             Condition::Weekday { weekdays } => {
                 let now = Local::now();
                 let weekday = now.date_naive().weekday();
@@ -93,7 +93,7 @@ impl Condition {
                 }
             }
             Condition::OnSideStory { client } => has_side_story_open(*client),
-            Condition::Combined { conditions } => {
+            Condition::And { conditions } => {
                 for condition in conditions {
                     if !condition.is_active() {
                         return false;
@@ -101,6 +101,15 @@ impl Condition {
                 }
                 true
             }
+            Condition::Or { conditions } => {
+                for condition in conditions {
+                    if condition.is_active() {
+                        return true;
+                    }
+                }
+                false
+            }
+            Condition::Not { condition } => !condition.is_active(),
         }
     }
 }
@@ -230,33 +239,33 @@ mod tests {
         // fn on_side_story() {}
 
         #[test]
-        fn combined() {
-            let now = chrono::Local::now();
-            let now_time = now.time();
-            let weekday = now.date_naive().weekday();
-
-            assert!(Condition::Combined {
+        fn boolean() {
+            assert!(Condition::And {
+                conditions: vec![Condition::Always, Condition::Always]
+            }
+            .is_active());
+            assert!(!Condition::And {
                 conditions: vec![
-                    Condition::Time {
-                        start: Some(now_time + Duration::minutes(-10)),
-                        end: Some(now_time + Duration::minutes(10)),
-                    },
-                    Condition::Weekday {
-                        weekdays: vec![weekday]
+                    Condition::Always,
+                    Condition::Not {
+                        condition: Box::new(Condition::Always)
                     },
                 ]
             }
             .is_active());
-            assert!(!Condition::Combined {
+
+            assert!(Condition::Or {
                 conditions: vec![
-                    Condition::Time {
-                        start: Some(now_time + Duration::minutes(10)),
-                        end: Some(now_time + Duration::minutes(20)),
-                    },
-                    Condition::Weekday {
-                        weekdays: vec![weekday]
-                    },
+                    Condition::Always,
+                    Condition::Not {
+                        condition: Box::new(Condition::Always)
+                    }
                 ]
+            }
+            .is_active());
+
+            assert!(!Condition::Not {
+                condition: Box::new(Condition::Always)
             }
             .is_active());
         }
@@ -371,6 +380,95 @@ mod tests {
                     Token::Str("OnSideStory"),
                     Token::Str("client"),
                     Token::Str("txwy"),
+                    Token::MapEnd,
+                ],
+            );
+        }
+
+        #[test]
+        fn boolean() {
+            assert_de_tokens(
+                &Condition::And {
+                    conditions: vec![Condition::Always, Condition::Always],
+                },
+                &[
+                    Token::Map { len: Some(2) },
+                    Token::Str("type"),
+                    Token::Str("Combined"),
+                    Token::Str("conditions"),
+                    Token::Seq { len: Some(2) },
+                    Token::Map { len: Some(1) },
+                    Token::Str("type"),
+                    Token::Str("Always"),
+                    Token::MapEnd,
+                    Token::Map { len: Some(1) },
+                    Token::Str("type"),
+                    Token::Str("Always"),
+                    Token::MapEnd,
+                    Token::SeqEnd,
+                    Token::MapEnd,
+                ],
+            );
+
+            assert_de_tokens(
+                &Condition::And {
+                    conditions: vec![Condition::Always, Condition::Always],
+                },
+                &[
+                    Token::Map { len: Some(2) },
+                    Token::Str("type"),
+                    Token::Str("And"),
+                    Token::Str("conditions"),
+                    Token::Seq { len: Some(2) },
+                    Token::Map { len: Some(1) },
+                    Token::Str("type"),
+                    Token::Str("Always"),
+                    Token::MapEnd,
+                    Token::Map { len: Some(1) },
+                    Token::Str("type"),
+                    Token::Str("Always"),
+                    Token::MapEnd,
+                    Token::SeqEnd,
+                    Token::MapEnd,
+                ],
+            );
+
+            assert_de_tokens(
+                &Condition::Or {
+                    conditions: vec![Condition::Always, Condition::Always],
+                },
+                &[
+                    Token::Map { len: Some(2) },
+                    Token::Str("type"),
+                    Token::Str("Or"),
+                    Token::Str("conditions"),
+                    Token::Seq { len: Some(2) },
+                    Token::Map { len: Some(1) },
+                    Token::Str("type"),
+                    Token::Str("Always"),
+                    Token::MapEnd,
+                    Token::Map { len: Some(1) },
+                    Token::Str("type"),
+                    Token::Str("Always"),
+                    Token::MapEnd,
+                    Token::SeqEnd,
+                    Token::MapEnd,
+                ],
+            );
+
+            assert_de_tokens(
+                &Condition::Not {
+                    condition: Box::new(Condition::Always),
+                },
+                &[
+                    Token::Map { len: Some(2) },
+                    Token::Str("type"),
+                    Token::Str("Not"),
+                    Token::Str("condition"),
+                    Token::Map { len: Some(1) },
+                    Token::Str("type"),
+                    Token::Str("Always"),
+                    Token::MapEnd,
                     Token::MapEnd,
                 ],
             );

@@ -241,7 +241,7 @@ params = { plan_index = 0 }
 
 **注意**：如果你的自定义基建计划文件使用相对路径，应该相对于 `$MAA_CONFIG_DIR/infrast`。此外，由于基建文件是由 `MaaCore` 而不是 `maa-cli` 读取的，因此这些文件的格式必须是 `JSON`。同时，`maa-cli` 不会读取基建文件，也不会根据其中定义的时间段来选择相应的子计划。因此，必须通过 `condition` 字段来指定在相应时间段使用正确的基建计划的参数中的 `plan_index` 字段。这样可以确保在适当的时间段使用正确的基建计划。
 
-除了 `Time` 条件，还有 `DateTime`，`Weakday` 以及 `Combined` 条件。`DateTime` 条件用于指定一个时间段，`Weekday` 条件用于指定一周中的某些天，`Combined` 条件用于指定多个条件的组合。
+除了 `Time` 条件，还有 `DateTime`，`Weakday` 条件。`DateTime` 条件用于指定一个时间段，`Weekday` 条件用于指定一周中的某些天。
 
 ```toml
 [[tasks]]
@@ -264,6 +264,8 @@ params = { stage = "1-7" }
 
 除了上述确定的条件之外，还有一个依赖于热更新资源的条件 `OnSideStory`，当你启动该条件后，`maa-cli` 会尝试读取相应的资源来判断当前是否有正在开启的活动，如果有那么对应的变体会被匹配。 比如上述夏活期间刷 `SL-8` 的条件就可以简化为 `{ type = "OnSideStory", client = "Official" }`，这里的 `client` 参数用于确定你使用的客户端，因为不同的客户端的活动时间不同，对于使用官服或者 b 服的用户，这可以省略。通过这个条件，每次活动更新之后你可以只需要更新需要刷的关卡而不需要手动编辑对应活动的开放时间。
 
+除了以上基础条件之外，你可以使用 `{ type = "And", conditions = [...] }`，`{ type = "Or", conditions = [...] }`, `{ type = "Not", condition = ... }` 来对条件进行逻辑运算。
+
 在默认的策略下，如果有多个变体被匹配，第一个将会被使用。如果没有给出条件，那么变体将会总是被匹配，所以你可以把没有条件的变体放在最后，作为默认的情况。
 
 你可以使用 `strategy` 字段来改变匹配策略：
@@ -278,7 +280,7 @@ strategy = "merge" # 或者 "first" (默认)
 params = { expiring_medicine = 1000 }
 
 [tasks.variants.condition]
-type = "Combined"
+type = "And"
 conditions = [
   { type = "Time", start = "18:00:00" },
   { type = "Weekday", weekdays = ["Sun"] },

@@ -249,6 +249,8 @@ params = { stage = "1-7" }
 
 Beside of above conditions, there is a condition `OnSideStory` which depends on hot update resource to check if there is any opening side story. Thus, the condition of fight `SL-8`can be simplified as `{ type = "OnSideStory", client = "Official" }`, where `client` is the client type of game. 
 
+Beside of above basic condition, `{ type = "And", conditions = [...] }` `{ type = "Or", conditions = [...] }`, and `{ type = "Not", condition = ... }` can be used for logical combination of conditions.
+
 With default strategy, if multiple variants are matched, only the first one will be used. And if the condition is not given, the variant will always be matched. So you can put a variant without condition at the end of variants.
 
 The strategy of matching variants can be changed by `strategy` field:
