@@ -383,6 +383,7 @@ where
 /// # Panics
 ///
 /// Panics if the given str is a string containing path separator.
+#[allow(dead_code)]
 fn ensure_name(name: &str) -> &str {
     assert!(
         !name.contains(std::path::is_separator),
