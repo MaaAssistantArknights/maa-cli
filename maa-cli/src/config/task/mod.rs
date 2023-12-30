@@ -363,7 +363,9 @@ mod tests {
 
             fn never_active() -> TaskVariant {
                 TaskVariant {
-                    condition: Condition::Never,
+                    condition: Condition::Not {
+                        condition: Box::new(Condition::Always),
+                    },
                     params: MAAValue::default(),
                 }
             }
@@ -470,7 +472,9 @@ mod tests {
                     Strategy::First,
                     vec![
                         TaskVariant {
-                            condition: Condition::Never,
+                            condition: Condition::Not {
+                                condition: Box::new(Condition::Always),
+                            },
                             params: object!("a" => 2),
                         },
                         TaskVariant {

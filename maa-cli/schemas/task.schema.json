@@ -165,13 +165,34 @@
         {
           "type": "object",
           "properties": {
-            "type": { "const": "Combined" },
+            "type": { "const": "And" },
             "conditions": {
               "type": "array",
               "items": { "$ref": "#/definitions/condition" }
             }
           },
           "required": ["type", "conditions"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "Or" },
+            "conditions": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/condition" }
+            }
+          },
+          "required": ["type", "conditions"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "Not" },
+            "condition": { "$ref": "#/definitions/condition" }
+          },
+          "required": ["type", "condition"],
           "additionalProperties": false
         }
       ]
