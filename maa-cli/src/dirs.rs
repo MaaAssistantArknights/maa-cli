@@ -378,6 +378,19 @@ where
     paths
 }
 
+/// Ensure the given str is a name instead of a path.
+///
+/// # Panics
+///
+/// Panics if the given str is a string containing path separator.
+fn ensure_name(name: &str) -> &str {
+    assert!(
+        !name.contains(std::path::is_separator),
+        "The given name should not contain path separator"
+    );
+    name
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -516,8 +529,8 @@ mod tests {
             assert_eq!(dirs.find_library(&bin_exe).unwrap(), library_dir);
             assert_eq!(dirs.find_resource(&bin_exe).unwrap(), resource_dir);
 
-            if let Some(extra_share) = option_env!("MAA_EXTRA_SHARE_NAME") {
-                let extra_share_dir = test_root.join("share").join(extra_share);
+            if let Some(name) = option_env!("MAA_EXTRA_SHARE_NAME") {
+                let extra_share_dir = test_root.join("share").join(ensure_name(name));
                 let extra_resource_dir = extra_share_dir.join("resource");
                 create_dir_all(&extra_resource_dir).unwrap();
                 assert_eq!(dirs.find_resource(&bin_exe).unwrap(), extra_resource_dir);
@@ -703,5 +716,19 @@ mod tests {
         );
 
         remove_dir_all(&test_root).unwrap();
+    }
+
+    #[test]
+    fn ensure_name_ok() {
+        assert_eq!(ensure_name("foo"), "foo");
+    }
+
+    #[test]
+    #[should_panic]
+    fn ensure_name_fail() {
+        #[cfg(unix)]
+        ensure_name("foo/bar");
+        #[cfg(windows)]
+        ensure_name("foo\\bar");
     }
 }
