@@ -5,17 +5,7 @@
   "required": ["tasks"],
   "properties": {
     "client_type": {
-      "type": "string",
-      "description": "Game client type",
-      "default": "Official",
-      "enum": [
-        "Official",
-        "Bilibili",
-        "Txwy",
-        "YoStarEN",
-        "YoStarJP",
-        "YoStarKR"
-      ]
+      "$ref": "#/definitions/client"
     },
     "startup": {
       "type": "boolean",
@@ -35,6 +25,19 @@
     }
   },
   "definitions": {
+    "client": {
+      "type": "string",
+      "description": "Game client type",
+      "default": "Official",
+      "enum": [
+        "Official",
+        "Bilibili",
+        "Txwy",
+        "YoStarEN",
+        "YoStarJP",
+        "YoStarKR"
+      ]
+    },
     "task": {
       "type": "object",
       "properties": {
@@ -146,6 +149,15 @@
             "type": { "const": "DateTime" },
             "start": { "$ref": "#/definitions/date-time" },
             "end": { "$ref": "#/definitions/date-time" }
+          },
+          "required": ["type"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "OnSideStory" },
+            "client": { "$ref": "#/definitions/client" }
           },
           "required": ["type"],
           "additionalProperties": false

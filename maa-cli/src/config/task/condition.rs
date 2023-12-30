@@ -1,8 +1,12 @@
+use super::client_type::ClientType;
+
+use crate::activity::has_side_story_open;
+
 use chrono::{Datelike, Local, NaiveDateTime, NaiveTime, Weekday};
 use serde::Deserialize;
 
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Deserialize, Debug)]
+#[cfg_attr(test, derive(PartialEq, Debug))]
+#[derive(Deserialize)]
 #[serde(tag = "type")]
 #[derive(Default)]
 pub enum Condition {
@@ -33,6 +37,10 @@ pub enum Condition {
         start: Option<NaiveDateTime>,
         #[serde(default, deserialize_with = "deserialize_from_str")]
         end: Option<NaiveDateTime>,
+    },
+    OnSideStory {
+        #[serde(default)]
+        client: ClientType,
     },
     /// The task is active if all the sub-conditions are met
     Combined { conditions: Vec<Condition> },
@@ -84,6 +92,7 @@ impl Condition {
                     (None, None) => true,
                 }
             }
+            Condition::OnSideStory { client } => has_side_story_open(*client),
             Condition::Combined { conditions } => {
                 for condition in conditions {
                     if !condition.is_active() {
@@ -216,6 +225,10 @@ mod tests {
             .is_active());
         }
 
+        // It's hart to test OnSideStory, because it depends on real world data
+        // #[test]
+        // fn on_side_story() {}
+
         #[test]
         fn combined() {
             let now = chrono::Local::now();
@@ -316,18 +329,50 @@ mod tests {
 
         #[test]
         fn datatime() {
-            let cond_str = r#"{
-                "type": "DateTime",
-                "start": "2021-08-01T16:00:00",
-                "end": "2021-08-21T04:00:00"
-            }"#;
-            let cond: Condition = serde_json::from_str(cond_str).unwrap();
-            assert_eq!(
-                cond,
-                Condition::DateTime {
+            assert_de_tokens(
+                &Condition::DateTime {
                     start: Some(naive_local_datetime(2021, 8, 1, 16, 0, 0)),
                     end: Some(naive_local_datetime(2021, 8, 21, 4, 0, 0)),
-                }
+                },
+                &[
+                    Token::Map { len: Some(3) },
+                    Token::Str("type"),
+                    Token::Str("DateTime"),
+                    Token::Str("start"),
+                    Token::Str("2021-08-01T16:00:00"),
+                    Token::Str("end"),
+                    Token::Str("2021-08-21T04:00:00"),
+                    Token::MapEnd,
+                ],
+            );
+        }
+
+        #[test]
+        fn on_side_story() {
+            assert_de_tokens(
+                &Condition::OnSideStory {
+                    client: ClientType::Official,
+                },
+                &[
+                    Token::Map { len: Some(1) },
+                    Token::Str("type"),
+                    Token::Str("OnSideStory"),
+                    Token::MapEnd,
+                ],
+            );
+
+            assert_de_tokens(
+                &Condition::OnSideStory {
+                    client: ClientType::Txwy,
+                },
+                &[
+                    Token::Map { len: Some(2) },
+                    Token::Str("type"),
+                    Token::Str("OnSideStory"),
+                    Token::Str("client"),
+                    Token::Str("txwy"),
+                    Token::MapEnd,
+                ],
             );
         }
     }
