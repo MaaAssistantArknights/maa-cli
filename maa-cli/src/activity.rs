@@ -424,4 +424,13 @@ mod tests {
         }
         .has_side_story_open());
     }
+
+    #[test]
+    fn warn_err() {
+        let ok: Result<isize, &str> = Ok(1);
+        let err: Result<isize, &str> = Err("test");
+
+        assert_eq!(ok.warn_err(), Some(1));
+        assert_eq!(err.warn_err(), None);
+    }
 }

@@ -154,6 +154,7 @@ More other commands can be found by `maa help`.
 - `maa version`: print the version of `maa-cli` and `MaaCore`;
 - `maa convert <input> [output]`: convert a configuration file to another format, like `maa convert daily.toml daily.json`;
 - `maa complete <shell>`: generate completion script for specific shell;
+- `maa activity [client]`: get the current activity of game, the `client` is the client type of game, like `Official` (default), `Bilibili`, etc;
 
 ## Configurations
 
@@ -245,6 +246,8 @@ params = { stage = "CE-6" }
 [[tasks.variants]]
 params = { stage = "1-7" }
 ```
+
+Beside of above conditions, there is a condition `OnSideStory` which depends on hot update resource to check if there is any opening side story. Thus, the condition of fight `SL-8`can be simplified as `{ type = "OnSideStory", client = "Official" }`, where `client` is the client type of game. 
 
 With default strategy, if multiple variants are matched, only the first one will be used. And if the condition is not given, the variant will always be matched. So you can put a variant without condition at the end of variants.
 

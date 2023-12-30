@@ -170,6 +170,7 @@ OpenSSL 库是 `git2` 在所有平台和 `reqwest` 在 Linux 上的依赖。如�
 - `maa version`: 获取 `maa-cli` 以及 `MaaCore` 的版本信息；
 - `maa convert <input> [output]`: 将 `JSON`, `YAML` 或者 `TOML` 格式的文件转换为其他格式;
 - `maa complete <shell>`: 生成自动补全脚本;
+- `maa activity [client]`: 获取游戏的当前活动信息，`client` 是客户端类型，默认为 `Official`。
 
 ## 配置
 
@@ -260,6 +261,8 @@ params = { stage = "CE-6" }
 [[tasks.variants]]
 params = { stage = "1-7" }
 ```
+
+除了上述确定的条件之外，还有一个依赖于热更新资源的条件 `OnSideStory`，当你启动该条件后，`maa-cli` 会尝试读取相应的资源来判断当前是否有正在开启的活动，如果有那么对应的变体会被匹配。 比如上述夏活期间刷 `SL-8` 的条件就可以简化为 `{ type = "OnSideStory", client = "Official" }`，这里的 `client` 参数用于确定你使用的客户端，因为不同的客户端的活动时间不同，对于使用官服或者 b 服的用户，这可以省略。通过这个条件，每次活动更新之后你可以只需要更新需要刷的关卡而不需要手动编辑对应活动的开放时间。
 
 在默认的策略下，如果有多个变体被匹配，第一个将会被使用。如果没有给出条件，那么变体将会总是被匹配，所以你可以把没有条件的变体放在最后，作为默认的情况。
 
