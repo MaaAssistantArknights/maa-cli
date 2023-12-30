@@ -17,8 +17,8 @@ use std::path::PathBuf;
 use anyhow::Context;
 use serde::Deserialize;
 
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Deserialize, Default, Debug)]
+#[cfg_attr(test, derive(PartialEq, Debug))]
+#[derive(Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct TaskVariant {
     #[serde(default)]
@@ -63,8 +63,8 @@ pub enum Strategy {
     Merge,
 }
 
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Deserialize, Debug)]
+#[cfg_attr(test, derive(PartialEq, Debug))]
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Task {
     #[serde(default)]

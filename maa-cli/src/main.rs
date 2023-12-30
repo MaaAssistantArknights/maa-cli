@@ -1,3 +1,4 @@
+mod activity;
 mod config;
 mod consts;
 mod dirs;
@@ -193,6 +194,11 @@ enum SubCommand {
         #[arg(short, long)]
         format: Option<config::Filetype>,
     },
+    /// Show stage activity of given client
+    Activity {
+        #[arg(default_value_t = config::task::ClientType::Official)]
+        client: config::task::ClientType,
+    },
     /// List all available tasks
     List,
     /// Generate completion script for given shell
@@ -358,10 +364,11 @@ fn main() -> Result<()> {
         )?,
         SubCommand::Roguelike { theme, common } => run::run(|_| run::roguelike(theme), common)?,
         SubCommand::Convert {
-            input: task,
+            input,
             output,
             format,
-        } => config::convert(&task, output.as_deref(), format)?,
+        } => config::convert(&input, output.as_deref(), format)?,
+        SubCommand::Activity { client } => activity::display_stage_activity(client)?,
         SubCommand::List => {
             let task_dir = dirs::config().join("tasks");
             if !task_dir.exists() {
@@ -801,6 +808,23 @@ mod test {
                     format: Some(config::Filetype::Yaml),
                     ..
                 } if output == PathBuf::from("output.json")
+            );
+        }
+
+        #[test]
+        fn activity() {
+            assert_matches!(
+                CLI::parse_from(["maa", "activity"]).command,
+                SubCommand::Activity {
+                    client: config::task::ClientType::Official,
+                }
+            );
+
+            assert_matches!(
+                CLI::parse_from(["maa", "activity", "YoStarEN"]).command,
+                SubCommand::Activity {
+                    client: config::task::ClientType::YoStarEN,
+                }
             );
         }
 

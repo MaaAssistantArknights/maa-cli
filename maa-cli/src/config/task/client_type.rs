@@ -1,7 +1,9 @@
+use clap::ValueEnum;
 use serde::Deserialize;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, ValueEnum)]
+#[clap(rename_all = "verbatim")]
 pub enum ClientType {
     #[default]
     Official,
