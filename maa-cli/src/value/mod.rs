@@ -85,7 +85,7 @@ impl MAAValue {
     pub fn init(self) -> io::Result<Self> {
         use MAAValue::*;
         match self {
-            Input(v) => Ok(v.to_primate()?.into()),
+            Input(v) => Ok(v.into_primate()?.into()),
             Array(array) => {
                 let mut ret = Vec::with_capacity(array.len());
                 for value in array {
@@ -132,7 +132,7 @@ impl MAAValue {
                         }
                         // if all the dependencies are satisfied, initialize the value
                         if satisfied {
-                            initailized.insert(key, input.to_primate()?.into());
+                            initailized.insert(key, input.into_primate()?.into());
                         }
                     } else {
                         initailized.insert(key, value.init()?);
@@ -215,12 +215,6 @@ impl MAAValue {
 
     pub fn as_str(&self) -> Option<&str> {
         self.as_primate().and_then(MAAPrimate::as_string)
-    }
-
-    pub fn merge(&self, other: &Self) -> Self {
-        let mut ret = self.clone();
-        ret.merge_mut(other);
-        ret
     }
 
     pub fn merge_mut(&mut self, other: &Self) {
@@ -312,16 +306,23 @@ impl<'a> TryFromMAAValue<'a> for &str {
 
 pub type Map<T> = std::collections::BTreeMap<String, T>;
 
-/// A shortcut for create a Some(String) from a &str
-pub fn sstr(s: &str) -> Option<String> {
-    Some(s.to_string())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     use userinput::{BoolInput, Input, SelectD};
+
+    impl MAAValue {
+        pub fn merge(&self, other: &Self) -> Self {
+            let mut ret = self.clone();
+            ret.merge_mut(other);
+            ret
+        }
+    }
+
+    fn sstr(s: &str) -> Option<String> {
+        Some(s.to_string())
+    }
 
     #[test]
     fn serde() {

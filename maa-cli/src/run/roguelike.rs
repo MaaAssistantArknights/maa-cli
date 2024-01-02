@@ -15,7 +15,7 @@ pub enum Theme {
 }
 
 impl Theme {
-    fn to_str(&self) -> &'static str {
+    fn to_str(self) -> &'static str {
         match self {
             Self::Phantom => "Phantom",
             Self::Mizuki => "Mizuki",
@@ -87,7 +87,7 @@ pub struct RoguelikeArgs {
 }
 
 impl RoguelikeArgs {
-    fn to_params(self) -> MAAValue {
+    fn into_params(self) -> MAAValue {
         let mut params = object!(
             "theme" => self.theme.to_str(),
             "mode" => self.mode,
@@ -116,7 +116,10 @@ impl RoguelikeArgs {
 pub fn roguelike(args: RoguelikeArgs) -> Result<TaskConfig> {
     let mut task_config = TaskConfig::new();
 
-    task_config.push(Task::new_with_default(MAATask::Roguelike, args.to_params()));
+    task_config.push(Task::new_with_default(
+        MAATask::Roguelike,
+        args.into_params(),
+    ));
 
     Ok(task_config)
 }

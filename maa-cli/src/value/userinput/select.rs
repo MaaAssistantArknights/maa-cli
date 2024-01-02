@@ -266,16 +266,6 @@ pub enum ValueWithDesc<T> {
 }
 
 impl<T: Display> ValueWithDesc<T> {
-    pub fn new(value: impl Into<T>, description: Option<&str>) -> Self {
-        match description {
-            Some(description) => ValueWithDesc::WithDesc {
-                value: value.into(),
-                desc: description.into(),
-            },
-            None => ValueWithDesc::Value(value.into()),
-        }
-    }
-
     fn value(self) -> T {
         use ValueWithDesc::*;
         match self {
@@ -369,6 +359,18 @@ mod tests {
     use crate::assert_matches;
 
     use serde_test::{assert_de_tokens, Token};
+
+    impl<T> ValueWithDesc<T> {
+        pub fn new(value: impl Into<T>, desc: Option<&str>) -> Self {
+            match desc {
+                Some(desc) => Self::WithDesc {
+                    value: value.into(),
+                    desc: desc.to_string(),
+                },
+                None => Self::Value(value.into()),
+            }
+        }
+    }
 
     // Use this function to get a Select with most fields set to Some.
     fn test_full() -> SelectD<String> {

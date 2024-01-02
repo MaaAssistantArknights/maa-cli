@@ -22,7 +22,7 @@ pub enum MAAInput {
 }
 
 impl MAAInput {
-    pub(super) fn to_primate(self) -> io::Result<MAAPrimate> {
+    pub(super) fn into_primate(self) -> io::Result<MAAPrimate> {
         use MAAInput::*;
         use MAAPrimate::*;
         match self {
@@ -109,7 +109,11 @@ impl_into_maa_value!(
 
 #[cfg(test)]
 mod tests {
-    use super::{super::sstr, *};
+    use super::*;
+
+    fn sstr(s: &str) -> Option<String> {
+        Some(s.to_string())
+    }
 
     #[test]
     fn deserialize() {
@@ -184,53 +188,46 @@ mod tests {
     #[test]
     fn to_primate() {
         assert_eq!(
-            MAAInput::InputBool(BoolInput::new(Some(true), None).into())
-                .to_primate()
+            MAAInput::from(BoolInput::new(Some(true), None))
+                .into_primate()
                 .unwrap(),
             true.into()
         );
         assert_eq!(
-            MAAInput::InputInt(Input::new(Some(1), None).into())
-                .to_primate()
+            MAAInput::InputInt(Input::new(Some(1), None))
+                .into_primate()
                 .unwrap(),
             1.into()
         );
         assert_eq!(
-            MAAInput::InputFloat(Input::new(Some(1.0), None).into())
-                .to_primate()
+            MAAInput::InputFloat(Input::new(Some(1.0), None))
+                .into_primate()
                 .unwrap(),
             1.0.into()
         );
         assert_eq!(
-            MAAInput::InputString(Input::new(sstr("1"), None).into())
-                .to_primate()
+            MAAInput::InputString(Input::new(sstr("1"), None))
+                .into_primate()
                 .unwrap(),
             "1".into()
         );
         assert_eq!(
-            MAAInput::SelectInt(SelectD::new([1, 2], Some(2), None, false).unwrap().into())
-                .to_primate()
+            MAAInput::SelectInt(SelectD::new([1, 2], Some(2), None, false).unwrap())
+                .into_primate()
                 .unwrap(),
             2.into()
         );
         assert_eq!(
-            MAAInput::SelectFloat(
-                SelectD::new([1.0, 2.0], Some(2), None, false)
-                    .unwrap()
-                    .into()
-            )
-            .to_primate()
-            .unwrap(),
+            MAAInput::SelectFloat(SelectD::new([1.0, 2.0], Some(2), None, false).unwrap())
+                .into_primate()
+                .unwrap(),
             2.0.into()
         );
+
         assert_eq!(
-            MAAInput::SelectString(
-                SelectD::<String>::new(["1", "2"], Some(2), None, false)
-                    .unwrap()
-                    .into()
-            )
-            .to_primate()
-            .unwrap(),
+            MAAInput::from(SelectD::<String>::new(["1", "2"], Some(2), None, false).unwrap())
+                .into_primate()
+                .unwrap(),
             "2".into()
         );
     }
