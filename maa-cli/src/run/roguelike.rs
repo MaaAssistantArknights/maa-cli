@@ -1,12 +1,16 @@
 use crate::{
     config::task::{task_type::MAATask, Task, TaskConfig},
     object,
-    value::MAAValue,
+    value::{
+        userinput::{BoolInput, Input, SelectD, ValueWithDesc},
+        MAAValue, Map,
+    },
 };
 
 use anyhow::Result;
-use clap::{Args, ValueEnum};
+use clap::ValueEnum;
 
+#[cfg_attr(test, derive(PartialEq, Debug))]
 #[derive(Clone, Copy)]
 pub enum Theme {
     Phantom,
@@ -34,92 +38,48 @@ impl ValueEnum for Theme {
     }
 }
 
-#[derive(Args)]
-pub struct RoguelikeArgs {
-    /// Roguelike theme
-    ///
-    /// - Phantom
-    /// - Mizuki
-    /// - Sami
-    #[clap(default_value = "Sami")]
-    theme: Theme,
-    /// Roguelike mode, determine the strategy to use
-    ///
-    /// - 0: Clear as many stages as possible with stable strategy
-    /// - 1: Invest ingots and exits after first level
-    /// - 2: A combination of 0 and 1, depracated
-    /// - 3: Clear as many stages as possible with agrressive strategy
-    /// - 4: Exit after entering 3rd level
-    #[clap(long, default_value_t = 0)]
-    mode: i64,
-    /// The number of times to start a new run
-    #[clap(long)]
-    start_count: Option<i64>,
-    /// Disable investment
-    #[clap(long)]
-    investment_disabled: bool,
-    /// The number of times to invest
-    #[clap(long)]
-    investments_count: Option<i64>,
-    /// Stop when investment is full
-    #[clap(long)]
-    stop_when_investment_full: bool,
-    /// Squad name
-    #[clap(long)]
-    squad: String,
-    /// Roles
-    #[clap(long)]
-    roles: String,
-    /// Core operator name
-    #[clap(long)]
-    core_char: String,
-    /// Use support operator
-    #[clap(long)]
-    use_support: bool,
-    /// Use non-friend support operator
-    #[clap(long)]
-    use_nonfriend_support: bool,
-    /// Refresh trader with dice
-    ///
-    /// Only support in Mizuki theme
-    #[clap(long)]
-    refresh_trader_with_dice: bool,
-}
-
-impl RoguelikeArgs {
-    fn into_params(self) -> MAAValue {
-        let mut params = object!(
-            "theme" => self.theme.to_str(),
-            "mode" => self.mode,
-            "investment_disabled" => self.investment_disabled,
-            "stop_when_investment_full" => self.stop_when_investment_full,
-            "squad" => self.squad,
-            "roles" => self.roles,
-            "core_char" => self.core_char,
-            "use_support" => self.use_support,
-            "use_nonfriend_support" => self.use_nonfriend_support,
-            "refresh_trader_with_dice" => self.refresh_trader_with_dice,
-        );
-
-        if let Some(start_count) = self.start_count {
-            params.insert("start_count", start_count);
-        }
-
-        if let Some(investments_count) = self.investments_count {
-            params.insert("investments_count", investments_count);
-        }
-
-        params
-    }
-}
-
-pub fn roguelike(args: RoguelikeArgs) -> Result<TaskConfig> {
+pub fn roguelike(theme: Theme) -> Result<TaskConfig> {
     let mut task_config = TaskConfig::new();
 
-    task_config.push(Task::new_with_default(
-        MAATask::Roguelike,
-        args.into_params(),
-    ));
+    use MAAValue::OptionalInput;
+    let params = object!(
+        "theme" => theme.to_str(),
+        "mode" => SelectD::<i64>::new([
+            ValueWithDesc::new(0, Some("Clear as many stages as possible with stable strategy")),
+            ValueWithDesc::new(1, Some("Invest ingots and exits after first level")),
+            ValueWithDesc::new(3, Some("Clear as many stages as possible with agrressive strategy")),
+            ValueWithDesc::new(4, Some("Exit after entering 3rd level")),
+        ], Some(1), Some("Roguelike mode"), false).unwrap(),
+        "start_count" => Input::<i64>::new(Some(999), Some("number of times to start a new run")),
+        "investment_disabled" => BoolInput::new(Some(false), Some("disable investment")),
+        "investments_count" => OptionalInput {
+            deps: Map::from([("investment_disabled".to_string(), false.into())]),
+            input: Input::<i64>::new(Some(999), Some("number of times to invest")).into(),
+        },
+        "stop_when_investment_full" => OptionalInput {
+            deps: Map::from([("investment_disabled".to_string(), false.into())]),
+            input: BoolInput::new(Some(false), Some("stop when investment is full")).into(),
+        },
+        "squad" => Input::<String>::new(None, Some("squad name")),
+        "roles" => Input::<String>::new(None, Some("roles")),
+        "core_char" => SelectD::<String>::new(
+            ["百炼嘉维尔", "焰影苇草", "锏"],
+            None,
+            Some("core operator"),
+            true,
+        ).unwrap(),
+        "use_support" => BoolInput::new(Some(false), Some("use support operator")),
+        "use_nonfriend_support" => OptionalInput {
+            deps: Map::from([("use_support".to_string(), true.into())]),
+            input: BoolInput::new(Some(false), Some("use non-friend support operator")).into(),
+        },
+        "refresh_trader_with_dice" => OptionalInput {
+            deps: Map::from([("theme".to_string(), "Mizuki".into())]),
+            input: BoolInput::new(Some(false), Some("refresh trader with dice")).into(),
+        },
+    );
+
+    task_config.push(Task::new_with_default(MAATask::Roguelike, params));
 
     Ok(task_config)
 }
@@ -133,5 +93,41 @@ mod tests {
         assert_eq!(Theme::Phantom.to_str(), "Phantom");
         assert_eq!(Theme::Mizuki.to_str(), "Mizuki");
         assert_eq!(Theme::Sami.to_str(), "Sami");
+    }
+
+    #[test]
+    fn theme_value_variants() {
+        assert_eq!(
+            Theme::value_variants(),
+            &[Theme::Phantom, Theme::Mizuki, Theme::Sami]
+        );
+    }
+
+    #[test]
+    fn theme_to_possible_value() {
+        assert_eq!(
+            Theme::Phantom.to_possible_value(),
+            Some(clap::builder::PossibleValue::new("Phantom"))
+        );
+        assert_eq!(
+            Theme::Mizuki.to_possible_value(),
+            Some(clap::builder::PossibleValue::new("Mizuki"))
+        );
+        assert_eq!(
+            Theme::Sami.to_possible_value(),
+            Some(clap::builder::PossibleValue::new("Sami"))
+        );
+    }
+
+    #[test]
+    fn roguelike_task_config() {
+        let task_config = roguelike(Theme::Phantom).unwrap();
+        let tasks = task_config.tasks();
+        assert_eq!(tasks.len(), 1);
+        assert_eq!(tasks[0].task_type(), &MAATask::Roguelike);
+        assert_eq!(
+            tasks[0].params().get("theme").unwrap(),
+            &MAAValue::from("Phantom")
+        );
     }
 }

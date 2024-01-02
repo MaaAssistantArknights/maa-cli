@@ -57,6 +57,7 @@ pub trait UserInput: Sized {
     /// Prompt user to input a value for this parameter and return the value when success.
     fn ask(self, writer: &mut impl Write, reader: &mut impl BufRead) -> io::Result<Self::Value> {
         self.prompt(writer)?;
+        writer.write_all(b": ")?;
         writer.flush()?;
         let mut input = String::new();
         let mut self_mut = self;
@@ -69,6 +70,7 @@ pub trait UserInput: Sized {
                     Err(self_) => {
                         self_mut = self_;
                         self_mut.prompt_no_default(writer)?;
+                        writer.write_all(b": ")?;
                         writer.flush()?;
                     }
                 };

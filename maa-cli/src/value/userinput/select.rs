@@ -138,7 +138,7 @@ impl<A> Select<A> {
 
 impl<S> UserInput for Select<S>
 where
-    S: Selectable,
+    S: Selectable + Display,
 {
     type Value = S::Value;
 
@@ -158,7 +158,7 @@ where
 
     fn prompt(&self, writer: &mut impl Write) -> io::Result<()> {
         for (i, alternative) in self.alternatives.iter().enumerate() {
-            write!(writer, "{}. {}", i + 1, alternative.display())?;
+            write!(writer, "{}. {}", i + 1, alternative)?;
             if self.default_index.is_some_and(|d| d == i) {
                 writeln!(writer, " [default]")?;
             } else {
@@ -177,7 +177,8 @@ where
         if self.default_index.is_some() {
             write!(writer, " (empty for default)")?;
         }
-        write!(writer, ": ")
+
+        Ok(())
     }
 
     fn prompt_no_default(&self, writer: &mut impl Write) -> io::Result<()> {
@@ -190,7 +191,8 @@ where
         if self.allow_custom {
             write!(writer, " or input a custom value")?;
         }
-        write!(writer, ": ")
+
+        Ok(())
     }
 
     fn parse(
@@ -248,8 +250,6 @@ pub trait Selectable {
     /// Get the value of this element, consum self.
     fn value(self) -> Self::Value;
 
-    fn display(&self) -> String;
-
     /// Parse a string to value of this element.
     ///
     /// This function parse a string to value of this element
@@ -266,19 +266,21 @@ pub enum ValueWithDesc<T> {
 }
 
 impl<T: Display> ValueWithDesc<T> {
+    pub fn new(value: impl Into<T>, desc: Option<&str>) -> Self {
+        match desc {
+            Some(desc) => Self::WithDesc {
+                value: value.into(),
+                desc: desc.to_string(),
+            },
+            None => Self::Value(value.into()),
+        }
+    }
+
     fn value(self) -> T {
         use ValueWithDesc::*;
         match self {
             Value(value) => value,
             WithDesc { value, .. } => value,
-        }
-    }
-
-    fn desc(&self) -> String {
-        use ValueWithDesc::*;
-        match self {
-            Value(value) => format!("{value}"),
-            WithDesc { value, desc } => format!("{value} ({desc})"),
         }
     }
 }
@@ -303,12 +305,17 @@ impl Selectable for ValueWithDesc<i64> {
         self.value()
     }
 
-    fn display(&self) -> String {
-        self.desc()
-    }
-
     fn parse(input: &str) -> Result<i64, Self::Error> {
         input.parse()
+    }
+}
+
+impl<T: Display> Display for ValueWithDesc<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ValueWithDesc::Value(value) => write!(f, "{value}"),
+            ValueWithDesc::WithDesc { value, desc } => write!(f, "{value} ({desc})"),
+        }
     }
 }
 
@@ -318,10 +325,6 @@ impl Selectable for ValueWithDesc<f64> {
 
     fn value(self) -> f64 {
         self.value()
-    }
-
-    fn display(&self) -> String {
-        self.desc()
     }
 
     fn parse(input: &str) -> Result<f64, Self::Error> {
@@ -335,10 +338,6 @@ impl Selectable for ValueWithDesc<String> {
 
     fn value(self) -> String {
         self.value()
-    }
-
-    fn display(&self) -> String {
-        self.desc()
     }
 
     fn parse(input: &str) -> Result<String, Self::Error> {
@@ -359,18 +358,6 @@ mod tests {
     use crate::assert_matches;
 
     use serde_test::{assert_de_tokens, Token};
-
-    impl<T> ValueWithDesc<T> {
-        pub fn new(value: impl Into<T>, desc: Option<&str>) -> Self {
-            match desc {
-                Some(desc) => Self::WithDesc {
-                    value: value.into(),
-                    desc: desc.to_string(),
-                },
-                None => Self::Value(value.into()),
-            }
-        }
-    }
 
     // Use this function to get a Select with most fields set to Some.
     fn test_full() -> SelectD<String> {
@@ -496,7 +483,7 @@ mod tests {
             String::from_utf8(buffer).unwrap(),
             "1. CE-5 (LMB stage 5)\n\
              2. CE-6 (LMB stage 6) [default]\n\
-             Please select a stage to fight or input a custom value (empty for default): "
+             Please select a stage to fight or input a custom value (empty for default)"
         );
 
         let mut buffer = Vec::new();
@@ -505,7 +492,7 @@ mod tests {
             String::from_utf8(buffer).unwrap(),
             "1. CE-5\n\
              2. CE-6\n\
-             Please select one of the alternatives: "
+             Please select one of the alternatives"
         );
     }
 
@@ -515,14 +502,14 @@ mod tests {
         test_full().prompt_no_default(&mut buffer).unwrap();
         assert_eq!(
             String::from_utf8(buffer).unwrap(),
-            "Default not set, please select a stage to fight or input a custom value: "
+            "Default not set, please select a stage to fight or input a custom value"
         );
 
         let mut buffer = Vec::new();
         test_none().prompt_no_default(&mut buffer).unwrap();
         assert_eq!(
             String::from_utf8(buffer).unwrap(),
-            "Default not set, please select one of the alternatives: "
+            "Default not set, please select one of the alternatives"
         );
     }
 

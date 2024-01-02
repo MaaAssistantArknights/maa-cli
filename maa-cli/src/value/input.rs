@@ -79,14 +79,8 @@ impl From<SelectD<String>> for MAAInput {
     }
 }
 
-impl From<MAAInput> for MAAValue {
-    fn from(v: MAAInput) -> Self {
-        Self::Input(v)
-    }
-}
-
 macro_rules! impl_into_maa_value {
-    ($($t:ty),*) => {
+    ($($t:ty),* $(,)?) => {
         $(
             impl From<$t> for MAAValue {
                 fn from(v: $t) -> Self {
@@ -104,7 +98,8 @@ impl_into_maa_value!(
     Input<String>,
     SelectD<i64>,
     SelectD<f64>,
-    SelectD<String>
+    SelectD<String>,
+    // MAAInput,
 );
 
 #[cfg(test)]

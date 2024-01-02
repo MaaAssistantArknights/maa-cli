@@ -5,8 +5,11 @@
 type = "StartUp"
 
 [tasks.params]
-client_type = "Official"
 start_game_enabled = { default = true, description = "start the game" }
+[tasks.params.client_type]
+alternatives = ["Official", "YoStarEN", "YoStarJP"]
+description = "a client type"
+deps = { start_game_enabled = true }
 
 [[tasks]]
 name = "Fight Daily"

@@ -14,7 +14,7 @@ mod copilot;
 pub use copilot::copilot;
 
 mod roguelike;
-pub use roguelike::{roguelike, RoguelikeArgs, Theme as RoguelikeTheme};
+pub use roguelike::{roguelike, Theme as RoguelikeTheme};
 
 use crate::{
     config::{

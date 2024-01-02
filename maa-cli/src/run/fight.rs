@@ -3,7 +3,7 @@ use crate::{
     object,
     value::{
         userinput::{BoolInput, Input, SelectD, ValueWithDesc},
-        MAAValue,
+        MAAValue, Map,
     },
 };
 
@@ -11,29 +11,29 @@ use anyhow::Result;
 
 impl From<ClientType> for ValueWithDesc<String> {
     fn from(client: ClientType) -> Self {
-        Self::WithDesc {
-            value: client.to_string(),
-            // TODO: localized description
-            desc: client.to_string(),
-        }
+        Self::Value(client.to_string())
     }
 }
 
 pub fn fight(stage: String, startup: bool, closedown: bool) -> Result<TaskConfig> {
     let mut task_config = TaskConfig::new();
 
+    use MAAValue::OptionalInput;
     if startup {
         use ClientType::*;
         task_config.push(Task::new_with_default(
             MAATask::StartUp,
             object!(
                 "start_game_enabled" => BoolInput::new(Some(true), Some("start game")),
-                "client_type" => SelectD::<String>::new(
-                    vec![Official, Bilibili, Txwy, YoStarEN, YoStarJP, YoStarKR],
-                    Some(1),
-                    Some("client type"),
-                    true,
-                ).unwrap(),
+                "client_type" => OptionalInput {
+                    deps: Map::from([("start_game_enabled".to_string(), true.into())]),
+                    input: SelectD::<String>::new(
+                        vec![Official, Bilibili, Txwy, YoStarEN, YoStarJP, YoStarKR],
+                        Some(1),
+                        Some("a client type"),
+                        true,
+                    ).unwrap().into(),
+                }
             ),
         ));
     }
@@ -42,7 +42,7 @@ pub fn fight(stage: String, startup: bool, closedown: bool) -> Result<TaskConfig
         MAATask::Fight,
         object!(
             "stage" => stage,
-            "medicine" => Input::new(Some(0), Some("medicine to use")),
+            "medicine" => Input::new(Some(0), Some("the number of medicine to use")),
         ),
     ));
 

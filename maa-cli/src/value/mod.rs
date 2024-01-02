@@ -57,10 +57,7 @@ impl Serialize for MAAValue {
             // Serialize as a sequence of values and filter out all the missing values
             Array(v) => v.serialize(serializer),
             // Serialize as a map of key-value pairs and filter all the missing values
-            Object(v) => {
-                eprintln!("object: {:?}", v.keys());
-                v.serialize(serializer)
-            }
+            Object(v) => v.serialize(serializer),
             // Input value should be initialized before serializing
             _ => serr!("cannot serialize input value, you shoule initialize it first"),
         }
@@ -233,6 +230,7 @@ impl MAAValue {
     }
 }
 
+// TODO: shortcur for OptionalInput
 #[macro_export]
 macro_rules! object {
     () => {
@@ -518,6 +516,10 @@ mod tests {
             deps: Map::from([("no_exist".to_string(), true.into())]),
             input: input.clone().into(),
         };
+        let optional_chianed = OptionalInput {
+            deps: Map::from([("optional".to_string(), true.into())]),
+            input: input.clone().into(),
+        };
 
         let value = object!(
             "input" => input.clone(),
@@ -526,6 +528,7 @@ mod tests {
             "optional" => optional.clone(),
             "optional_no_satisfied" => optional_no_satisfied.clone(),
             "optional_no_exist" => optional_no_exist.clone(),
+            "optinal_chian" => optional_chianed.clone(),
         );
 
         assert_eq!(value.get("input").unwrap(), &MAAValue::from(input.clone()));
@@ -540,6 +543,7 @@ mod tests {
             &optional_no_satisfied
         );
         assert_eq!(value.get("optional_no_exist").unwrap(), &optional_no_exist);
+        assert_eq!(value.get("optinal_chian").unwrap(), &optional_chianed);
 
         let value = value.init().unwrap();
 
@@ -552,6 +556,12 @@ mod tests {
         assert_eq!(value.get("optional").unwrap(), &MAAValue::from(true));
         assert_eq!(value.get("optional_no_satisfied"), None);
         assert_eq!(value.get("optional_no_exist"), None);
+        assert_eq!(value.get("optinal_chian").unwrap(), &MAAValue::from(true));
+
+        assert_eq!(
+            optional.init().unwrap_err().kind(),
+            io::ErrorKind::InvalidData
+        )
     }
 
     #[test]
@@ -578,6 +588,7 @@ mod tests {
 
         assert_eq!(value.get("int").unwrap().as_int().unwrap(), 1);
         assert_eq!(value.get("float"), None);
+        assert_eq!(MAAValue::from(1).get("int"), None);
 
         assert_eq!(value.get_or("int", 2), 1);
         assert_eq!(value.get_or("int", 2.0), 2.0);
@@ -590,6 +601,13 @@ mod tests {
         assert_eq!(value.get("int"), None);
         value.insert("int", 1);
         assert_eq!(value.get("int").unwrap().as_int().unwrap(), 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "value is not an object")]
+    fn insert_panics() {
+        let mut value = MAAValue::from(1);
+        value.insert("int", 1);
     }
 
     #[test]

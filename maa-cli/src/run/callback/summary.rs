@@ -115,12 +115,13 @@ pub struct TaskSummary {
 impl TaskSummary {
     pub fn new(name: Option<String>, task: TaskOrUnknown) -> Self {
         use MAATask::*;
+        use TaskOrUnknown::Task;
 
         let detail = match task {
-            TaskOrUnknown::MAATask(Fight) => Detail::Fight(FightDetail::new()),
-            TaskOrUnknown::MAATask(Infrast) => Detail::Infrast(InfrastDetail::new()),
-            TaskOrUnknown::MAATask(Recruit) => Detail::Recruit(RecruitDetail::new()),
-            TaskOrUnknown::MAATask(Roguelike) => Detail::Roguelike(RoguelikeDetail::new()),
+            Task(Fight) => Detail::Fight(FightDetail::new()),
+            Task(Infrast) => Detail::Infrast(InfrastDetail::new()),
+            Task(Recruit) => Detail::Recruit(RecruitDetail::new()),
+            Task(Roguelike) => Detail::Roguelike(RoguelikeDetail::new()),
             _ => Detail::None,
         };
 

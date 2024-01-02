@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-#[derive(Deserialize, Debug, Clone, Copy, PartialEq)]
+#[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MAATask {
     StartUp,
     CloseDown,
@@ -19,48 +19,50 @@ pub enum MAATask {
     SingleStep,
     VideoRecognition,
 }
+use MAATask::*;
 
 impl MAATask {
     fn to_str(self) -> &'static str {
         match self {
-            MAATask::StartUp => "StartUp",
-            MAATask::CloseDown => "CloseDown",
-            MAATask::Fight => "Fight",
-            MAATask::Recruit => "Recruit",
-            MAATask::Infrast => "Infrast",
-            MAATask::Mall => "Mall",
-            MAATask::Award => "Award",
-            MAATask::Roguelike => "Roguelike",
-            MAATask::Copilot => "Copilot",
-            MAATask::SSSCopilot => "SSSCopilot",
-            MAATask::Depot => "Depot",
-            MAATask::OperBox => "OperBox",
-            MAATask::ReclamationAlgorithm => "ReclamationAlgorithm",
-            MAATask::Custom => "Custom",
-            MAATask::SingleStep => "SingleStep",
-            MAATask::VideoRecognition => "VideoRecognition",
+            StartUp => "StartUp",
+            CloseDown => "CloseDown",
+            Fight => "Fight",
+            Recruit => "Recruit",
+            Infrast => "Infrast",
+            Mall => "Mall",
+            Award => "Award",
+            Roguelike => "Roguelike",
+            Copilot => "Copilot",
+            SSSCopilot => "SSSCopilot",
+            Depot => "Depot",
+            OperBox => "OperBox",
+            ReclamationAlgorithm => "ReclamationAlgorithm",
+            Custom => "Custom",
+            SingleStep => "SingleStep",
+            VideoRecognition => "VideoRecognition",
         }
     }
 }
 
-#[derive(Deserialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum TaskOrUnknown {
-    MAATask(MAATask),
+    Task(MAATask),
     Unknown(String),
 }
+use TaskOrUnknown::*;
 
 impl From<MAATask> for TaskOrUnknown {
     fn from(task: MAATask) -> Self {
-        TaskOrUnknown::MAATask(task)
+        Task(task)
     }
 }
 
 impl AsRef<str> for TaskOrUnknown {
     fn as_ref(&self) -> &str {
         match self {
-            TaskOrUnknown::MAATask(task) => task.to_str(),
-            TaskOrUnknown::Unknown(s) => s.as_str(),
+            Task(task) => task.to_str(),
+            Unknown(s) => s.as_str(),
         }
     }
 }
@@ -83,26 +85,35 @@ mod tests {
 
     use serde_test::{assert_de_tokens, Token};
 
+    impl PartialEq<MAATask> for TaskOrUnknown {
+        fn eq(&self, other: &MAATask) -> bool {
+            match self {
+                Task(task) => task == other,
+                Unknown(_) => false,
+            }
+        }
+    }
+
     #[test]
     fn deserialize() {
         let types: [TaskOrUnknown; 17] = [
-            MAATask::StartUp.into(),
-            MAATask::CloseDown.into(),
-            MAATask::Fight.into(),
-            MAATask::Recruit.into(),
-            MAATask::Infrast.into(),
-            MAATask::Mall.into(),
-            MAATask::Award.into(),
-            MAATask::Roguelike.into(),
-            MAATask::Copilot.into(),
-            MAATask::SSSCopilot.into(),
-            MAATask::Depot.into(),
-            MAATask::OperBox.into(),
-            MAATask::ReclamationAlgorithm.into(),
-            MAATask::Custom.into(),
-            MAATask::SingleStep.into(),
-            MAATask::VideoRecognition.into(),
-            TaskOrUnknown::Unknown("Other".to_string()),
+            StartUp.into(),
+            CloseDown.into(),
+            Fight.into(),
+            Recruit.into(),
+            Infrast.into(),
+            Mall.into(),
+            Award.into(),
+            Roguelike.into(),
+            Copilot.into(),
+            SSSCopilot.into(),
+            Depot.into(),
+            OperBox.into(),
+            ReclamationAlgorithm.into(),
+            Custom.into(),
+            SingleStep.into(),
+            VideoRecognition.into(),
+            Unknown("Other".to_string()),
         ];
 
         assert_de_tokens(
@@ -133,27 +144,27 @@ mod tests {
 
     #[test]
     fn to_str() {
-        assert_eq!(MAATask::StartUp.to_str(), "StartUp");
-        assert_eq!(MAATask::CloseDown.to_str(), "CloseDown");
-        assert_eq!(MAATask::Fight.to_str(), "Fight");
-        assert_eq!(MAATask::Recruit.to_str(), "Recruit");
-        assert_eq!(MAATask::Infrast.to_str(), "Infrast");
-        assert_eq!(MAATask::Mall.to_str(), "Mall");
-        assert_eq!(MAATask::Award.to_str(), "Award");
-        assert_eq!(MAATask::Roguelike.to_str(), "Roguelike");
-        assert_eq!(MAATask::Copilot.to_str(), "Copilot");
-        assert_eq!(MAATask::SSSCopilot.to_str(), "SSSCopilot");
-        assert_eq!(MAATask::Depot.to_str(), "Depot");
-        assert_eq!(MAATask::OperBox.to_str(), "OperBox");
+        assert_eq!(StartUp.to_str(), "StartUp");
+        assert_eq!(CloseDown.to_str(), "CloseDown");
+        assert_eq!(Fight.to_str(), "Fight");
+        assert_eq!(Recruit.to_str(), "Recruit");
+        assert_eq!(Infrast.to_str(), "Infrast");
+        assert_eq!(Mall.to_str(), "Mall");
+        assert_eq!(Award.to_str(), "Award");
+        assert_eq!(Roguelike.to_str(), "Roguelike");
+        assert_eq!(Copilot.to_str(), "Copilot");
+        assert_eq!(SSSCopilot.to_str(), "SSSCopilot");
+        assert_eq!(Depot.to_str(), "Depot");
+        assert_eq!(OperBox.to_str(), "OperBox");
         assert_eq!(
             MAATask::ReclamationAlgorithm.to_str(),
             "ReclamationAlgorithm",
         );
-        assert_eq!(MAATask::Custom.to_str(), "Custom");
-        assert_eq!(MAATask::SingleStep.to_str(), "SingleStep");
-        assert_eq!(MAATask::VideoRecognition.to_str(), "VideoRecognition");
-        assert_eq!(TaskOrUnknown::MAATask(MAATask::StartUp).as_ref(), "StartUp");
-        assert_eq!(TaskOrUnknown::Unknown("Other".into()).as_ref(), "Other");
+        assert_eq!(Custom.to_str(), "Custom");
+        assert_eq!(SingleStep.to_str(), "SingleStep");
+        assert_eq!(VideoRecognition.to_str(), "VideoRecognition");
+        assert_eq!(Task(StartUp).as_ref(), "StartUp");
+        assert_eq!(Unknown("Other".into()).as_ref(), "Other");
     }
 
     #[test]
@@ -162,14 +173,12 @@ mod tests {
         use std::ffi::CString;
 
         assert_eq!(
-            TaskOrUnknown::MAATask(MAATask::StartUp)
-                .to_cstring()
-                .unwrap(),
+            Task(StartUp).to_cstring().unwrap(),
             CString::new("StartUp").unwrap(),
         );
 
         assert_eq!(
-            TaskOrUnknown::Unknown("Other".into()).to_cstring().unwrap(),
+            Unknown("Other".into()).to_cstring().unwrap(),
             CString::new("Other").unwrap(),
         );
     }

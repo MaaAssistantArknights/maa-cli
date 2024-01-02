@@ -166,9 +166,7 @@ enum SubCommand {
         /// Theme of the game
         ///
         /// The theme of the game, can be one of "Phantom", "Mizuki" and "Sami".
-        /// If not specified, it will be asked in the game.
-        #[command(flatten)]
-        args: run::RoguelikeArgs,
+        args: run::RoguelikeTheme,
         #[command(flatten)]
         common: run::CommonArgs,
     },

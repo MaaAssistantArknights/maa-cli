@@ -54,12 +54,17 @@ impl<F: FromStr + Display + Clone> UserInput for Input<F> {
         if let Some(default) = &self.default {
             write!(writer, " [default: {}]", default)?;
         }
-        write!(writer, ": ")?;
         Ok(())
     }
 
     fn prompt_no_default(&self, writer: &mut impl Write) -> io::Result<()> {
-        write!(writer, "Default value not set, please input")
+        write!(writer, "Default value not set, please input")?;
+        if let Some(description) = self.description.as_deref() {
+            write!(writer, " {}", description)?;
+        } else {
+            write!(writer, " a {}", std::any::type_name::<F>())?;
+        }
+        Ok(())
     }
 
     fn parse(self, input: &str, writer: &mut impl Write) -> Result<Self::Value, io::Result<Self>> {
@@ -170,25 +175,25 @@ mod tests {
         Input::<i64>::new(Some(0), Some("medicine to use"))
             .prompt(&mut buffer)
             .unwrap();
-        assert_eq!(buffer, b"Please input medicine to use [default: 0]: ");
+        assert_eq!(buffer, b"Please input medicine to use [default: 0]");
         buffer.clear();
 
         Input::<i64>::new(None::<i64>, Some("medicine to use"))
             .prompt(&mut buffer)
             .unwrap();
-        assert_eq!(buffer, b"Please input medicine to use: ");
+        assert_eq!(buffer, b"Please input medicine to use");
         buffer.clear();
 
         Input::<i64>::new(Some(0), None::<&str>)
             .prompt(&mut buffer)
             .unwrap();
-        assert_eq!(buffer, b"Please input a i64 [default: 0]: ");
+        assert_eq!(buffer, b"Please input a i64 [default: 0]");
         buffer.clear();
 
         Input::<i64>::new(None::<i64>, None::<&str>)
             .prompt(&mut buffer)
             .unwrap();
-        assert_eq!(buffer, b"Please input a i64: ");
+        assert_eq!(buffer, b"Please input a i64");
         buffer.clear();
     }
 
@@ -199,7 +204,10 @@ mod tests {
         Input::<i64>::new(Some(0), Some("medicine to use"))
             .prompt_no_default(&mut buffer)
             .unwrap();
-        assert_eq!(buffer, b"Default value not set, please input");
+        assert_eq!(
+            buffer,
+            b"Default value not set, please input medicine to use"
+        );
         buffer.clear();
     }
 

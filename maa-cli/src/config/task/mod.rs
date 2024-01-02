@@ -182,13 +182,14 @@ impl TaskConfig {
 
         let mut tasks: Vec<InitializedTask> = Vec::new();
 
+        use TaskOrUnknown::Task;
         for task in self.tasks.iter() {
             if task.is_active() {
                 let task_type = task.task_type();
                 let mut params = task.params().init()?;
 
                 match task_type {
-                    TaskOrUnknown::MAATask(MAATask::StartUp) => {
+                    Task(MAATask::StartUp) => {
                         let start_game = params.get_or("enable", true)
                             && params.get_or("start_game_enabled", false);
 
@@ -221,7 +222,7 @@ impl TaskConfig {
 
                         prepend_startup = false;
                     }
-                    TaskOrUnknown::MAATask(MAATask::CloseDown) => {
+                    Task(MAATask::CloseDown) => {
                         match (params.get_or("enable", true), closedown) {
                             // If closedown task is enabled, enable closedown automatically
                             (true, None) => {
@@ -340,6 +341,12 @@ mod tests {
 
     use task_type::MAATask;
 
+    impl TaskConfig {
+        pub fn tasks(&self) -> &[Task] {
+            &self.tasks
+        }
+    }
+
     mod task {
         use super::*;
 
@@ -386,7 +393,7 @@ mod tests {
         fn get_type() {
             assert_eq!(
                 Task::new_with_default(MAATask::StartUp, object!()).task_type(),
-                &MAATask::StartUp.into()
+                &MAATask::StartUp,
             );
         }
 
@@ -519,12 +526,28 @@ mod tests {
             }
 
             fn example_task_config() -> TaskConfig {
+                use crate::value::Map;
+                use ClientType::*;
+                use MAAValue::OptionalInput;
+
                 let mut task_list = TaskConfig::new();
 
                 task_list.push(Task::new_with_default(
                     MAATask::StartUp,
                     object!(
-                        "client_type" => "Official",
+                        "client_type" => OptionalInput {
+                            deps: Map::from([("start_game_enabled".to_string(), true.into())]),
+                            input: SelectD::<String>::new(
+                                vec![
+                                    Official,
+                                    YoStarEN,
+                                    YoStarJP,
+                                ],
+                                None,
+                                Some("a client type"),
+                                false
+                            ).unwrap().into(),
+                        },
                         "start_game_enabled" => BoolInput::new(
                             Some(true),
                             Some("start the game"),
@@ -782,7 +805,7 @@ mod tests {
                 object!("stage" => "1-7"),
             );
             assert_eq!(task.name(), Some("Fight Daily"));
-            assert_eq!(task.task_type(), &MAATask::Fight.into());
+            assert_eq!(task.task_type(), &MAATask::Fight);
             assert_eq!(task.params(), &object!("stage" => "1-7"));
         }
     }

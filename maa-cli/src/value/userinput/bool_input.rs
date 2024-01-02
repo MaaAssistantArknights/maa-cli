@@ -43,18 +43,18 @@ impl UserInput for BoolInput {
         }
         if let Some(default) = &self.default {
             if *default {
-                write!(writer, " [Y/n]: ")?;
+                write!(writer, " [Y/n]")?;
             } else {
-                write!(writer, " [y/N]: ")?;
+                write!(writer, " [y/N]")?;
             }
         } else {
-            write!(writer, " [y/n]: ")?;
+            write!(writer, " [y/n]")?;
         }
         Ok(())
     }
 
     fn prompt_no_default(&self, writer: &mut impl Write) -> Result<(), io::Error> {
-        write!(writer, "Default value not set, please input y/n: ")
+        write!(writer, "Default value not set, please input y/n")
     }
 
     fn parse(
@@ -171,20 +171,19 @@ mod tests {
         BoolInput::new(Some(true), None)
             .prompt(&mut buffer)
             .unwrap();
-        assert_eq!(buffer, b"Whether to do something [Y/n]: ");
+        assert_eq!(buffer, b"Whether to do something [Y/n]");
         buffer.clear();
 
         BoolInput::new(Some(true), Some("do other thing"))
             .prompt(&mut buffer)
             .unwrap();
-        assert_eq!(buffer, b"Whether to do other thing [Y/n]: ");
+        assert_eq!(buffer, b"Whether to do other thing [Y/n]");
         buffer.clear();
 
-        let mut buffer = Vec::new();
         BoolInput::new(None, Some("do other thing"))
             .prompt(&mut buffer)
             .unwrap();
-        assert_eq!(buffer, b"Whether to do other thing [y/n]: ");
+        assert_eq!(buffer, b"Whether to do other thing [y/n]");
         buffer.clear();
     }
 
@@ -195,7 +194,7 @@ mod tests {
         BoolInput::new(None, None)
             .prompt_no_default(&mut buffer)
             .unwrap();
-        assert_eq!(buffer, b"Default value not set, please input y/n: ");
+        assert_eq!(buffer, b"Default value not set, please input y/n");
     }
 
     #[test]
