@@ -1,8 +1,12 @@
-use super::{Result, UserInput};
+use super::UserInput;
 
-use std::{fmt::Display, io::Write, str::FromStr};
+use std::{
+    fmt::Display,
+    io::{self, Write},
+    str::FromStr,
+};
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Deserialize, Debug, Clone)]
@@ -22,28 +26,27 @@ pub struct Input<F> {
 }
 
 impl<F> Input<F> {
-    pub fn new<I, S>(default: Option<I>, description: Option<S>) -> Self
-    where
-        I: Into<F>,
-        S: Into<String>,
-    {
+    pub fn new(default: Option<F>, description: Option<&str>) -> Self {
         Self {
-            default: default.map(|i| i.into()),
-            description: description.map(|s| s.into()),
+            default,
+            description: description.map(|s| s.to_string()),
         }
     }
 }
 
-impl<F: FromStr + Display> UserInput for Input<F> {
+impl<F: FromStr + Display + Clone> UserInput for Input<F> {
     type Value = F;
 
-    fn default(&self) -> Option<F> {
-        self.default
+    fn default(self) -> Result<Self::Value, Self> {
+        match self.default {
+            Some(v) => Ok(v),
+            None => Err(self),
+        }
     }
 
-    fn prompt(&self, mut writer: impl Write) -> Result<()> {
+    fn prompt(&self, writer: &mut impl Write) -> io::Result<()> {
         write!(writer, "Please input")?;
-        if let Some(description) = self.description {
+        if let Some(description) = self.description.as_deref() {
             write!(writer, " {}", description)?;
         } else {
             write!(writer, " a {}", std::any::type_name::<F>())?;
@@ -55,21 +58,21 @@ impl<F: FromStr + Display> UserInput for Input<F> {
         Ok(())
     }
 
-    fn prompt_no_default(&self, mut writer: impl Write) -> Result<()> {
+    fn prompt_no_default(&self, writer: &mut impl Write) -> io::Result<()> {
         write!(writer, "Default value not set, please input")
     }
 
-    fn parse(&self, input: &str) -> Result<F, String> {
-        match input.parse() {
-            Ok(value) => Ok(value),
-            Err(_) => Err(format!("Invalid input \"{}\", please try again", input)),
+    fn parse(self, input: &str, writer: &mut impl Write) -> Result<Self::Value, io::Result<Self>> {
+        if let Ok(value) = input.parse() {
+            Ok(value)
+        } else {
+            err_err!(write!(
+                writer,
+                "Invalid input \"{}\", please try again",
+                input
+            ));
+            Err(Ok(self))
         }
-    }
-}
-
-impl<F: FromStr + Display + Serialize> Serialize for Input<F> {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        super::serialize_userinput(self, serializer)
     }
 }
 
@@ -79,15 +82,15 @@ mod tests {
 
     use crate::assert_matches;
 
-    use serde_test::{assert_de_tokens, assert_ser_tokens_error, Token};
+    use serde_test::{assert_de_tokens, Token};
 
     #[test]
     fn serde() {
         let values: Vec<Input<i64>> = vec![
             Input::new(Some(0), Some("how many medicine to use")),
-            Input::new(Some(0), None::<&str>),
-            Input::new(None::<i64>, Some("how many medicine to use")),
-            Input::new(None::<i64>, None::<&str>),
+            Input::new(Some(0), None),
+            Input::new(None, Some("how many medicine to use")),
+            Input::new(None, None),
         ];
 
         assert_de_tokens(
@@ -96,16 +99,20 @@ mod tests {
                 Token::Seq { len: Some(4) },
                 Token::Map { len: Some(2) },
                 Token::Str("default"),
+                Token::Some,
                 Token::I64(0),
                 Token::Str("description"),
+                Token::Some,
                 Token::Str("how many medicine to use"),
                 Token::MapEnd,
                 Token::Map { len: Some(1) },
                 Token::Str("default"),
+                Token::Some,
                 Token::I64(0),
                 Token::MapEnd,
                 Token::Map { len: Some(1) },
                 Token::Str("description"),
+                Token::Some,
                 Token::Str("how many medicine to use"),
                 Token::MapEnd,
                 Token::Map { len: Some(0) },
@@ -113,18 +120,12 @@ mod tests {
                 Token::SeqEnd,
             ],
         );
-
-        assert_ser_tokens_error(
-            &values,
-            &[Token::Seq { len: Some(4) }, Token::I64(0), Token::I64(0)],
-            "can not get default value in batch mode",
-        )
     }
 
     #[test]
     fn construct() {
         assert_matches!(
-            Input::<i64>::new(Some(0), Some("medicine to use")),
+            Input::new(Some(0), Some("medicine to use")),
             Input::<i64> {
                 default: Some(0),
                 description: Some(s)
@@ -155,16 +156,11 @@ mod tests {
 
     #[test]
     fn default() {
+        assert_eq!(Input::new(Some(0), None).default(), Ok(0));
         assert_eq!(
-            Input::<i64>::new(Some(0), Some("medicine to use")).default(),
-            Some(0)
+            Input::new(None::<i64>, None).default(),
+            Err(Input::new(None, None))
         );
-        assert_eq!(
-            Input::<i64>::new(None::<i64>, Some("medicine to use")).default(),
-            None
-        );
-        assert_eq!(Input::<i64>::new(Some(0), None::<&str>).default(), Some(0));
-        assert_eq!(Input::<i64>::new(None::<i64>, None::<&str>).default(), None);
     }
 
     #[test]
@@ -209,17 +205,18 @@ mod tests {
 
     #[test]
     fn parse() {
-        let input = Input::<i64>::new(Some(0), Some("medicine to use"));
+        let input = Input::new(Some(0), None);
 
-        assert_eq!(input.parse("0"), Ok(0));
-        assert_eq!(input.parse("1"), Ok(1));
+        let mut output = Vec::new();
+
+        assert_eq!(input.clone().parse("1", &mut output).unwrap(), 1);
         assert_eq!(
-            input.parse("1.0"),
-            Err("Invalid input \"1.0\", please try again".to_owned())
+            input.clone().parse("a", &mut output).unwrap_err().unwrap(),
+            input.clone()
         );
         assert_eq!(
-            input.parse("a"),
-            Err("Invalid input \"a\", please try again".to_owned())
+            String::from_utf8(output).unwrap(),
+            "Invalid input \"a\", please try again",
         );
     }
 }

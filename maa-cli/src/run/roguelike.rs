@@ -1,15 +1,13 @@
 use crate::{
-    config::task::{task_type::MAATask, MAAValue, Task, TaskConfig},
-    input::{BoolInput, Input, Select, SelectD, Selectable, UserInput, ValueWithDesc},
+    config::task::{task_type::MAATask, Task, TaskConfig},
     object,
+    value::MAAValue,
 };
-
-use std::convert::Infallible;
 
 use anyhow::Result;
 use clap::{Args, ValueEnum};
 
-#[derive(ValueEnum, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub enum Theme {
     Phantom,
     Mizuki,
@@ -17,78 +15,33 @@ pub enum Theme {
 }
 
 impl Theme {
-    pub fn to_str(self) -> &'static str {
+    fn to_str(&self) -> &'static str {
         match self {
-            Theme::Phantom => "Phantom",
-            Theme::Mizuki => "Mizuki",
-            Theme::Sami => "Sami",
+            Self::Phantom => "Phantom",
+            Self::Mizuki => "Mizuki",
+            Self::Sami => "Sami",
         }
     }
 }
 
-impl Selectable for Theme {
-    type Value = String;
-    type Error = Infallible;
-
-    fn value(self) -> Self::Value {
-        self.to_str().to_owned()
+impl ValueEnum for Theme {
+    fn value_variants<'a>() -> &'a [Self] {
+        &[Self::Phantom, Self::Mizuki, Self::Sami]
     }
 
-    // TODO: localized description
-    fn desc(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.to_str())
-    }
-
-    fn parse(input: &str) -> std::prelude::v1::Result<Self::Value, Self::Error> {
-        Ok(input.to_owned())
-    }
-}
-
-impl std::fmt::Display for Theme {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.to_str())
+    fn to_possible_value(&self) -> Option<clap::builder::PossibleValue> {
+        Some(clap::builder::PossibleValue::new(self.to_str()))
     }
 }
 
 #[derive(Args)]
-
-/// Task parameters for task roguelike
-///
-/// ```json
-/// {
-///     "enable": bool,         // 是否启用本任务，可选，默认为 true
-///     "theme": string,        // 肉鸽名，可选，默认 "Phantom"
-///                             // Phantom - 傀影与猩红血钻
-///                             // Mizuki  - 水月与深蓝之树
-///                             // Sami    - 探索者的银凇止境
-///     "mode": int,            // 模式，可选项。默认 0
-///                             // 0 - 刷蜡烛，尽可能稳定地打更多层数
-///                             // 1 - 刷源石锭，第一层投资完就退出
-///                             // 2 - 【即将弃用】两者兼顾，投资过后再退出，没有投资就继续往后打
-///                             // 3 - 开发中...
-///                             // 4 - 烧热水，到达第三层后直接退出
-///     "starts_count": int,    // 开始探索 次数，可选，默认 INT_MAX。达到后自动停止任务
-///     "investment_enabled": bool, // 是否投资源石锭，默认开
-///     "investments_count": int,
-///                             // 投资源石锭 次数，可选，默认 INT_MAX。达到后自动停止任务
-///     "stop_when_investment_full": bool,
-///                             // 投资满了自动停止任务，可选，默认 false
-///     "squad": string,        // 开局分队，可选，例如 "突击战术分队" 等，默认 "指挥分队"
-///     "roles": string,        // 开局职业组，可选，例如 "先手必胜" 等，默认 "取长补短"
-///     "core_char": string,    // 开局干员名，可选，仅支持单个干员中！文！名！。默认识别练度自动选择
-///     "use_support": bool,  // 开局干员是否为助战干员，可选，默认 false
-///     "use_nonfriend_support": bool,  // 是否可以是非好友助战干员，可选，默认 false，use_support为true时有效
-///     "refresh_trader_with_dice": bool  // 是否用骰子刷新商店购买特殊商品，目前支持水月肉鸽的指路鳞，可选，默认 false
-/// }
-/// ```
 pub struct RoguelikeArgs {
-    /// Query arguments for task roguelike interactively, instead of using command line arguments
-    ///
-    /// If this is set to true, all other arguments will be ignored
-    #[clap(short, long)]
-    interactive: bool,
     /// Roguelike theme
-    #[clap(default_value_t = Theme::Sami)]
+    ///
+    /// - Phantom
+    /// - Mizuki
+    /// - Sami
+    #[clap(default_value = "Sami")]
     theme: Theme,
     /// Roguelike mode, determine the strategy to use
     ///
@@ -100,16 +53,16 @@ pub struct RoguelikeArgs {
     #[clap(long, default_value_t = 0)]
     mode: i64,
     /// The number of times to start a new run
-    #[clap(long, default_value_t = 999)]
-    start_count: i64,
+    #[clap(long)]
+    start_count: Option<i64>,
     /// Disable investment
-    #[clap(long, default_value_t = false)]
+    #[clap(long)]
     investment_disabled: bool,
     /// The number of times to invest
-    #[clap(long, default_value_t = 999)]
-    investments_count: i64,
+    #[clap(long)]
+    investments_count: Option<i64>,
     /// Stop when investment is full
-    #[clap(long, default_value_t = false)]
+    #[clap(long)]
     stop_when_investment_full: bool,
     /// Squad name
     #[clap(long)]
@@ -121,104 +74,56 @@ pub struct RoguelikeArgs {
     #[clap(long)]
     core_char: String,
     /// Use support operator
-    #[clap(long, default_value_t = false)]
+    #[clap(long)]
     use_support: bool,
     /// Use non-friend support operator
-    #[clap(long, default_value_t = false)]
+    #[clap(long)]
     use_nonfriend_support: bool,
     /// Refresh trader with dice
     ///
     /// Only support in Mizuki theme
-    #[clap(long, default_value_t = false)]
+    #[clap(long)]
     refresh_trader_with_dice: bool,
 }
 
 impl RoguelikeArgs {
-    fn to_params(&self) -> Result<MAAValue> {
-        if self.interactive {
-            interactive_params()
-        } else {
-            let mut params = MAAValue::new();
+    fn to_params(self) -> MAAValue {
+        let mut params = object!(
+            "theme" => self.theme.to_str(),
+            "mode" => self.mode,
+            "investment_disabled" => self.investment_disabled,
+            "stop_when_investment_full" => self.stop_when_investment_full,
+            "squad" => self.squad,
+            "roles" => self.roles,
+            "core_char" => self.core_char,
+            "use_support" => self.use_support,
+            "use_nonfriend_support" => self.use_nonfriend_support,
+            "refresh_trader_with_dice" => self.refresh_trader_with_dice,
+        );
 
-            params.insert("theme", self.theme.to_str());
-
-            Ok(params)
+        if let Some(start_count) = self.start_count {
+            params.insert("start_count", start_count);
         }
+
+        if let Some(investments_count) = self.investments_count {
+            params.insert("investments_count", investments_count);
+        }
+
+        params
     }
 }
 
 pub fn roguelike(args: RoguelikeArgs) -> Result<TaskConfig> {
     let mut task_config = TaskConfig::new();
 
-    let params = args.to_params()?;
-
-    task_config.push(Task::new_with_default(MAATask::Roguelike, params));
+    task_config.push(Task::new_with_default(MAATask::Roguelike, args.to_params()));
 
     Ok(task_config)
-}
-
-fn interactive_params() -> Result<MAAValue> {
-    let theme = Select::<Theme>::new(
-        [Theme::Phantom, Theme::Mizuki, Theme::Sami],
-        Some(3),
-        Some("a roguelike theme"),
-        true,
-    )
-    .value()?;
-
-    let mut params = object!(
-        "mode" => SelectD::<i64>::new(
-            [
-                ValueWithDesc::new(
-                    0,
-                    Some("Clear as many stages as possible with stable strategy"),
-                ),
-                ValueWithDesc::new(1, Some("Invest ingots and exits after first level")),
-                ValueWithDesc::new(2, Some("A combination of 0 and 1, depracated")),
-                ValueWithDesc::new(
-                    3,
-                    Some("Clear as many stages as possible with agrressive strategy"),
-                ),
-                ValueWithDesc::new(4, Some("Exit entering 3rd level")),
-            ],
-            Some(0),
-            Some("a roguelike mode"),
-            true,
-        ),
-        "start_count" => Input::<i64>::new(Some(9999), Some("the number of times to start a new run")),
-        "investment_enabled" => BoolInput::new(Some(true), Some("enable investment")),
-        "investments_count" => Input::<i64>::new(Some(99999), Some("the number of times to invest")),
-        "stop_when_investment_full" => BoolInput::new(Some(false), Some("stop when investment is full")),
-        "squad" => Input::<String>::new(None::<String>, Some("a squad name")),
-        "roles" => Input::<String>::new(None::<String>, Some("roles")),
-        "core_char" => Input::<String>::new(None::<String>, Some("a operator name")),
-        "use_support" => BoolInput::new(Some(true), Some("use support operator")),
-    );
-
-    params.init()?;
-
-    if params.get_or("use_support", false)? {
-        params.insert(
-            "use_nonfriend_support",
-            BoolInput::new(Some(false), Some("use non-friend support operator")).value()?,
-        );
-    }
-
-    if &theme == Theme::Mizuki.to_str() {
-        params.insert(
-            "refresh_trader_with_dice",
-            BoolInput::new(Some(false), Some("refresh trader with dice")).value()?,
-        );
-    }
-
-    Ok(params)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use crate::{assert_matches, config::task::task_type::TaskOrUnknown};
 
     #[test]
     fn theme_to_str() {

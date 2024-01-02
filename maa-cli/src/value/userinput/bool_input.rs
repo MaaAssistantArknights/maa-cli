@@ -1,8 +1,8 @@
-use super::{Result, UserInput};
+use super::UserInput;
 
-use std::io::Write;
+use std::io::{self, Write};
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 /// A struct that represents a user input that queries the user for boolean input.
 #[cfg_attr(test, derive(PartialEq))]
@@ -16,13 +16,10 @@ pub struct BoolInput {
 }
 
 impl BoolInput {
-    pub fn new<S>(default: Option<bool>, description: Option<S>) -> Self
-    where
-        S: Into<String>,
-    {
+    pub fn new(default: Option<bool>, description: Option<&str>) -> Self {
         Self {
             default,
-            description: description.map(|s| s.into()),
+            description: description.map(|s| s.to_string()),
         }
     }
 }
@@ -30,11 +27,14 @@ impl BoolInput {
 impl UserInput for BoolInput {
     type Value = bool;
 
-    fn default(&self) -> Option<Self::Value> {
-        self.default
+    fn default(self) -> Result<Self::Value, Self> {
+        match self.default {
+            Some(v) => Ok(v),
+            None => Err(self),
+        }
     }
 
-    fn prompt(&self, mut writer: impl Write) -> Result<()> {
+    fn prompt(&self, writer: &mut impl Write) -> Result<(), io::Error> {
         write!(writer, "Whether to")?;
         if let Some(description) = &self.description {
             write!(writer, " {}", description)?;
@@ -53,22 +53,23 @@ impl UserInput for BoolInput {
         Ok(())
     }
 
-    fn prompt_no_default(&self, mut writer: impl Write) -> Result<()> {
+    fn prompt_no_default(&self, writer: &mut impl Write) -> Result<(), io::Error> {
         write!(writer, "Default value not set, please input y/n: ")
     }
 
-    fn parse(&self, trimmed: &str) -> Result<Self::Value, String> {
+    fn parse(
+        self,
+        trimmed: &str,
+        writer: &mut impl Write,
+    ) -> Result<Self::Value, io::Result<Self>> {
         match trimmed {
             "y" | "Y" | "yes" | "Yes" | "YES" => Ok(true),
             "n" | "N" | "no" | "No" | "NO" => Ok(false),
-            _ => Err(String::from("Invalid input, please input y/n: ")),
+            _ => {
+                err_err!(writer.write_all(b"Invalid input, please input y/n"));
+                Err(Ok(self))
+            }
         }
-    }
-}
-
-impl Serialize for BoolInput {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        super::serialize_userinput(self, serializer)
     }
 }
 
@@ -78,15 +79,15 @@ mod tests {
 
     use crate::assert_matches;
 
-    use serde_test::{assert_de_tokens, assert_ser_tokens_error, Token};
+    use serde_test::{assert_de_tokens, Token};
 
     #[test]
     fn serde() {
         let values = vec![
             BoolInput::new(Some(true), Some("do something")),
-            BoolInput::new::<&str>(Some(false), None),
+            BoolInput::new(Some(false), None),
             BoolInput::new(None, Some("do something")),
-            BoolInput::new::<&str>(None, None),
+            BoolInput::new(None, None),
         ];
 
         assert_de_tokens(
@@ -116,17 +117,6 @@ mod tests {
                 Token::SeqEnd,
             ],
         );
-
-        // Only input with default value can be serialized
-        assert_ser_tokens_error(
-            &values,
-            &[
-                Token::Seq { len: Some(4) },
-                Token::Bool(true),
-                Token::Bool(false),
-            ],
-            "can not get default value in batch mode",
-        );
     }
 
     #[test]
@@ -140,7 +130,7 @@ mod tests {
         );
 
         assert_matches!(
-            BoolInput::new::<&str>(Some(true), None),
+            BoolInput::new(Some(true), None),
             BoolInput {
                 default: Some(true),
                 description: None,
@@ -148,7 +138,7 @@ mod tests {
         );
 
         assert_matches!(
-            BoolInput::new::<&str>(None, Some("do something")),
+            BoolInput::new(None, Some("do something")),
             BoolInput {
                 default: None,
                 description: Some(description),
@@ -156,7 +146,7 @@ mod tests {
         );
 
         assert_matches!(
-            BoolInput::new::<&str>(None, None),
+            BoolInput::new(None, None),
             BoolInput {
                 default: None,
                 description: None,
@@ -166,14 +156,11 @@ mod tests {
 
     #[test]
     fn default() {
-        assert_matches!(
-            BoolInput::new(Some(true), Some("do something")).default(),
-            Some(true)
-        );
+        assert_eq!(BoolInput::new(Some(true), None).default(), Ok(true));
 
-        assert_matches!(
-            BoolInput::new::<&str>(None, Some("do something")).default(),
-            None
+        assert_eq!(
+            BoolInput::new(None, None).default(),
+            Err(BoolInput::new(None, None))
         );
     }
 
@@ -181,7 +168,7 @@ mod tests {
     fn prompt() {
         let mut buffer = Vec::new();
 
-        BoolInput::new::<&str>(Some(true), None)
+        BoolInput::new(Some(true), None)
             .prompt(&mut buffer)
             .unwrap();
         assert_eq!(buffer, b"Whether to do something [Y/n]: ");
@@ -194,7 +181,7 @@ mod tests {
         buffer.clear();
 
         let mut buffer = Vec::new();
-        BoolInput::new::<&str>(None, Some("do other thing"))
+        BoolInput::new(None, Some("do other thing"))
             .prompt(&mut buffer)
             .unwrap();
         assert_eq!(buffer, b"Whether to do other thing [y/n]: ");
@@ -205,7 +192,7 @@ mod tests {
     fn prompt_no_default() {
         let mut buffer = Vec::new();
 
-        BoolInput::new::<&str>(None, None)
+        BoolInput::new(None, None)
             .prompt_no_default(&mut buffer)
             .unwrap();
         assert_eq!(buffer, b"Default value not set, please input y/n: ");
@@ -213,18 +200,28 @@ mod tests {
 
     #[test]
     fn parse() {
-        let bool_input = BoolInput::new::<&str>(None, None);
+        let bool_input = BoolInput::new(None, None);
+        let mut output = Vec::new();
         for input in &["y", "Y", "yes", "Yes", "YES"] {
-            assert!(bool_input.parse(input).unwrap());
+            assert!(bool_input.clone().parse(input, &mut output).unwrap())
         }
 
         for input in &["n", "N", "no", "No", "NO"] {
-            assert!(!bool_input.parse(input).unwrap());
+            assert!(!bool_input.clone().parse(input, &mut output).unwrap())
         }
 
         assert_eq!(
-            bool_input.parse("invalid").unwrap_err(),
-            "Invalid input, please input y/n: "
+            bool_input
+                .clone()
+                .parse("invalid", &mut output)
+                .unwrap_err()
+                .unwrap(),
+            bool_input.clone()
+        );
+
+        assert_eq!(
+            String::from_utf8(output).unwrap(),
+            "Invalid input, please input y/n",
         );
     }
 }

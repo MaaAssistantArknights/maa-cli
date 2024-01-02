@@ -31,7 +31,9 @@ tasks:
         params:
           stage:
             alternatives: [SL-6, SL-7, SL-8]
+            default_index: 2
             description: a stage to fight in summer event
+            allow_custom: true
   - type: Mall
     params:
       shopping: true

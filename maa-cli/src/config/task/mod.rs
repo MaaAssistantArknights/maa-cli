@@ -1,6 +1,3 @@
-pub mod value;
-pub use value::MAAValue;
-
 pub mod task_type;
 use task_type::{MAATask, TaskOrUnknown};
 
@@ -10,7 +7,7 @@ pub use client_type::ClientType;
 mod condition;
 use condition::Condition;
 
-use crate::{dirs, object};
+use crate::{dirs, object, value::MAAValue};
 
 use std::path::PathBuf;
 
@@ -188,13 +185,12 @@ impl TaskConfig {
         for task in self.tasks.iter() {
             if task.is_active() {
                 let task_type = task.task_type();
-                let mut params = task.params();
-                params.init()?;
+                let mut params = task.params().init()?;
 
                 match task_type {
                     TaskOrUnknown::MAATask(MAATask::StartUp) => {
-                        let start_game = params.get_or("enable", true)?
-                            && params.get_or("start_game_enabled", false)?;
+                        let start_game = params.get_or("enable", true)
+                            && params.get_or("start_game_enabled", false);
 
                         match (start_game, startup) {
                             (true, None) => {
@@ -210,7 +206,11 @@ impl TaskConfig {
                         match (params.get("client_type"), client_type) {
                             // If client_type in task is set, set client type in config automatically
                             (Some(t), None) => {
-                                client_type = Some(t.as_string()?.parse()?);
+                                client_type = Some(
+                                    t.as_str()
+                                        .context("client_type must be a string")?
+                                        .parse()?,
+                                );
                             }
                             // If client type in config is set, set client_type in task automatically
                             (None, Some(t)) => {
@@ -222,7 +222,7 @@ impl TaskConfig {
                         prepend_startup = false;
                     }
                     TaskOrUnknown::MAATask(MAATask::CloseDown) => {
-                        match (params.get_or("enable", true)?, closedown) {
+                        match (params.get_or("enable", true), closedown) {
                             // If closedown task is enabled, enable closedown automatically
                             (true, None) => {
                                 closedown = Some(true);
@@ -242,7 +242,8 @@ impl TaskConfig {
                         // it will be treated as a relative path to the config directory
                         // and will be converted to an absolute path.
                         if let Some(v) = params.get("filename") {
-                            let file = PathBuf::from(v.as_string()?);
+                            let file: PathBuf =
+                                v.as_str().context("filename must be a string")?.into();
                             let sub_dir = task_type.as_ref().to_lowercase();
                             if let Some(path) = dirs::abs_config(file, Some(sub_dir)) {
                                 params.insert("filename", path.to_str().context("Invilid UTF-8")?)
@@ -302,7 +303,11 @@ pub struct InitializedTask {
 }
 
 impl InitializedTask {
-    fn new(name: Option<String>, task_type: impl Into<TaskOrUnknown>, params: MAAValue) -> Self {
+    pub fn new(
+        name: Option<String>,
+        task_type: impl Into<TaskOrUnknown>,
+        params: MAAValue,
+    ) -> Self {
         Self {
             name,
             task_type: task_type.into(),
@@ -310,7 +315,7 @@ impl InitializedTask {
         }
     }
 
-    fn new_noname(task_type: impl Into<TaskOrUnknown>, params: MAAValue) -> Self {
+    pub fn new_noname(task_type: impl Into<TaskOrUnknown>, params: MAAValue) -> Self {
         Self::new(None, task_type.into(), params)
     }
 
@@ -501,7 +506,7 @@ mod tests {
         mod serde {
             use super::*;
 
-            use crate::input::{BoolInput, Input, SelectD};
+            use crate::value::userinput::{BoolInput, Input, SelectD};
 
             use chrono::{NaiveDateTime, NaiveTime, TimeZone, Weekday};
 
@@ -548,8 +553,8 @@ mod tests {
                         TaskVariant {
                             condition: Condition::Always,
                             params: object!(
-                                "stage" => Input::<String>::new(
-                                    Some("1-7"),
+                                "stage" => Input::new(
+                                    Some("1-7".to_string()),
                                     Some("a stage to fight"),
                                 ),
                             ),
@@ -572,10 +577,10 @@ mod tests {
                                         "SL-7",
                                         "SL-8",
                                     ],
-                                    None,
+                                    Some(2),
                                     Some("a stage to fight in summer event"),
                                     true,
-                                )
+                                ).unwrap(),
                             ),
                         },
                     ],

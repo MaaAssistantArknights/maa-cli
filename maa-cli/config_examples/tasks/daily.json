@@ -51,7 +51,9 @@
           "params": {
             "stage": {
               "alternatives": ["SL-6", "SL-7", "SL-8"],
-              "description": "a stage to fight in summer event"
+              "default_index": 2,
+              "description": "a stage to fight in summer event",
+              "allow_custom": true
             }
           }
         }

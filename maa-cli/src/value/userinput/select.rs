@@ -7,7 +7,8 @@ use std::{
     str::FromStr,
 };
 
-use serde::{Deserialize, Serialize};
+use anyhow::bail;
+use serde::Deserialize;
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
@@ -40,20 +41,15 @@ impl<'de, S: Deserialize<'de>> Deserialize<'de> for Select<S> {
             allow_custom: bool,
         }
 
-        let helper = SelectHelper::deserialize(deserializer)?;
+        let helper = SelectHelper::<S>::deserialize(deserializer)?;
 
-        if helper.default_index.is_some()
-            && helper.default_index.unwrap() >= helper.alternatives.len()
-        {
-            return Err(serde::de::Error::custom("default_index out of range"));
-        }
-
-        Ok(Select {
-            alternatives: helper.alternatives,
-            default_index: helper.default_index,
-            description: helper.description,
-            allow_custom: helper.allow_custom,
-        })
+        Select::raw_new(
+            helper.alternatives,
+            helper.default_index,
+            helper.description,
+            helper.allow_custom,
+        )
+        .map_err(serde::de::Error::custom)
     }
 }
 
@@ -92,60 +88,78 @@ impl<A> Select<A> {
     /// If user input a number in range like `1`, it will be return the first alternative `CE-5`.
     /// If user input a custom value like `CE-4`, it will be return the custom value `CE-4`.
     ///
-    /// # panic
+    /// # Errors
     ///
-    /// panic if `default_index` is out of range of `alternatives`.
-    pub fn new<Item, Iter, Desc>(
+    /// - `alternatives` is empty;
+    /// - `default_index` is out of range;
+    pub fn new<Item, Iter>(
         alternatives: Iter,
         default_index: Option<usize>,
-        description: Option<Desc>,
+        description: Option<&str>,
         allow_custom: bool,
-    ) -> Self
+    ) -> anyhow::Result<Self>
     where
         Item: Into<A>,
         Iter: IntoIterator<Item = Item>,
-        Desc: Into<String>,
     {
-        let alternatives: Vec<A> = alternatives.into_iter().map(|i| i.into()).collect();
-        if let Some(default_index) = default_index {
-            if default_index > alternatives.len() || default_index == 0 {
-                panic!("default_index out of range");
-            }
+        Self::raw_new(
+            alternatives.into_iter().map(Into::into).collect(),
+            default_index,
+            description.map(|s| s.into()),
+            allow_custom,
+        )
+    }
+
+    fn raw_new(
+        alternatives: Vec<A>,
+        mut default_index: Option<usize>,
+        description: Option<String>,
+        allow_custom: bool,
+    ) -> anyhow::Result<Self> {
+        if alternatives.is_empty() {
+            bail!("alternatives is empty");
         }
-        Self {
+
+        if let Some(ref mut default_index) = default_index {
+            if *default_index > alternatives.len() || *default_index < 1 {
+                bail!("default_index out of range (1 - {})", alternatives.len());
+            }
+            *default_index -= 1;
+        }
+
+        Ok(Self {
             alternatives,
             default_index,
-            description: description.map(|s| s.into()),
+            description,
             allow_custom,
-        }
+        })
     }
 }
 
-impl<S: Selectable> UserInput for Select<S> {
+impl<S> UserInput for Select<S>
+where
+    S: Selectable,
+{
     type Value = S::Value;
 
-    fn default(&self) -> Option<Self::Value> {
+    fn default(mut self) -> Result<Self::Value, Self> {
         self.default_index
-            .map(|i| {
-                self.alternatives
-                    .get(i.saturating_sub(1))
-                    .map(|a| a.value())
-            })
-            .flatten()
+            .map(|i| self.alternatives.swap_remove(i).value())
+            .ok_or(self)
     }
 
     /// Get the first alternative as default value if default_index is not set.
-    fn batch_default(&self) -> Option<Self::Value> {
-        self.alternatives
-            .get(self.default_index.unwrap_or(1).saturating_sub(1))
-            .map(|a| a.value())
+    fn batch_default(mut self) -> Result<Self::Value, Self> {
+        Ok(self
+            .alternatives
+            .swap_remove(self.default_index.unwrap_or(0))
+            .value())
     }
 
-    fn prompt(&self, mut writer: impl Write) -> io::Result<()> {
+    fn prompt(&self, writer: &mut impl Write) -> io::Result<()> {
         for (i, alternative) in self.alternatives.iter().enumerate() {
-            write!(writer, "{}. ", i + 1);
-            alternative.desc(writer)?;
-            if self.default_index.is_some_and(|d| d == i + 1) {
+            write!(writer, "{}. {}", i + 1, alternative.display())?;
+            if self.default_index.is_some_and(|d| d == i) {
                 writeln!(writer, " [default]")?;
             } else {
                 writeln!(writer)?;
@@ -166,12 +180,12 @@ impl<S: Selectable> UserInput for Select<S> {
         write!(writer, ": ")
     }
 
-    fn prompt_no_default(&self, mut writer: impl Write) -> io::Result<()> {
+    fn prompt_no_default(&self, writer: &mut impl Write) -> io::Result<()> {
         write!(writer, "Default not set, please select")?;
         if let Some(description) = &self.description {
-            writeln!(writer, " {}", description)?;
+            write!(writer, " {}", description)?;
         } else {
-            writeln!(writer, "one of the alternatives")?;
+            write!(writer, " one of the alternatives")?;
         }
         if self.allow_custom {
             write!(writer, " or input a custom value")?;
@@ -179,42 +193,51 @@ impl<S: Selectable> UserInput for Select<S> {
         write!(writer, ": ")
     }
 
-    fn parse(&self, input: &str) -> Result<Self::Value, String> {
+    fn parse(
+        mut self,
+        input: &str,
+        writer: &mut impl Write,
+    ) -> Result<Self::Value, io::Result<Self>> {
+        let len = self.alternatives.len();
         match input.parse::<usize>() {
-            Ok(index) => match self.alternatives.get(index - 1) {
-                Some(alternative) => Ok(alternative.value()),
-                None => Err(format!(
-                    "Index {} out of range, please try again (1 - {}): ",
-                    index,
-                    self.alternatives.len()
-                )),
-            },
-            Err(_) if self.allow_custom => <S as Selectable>::parse(input).map_err(|_| {
-                format!(
-                    "Invalid input \"{}\"\
-                    please input an index number (1 - {}) or a custom value",
-                    input,
-                    self.alternatives.len()
-                )
-            }),
-            Err(_) => Err(format!(
-                "Invalid index \"{}\", please input an index number (1 - {})",
-                input,
-                self.alternatives.len()
-            )),
-        }
-    }
-}
+            Ok(index) => {
+                if index > len || index < 1 {
+                    err_err!(write!(
+                        writer,
+                        "Index {} out of range, please try again (1 - {})",
+                        index, len
+                    ));
 
-impl<S> Serialize for Select<S>
-where
-    S: Selectable + Serialize,
-    S::Value: Serialize,
-{
-    fn serialize<Se: serde::Serializer>(&self, serializer: Se) -> Result<Se::Ok, Se::Error> {
-        self.value()
-            .map_err(serde::ser::Error::custom)?
-            .serialize(serializer)
+                    Err(Ok(self))
+                } else {
+                    Ok(self
+                        .alternatives
+                        .swap_remove(index.saturating_sub(1))
+                        .value())
+                }
+            }
+            Err(_) if self.allow_custom => match S::parse(input) {
+                Ok(value) => Ok(value),
+                Err(_) => {
+                    err_err!(write!(
+                        writer,
+                        "Invalid input \"{}\", please input an index number (1 - {}) or a custom value",
+                        input, len
+                    ));
+
+                    Err(Ok(self))
+                }
+            },
+            Err(_) => {
+                err_err!(write!(
+                    writer,
+                    "Invalid index \"{}\", please input an index number (1 - {})",
+                    input, len
+                ));
+
+                Err(Ok(self))
+            }
+        }
     }
 }
 
@@ -225,8 +248,7 @@ pub trait Selectable {
     /// Get the value of this element, consum self.
     fn value(self) -> Self::Value;
 
-    /// Return the description of this element.
-    fn desc(&self, writer: impl Write) -> io::Result<()>;
+    fn display(&self) -> String;
 
     /// Parse a string to value of this element.
     ///
@@ -237,18 +259,14 @@ pub trait Selectable {
 
 #[cfg_attr(test, derive(PartialEq, Debug))]
 #[derive(Deserialize, Clone)]
-#[serde(untagged)]
+#[serde(untagged, deny_unknown_fields)]
 pub enum ValueWithDesc<T> {
     Value(T),
     WithDesc { value: T, desc: String },
 }
 
 impl<T: Display> ValueWithDesc<T> {
-    pub fn new<V, D>(value: V, description: Option<D>) -> Self
-    where
-        V: Into<T>,
-        D: Into<String>,
-    {
+    pub fn new(value: impl Into<T>, description: Option<&str>) -> Self {
         match description {
             Some(description) => ValueWithDesc::WithDesc {
                 value: value.into(),
@@ -259,16 +277,18 @@ impl<T: Display> ValueWithDesc<T> {
     }
 
     fn value(self) -> T {
+        use ValueWithDesc::*;
         match self {
-            ValueWithDesc::Value(value) => value,
-            ValueWithDesc::WithDesc { value, .. } => value,
+            Value(value) => value,
+            WithDesc { value, .. } => value,
         }
     }
 
-    fn desc(&self, mut writer: impl Write) -> io::Result<()> {
+    fn desc(&self) -> String {
+        use ValueWithDesc::*;
         match self {
-            ValueWithDesc::Value(value) => write!(writer, "{}", value),
-            ValueWithDesc::WithDesc { desc, .. } => write!(writer, "{}", desc),
+            Value(value) => format!("{value}"),
+            WithDesc { value, desc } => format!("{value} ({desc})"),
         }
     }
 }
@@ -285,15 +305,6 @@ impl From<&str> for ValueWithDesc<String> {
     }
 }
 
-impl<S: Serialize> Serialize for ValueWithDesc<S> {
-    fn serialize<Se: serde::Serializer>(&self, serializer: Se) -> Result<Se::Ok, Se::Error> {
-        match self {
-            ValueWithDesc::Value(value) => value.serialize(serializer),
-            ValueWithDesc::WithDesc { value, .. } => value.serialize(serializer),
-        }
-    }
-}
-
 impl Selectable for ValueWithDesc<i64> {
     type Value = i64;
     type Error = <i64 as FromStr>::Err;
@@ -302,8 +313,8 @@ impl Selectable for ValueWithDesc<i64> {
         self.value()
     }
 
-    fn desc(&self, mut f: impl Write) -> io::Result<()> {
-        self.desc(&mut f)
+    fn display(&self) -> String {
+        self.desc()
     }
 
     fn parse(input: &str) -> Result<i64, Self::Error> {
@@ -319,8 +330,8 @@ impl Selectable for ValueWithDesc<f64> {
         self.value()
     }
 
-    fn desc(&self, writer: impl Write) -> io::Result<()> {
-        self.desc(writer)
+    fn display(&self) -> String {
+        self.desc()
     }
 
     fn parse(input: &str) -> Result<f64, Self::Error> {
@@ -336,8 +347,8 @@ impl Selectable for ValueWithDesc<String> {
         self.value()
     }
 
-    fn desc(&self, mut writer: impl Write) -> io::Result<()> {
-        self.desc(writer)
+    fn display(&self) -> String {
+        self.desc()
     }
 
     fn parse(input: &str) -> Result<String, Self::Error> {
@@ -357,7 +368,7 @@ mod tests {
 
     use crate::assert_matches;
 
-    use serde_test::{assert_de_tokens, assert_ser_tokens_error, Token};
+    use serde_test::{assert_de_tokens, Token};
 
     // Use this function to get a Select with most fields set to Some.
     fn test_full() -> SelectD<String> {
@@ -367,14 +378,15 @@ mod tests {
                 ValueWithDesc::new("CE-6", Some("LMB stage 6")),
             ],
             Some(2),
-            Some("stage to fight"),
+            Some("a stage to fight"),
             true,
         )
+        .unwrap()
     }
 
     // Use this function to get a Select with most fields set to None.
     fn test_none() -> SelectD<String> {
-        SelectD::<String>::new(vec!["CE-5", "CE-6"], None, None::<&str>, false)
+        SelectD::<String>::new(vec!["CE-5", "CE-6"], None, None, false).unwrap()
     }
 
     #[test]
@@ -391,13 +403,13 @@ mod tests {
                 Token::Map { len: Some(2) },
                 Token::Str("value"),
                 Token::Str("CE-5"),
-                Token::Str("description"),
+                Token::Str("desc"),
                 Token::Str("LMB stage 5"),
                 Token::MapEnd,
                 Token::Map { len: Some(2) },
                 Token::Str("value"),
                 Token::Str("CE-6"),
-                Token::Str("description"),
+                Token::Str("desc"),
                 Token::Str("LMB stage 6"),
                 Token::MapEnd,
                 Token::SeqEnd,
@@ -406,7 +418,7 @@ mod tests {
                 Token::U64(2),
                 Token::Str("description"),
                 Token::Some,
-                Token::Str("stage to fight"),
+                Token::Str("a stage to fight"),
                 Token::Str("allow_custom"),
                 Token::Bool(true),
                 Token::MapEnd,
@@ -420,12 +432,6 @@ mod tests {
                 Token::SeqEnd,
             ],
         );
-
-        assert_ser_tokens_error(
-            &values,
-            &[Token::Seq { len: Some(2) }, Token::String("CE-6")],
-            "can not get default value in batch mode",
-        );
     }
 
     #[test]
@@ -437,8 +443,10 @@ mod tests {
                 default_index: Some(1),
                 description: Some(description),
                 allow_custom: true,
-            } if alternatives == ["CE-5", "CE-6"].into_iter().map(|s| s.into()).collect::<Vec<_>>()
-                && description == "a number"
+            } if alternatives == [
+                ValueWithDesc::new("CE-5", Some("LMB stage 5")),
+                ValueWithDesc::new("CE-6", Some("LMB stage 6")),
+            ] && description == "a stage to fight"
         );
 
         assert_matches!(
@@ -449,34 +457,47 @@ mod tests {
                 description: None,
                 allow_custom: false,
             } if alternatives == vec!["CE-5", "CE-6"].into_iter().map(|s| s.into()).collect::<Vec<_>>()
+        );
+
+        assert_eq!(
+            SelectD::<String>::new::<&str, [_; 0]>([], None, None, false)
+                .unwrap_err()
+                .to_string(),
+            "alternatives is empty"
+        );
+
+        assert_eq!(
+            SelectD::<String>::new(["CE-5", "CE-6"], Some(3), None, false)
+                .unwrap_err()
+                .to_string(),
+            "default_index out of range (1 - 2)"
         )
     }
 
     #[test]
     fn default() {
         assert_eq!(test_full().default().unwrap(), "CE-6");
-        assert_eq!(test_none().default(), None)
+        assert_eq!(test_none().default().unwrap_err(), test_none());
     }
 
     #[test]
     fn batch_default() {
         assert_eq!(test_full().batch_default().unwrap(), "CE-6");
-        assert_eq!(test_none().batch_default().unwrap(), "CE-5")
+        assert_eq!(test_none().batch_default().unwrap(), "CE-5");
     }
 
     #[test]
     fn prompt() {
         let mut buffer = Vec::new();
-
         test_full().prompt(&mut buffer).unwrap();
         assert_eq!(
             String::from_utf8(buffer).unwrap(),
-            "1. LMB stage 5\n\
-             2. LMB stage 6 [default]\n\
+            "1. CE-5 (LMB stage 5)\n\
+             2. CE-6 (LMB stage 6) [default]\n\
              Please select a stage to fight or input a custom value (empty for default): "
         );
-        buffer.clear();
 
+        let mut buffer = Vec::new();
         test_none().prompt(&mut buffer).unwrap();
         assert_eq!(
             String::from_utf8(buffer).unwrap(),
@@ -484,20 +505,18 @@ mod tests {
              2. CE-6\n\
              Please select one of the alternatives: "
         );
-        buffer.clear();
     }
 
     #[test]
     fn prompt_no_default() {
         let mut buffer = Vec::new();
-
         test_full().prompt_no_default(&mut buffer).unwrap();
         assert_eq!(
             String::from_utf8(buffer).unwrap(),
             "Default not set, please select a stage to fight or input a custom value: "
         );
-        buffer.clear();
 
+        let mut buffer = Vec::new();
         test_none().prompt_no_default(&mut buffer).unwrap();
         assert_eq!(
             String::from_utf8(buffer).unwrap(),
@@ -507,24 +526,31 @@ mod tests {
 
     #[test]
     fn parse() {
-        let select =
-            SelectD::<String>::new(["CE-5", "CE-6"], Some(2), Some("a stage to fight"), true);
+        let select = SelectD::new([1.0, 3.0], Some(2), None, true).unwrap();
 
-        assert_eq!(select.parse("").unwrap(), "CE-6");
-        assert_eq!(select.parse("1").unwrap(), "CE-5");
-        assert_eq!(select.parse("CE-4").unwrap(), "CE-4");
+        let mut output = Vec::new();
+        assert_eq!(select.clone().parse("1", &mut output).unwrap(), 1.0);
+        assert_eq!(select.clone().parse("2.0", &mut output).unwrap(), 2.0);
         assert_eq!(
-            select.parse("3").unwrap_err(),
-            "Index 3 out of range, please try again (1 - 2): "
+            select.clone().parse("3", &mut output).unwrap_err().unwrap(),
+            select
+        );
+        assert_eq!(
+            select.clone().parse("x", &mut output).unwrap_err().unwrap(),
+            select
         );
 
-        let select = SelectD::<f64>::new([1.0, 2.0], Some(2), Some("a float"), false);
-
-        assert_eq!(select.parse("").unwrap(), 2.0);
-        assert_eq!(select.parse("1").unwrap(), 1.0);
+        let select = SelectD::new([1.0, 3.0], Some(2), None, false).unwrap();
         assert_eq!(
-            select.parse("Invalid").unwrap_err(),
-            "Invalid index \"Invalid\", please input an index number (1 - 2)"
+            select.clone().parse("x", &mut output).unwrap_err().unwrap(),
+            select.clone()
+        );
+
+        assert_eq!(
+            String::from_utf8(output).unwrap(),
+            "Index 3 out of range, please try again (1 - 2)\
+             Invalid input \"x\", please input an index number (1 - 2) or a custom value\
+             Invalid index \"x\", please input an index number (1 - 2)"
         );
     }
 
@@ -533,7 +559,7 @@ mod tests {
 
         #[test]
         fn int() {
-            let value = ValueWithDesc::<i64>::new(1, None::<&str>);
+            let value = ValueWithDesc::<i64>::new(1, None);
             assert_eq!(value.value(), 1);
             assert_eq!(ValueWithDesc::<i64>::parse("1").unwrap(), 1);
             assert!(ValueWithDesc::<i64>::parse("a").is_err())
@@ -541,7 +567,7 @@ mod tests {
 
         #[test]
         fn float() {
-            let value = ValueWithDesc::<f64>::new(1.0, None::<&str>);
+            let value = ValueWithDesc::<f64>::new(1.0, None);
             assert_eq!(value.value(), 1.0);
             assert_eq!(ValueWithDesc::<f64>::parse("1.0").unwrap(), 1.0);
             assert!(ValueWithDesc::<f64>::parse("a").is_err())
@@ -549,7 +575,7 @@ mod tests {
 
         #[test]
         fn string() {
-            let value = ValueWithDesc::<String>::new("a", None::<&str>);
+            let value = ValueWithDesc::<String>::new("a", None);
             assert_eq!(value.value(), "a");
             assert_eq!(ValueWithDesc::<String>::parse("a").unwrap(), "a");
         }
