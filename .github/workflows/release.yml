@@ -122,13 +122,16 @@ jobs:
         run: |
           MAA_VERSION="${{ needs.meta.outputs.version }}"
           if [ $(uname) == "Darwin" ]; then
-            SED_INPUT_ARGS='-i ""' # BSD sed needs an extension for backup
+            SED="sed -i '' -E" # BSD sed should use '' as backup extension
           else
-            SED_INPUT_ARGS="-i"
+            SED="sed -i -E"
           fi
           S="[[:space:]]" # BSD sed doesn't support \s
-          sed $SED_INPUT_ARGS -E "1,6 s/(version${S}*=${S}*)\"[^\"]+\"/\1\"$MAA_VERSION\"/" maa-cli/Cargo.toml
-          sed $SED_INPUT_ARGS -E "s/(name${S}*=${S}*\"maa-cli\"${S}*\\n${S}*version${S}*=${S}*)\"[^\"]+\"/\1\"$MAA_VERSION\"/" Cargo.lock
+          $SED "1,6 s/(version${S}*=${S}*)\"[^\"]+\"/\1\"$MAA_VERSION\"/" maa-cli/Cargo.toml
+          NL=$(grep -n -E "name${S}*=${S}*\"maa-cli\"" Cargo.lock | cut -d: -f1)
+          NS=$((NL - 1))
+          NE=$((NL + 3))
+          $SED "$NS,$NE s/(version${S}*=${S}*)\"[^\"]+\"/\1\"$MAA_VERSION\"/" Cargo.lock
           {
             echo "Patch Version (${{ matrix.os }}, ${{ matrix.arch }})"
             echo '```diff'
