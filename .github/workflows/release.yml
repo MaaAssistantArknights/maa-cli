@@ -91,7 +91,6 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-
   build:
     name: Build
     needs: meta
@@ -119,25 +118,36 @@ jobs:
         with:
           os: ${{ matrix.os }}
           arch: ${{ matrix.arch }}
-      - name: Patch Cargo.toml (BSD sed)
+      - name: Patch Version (BSD sed)
         if: ${{ startsWith(matrix.os, 'macos') }}
-        working-directory: maa-cli
         run: |
-          sed -i "" '1,6 s/^version = .*/version = "${{ needs.meta.outputs.version }}"/' Cargo.toml
-          git diff Cargo.toml
-      - name: Patch Cargo.toml (GNU sed)
+          sed -i "" '1,6 s/(version\s*=\s*)"[^"]+"/\1"${{ needs.meta.outputs.version }}"/' maa-cli/Cargo.toml
+          sed -i "" 's/(name\s*=\s*"maa-cli"\s*\n\s*version\s*=\s*)"[^"]+"/\1"${{ needs.meta.outputs.version }}"/' Cargo.lock
+          {
+            echo "Patch Version (BSD sed, ${{ matrix.os }}, ${{ matrix.arch }})"
+            echo '```diff'
+            git diff
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Patch Version (GNU sed)
         if: ${{ !startsWith(matrix.os, 'macos') }}
-        working-directory: maa-cli
         run: |
-          sed -i '1,6 s/^version = .*/version = "${{ needs.meta.outputs.version }}"/' Cargo.toml
-          git diff Cargo.toml
+          sed -i '1,6 s/(version\s*=\s*)"[^"]+"/\1"${{ needs.meta.outputs.version }}"/' maa-cli/Cargo.toml
+          sed -i 's/(name\s*=\s*"maa-cli"\s*\n\s*version\s*=\s*)"[^"]+"/\1"${{ needs.meta.outputs.version }}"/' Cargo.lock
+          {
+            echo "Patch Version (GNU sed, ${{ matrix.os }}, ${{ matrix.arch }})"
+            echo '```diff'
+            git diff
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          git diff
       - name: Build
         env:
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 1
           CARGO_PROFILE_RELEASE_LTO: true
           CARGO_PROFILE_RELEASE_STRIP: true
         run: |
-          cargo build --release --package maa-cli \
+          cargo build --release --package maa-cli --locked \
             ${{ matrix.arch != 'x86_64' && '--features git2/vendored-openssl,reqwest/native-tls-vendored' || '' }}
       - name: Tar Artifact
         run: |
