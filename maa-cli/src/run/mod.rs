@@ -165,6 +165,7 @@ where
     });
 
     if !args.dry_run {
+        #[cfg(target_os = "macos")]
         let rt = Runtime::new().context("Failed to create tokio runtime")?;
 
         #[cfg(target_os = "macos")]
