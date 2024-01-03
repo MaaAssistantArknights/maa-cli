@@ -127,7 +127,7 @@ jobs:
             SED_INPUT_ARGS="-i"
           fi
           S="[[:space:]]" # BSD sed doesn't support \s
-          sed $SED_INPUT_ARGS -E "s/(version${S}*=${S}*)\"[^\"]+\"/\1\"$MAA_VERSION\"/" maa-cli/Cargo.toml
+          sed $SED_INPUT_ARGS -E "1,6 s/(version${S}*=${S}*)\"[^\"]+\"/\1\"$MAA_VERSION\"/" maa-cli/Cargo.toml
           sed $SED_INPUT_ARGS -E "s/(name${S}*=${S}*\"maa-cli\"${S}*\\n${S}*version${S}*=${S}*)\"[^\"]+\"/\1\"$MAA_VERSION\"/" Cargo.lock
           {
             echo "Patch Version (${{ matrix.os }}, ${{ matrix.arch }})"
