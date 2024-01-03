@@ -1,45 +1,48 @@
 use crate::{
-    config::task::{
-        task_type::MAATask,
-        value::input::{BoolInput, Input, Select},
-        MAAValue, Task, TaskConfig,
-    },
+    config::task::{task_type::MAATask, ClientType, Task, TaskConfig},
     object,
+    value::{
+        userinput::{BoolInput, Input, SelectD, ValueWithDesc},
+        MAAValue, Map,
+    },
 };
 
 use anyhow::Result;
 
-pub fn fight<S>(stage: Option<S>, startup: bool, closedown: bool) -> Result<TaskConfig>
-where
-    S: Into<String>,
-{
+impl From<ClientType> for ValueWithDesc<String> {
+    fn from(client: ClientType) -> Self {
+        Self::Value(client.to_string())
+    }
+}
+
+pub fn fight(stage: String, startup: bool, closedown: bool) -> Result<TaskConfig> {
     let mut task_config = TaskConfig::new();
 
+    use MAAValue::OptionalInput;
     if startup {
+        use ClientType::*;
         task_config.push(Task::new_with_default(
             MAATask::StartUp,
             object!(
                 "start_game_enabled" => BoolInput::new(Some(true), Some("start game")),
-                "client_type" => Select::<String>::new(
-                    // TODO: a select type that accepts a enum (maybe a trait)
-                    vec!["Official", "Bilibili", "Txwy", "YoStarEN", "YoStarJP", "YoStarKR"],
-                    Some("client type"),
-                ),
+                "client_type" => OptionalInput {
+                    deps: Map::from([("start_game_enabled".to_string(), true.into())]),
+                    input: SelectD::<String>::new(
+                        vec![Official, Bilibili, Txwy, YoStarEN, YoStarJP, YoStarKR],
+                        Some(1),
+                        Some("a client type"),
+                        true,
+                    ).unwrap().into(),
+                }
             ),
         ));
     }
-
-    let stage = if let Some(stage) = stage {
-        MAAValue::String(stage.into())
-    } else {
-        Input::<String>::new(Some("1-7"), Some("a stage to fight")).into()
-    };
 
     task_config.push(Task::new_with_default(
         MAATask::Fight,
         object!(
             "stage" => stage,
-            "medicine" => Input::<i64>::new(Some(0), Some("medicine to use")),
+            "medicine" => Input::new(Some(0), Some("the number of medicine to use")),
         ),
     ));
 
@@ -57,40 +60,57 @@ where
 mod tests {
     use super::*;
 
-    use crate::{
-        assert_matches,
-        config::task::{task_type::TaskOrUnknown, ClientType, InitializedTaskConfig},
-    };
+    use crate::config::task::{InitializedTask, InitializedTaskConfig};
 
     #[test]
     fn test_fight() {
-        assert_matches!(
-            fight::<&str>(None, true, true).unwrap().init().unwrap(),
+        use ClientType::*;
+
+        assert_eq!(
+            fight("1-7".to_string(), true, true)
+                .unwrap()
+                .init()
+                .unwrap(),
             InitializedTaskConfig {
                 client_type: Some(ClientType::Official),
                 start_app: true,
                 close_app: true,
-                tasks
-            } if tasks.len() == 3 && {
-                let fight = &tasks[1];
-                fight.task_type() == &TaskOrUnknown::MAATask(MAATask::Fight)
-                    && fight.params().get("stage").unwrap().as_string().unwrap() == "1-7"
-                    && fight.params().get("medicine").unwrap().as_int().unwrap() == 0
+                tasks: vec![
+                    InitializedTask::new_noname(
+                        MAATask::StartUp,
+                        object!(
+                            "start_game_enabled" => true,
+                            "client_type" => Official.as_ref(),
+                        ),
+                    ),
+                    InitializedTask::new_noname(
+                        MAATask::Fight,
+                        object!(
+                            "stage" => "1-7",
+                            "medicine" => 0,
+                        ),
+                    ),
+                    InitializedTask::new_noname(MAATask::CloseDown, object!()),
+                ],
             }
         );
 
-        assert_matches!(
-            fight(Some("CE-6"), false, false).unwrap().init().unwrap(),
+        assert_eq!(
+            fight("CE-6".to_string(), false, false)
+                .unwrap()
+                .init()
+                .unwrap(),
             InitializedTaskConfig {
                 client_type: None,
                 start_app: false,
                 close_app: false,
-                tasks
-            } if tasks.len() == 1 && {
-                let fight = &tasks[0];
-                fight.task_type() == &TaskOrUnknown::MAATask(MAATask::Fight)
-                    && fight.params().get("stage").unwrap().as_string().unwrap() == "CE-6"
-                    && fight.params().get("medicine").unwrap().as_int().unwrap() == 0
+                tasks: vec![InitializedTask::new_noname(
+                    MAATask::Fight,
+                    object!(
+                        "stage" => "CE-6",
+                        "medicine" => 0,
+                    ),
+                )],
             }
         )
     }

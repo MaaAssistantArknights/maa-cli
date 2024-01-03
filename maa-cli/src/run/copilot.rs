@@ -1,11 +1,11 @@
 use crate::{
-    config::task::{
-        task_type::MAATask,
-        value::input::{BoolInput, Input},
-        MAAValue, Task, TaskConfig,
-    },
+    config::task::{task_type::MAATask, Task, TaskConfig},
     dirs::{self, Ensure},
     object,
+    value::{
+        userinput::{BoolInput, Input},
+        MAAValue,
+    },
 };
 
 use std::{
@@ -15,7 +15,7 @@ use std::{
 };
 
 use anyhow::{bail, Context, Result};
-use log::{debug, info, trace, warn};
+use log::{debug, trace, warn};
 use prettytable::{format, row, Table};
 use serde_json::Value as JsonValue;
 
@@ -37,10 +37,10 @@ pub fn copilot(uri: impl AsRef<str>, resource_dirs: &Vec<PathBuf>) -> Result<Tas
         .context("Failed to get stage ID")?;
     let stage_name = task_type.get_stage_name(resource_dirs, stage_id)?;
 
-    info!("Copilot Stage: {}", stage_name);
+    println!("Copilot Stage: {}", stage_name);
 
     // Print operators info
-    info!("Operators:\n{}", operator_table(&value)?);
+    println!("Operators:\n{}", operator_table(&value)?);
 
     // Append task
     let mut task_config = TaskConfig::new();
@@ -131,20 +131,19 @@ impl CopilotType {
                 let stage_files = dirs::global_find(base_dirs, |dir| {
                     let dir = dir.join("Arknights-Tile-Pos");
                     trace!("Searching stage file in {}", dir.display());
-                    fs::read_dir(dir)
-                        .map(|entries| {
-                            entries
-                                .filter_map(|entry| entry.map(|e| e.path()).ok())
-                                .find(|file_path| {
-                                    file_path.file_name().map_or(false, |file_name| {
-                                        file_name.to_str().map_or(false, |file_name| {
-                                            file_name.starts_with(stage_id)
-                                                && file_name.ends_with("json")
-                                        })
+                    fs::read_dir(dir).ok().and_then(|entries| {
+                        entries
+                            .filter_map(|entry| entry.map(|e| e.path()).ok())
+                            .find(|file_path| {
+                                file_path
+                                    .file_name()
+                                    .and_then(|file_name| file_name.to_str())
+                                    .map_or(false, |file_name| {
+                                        file_name.starts_with(stage_id)
+                                            && file_name.ends_with("json")
                                     })
-                                })
-                        })
-                        .unwrap_or(None)
+                            })
+                    })
                 });
 
                 if let Some(stage_file) = stage_files.last() {
@@ -179,7 +178,7 @@ impl CopilotType {
                 MAATask::SSSCopilot,
                 object!(
                     "filename" => filename.as_ref(),
-                    "loop_times" => Input::<i64>::new(Some(1), Some("loop times"))
+                    "loop_times" => Input::new(Some(1), Some("loop times"))
                 ),
             ),
         }

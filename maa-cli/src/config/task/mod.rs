@@ -1,6 +1,3 @@
-pub mod value;
-pub use value::MAAValue;
-
 pub mod task_type;
 use task_type::{MAATask, TaskOrUnknown};
 
@@ -10,7 +7,7 @@ pub use client_type::ClientType;
 mod condition;
 use condition::Condition;
 
-use crate::{dirs, object};
+use crate::{dirs, object, value::MAAValue};
 
 use std::path::PathBuf;
 
@@ -185,16 +182,16 @@ impl TaskConfig {
 
         let mut tasks: Vec<InitializedTask> = Vec::new();
 
+        use TaskOrUnknown::Task;
         for task in self.tasks.iter() {
             if task.is_active() {
                 let task_type = task.task_type();
-                let mut params = task.params();
-                params.init()?;
+                let mut params = task.params().init()?;
 
                 match task_type {
-                    TaskOrUnknown::MAATask(MAATask::StartUp) => {
-                        let start_game = params.get_or("enable", true)?
-                            && params.get_or("start_game_enabled", false)?;
+                    Task(MAATask::StartUp) => {
+                        let start_game = params.get_or("enable", true)
+                            && params.get_or("start_game_enabled", false);
 
                         match (start_game, startup) {
                             (true, None) => {
@@ -210,7 +207,11 @@ impl TaskConfig {
                         match (params.get("client_type"), client_type) {
                             // If client_type in task is set, set client type in config automatically
                             (Some(t), None) => {
-                                client_type = Some(t.as_string()?.parse()?);
+                                client_type = Some(
+                                    t.as_str()
+                                        .context("client_type must be a string")?
+                                        .parse()?,
+                                );
                             }
                             // If client type in config is set, set client_type in task automatically
                             (None, Some(t)) => {
@@ -221,8 +222,8 @@ impl TaskConfig {
 
                         prepend_startup = false;
                     }
-                    TaskOrUnknown::MAATask(MAATask::CloseDown) => {
-                        match (params.get_or("enable", true)?, closedown) {
+                    Task(MAATask::CloseDown) => {
+                        match (params.get_or("enable", true), closedown) {
                             // If closedown task is enabled, enable closedown automatically
                             (true, None) => {
                                 closedown = Some(true);
@@ -242,7 +243,8 @@ impl TaskConfig {
                         // it will be treated as a relative path to the config directory
                         // and will be converted to an absolute path.
                         if let Some(v) = params.get("filename") {
-                            let file = PathBuf::from(v.as_string()?);
+                            let file: PathBuf =
+                                v.as_str().context("filename must be a string")?.into();
                             let sub_dir = task_type.as_ref().to_lowercase();
                             if let Some(path) = dirs::abs_config(file, Some(sub_dir)) {
                                 params.insert("filename", path.to_str().context("Invilid UTF-8")?)
@@ -302,7 +304,11 @@ pub struct InitializedTask {
 }
 
 impl InitializedTask {
-    fn new(name: Option<String>, task_type: impl Into<TaskOrUnknown>, params: MAAValue) -> Self {
+    pub fn new(
+        name: Option<String>,
+        task_type: impl Into<TaskOrUnknown>,
+        params: MAAValue,
+    ) -> Self {
         Self {
             name,
             task_type: task_type.into(),
@@ -310,7 +316,7 @@ impl InitializedTask {
         }
     }
 
-    fn new_noname(task_type: impl Into<TaskOrUnknown>, params: MAAValue) -> Self {
+    pub fn new_noname(task_type: impl Into<TaskOrUnknown>, params: MAAValue) -> Self {
         Self::new(None, task_type.into(), params)
     }
 
@@ -334,6 +340,12 @@ mod tests {
     use crate::object;
 
     use task_type::MAATask;
+
+    impl TaskConfig {
+        pub fn tasks(&self) -> &[Task] {
+            &self.tasks
+        }
+    }
 
     mod task {
         use super::*;
@@ -381,7 +393,7 @@ mod tests {
         fn get_type() {
             assert_eq!(
                 Task::new_with_default(MAATask::StartUp, object!()).task_type(),
-                &MAATask::StartUp.into()
+                &MAATask::StartUp,
             );
         }
 
@@ -492,16 +504,10 @@ mod tests {
     mod task_config {
         use super::*;
 
-        impl TaskConfig {
-            pub fn tasks(&self) -> &[Task] {
-                &self.tasks
-            }
-        }
-
         mod serde {
             use super::*;
 
-            use value::input::{BoolInput, Input, Select};
+            use crate::value::userinput::{BoolInput, Input, SelectD};
 
             use chrono::{NaiveDateTime, NaiveTime, TimeZone, Weekday};
 
@@ -520,12 +526,28 @@ mod tests {
             }
 
             fn example_task_config() -> TaskConfig {
+                use crate::value::Map;
+                use ClientType::*;
+                use MAAValue::OptionalInput;
+
                 let mut task_list = TaskConfig::new();
 
                 task_list.push(Task::new_with_default(
                     MAATask::StartUp,
                     object!(
-                        "client_type" => "Official",
+                        "client_type" => OptionalInput {
+                            deps: Map::from([("start_game_enabled".to_string(), true.into())]),
+                            input: SelectD::<String>::new(
+                                vec![
+                                    Official,
+                                    YoStarEN,
+                                    YoStarJP,
+                                ],
+                                None,
+                                Some("a client type"),
+                                false
+                            ).unwrap().into(),
+                        },
                         "start_game_enabled" => BoolInput::new(
                             Some(true),
                             Some("start the game"),
@@ -534,50 +556,52 @@ mod tests {
                 ));
 
                 task_list.push(Task::new(
-                Some("Fight Daily".to_string()),
-                MAATask::Fight,
-                object!(),
-                Strategy::Merge,
-                vec![
-                    TaskVariant {
-                        condition: Condition::Weekday {
-                            weekdays: vec![Weekday::Sun],
+                    Some("Fight Daily".to_string()),
+                    MAATask::Fight,
+                    object!(),
+                    Strategy::Merge,
+                    vec![
+                        TaskVariant {
+                            condition: Condition::Weekday {
+                                weekdays: vec![Weekday::Sun],
+                            },
+                            params: object!("expiring_medicine" => 5),
                         },
-                        params: object!("expiring_medicine" => 5),
-                    },
-                    TaskVariant {
-                        condition: Condition::Always,
-                        params: object!(
-                            "stage" => Input {
-                                default: Some("1-7".to_string()),
-                                description: Some("a stage to fight".to_string())
-                            }
-                        ),
-                    },
-                    TaskVariant {
-                        condition: Condition::Weekday {
-                            weekdays: vec![Weekday::Tue, Weekday::Thu, Weekday::Sat],
+                        TaskVariant {
+                            condition: Condition::Always,
+                            params: object!(
+                                "stage" => Input::new(
+                                    Some("1-7".to_string()),
+                                    Some("a stage to fight"),
+                                ),
+                            ),
                         },
-                        params: object!("stage" => "CE-6"),
-                    },
-                    TaskVariant {
-                        condition: Condition::DateTime {
-                            start: Some(naive_local_datetime(2023, 8, 1, 16, 0, 0)),
-                            end: Some(naive_local_datetime(2023, 8, 21, 3, 59, 59)),
+                        TaskVariant {
+                            condition: Condition::Weekday {
+                                weekdays: vec![Weekday::Tue, Weekday::Thu, Weekday::Sat],
+                            },
+                            params: object!("stage" => "CE-6"),
                         },
-                        params: object!(
-                            "stage" => Select {
-                                alternatives: vec![
-                                    "SL-6".to_string(),
-                                    "SL-7".to_string(),
-                                    "SL-8".to_string(),
-                                ],
-                                description: Some("a stage to fight in summer event".to_string()),
-                            }
-                        ),
-                    },
-                ],
-            ));
+                        TaskVariant {
+                            condition: Condition::DateTime {
+                                start: Some(naive_local_datetime(2023, 8, 1, 16, 0, 0)),
+                                end: Some(naive_local_datetime(2023, 8, 21, 3, 59, 59)),
+                            },
+                            params: object!(
+                                "stage" => SelectD::<String>::new(
+                                    [
+                                        "SL-6",
+                                        "SL-7",
+                                        "SL-8",
+                                    ],
+                                    Some(2),
+                                    Some("a stage to fight in summer event"),
+                                    true,
+                                ).unwrap(),
+                            ),
+                        },
+                    ],
+                ));
 
                 task_list.push(Task::new(
                     None,
@@ -781,7 +805,7 @@ mod tests {
                 object!("stage" => "1-7"),
             );
             assert_eq!(task.name(), Some("Fight Daily"));
-            assert_eq!(task.task_type(), &MAATask::Fight.into());
+            assert_eq!(task.task_type(), &MAATask::Fight);
             assert_eq!(task.params(), &object!("stage" => "1-7"));
         }
     }

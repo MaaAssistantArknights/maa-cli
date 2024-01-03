@@ -4,7 +4,13 @@
     {
       "type": "StartUp",
       "params": {
-        "client_type": "Official",
+        "client_type": {
+          "alternatives": ["Official", "YoStarEN", "YoStarJP"],
+          "description": "a client type",
+          "deps": {
+            "start_game_enabled": true
+          }
+        },
         "start_game_enabled": {
           "default": true,
           "description": "start the game"
@@ -51,7 +57,9 @@
           "params": {
             "stage": {
               "alternatives": ["SL-6", "SL-7", "SL-8"],
-              "description": "a stage to fight in summer event"
+              "default_index": 2,
+              "description": "a stage to fight in summer event",
+              "allow_custom": true
             }
           }
         }

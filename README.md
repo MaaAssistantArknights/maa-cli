@@ -121,9 +121,9 @@ OpenSSL 库是 `git2` 在所有平台和 `reqwest` 在 Linux 上的依赖。如�
 
 #### 预定义任务
 
-- `maa fight [stage]`: 运行战斗任务，`[stage]` 是关卡名称，例如 `1-7`；如果 `stage` 为空，那么 `maa` 将询问你要刷的关卡，然后运行战斗任务；
+- `maa fight [stage]`: 运行战斗任务，`[stage]` 是关卡名称，例如 `1-7`；留空选择上次或者当前关卡；
 - `maa copilot <maa_uri>`: 运行自动战斗任务，其中 `<maa_uri>` 是作业的 URI, 其可以是 `maa://1234` 或者本地文件路径 `./1234.json`；
-- `maa roguelike [theme]`: 运行 roguelike 模式的战斗任务，`[theme]` 是 roguelike 模式的主题，可选值为 `phantom`, `mizuki` 以及 `sami`，如果留空，那么你将需要在 `maa` 询问后手动输入主题，
+- `maa roguelike [theme]`: 运行 roguelike 模式的战斗任务，`[theme]` 是 roguelike 模式的主题，可选值为 `Phantom`, `Mizuki` 以及 `Sami`；
 
 #### 自定义任务
 
@@ -326,8 +326,15 @@ type = "Fight"
 [[tasks.variants]]
 condition = { type = "DateTime", start = "2023-08-01T16:00:00", end = "2023-08-21T03:59:59" }
 [tasks.variants.params.stage]
-alternatives = ["SL-6", "SL-7", "SL-8"] # 可选的关卡，必须提供至少一个可选值
+# 可选的关卡，必须提供至少一个可选值
+# 可选值可以是一个值，也可以是同时包含值和描述的一个表
+alternatives = [
+    "SL-7", # 将被显示为 "1. SL-7"
+    { value = "SL-8", desc = "轻锰矿" } # 将被显示为 "2. SL-8 (轻锰矿)"
+]
+default_index = 1 # 默认值的索引，从 1 开始，如果没有设置，输入空值将会重新提示输入
 description = "a stage to fight in summer event" # 描述，可选
+allow_custom = true # 是否允许输入自定义的值，默认为 false，如果允许，那么非整数的值将会被视为自定义的值
 
 # 无需任何输入
 [[tasks.variants]]
@@ -339,11 +346,18 @@ params = { stage = "CE-6" }
 [tasks.variants.params.stage]
 default = "1-7" # 默认的关卡，可选（如果没有默认值，输入空值将会重新提示输入）
 description = "a stage to fight" # 描述，可选
+[tasks.variants.params.medicine]
+# 依赖的参数，键为参数名，值为依赖的参数的预期值
+# 当设置时，只有所有的依赖参数都满足预期值时，这个参数才会被要求输入
+deps = { stage = "1-7" }
+default = 1000
+description = "medicine to use"
 ```
 
-对于 `Input` 类型，当运行任务时，你将会被提示输入一个值。如果你输入了一个空值，那么默认值将会被使用。
-对于 `Select` 类型，当运行任务时，你将会被提示选择一个值 （通过输入可选值的序号）。
-注意，当你的输入不是可选值时，你将会被提示重新输入。
+对于 `Input` 类型，当运行任务时，你将会被提示输入一个值。如果你输入了一个空值，如果有默认值，那么默认值将会被使用，否则你将会被提示重新输入。
+对于 `Select` 类型，当运行任务时，你将会被提示输入一个的索引或者自定义的值（如果允许）。如果你输入了一个空值，如果有默认值，那么默认值将会被使用，否则你将会被提示重新输入。
+
+`--batch` 选项可以用于在运行任务时跳过所有的输入，这将会使用默认值；如果有任何输入没有默认值，那么将会导致错误。
 
 ### MaaCore 相关配置
 
