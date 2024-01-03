@@ -34,6 +34,9 @@ use log::debug;
 use maa_sys::Assistant;
 use signal_hook::consts::TERM_SIGNALS;
 
+#[cfg(target_os = "macos")]
+use tokio::runtime::Runtime;
+
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Args, Default)]
 pub struct CommonArgs {
@@ -150,9 +153,14 @@ where
 
     #[cfg(target_os = "macos")]
     let app = with_asst_config(|config| {
-        use crate::config::asst::ConnectionConfig;
-        if matches!(config.connection, ConnectionConfig::PlayTools { .. }) {
-            playcover::PlayCoverApp::from(&task_config)
+        use crate::config::asst::ConnectionConfig::PlayTools;
+        if let PlayTools { ref address, .. } = config.connection {
+            playcover::PlayCoverApp::new(
+                task_config.start_app,
+                task_config.close_app,
+                task_config.client_type.unwrap_or_default(),
+                address.to_owned(),
+            )
         } else {
             None
         }
@@ -160,8 +168,11 @@ where
 
     if !args.dry_run {
         #[cfg(target_os = "macos")]
+        let rt = Runtime::new().context("Failed to create tokio runtime")?;
+
+        #[cfg(target_os = "macos")]
         if let Some(app) = app.as_ref() {
-            app.open()?;
+            rt.block_on(app.open())?;
         }
 
         with_asst_config(|config| {
@@ -182,7 +193,7 @@ where
 
         #[cfg(target_os = "macos")]
         if let Some(app) = app.as_ref() {
-            app.close()?;
+            rt.block_on(app.close())?;
         }
     }
 

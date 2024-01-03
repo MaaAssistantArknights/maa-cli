@@ -1,80 +1,82 @@
-use crate::config::task::InitializedTaskConfig;
+use crate::config::task::ClientType;
 
 use anyhow::{Context, Result};
-use log::{info, warn};
+use log::{info, trace};
+use tokio::{io::AsyncWriteExt, net::TcpStream};
+
+// M A A 0x00 0x00 0x04 T E R M
+const TERMINATE: &[u8] = &[0x4d, 0x41, 0x41, 0x00, 0x00, 0x04, 0x54, 0x45, 0x52, 0x4d];
 
 #[cfg_attr(test, derive(PartialEq, Debug))]
-pub struct PlayCoverApp<'a> {
-    name: &'a str,
-    start_app: bool,
-    close_app: bool,
+pub struct PlayCoverApp {
+    client: ClientType,
+    address: String,
+    start: bool,
+    close: bool,
 }
 
-impl<'n> PlayCoverApp<'n> {
-    pub fn from(task_config: &InitializedTaskConfig) -> Option<Self> {
-        if task_config.start_app || task_config.close_app {
+impl PlayCoverApp {
+    pub fn new(start: bool, close: bool, client: ClientType, address: String) -> Option<Self> {
+        if start || close {
             Some(Self {
-                name: task_config.client_type.unwrap_or_default().app(),
-                start_app: task_config.start_app,
-                close_app: task_config.close_app,
+                client,
+                address,
+                start,
+                close,
             })
         } else {
             None
         }
     }
 
-    fn is_running(&self) -> Result<bool> {
-        let output = std::process::Command::new("osascript")
-            .arg("-e")
-            .arg(r#"tell application "System Events" to count processes whose name is "Arknights""#)
-            .output()
-            .context("Failed to check if game is running!")?;
-        let output = String::from_utf8_lossy(&output.stdout);
-        Ok(output.trim() != "0")
+    async fn connect(&self) -> Result<TcpStream> {
+        let stream = TcpStream::connect(&self.address)
+            .await
+            .context("Failed to connect to game!")?;
+
+        Ok(stream)
     }
 
-    pub fn open(&self) -> Result<()> {
-        if !self.start_app {
+    pub async fn open(&self) -> Result<()> {
+        if !self.start {
             return Ok(());
         }
 
-        if self.is_running().unwrap_or(false) {
+        if self.connect().await.is_ok() {
             info!("Game is already running!");
             return Ok(());
         }
 
-        info!("Starting app: {}", self.name);
+        let app = self.client.app();
+        info!("Starting app: {}", app);
         std::process::Command::new("open")
             .arg("-a")
-            .arg(self.name)
+            .arg(app)
             .status()
             .context("Failed to start game!")?;
 
         // Wait for game ready
-        // TODO: Find a way to detect if game is ready, so we can remove this sleep
-        // The is_running() function is not enough
-        // maybe we can launch the game by macOS API instead of open command?
-        std::thread::sleep(std::time::Duration::from_secs(5));
+        loop {
+            if self.connect().await.is_ok() {
+                info!("Game ready!");
+                break;
+            }
+            trace!("Waiting for game ready...");
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
 
         Ok(())
     }
 
-    pub fn close(&self) -> Result<()> {
-        if !self.close_app {
+    pub async fn close(&self) -> Result<()> {
+        if !self.close {
             return Ok(());
         }
 
-        if !self.is_running().unwrap_or(true) {
-            warn!("Game is not running!");
-            return Ok(());
+        if let Ok(mut stream) = self.connect().await {
+            stream.write_all(TERMINATE).await?;
         }
 
-        info!("Closing game...");
-        std::process::Command::new("osascript")
-            .arg("-e")
-            .arg(format!("quit app \"{}\"", self.name))
-            .status()
-            .context("Failed to close game!")?;
         Ok(())
     }
 }
@@ -83,59 +85,31 @@ impl<'n> PlayCoverApp<'n> {
 mod tests {
     use super::*;
 
-    use crate::config::task::ClientType;
-
     #[test]
     fn from() {
+        use crate::config::task::ClientType::*;
         assert_eq!(
-            PlayCoverApp::from(&InitializedTaskConfig {
-                start_app: true,
-                close_app: true,
-                client_type: Some(ClientType::Official),
-                tasks: vec![],
-            }),
+            PlayCoverApp::new(true, true, Official, "localhost:1717".to_string(),),
             Some(PlayCoverApp {
-                name: "明日方舟",
-                start_app: true,
-                close_app: true,
+                start: true,
+                close: true,
+                client: Official,
+                address: "localhost:1717".to_string(),
             })
         );
 
         assert_eq!(
-            PlayCoverApp::from(&InitializedTaskConfig {
-                start_app: true,
-                close_app: false,
-                client_type: None,
-                tasks: vec![],
-            }),
+            PlayCoverApp::new(false, true, Official, "localhost:1717".to_string(),),
             Some(PlayCoverApp {
-                name: "明日方舟",
-                start_app: true,
-                close_app: false,
+                start: false,
+                close: true,
+                client: Official,
+                address: "localhost:1717".to_string(),
             })
         );
 
         assert_eq!(
-            PlayCoverApp::from(&InitializedTaskConfig {
-                start_app: true,
-                close_app: false,
-                client_type: Some(ClientType::YoStarEN),
-                tasks: vec![],
-            }),
-            Some(PlayCoverApp {
-                name: "Arknights",
-                start_app: true,
-                close_app: false,
-            })
-        );
-
-        assert_eq!(
-            PlayCoverApp::from(&InitializedTaskConfig {
-                start_app: false,
-                close_app: false,
-                client_type: Some(ClientType::Official),
-                tasks: vec![],
-            }),
+            PlayCoverApp::new(false, false, Official, "localhost:1717".to_string(),),
             None
         );
     }
