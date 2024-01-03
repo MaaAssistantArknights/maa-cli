@@ -107,8 +107,6 @@ jobs:
         with:
           os: ${{ matrix.os }}
           arch: aarch64
-      - name: Setup Cache
-        uses: Swatinem/rust-cache@v2
       - name: Build
         run: |
           cargo build --package maa-cli --locked \
@@ -135,10 +133,6 @@ jobs:
         with:
           os: ${{ matrix.os }}
           arch: x86_64
-      - name: Setup Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ matrix.feature }}
       - name: Build
         run: |
           cargo build --package maa-cli --locked \
