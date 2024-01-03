@@ -33,6 +33,8 @@ use clap::Args;
 use log::debug;
 use maa_sys::Assistant;
 use signal_hook::consts::TERM_SIGNALS;
+
+#[cfg(target_os = "macos")]
 use tokio::runtime::Runtime;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
