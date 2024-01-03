@@ -118,29 +118,23 @@ jobs:
         with:
           os: ${{ matrix.os }}
           arch: ${{ matrix.arch }}
-      - name: Patch Version (BSD sed)
-        if: ${{ startsWith(matrix.os, 'macos') }}
+      - name: Patch Version
         run: |
-          sed -i "" '1,6 s/(version\s*=\s*)"[^"]+"/\1"${{ needs.meta.outputs.version }}"/' maa-cli/Cargo.toml
-          sed -i "" 's/(name\s*=\s*"maa-cli"\s*\n\s*version\s*=\s*)"[^"]+"/\1"${{ needs.meta.outputs.version }}"/' Cargo.lock
+          MAA_VERSION="${{ needs.meta.outputs.version }}"
+          if [ $(uname) == "Darwin" ]; then
+            SED_INPUT_ARGS='-i ""' # BSD sed needs an extension for backup
+          else
+            SED_INPUT_ARGS="-i"
+          fi
+          S="[[:space:]]" # BSD sed doesn't support \s
+          sed $SED_INPUT_ARGS -E "s/(version${S}*=${S}*)\"[^\"]+\"/\1\"$MAA_VERSION\"/" maa-cli/Cargo.toml
+          sed $SED_INPUT_ARGS -E "s/(name${S}*=${S}*\"maa-cli\"${S}*\\n${S}*version${S}*=${S}*)\"[^\"]+\"/\1\"$MAA_VERSION\"/" Cargo.lock
           {
-            echo "Patch Version (BSD sed, ${{ matrix.os }}, ${{ matrix.arch }})"
+            echo "Patch Version (${{ matrix.os }}, ${{ matrix.arch }})"
             echo '```diff'
             git diff
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Patch Version (GNU sed)
-        if: ${{ !startsWith(matrix.os, 'macos') }}
-        run: |
-          sed -i '1,6 s/(version\s*=\s*)"[^"]+"/\1"${{ needs.meta.outputs.version }}"/' maa-cli/Cargo.toml
-          sed -i 's/(name\s*=\s*"maa-cli"\s*\n\s*version\s*=\s*)"[^"]+"/\1"${{ needs.meta.outputs.version }}"/' Cargo.lock
-          {
-            echo "Patch Version (GNU sed, ${{ matrix.os }}, ${{ matrix.arch }})"
-            echo '```diff'
-            git diff
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          git diff
       - name: Build
         env:
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 1
