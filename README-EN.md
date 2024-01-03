@@ -314,8 +314,15 @@ condition = { type = "DateTime", start = "2023-08-01T16:00:00", end = "2023-08-2
 
 # Set the stage to a `Select` type with alternatives and description
 [tasks.variants.params.stage]
-alternatives = ["SL-6", "SL-7", "SL-8"] # the alternatives of stage, at least one alternative should be given
+# the alternatives of stage, at least one alternative should be given
+# the element of alternatives can be a single value or a table with `value` and `desc` fields·
+alternatives = [
+    "SL-7", # will be displayed as "1. SL-7"
+    { value = "SL-8", desc = "Manganese Ore" } # will be displayed as "2. SL-8 (Manganese Ore)"
+]
+default_index = 1 # the index of default value, start from 1, if not given, empty value will be re-prompt
 description = "a stage to fight in summer event" # description of the input, optional
+allow_custom = true # whether allow input custom value, default to false, if allow, non-integer value will be treated as custom value
 
 # Task without input
 [[tasks.variants]]
@@ -329,9 +336,18 @@ params = { stage = "CE-6" }
 [tasks.variants.params.stage]
 default = "1-7" # default value of stage, optional (if not given, user can input empty value to re-prompt)
 description = "a stage to fight" # description of the input, optional
+[tasks.variants.params.medicine]
+# dependency of parameters, the key is the name of parameter, the value is the expected value of dependency parameter
+# when set, the parameter will be required to input only if all dependency parameters are satisfied
+deps = { stage = "1-7" }
+default = 1000
+description = "medicine to use"
 ```
 
-For `Input` type, a prompt will be shown to ask user to input a value. If the default value is given, it will be used if user input empty value, otherwise it will re-prompt. For `Select` type, a prompt will be shown to ask user to select a value from alternatives (by index). If user input is not a valid index, it will re-prompt. To promote and input can be disabled by `--batch` option, which is useful for running tasks in Schedule.
+For `Input` type, a prompt will be shown to ask user to input a value. If the default value is given, it will be used if user input empty value, otherwise it will re-prompt.
+For `Select` type, a prompt will be shown to ask user to input a index or custom value (if `allow_custom` is `true`). If the default index is given, it will be used if user input empty value, otherwise it will re-prompt.
+
+`--batch` option can be used to run tasks in batch mode, which will use default value for all inputs and panic if no default value is given.
 
 ### `MaaCore` related configurations
 

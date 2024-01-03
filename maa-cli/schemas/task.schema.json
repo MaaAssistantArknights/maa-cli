@@ -203,8 +203,7 @@
         { "$ref": "#/definitions/maaBool" },
         { "$ref": "#/definitions/maaNumber" },
         { "$ref": "#/definitions/maaString" },
-        { "$ref": "#/definitions/maaObject" },
-        { "type": "null" }
+        { "$ref": "#/definitions/maaObject" }
       ]
     },
     "maaObject": {
@@ -227,8 +226,10 @@
           "type": "object",
           "properties": {
             "default": { "type": "boolean" },
+            "deps": { "type": "object" },
             "description": { "type": "string" }
-          }
+          },
+          "additionalProperties": false
         }
       ]
     },
@@ -239,8 +240,10 @@
           "type": "object",
           "properties": {
             "default": { "type": "number" },
+            "deps": { "type": "object" },
             "description": { "type": "string" }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "type": "object",
@@ -255,14 +258,19 @@
                     "required": ["value"],
                     "properties": {
                       "value": { "type": "number" },
-                      "display": { "type": "string" }
-                    }
+                      "desc": { "type": "string" }
+                    },
+                    "additionalProperties": false
                   }
                 ]
               }
             },
+            "deps": { "type": "object" },
+            "default_index": { "type": "number" },
+            "allow_custom": { "type": "boolean" },
             "description": { "type": "string" }
-          }
+          },
+          "additionalProperties": false
         }
       ]
     },
@@ -273,8 +281,10 @@
           "type": "object",
           "properties": {
             "default": { "type": "string" },
+            "deps": { "type": "object" },
             "description": { "type": "string" }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "type": "object",
@@ -290,14 +300,19 @@
                     "required": ["value"],
                     "properties": {
                       "value": { "type": "string" },
-                      "display": { "type": "string" }
-                    }
+                      "desc": { "type": "string" }
+                    },
+                    "additionalProperties": false
                   }
                 ]
               }
             },
+            "deps": { "type": "object" },
+            "default_index": { "type": "number" },
+            "allow_custom": { "type": "boolean" },
             "description": { "type": "string" }
-          }
+          },
+          "additionalProperties": false
         }
       ]
     },

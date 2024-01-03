@@ -143,6 +143,7 @@ enum SubCommand {
     /// Run fight task
     Fight {
         /// Stage to fight
+        #[arg(default_value = "")]
         stage: String,
         /// Run startup task before the fight
         #[arg(long)]
