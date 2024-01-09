@@ -50,7 +50,7 @@ lazy_static = "1.4.0"
 sys-locale = "0.3.1"
 prettytable = { version = "0.10.0", default-features = false }
 
-clap = { version = "4.4", features = ["derive", "string"] }
+clap = { version = "4.4", features = ["derive", "string", "unicode"] }
 clap_complete = { version = "4.4" }
 
 toml = "0.8"
