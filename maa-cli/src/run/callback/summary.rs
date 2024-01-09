@@ -511,6 +511,7 @@ impl std::str::FromStr for Facility {
 
 #[cfg_attr(test, derive(Debug))]
 #[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq)]
+#[allow(clippy::upper_case_acronyms)]
 pub(super) enum Product {
     LMD,
     PureGold,

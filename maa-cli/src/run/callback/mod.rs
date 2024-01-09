@@ -464,13 +464,13 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
             let operators = details
                 .get("names")?
                 .as_array()?
-                .into_iter()
+                .iter()
                 .filter_map(|x| x.as_str().map(|x| x.to_owned()))
                 .collect::<Vec<_>>();
             let candidates = details
                 .get("candidates")?
                 .as_array()?
-                .into_iter()
+                .iter()
                 .filter_map(|x| x.as_str().map(|x| x.to_owned()))
                 .collect::<Vec<_>>();
 
@@ -513,7 +513,7 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
             let tags = details
                 .get("tags")?
                 .as_array()?
-                .into_iter()
+                .iter()
                 .filter_map(|x| x.as_str().map(|x| x.to_owned()))
                 .collect::<Vec<_>>();
 

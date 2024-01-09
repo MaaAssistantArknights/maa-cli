@@ -75,7 +75,7 @@ mod git {
         cmd.status()
             .with_context(lfl!("failed-clone-resource-repository"))?
             .success()
-            .then(|| ())
+            .then_some(())
             .with_context(lfl!("failed-clone-resource-repository"))
     }
 
@@ -104,7 +104,7 @@ mod git {
             .status()
             .with_context(lfl!("failed-pull-resource-repository"))?
             .success()
-            .then(|| ())
+            .then_some(())
             .with_context(lfl!("failed-pull-resource-repository"))
     }
 }

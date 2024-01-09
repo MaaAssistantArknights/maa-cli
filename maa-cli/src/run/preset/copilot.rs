@@ -151,13 +151,13 @@ impl CopilotType {
                 stage_files
                     .last()
                     .with_context(lfl!("failed-find-stage-file", stage = stage_id))
-                    .and_then(|stage_file| json_from_file(stage_file))
-                    .and_then(|stage_info| {
+                    .and_then(json_from_file)
+                    .map(|stage_info| {
                         match (stage_info.get_as_str("code"), stage_info.get_as_str("name")) {
-                            (Some(code), Some(name)) => Ok(format!("{} {}", code, name)),
-                            (Some(code), None) => Ok(code.to_string()),
-                            (None, Some(name)) => Ok(name.to_string()),
-                            (None, None) => Ok(stage_id.to_string()),
+                            (Some(code), Some(name)) => format!("{} {}", code, name),
+                            (Some(code), None) => code.to_string(),
+                            (None, Some(name)) => name.to_string(),
+                            (None, None) => stage_id.to_string(),
                         }
                     })
             }

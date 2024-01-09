@@ -229,10 +229,12 @@ impl Asset {
         &self.name
     }
 
+    #[cfg(test)]
     fn size(&self) -> u64 {
         self.size
     }
 
+    #[cfg(test)]
     fn download_links(&self) -> Vec<String> {
         let mut links = self.mirrors.clone();
         links.insert(0, self.browser_download_url.clone());
