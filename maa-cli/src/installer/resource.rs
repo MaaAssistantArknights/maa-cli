@@ -4,7 +4,6 @@ use crate::{
 };
 
 use anyhow::Result;
-use log::debug;
 
 pub fn update(is_auto: bool) -> Result<()> {
     let config = cli_config().resource_config();
@@ -21,14 +20,14 @@ pub fn update(is_auto: bool) -> Result<()> {
     let dest = dirs::hot_update();
 
     if dest.exists() {
-        debug!("Fetching resource repository...");
+        info!("updating-resource-repository");
         match backend {
             GitBackend::Git => git::pull(dest, branch, ssh_key.as_deref())?,
             #[cfg(feature = "git2")]
             GitBackend::Libgit2 => git2::pull(dest, branch, ssh_key.as_deref())?,
         }
     } else {
-        debug!("Cloning resource repository...");
+        info!("cloning-resource-repository");
         match backend {
             GitBackend::Git => git::clone(url, branch, dest, ssh_key.as_deref())?,
             #[cfg(feature = "git2")]
@@ -42,7 +41,7 @@ pub fn update(is_auto: bool) -> Result<()> {
 mod git {
     use std::path::Path;
 
-    use anyhow::{bail, Context, Result};
+    use anyhow::{Context, Result};
 
     pub fn clone(
         url: &str,
@@ -55,7 +54,7 @@ mod git {
         cmd.args([
             "clone",
             url,
-            dest.to_str().context("Invalid path")?,
+            dest.to_str().with_context(lfl!("invalid-utf8-path"))?,
             "--depth=1",
         ]);
 
@@ -66,19 +65,18 @@ mod git {
         if let Some(ssh_key) = ssh_key {
             cmd.env(
                 "GIT_SSH_COMMAND",
-                format!("ssh -i {}", ssh_key.to_str().context("Invalid path")?),
+                format!(
+                    "ssh -i {}",
+                    ssh_key.to_str().with_context(lfl!("invalid-utf8-path"))?
+                ),
             );
         }
 
-        let status = cmd
-            .status()
-            .context("Failed to clone resource repository")?;
-
-        if !status.success() {
-            bail!("Failed to clone resource repository")
-        }
-
-        Ok(())
+        cmd.status()
+            .with_context(lfl!("failed-clone-resource-repository"))?
+            .success()
+            .then(|| ())
+            .with_context(lfl!("failed-clone-resource-repository"))
     }
 
     pub fn pull(repo: &Path, branch: Option<&str>, ssh_key: Option<&Path>) -> Result<()> {
@@ -95,20 +93,19 @@ mod git {
         if let Some(ssh_key) = ssh_key {
             cmd.env(
                 "GIT_SSH_COMMAND",
-                format!("ssh -i {}", ssh_key.to_str().context("Invalid path")?),
+                format!(
+                    "ssh -i {}",
+                    ssh_key.to_str().with_context(lfl!("invalid-utf8-path"))?
+                ),
             );
         }
 
-        let status = cmd
-            .current_dir(repo)
+        cmd.current_dir(repo)
             .status()
-            .context("Failed to pull resource repository")?;
-
-        if !status.success() {
-            bail!("Failed to pull resource repository")
-        }
-
-        Ok(())
+            .with_context(lfl!("failed-pull-resource-repository"))?
+            .success()
+            .then(|| ())
+            .with_context(lfl!("failed-pull-resource-repository"))
     }
 }
 
@@ -116,9 +113,8 @@ mod git {
 mod git2 {
     use std::path::Path;
 
-    use anyhow::{bail, Context, Result};
+    use anyhow::{Context, Result};
     use git2::{build::RepoBuilder, Repository};
-    use log::debug;
 
     pub fn clone(
         url: &str,
@@ -146,13 +142,13 @@ mod git2 {
 
         builder
             .clone(url, dest)
-            .context("Failed to clone resource repository")?;
+            .with_context(lfl!("failed-clone-resource-repository"))?;
 
         Ok(())
     }
 
     pub fn pull(repo: &Path, branch: Option<&str>, ssh_key: Option<&Path>) -> Result<()> {
-        let repo = Repository::open(repo).context("Failed to open resource repository")?;
+        let repo = Repository::open(repo).with_context(lfl!("failed-open-resource-repository"))?;
 
         let branch = branch.unwrap_or("main");
 
@@ -169,40 +165,44 @@ mod git2 {
         });
 
         repo.find_remote("origin")
-            .context("Failed to find remote 'origin'")?
+            .with_context(lfl!("failed-find-remote", name = "origin"))?
             .fetch(&[branch], fetch_options.as_mut(), None)?;
 
         let fetch_head = repo
             .find_reference("FETCH_HEAD")
-            .context("Failed to find reference 'FETCH_HEAD'")?;
+            .with_context(lfl!("failed-find-reference", name = "FETCH_HEAD"))?;
 
         let fetch_commit = repo
             .reference_to_annotated_commit(&fetch_head)
-            .context("Failed to find annotated commit")?;
+            .with_context(lfl!(
+                "failed-reference-to-annotated-commit",
+                name = "FETCH_HEAD"
+            ))?;
 
         let (analysis, _) = repo
             .merge_analysis(&[&fetch_commit])
-            .context("Failed to analyze merge")?;
+            .with_context(lfl!("failed-merge-analysis"))?;
 
         if analysis.is_fast_forward() {
-            debug!("Fast-forwarding");
+            debug!("fast-forward-merge");
 
             let refname = format!("refs/heads/{}", branch);
             let mut reference = repo
                 .find_reference(&refname)
-                .context("Failed to find reference")?;
+                .with_context(lfl!("failed-find-reference", name = refname.as_str()))?;
 
             reference
                 .set_target(fetch_commit.id(), "Fast-Forward")
-                .context("Failed to set target")?;
+                .with_context(lfl!("failed-create-reference", name = refname.as_str()))?;
 
-            repo.set_head(&refname).context("Failed to set HEAD")?;
+            repo.set_head(&refname)
+                .with_context(lfl!("failed-set-head"))?;
             repo.checkout_head(Some(git2::build::CheckoutBuilder::default().force()))
-                .context("Failed to checkout HEAD")?;
+                .with_context(lfl!("failed-checkout", name = "HEAD"))?;
         } else if analysis.is_up_to_date() {
-            debug!("Already up-to-date");
+            debug!("repo-up-to-date");
         } else {
-            bail!("Failed to pull resource repository")
+            bailfl!("failed-pull-resource-repository");
         }
 
         Ok(())

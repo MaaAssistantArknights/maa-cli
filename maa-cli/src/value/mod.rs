@@ -228,6 +228,14 @@ impl MAAValue {
             (s, o) => *s = o.clone(),
         }
     }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Self::Array(v) => v.is_empty(),
+            Self::Object(v) => v.is_empty(),
+            _ => false,
+        }
+    }
 }
 
 // TODO: shortcur for OptionalInput

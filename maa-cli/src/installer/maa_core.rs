@@ -22,8 +22,7 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{anyhow, bail, Context, Result};
-use log::debug;
+use anyhow::{Context, Result};
 use semver::Version;
 use serde::Deserialize;
 use tokio::runtime::Runtime;
@@ -34,7 +33,6 @@ fn extract_mapper(
     resource_dir: &Path,
     config: &Components,
 ) -> Option<PathBuf> {
-    debug!("Extracting file: {}", src.display());
     let mut path_components = src.components();
     for c in path_components.by_ref() {
         match c {
@@ -47,14 +45,12 @@ fn extract_mapper(
                     for c in path_components.by_ref() {
                         dest.push(c);
                     }
-                    debug!( "Extracting {} => {}", src.display(), dest.display());
                     return Some(dest);
                 } else if config.library && c
                     .to_str() // The DLL suffix may not the last part of the file name
                     .is_some_and(|s| s.starts_with(DLL_PREFIX) && s.contains(DLL_SUFFIX))
                 {
                     let dest = lib_dir.join(src.file_name()?);
-                    debug!( "Extracting {} => {}", src.display(), dest.display());
                     return Some(dest);
                 } else {
                     continue;
@@ -63,51 +59,51 @@ fn extract_mapper(
             _ => continue,
         }
     }
-    debug!("Ignored file {}", src.display());
     None
 }
 
 pub fn version() -> Result<Version> {
     let ver_str = run::core_version()?.trim();
-    Version::parse(&ver_str[1..]).context("Failed to parse version")
+    Version::parse(&ver_str[1..]).with_context(lfl!("failed-parse-version"))
 }
 
 pub fn install(force: bool, args: &CommonArgs) -> Result<()> {
     let config = cli_config().core_config().apply_args(args);
 
+    let components = config.components();
+    // Check if any component is specified
+    if !(components.library || components.resource) {
+        bailfl!("no-component-to-install");
+    }
+
     let lib_dir = dirs::library();
 
     if lib_dir.join(MAA_CORE_LIB).exists() && !force {
-        bail!("MaaCore already exists, use `maa update` to update it or `maa install --force` to force reinstall")
+        bailfl!("core-already-installed");
     }
 
-    println!(
-        "Fetching MaaCore version info (channel: {})...",
-        config.channel()
-    );
+    printlnfl!("fetching", name = "MaaCore", channel = config.channel());
     let version_json = get_version_json(&config)?;
-    let asset_version = version_json.version();
-    let asset_name = name(asset_version)?;
-    let asset = version_json.details().asset(&asset_name)?;
+    let asset_version = version_json.version().to_owned();
+    let asset_name = name(&asset_version)?;
 
-    println!("Downloading MaaCore {}...", asset_version);
-    let cache_dir = dirs::cache().ensure()?;
-    let archive = download(
-        &cache_dir.join(asset_name),
-        asset.size(),
-        asset.download_links(),
-        &config,
-    )?;
+    let archive = version_json
+        .details()
+        .asset(&asset_name)?
+        .download(config.test_time())?;
 
-    println!("Installing MaaCore...");
-    let components = config.components();
+    printlnfl!(
+        "installing",
+        name = "maa-core",
+        version = asset_version.to_string()
+    );
     if components.library {
-        debug!("Cleaning library directory");
+        warn!("deprecated-disable-library-option");
         lib_dir.ensure_clean()?;
     }
     let resource_dir = dirs::resource();
     if components.resource {
-        debug!("Cleaning resource directory");
+        warn!("deprecated-disable-resource-option");
         resource_dir.ensure_clean()?;
     }
     archive.extract(|path: &Path| extract_mapper(path, lib_dir, resource_dir, components))?;
@@ -121,51 +117,55 @@ pub fn update(args: &CommonArgs) -> Result<()> {
     let components = config.components();
     // Check if any component is specified
     if !(components.library || components.resource) {
-        bail!("No component specified, aborting");
+        bailfl!("no-component-to-install");
     }
     // Check if MaaCore is installed and installed by maa
     let lib_dir = dirs::library();
     let resource_dir = dirs::resource();
     match (components.library, dirs::find_library()) {
-        (true, Some(dir)) if dir != lib_dir => bail!(
-            "MaaCore found at {} but not installed by maa, aborting",
-            dir.display()
+        (true, Some(dir)) if dir != lib_dir => bailfl!(
+            "library-installed-by-other",
+            path = dir.to_str().unwrap_or("")
         ),
+        (false, _) => {
+            warn!("deprecated-disable-library-option");
+        }
         _ => {}
     }
     match (components.resource, dirs::find_resource()) {
-        (true, Some(dir)) if dir != resource_dir => bail!(
-            "MaaCore resource found at {} but not installed by maa, aborting",
-            dir.display()
+        (true, Some(dir)) if dir != resource_dir => bailfl!(
+            "resource-installed-by-other",
+            path = dir.to_str().unwrap_or("")
         ),
+        (false, _) => {
+            warn!("deprecated-disable-resource-option");
+        }
         _ => {}
     }
 
-    println!(
-        "Fetching MaaCore version info (channel: {})...",
-        config.channel()
-    );
+    printlnfl!("fetching", name = "MaaCore", channel = config.channel());
     let version_json = get_version_json(&config)?;
-    let asset_version = version_json.version();
+    let asset_version = version_json.version().to_owned();
     let current_version = version()?;
     if !version_json.can_update("MaaCore", &current_version)? {
         return Ok(());
     }
-    let asset_name = name(asset_version)?;
-    let asset = version_json.details().asset(&asset_name)?;
+    let asset_name = name(&asset_version)?;
 
-    println!("Downloading MaaCore {}...", asset_version);
-    let cache_dir = dirs::cache().ensure()?;
-    let asset_path = cache_dir.join(asset_name);
-    let archive = download(&asset_path, asset.size(), asset.download_links(), &config)?;
+    let archive = version_json
+        .details()
+        .asset(&asset_name)?
+        .download(config.test_time())?;
 
-    println!("Installing MaaCore...");
+    printlnfl!(
+        "installing",
+        name = "MaaCore",
+        version = asset_version.to_string()
+    );
     if components.library {
-        debug!("Cleaning library directory");
         lib_dir.ensure_clean()?;
     }
     if components.resource {
-        debug!("Cleaning resource directory");
         resource_dir.ensure_clean()?;
     }
     archive.extract(|path| extract_mapper(path, lib_dir, resource_dir, components))?;
@@ -174,11 +174,11 @@ pub fn update(args: &CommonArgs) -> Result<()> {
 }
 
 fn get_version_json(config: &Config) -> Result<VersionJSON<Details>> {
-    let url = config.api_url();
-    let version_json = reqwest::blocking::get(&url)
-        .with_context(|| format!("Failed to fetch version info from {}", url))?
+    let api_url = config.api_url();
+    let version_json = reqwest::blocking::get(&api_url)
+        .with_context(lfl!("failed-fetch-version-json", url = api_url.as_str()))?
         .json()
-        .with_context(|| "Failed to parse version info")?;
+        .with_context(lfl!("failed-parse-version-json"))?;
 
     Ok(version_json)
 }
@@ -190,14 +190,14 @@ fn name(version: &Version) -> Result<String> {
         "linux" => match ARCH {
             "x86_64" => Ok(format!("MAA-v{}-linux-x86_64.tar.gz", version)),
             "aarch64" => Ok(format!("MAA-v{}-linux-aarch64.tar.gz", version)),
-            _ => Err(anyhow!("Unsupported architecture: {}", ARCH)),
+            _ => bailfl!("unsupported-architecture", arch = ARCH),
         },
         "windows" => match ARCH {
             "x86_64" => Ok(format!("MAA-v{}-win-x64.zip", version)),
             "aarch64" => Ok(format!("MAA-v{}-win-arm64.zip", version)),
-            _ => Err(anyhow!("Unsupported architecture: {}", ARCH)),
+            _ => bailfl!("unsupported-architecture", arch = ARCH),
         },
-        _ => Err(anyhow!("Unsupported platform: {}", OS)),
+        _ => bailfl!("unsupported-platform", os = OS, arch = ARCH),
     }
 }
 
@@ -207,11 +207,11 @@ pub struct Details {
 }
 
 impl Details {
-    pub fn asset(&self, name: &str) -> Result<&Asset> {
+    pub fn asset(self, name: &str) -> Result<Asset> {
         self.assets
-            .iter()
+            .into_iter()
             .find(|asset| name == asset.name())
-            .ok_or_else(|| anyhow!("Asset not found"))
+            .with_context(lfl!("asset-not-found", name = name))
     }
 }
 
@@ -225,44 +225,46 @@ pub struct Asset {
 }
 
 impl Asset {
-    pub fn name(&self) -> &str {
+    fn name(&self) -> &str {
         &self.name
     }
 
-    pub fn size(&self) -> u64 {
+    fn size(&self) -> u64 {
         self.size
     }
 
-    pub fn download_links(&self) -> Vec<String> {
+    fn download_links(&self) -> Vec<String> {
         let mut links = self.mirrors.clone();
         links.insert(0, self.browser_download_url.clone());
         links
     }
-}
 
-pub fn download(path: &Path, size: u64, links: Vec<String>, config: &Config) -> Result<Archive> {
-    if check_file_exists(path, size) {
-        println!("Already downloaded, skip downloading");
-        return Archive::try_from(path);
+    fn download(self, test_time: u64) -> Result<Archive> {
+        let file = self.name;
+        let size = self.size;
+        let cache_dir = dirs::cache().ensure()?;
+        let path = cache_dir.join(&file);
+        if check_file_exists(&path, size) {
+            printlnfl!("package-cache-hit", file = file);
+            return Archive::try_from(path);
+        }
+
+        let mut links = self.mirrors;
+        links.insert(0, self.browser_download_url);
+
+        printlnfl!("downloading", file = file);
+        let client = reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(3))
+            .build()
+            .with_context(lfl!("failed-create-reqwest-client"))?;
+        Runtime::new()
+            .with_context(lfl!("failed-create-tokio-runtime"))?
+            .block_on(download_mirrors(
+                &client, links, &path, size, test_time, None,
+            ))?;
+
+        Archive::try_from(path)
     }
-
-    let client = reqwest::Client::builder()
-        .connect_timeout(Duration::from_secs(3))
-        .build()
-        .context("Failed to build reqwest client")?;
-    Runtime::new()
-        .context("Failed to create tokio runtime")?
-        .block_on(download_mirrors(
-            &client,
-            links,
-            path,
-            size,
-            config.test_time(),
-            None,
-        ))
-        .context("Failed to download asset")?;
-
-    Archive::try_from(path)
 }
 
 #[cfg(test)]
@@ -360,9 +362,12 @@ mod tests {
             &Version::parse("4.26.1").expect("Failed to parse version")
         );
 
-        let details = version_json.details();
-        let asset_name = name(version_json.version()).unwrap();
-        let asset = details.asset(&asset_name).unwrap();
+        let version = version_json.version().to_owned();
+        let asset_name = name(&version).unwrap();
+        let asset = version_json
+            .details()
+            .asset(&asset_name)
+            .expect("Failed to get asset");
 
         // Test asset name, size and download links
         match OS {

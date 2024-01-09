@@ -109,49 +109,17 @@ impl Default for Components {
 
 #[derive(Args, Default)]
 pub struct CommonArgs {
-    /// Channel to download prebuilt package
-    ///
-    /// There are three channels of maa-core prebuilt packages,
-    /// stable, beta and alpha.
-    /// The default channel is stable, you can use this flag to change the channel.
-    /// If you want to use the latest features of maa-core,
-    /// you can use beta or alpha channel.
-    /// You can also configure the default channel
-    /// in the cli configure file `$MAA_CONFIG_DIR/cli.toml` with the key `maa_core.channel`.
-    /// Note: the alpha channel is only available for windows.
+    #[arg(hide_possible_values = true,
+          help= fl!("core-channel-help"), long_help = fl!("core-channel-long-help"))]
     pub channel: Option<Channel>,
-    /// Do not install resource
-    ///
-    /// By default, resources are shipped with maa-core,
-    /// and we will install them when installing maa-core.
-    /// If you do not want to install resource,
-    /// you can use this flag to disable it.
-    /// You can also configure the default value in the cli configure file
-    /// `$MAA_CONFIG_DIR/cli.toml` with the key `maa_core.component.resource`;
-    /// set it to false to disable installing resource by default.
-    /// This is useful when you want to install maa-core only.
-    /// For my own, I will use this flag to install maa-core,
-    /// because I use the latest resource from github,
-    /// and this flag can avoid the resource being overwritten.
-    /// Note: if you use resources that too new or too old,
-    /// you may encounter some problems.
-    /// Use at your own risk.
-    #[arg(long)]
+    #[arg(long,
+          help = fl!("core-no-resource-help"), long_help = fl!("core-no-resource-long-help"))]
     pub no_resource: bool,
-    /// Time to test download speed
-    ///
-    /// There are several mirrors of maa-core prebuilt packages.
-    /// This command will test the download speed of these mirrors,
-    /// and choose the fastest one to download.
-    /// This flag is used to set the time in seconds to test download speed.
-    /// If test time is 0, speed test will be skipped.
-    #[arg(short, long)]
+    #[arg(short, long, value_name = "SECONDS",
+          help = fl!("core-test-time-help"), long_help = fl!("core-test-time-long-help"))]
     pub test_time: Option<u64>,
-    /// URL of api to get version information
-    ///
-    /// This flag is used to set the URL of api to get version information.
-    /// It can also be changed by environment variable `MAA_API_URL`.
-    #[arg(long)]
+    #[arg(long, value_name = "URL",
+          help = fl!("core-api-url-help"), long_help = fl!("core-api-url-long-help"))]
     pub api_url: Option<String>,
 }
 

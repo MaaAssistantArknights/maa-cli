@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result};
 
 /// Supported archive types.
 ///
@@ -53,14 +53,14 @@ impl Archive {
                     if stem.is_some_and(|s| s.extension().is_some_and(|e| e == "tar")) {
                         ArchiveType::TarGz
                     } else {
-                        bail!("Unsupported archive type")
+                        bailfl!("unsupported-archive", file = file.to_str().unwrap_or(""))
                     }
                 }
-                _ => bail!("Unsupported archive type"),
+                _ => bailfl!("unsupported-archive", file = file.to_str().unwrap_or("")),
             };
             Ok(Self::new(file.to_path_buf(), archive_type))
         } else {
-            Err(anyhow!("Failed to get file extension"))
+            bailfl!("unknown-archive", file = file.to_str().unwrap_or(""))
         }
     }
 
@@ -74,7 +74,7 @@ impl Archive {
     /// Otherwise, the file will be overwritten.
     /// The file permissions will be preserved.
     pub fn extract(&self, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Result<()> {
-        println!("Extracting archive file...");
+        printlnfl!("extracting");
         match self.file_type {
             ArchiveType::Zip => extract_zip(&self.file, mapper),
             ArchiveType::TarGz => extract_tar_gz(&self.file, mapper),
@@ -119,22 +119,24 @@ fn extract_zip(file: &Path, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Result
                         file.read_to_end(&mut contents)?;
                         let link_target = std::ffi::OsString::from_vec(contents);
                         if outpath.exists() {
-                            remove_file(&outpath).with_context(|| {
-                                format!("Failed to remove existing file: {}", outpath.display())
-                            })?;
+                            remove_file(&outpath).with_context(lfl!(
+                                "failed-remove",
+                                file = outpath.to_str().unwrap_or("")
+                            ))?;
                         }
-                        symlink(link_target, &outpath).with_context(|| {
-                            format!("Failed to extract file: {}", outpath.display())
-                        })?;
+                        symlink(link_target, &outpath).with_context(lfl!(
+                            "failed-symlink",
+                            file = outpath.to_str().unwrap_or("")
+                        ))?;
                         continue;
                     }
                 }
             }
 
             let mut outfile = File::create(&outpath)
-                .with_context(|| format!("Failed to create file: {}", outpath.display()))?;
+                .with_context(lfl!("failed-create", file = outpath.to_str().unwrap_or("")))?;
             copy(&mut file, &mut outfile)
-                .with_context(|| format!("Failed to extract file: {}", outpath.display()))?;
+                .with_context(lfl!("failed-write", file = outpath.to_str().unwrap_or("")))?;
         }
 
         #[cfg(unix)]
@@ -143,8 +145,10 @@ fn extract_zip(file: &Path, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Result
             use std::os::unix::fs::PermissionsExt;
 
             if let Some(mode) = file.unix_mode() {
-                set_permissions(&outpath, Permissions::from_mode(mode))
-                    .with_context(|| format!("Failed to set permissions: {}", outpath.display()))?;
+                set_permissions(&outpath, Permissions::from_mode(mode)).with_context(lfl!(
+                    "failed-set-permission",
+                    file = outpath.to_str().unwrap_or("")
+                ))?
             }
         }
     }
@@ -159,22 +163,34 @@ fn extract_tar_gz(file: &Path, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Res
     for entry in archive.entries()? {
         let mut file = entry?;
 
-        let outpath = match &file.path() {
-            Ok(path) => match mapper(path) {
-                Some(path) => path,
-                None => continue,
-            },
-            Err(e) => return Err(anyhow!("Error while reading tar entry: {}", e)),
+        let filepath = file.path().with_context(lfl!("failed-read-entry"))?;
+
+        let outpath = match mapper(&filepath) {
+            Some(path) => {
+                debug!(
+                    "extract",
+                    src = filepath.to_str().unwrap_or(""),
+                    dest = path.to_str().unwrap_or(""),
+                );
+                path
+            }
+            None => {
+                debug!("skip-extract", src = filepath.to_str().unwrap_or(""));
+                continue;
+            }
         };
 
         if let Some(p) = outpath.parent() {
             p.ensure()?;
         }
 
-        file.unpack(&outpath)?;
+        file.unpack(&outpath).with_context(lfl!(
+            "failed-extract",
+            file = outpath.to_str().unwrap_or("")
+        ))?;
     }
 
-    println!("Done!");
+    printlnfl!("extracted");
 
     Ok(())
 }

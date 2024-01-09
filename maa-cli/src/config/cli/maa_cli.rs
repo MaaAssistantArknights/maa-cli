@@ -76,22 +76,14 @@ impl Config {
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Args, Default)]
 pub struct CommonArgs {
-    /// Channel to download prebuilt CLI binary
-    ///
-    /// There are two channels of maa-cli prebuilt binary,
-    /// stable and alpha (which means nightly).
+    #[arg(hide_possible_values = true,
+          help = fl!("self-channel-help"), long_help = fl!("self-channel-long-help"))]
     pub channel: Option<Channel>,
-    /// Url of api to get version information
-    ///
-    /// This flag is used to set the URL of api to get version information.
-    /// Default to https://github.com/MaaAssistantArknights/maa-cli/raw/release/.
-    #[arg(long)]
+    #[arg(long, value_name = "URL",
+          help = fl!("self-api-url-help"), long_help = fl!("self-api-url-long-help"))]
     pub api_url: Option<String>,
-    /// Url of download to download prebuilt CLI binary
-    ///
-    /// This flag is used to set the URL of download to download prebuilt CLI binary.
-    /// Default to https://github.com/MaaAssistantArknights/maa-cli/releases/download/.
-    #[arg(long)]
+    #[arg(long, value_name = "URL",
+            help = fl!("self-download-url-help"), long_help = fl!("self-download-url-long-help"))]
     pub download_url: Option<String>,
 }
 

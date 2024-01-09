@@ -15,24 +15,26 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use dunce::canonicalize;
 use semver::Version;
 use serde::Deserialize;
 use tokio::runtime::Runtime;
 
 pub fn version() -> Result<Version> {
-    Version::parse(MAA_CLI_VERSION).context("Failed to parse maa-cli version")
+    Version::parse(MAA_CLI_VERSION).with_context(lfl!("failed-parse-version"))
 }
 
 pub fn update(args: &CommonArgs) -> Result<()> {
     let config = cli_config().cli_config().clone().with_args(args);
 
-    println!("Fetching maa-cli version info...");
-    let version_json: VersionJSON<Details> = reqwest::blocking::get(config.api_url())
-        .context("Failed to fetch version info")?
+    printlnfl!("fetching", name = "maa-cli", channel = config.channel());
+
+    let api_url = config.api_url();
+    let version_json: VersionJSON<Details> = reqwest::blocking::get(&api_url)
+        .with_context(lfl!("failed-fetch-version-json", url = api_url.as_str()))?
         .json()
-        .context("Failed to parse version info")?;
+        .with_context(lfl!("failed-parse-version-json"))?;
     let current_version = version()?;
     if !version_json.can_update("maa-cli", &current_version)? {
         return Ok(());
@@ -47,15 +49,16 @@ pub fn update(args: &CommonArgs) -> Result<()> {
     let cache_path = dirs::cache().ensure()?.join(asset_name);
 
     if cache_path.exists() && cache_path.metadata()?.len() == asset_size {
-        println!("Found existing file: {}", cache_path.display());
+        printlnfl!("package-cache-hit", file = asset_name);
     } else {
         let url = config.download_url(details.tag(), asset_name);
+        printlnfl!("downloading", file = asset_name);
         let client = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(10))
             .build()
-            .context("Failed to create reqwest client")?;
+            .with_context(lfl!("failed-create-reqwest-client"))?;
         Runtime::new()
-            .context("Failed to create tokio runtime")?
+            .with_context(lfl!("failed-create-tokio-runtime"))?
             .block_on(download(
                 &client,
                 &url,
@@ -63,7 +66,7 @@ pub fn update(args: &CommonArgs) -> Result<()> {
                 asset_size,
                 Some(Checker::Sha256(asset_checksum)),
             ))
-            .context("Failed to download maa-cli")?;
+            .with_context(lfl!("failed-download", file = asset_name))?
     };
 
     Archive::try_from(cache_path.as_path())?.extract(|path| {
@@ -113,15 +116,15 @@ impl Assets {
             "macos" => match consts::ARCH {
                 "x86_64" => Ok(&self.x86_64_apple_darwin),
                 "aarch64" => Ok(&self.aarch64_apple_darwin),
-                _ => bail!("Unsupported architecture: {}", consts::ARCH),
+                _ => bailfl!("unsupported-architecture", arch = consts::ARCH),
             },
             "linux" => match consts::ARCH {
                 "x86_64" => Ok(&self.x86_64_unknown_linux_gnu),
                 "aarch64" => Ok(&self.aarch64_unknown_linux_gnu),
-                _ => bail!("Unsupported architecture: {}", consts::ARCH),
+                _ => bailfl!("unsupported-architecture", arch = consts::ARCH),
             },
             "windows" if consts::ARCH == "x86_64" => Ok(&self.x86_64_pc_windows_msvc),
-            _ => bail!("Unsupported platform: {} {}", consts::OS, consts::ARCH),
+            _ => bailfl!("unsupported-platform", os = consts::OS, arch = consts::ARCH),
         }
     }
 }
@@ -192,7 +195,8 @@ mod tests {
         "#;
 
         let version_json: VersionJSON<Details> = serde_json::from_str(json).unwrap();
-        let asset = version_json.details().asset().unwrap();
+        let details = version_json.details();
+        let asset = details.asset().unwrap();
 
         assert_eq!(asset.name(), "maa-cli.zip");
         assert_eq!(asset.size(), 123456);

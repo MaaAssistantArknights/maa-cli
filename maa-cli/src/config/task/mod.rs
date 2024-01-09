@@ -1,5 +1,5 @@
 pub mod task_type;
-use task_type::{MAATask, TaskOrUnknown};
+use task_type::TaskType;
 
 mod client_type;
 pub use client_type::ClientType;
@@ -67,7 +67,7 @@ pub struct Task {
     #[serde(default)]
     name: Option<String>,
     #[serde(rename = "type")]
-    task_type: TaskOrUnknown,
+    task_type: TaskType,
     #[serde(default)]
     params: MAAValue,
     #[serde(default)]
@@ -85,7 +85,7 @@ impl Task {
         variants: S,
     ) -> Self
     where
-        T: Into<TaskOrUnknown>,
+        T: Into<TaskType>,
         V: Into<MAAValue>,
         S: IntoIterator<Item = TaskVariant>,
     {
@@ -100,7 +100,7 @@ impl Task {
 
     pub fn new_with_default<T, V>(task_type: T, params: V) -> Self
     where
-        T: Into<TaskOrUnknown>,
+        T: Into<TaskType>,
         V: Into<MAAValue>,
     {
         Self::new(
@@ -121,7 +121,7 @@ impl Task {
         false
     }
 
-    pub fn task_type(&self) -> &TaskOrUnknown {
+    pub fn task_type(&self) -> &TaskType {
         &self.task_type
     }
 
@@ -182,14 +182,14 @@ impl TaskConfig {
 
         let mut tasks: Vec<InitializedTask> = Vec::new();
 
-        use TaskOrUnknown::Task;
         for task in self.tasks.iter() {
             if task.is_active() {
                 let task_type = task.task_type();
                 let mut params = task.params().init()?;
 
+                use TaskType::*;
                 match task_type {
-                    Task(MAATask::StartUp) => {
+                    StartUp => {
                         let start_game = params.get_or("enable", true)
                             && params.get_or("start_game_enabled", false);
 
@@ -209,7 +209,11 @@ impl TaskConfig {
                             (Some(t), None) => {
                                 client_type = Some(
                                     t.as_str()
-                                        .context("client_type must be a string")?
+                                        .with_context(lfl!(
+                                            "value-type-mismatch",
+                                            value = "client_type",
+                                            expected = "string"
+                                        ))?
                                         .parse()?,
                                 );
                             }
@@ -222,7 +226,7 @@ impl TaskConfig {
 
                         prepend_startup = false;
                     }
-                    Task(MAATask::CloseDown) => {
+                    CloseDown => {
                         match (params.get_or("enable", true), closedown) {
                             // If closedown task is enabled, enable closedown automatically
                             (true, None) => {
@@ -243,11 +247,20 @@ impl TaskConfig {
                         // it will be treated as a relative path to the config directory
                         // and will be converted to an absolute path.
                         if let Some(v) = params.get("filename") {
-                            let file: PathBuf =
-                                v.as_str().context("filename must be a string")?.into();
-                            let sub_dir = task_type.as_ref().to_lowercase();
+                            let file: PathBuf = v
+                                .as_str()
+                                .with_context(lfl!(
+                                    "value-type-mismatch",
+                                    value = "filename",
+                                    expected = "string"
+                                ))?
+                                .into();
+                            let sub_dir = task_type.to_str().to_lowercase();
                             if let Some(path) = dirs::abs_config(file, Some(sub_dir)) {
-                                params.insert("filename", path.to_str().context("Invilid UTF-8")?)
+                                params.insert(
+                                    "filename",
+                                    path.to_str().with_context(lfl!("invalid-utf8-path"))?,
+                                );
                             }
                         }
                     }
@@ -264,7 +277,7 @@ impl TaskConfig {
             tasks.insert(
                 0,
                 InitializedTask::new_noname(
-                    MAATask::StartUp,
+                    TaskType::StartUp,
                     object!(
                         "start_game_enabled" => true,
                         "client_type" => self.client_type.unwrap_or_default().to_string(),
@@ -274,7 +287,7 @@ impl TaskConfig {
         }
 
         if append_closedown {
-            tasks.push(InitializedTask::new_noname(MAATask::CloseDown, object!()));
+            tasks.push(InitializedTask::new_noname(TaskType::CloseDown, object!()));
         }
 
         Ok(InitializedTaskConfig {
@@ -299,16 +312,12 @@ pub struct InitializedTaskConfig {
 #[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct InitializedTask {
     name: Option<String>,
-    task_type: TaskOrUnknown,
+    task_type: TaskType,
     params: MAAValue,
 }
 
 impl InitializedTask {
-    pub fn new(
-        name: Option<String>,
-        task_type: impl Into<TaskOrUnknown>,
-        params: MAAValue,
-    ) -> Self {
+    pub fn new(name: Option<String>, task_type: impl Into<TaskType>, params: MAAValue) -> Self {
         Self {
             name,
             task_type: task_type.into(),
@@ -316,7 +325,7 @@ impl InitializedTask {
         }
     }
 
-    pub fn new_noname(task_type: impl Into<TaskOrUnknown>, params: MAAValue) -> Self {
+    pub fn new_noname(task_type: impl Into<TaskType>, params: MAAValue) -> Self {
         Self::new(None, task_type.into(), params)
     }
 
@@ -324,7 +333,7 @@ impl InitializedTask {
         self.name.as_deref()
     }
 
-    pub fn task_type(&self) -> &TaskOrUnknown {
+    pub fn task_type(&self) -> &TaskType {
         &self.task_type
     }
 
@@ -339,7 +348,7 @@ mod tests {
 
     use crate::object;
 
-    use task_type::MAATask;
+    use task_type::TaskType;
 
     impl TaskConfig {
         pub fn tasks(&self) -> &[Task] {
@@ -356,7 +365,7 @@ mod tests {
                 assert_eq!(
                     Task::new(
                         None,
-                        MAATask::StartUp,
+                        TaskType::StartUp,
                         object!(),
                         Strategy::default(),
                         variants
@@ -392,8 +401,8 @@ mod tests {
         #[test]
         fn get_type() {
             assert_eq!(
-                Task::new_with_default(MAATask::StartUp, object!()).task_type(),
-                &MAATask::StartUp,
+                Task::new_with_default(TaskType::StartUp, object!()).task_type(),
+                &TaskType::StartUp,
             );
         }
 
@@ -408,7 +417,7 @@ mod tests {
                 assert_eq!(
                     Task::new(
                         None,
-                        MAATask::StartUp,
+                        TaskType::StartUp,
                         base,
                         strategy,
                         variants.into_iter().map(|v| TaskVariant {
@@ -479,7 +488,7 @@ mod tests {
             assert_eq!(
                 Task::new(
                     None,
-                    MAATask::StartUp,
+                    TaskType::StartUp,
                     object!("a" => 1, "c" => 5),
                     Strategy::First,
                     vec![
@@ -533,15 +542,15 @@ mod tests {
                 let mut task_list = TaskConfig::new();
 
                 task_list.push(Task::new_with_default(
-                    MAATask::StartUp,
+                    TaskType::StartUp,
                     object!(
                         "client_type" => OptionalInput {
                             deps: Map::from([("start_game_enabled".to_string(), true.into())]),
                             input: SelectD::<String>::new(
                                 vec![
-                                    Official,
-                                    YoStarEN,
-                                    YoStarJP,
+                                    Official.to_str(),
+                                    YoStarEN.to_str(),
+                                    YoStarJP.to_str(),
                                 ],
                                 None,
                                 Some("a client type"),
@@ -557,7 +566,7 @@ mod tests {
 
                 task_list.push(Task::new(
                     Some("Fight Daily".to_string()),
-                    MAATask::Fight,
+                    TaskType::Fight,
                     object!(),
                     Strategy::Merge,
                     vec![
@@ -605,7 +614,7 @@ mod tests {
 
                 task_list.push(Task::new(
                     None,
-                    MAATask::Mall,
+                    TaskType::Mall,
                     object!(
                         "shopping" => true,
                         "credit_fight" => true,
@@ -629,7 +638,7 @@ mod tests {
                     }],
                 ));
 
-                task_list.push(Task::new_with_default(MAATask::CloseDown, object!()));
+                task_list.push(Task::new_with_default(TaskType::CloseDown, object!()));
 
                 task_list
             }
@@ -671,14 +680,14 @@ mod tests {
                     closedown: None,
                     tasks: vec![
                         Task::new_with_default(
-                            MAATask::StartUp,
+                            TaskType::StartUp,
                             object!(
                                 "client_type" => "Official",
                                 "start_game_enabled" => true,
                             ),
                         ),
-                        Task::new_with_default(MAATask::Fight, object!("stage" => "1-7")),
-                        Task::new_with_default(MAATask::CloseDown, object!()),
+                        Task::new_with_default(TaskType::Fight, object!("stage" => "1-7")),
+                        Task::new_with_default(TaskType::CloseDown, object!()),
                     ],
                 }
                 .init()
@@ -689,14 +698,14 @@ mod tests {
                     close_app: true,
                     tasks: vec![
                         InitializedTask::new_noname(
-                            MAATask::StartUp,
+                            TaskType::StartUp,
                             object!(
                                 "client_type" => "Official",
                                 "start_game_enabled" => true,
                             )
                         ),
-                        InitializedTask::new_noname(MAATask::Fight, object!("stage" => "1-7")),
-                        InitializedTask::new_noname(MAATask::CloseDown, object!()),
+                        InitializedTask::new_noname(TaskType::Fight, object!("stage" => "1-7")),
+                        InitializedTask::new_noname(TaskType::CloseDown, object!()),
                     ]
                 }
             );
@@ -708,11 +717,11 @@ mod tests {
                     closedown: Some(true),
                     tasks: vec![
                         Task::new_with_default(
-                            MAATask::StartUp,
+                            TaskType::StartUp,
                             object!( "start_game_enabled" => false)
                         ),
-                        Task::new_with_default(MAATask::Fight, object!("stage" => "1-7")),
-                        Task::new_with_default(MAATask::CloseDown, object!("enable" => false)),
+                        Task::new_with_default(TaskType::Fight, object!("stage" => "1-7")),
+                        Task::new_with_default(TaskType::CloseDown, object!("enable" => false)),
                     ],
                 }
                 .init()
@@ -723,15 +732,15 @@ mod tests {
                     close_app: true,
                     tasks: vec![
                         InitializedTask::new_noname(
-                            MAATask::StartUp,
+                            TaskType::StartUp,
                             object!(
                                 "enable" => true,
                                 "client_type" => "Official",
                                 "start_game_enabled" => true,
                             )
                         ),
-                        InitializedTask::new_noname(MAATask::Fight, object!("stage" => "1-7")),
-                        InitializedTask::new_noname(MAATask::CloseDown, object!("enable" => true)),
+                        InitializedTask::new_noname(TaskType::Fight, object!("stage" => "1-7")),
+                        InitializedTask::new_noname(TaskType::CloseDown, object!("enable" => true)),
                     ]
                 },
             );
@@ -742,7 +751,7 @@ mod tests {
                     startup: Some(true),
                     closedown: Some(true),
                     tasks: vec![Task::new_with_default(
-                        MAATask::Fight,
+                        TaskType::Fight,
                         object!("stage" => "1-7")
                     )],
                 }
@@ -754,14 +763,14 @@ mod tests {
                     close_app: true,
                     tasks: vec![
                         InitializedTask::new_noname(
-                            MAATask::StartUp,
+                            TaskType::StartUp,
                             object!(
                                 "client_type" => "Official",
                                 "start_game_enabled" => true,
                             )
                         ),
-                        InitializedTask::new_noname(MAATask::Fight, object!("stage" => "1-7")),
-                        InitializedTask::new_noname(MAATask::CloseDown, object!()),
+                        InitializedTask::new_noname(TaskType::Fight, object!("stage" => "1-7")),
+                        InitializedTask::new_noname(TaskType::CloseDown, object!()),
                     ]
                 },
             );
@@ -772,7 +781,7 @@ mod tests {
                     startup: Some(true),
                     closedown: Some(true),
                     tasks: vec![Task::new_with_default(
-                        MAATask::Fight,
+                        TaskType::Fight,
                         object!("stage" => "1-7")
                     )],
                 }
@@ -784,14 +793,14 @@ mod tests {
                     close_app: true,
                     tasks: vec![
                         InitializedTask::new_noname(
-                            MAATask::StartUp,
+                            TaskType::StartUp,
                             object!(
                                 "start_game_enabled" => true,
                                 "client_type" => "YoStarEN",
                             )
                         ),
-                        InitializedTask::new_noname(MAATask::Fight, object!("stage" => "1-7")),
-                        InitializedTask::new_noname(MAATask::CloseDown, object!()),
+                        InitializedTask::new_noname(TaskType::Fight, object!("stage" => "1-7")),
+                        InitializedTask::new_noname(TaskType::CloseDown, object!()),
                     ]
                 }
             )
@@ -801,11 +810,11 @@ mod tests {
         fn initialized_task() {
             let task = InitializedTask::new(
                 Some("Fight Daily".to_string()),
-                MAATask::Fight,
+                TaskType::Fight,
                 object!("stage" => "1-7"),
             );
             assert_eq!(task.name(), Some("Fight Daily"));
-            assert_eq!(task.task_type(), &MAATask::Fight);
+            assert_eq!(task.task_type(), &TaskType::Fight);
             assert_eq!(task.params(), &object!("stage" => "1-7"));
         }
     }

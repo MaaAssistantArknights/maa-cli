@@ -1,5 +1,5 @@
 use crate::{
-    config::task::{task_type::MAATask, Task, TaskConfig},
+    config::task::{task_type::TaskType, Task, TaskConfig},
     dirs::{self, Ensure},
     object,
     value::{
@@ -15,7 +15,6 @@ use std::{
 };
 
 use anyhow::{bail, Context, Result};
-use log::{debug, trace, warn};
 use prettytable::{format, row, Table};
 use serde_json::Value as JsonValue;
 
@@ -32,20 +31,18 @@ pub fn copilot(uri: impl AsRef<str>, resource_dirs: &Vec<PathBuf>) -> Result<Tas
     };
 
     // Print stage info
-    let stage_id = value["stage_name"]
-        .as_str()
-        .context("Failed to get stage ID")?;
-    let stage_name = task_type.get_stage_name(resource_dirs, stage_id)?;
+    let stage_name = value
+        .get_as_str("stage_name")
+        .with_context(lfl!("failed-get-stage-name"))?;
+    let stage_name = task_type.get_stage_name(resource_dirs, stage_name)?;
 
-    println!("Copilot Stage: {}", stage_name);
-
-    // Print operators info
-    println!("Operators:\n{}", operator_table(&value)?);
+    println!("{}{}", fl!("copilot-stage"), stage_name);
+    println!("{}\n{}", fl!("copilot-operators"), operator_table(&value)?);
 
     // Append task
     let mut task_config = TaskConfig::new();
 
-    task_config.push(task_type.to_task(path.to_str().context("Invalid path")?));
+    task_config.push(task_type.to_task(path.to_str().with_context(lfl!("invalid-utf8-path"))?));
 
     Ok(task_config)
 }
@@ -77,33 +74,39 @@ impl CopilotJson<'_> {
                 let json_file = dir.as_ref().join(code).with_extension("json");
 
                 if json_file.is_file() {
-                    debug!("Cache hit, using cached json file {}", json_file.display());
+                    debug!("copilot-cache-hit", file = json_file.to_string_lossy());
                     return Ok((json_from_file(&json_file)?, json_file));
                 }
 
                 let url = format!("{}{}", MAA_COPILOT_API, code);
-                debug!("Cache miss, downloading from {}", url);
-                let resp: JsonValue = reqwest::blocking::get(url)
-                    .context("Failed to send request")?
+                let resp: JsonValue = reqwest::blocking::get(&url)
+                    .with_context(lfl!("failed-download-copilot", url = url.clone()))?
                     .json()
-                    .context("Failed to parse response")?;
+                    .with_context(lfl!("failed-parse-copilot"))?;
+                debug!("copilot-downloaded", url = url.clone());
 
                 if resp["status_code"].as_i64().unwrap() == 200 {
                     let context = resp["data"]["content"]
                         .as_str()
-                        .context("Failed to get copilot context")?;
-                    let value: JsonValue =
-                        serde_json::from_str(context).context("Failed to parse context")?;
+                        .with_context(lfl!("failed-get-copilot-content"))?;
+                    let value: JsonValue = serde_json::from_str(context)
+                        .with_context(lfl!("failed-parse-copilot-content"))?;
 
                     // Save json file
                     fs::File::create(&json_file)
-                        .context("Failed to create json file")?
+                        .with_context(lfl!("failed-open-file", file = json_file.to_string_lossy()))?
                         .write_all(context.as_bytes())
-                        .context("Failed to write json file")?;
+                        .with_context(lfl!(
+                            "failed-write-file",
+                            file = json_file.to_string_lossy()
+                        ))?;
 
                     Ok((value, json_file))
                 } else {
-                    bail!("Request Error, code: {}", code);
+                    bailfl!(
+                        "failed-response-status",
+                        status = serde_json::to_string(&resp["status_code"])?
+                    );
                 }
             }
             CopilotJson::File(file) => {
@@ -130,7 +133,6 @@ impl CopilotType {
             CopilotType::Copilot => {
                 let stage_files = dirs::global_find(base_dirs, |dir| {
                     let dir = dir.join("Arknights-Tile-Pos");
-                    trace!("Searching stage file in {}", dir.display());
                     fs::read_dir(dir).ok().and_then(|entries| {
                         entries
                             .filter_map(|entry| entry.map(|e| e.path()).ok())
@@ -146,20 +148,18 @@ impl CopilotType {
                     })
                 });
 
-                if let Some(stage_file) = stage_files.last() {
-                    let stage_info = json_from_file(stage_file)?;
-                    Ok(format!(
-                        "{} {}",
-                        get_str_key(&stage_info, "code")?,
-                        get_str_key(&stage_info, "name")?
-                    ))
-                } else {
-                    warn!(
-                        "Failed to find stage file for {}, your resources may be outdated",
-                        stage_id
-                    );
-                    Ok(stage_id.to_string())
-                }
+                stage_files
+                    .last()
+                    .with_context(lfl!("failed-find-stage-file", stage = stage_id))
+                    .and_then(|stage_file| json_from_file(stage_file))
+                    .and_then(|stage_info| {
+                        match (stage_info.get_as_str("code"), stage_info.get_as_str("name")) {
+                            (Some(code), Some(name)) => Ok(format!("{} {}", code, name)),
+                            (Some(code), None) => Ok(code.to_string()),
+                            (None, Some(name)) => Ok(name.to_string()),
+                            (None, None) => Ok(stage_id.to_string()),
+                        }
+                    })
             }
             CopilotType::SSSCopilot => Ok(stage_id.to_string()),
         }
@@ -168,14 +168,14 @@ impl CopilotType {
     pub fn to_task(self, filename: impl AsRef<str>) -> Task {
         match self {
             CopilotType::Copilot => Task::new_with_default(
-                MAATask::Copilot,
+                TaskType::Copilot,
                 object!(
                     "filename" => filename.as_ref(),
                     "formation" => BoolInput::new(Some(true), Some("auto formation"))
                 ),
             ),
             CopilotType::SSSCopilot => Task::new_with_default(
-                MAATask::SSSCopilot,
+                TaskType::SSSCopilot,
                 object!(
                     "filename" => filename.as_ref(),
                     "loop_times" => Input::new(Some(1), Some("loop times"))
@@ -183,19 +183,21 @@ impl CopilotType {
             ),
         }
     }
-}
 
-impl AsRef<str> for CopilotType {
-    fn as_ref(&self) -> &str {
-        match self {
-            CopilotType::Copilot => "Copilot",
-            CopilotType::SSSCopilot => "SSSCopilot",
-        }
-    }
+    // fn to_fl_string(&self) -> String {
+    //     match self {
+    //         CopilotType::Copilot => fl!("Copilot"),
+    //         CopilotType::SSSCopilot => fl!("SSSCopilot"),
+    //     }
+    // }
 }
 
 fn json_from_file(path: impl AsRef<Path>) -> Result<JsonValue> {
-    Ok(serde_json::from_reader(fs::File::open(path)?)?)
+    let path = path.as_ref();
+    let file = fs::File::open(path)
+        .with_context(lfl!("failed-read-file", file = path.to_string_lossy()))?;
+
+    serde_json::from_reader(file).with_context(lfl!("failed-deserialize-json"))
 }
 
 fn operator_table(value: &JsonValue) -> Result<Table> {
@@ -203,19 +205,29 @@ fn operator_table(value: &JsonValue) -> Result<Table> {
     table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
     table.set_titles(row!["NAME", "SKILL"]);
 
-    if let Some(opers) = value["opers"].as_array() {
+    if let Some(opers) = value.get("opers").and_then(|v| v.as_array()) {
         for operator in opers {
-            table.add_row(row![get_str_key(operator, "name")?, operator["skill"]]);
+            table.add_row(row![
+                operator.get_as_str_or("name", "Unknown"),
+                operator["skill"]
+            ]);
         }
     }
 
-    if let Some(groups) = value["groups"].as_array() {
+    if let Some(groups) = value.get("groups").and_then(|v| v.as_array()) {
         for group in groups.iter() {
-            let opers = group["opers"].as_array().context("Failed to get opers")?;
+            let opers = if let Some(opers) = group.get("opers").and_then(|v| v.as_array()) {
+                opers
+            } else {
+                continue;
+            };
             let mut sub_table = Table::new();
             sub_table.set_format(*format::consts::FORMAT_NO_LINESEP);
             for operator in opers {
-                sub_table.add_row(row![get_str_key(operator, "name")?, operator["skill"]]);
+                sub_table.add_row(row![
+                    operator.get_as_str_or("name", "Unknown"),
+                    operator["skill"]
+                ]);
             }
 
             let vertical_offset = (sub_table.len() + 2) >> 1;
@@ -224,7 +236,7 @@ fn operator_table(value: &JsonValue) -> Result<Table> {
                 format!(
                     "{}[{}]",
                     "\n".repeat(vertical_offset - 1),
-                    get_str_key(group, "name")?
+                    group.get_as_str_or("name", "Unknown")
                 ),
                 sub_table
             ]);
@@ -234,11 +246,48 @@ fn operator_table(value: &JsonValue) -> Result<Table> {
     Ok(table)
 }
 
-fn get_str_key(value: &JsonValue, key: impl AsRef<str>) -> Result<&str> {
-    let key = key.as_ref();
-    value[key]
-        .as_str()
-        .with_context(|| format!("Failed to get {}", key))
+trait GetAsStr {
+    fn get_as_str(&self, key: impl AsRef<str>) -> Option<&str>;
+
+    fn get_as_str_or<'a>(&'a self, key: impl AsRef<str>, default: &'a str) -> &'a str {
+        self.get_as_str(key).unwrap_or(default)
+    }
+}
+
+impl GetAsStr for JsonValue {
+    fn get_as_str(&self, key: impl AsRef<str>) -> Option<&str> {
+        self.get(key.as_ref())?.as_str()
+    }
+}
+
+#[repr(u8)]
+#[derive(serde::Serialize, Default)]
+enum Diretion {
+    #[default]
+    Right = 0,
+    Down = 1,
+    Left = 2,
+    Up = 3,
+    None = 4, // 没有方向，通常是无人机之类的
+}
+
+impl<'de> serde::Deserialize<'de> for Diretion {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match String::deserialize(deserializer)?.as_str() {
+            "Right" | "RIGHT" | "right" | "右" => Ok(Diretion::Right),
+            "Left" | "LEFT" | "left" | "左" => Ok(Diretion::Left),
+            "Up" | "UP" | "up" | "上" => Ok(Diretion::Up),
+            "Down" | "DOWN" | "down" | "下" => Ok(Diretion::Down),
+            "None" | "NONE" | "none" | "无" => Ok(Diretion::None),
+            s => Err(serde::de::Error::custom(format!(
+                "Invalid direction: {}",
+                s
+            ))),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -342,7 +391,7 @@ mod tests {
             assert_eq!(
                 CopilotType::Copilot.to_task("filename"),
                 Task::new_with_default(
-                    MAATask::Copilot,
+                    TaskType::Copilot,
                     object!(
                         "filename" => "filename",
                         "formation" => BoolInput::new(Some(true), Some("auto formation"))
@@ -353,7 +402,7 @@ mod tests {
             assert_eq!(
                 CopilotType::SSSCopilot.to_task("filename"),
                 Task::new_with_default(
-                    MAATask::SSSCopilot,
+                    TaskType::SSSCopilot,
                     object!(
                         "filename" => "filename",
                         "loop_times" => Input::<i64>::new(Some(1), Some("loop times"))

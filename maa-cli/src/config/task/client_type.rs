@@ -42,10 +42,8 @@ impl ClientType {
             ClientType::YoStarKR => "명일방주",
         }
     }
-}
 
-impl AsRef<str> for ClientType {
-    fn as_ref(&self) -> &str {
+    pub fn to_str(self) -> &'static str {
         match self {
             ClientType::Official => "Official",
             ClientType::Bilibili => "Bilibili",
@@ -57,9 +55,15 @@ impl AsRef<str> for ClientType {
     }
 }
 
+impl From<ClientType> for fluent_bundle::FluentValue<'static> {
+    fn from(client_type: ClientType) -> Self {
+        Self::String(client_type.to_str().into())
+    }
+}
+
 impl std::fmt::Display for ClientType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_ref())
+        f.write_str(self.to_str())
     }
 }
 

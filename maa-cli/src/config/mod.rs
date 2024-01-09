@@ -171,14 +171,24 @@ pub trait FindFile: FromFile {
 }
 
 pub trait FindFileOrDefault: FromFile + Default {
-    fn find_file_or_default(path: &Path) -> Result<Self> {
+    fn find_file_or_default(path: &Path) -> Self {
         for filetype in SUPPORTED_EXTENSION.iter() {
             let path = path.with_extension(filetype);
             if path.exists() {
-                return Self::from_file(&path);
+                match Self::from_file(&path) {
+                    Ok(value) => return value,
+                    Err(e) => {
+                        error!(
+                            "failed-load-config-skip",
+                            path = path.to_str().unwrap_or(""),
+                            error = e.to_string()
+                        );
+                    }
+                }
             }
         }
-        Ok(Self::default())
+        info!("no-successful-config-found-use-default");
+        Self::default()
     }
 }
 
@@ -309,7 +319,7 @@ mod tests {
         );
 
         assert_eq!(
-            TestConfig::find_file_or_default(&test_file).unwrap(),
+            TestConfig::find_file_or_default(&test_file),
             TestConfig {
                 a: 1,
                 b: "test".to_string()
@@ -317,7 +327,7 @@ mod tests {
         );
 
         assert_eq!(
-            TestConfig::find_file_or_default(&non_exist_file).unwrap(),
+            TestConfig::find_file_or_default(&non_exist_file),
             TestConfig::default()
         );
 

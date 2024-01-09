@@ -1,5 +1,3 @@
-use log::debug;
-
 use std::cmp::min;
 use std::fs::{remove_file, File};
 use std::io::Write;
@@ -36,7 +34,7 @@ impl std::fmt::Display for Error {
         match self {
             Error::Reqwest(e) => e.fmt(f),
             Error::Io(e) => e.fmt(f),
-            Error::Verify => write!(f, "Checksum verification failed"),
+            Error::Verify => writefl!(f, "failed-verify"),
         }
     }
 }
@@ -113,7 +111,6 @@ pub async fn download<'a>(
             .unwrap()
             .progress_chars("=>-"),
     );
-    progress_bar.set_message("Downloading...");
 
     let mut stream = resp.bytes_stream();
     let mut file = File::create(path)?;
@@ -130,10 +127,10 @@ pub async fn download<'a>(
             progress_bar.set_position(downloaded);
         }
 
-        progress_bar.finish_with_message("Downloaded, verifying checksum...");
+        progress_bar.finish_with_message(fl!("downloaded-verifying"));
 
         if hasher.verify(checker.checksum()) {
-            println!("Checksum verified");
+            printlnfl!("verified");
         } else {
             remove_file(path)?;
             return Err(Error::Verify);
@@ -147,7 +144,7 @@ pub async fn download<'a>(
             progress_bar.set_position(downloaded);
         }
 
-        progress_bar.finish_with_message("Downloaded.");
+        progress_bar.finish_with_message(fl!("downloaded"));
     }
 
     Ok(())
@@ -201,8 +198,7 @@ pub async fn download_mirrors<'a>(
     let mut download_link = &mirrors[0];
 
     if t == 0 {
-        println!("Skip speed test, downloading from first link...");
-        debug!("First link: {}", download_link);
+        printlnfl!("skip-speed-test", link = download_link.as_str());
         download(client, download_link, path, size, checker).await?;
         return Ok(());
     }
@@ -210,23 +206,22 @@ pub async fn download_mirrors<'a>(
     let test_duration = Duration::from_secs(t);
     let mut largest: u64 = 0;
 
-    println!("Testing download speed...");
+    printlnfl!("testing-download-speed");
     for link in mirrors.iter() {
-        debug!("Testing {}", link);
+        debug!("testing-mirror", link = link.as_str());
         if let Ok(downloaded) = try_download(client, link, test_duration).await {
             if downloaded > largest {
-                debug!(
-                    "Found faster link {} with {} bytes downloaded",
-                    link, downloaded
-                );
+                debug!("found-faster-mirror", link = link.as_str());
                 download_link = link;
                 largest = downloaded;
             }
         }
     }
 
-    println!("Downloading from fastest mirror...");
-    debug!("Fastest link: {}", download_link);
+    printlnfl!(
+        "download-from-fastest-mirror",
+        link = download_link.as_str()
+    );
     download(client, download_link, path, size, checker).await?;
 
     Ok(())

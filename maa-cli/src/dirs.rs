@@ -330,6 +330,7 @@ impl Ensure for &Path {
 
     fn ensure(self) -> Result<Self, Self::Error> {
         if !self.exists() {
+            debug!("create-dir", dir = self.to_str().unwrap_or(""));
             create_dir_all(self)?;
         }
         Ok(self)
@@ -337,11 +338,13 @@ impl Ensure for &Path {
 
     fn ensure_clean(self) -> Result<Self, Self::Error> {
         if self.exists() {
+            debug!("remove-dir", dir = self.to_string_lossy());
             remove_dir_all(self)?;
-        } else if let Some(parent) = self.parent() {
-            parent.ensure()?;
+            create_dir(self)?;
+        } else {
+            create_dir_all(self)?;
         }
-        create_dir(self)?;
+
         Ok(self)
     }
 }

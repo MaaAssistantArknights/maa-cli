@@ -5,7 +5,6 @@ use crate::{config::task::ClientType, dirs};
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, FixedOffset, NaiveDateTime};
 use lazy_static::lazy_static;
-use log::warn;
 use serde::Deserialize;
 use serde_json::Value as JsonValue;
 
@@ -56,8 +55,9 @@ pub struct StageActivityJson {
 
 fn load_stage_activity(file_path: impl AsRef<Path>) -> Result<StageActivityJson> {
     let file_path = file_path.as_ref();
-    let file = std::fs::File::open(file_path).context("Failed to open StageActivity.json")?;
-    serde_json::from_reader(file).context("Failed to parse StageActivity.json")
+    let file = std::fs::File::open(file_path)
+        .with_context(lfl!("failed-open-file", file = file_path.to_string_lossy()))?;
+    serde_json::from_reader(file).with_context(lfl!("failed-deserialize-json"))
 }
 
 impl StageActivityJson {
@@ -171,9 +171,10 @@ fn load_item_index(client: ClientType) -> Result<JsonValue> {
     }
     .join("item_index.json");
 
-    let file = std::fs::File::open(item_index_path).context("Failed to open item_index.json")?;
+    let file = std::fs::File::open(item_index_path)
+        .with_context(lfl!("failed-open-file", file = "item_index.json"))?;
 
-    serde_json::from_reader(file).context("Failed to parse item_index.json")
+    serde_json::from_reader(file).with_context(lfl!("failed-deserialize-json"))
 }
 
 pub trait WarnError<T> {
@@ -186,7 +187,7 @@ impl<T, E: std::fmt::Display> WarnError<T> for std::result::Result<T, E> {
         match self {
             Ok(t) => Some(t),
             Err(err) => {
-                warn!("{}", err);
+                log::warn!("{}", err);
                 None
             }
         }

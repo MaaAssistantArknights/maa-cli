@@ -6,7 +6,6 @@ use std::{path::PathBuf, sync::Mutex};
 
 use anyhow::{Context, Result};
 use lazy_static::lazy_static;
-use log::{debug, info, warn};
 use maa_sys::{Assistant, InstanceOptionKey, StaticOptionKey, TouchMode};
 use serde::Deserialize;
 
@@ -39,7 +38,7 @@ impl<'de> Deserialize<'de> for AsstConfig {
         let mut config = AsstConfigHelper::deserialize(deserializer)?;
 
         if matches!(config.connection, ConnectionConfig::PlayTools { .. }) {
-            info!("Detected connection with PlayTools");
+            info!("detected-connection-type", connection = "PlayTools");
             config.instance_options.force_playtools();
             config.resource.use_platform_diff_resource("iOS");
         }
@@ -56,10 +55,9 @@ impl<'de> Deserialize<'de> for AsstConfig {
 impl super::FromFile for AsstConfig {}
 
 lazy_static! {
-    static ref ASST_CONFIG: Mutex<AsstConfig> = Mutex::new(
-        AsstConfig::find_file_or_default(&dirs::config().join("asst"))
-            .expect("Failed to load asst config")
-    );
+    static ref ASST_CONFIG: Mutex<AsstConfig> = Mutex::new(AsstConfig::find_file_or_default(
+        &dirs::config().join("asst")
+    ));
 }
 
 pub fn with_asst_config<R>(f: impl FnOnce(&AsstConfig) -> R) -> R {
@@ -113,20 +111,23 @@ impl ConnectionConfig {
     pub fn connect_args(&self) -> (&str, &str, &str) {
         match self {
             ConnectionConfig::ADB {
-                adb_path,
+                adb_path: adb,
                 device,
                 config,
             } => {
                 debug!(
-                    "Connecting to {} with config {} via {}",
-                    device, config, adb_path
+                    "connection-args-adb",
+                    adb = adb.as_str(),
+                    device = device.as_str(),
+                    config = config.as_str(),
                 );
-                (adb_path, device, config)
+                (adb, device, config)
             }
             ConnectionConfig::PlayTools { address, config } => {
                 debug!(
-                    "Connecting to {} with config {} via PlayTools",
-                    address, config
+                    "connection-args-playtools",
+                    address = address.as_str(),
+                    config = config.as_str(),
                 );
                 (EMPTY_STR, address, config)
             }
@@ -228,22 +229,28 @@ fn default_resource_base_dirs() -> Vec<PathBuf> {
     let mut resource_dirs = Vec::new();
 
     if let Some(resource_dir) = dirs::find_resource() {
-        debug!("Found resource directory: {}", resource_dir.display());
+        debug!(
+            "found-resource-directory",
+            path = resource_dir.to_string_lossy()
+        );
         resource_dirs.push(resource_dir);
     } else {
-        warn!("Resource directory not found!")
+        warn!("resource-directory-not-found");
     }
 
     let hot_update_dir = dirs::hot_update();
     if hot_update_dir.exists() {
         debug!(
-            "Found hot update resource directory: {}",
-            hot_update_dir.display()
+            "found-hot-update-resource",
+            path = hot_update_dir.to_string_lossy()
         );
         resource_dirs.push(hot_update_dir.join("resource"));
         resource_dirs.push(hot_update_dir.join("cache").join("resource"));
     } else {
-        warn!("Hot update resource directory not found!");
+        warn!(
+            "hot-update-resource-not-exist",
+            path = hot_update_dir.to_string_lossy()
+        );
     }
 
     resource_dirs
@@ -259,17 +266,17 @@ impl ResourceConfig {
     }
 
     pub fn use_global_resource(&mut self, resource: impl Into<PathBuf>) -> &mut Self {
+        let resource = resource.into();
         match self.global_resource.as_ref() {
             Some(global_resource) => {
                 warn!(
-                    "Global resource {} already set, ignoring {}",
-                    global_resource.display(),
-                    resource.into().display(),
+                    "globalize-resource-twice-set",
+                    loaded = global_resource.to_string_lossy(),
+                    path = resource.to_string_lossy()
                 );
             }
             None => {
-                let resource = resource.into();
-                info!("Using global resource: {}", resource.display());
+                info!("use-globalize-resource", path = resource.to_string_lossy());
                 self.global_resource = Some(resource);
             }
         }
@@ -277,17 +284,20 @@ impl ResourceConfig {
     }
 
     pub fn use_platform_diff_resource(&mut self, resource: impl Into<PathBuf>) -> &mut Self {
+        let resource = resource.into();
         match self.platform_diff_resource.as_ref() {
             Some(platform_diff_resource) => {
                 warn!(
-                    "Platform diff resource {} already set, ignoring {}",
-                    platform_diff_resource.display(),
-                    resource.into().display(),
+                    "platform-diff-resource-twice-set",
+                    loaded = platform_diff_resource.to_string_lossy(),
+                    path = resource.to_string_lossy()
                 );
             }
             None => {
-                let resource = resource.into();
-                info!("Using platform diff resource: {}", resource.display());
+                info!(
+                    "use-platform-diff-resource",
+                    path = resource.to_string_lossy()
+                );
                 self.platform_diff_resource = Some(resource);
             }
         }
@@ -309,7 +319,10 @@ impl ResourceConfig {
                 .join("resource");
             let full_paths = global_path(base_dirs, global_resource_dir);
             if full_paths.is_empty() {
-                warn!("Global resource {} not found", global_resource.display(),);
+                warn!(
+                    "globalize-resource-not-found",
+                    path = global_resource.to_string_lossy()
+                );
             } else {
                 resource_dirs.extend(full_paths);
             }
@@ -321,8 +334,8 @@ impl ResourceConfig {
             let full_paths = global_path(base_dirs, platform_diff_resource_dir);
             if full_paths.is_empty() {
                 warn!(
-                    "Platform diff resource {} not found",
-                    platform_diff_resource.display(),
+                    "platform-diff-resource-not-found",
+                    path = platform_diff_resource.to_string_lossy()
                 );
             } else {
                 resource_dirs.extend(full_paths);
@@ -335,7 +348,7 @@ impl ResourceConfig {
     pub fn load(&self) -> Result<()> {
         let resource_dirs = self.resource_dirs();
         for resource_dir in resource_dirs {
-            debug!("Loading resource from {}", resource_dir.display());
+            debug!("load-resource-from", path = resource_dir.to_string_lossy());
             Assistant::load_resource(resource_dir.parent().unwrap())?;
         }
 
@@ -352,7 +365,7 @@ fn push_resource(resource_dirs: &mut Vec<PathBuf>, dir: impl Into<PathBuf>) -> &
     if dir.exists() {
         resource_dirs.push(dir);
     } else {
-        warn!("Resource directory {} not found, ignoring", dir.display(),);
+        warn!("resource-not-exist", path = dir.to_string_lossy());
     }
 
     resource_dirs
@@ -372,18 +385,18 @@ impl StaticOptions {
         match (self.cpu_ocr, self.gpu_ocr) {
             (Some(cpu_ocr), Some(gpu_id)) => {
                 if cpu_ocr {
-                    warn!("Both CPU OCR and GPU OCR are enabled, CPU OCR will be ignored");
+                    warn!("both-cpu-and-gpu-ocr-enabled");
                 }
-                debug!("Using GPU OCR with GPU ID {}", gpu_id);
+                debug!("use-gpu-ocr", id = gpu_id);
                 StaticOptionKey::GpuOCR
                     .apply(gpu_id)
-                    .with_context(|| format!("Failed to enable GPU OCR with GPU ID {}", gpu_id))?;
+                    .with_context(lfl!("failed-use-gpu-ocr", id = gpu_id))?;
             }
             (Some(cpu_core), None) if cpu_core => {
-                debug!("Using CPU OCR");
+                debug!("use-cpu-ocr");
                 StaticOptionKey::CpuOCR
                     .apply(true)
-                    .context("Failed to enable CPU OCR")?;
+                    .with_context(lfl!("failed-use-cpu-ocr"))?;
             }
             (_, _) => {}
         };
@@ -406,14 +419,19 @@ impl InstanceOptions {
     fn force_playtools(&mut self) -> &mut Self {
         match self.touch_mode {
             Some(touch_mode) if !matches!(touch_mode, TouchMode::MacPlayTools) => {
-                warn!("Connect with PlayTools force touch mode to MacPlayTools");
+                warn!("force-macplaytools");
                 self.touch_mode = Some(TouchMode::MacPlayTools);
             }
             None => {
-                info!("Connect with PlayTools set touch mode to MacPlayTools automatically");
+                info!("automatic-macplaytools");
                 self.touch_mode = Some(TouchMode::MacPlayTools);
             }
             _ => {}
+        }
+
+        if self.adb_lite_enabled.is_some_and(|v| v) {
+            warn!("force-disable-adb-lite");
+            self.adb_lite_enabled = Some(false);
         }
 
         self
@@ -421,28 +439,34 @@ impl InstanceOptions {
 
     pub fn apply_to(&self, asst: &Assistant) -> Result<()> {
         if let Some(touch_mode) = self.touch_mode {
-            debug!("Setting touch mode to {}", touch_mode);
+            debug!("set-touch-mode", mode = touch_mode.as_ref());
             InstanceOptionKey::TouchMode
                 .apply_to(asst, touch_mode)
-                .with_context(|| format!("Failed to set touch mode to {}", touch_mode))?;
+                .with_context(lfl!("failed-set-touch-mode", mode = touch_mode.as_ref()))?;
         }
-        if let Some(deployment_with_pause) = self.deployment_with_pause {
-            debug!("Setting deployment with pause to {}", deployment_with_pause);
+        if let Some(enabled) = self.deployment_with_pause {
+            debug!("deploy-with-pause", enabled = enabled.to_string());
             InstanceOptionKey::DeploymentWithPause
-                .apply_to(asst, deployment_with_pause)
-                .context("Failed to set deployment with pause")?;
+                .apply_to(asst, enabled)
+                .with_context(lfl!(
+                    "failed-deploy-with-pause",
+                    enabled = enabled.to_string()
+                ))?;
         }
-        if let Some(adb_lite_enabled) = self.adb_lite_enabled {
-            debug!("Setting adb lite enabled to {}", adb_lite_enabled);
+        if let Some(enabled) = self.adb_lite_enabled {
+            debug!("adb-lite", enabled = enabled.to_string());
             InstanceOptionKey::AdbLiteEnabled
-                .apply_to(asst, adb_lite_enabled)
-                .context("Failed to set adb lite enabled")?;
+                .apply_to(asst, enabled)
+                .with_context(lfl!("failed-adb-lite", enabled = enabled.to_string()))?;
         }
-        if let Some(kill_adb_on_exit) = self.kill_adb_on_exit {
-            debug!("Setting kill adb on exit to {}", kill_adb_on_exit);
+        if let Some(enabled) = self.kill_adb_on_exit {
+            debug!("kill-adb-on-exit", enabled = enabled.to_string());
             InstanceOptionKey::KillAdbOnExit
-                .apply_to(asst, kill_adb_on_exit)
-                .context("Failed to set kill adb on exit")?;
+                .apply_to(asst, enabled)
+                .with_context(lfl!(
+                    "failed-kill-adb-on-exit",
+                    enabled = enabled.to_string()
+                ))?;
         }
         Ok(())
     }

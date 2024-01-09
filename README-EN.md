@@ -120,8 +120,11 @@ The main feature of `maa-cli` is to run tasks, including predefined tasks and cu
 
 #### Predefined tasks
 
+- `maa startup [client]`: run a startup task, if `client` is given, it will be used to launch the game;
+- `maa closedown`: close the game;
 - `maa fight [stage]`: run a fight task, the `stage` is the stage to fight, like `1-7`, `CE-6`, etc; if not given, it will be queried from user;
 - `maa copilot <maa_uri>`: run a copilot task, the `maa_uri` is the URI of a copilot task; it can be `maa://1234` or local file path;
+- `maa roguelike [theme]`: run a roguelike task, the `theme` is the theme of roguelike，available themes are `Phantom`, `Mizuki` and `Sami`.
 
 #### Custom tasks
 
@@ -247,7 +250,7 @@ params = { stage = "CE-6" }
 params = { stage = "1-7" }
 ```
 
-Beside of above conditions, there is a condition `OnSideStory` which depends on hot update resource to check if there is any opening side story. Thus, the condition of fight `SL-8`can be simplified as `{ type = "OnSideStory", client = "Official" }`, where `client` is the client type of game. 
+Beside of above conditions, there is a condition `OnSideStory` which depends on hot update resource to check if there is any opening side story. Thus, the condition of fight `SL-8`can be simplified as `{ type = "OnSideStory", client = "Official" }`, where `client` is the client type of game.
 
 Beside of above basic condition, `{ type = "And", conditions = [...] }` `{ type = "Or", conditions = [...] }`, and `{ type = "Not", condition = ... }` can be used for logical combination of conditions.
 

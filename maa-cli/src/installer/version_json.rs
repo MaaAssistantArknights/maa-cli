@@ -38,21 +38,27 @@ impl<D> VersionJSON<D> {
         &self.version
     }
 
-    pub fn can_update(&self, name: &str, current_version: &Version) -> Result<bool, semver::Error> {
-        let version = self.version();
-        if version > current_version {
-            println!(
-                "Found newer {} version: v{} (current: v{})",
-                name, version, current_version
+    pub fn can_update(&self, name: &str, ver_current: &Version) -> Result<bool, semver::Error> {
+        let ver_remote = self.version();
+        if ver_remote > ver_current {
+            printlnfl!(
+                "found-newer-version",
+                name = name,
+                new = ver_remote.to_string(),
+                old = ver_current.to_string()
             );
             Ok(true)
         } else {
-            println!("Up to date: {} v{}.", name, current_version);
+            printlnfl!(
+                "update-to-date",
+                name = name,
+                version = ver_current.to_string()
+            );
             Ok(false)
         }
     }
 
-    pub fn details(&self) -> &D {
-        &self.details
+    pub fn details(self) -> D {
+        self.details
     }
 }

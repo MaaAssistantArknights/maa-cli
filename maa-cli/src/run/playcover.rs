@@ -1,7 +1,6 @@
 use crate::config::task::ClientType;
 
 use anyhow::{Context, Result};
-use log::{info, trace};
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 // M A A 0x00 0x00 0x04 T E R M
@@ -32,7 +31,7 @@ impl PlayCoverApp {
     async fn connect(&self) -> Result<TcpStream> {
         let stream = TcpStream::connect(&self.address)
             .await
-            .context("Failed to connect to game!")?;
+            .with_context(lfl!("failed-connect-game"))?;
 
         Ok(stream)
     }
@@ -43,25 +42,25 @@ impl PlayCoverApp {
         }
 
         if self.connect().await.is_ok() {
-            info!("Game is already running!");
+            info!("game-is-running");
             return Ok(());
         }
 
         let app = self.client.app();
-        info!("Starting app: {}", app);
+        info!("start-game", name = app);
         std::process::Command::new("open")
             .arg("-a")
             .arg(app)
             .status()
-            .context("Failed to start game!")?;
+            .with_context(lfl!("failed-start-game"))?;
 
         // Wait for game ready
         loop {
             if self.connect().await.is_ok() {
-                info!("Game ready!");
+                info!("game-ready");
                 break;
             }
-            trace!("Waiting for game ready...");
+            trace!("waiting-for-game");
             std::thread::sleep(std::time::Duration::from_millis(500));
         }
 

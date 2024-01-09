@@ -48,8 +48,7 @@ impl super::FromFile for CLIConfig {}
 
 lazy_static! {
     static ref INSTALLER_CONFIG: CLIConfig =
-        CLIConfig::find_file_or_default(&dirs::config().join("cli"))
-            .expect("Failed to load installer config");
+        CLIConfig::find_file_or_default(&dirs::config().join("cli"));
 }
 
 pub fn cli_config() -> &'static CLIConfig {
@@ -68,13 +67,25 @@ pub enum Channel {
     Alpha,
 }
 
+impl Channel {
+    fn to_str(self) -> &'static str {
+        match self {
+            Channel::Stable => "stable",
+            Channel::Beta => "beta",
+            Channel::Alpha => "alpha",
+        }
+    }
+}
+
 impl std::fmt::Display for Channel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Channel::Stable => write!(f, "stable"),
-            Channel::Beta => write!(f, "beta"),
-            Channel::Alpha => write!(f, "alpha"),
-        }
+        f.write_str(self.to_str())
+    }
+}
+
+impl<'source> From<Channel> for fluent_bundle::FluentValue<'source> {
+    fn from(channel: Channel) -> Self {
+        Self::String(channel.to_str().into())
     }
 }
 

@@ -1,7 +1,6 @@
-use serde::Deserialize;
-
-#[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MAATask {
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone)]
+pub enum TaskType {
     StartUp,
     CloseDown,
     Fight,
@@ -18,11 +17,12 @@ pub enum MAATask {
     Custom,
     SingleStep,
     VideoRecognition,
+    Unknown(String),
 }
-use MAATask::*;
 
-impl MAATask {
-    fn to_str(self) -> &'static str {
+impl TaskType {
+    pub fn to_str(&self) -> &str {
+        use TaskType::*;
         match self {
             StartUp => "StartUp",
             CloseDown => "CloseDown",
@@ -40,63 +40,112 @@ impl MAATask {
             Custom => "Custom",
             SingleStep => "SingleStep",
             VideoRecognition => "VideoRecognition",
-        }
-    }
-}
-
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
-#[serde(untagged)]
-pub enum TaskOrUnknown {
-    Task(MAATask),
-    Unknown(String),
-}
-use TaskOrUnknown::*;
-
-impl From<MAATask> for TaskOrUnknown {
-    fn from(task: MAATask) -> Self {
-        Task(task)
-    }
-}
-
-impl AsRef<str> for TaskOrUnknown {
-    fn as_ref(&self) -> &str {
-        match self {
-            Task(task) => task.to_str(),
             Unknown(s) => s.as_str(),
         }
     }
-}
 
-impl std::fmt::Display for TaskOrUnknown {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_ref())
+    pub fn to_fl_string(&self) -> String {
+        use TaskType::*;
+        match self {
+            StartUp => fl!("task-type-startup"),
+            CloseDown => fl!("task-type-closedown"),
+            Fight => fl!("task-type-fight"),
+            Recruit => fl!("task-type-recruit"),
+            Infrast => fl!("task-type-infrast"),
+            Mall => fl!("task-type-mall"),
+            Award => fl!("task-type-award"),
+            Roguelike => fl!("task-type-roguelike"),
+            Copilot => fl!("task-type-copilot"),
+            SSSCopilot => fl!("task-type-ssscopilot"),
+            Depot => fl!("task-type-depot"),
+            OperBox => fl!("task-type-operbox"),
+            ReclamationAlgorithm => fl!("task-type-reclamationalgorithm"),
+            Custom => fl!("task-type-custom"),
+            SingleStep => fl!("task-type-singlestep"),
+            VideoRecognition => fl!("task-type-videorecognition"),
+            Unknown(s) => s.clone(),
+        }
     }
 }
 
-impl maa_sys::ToCString for &TaskOrUnknown {
+impl std::str::FromStr for TaskType {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use TaskType::*;
+        Ok(match s {
+            "StartUp" => StartUp,
+            "CloseDown" => CloseDown,
+            "Fight" => Fight,
+            "Recruit" => Recruit,
+            "Infrast" => Infrast,
+            "Mall" => Mall,
+            "Award" => Award,
+            "Roguelike" => Roguelike,
+            "Copilot" => Copilot,
+            "SSSCopilot" => SSSCopilot,
+            "Depot" => Depot,
+            "OperBox" => OperBox,
+            "ReclamationAlgorithm" => ReclamationAlgorithm,
+            "Custom" => Custom,
+            "SingleStep" => SingleStep,
+            "VideoRecognition" => VideoRecognition,
+            _ => {
+                warn!("unknown-task-type", task_type = s);
+                Unknown(s.to_string())
+            }
+        })
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for TaskType {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<TaskType, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct TaskTypeVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for TaskTypeVisitor {
+            type Value = TaskType;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a string representing a task type")
+            }
+
+            fn visit_str<E>(self, value: &str) -> std::result::Result<TaskType, E>
+            where
+                E: serde::de::Error,
+            {
+                value.parse().map_err(serde::de::Error::custom)
+            }
+        }
+
+        deserializer.deserialize_str(TaskTypeVisitor)
+    }
+}
+
+impl std::fmt::Display for TaskType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.to_str())
+    }
+}
+
+impl maa_sys::ToCString for &TaskType {
     fn to_cstring(self) -> maa_sys::Result<std::ffi::CString> {
-        self.as_ref().to_cstring()
+        self.to_str().to_cstring()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use TaskType::*;
 
     use serde_test::{assert_de_tokens, Token};
 
-    impl PartialEq<MAATask> for TaskOrUnknown {
-        fn eq(&self, other: &MAATask) -> bool {
-            match self {
-                Task(task) => task == other,
-                Unknown(_) => false,
-            }
-        }
-    }
-
     #[test]
     fn deserialize() {
-        let types: [TaskOrUnknown; 17] = [
+        let types: [TaskType; 17] = [
             StartUp.into(),
             CloseDown.into(),
             Fight.into(),
@@ -157,14 +206,13 @@ mod tests {
         assert_eq!(Depot.to_str(), "Depot");
         assert_eq!(OperBox.to_str(), "OperBox");
         assert_eq!(
-            MAATask::ReclamationAlgorithm.to_str(),
+            TaskType::ReclamationAlgorithm.to_str(),
             "ReclamationAlgorithm",
         );
         assert_eq!(Custom.to_str(), "Custom");
         assert_eq!(SingleStep.to_str(), "SingleStep");
         assert_eq!(VideoRecognition.to_str(), "VideoRecognition");
-        assert_eq!(Task(StartUp).as_ref(), "StartUp");
-        assert_eq!(Unknown("Other".into()).as_ref(), "Other");
+        assert_eq!(Unknown("Other".into()).to_str(), "Other");
     }
 
     #[test]
@@ -173,7 +221,7 @@ mod tests {
         use std::ffi::CString;
 
         assert_eq!(
-            Task(StartUp).to_cstring().unwrap(),
+            StartUp.to_cstring().unwrap(),
             CString::new("StartUp").unwrap(),
         );
 

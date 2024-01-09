@@ -3,7 +3,6 @@ use summary::{edit_current_task_detail, end_current_task, start_task};
 
 use std::fmt::Write;
 
-use log::{debug, error, info, trace, warn};
 use maa_sys::binding::{AsstMsgId, AsstTaskId};
 use serde_json::{Map, Value};
 
@@ -82,12 +81,12 @@ fn process_message(code: AsstMsgId, json: Value) {
     let ret = match code.into() {
         InternalError => Some(()),
         InitFailed => {
-            error!("InitializationError");
+            error!("init-failed");
             Some(())
         }
         ConnectionInfo => process_connection_info(message),
         AllTasksCompleted => {
-            info!("AllTasksCompleted");
+            info!("all-tasks-completed");
             Some(())
         }
         AsyncCallInfo => Some(()),
@@ -108,9 +107,9 @@ fn process_message(code: AsstMsgId, json: Value) {
     // we should print the message to trace the error
     if ret.is_none() {
         debug!(
-            "FailedToProcessMessage, code: {}, message: {}",
-            code,
-            serde_json::to_string_pretty(message).unwrap()
+            "failed-process-message",
+            code = code,
+            message = serde_json::to_string_pretty(message).unwrap(),
         )
     }
 }
@@ -120,42 +119,62 @@ fn process_connection_info(message: &Map<String, Value>) -> Option<()> {
 
     match what {
         // Resulution
-        "UnsupportedResolution" => error!("{}", "UnsupportedResolution"),
-        "ResolutionError" => error!("{}", "ResolutionAcquisitionFailure"),
+        "ResulutionGot" => info!(
+            "got-resolution",
+            width = message.get("details")?.get("width")?.as_i64()?,
+            height = message.get("details")?.get("height")?.as_i64()?
+        ),
+        "ResolutionError" => error!("failed-get-resolution"),
+        "UnsupportedResolution" => {
+            let details = message.get("details")?.as_object()?;
+            let width = details.get("width")?.as_i64()?;
+            let height = details.get("height")?.as_i64()?;
+
+            match message.get("why")?.as_str()? {
+                "low-screen-resolution" => {
+                    error!("low-screen-resolution", width = width, height = height)
+                }
+                "not-16-9" => error!("not-16-9", width = width, height = height),
+                s => error!(
+                    "unsupported-resolution",
+                    why = s,
+                    width = width,
+                    height = height
+                ),
+            };
+        }
 
         // Connection
-        "Connected" => info!("{}", "Connected"),
-        "Disconnect" => warn!("{}", "Disconnected"),
-        "Reconnecting" => warn!(
-            "{} {} {}",
-            "Reconnect",
-            message.get("details")?.get("times")?.as_i64()?,
-            "times"
+        "Connected" => info!(
+            "connected",
+            address = message.get("details")?.get("address")?.as_str()?
         ),
-        "Reconnected" => info!("{}", "ReconnectSuccess"),
+        "Disconnect" => warn!("disconnected"),
+        "Reconnecting" => warn!(
+            "reconnecting",
+            times = message.get("details")?.get("times")?.as_i64()?,
+        ),
+        "Reconnected" => info!("reconnected"),
 
         // Screen Capture
-        "ScreencapFailed" => error!("{}", "ScreencapFailed"),
+        "ScreencapFailed" => error!("failed-screencap"),
         "FastestWayToScreencap" => info!(
-            "{} {} {}",
-            "FastestWayToScreencap",
-            message.get("details")?.get("method")?.as_str()?,
-            message.get("details")?.get("cost")?.as_i64()?,
+            "fastest-way-screencap",
+            method = message.get("details")?.get("method")?.as_str()?,
+            cost = message.get("details")?.get("cost")?.as_i64()?,
         ),
-        "ScreencapCost" => debug!(
-            "{} {} ({} ~ {})",
-            "ScreencapCost",
-            message.get("details")?.get("avg")?.as_i64()?,
-            message.get("details")?.get("min")?.as_i64()?,
-            message.get("details")?.get("max")?.as_i64()?,
+        "ScreencapCost" => trace!(
+            "screencap-cost",
+            min = message.get("details")?.get("min")?.as_i64()?,
+            max = message.get("details")?.get("max")?.as_i64()?,
+            avg = message.get("details")?.get("avg")?.as_i64()?,
         ),
 
-        "TouchModeNotAvailable" => error!("{}", "TouchModeNotAvailable"),
+        "TouchModeNotAvailable" => error!("touch-mode-not-available"),
         _ => {
             trace!(
-                "{}: {}",
-                "Unknown Connection Info",
-                serde_json::to_string_pretty(message).unwrap()
+                "unknown-connection-info",
+                message = serde_json::to_string_pretty(message).unwrap()
             );
         }
     }
@@ -170,19 +189,19 @@ fn process_taskchain(code: AsstMsg, message: &Map<String, Value>) -> Option<()> 
 
     match code {
         TaskChainStart => {
-            info!("{} {}", taskchain, "Start");
+            info!("taskchain-start", name = taskchain);
             start_task(message.get("taskid")?.as_i64()? as AsstTaskId);
         }
         TaskChainCompleted => {
-            info!("{} {}", taskchain, "Completed");
+            info!("taskchain-completed", name = taskchain);
             end_current_task(summary::Reason::Completed);
         }
         TaskChainStopped => {
-            warn!("{} {}", taskchain, "Stopped");
+            warn!("taskchain-stopped", name = taskchain);
             end_current_task(summary::Reason::Stopped);
         }
         TaskChainError => {
-            error!("{} {}", taskchain, "Error");
+            error!("taskchain-error", name = taskchain);
             end_current_task(summary::Reason::Error);
         }
         TaskChainExtraInfo => {}
@@ -197,19 +216,21 @@ fn process_subtask_error(message: &Map<String, Value>) -> Option<()> {
     let subtask = message.get("subtask")?.as_str()?;
 
     match subtask {
-        "StartGameTask" => error!("{}", "FailedToStartGame"),
-        "AutoRecruitTask" => error!("{} {}", message.get("why")?.as_str()?, "HasReturned"),
-        "RecognizeDrops" => error!("{}", "FailedToRecognizeDrops"),
-        "ReportToPenguinStats" => error!(
-            "{}, {}",
-            "FailedToReportToPenguinStats",
-            message.get("why")?.as_str()?,
+        "StartGameTask" => error!("failed-start-game"),
+        "AutoRecruitTask" => warn!("failed-auto-recruit", why = message.get("why")?.as_str()?),
+        "RecognizeDrops" => warn!("failed-recognize-drops"),
+        "ReportToPenguinStats" => warn!(
+            "failed-report-penguinstats",
+            why = message.get("why")?.as_str()?,
         ),
-        "CheckStageValid" => error!("TheEX"),
+        "ReportToYituliu" => warn!("failed-report-yituliu", why = message.get("why")?.as_str()?),
+        "CheckStageValid" => warn!(
+            "invalid-stage-for-recognition",
+            why = message.get("why")?.as_str()?
+        ),
         _ => trace!(
-            "{}: {}",
-            "UnknownSubTaskError",
-            serde_json::to_string_pretty(message).unwrap()
+            "unknown-subtask-error",
+            message = serde_json::to_string_pretty(message).unwrap()
         ),
     };
 
@@ -232,7 +253,7 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
                         detail.set_times(exec_times);
                     }
                 });
-                info!("{} {} {}", "MissionStart", exec_times, "times");
+                info!("mission-start-times", times = exec_times);
             }
             "MedicineConfirm" => {
                 let exec_times = details.get("exec_times")?.as_i64()?;
@@ -241,7 +262,7 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
                         detail.set_medicine(exec_times)
                     }
                 });
-                info!("{} {} {}", "medicine used", exec_times, "times",)
+                info!("medicine-used", times = exec_times);
             }
             "StoneConfirm" => {
                 let exec_times = details.get("exec_times")?.as_i64()?;
@@ -250,9 +271,9 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
                         detail.set_stone(exec_times)
                     }
                 });
-                info!("{} {} {}", "stone used", exec_times, "times",)
+                info!("stone-used", times = exec_times);
             }
-            "AbandonAction" => warn!("{}", "PRTS error"),
+            "AbandonAction" => warn!("prts-error"),
             // Recruit
             "RecruitRefreshConfirm" => {
                 edit_current_task_detail(|detail| {
@@ -260,7 +281,7 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
                         detail.refresh()
                     }
                 });
-                info!("{}", "Refresh Tags")
+                info!("recruit-refresh");
             }
             "RecruitConfirm" => {
                 edit_current_task_detail(|detail| {
@@ -268,10 +289,10 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
                         detail.recruit()
                     }
                 });
-                info!("{}", "Recruit")
+                info!("recruit-confirm");
             }
             // Infrast
-            "InfrastDormDoubleConfirmButton" => warn!("{}", "InfrastDormDoubleConfirmed"),
+            "InfrastDormDoubleConfirmButton" => warn!("infrast-dorm-double-confirm"),
             // RogueLike
             "StartExplore" => {
                 let exec_times = details.get("exec_times")?.as_i64()?;
@@ -280,8 +301,16 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
                         detail.set_times(exec_times)
                     }
                 });
-                info!("{} {} {}", "MissionStart", exec_times, "times");
+                info!("roguelike-start", times = exec_times);
             }
+            "ExitThenAbandon" => info!("roguelike-abandon"),
+            "MissionCompletedFlag" => info!("mission-complete"),
+            "MissionFailedFlag" => info!("mission-failed"),
+            "StageTraderEnter" => info!("trader-enter"),
+            "StageSafeHouseEnter" => info!("safe-house-enter"),
+            "StageCambatDpsEnter" => info!("normal-dps-enter"),
+            "StageEmergencyDps" => info!("emergency-dps-enter"),
+            "StageDreadfulFoe" | "StageDreadfulFoe-5Enter" => info!("dreadful-foe-enter"),
             "StageTraderInvestConfirm" => {
                 let exec_times = details.get("exec_times")?.as_i64()?;
                 edit_current_task_detail(|detail| {
@@ -289,27 +318,18 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
                         detail.set_invest(exec_times)
                     }
                 });
-                info!("{} {} {}", "Invest", exec_times, "times");
+                info!("invest", times = exec_times);
             }
-            "ExitThenAbandon" => info!("{}", "ExplorationAbandoned"),
-            "ExitThenConfirm" => info!("{}", "ExplorationConfirmed"),
-            "MissionCompletedFlag" => info!("{}", "MissionCompleted"),
-            "MissionFailedFlag" => info!("{}", "MissionFailed"),
-            "StageTraderEnter" => info!("{}", "StageTraderEnter"),
-            "StageSafeHouseEnter" => info!("{}", "StageSafeHouseEnter"),
-            "StageCambatDpsEnter" => info!("{}", "StageCambatDpsEnter"),
-            "StageEmergencyDps" => info!("{}", "EmergencyDpsEnter"),
-            "StageDreadfulFoe" | "StageDreadfulFoe-5Enter" => info!("{}", "DreadfulFoe"),
-            "StageTraderInvestSystemFull" => warn!("{}", "TraderInvestSystemFull"),
-            "GamePass" => info!("{}", "RoguelikeGamePass"),
+            "StageTraderInvestSystemFull" => warn!("invest-full"),
 
-            "OfflineConfirm" => warn!("{}", "GameOffline"),
-            "BattleStartAll" => info!("{}", "MissionStart"),
-            "StageTraderSpecialShoppingAfterRefresh" => info!("{}", "RoguelikeSpecialItemBought"),
+            "StageTraderSpecialShoppingAfterRefresh" => info!("special-item-bought"),
+            "GamePass" => info!("roguelike-complete"),
+
+            "OfflineConfirm" => warn!("game-offline"),
+            "BattleStartAll" => info!("mission-start"),
             _ => trace!(
-                "{}: {}",
-                "UnknownSubTaskStart",
-                serde_json::to_string_pretty(message).unwrap()
+                "unknown-subtask-start",
+                message = serde_json::to_string_pretty(message).unwrap()
             ),
         }
     }
@@ -322,22 +342,21 @@ fn process_subtask_completed(_: &Map<String, Value>) -> Option<()> {
 fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
     let taskchain = message.get("taskchain")?.as_str()?;
 
+    let details = message.get("details")?.as_object()?;
+
     match taskchain {
         "Depot" => info!(
-            "{}: {}",
-            "Depot",
-            serde_json::to_string_pretty(message).unwrap()
+            "depot-recognition",
+            result = serde_json::to_string_pretty(details).unwrap(),
         ),
         "OperBox" => info!(
-            "{}: {}",
-            "OperBox",
-            serde_json::to_string_pretty(message).unwrap()
+            "operator-recognition",
+            result = serde_json::to_string_pretty(details).unwrap(),
         ),
         _ => {}
     }
 
     let what = message.get("what")?.as_str()?;
-    let details = message.get("details")?;
 
     match what {
         "StageDrops" => {
@@ -351,9 +370,8 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
             }
 
             info!(
-                "{}: {}",
-                "Drops",
-                all_drops
+                "drops",
+                drops = all_drops
                     .iter()
                     .map(|(item, count)| format!("{} × {}", item, count))
                     .join(", ")
@@ -373,143 +391,226 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
                 }
             });
         }
+        "SanityBeforeStage" => {
+            info!(
+                "sanity-before-stage",
+                sanity = details.get("current_sanity")?.as_i64()?,
+                max = details.get("max_sanity")?.as_i64()?,
+            );
+        }
 
         // Infrast
-        "EnterFacility" => info!(
-            "{} {} #{}",
-            "EnterFacility",
-            details.get("facility")?.as_str()?,
-            details.get("index")?.as_i64()?,
+        "EnterFacility" => debug!(
+            "facility-enter",
+            facility = details.get("facility")?.as_facility()?,
+            index = details.get("index")?.as_i64()?
         ),
-        "ProductIncorrect" => warn!("{}", "ProductIncorrect"),
-        "ProductUnknown" => error!("{}", "ProductUnknown"),
-        "ProductChanged" => info!("{}", "ProductChanged"),
-        "NotEnoughStaff" => error!("{}", "NotEnoughStaff"),
         "ProductOfFacility" => {
+            let facility = details.get("facility")?.as_str()?.parse().unwrap();
+            let index = details.get("index")?.as_i64()?;
+            let product = details.get("product")?.as_str()?.parse().unwrap();
+
+            edit_current_task_detail(|detail| {
+                if let Some(detail) = detail.as_infrast_mut() {
+                    detail.set_product(facility, index, product);
+                }
+            });
+            debug!(
+                "product-of-facility",
+                facility = facility,
+                index = index,
+                product = product
+            );
+        }
+        "ProductIncorrect" => {
             let facility = details.get("facility")?.as_str()?;
             let index = details.get("index")?.as_i64()?;
             let product = details.get("product")?.as_str()?;
 
-            edit_current_task_detail(|detail| {
-                if let Some(detail) = detail.as_infrast_mut() {
-                    detail.set_product(facility.parse().unwrap(), index, product);
-                }
-            });
-
-            info!("{}: {}", "ProductOfFacility", product)
+            warn!(
+                "product-incorrect",
+                facility = facility,
+                index = index,
+                product = product,
+            );
         }
-        "CustomInfrastRoomOperators" => {
-            let facility = details.get("facility")?.as_str()?;
+        "ProductChanged" => {
+            let facility = details.get("facility")?.as_facility()?;
             let index = details.get("index")?.as_i64()?;
-            let operators = details.get("names")?.as_array()?;
-            let candidates = details.get("candidates")?.as_array()?;
+            let product = details.get("product")?.as_product()?;
+
+            warn!(
+                "product-changed",
+                facility = facility,
+                index = index,
+                product = product,
+            );
+
+            //  Set product to the new product
+            edit_current_task_detail(|detail| {
+                if let Some(detail) = detail.as_infrast_mut() {
+                    detail.set_product(facility, index, product);
+                }
+            });
+        }
+        "NotEnoughStaff" => error!(
+            "not-enough-staff",
+            facility = details.get("facility")?.as_facility()?,
+            index = details.get("index")?.as_i64()?
+        ),
+        "CustomInfrastRoomOperators" => {
+            let facility = details.get("facility")?.as_facility()?;
+            let index = details.get("index")?.as_i64()?;
+            let operators = details
+                .get("names")?
+                .as_array()?
+                .into_iter()
+                .filter_map(|x| x.as_str().map(|x| x.to_owned()))
+                .collect::<Vec<_>>();
+            let candidates = details
+                .get("candidates")?
+                .as_array()?
+                .into_iter()
+                .filter_map(|x| x.as_str().map(|x| x.to_owned()))
+                .collect::<Vec<_>>();
+
+            match (operators.is_empty(), candidates.is_empty()) {
+                (true, true) => return Some(()),
+                (true, false) => info!(
+                    "custom-infrast-candidates",
+                    facility = facility,
+                    index = index,
+                    candidates = candidates.iter().join(", ").unwrap()
+                ),
+                (false, true) => info!(
+                    "custom-infrast-operators",
+                    facility = facility,
+                    index = index,
+                    operators = operators.iter().join(", ").unwrap()
+                ),
+                (false, false) => info!(
+                    "custom-infrast-both",
+                    facility = facility,
+                    index = index,
+                    operators = operators.iter().join(", ").unwrap(),
+                    candidates = candidates.iter().join(", ").unwrap()
+                ),
+            }
 
             edit_current_task_detail(|detail| {
                 if let Some(detail) = detail.as_infrast_mut() {
-                    detail.set_operators(
-                        facility.parse().unwrap(),
-                        index,
-                        operators
-                            .iter()
-                            .filter_map(|x| x.as_str().map(|x| x.to_owned()))
-                            .collect(),
-                        candidates
-                            .iter()
-                            .filter_map(|x| x.as_str().map(|x| x.to_owned()))
-                            .collect(),
-                    );
+                    detail.set_operators(facility, index, operators, candidates);
                 }
             });
-
-            info!(
-                "{}: {}",
-                "CustomInfrastRoomOperators",
-                details
-                    .get("names")?
-                    .as_array()?
-                    .iter()
-                    .filter_map(|x| x.as_str())
-                    .join(", ")
-                    .unwrap_or_else(|| "none".to_owned())
-            )
         }
 
         // Recruit
         "RecruitTagsDetected" => (), // this info is contained in RecruitResult, so ignore it
-        "RecruitSpecialTag" => info!("{}: {}", "RecruitingTips", details.get("tag")?.as_str()?),
-        "RecruitRobotTag" => info!("{}: {}", "RecruitingTips", details.get("tag")?.as_str()?),
+        "RecruitSpecialTag" => info!("recruit-special-tag", tag = details.get("tag")?.as_str()?),
+        "RecruitRobotTag" => info!("recruit-robot-tag", tag = details.get("tag")?.as_str()?),
         "RecruitResult" => {
             let level = details.get("level")?.as_u64()?;
-            let tags = details.get("tags")?.as_array()?;
+            let tags = details
+                .get("tags")?
+                .as_array()?
+                .into_iter()
+                .filter_map(|x| x.as_str().map(|x| x.to_owned()))
+                .collect::<Vec<_>>();
+
+            info!(
+                "recruit-tags",
+                star = level,
+                tags = tags.iter().join(", ").unwrap_or_else(|| "none".to_owned())
+            );
 
             edit_current_task_detail(|detail| {
                 if let Some(detail) = detail.as_recruit_mut() {
-                    detail.push_recruit(
-                        level,
-                        tags.iter().filter_map(|x| x.as_str().map(|x| x.to_owned())),
-                    );
+                    detail.push_recruit(level, tags);
                 }
             });
-
-            info!(
-                "{}: {} {}",
-                "RecruitResult",
-                "★".repeat(level as usize),
-                tags.iter()
-                    .filter_map(|x| x.as_str())
-                    .join(", ")
-                    .unwrap_or_else(|| "none".to_owned())
-            )
         }
-        "RecruitTagsSelected" => info!("{}: {}", "RecruitTagsSelected", {
-            details
+        "RecruitTagsSelected" => info!(
+            "recruit-tags-selected",
+            tags = details
                 .get("tags")?
                 .as_array()?
                 .iter()
                 .filter_map(|x| x.as_str())
                 .join(", ")
                 .unwrap_or_else(|| "none".to_owned())
-        }),
-        "RecruitTagsRefreshed" => info!("{}: {}", "RecruitTagsRefreshed", {
-            let count = details.get("count")?.as_i64()?;
-            format!("{} times", count)
-        }),
+        ),
+        "RecruitTagsRefreshed" => {} // see RecruitRefreshConfirm
+        "RecruitNoPermit" => warn!("recruit-no-permit"),
         // RogueLike
-        "StageInfo" => info!("{} {}", "StartCombat", details.get("name")?.as_str()?),
-        "StageInfoError" => error!("{}", "StageInfoError"),
+        "RoguelikeSettlement" => {
+            let difficulty = details.get("difficulty")?.as_str()?;
+            let pass = details.get("pass")?.as_bool()?;
+            let explore = details.get("explore")?.as_i64()?;
+            let steps = details.get("steps")?.as_i64()?;
+            let combat = details.get("combat")?.as_i64()?;
+            let emergency = details.get("emergency")?.as_i64()?;
+            let boss = details.get("boss")?.as_i64()?;
+            let recruit = details.get("recruit")?.as_i64()?;
+            let object = details.get("object")?.as_i64()?;
+            let score = details.get("score")?.as_i64()?;
+            let exp = details.get("exp")?.as_i64()?;
+            let skill = details.get("skill")?.as_i64()?;
+
+            // TODO: add to summary
+
+            let pass = if pass {
+                fl!("roguelike-pass")
+            } else {
+                fl!("roguelike-fail")
+            };
+
+            info!(
+                "roguelike-settlement",
+                difficulty = difficulty,
+                pass = pass,
+                explore = explore,
+                steps = steps,
+                combat = combat,
+                emergency = emergency,
+                boss = boss,
+                recruit = recruit,
+                object = object,
+                score = score,
+                exp = exp,
+                skill = skill,
+            );
+        }
+        "StageInfo" => info!(
+            "roguelike-stage-enter",
+            name = details.get("name")?.as_str()?
+        ),
+        "StageInfoError" => error!("roguelike-stage-info-error"),
+        "RoguelikeEvent" => info!("roguelike-event", name = details.get("name")?.as_str()?),
         // Copilot
         "BattleFormation" => info!(
-            "{} {}",
-            "BattleFormation",
-            details
-                .get("formation")?
-                .as_array()?
-                .iter()
-                .filter_map(|x| x.as_str())
-                .join(", ")
-                .unwrap_or_else(|| "none".to_owned())
+            "battle-formation",
+            formation = serde_json::to_string_pretty(details.get("formation")?).unwrap()
         ),
         "BattleFormationSelected" => info!(
-            "{} {}",
-            "BattleFormationSelected",
-            details.get("selected")?.as_str()?
+            "battle-formation-selected",
+            selected = details.get("selected")?.as_str()?
         ),
+        // TODO: localize action, there is enum in MaaCore
         "CopilotAction" => info!(
-            "{} {} {}",
-            "CurrentSteps",
-            details.get("action")?.as_str()?,
-            details.get("target")?.as_str()?,
+            "current-copilot-action",
+            action = details.get("action")?.as_action()?,
+            target = details.get("target")?.as_str().unwrap_or(""),
+            doc = details.get("doc")?.as_str().unwrap_or(""),
         ),
         // SSS
-        "SSSStage" => info!("{} {}", "CurrentStage", details.get("stage")?.as_str()?),
-        "SSSSettlement" => info!("{} {}", "SSSSettlement", details.get("why")?.as_str()?),
-        "SSSGamePass" => info!("{}", "SSSGamePass"),
-        "UnsupportedLevel" => error!("{}", "UnsupportedLevel"),
+        "SSSStage" => info!("sss-stage-enter", name = details.get("stage")?.as_str()?),
+        "SSSSettlement" => info!("sss-settlement", why = details.get("why")?.as_str()?),
+        "SSSGamePass" => info!("sss-game-pass"),
+        "UnsupportedLevel" => error!("unsupported-level"),
         _ => {
             trace!(
-                "{}: {}",
-                "UnknownSubTaskExtraInfo",
-                serde_json::to_string_pretty(message).unwrap()
+                "unknown-subtask-extra-info",
+                message = serde_json::to_string_pretty(message).unwrap()
             )
         }
     }
@@ -538,6 +639,113 @@ trait IterJoin: Iterator {
 }
 
 impl<I> IterJoin for I where I: Iterator {}
+
+trait AsFacility {
+    fn as_facility(&self) -> Option<summary::Facility>;
+}
+
+impl AsFacility for Value {
+    fn as_facility(&self) -> Option<summary::Facility> {
+        self.as_str().and_then(|s| s.parse().ok())
+    }
+}
+
+trait AsProduct {
+    fn as_product(&self) -> Option<summary::Product>;
+}
+
+impl AsProduct for Value {
+    fn as_product(&self) -> Option<summary::Product> {
+        self.as_str().and_then(|s| s.parse().ok())
+    }
+}
+
+trait AsAction {
+    fn as_action(&self) -> Option<ActionType>;
+}
+
+impl AsAction for Value {
+    fn as_action(&self) -> Option<ActionType> {
+        self.as_str().and_then(|s| s.parse().ok())
+    }
+}
+
+enum ActionType {
+    Deploy,
+    UseSkill,
+    Retreat,
+    SwitchSpeed,
+    BulletTime,
+    SkillUsage,
+    Output,
+    SkillDaemon,
+
+    /* 引航者试炼 */
+    MoveCamera,
+    /* 保全派驻 */
+    DrawCard,
+    CheckIfStartOver,
+
+    Unknown(String),
+}
+
+impl ActionType {
+    fn to_fl_string(&self) -> String {
+        use ActionType::*;
+        match self {
+            Deploy => fl!("Deploy"),
+            UseSkill => fl!("UseSkill"),
+            Retreat => fl!("Retreat"),
+            SwitchSpeed => fl!("SwitchSpeed"),
+            BulletTime => fl!("BulletTime"),
+            SkillUsage => fl!("SkillUsage"),
+            Output => fl!("Output"),
+            SkillDaemon => fl!("SkillDaemon"),
+            MoveCamera => fl!("MoveCamera"),
+            DrawCard => fl!("DrawCard"),
+            CheckIfStartOver => fl!("CheckIfStartOver"),
+            Unknown(s) => s.clone(),
+        }
+    }
+}
+
+impl std::str::FromStr for ActionType {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Deploy" | "DEPLOY" | "deploy" | "部署" => Ok(ActionType::Deploy),
+            "Skill" | "SKILL" | "skill" | "技能" => Ok(ActionType::UseSkill),
+            "Retreat" | "RETREAT" | "retreat" | "撤退" => Ok(ActionType::Retreat),
+            "SpeedUp" | "SPEEDUP" | "Speedup" | "speedup" | "二倍速" | "SwitchSpeed" => {
+                Ok(ActionType::SwitchSpeed)
+            }
+            "BulletTime" | "BULLETTIME" | "Bullettime" | "bullettime" | "子弹时间" => {
+                Ok(ActionType::BulletTime)
+            }
+            "SkillUsage" | "SKILLUSAGE" | "Skillusage" | "skillusage" | "技能用法" => {
+                Ok(ActionType::SkillUsage)
+            }
+            "Output" | "OUTPUT" | "output" | "输出" | "打印" => Ok(ActionType::Output),
+            "SkillDaemon" | "skilldaemon" | "SKILLDAEMON" | "Skilldaemon" | "DoNothing"
+            | "摆完挂机" | "开摆" => Ok(ActionType::SkillDaemon),
+            "MoveCamera" | "movecamera" | "MOVECAMERA" | "Movecamera" | "移动镜头" => {
+                Ok(ActionType::MoveCamera)
+            }
+            "DrawCard" | "drawcard" | "DRAWCARD" | "Drawcard" | "抽卡" | "抽牌" | "调配"
+            | "调配干员" => Ok(ActionType::DrawCard),
+            "CheckIfStartOver" | "Checkifstartover" | "CHECKIFSTARTOVER" | "checkifstartover"
+            | "检查重开" => Ok(ActionType::CheckIfStartOver),
+            s => Ok(ActionType::Unknown(s.to_string())),
+        }
+    }
+}
+
+impl<'source> From<ActionType> for fluent_bundle::FluentValue<'source> {
+    fn from(value: ActionType) -> Self {
+        Self::String(value.to_fl_string().into())
+    }
+}
 
 #[cfg(test)]
 mod tests {

@@ -1,6 +1,6 @@
 use super::IterJoin;
 
-use crate::config::task::task_type::{MAATask, TaskOrUnknown};
+use crate::config::task::task_type::TaskType;
 
 pub use std::collections::BTreeMap as Map;
 use std::sync::Mutex;
@@ -59,7 +59,7 @@ impl Summary {
         }
     }
 
-    pub fn insert(&mut self, id: AsstTaskId, name: Option<String>, task: impl Into<TaskOrUnknown>) {
+    pub fn insert(&mut self, id: AsstTaskId, name: Option<String>, task: impl Into<TaskType>) {
         self.task_summarys
             .insert(id, TaskSummary::new(name, task.into()));
     }
@@ -93,8 +93,7 @@ impl std::fmt::Display for Summary {
     // we print literal but it will be replace by a localizable string, so it's fine
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if !self.task_summarys.is_empty() {
-            #[allow(clippy::write_literal)]
-            writeln!(f, "{}", "Summary")?;
+            writelnfl!(f, "task-summary")?;
             for task_summary in self.task_summarys.values() {
                 write!(f, "{LINE_SEP}\n{task_summary}")?;
             }
@@ -105,7 +104,7 @@ impl std::fmt::Display for Summary {
 
 pub struct TaskSummary {
     name: Option<String>,
-    task: TaskOrUnknown,
+    task: TaskType,
     detail: Detail,
     start_time: Option<chrono::DateTime<chrono::Local>>,
     end_time: Option<chrono::DateTime<chrono::Local>>,
@@ -113,15 +112,14 @@ pub struct TaskSummary {
 }
 
 impl TaskSummary {
-    pub fn new(name: Option<String>, task: TaskOrUnknown) -> Self {
-        use MAATask::*;
-        use TaskOrUnknown::Task;
+    pub fn new(name: Option<String>, task: TaskType) -> Self {
+        use TaskType::*;
 
         let detail = match task {
-            Task(Fight) => Detail::Fight(FightDetail::new()),
-            Task(Infrast) => Detail::Infrast(InfrastDetail::new()),
-            Task(Recruit) => Detail::Recruit(RecruitDetail::new()),
-            Task(Roguelike) => Detail::Roguelike(RoguelikeDetail::new()),
+            Fight => Detail::Fight(FightDetail::new()),
+            Infrast => Detail::Infrast(InfrastDetail::new()),
+            Recruit => Detail::Recruit(RecruitDetail::new()),
+            Roguelike => Detail::Roguelike(RoguelikeDetail::new()),
             _ => Detail::None,
         };
 
@@ -152,11 +150,11 @@ impl TaskSummary {
 
 impl std::fmt::Display for TaskSummary {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "[{}]",
-            self.name.as_deref().unwrap_or(self.task.as_ref())
-        )?;
+        if let Some(name) = self.name.as_ref() {
+            write!(f, "{}", name)?;
+        } else {
+            write!(f, "{}", self.task.to_fl_string())?;
+        }
 
         match (self.start_time, self.end_time) {
             (Some(start), Some(end)) => write!(
@@ -171,13 +169,7 @@ impl std::fmt::Display for TaskSummary {
             (None, None) => Ok(()),
         }?;
 
-        match self.reason {
-            Reason::Completed => write!(f, " Completed")?,
-            Reason::Stopped => write!(f, " Stopped")?,
-            Reason::Error => write!(f, " Error")?,
-            Reason::Unfinished => write!(f, " Unfinished")?,
-            Reason::Unstarted => write!(f, " Unstarted")?,
-        }
+        write!(f, " {}", self.reason.to_fl_string())?;
 
         writeln!(f)?;
 
@@ -189,12 +181,26 @@ impl std::fmt::Display for TaskSummary {
     }
 }
 
+#[derive(Clone, Copy)]
 pub(super) enum Reason {
+    Unstarted,
+    Unfinished,
     Completed,
     Stopped,
     Error,
-    Unstarted,
-    Unfinished,
+}
+
+impl Reason {
+    fn to_fl_string(self) -> String {
+        use Reason::*;
+        match self {
+            Unstarted => fl!("task-state-unstarted"),
+            Unfinished => fl!("task-state-unfinished"),
+            Completed => fl!("task-state-completed"),
+            Stopped => fl!("task-state-stopped"),
+            Error => fl!("task-state-error"),
+        }
+    }
 }
 
 struct FormattedDuration {
@@ -301,18 +307,12 @@ impl std::fmt::Display for Detail {
 
 pub struct InfrastDetail(Map<Facility, Map<i64, InfrastRoomInfo>>);
 
-struct InfrastRoomInfo {
-    product: Option<String>,
-    operators: Vec<String>,
-    candidates: Vec<String>,
-}
-
 impl InfrastDetail {
     pub fn new() -> Self {
         Self(Map::new())
     }
 
-    pub(super) fn set_product(&mut self, facility: Facility, id: i64, info: &str) {
+    pub(super) fn set_product(&mut self, facility: Facility, id: i64, product: Product) {
         use Facility::*;
         // only the product of Mfg and Trade is useful
         if matches!(facility, Mfg | Trade) {
@@ -320,8 +320,8 @@ impl InfrastDetail {
                 .entry(facility)
                 .or_default()
                 .entry(id)
-                .and_modify(|room_info| room_info.set_product(info))
-                .or_insert_with(|| InfrastRoomInfo::new_with_info(info));
+                .and_modify(|room_info| room_info.set_product(product))
+                .or_insert_with(|| InfrastRoomInfo::new_with_product(product));
         }
     }
 
@@ -349,10 +349,97 @@ impl std::fmt::Display for InfrastDetail {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (facility, map) in &self.0 {
             for room_info in map.values() {
-                writeln!(f, "{}{}", facility, room_info)?;
+                let facility = facility.to_fl_string();
+                if let Some(product) = room_info.product.as_ref() {
+                    write!(f, "{} ({})", facility, product.to_fl_string())?;
+                } else {
+                    write!(f, "{}", facility)?;
+                }
+
+                match (
+                    room_info.operators.is_empty(),
+                    room_info.candidates.is_empty(),
+                ) {
+                    (true, true) => continue,
+                    (false, true) => writefl!(
+                        f,
+                        "summary-infrast-operator",
+                        operators = room_info.operators.iter().join(", ").unwrap()
+                    )?,
+                    (true, false) => writefl!(
+                        f,
+                        "summary-infrast-candidate",
+                        candidates = room_info.candidates.iter().join(", ").unwrap()
+                    )?,
+                    (false, false) => writefl!(
+                        f,
+                        "summary-infrast-both",
+                        operators = room_info.operators.iter().join(", ").unwrap(),
+                        candidates = room_info.candidates.iter().join(", ").unwrap(),
+                    )?,
+                }
             }
         }
 
+        Ok(())
+    }
+}
+
+struct InfrastRoomInfo {
+    product: Option<Product>,
+    operators: Vec<String>,
+    candidates: Vec<String>,
+}
+
+impl InfrastRoomInfo {
+    fn new_with_product(product: Product) -> Self {
+        Self {
+            product: Some(product),
+            operators: Vec::new(),
+            candidates: Vec::new(),
+        }
+    }
+
+    fn new_with_operators(operators: Vec<String>, candidates: Vec<String>) -> Self {
+        Self {
+            product: None,
+            operators,
+            candidates,
+        }
+    }
+
+    fn set_product(&mut self, product: Product) {
+        self.product = Some(product);
+    }
+
+    fn set_operators(&mut self, operators: Vec<String>, candidates: Vec<String>) {
+        self.operators = operators;
+        self.candidates = candidates;
+    }
+}
+
+impl std::fmt::Display for InfrastRoomInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(info) = self.product.as_ref() {
+            write!(f, "({})", info)?;
+        }
+
+        writefl!(
+            f,
+            "summary-infrast-operator",
+            operators = self
+                .operators
+                .iter()
+                .join(", ")
+                .unwrap_or_else(|| "unknown".to_owned())
+        )?;
+        if !self.candidates.is_empty() {
+            write!(
+                f,
+                ", [{}]",
+                self.candidates.iter().join(", ").unwrap() // safe to unwrap, because it's not empty
+            )?;
+        }
         Ok(())
     }
 }
@@ -373,20 +460,32 @@ pub(super) enum Facility {
 }
 
 impl Facility {
-    fn to_str(self) -> &'static str {
+    fn to_fl_string(self) -> String {
         use Facility::*;
         match self {
-            Control => "Control",
-            Mfg => "Mfg",
-            Trade => "Trade",
-            Power => "Power",
-            Office => "Office",
-            Reception => "Reception",
-            Dorm => "Dorm",
-            Processing => "Processing",
-            Training => "Training",
-            Unknown => "Unknown",
+            Control => fl!("Control"),
+            Mfg => fl!("Mfg"),
+            Trade => fl!("Trade"),
+            Power => fl!("Power"),
+            Office => fl!("Office"),
+            Reception => fl!("Reception"),
+            Dorm => fl!("Dorm"),
+            Processing => fl!("Processing"),
+            Training => fl!("Training"),
+            Unknown => fl!("UnknownFacility"),
         }
+    }
+}
+
+impl<'source> From<Facility> for fluent_bundle::FluentValue<'source> {
+    fn from(facility: Facility) -> Self {
+        Self::String(facility.to_fl_string().into())
+    }
+}
+
+impl std::fmt::Display for Facility {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.to_fl_string())
     }
 }
 
@@ -410,60 +509,59 @@ impl std::str::FromStr for Facility {
     }
 }
 
-impl std::fmt::Display for Facility {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.to_str())
+#[cfg_attr(test, derive(Debug))]
+#[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq)]
+pub(super) enum Product {
+    LMD,
+    PureGold,
+    Orundum,
+    OriginiumShard,
+    Dualchip,
+    BattleRecord,
+    Unknown,
+}
+
+impl Product {
+    fn to_fl_string(self) -> String {
+        use Product::*;
+        match self {
+            LMD => fl!("LMD"),
+            PureGold => fl!("PureGold"),
+            Orundum => fl!("Orundum"),
+            OriginiumShard => fl!("OriginiumShard"),
+            Dualchip => fl!("Dualchip"),
+            BattleRecord => fl!("BattleRecord"),
+            Unknown => fl!("UnknownProduct"),
+        }
     }
 }
 
-impl InfrastRoomInfo {
-    fn new_with_info(info: &str) -> Self {
-        Self {
-            product: Some(info.to_owned()),
-            operators: Vec::new(),
-            candidates: Vec::new(),
-        }
-    }
-
-    fn new_with_operators(operators: Vec<String>, candidates: Vec<String>) -> Self {
-        Self {
-            product: None,
-            operators,
-            candidates,
-        }
-    }
-
-    fn set_product(&mut self, product: &str) {
-        self.product = Some(product.to_owned());
-    }
-
-    fn set_operators(&mut self, operators: Vec<String>, candidates: Vec<String>) {
-        self.operators = operators;
-        self.candidates = candidates;
+impl From<Product> for fluent_bundle::FluentValue<'_> {
+    fn from(product: Product) -> Self {
+        Self::String(product.to_fl_string().into())
     }
 }
 
-impl std::fmt::Display for InfrastRoomInfo {
+impl std::fmt::Display for Product {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(info) = self.product.as_ref() {
-            write!(f, "({})", info)?;
+        f.write_str(&self.to_fl_string())
+    }
+}
+
+impl std::str::FromStr for Product {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use Product::*;
+        match s {
+            "LMD" | "Money" => Ok(LMD),
+            "PureGold" => Ok(PureGold),
+            "Orundum" | "SyntheticJade" => Ok(Orundum),
+            "OriginiumShard" | "OriginStone" => Ok(OriginiumShard),
+            "Chip" | "Dualchip" => Ok(Dualchip),
+            "CombatRecord" | "BattleRecord" | "MiddleBattleRecord" => Ok(BattleRecord),
+            _ => Ok(Unknown),
         }
-        write!(
-            f,
-            " with operators: {}",
-            self.operators
-                .iter()
-                .join(", ")
-                .unwrap_or_else(|| "unknown".to_owned())
-        )?;
-        if !self.candidates.is_empty() {
-            write!(
-                f,
-                ", [{}]",
-                self.candidates.iter().join(", ").unwrap() // safe to unwrap, because it's not empty
-            )?;
-        }
-        Ok(())
     }
 }
 
@@ -519,23 +617,23 @@ impl FightDetail {
 
 impl std::fmt::Display for FightDetail {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(stage) = self.stage.as_ref() {
-            write!(f, "Fight {stage}")?;
+        if let Some(stage) = self.stage.as_deref() {
+            writefl!(f, "summary-fight-stage", stage = stage)?;
         } else {
             return Ok(());
         }
 
         if let Some(times) = self.times {
-            write!(f, " {times} times")?;
+            writefl!(f, "summary-fight-times", times = times)?;
         }
         if let Some(medicine) = self.medicine {
-            write!(f, ", used {medicine} medicine")?;
+            writefl!(f, "summary-fight-medicine", medicine = medicine)?;
         }
         if let Some(stone) = self.stone {
-            write!(f, ", used {stone} stone")?;
+            writefl!(f, "summary-fight-stone", stone = stone)?;
         }
         if !self.drops.is_empty() {
-            writeln!(f, ", drops:")?;
+            writelnfl!(f, "summary-fight-drop")?;
             let mut total_drop = Map::new();
             for (i, drop) in self.drops.iter().enumerate() {
                 write!(f, "{}.", i + 1)?;
@@ -550,7 +648,7 @@ impl std::fmt::Display for FightDetail {
                 }
                 writeln!(f)?;
             }
-            write!(f, "total drops:")?;
+            writefl!(f, "summary-fight-total-drop")?;
             let mut iter = total_drop.iter();
             if let Some((item, count)) = iter.next() {
                 write!(f, " {} × {}", item, count)?;
@@ -609,11 +707,11 @@ impl RecruitDetail {
 impl std::fmt::Display for RecruitDetail {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if !self.record.is_empty() {
-            writeln!(f, "Detected tags:")?;
+            writelnfl!(f, "recruit-tag-records")?;
             for (i, (level, tags, state)) in self.record.iter().enumerate() {
                 write!(
                     f,
-                    "{}. {} {}",
+                    "{}. {} {} ",
                     i + 1,
                     "★".repeat(*level as usize),
                     tags.iter()
@@ -621,17 +719,17 @@ impl std::fmt::Display for RecruitDetail {
                         .unwrap_or_else(|| "unknown".to_owned())
                 )?;
                 match state {
-                    RecruitState::Refreshed => write!(f, ", Refreshed")?,
-                    RecruitState::Recruited => write!(f, ", Recruited")?,
+                    RecruitState::Refreshed => writefl!(f, "recruit-refreshed")?,
+                    RecruitState::Recruited => writefl!(f, "recruit-recruited")?,
                     RecruitState::None => (),
                 }
                 writeln!(f)?
             }
             if let Some(times) = self.recruit_times {
-                writeln!(f, "Recruited {} times", times)?;
+                writelnfl!(f, "recruit-recruited-times", times = times)?;
             }
             if let Some(times) = self.refresh_times {
-                writeln!(f, "Refreshed {} times", times)?;
+                writelnfl!(f, "recruit-refreshed-times", times = times)?;
             }
         }
         Ok(())
@@ -663,11 +761,13 @@ impl RoguelikeDetail {
 impl std::fmt::Display for RoguelikeDetail {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(times) = self.times {
-            write!(f, "Explore {} times", times)?;
+            writelnfl!(f, "roguelike-explore-times", times = times)?;
+        } else {
+            return Ok(());
         }
         if let Some(invest) = self.invest {
             if invest > 0 {
-                write!(f, " invest {} times", invest)?;
+                writelnfl!(f, "roguelike-invest-times", times = invest)?;
             }
         }
         Ok(())
@@ -731,7 +831,7 @@ mod tests {
 
         #[test]
         fn task_summary() {
-            use MAATask::*;
+            use TaskType::*;
 
             let mut summary = Summary::new();
             summary.insert(1, Some("Fight TS".to_owned()), Fight);
@@ -750,7 +850,7 @@ mod tests {
             summary.start_task(2);
             summary.edit_current_task_detail(|detail| {
                 let detail = detail.as_infrast_mut().unwrap();
-                detail.set_product(Facility::Mfg, 1, "Product");
+                detail.set_product(Facility::Mfg, 1, Product::LMD);
             });
             summary.end_current_task(Reason::Stopped);
 
@@ -850,16 +950,16 @@ mod tests {
         #[test]
         fn facility() {
             use Facility::*;
-            assert_eq!(Control.to_string(), "Control");
-            assert_eq!(Mfg.to_string(), "Mfg");
-            assert_eq!(Trade.to_string(), "Trade");
-            assert_eq!(Power.to_string(), "Power");
-            assert_eq!(Office.to_string(), "Office");
-            assert_eq!(Reception.to_string(), "Reception");
-            assert_eq!(Dorm.to_string(), "Dorm");
-            assert_eq!(Processing.to_string(), "Processing");
-            assert_eq!(Training.to_string(), "Training");
-            assert_eq!(Unknown.to_string(), "Unknown");
+            assert_eq!(Control.to_fl_string(), fl!("Control"));
+            assert_eq!(Mfg.to_fl_string(), fl!("Mfg"));
+            assert_eq!(Trade.to_fl_string(), fl!("Trade"));
+            assert_eq!(Power.to_fl_string(), fl!("Power"));
+            assert_eq!(Office.to_fl_string(), fl!("Office"));
+            assert_eq!(Reception.to_fl_string(), fl!("Reception"));
+            assert_eq!(Dorm.to_fl_string(), fl!("Dorm"));
+            assert_eq!(Processing.to_fl_string(), fl!("Processing"));
+            assert_eq!(Training.to_fl_string(), fl!("Training"));
+            assert_eq!(Unknown.to_fl_string(), fl!("UnknownFacility"));
 
             assert_eq!("Control".parse::<Facility>().unwrap(), Control);
             assert_eq!("Mfg".parse::<Facility>().unwrap(), Mfg);
@@ -875,16 +975,45 @@ mod tests {
         }
 
         #[test]
+        fn product() {
+            use Product::*;
+            assert_eq!(LMD.to_fl_string(), fl!("LMD"));
+            assert_eq!(PureGold.to_fl_string(), fl!("PureGold"));
+            assert_eq!(Orundum.to_fl_string(), fl!("Orundum"));
+            assert_eq!(OriginiumShard.to_fl_string(), fl!("OriginiumShard"));
+            assert_eq!(Dualchip.to_fl_string(), fl!("Dualchip"));
+            assert_eq!(BattleRecord.to_fl_string(), fl!("BattleRecord"));
+            assert_eq!(Unknown.to_fl_string(), fl!("UnknownProduct"));
+
+            assert_eq!("LMD".parse::<Product>().unwrap(), LMD);
+            assert_eq!("Money".parse::<Product>().unwrap(), LMD);
+            assert_eq!("PureGold".parse::<Product>().unwrap(), PureGold);
+            assert_eq!("Orundum".parse::<Product>().unwrap(), Orundum);
+            assert_eq!("SyntheticJade".parse::<Product>().unwrap(), Orundum);
+            assert_eq!("OriginiumShard".parse::<Product>().unwrap(), OriginiumShard);
+            assert_eq!("OriginStone".parse::<Product>().unwrap(), OriginiumShard);
+            assert_eq!("Chip".parse::<Product>().unwrap(), Dualchip);
+            assert_eq!("Dualchip".parse::<Product>().unwrap(), Dualchip);
+            assert_eq!("CombatRecord".parse::<Product>().unwrap(), BattleRecord);
+            assert_eq!("BattleRecord".parse::<Product>().unwrap(), BattleRecord);
+            assert_eq!(
+                "MiddleBattleRecord".parse::<Product>().unwrap(),
+                BattleRecord
+            );
+            assert_eq!("Other".parse::<Product>().unwrap(), Unknown);
+        }
+
+        #[test]
         fn infrast() {
             let mut detail = InfrastDetail::new();
-            detail.set_product(Facility::Mfg, 1, "Product");
+            detail.set_product(Facility::Mfg, 1, Product::PureGold);
             detail.set_operators(
                 Facility::Mfg,
                 1,
                 ["A", "B"].into_iter().map(|s| s.to_owned()).collect(),
                 ["C", "D"].into_iter().map(|s| s.to_owned()).collect(),
             );
-            detail.set_product(Facility::Office, 1, "Product");
+            detail.set_product(Facility::Office, 1, Product::Unknown);
             detail.set_operators(Facility::Office, 1, Vec::new(), Vec::new());
             assert_eq!(
                 detail.to_string(),

@@ -7,14 +7,7 @@ use callback::summary;
 #[cfg(target_os = "macos")]
 mod playcover;
 
-mod fight;
-pub use fight::fight;
-
-mod copilot;
-pub use copilot::copilot;
-
-mod roguelike;
-pub use roguelike::{roguelike, Theme as RoguelikeTheme};
+pub mod preset;
 
 use crate::{
     config::{
@@ -28,9 +21,8 @@ use crate::{
 
 use std::sync::{atomic, Arc};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use clap::Args;
-use log::debug;
 use maa_sys::Assistant;
 use signal_hook::consts::TERM_SIGNALS;
 
@@ -40,48 +32,13 @@ use tokio::runtime::Runtime;
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Args, Default)]
 pub struct CommonArgs {
-    /// ADB serial number of device or MaaTools address set in PlayCover
-    ///
-    /// By default, MaaCore connects to game with ADB,
-    /// and this parameter is the serial number of the device
-    /// (default to `emulator-5554` if not specified here and not set in config file).
-    /// And if you want to use PlayCover,
-    /// you need to set the connection type to PlayCover in the config file
-    /// and then you can specify the address of MaaTools here.
-    #[arg(short, long, verbatim_doc_comment)]
+    #[arg(short, long, help = fl!("run-addr-help"), long_help = fl!("run-addr-long-help"))]
     pub addr: Option<String>,
-    /// Load resources from the config directory
-    ///
-    /// By default, MaaCore loads resources from the resource installed with MaaCore.
-    /// If you want to modify some configuration of MaaCore or you want to use your own resources,
-    /// you can use this option to load resources from the `resource` directory,
-    /// which is a subdirectory of the config directory.
-    ///
-    /// This option can also be enabled by setting the value of the key `user_resource` to true
-    /// in the asst configure file `$MAA_CONFIG_DIR/asst.toml`.
-    ///
-    /// Note:
-    /// CLI will load resources shipped with MaaCore firstly,
-    /// then some client specific or platform specific when needed,
-    /// lastly, it will load resources from the config directory.
-    /// MaaCore will overwrite the resources loaded before,
-    /// if there are some resources with the same name.
-    /// Use at your own risk!
-    #[arg(long, verbatim_doc_comment)]
+    #[arg(long, help = fl!("run-user-resource-help"), long_help = fl!("run-user-resource-long-help"))]
     pub user_resource: bool,
-    /// Parse the your config but do not connect to the game
-    ///
-    /// This option is useful when you want to check your config file.
-    /// It will parse your config file and set the log level to debug.
-    /// If there are some errors in your config file,
-    /// it will print the error message and exit.
-    #[arg(long, verbatim_doc_comment)]
+    #[arg(long, help = fl!("run-dry-run-help"), long_help = fl!("run-dry-run-long-help"))]
     pub dry_run: bool,
-    /// Do not display task summary
-    ///
-    /// By default, maa will display task summary after all tasks are finished.
-    /// If you want to disable this behavior, you can use this option.
-    #[arg(long, verbatim_doc_comment)]
+    #[arg(long, help = fl!("run-no-summary-help"), long_help = fl!("run-no-summary-long-help"))]
     pub no_summary: bool,
 }
 
@@ -108,7 +65,7 @@ where
     let task = with_asst_config(f)?;
     let task_config = task.init()?;
     if let Some(client_type) = task_config.client_type {
-        debug!("Detected client type: {}", client_type.as_ref());
+        debug!("detected-client-type", client = client_type);
         if let Some(resource) = client_type.resource() {
             with_mut_asst_config(|config| {
                 config.resource.use_global_resource(resource);
@@ -122,9 +79,9 @@ where
     let stop_bool = Arc::new(std::sync::atomic::AtomicBool::new(false));
     for sig in TERM_SIGNALS {
         signal_hook::flag::register_conditional_default(*sig, Arc::clone(&stop_bool))
-            .context("Failed to register signal handler!")?;
+            .with_context(lfl!("failed-register-signal-handler"))?;
         signal_hook::flag::register(*sig, Arc::clone(&stop_bool))
-            .context("Failed to register signal handler!")?;
+            .with_context(lfl!("failed-register-signal-handler"))?;
     }
 
     let asst = Assistant::new(Some(callback::default_callback), None);
@@ -136,11 +93,23 @@ where
         let name = task.name();
         let task_type = task.task_type();
         let params = task.params();
-        debug!(
-            "Adding task [{}] with params: {}",
-            name.unwrap_or(task_type.as_ref()),
-            serde_json::to_string_pretty(params)?
-        );
+
+        if params.is_empty() {
+            debug!(
+                "append-task-no-param",
+                task = name
+                    .map(|s| s.to_owned())
+                    .unwrap_or(task_type.to_fl_string()),
+            );
+        } else {
+            debug!(
+                "append-task-with-param",
+                task = name
+                    .map(|s| s.to_owned())
+                    .unwrap_or(task_type.to_fl_string()),
+                params = serde_json::to_string_pretty(params)?,
+            );
+        }
         let id = asst.append_task(task_type, serde_json::to_string(params)?)?;
 
         if let Some(s) = summarys.as_mut() {
@@ -168,7 +137,7 @@ where
 
     if !args.dry_run {
         #[cfg(target_os = "macos")]
-        let rt = Runtime::new().context("Failed to create tokio runtime")?;
+        let rt = Runtime::new().with_context(lfl!("failed-create-tokio-runtime"))?;
 
         #[cfg(target_os = "macos")]
         if let Some(app) = app.as_ref() {
@@ -184,7 +153,7 @@ where
 
         while asst.running() {
             if stop_bool.load(atomic::Ordering::Relaxed) {
-                bail!("Interrupted by user!");
+                bailfl!("interrupted");
             }
             std::thread::sleep(std::time::Duration::from_millis(500));
         }
@@ -225,7 +194,7 @@ pub fn run_custom(path: impl AsRef<std::path::Path>, args: CommonArgs) -> Result
             } else {
                 TaskConfig::find_file(path)
             }
-            .context("Failed to find task file!")
+            .with_context(lfl!("failed-find-task-file"))
         },
         args,
     )
@@ -244,12 +213,12 @@ pub fn core_version<'a>() -> Result<&'a str, maa_sys::Error> {
 
 fn load_core() {
     if maa_sys::binding::loaded() {
-        debug!("MaaCore already loaded");
+        debug!("maa-core-already-loaded");
         return;
     }
 
     if let Some(lib_dir) = dirs::find_library() {
-        debug!("Loading MaaCore from: {}", lib_dir.display());
+        debug!("load-maa-core", path = lib_dir.display().to_string());
         // Set DLL directory on Windows
         #[cfg(target_os = "windows")]
         {
@@ -261,14 +230,17 @@ fn load_core() {
         }
         maa_sys::binding::load(lib_dir.join(MAA_CORE_LIB));
     } else {
-        debug!("MaaCore not found, trying to load from system library path");
+        debug!("use-system-maa-core");
         maa_sys::binding::load(MAA_CORE_LIB);
     }
 }
 
 fn setup_core(config: &AsstConfig) -> Result<()> {
-    debug!("Setting user directory: {}", dirs::state().display());
-    Assistant::set_user_dir(dirs::state().ensure()?).context("Failed to set user directory!")?;
+    debug!("set-user-directory", path = dirs::state().to_string_lossy());
+    Assistant::set_user_dir(dirs::state().ensure()?).with_context(lfl!(
+        "failed-set-user-directory",
+        path = dirs::state().to_string_lossy()
+    ))?;
 
     config.static_options.apply()?;
     config.resource.load()?;
