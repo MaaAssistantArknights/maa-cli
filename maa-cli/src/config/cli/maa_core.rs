@@ -1,6 +1,6 @@
 use super::{normalize_url, return_true, Channel};
 
-use clap::Parser;
+use clap::Args;
 use serde::Deserialize;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -64,7 +64,7 @@ impl Config {
         self
     }
 
-    pub fn apply_args(&mut self, args: &CommonArgs) -> &Self {
+    pub fn apply_args(mut self, args: &CommonArgs) -> Self {
         if let Some(channel) = args.channel {
             self.set_channel(channel);
         }
@@ -107,7 +107,7 @@ impl Default for Components {
     }
 }
 
-#[derive(Parser, Default)]
+#[derive(Args, Default)]
 pub struct CommonArgs {
     /// Channel to download prebuilt package
     ///
@@ -156,25 +156,20 @@ pub struct CommonArgs {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
 
     use lazy_static::lazy_static;
 
-    impl Config {
-        pub fn with_channel(mut self, channel: Channel) -> Self {
-            self.channel = channel;
-            self
-        }
-
-        pub fn with_test_time(mut self, test_time: u64) -> Self {
-            self.test_time = test_time;
-            self
-        }
-
-        pub fn with_api_url(mut self, api_url: impl ToString) -> Self {
-            self.api_url = api_url.to_string();
-            self
+    pub fn example_config() -> Config {
+        Config {
+            channel: Channel::Beta,
+            test_time: 0,
+            api_url: "https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version/".to_string(),
+            components: Components {
+                library: true,
+                resource: true,
+            },
         }
     }
 
@@ -247,9 +242,9 @@ mod tests {
                     },
                 },
                 &[
-                    Token::Map { len: Some(3) },
+                    Token::Map { len: Some(4) },
                     Token::Str("channel"),
-                    Channel::Beta.as_token(),
+                    Channel::Beta.to_token(),
                     Token::Str("test_time"),
                     Token::I64(10),
                     Token::Str("api_url"),
@@ -333,9 +328,7 @@ mod tests {
         #[test]
         fn apply_args() {
             fn apply_to_default(args: &CommonArgs) -> Config {
-                let mut config = default_config();
-                config.apply_args(args);
-                config
+                default_config().apply_args(args)
             }
 
             assert_eq!(apply_to_default(&CommonArgs::default()), default_config());
@@ -375,19 +368,21 @@ mod tests {
             );
 
             assert_eq!(
-                &apply_to_default(&CommonArgs {
+                apply_to_default(&CommonArgs {
                     channel: Some(Channel::Beta),
                     test_time: Some(5),
                     api_url: Some("https://foo.bar/maa_core/".to_string()),
                     no_resource: true,
                 }),
-                Config::default()
-                    .with_channel(Channel::Beta)
-                    .with_test_time(5)
-                    .with_api_url("https://foo.bar/maa_core/")
-                    .set_components(|components| {
-                        components.resource = false;
-                    })
+                Config {
+                    channel: Channel::Beta,
+                    test_time: 5,
+                    api_url: "https://foo.bar/maa_core/".to_string(),
+                    components: Components {
+                        resource: false,
+                        ..Default::default()
+                    },
+                }
             );
         }
     }

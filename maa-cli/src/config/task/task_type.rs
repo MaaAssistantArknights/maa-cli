@@ -1,8 +1,7 @@
 use serde::Deserialize;
 
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Deserialize, Debug, Clone, Copy)]
-pub enum TaskType {
+#[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MAATask {
     StartUp,
     CloseDown,
     Fight,
@@ -20,50 +19,63 @@ pub enum TaskType {
     SingleStep,
     VideoRecognition,
 }
+use MAATask::*;
 
-impl AsRef<str> for TaskType {
-    fn as_ref(&self) -> &str {
+impl MAATask {
+    fn to_str(self) -> &'static str {
         match self {
-            TaskType::StartUp => "StartUp",
-            TaskType::CloseDown => "CloseDown",
-            TaskType::Fight => "Fight",
-            TaskType::Recruit => "Recruit",
-            TaskType::Infrast => "Infrast",
-            TaskType::Mall => "Mall",
-            TaskType::Award => "Award",
-            TaskType::Roguelike => "Roguelike",
-            TaskType::Copilot => "Copilot",
-            TaskType::SSSCopilot => "SSSCopilot",
-            TaskType::Depot => "Depot",
-            TaskType::OperBox => "OperBox",
-            TaskType::ReclamationAlgorithm => "ReclamationAlgorithm",
-            TaskType::Custom => "Custom",
-            TaskType::SingleStep => "SingleStep",
-            TaskType::VideoRecognition => "VideoRecognition",
+            StartUp => "StartUp",
+            CloseDown => "CloseDown",
+            Fight => "Fight",
+            Recruit => "Recruit",
+            Infrast => "Infrast",
+            Mall => "Mall",
+            Award => "Award",
+            Roguelike => "Roguelike",
+            Copilot => "Copilot",
+            SSSCopilot => "SSSCopilot",
+            Depot => "Depot",
+            OperBox => "OperBox",
+            ReclamationAlgorithm => "ReclamationAlgorithm",
+            Custom => "Custom",
+            SingleStep => "SingleStep",
+            VideoRecognition => "VideoRecognition",
         }
     }
 }
 
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum TaskOrUnknown {
-    Task(TaskType),
+    Task(MAATask),
     Unknown(String),
 }
+use TaskOrUnknown::*;
 
-impl From<TaskType> for TaskOrUnknown {
-    fn from(task_type: TaskType) -> Self {
-        TaskOrUnknown::Task(task_type)
+impl From<MAATask> for TaskOrUnknown {
+    fn from(task: MAATask) -> Self {
+        Task(task)
     }
 }
 
 impl AsRef<str> for TaskOrUnknown {
     fn as_ref(&self) -> &str {
         match self {
-            TaskOrUnknown::Task(task) => task.as_ref(),
-            TaskOrUnknown::Unknown(s) => s.as_str(),
+            Task(task) => task.to_str(),
+            Unknown(s) => s.as_str(),
         }
+    }
+}
+
+impl std::fmt::Display for TaskOrUnknown {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_ref())
+    }
+}
+
+impl maa_sys::ToCString for &TaskOrUnknown {
+    fn to_cstring(self) -> maa_sys::Result<std::ffi::CString> {
+        self.as_ref().to_cstring()
     }
 }
 
@@ -73,26 +85,35 @@ mod tests {
 
     use serde_test::{assert_de_tokens, Token};
 
+    impl PartialEq<MAATask> for TaskOrUnknown {
+        fn eq(&self, other: &MAATask) -> bool {
+            match self {
+                Task(task) => task == other,
+                Unknown(_) => false,
+            }
+        }
+    }
+
     #[test]
     fn deserialize() {
         let types: [TaskOrUnknown; 17] = [
-            TaskType::StartUp.into(),
-            TaskType::CloseDown.into(),
-            TaskType::Fight.into(),
-            TaskType::Recruit.into(),
-            TaskType::Infrast.into(),
-            TaskType::Mall.into(),
-            TaskType::Award.into(),
-            TaskType::Roguelike.into(),
-            TaskType::Copilot.into(),
-            TaskType::SSSCopilot.into(),
-            TaskType::Depot.into(),
-            TaskType::OperBox.into(),
-            TaskType::ReclamationAlgorithm.into(),
-            TaskType::Custom.into(),
-            TaskType::SingleStep.into(),
-            TaskType::VideoRecognition.into(),
-            TaskOrUnknown::Unknown("Other".to_string()),
+            StartUp.into(),
+            CloseDown.into(),
+            Fight.into(),
+            Recruit.into(),
+            Infrast.into(),
+            Mall.into(),
+            Award.into(),
+            Roguelike.into(),
+            Copilot.into(),
+            SSSCopilot.into(),
+            Depot.into(),
+            OperBox.into(),
+            ReclamationAlgorithm.into(),
+            Custom.into(),
+            SingleStep.into(),
+            VideoRecognition.into(),
+            Unknown("Other".to_string()),
         ];
 
         assert_de_tokens(
@@ -122,27 +143,43 @@ mod tests {
     }
 
     #[test]
-    fn as_str() {
-        assert_eq!(TaskType::StartUp.as_ref(), "StartUp",);
-        assert_eq!(TaskType::CloseDown.as_ref(), "CloseDown",);
-        assert_eq!(TaskType::Fight.as_ref(), "Fight",);
-        assert_eq!(TaskType::Recruit.as_ref(), "Recruit",);
-        assert_eq!(TaskType::Infrast.as_ref(), "Infrast",);
-        assert_eq!(TaskType::Mall.as_ref(), "Mall",);
-        assert_eq!(TaskType::Award.as_ref(), "Award",);
-        assert_eq!(TaskType::Roguelike.as_ref(), "Roguelike",);
-        assert_eq!(TaskType::Copilot.as_ref(), "Copilot",);
-        assert_eq!(TaskType::SSSCopilot.as_ref(), "SSSCopilot",);
-        assert_eq!(TaskType::Depot.as_ref(), "Depot",);
-        assert_eq!(TaskType::OperBox.as_ref(), "OperBox",);
+    fn to_str() {
+        assert_eq!(StartUp.to_str(), "StartUp");
+        assert_eq!(CloseDown.to_str(), "CloseDown");
+        assert_eq!(Fight.to_str(), "Fight");
+        assert_eq!(Recruit.to_str(), "Recruit");
+        assert_eq!(Infrast.to_str(), "Infrast");
+        assert_eq!(Mall.to_str(), "Mall");
+        assert_eq!(Award.to_str(), "Award");
+        assert_eq!(Roguelike.to_str(), "Roguelike");
+        assert_eq!(Copilot.to_str(), "Copilot");
+        assert_eq!(SSSCopilot.to_str(), "SSSCopilot");
+        assert_eq!(Depot.to_str(), "Depot");
+        assert_eq!(OperBox.to_str(), "OperBox");
         assert_eq!(
-            TaskType::ReclamationAlgorithm.as_ref(),
+            MAATask::ReclamationAlgorithm.to_str(),
             "ReclamationAlgorithm",
         );
-        assert_eq!(TaskType::Custom.as_ref(), "Custom",);
-        assert_eq!(TaskType::SingleStep.as_ref(), "SingleStep",);
-        assert_eq!(TaskType::VideoRecognition.as_ref(), "VideoRecognition",);
-        assert_eq!(TaskOrUnknown::Task(TaskType::StartUp).as_ref(), "StartUp");
-        assert_eq!(TaskOrUnknown::Unknown("Other".into()).as_ref(), "Other");
+        assert_eq!(Custom.to_str(), "Custom");
+        assert_eq!(SingleStep.to_str(), "SingleStep");
+        assert_eq!(VideoRecognition.to_str(), "VideoRecognition");
+        assert_eq!(Task(StartUp).as_ref(), "StartUp");
+        assert_eq!(Unknown("Other".into()).as_ref(), "Other");
+    }
+
+    #[test]
+    fn to_cstring() {
+        use maa_sys::ToCString;
+        use std::ffi::CString;
+
+        assert_eq!(
+            Task(StartUp).to_cstring().unwrap(),
+            CString::new("StartUp").unwrap(),
+        );
+
+        assert_eq!(
+            Unknown("Other".into()).to_cstring().unwrap(),
+            CString::new("Other").unwrap(),
+        );
     }
 }

@@ -1,0 +1,44 @@
+"$schema" = "../schemas/cli.schema.json"
+
+# Configurations for MaaCore
+[core]
+channel = "Beta" # update channel of MaaCore, can be "Alpha", "Beta" or "Stable"
+test_time = 0    # time to test the speed of mirrors, 0 to disable
+# url of the MaaCore version api, used to get the latest version of MaaCore,
+# leave it empty to use the default url
+api_url = "https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version/"
+
+# Configurations for whether to install given components of MaaCore
+[core.components]
+library = true  # whether to install libraries of MaaCore
+resource = true # whether to install resources of MaaCore
+
+# Configurations for maa-cli
+[cli]
+channel = "Alpha" # update channel of maa-cli, can be "Alpha", "Beta" or "Stable"
+# url of the maa-cli version api, used to get the latest version of maa-cli,
+# if you want to use jsdelivr, the double v in @vversion is necessary instead of a typo
+api_url = "https://cdn.jsdelivr.net/gh/MaaAssistantArknights/maa-cli@vversion/"
+# url to download latest version of maa-cli, leave it empty to use the default url
+download_url = "https://github.com/MaaAssistantArknights/maa-cli/releases/download/"
+
+# Configurations for whether to install given components of maa-cli
+[cli.components]
+binary = false # whether to install binary of maa-cli
+
+# Configurations for hot update of resource
+# Note: this is different from `core.components.resource`, this is for hot update of resource
+# while this is hot update resource of MaaCore
+# You can not use this to hot update without any base resource
+[resource]
+auto_update = true  # whether to auto update resource each time run maa task
+backend = "libgit2" # backend to manipulate repository, can be "git" or "libgit2"
+
+# Configurations for remote git repository of resource
+[resource.remote]
+branch = "main" # branch of remote resource repository
+# url of remote resource repository, leave it empty to use the default url
+url = "https://github.com/MaaAssistantArknights/MaaResource.git"
+# if you want to use ssh, set url to ssh url and set ssh_key to the path of ssh key
+# url = "git@github.com:MaaAssistantArknights/MaaResource.git"
+# ssh_key = "~/.ssh/id_ed25519" # path to ssh key

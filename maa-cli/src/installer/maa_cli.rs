@@ -5,10 +5,9 @@ use super::{
 };
 
 use crate::{
-    config::cli::maa_cli::Config,
+    config::cli::{cli_config, maa_cli::CommonArgs},
     consts::{MAA_CLI_EXE, MAA_CLI_VERSION},
     dirs::{self, Ensure},
-    normal,
 };
 
 use std::{
@@ -26,8 +25,10 @@ pub fn version() -> Result<Version> {
     Version::parse(MAA_CLI_VERSION).context("Failed to parse maa-cli version")
 }
 
-pub fn update(config: &Config) -> Result<()> {
-    normal!("Fetching maa-cli version info...");
+pub fn update(args: &CommonArgs) -> Result<()> {
+    let config = cli_config().cli_config().clone().with_args(args);
+
+    println!("Fetching maa-cli version info...");
     let version_json: VersionJSON<Details> = reqwest::blocking::get(config.api_url())
         .context("Failed to fetch version info")?
         .json()
@@ -46,7 +47,7 @@ pub fn update(config: &Config) -> Result<()> {
     let cache_path = dirs::cache().ensure()?.join(asset_name);
 
     if cache_path.exists() && cache_path.metadata()?.len() == asset_size {
-        normal!(format!("Found existing file: {}", cache_path.display()));
+        println!("Found existing file: {}", cache_path.display());
     } else {
         let url = config.download_url(details.tag(), asset_name);
         let client = reqwest::Client::builder()
@@ -94,8 +95,10 @@ impl Details {
 
 #[derive(Deserialize)]
 struct Assets {
-    #[serde(rename = "universal-apple-darwin")]
-    universal_apple_darwin: Asset,
+    #[serde(rename = "x86_64-apple-darwin")]
+    x86_64_apple_darwin: Asset,
+    #[serde(rename = "aarch64-apple-darwin")]
+    aarch64_apple_darwin: Asset,
     #[serde(rename = "x86_64-unknown-linux-gnu")]
     x86_64_unknown_linux_gnu: Asset,
     #[serde(rename = "aarch64-unknown-linux-gnu")]
@@ -107,7 +110,11 @@ struct Assets {
 impl Assets {
     fn asset(&self) -> Result<&Asset> {
         match consts::OS {
-            "macos" => Ok(&self.universal_apple_darwin),
+            "macos" => match consts::ARCH {
+                "x86_64" => Ok(&self.x86_64_apple_darwin),
+                "aarch64" => Ok(&self.aarch64_apple_darwin),
+                _ => bail!("Unsupported architecture: {}", consts::ARCH),
+            },
             "linux" => match consts::ARCH {
                 "x86_64" => Ok(&self.x86_64_unknown_linux_gnu),
                 "aarch64" => Ok(&self.aarch64_unknown_linux_gnu),
@@ -154,7 +161,12 @@ mod tests {
     "details": {
         "tag": "v0.1.0",
         "assets": {
-            "universal-apple-darwin": {
+            "x86_64-apple-darwin": {
+                "name": "maa-cli.zip",
+                "size": 123456,
+                "sha256sum": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+            },
+            "aarch64-apple-darwin": {
                 "name": "maa-cli.zip",
                 "size": 123456,
                 "sha256sum": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"

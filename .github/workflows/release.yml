@@ -9,6 +9,7 @@ on:
       - main
     paths:
       - ".github/workflows/release.yml"
+      - ".github/actions/setup/action.yml"
   workflow_dispatch:
     inputs:
       channel:
@@ -90,7 +91,6 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-
   build:
     name: Build
     needs: meta
@@ -118,30 +118,39 @@ jobs:
         with:
           os: ${{ matrix.os }}
           arch: ${{ matrix.arch }}
-      - name: Patch Cargo.toml (BSD sed)
-        if: ${{ startsWith(matrix.os, 'macos') }}
-        working-directory: maa-cli
+      - name: Patch Version
         run: |
-          sed -i "" '1,6 s/^version = .*/version = "${{ needs.meta.outputs.version }}"/' Cargo.toml
-          git diff Cargo.toml
-      - name: Patch Cargo.toml (GNU sed)
-        if: ${{ !startsWith(matrix.os, 'macos') }}
-        working-directory: maa-cli
-        run: |
-          sed -i '1,6 s/^version = .*/version = "${{ needs.meta.outputs.version }}"/' Cargo.toml
-          git diff Cargo.toml
+          MAA_VERSION="${{ needs.meta.outputs.version }}"
+          if [ $(uname) == "Darwin" ]; then
+            SED="sed -i '' -E" # BSD sed should use '' as backup extension
+          else
+            SED="sed -i -E"
+          fi
+          S="[[:space:]]" # BSD sed doesn't support \s
+          $SED "1,6 s/(version${S}*=${S}*)\"[^\"]+\"/\1\"$MAA_VERSION\"/" maa-cli/Cargo.toml
+          NL=$(grep -n -E "name${S}*=${S}*\"maa-cli\"" Cargo.lock | cut -d: -f1)
+          NS=$((NL - 1))
+          NE=$((NL + 3))
+          $SED "$NS,$NE s/(version${S}*=${S}*)\"[^\"]+\"/\1\"$MAA_VERSION\"/" Cargo.lock
+          {
+            echo "Patch Version (${{ matrix.os }}, ${{ matrix.arch }})"
+            echo '```diff'
+            git diff
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Build
         env:
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 1
           CARGO_PROFILE_RELEASE_LTO: true
           CARGO_PROFILE_RELEASE_STRIP: true
         run: |
-          cargo build --release --package maa-cli
+          cargo build --release --package maa-cli --locked \
+            ${{ matrix.arch != 'x86_64' && '--features git2/vendored-openssl,reqwest/native-tls-vendored' || '' }}
       - name: Tar Artifact
         run: |
           tar -cvf "$CARGO_BUILD_TARGET.tar" -C "target/$CARGO_BUILD_TARGET/release" maa
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: maa_cli-${{ env.CARGO_BUILD_TARGET }}
           path: ${{ env.CARGO_BUILD_TARGET }}.tar
@@ -157,7 +166,7 @@ jobs:
       # download all artifacts, even if not all are used,
       # because this action don't support wildcards
       - name: Download Artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
       - name: Create universal binaries
         run: |
           for arch in x86_64 aarch64; do
@@ -168,7 +177,7 @@ jobs:
           lipo -create -output maa maa_cli-x86_64-apple-darwin/maa maa_cli-aarch64-apple-darwin/maa
           tar -cvf "universal-apple-darwin.tar" maa
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: maa_cli-universal-apple-darwin
           path: universal-apple-darwin.tar
@@ -191,7 +200,7 @@ jobs:
       COMMIT: ${{ needs.meta.outputs.commit }}
     steps:
       - name: Download Artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
       - name: Checkout version branch
         uses: actions/checkout@v4
         with:
@@ -221,6 +230,8 @@ jobs:
             x86_64-unknown-linux-gnu
             aarch64-unknown-linux-gnu
             universal-apple-darwin
+            x86_64-apple-darwin
+            aarch64-apple-darwin
             x86_64-pc-windows-msvc
           )
 
@@ -270,6 +281,7 @@ jobs:
               exit 1
             fi
           fi
+          sleep 5 # wait to avoid the release becames draft
       - name: Create Release
         uses: softprops/action-gh-release@v1
         if: ${{ fromJson(needs.meta.outputs.publish) }}
@@ -281,7 +293,7 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             maa_cli-v${{ needs.meta.outputs.version }}-*-unknown-linux-gnu.tar.gz*
-            maa_cli-v${{ needs.meta.outputs.version }}-universal-apple-darwin.zip*
+            maa_cli-v${{ needs.meta.outputs.version }}-*-apple-darwin.zip*
             maa_cli-v${{ needs.meta.outputs.version }}-*-pc-windows-msvc.zip*
       - name: Commit version.json and Push
         working-directory: version

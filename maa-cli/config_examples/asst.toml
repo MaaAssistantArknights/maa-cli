@@ -1,0 +1,53 @@
+"$schema" = "../schemas/asst.schema.json"
+
+# connection options for MAA Core
+# There are two ways to connect to Arknights
+# 1. Connect by ADB
+[connection]
+type = "ADB"             # connection type
+adb_path = "adb"         # adb executable path
+device = "emulator-5554" # ADB device serial number (see `adb help` for more details)
+config = "CompatMac"     # connect config name
+
+# 2. Connect by PlayTools
+# See https://maa.plus/docs/1.4-Mac模拟器支持.html#✅-playcover-原生运行最流畅🚀
+# for more details about PlayTools
+# [connection]
+# type = "PlayTools"         # connection type
+# address = "localhost:1717" # PlayTools address
+# config = "CompatMac"       # connect config name
+
+
+# Resource options for MAA Core
+[resource]
+# Load additional resources for non Simplified Chinese version
+# all base resource is for Simplified Chinese, so only non Simplified Chinese need to be specified here
+# Leave it empty if you are using Simplified Chinese version
+# This option will be set automatically based on `client_type` field in task config
+# More details about `client_type` check documentation of task config
+global_resource = "YoStarEN"
+# Load additional resources for non Android version of Arknights
+# all base resource is for android, only iOS is supported and need to be specified here
+# Leave it empty if you are using Android version
+# This option will be set automatically based on `connection.type` field,
+# so you don't need to set it manually
+platform_diff_resource = "iOS"
+# load resource from user config dir, load at last to override all other resources
+# Leave it empty if you don't want to load user resource
+# If this option is set to true, but no user resource is found,
+# this option will be ignored and show a warning
+user_resource = true
+
+# static options for MAA Core
+# See `https://maa.plus/docs/3.1-集成文档.html#asstsetstaticoption` for more details
+[static_options]
+cpu_ocr = false # set to true to use cpu ocr, if you want to use gpu ocr, set it to false
+gpu_ocr = 1     # set the gpu_id to use gpu ocr (not set by default)
+
+# instance options for MAA Core
+# See `https://maa.plus/docs/3.1-集成文档.html#asstsetinstanceoption` for more details
+[instance_options]
+touch_mode = "MaaTouch"
+deployment_with_pause = false
+adb_lite_enabled = false
+kill_adb_on_exit = false

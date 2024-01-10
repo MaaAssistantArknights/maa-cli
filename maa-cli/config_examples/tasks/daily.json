@@ -1,9 +1,16 @@
 {
+  "$schema": "../../schemas/task.schema.json",
   "tasks": [
     {
       "type": "StartUp",
       "params": {
-        "client_type": "Official",
+        "client_type": {
+          "alternatives": ["Official", "YoStarEN", "YoStarJP"],
+          "description": "a client type",
+          "deps": {
+            "start_game_enabled": true
+          }
+        },
         "start_game_enabled": {
           "default": true,
           "description": "start the game"
@@ -12,14 +19,13 @@
     },
     {
       "type": "Fight",
+      "name": "Fight Daily",
       "strategy": "merge",
       "variants": [
         {
           "condition": {
             "type": "Weekday",
-            "weekdays": [
-              "Sun"
-            ]
+            "weekdays": ["Sun"]
           },
           "params": {
             "expiring_medicine": 5
@@ -36,11 +42,7 @@
         {
           "condition": {
             "type": "Weekday",
-            "weekdays": [
-              "Tue",
-              "Thu",
-              "Sat"
-            ]
+            "weekdays": ["Tue", "Thu", "Sat"]
           },
           "params": {
             "stage": "CE-6"
@@ -54,12 +56,10 @@
           },
           "params": {
             "stage": {
-              "alternatives": [
-                "SL-6",
-                "SL-7",
-                "SL-8"
-              ],
-              "description": "a stage to fight in summer event"
+              "alternatives": ["SL-6", "SL-7", "SL-8"],
+              "default_index": 2,
+              "description": "a stage to fight in summer event",
+              "allow_custom": true
             }
           }
         }
@@ -70,15 +70,8 @@
       "params": {
         "shopping": true,
         "credit_fight": true,
-        "buy_first": [
-          "招聘许可",
-          "龙门币"
-        ],
-        "blacklist": [
-          "碳",
-          "家具",
-          "加急许可"
-        ]
+        "buy_first": ["招聘许可", "龙门币"],
+        "blacklist": ["碳", "家具", "加急许可"]
       },
       "variants": [
         {

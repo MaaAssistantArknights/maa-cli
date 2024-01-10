@@ -2,7 +2,7 @@ use crate::consts::MAA_CORE_LIB;
 
 use std::{
     env::{current_exe, var_os},
-    fs::{create_dir, remove_dir_all},
+    fs::{create_dir, create_dir_all, remove_dir_all},
     path::{Path, PathBuf},
 };
 
@@ -60,7 +60,9 @@ pub struct Dirs {
     library: PathBuf,
     config: PathBuf,
     cache: PathBuf,
+    copilot: PathBuf,
     resource: PathBuf,
+    hot_update: PathBuf,
     state: PathBuf,
     log: PathBuf,
 }
@@ -69,46 +71,40 @@ impl Dirs {
     pub fn new(proj: Option<ProjectDirs>) -> Self {
         let data_dir = get_data_dir(&proj);
         let state_dir = get_state_dir(&proj);
+        let cache_dir = get_cache_dir(&proj);
 
         Self {
             data: data_dir.clone(),
-            cache: get_cache_dir(&proj),
+            cache: cache_dir.clone(),
+            copilot: cache_dir.join("copilot"),
             config: get_config_dir(&proj),
             library: data_dir.join("lib"),
             resource: data_dir.join("resource"),
+            hot_update: data_dir.join("MaaResource"),
             state: state_dir.clone(),
             log: state_dir.join("debug"),
         }
     }
 
+    /// Get data directory.
     pub fn data(&self) -> &Path {
         &self.data
     }
 
+    /// Get library directory.
     pub fn library(&self) -> &Path {
         &self.library
     }
 
-    pub fn config(&self) -> &Path {
-        &self.config
-    }
-
-    pub fn cache(&self) -> &Path {
-        &self.cache
-    }
-
-    pub fn resource(&self) -> &Path {
-        &self.resource
-    }
-
-    pub fn state(&self) -> &Path {
-        &self.state
-    }
-
-    pub fn log(&self) -> &Path {
-        &self.log
-    }
-
+    /// Find the library directory.
+    ///
+    /// By default, the library directory is the `lib` directory in the data directory.
+    /// If the library `MaaCore` is not found in the default library directory,
+    /// Try to find it in the directory relative to the executable file.
+    /// First, try to find the `MaaCore` in the same directory as the executable file.
+    /// Then, assume the executable file is in the `bin` directory,
+    /// try to find the `MaaCore` in the `lib` directory in the parent directory of the executable file.
+    /// If the executable is a symbolic link, will try to find the `MaaCore` both in the symbolic link and the link target.
     pub fn find_library(&self, exe_path: &Path) -> Option<PathBuf> {
         if self.library.join(MAA_CORE_LIB).exists() {
             return Some(self.library.clone());
@@ -130,6 +126,64 @@ impl Dirs {
         })
     }
 
+    /// Get config directory.
+    pub fn config(&self) -> &Path {
+        &self.config
+    }
+
+    /// Get absolute path in config directory.
+    ///
+    /// If the given path is absolute, return `None`.
+    /// Otherwise, return the path in the config directory.
+    /// The `sub_dir` is the sub directory of the config directory.
+    /// If `sub_dir` is `None`, the path is relative to the config directory.
+    /// Otherwise, the path is relative to the `sub_dir` directory.
+    pub fn abs_config<P: AsRef<Path>, D: AsRef<Path>>(
+        &self,
+        path: P,
+        sub_dir: Option<D>,
+    ) -> Option<PathBuf> {
+        let path = path.as_ref();
+        if path.is_absolute() {
+            None
+        } else {
+            let mut result = self.config.to_path_buf();
+            if let Some(sub_dir) = sub_dir {
+                result.push(sub_dir);
+            }
+            result.push(path);
+            Some(result)
+        }
+    }
+
+    /// Get cache directory.
+    pub fn cache(&self) -> &Path {
+        &self.cache
+    }
+
+    /// Get copilot cache directory.
+    pub fn copilot(&self) -> &Path {
+        &self.copilot
+    }
+
+    /// Get resource directory.
+    pub fn resource(&self) -> &Path {
+        &self.resource
+    }
+
+    /// Find the resource directory.
+    ///
+    /// By default, the resource directory is the `resource` directory in the data directory.
+    /// If the resource directory is not found in the default resource directory,
+    /// Try to find it in the directory relative to the executable file.
+    /// First, try to find the resource directory in the same directory as the executable file.
+    /// Then, assume the executable file is in the `bin` directory,
+    /// try to find the resource directory in the `share/maa` directory in the parent directory of the executable file.
+    /// If the executable is a symbolic link, will try to find the resource directory both in the symbolic link and the link target.
+    ///
+    /// Additionally, if maa is compiled with `MAA_EXTRA_SHARE_NAME` environment variable,
+    /// try to find the resource directory in the `share/$MAA_EXTRA_SHARE_NAME` directory.
+    /// This is used to support the situation that MaaCore is installed by other package manager.
     pub fn find_resource(&self, exe_path: &Path) -> Option<PathBuf> {
         if self.resource.exists() {
             return Some(self.resource.clone());
@@ -156,6 +210,21 @@ impl Dirs {
             None
         })
     }
+
+    /// Get hot update resource directory.
+    pub fn hot_update(&self) -> &Path {
+        &self.hot_update
+    }
+
+    /// Get state directory.
+    pub fn state(&self) -> &Path {
+        &self.state
+    }
+
+    /// Get log directory.
+    pub fn log(&self) -> &Path {
+        &self.log
+    }
 }
 
 lazy_static! {
@@ -170,16 +239,36 @@ pub fn library() -> &'static Path {
     DIRS.library()
 }
 
+pub fn find_library() -> Option<PathBuf> {
+    DIRS.find_library(&current_exe().ok()?)
+}
+
 pub fn config() -> &'static Path {
     DIRS.config()
+}
+
+pub fn abs_config<P: AsRef<Path>, D: AsRef<Path>>(path: P, sub_dir: Option<D>) -> Option<PathBuf> {
+    DIRS.abs_config(path, sub_dir)
 }
 
 pub fn cache() -> &'static Path {
     DIRS.cache()
 }
 
+pub fn copilot() -> &'static Path {
+    DIRS.copilot()
+}
+
 pub fn resource() -> &'static Path {
     DIRS.resource()
+}
+
+pub fn find_resource() -> Option<PathBuf> {
+    DIRS.find_resource(&current_exe().ok()?)
+}
+
+pub fn hot_update() -> &'static Path {
+    DIRS.hot_update()
 }
 
 pub fn state() -> &'static Path {
@@ -190,12 +279,20 @@ pub fn log() -> &'static Path {
     DIRS.log()
 }
 
-pub fn find_library() -> Option<PathBuf> {
-    DIRS.find_library(&current_exe().ok()?)
+lazy_static! {
+    static ref HOME: PathBuf = directories::BaseDirs::new()
+        .expect("Failed to get home directory")
+        .home_dir()
+        .to_path_buf();
 }
 
-pub fn find_resource() -> Option<PathBuf> {
-    DIRS.find_resource(&current_exe().ok()?)
+pub fn expand_tilde(path: impl AsRef<Path>) -> PathBuf {
+    let path = path.as_ref();
+    if let Ok(path) = path.strip_prefix("~") {
+        HOME.join(path)
+    } else {
+        path.to_path_buf()
+    }
 }
 
 /// Similar to `finder(exe_path.parent()?)`, but try to canonicalize the path first.
@@ -233,10 +330,7 @@ impl Ensure for &Path {
 
     fn ensure(self) -> Result<Self, Self::Error> {
         if !self.exists() {
-            if let Some(parent) = self.parent() {
-                parent.ensure()?;
-            }
-            create_dir(self)?;
+            create_dir_all(self)?;
         }
         Ok(self)
     }
@@ -250,6 +344,52 @@ impl Ensure for &Path {
         create_dir(self)?;
         Ok(self)
     }
+}
+
+/// Similar to `globpath` of vim
+pub fn global_path<I, D>(base_dirs: D, path: impl AsRef<Path>) -> Vec<PathBuf>
+where
+    I: AsRef<Path>,
+    D: IntoIterator<Item = I>,
+{
+    let path = path.as_ref();
+    let mut paths = Vec::new();
+    for base_dir in base_dirs {
+        let full_path = base_dir.as_ref().join(path);
+        if full_path.exists() {
+            paths.push(full_path);
+        }
+    }
+    paths
+}
+
+pub fn global_find<I, D, F>(base_dirs: D, finder: F) -> Vec<PathBuf>
+where
+    I: AsRef<Path>,
+    D: IntoIterator<Item = I>,
+    F: Fn(&Path) -> Option<PathBuf>,
+{
+    let mut paths = Vec::new();
+    for base_dir in base_dirs {
+        if let Some(path) = finder(base_dir.as_ref()) {
+            paths.push(path);
+        }
+    }
+    paths
+}
+
+/// Ensure the given str is a name instead of a path.
+///
+/// # Panics
+///
+/// Panics if the given str is a string containing path separator.
+#[allow(dead_code)]
+fn ensure_name(name: &str) -> &str {
+    assert!(
+        !name.contains(std::path::is_separator),
+        "The given name should not contain path separator"
+    );
+    name
 }
 
 #[cfg(test)]
@@ -269,19 +409,18 @@ mod tests {
         fn state_relative() {
             env::remove_var("XDG_STATE_HOME");
             let project = ProjectDirs::from("com", "loong", "maa");
-            let home_dir = PathBuf::from(env::var_os("HOME").unwrap());
             if cfg!(target_os = "macos") {
                 assert_eq!(
                     TEST_DIRS.state(),
-                    home_dir.join("Library/Application Support/com.loong.maa")
+                    HOME.join("Library/Application Support/com.loong.maa")
                 );
                 assert_eq!(
                     TEST_DIRS.log(),
-                    home_dir.join("Library/Application Support/com.loong.maa/debug")
+                    HOME.join("Library/Application Support/com.loong.maa/debug")
                 );
             } else if cfg!(target_os = "linux") {
-                assert_eq!(TEST_DIRS.state(), home_dir.join(".local/state/maa"));
-                assert_eq!(TEST_DIRS.log(), home_dir.join(".local/state/maa/debug"));
+                assert_eq!(TEST_DIRS.state(), HOME.join(".local/state/maa"));
+                assert_eq!(TEST_DIRS.log(), HOME.join(".local/state/maa/debug"));
             }
             assert_eq!(state(), TEST_DIRS.state());
             assert_eq!(log(), TEST_DIRS.log());
@@ -303,27 +442,23 @@ mod tests {
         fn data_relative() {
             env::remove_var("XDG_DATA_HOME");
             let project = ProjectDirs::from("com", "loong", "maa");
-            let home_dir = PathBuf::from(env::var_os("HOME").unwrap());
             if cfg!(target_os = "macos") {
                 assert_eq!(
                     TEST_DIRS.data(),
-                    home_dir.join("Library/Application Support/com.loong.maa")
+                    HOME.join("Library/Application Support/com.loong.maa")
                 );
                 assert_eq!(
                     TEST_DIRS.library(),
-                    home_dir.join("Library/Application Support/com.loong.maa/lib")
+                    HOME.join("Library/Application Support/com.loong.maa/lib")
                 );
                 assert_eq!(
                     TEST_DIRS.resource(),
-                    home_dir.join("Library/Application Support/com.loong.maa/resource")
+                    HOME.join("Library/Application Support/com.loong.maa/resource")
                 );
             } else if cfg!(target_os = "linux") {
-                assert_eq!(TEST_DIRS.data(), home_dir.join(".local/share/maa"));
-                assert_eq!(TEST_DIRS.library(), home_dir.join(".local/share/maa/lib"));
-                assert_eq!(
-                    TEST_DIRS.resource(),
-                    home_dir.join(".local/share/maa/resource")
-                );
+                assert_eq!(TEST_DIRS.data(), HOME.join(".local/share/maa"));
+                assert_eq!(TEST_DIRS.library(), HOME.join(".local/share/maa/lib"));
+                assert_eq!(TEST_DIRS.resource(), HOME.join(".local/share/maa/resource"));
             }
             assert_eq!(data(), TEST_DIRS.data());
             assert_eq!(library(), TEST_DIRS.library());
@@ -395,8 +530,8 @@ mod tests {
             assert_eq!(dirs.find_library(&bin_exe).unwrap(), library_dir);
             assert_eq!(dirs.find_resource(&bin_exe).unwrap(), resource_dir);
 
-            if let Some(extra_share) = option_env!("MAA_EXTRA_SHARE_NAME") {
-                let extra_share_dir = test_root.join("share").join(extra_share);
+            if let Some(name) = option_env!("MAA_EXTRA_SHARE_NAME") {
+                let extra_share_dir = test_root.join("share").join(ensure_name(name));
                 let extra_resource_dir = extra_share_dir.join("resource");
                 create_dir_all(&extra_resource_dir).unwrap();
                 assert_eq!(dirs.find_resource(&bin_exe).unwrap(), extra_resource_dir);
@@ -450,19 +585,37 @@ mod tests {
         }
 
         #[test]
-        fn config_dir() {
+        fn config_relative() {
             env::remove_var("XDG_CONFIG_HOME");
             let project = ProjectDirs::from("com", "loong", "maa");
-            let home_dir = PathBuf::from(env::var_os("HOME").unwrap());
             if cfg!(target_os = "macos") {
                 assert_eq!(
                     TEST_DIRS.config(),
-                    home_dir.join("Library/Application Support/com.loong.maa/config")
+                    HOME.join("Library/Application Support/com.loong.maa/config")
                 );
             } else if cfg!(target_os = "linux") {
-                assert_eq!(TEST_DIRS.config(), home_dir.join(".config/maa"));
+                assert_eq!(TEST_DIRS.config(), HOME.join(".config/maa"));
             }
+            assert_eq!(
+                TEST_DIRS.abs_config::<&str, &str>("foo", None).unwrap(),
+                TEST_DIRS.config().join("foo")
+            );
+            assert_eq!(
+                TEST_DIRS.abs_config("foo", Some("bar")).unwrap(),
+                TEST_DIRS.config().join("bar").join("foo")
+            );
+
+            #[cfg(unix)]
+            {
+                assert_eq!(TEST_DIRS.abs_config::<&str, &str>("/tmp", None), None);
+                assert_eq!(TEST_DIRS.abs_config("/tmp", Some("bar")), None);
+            }
+
             assert_eq!(config(), TEST_DIRS.config());
+            assert_eq!(
+                abs_config("foo", Some("bar")).unwrap(),
+                config().join("bar").join("foo")
+            );
 
             env::set_var("XDG_CONFIG_HOME", "/xdg");
             let dirs = Dirs::new(project.clone());
@@ -474,28 +627,39 @@ mod tests {
         }
 
         #[test]
-        fn cache_dir() {
+        fn cache_relative() {
             env::remove_var("XDG_CACHE_HOME");
             let project = ProjectDirs::from("com", "loong", "maa");
-            let home_dir = PathBuf::from(env::var_os("HOME").unwrap());
             if cfg!(target_os = "macos") {
+                assert_eq!(TEST_DIRS.cache(), HOME.join("Library/Caches/com.loong.maa"));
                 assert_eq!(
-                    TEST_DIRS.cache(),
-                    home_dir.join("Library/Caches/com.loong.maa")
+                    TEST_DIRS.copilot(),
+                    HOME.join("Library/Caches/com.loong.maa/copilot")
                 );
             } else if cfg!(target_os = "linux") {
-                assert_eq!(TEST_DIRS.cache(), home_dir.join(".cache/maa"));
+                assert_eq!(TEST_DIRS.cache(), HOME.join(".cache/maa"));
+                assert_eq!(TEST_DIRS.copilot(), HOME.join(".cache/maa/copilot"));
             }
             assert_eq!(cache(), TEST_DIRS.cache());
+            assert_eq!(copilot(), TEST_DIRS.copilot());
 
             env::set_var("XDG_CACHE_HOME", "/xdg");
             let dirs = Dirs::new(project.clone());
             assert_eq!(dirs.cache(), PathBuf::from("/xdg/maa"));
+            assert_eq!(dirs.copilot(), PathBuf::from("/xdg/maa/copilot"));
 
             env::set_var("MAA_CACHE_DIR", "/maa");
             let dirs = Dirs::new(project.clone());
             assert_eq!(dirs.cache(), PathBuf::from("/maa"));
+            assert_eq!(dirs.copilot(), PathBuf::from("/maa/copilot"));
         }
+    }
+
+    #[test]
+    fn test_expand_tilde() {
+        assert_eq!(expand_tilde(Path::new("~")), HOME.as_path());
+        assert_eq!(expand_tilde(Path::new("~/foo")), HOME.join("foo").as_path());
+        assert_eq!(expand_tilde(Path::new("/foo")), Path::new("/foo"));
     }
 
     #[test]
@@ -506,5 +670,66 @@ mod tests {
         assert!(!test_dir.exists());
         assert_eq!(test_dir.ensure().unwrap(), test_dir);
         assert!(test_dir.exists());
+        remove_dir_all(&test_root).unwrap();
+    }
+
+    #[test]
+    fn global_path_and_find() {
+        let test_root = temp_dir().join("maa-test-global-path");
+        let test_dir1 = test_root.join("test1");
+        let test_dir2 = test_root.join("test2");
+        let test_file = test_dir1.join("test");
+
+        test_dir1.ensure_clean().unwrap();
+        test_dir2.ensure_clean().unwrap();
+
+        std::fs::File::create(&test_file).unwrap();
+
+        assert_eq!(
+            global_path([&test_dir1, &test_dir2], "test"),
+            vec![test_file.clone()]
+        );
+        assert_eq!(
+            global_path([&test_dir1, &test_dir2], "not_exist"),
+            Vec::<PathBuf>::new()
+        );
+
+        assert_eq!(
+            global_find([&test_dir1, &test_dir2], |dir| {
+                if dir.join("test").exists() {
+                    Some(dir.join("test"))
+                } else {
+                    None
+                }
+            }),
+            vec![test_file.clone()]
+        );
+
+        assert_eq!(
+            global_find([&test_dir1, &test_dir2], |dir| {
+                if dir.join("not_exist").exists() {
+                    Some(dir.join("not_exist"))
+                } else {
+                    None
+                }
+            }),
+            Vec::<PathBuf>::new()
+        );
+
+        remove_dir_all(&test_root).unwrap();
+    }
+
+    #[test]
+    fn ensure_name_ok() {
+        assert_eq!(ensure_name("foo"), "foo");
+    }
+
+    #[test]
+    #[should_panic]
+    fn ensure_name_fail() {
+        #[cfg(unix)]
+        ensure_name("foo/bar");
+        #[cfg(windows)]
+        ensure_name("foo\\bar");
     }
 }

@@ -1,7 +1,7 @@
 [package]
 name = "maa-sys"
 authors = ["Loong Wang <wangl-cc@outlook.com>"]
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "Low-level bindings to MAA (MaaAssistantArknights)"
 repository.workspace = true
@@ -12,6 +12,7 @@ runtime = ["libloading"]
 
 [dependencies]
 libloading = { version = "0.8.0", optional = true }
+serde = { version = "1", optional = true, features = ["derive"] }
 
 [build-dependencies]
 directories = "5"

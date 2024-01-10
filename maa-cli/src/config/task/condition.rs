@@ -1,17 +1,18 @@
+use super::client_type::ClientType;
+
+use crate::activity::has_side_story_open;
+
 use chrono::{Datelike, Local, NaiveDateTime, NaiveTime, Weekday};
 use serde::Deserialize;
 
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Deserialize, Debug)]
+#[cfg_attr(test, derive(PartialEq, Debug))]
+#[derive(Deserialize)]
 #[serde(tag = "type")]
 #[derive(Default)]
 pub enum Condition {
     /// The task is always active
     #[default]
     Always,
-    /// The task is never active, only used for testing
-    #[cfg(test)]
-    Never,
     /// The task is active on the specified weekdays
     Weekday { weekdays: Vec<Weekday> },
     /// The task is active on the specified time range
@@ -34,8 +35,17 @@ pub enum Condition {
         #[serde(default, deserialize_with = "deserialize_from_str")]
         end: Option<NaiveDateTime>,
     },
+    OnSideStory {
+        #[serde(default)]
+        client: ClientType,
+    },
     /// The task is active if all the sub-conditions are met
-    Combined { conditions: Vec<Condition> },
+    #[serde(alias = "Combined")]
+    And { conditions: Vec<Condition> },
+    /// The task is active if any of the sub-conditions is met
+    Or { conditions: Vec<Condition> },
+    /// The task is active if the inner condition is not met
+    Not { condition: Box<Condition> },
 }
 
 fn deserialize_from_str<'de, S, D>(deserializer: D) -> Result<Option<S>, D::Error>
@@ -58,8 +68,6 @@ impl Condition {
     pub fn is_active(&self) -> bool {
         match self {
             Condition::Always => true,
-            #[cfg(test)]
-            Condition::Never => false,
             Condition::Weekday { weekdays } => {
                 let now = Local::now();
                 let weekday = now.date_naive().weekday();
@@ -84,7 +92,8 @@ impl Condition {
                     (None, None) => true,
                 }
             }
-            Condition::Combined { conditions } => {
+            Condition::OnSideStory { client } => has_side_story_open(*client),
+            Condition::And { conditions } => {
                 for condition in conditions {
                     if !condition.is_active() {
                         return false;
@@ -92,6 +101,15 @@ impl Condition {
                 }
                 true
             }
+            Condition::Or { conditions } => {
+                for condition in conditions {
+                    if condition.is_active() {
+                        return true;
+                    }
+                }
+                false
+            }
+            Condition::Not { condition } => !condition.is_active(),
         }
     }
 }
@@ -216,34 +234,50 @@ mod tests {
             .is_active());
         }
 
-        #[test]
-        fn combined() {
-            let now = chrono::Local::now();
-            let now_time = now.time();
-            let weekday = now.date_naive().weekday();
+        // It's hart to test OnSideStory, because it depends on real world data
+        // #[test]
+        // fn on_side_story() {}
 
-            assert!(Condition::Combined {
+        #[test]
+        fn boolean() {
+            assert!(Condition::And {
+                conditions: vec![Condition::Always, Condition::Always]
+            }
+            .is_active());
+            assert!(!Condition::And {
                 conditions: vec![
-                    Condition::Time {
-                        start: Some(now_time + Duration::minutes(-10)),
-                        end: Some(now_time + Duration::minutes(10)),
-                    },
-                    Condition::Weekday {
-                        weekdays: vec![weekday]
+                    Condition::Always,
+                    Condition::Not {
+                        condition: Box::new(Condition::Always)
                     },
                 ]
             }
             .is_active());
-            assert!(!Condition::Combined {
+
+            assert!(Condition::Or {
                 conditions: vec![
-                    Condition::Time {
-                        start: Some(now_time + Duration::minutes(10)),
-                        end: Some(now_time + Duration::minutes(20)),
-                    },
-                    Condition::Weekday {
-                        weekdays: vec![weekday]
-                    },
+                    Condition::Always,
+                    Condition::Not {
+                        condition: Box::new(Condition::Always)
+                    }
                 ]
+            }
+            .is_active());
+
+            assert!(!Condition::Or {
+                conditions: vec![
+                    Condition::Not {
+                        condition: Box::new(Condition::Always)
+                    },
+                    Condition::Not {
+                        condition: Box::new(Condition::Always)
+                    }
+                ]
+            }
+            .is_active());
+
+            assert!(!Condition::Not {
+                condition: Box::new(Condition::Always)
             }
             .is_active());
         }
@@ -316,18 +350,139 @@ mod tests {
 
         #[test]
         fn datatime() {
-            let cond_str = r#"{
-                "type": "DateTime",
-                "start": "2021-08-01T16:00:00",
-                "end": "2021-08-21T04:00:00"
-            }"#;
-            let cond: Condition = serde_json::from_str(cond_str).unwrap();
-            assert_eq!(
-                cond,
-                Condition::DateTime {
+            assert_de_tokens(
+                &Condition::DateTime {
                     start: Some(naive_local_datetime(2021, 8, 1, 16, 0, 0)),
                     end: Some(naive_local_datetime(2021, 8, 21, 4, 0, 0)),
-                }
+                },
+                &[
+                    Token::Map { len: Some(3) },
+                    Token::Str("type"),
+                    Token::Str("DateTime"),
+                    Token::Str("start"),
+                    Token::Str("2021-08-01T16:00:00"),
+                    Token::Str("end"),
+                    Token::Str("2021-08-21T04:00:00"),
+                    Token::MapEnd,
+                ],
+            );
+        }
+
+        #[test]
+        fn on_side_story() {
+            assert_de_tokens(
+                &Condition::OnSideStory {
+                    client: ClientType::Official,
+                },
+                &[
+                    Token::Map { len: Some(1) },
+                    Token::Str("type"),
+                    Token::Str("OnSideStory"),
+                    Token::MapEnd,
+                ],
+            );
+
+            assert_de_tokens(
+                &Condition::OnSideStory {
+                    client: ClientType::Txwy,
+                },
+                &[
+                    Token::Map { len: Some(2) },
+                    Token::Str("type"),
+                    Token::Str("OnSideStory"),
+                    Token::Str("client"),
+                    Token::Str("txwy"),
+                    Token::MapEnd,
+                ],
+            );
+        }
+
+        #[test]
+        fn boolean() {
+            assert_de_tokens(
+                &Condition::And {
+                    conditions: vec![Condition::Always, Condition::Always],
+                },
+                &[
+                    Token::Map { len: Some(2) },
+                    Token::Str("type"),
+                    Token::Str("Combined"),
+                    Token::Str("conditions"),
+                    Token::Seq { len: Some(2) },
+                    Token::Map { len: Some(1) },
+                    Token::Str("type"),
+                    Token::Str("Always"),
+                    Token::MapEnd,
+                    Token::Map { len: Some(1) },
+                    Token::Str("type"),
+                    Token::Str("Always"),
+                    Token::MapEnd,
+                    Token::SeqEnd,
+                    Token::MapEnd,
+                ],
+            );
+
+            assert_de_tokens(
+                &Condition::And {
+                    conditions: vec![Condition::Always, Condition::Always],
+                },
+                &[
+                    Token::Map { len: Some(2) },
+                    Token::Str("type"),
+                    Token::Str("And"),
+                    Token::Str("conditions"),
+                    Token::Seq { len: Some(2) },
+                    Token::Map { len: Some(1) },
+                    Token::Str("type"),
+                    Token::Str("Always"),
+                    Token::MapEnd,
+                    Token::Map { len: Some(1) },
+                    Token::Str("type"),
+                    Token::Str("Always"),
+                    Token::MapEnd,
+                    Token::SeqEnd,
+                    Token::MapEnd,
+                ],
+            );
+
+            assert_de_tokens(
+                &Condition::Or {
+                    conditions: vec![Condition::Always, Condition::Always],
+                },
+                &[
+                    Token::Map { len: Some(2) },
+                    Token::Str("type"),
+                    Token::Str("Or"),
+                    Token::Str("conditions"),
+                    Token::Seq { len: Some(2) },
+                    Token::Map { len: Some(1) },
+                    Token::Str("type"),
+                    Token::Str("Always"),
+                    Token::MapEnd,
+                    Token::Map { len: Some(1) },
+                    Token::Str("type"),
+                    Token::Str("Always"),
+                    Token::MapEnd,
+                    Token::SeqEnd,
+                    Token::MapEnd,
+                ],
+            );
+
+            assert_de_tokens(
+                &Condition::Not {
+                    condition: Box::new(Condition::Always),
+                },
+                &[
+                    Token::Map { len: Some(2) },
+                    Token::Str("type"),
+                    Token::Str("Not"),
+                    Token::Str("condition"),
+                    Token::Map { len: Some(1) },
+                    Token::Str("type"),
+                    Token::Str("Always"),
+                    Token::MapEnd,
+                    Token::MapEnd,
+                ],
             );
         }
     }

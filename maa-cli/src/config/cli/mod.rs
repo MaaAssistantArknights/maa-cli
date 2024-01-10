@@ -3,13 +3,20 @@ pub mod maa_cli;
 #[cfg(feature = "core_installer")]
 pub mod maa_core;
 
+pub mod resource;
+
+use super::FindFileOrDefault;
+
+use crate::dirs;
+
 use clap::ValueEnum;
+use lazy_static::lazy_static;
 use serde::Deserialize;
 
 /// Configuration for the CLI (cli.toml)
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Default)]
-pub struct InstallerConfig {
+pub struct CLIConfig {
     /// MaaCore configuration
     #[cfg(feature = "core_installer")]
     #[serde(default)]
@@ -17,22 +24,37 @@ pub struct InstallerConfig {
     #[cfg(feature = "cli_installer")]
     #[serde(default)]
     cli: maa_cli::Config,
-    // TODO: Add `resource` field for separate resource updater
+    #[serde(default)]
+    resource: resource::Config,
 }
 
-impl InstallerConfig {
+impl CLIConfig {
     #[cfg(feature = "core_installer")]
-    pub fn core_config(self) -> maa_core::Config {
-        self.core
+    pub fn core_config(&self) -> maa_core::Config {
+        self.core.clone()
     }
 
     #[cfg(feature = "cli_installer")]
-    pub fn cli_config(self) -> maa_cli::Config {
-        self.cli
+    pub fn cli_config(&self) -> maa_cli::Config {
+        self.cli.clone()
+    }
+
+    pub fn resource_config(&self) -> resource::Config {
+        self.resource.clone()
     }
 }
 
-impl super::FromFile for InstallerConfig {}
+impl super::FromFile for CLIConfig {}
+
+lazy_static! {
+    static ref INSTALLER_CONFIG: CLIConfig =
+        CLIConfig::find_file_or_default(&dirs::config().join("cli"))
+            .expect("Failed to load installer config");
+}
+
+pub fn cli_config() -> &'static CLIConfig {
+    &INSTALLER_CONFIG
+}
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(ValueEnum, Clone, Copy, Default, Deserialize)]
@@ -70,7 +92,7 @@ fn normalize_url(url: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{resource::GitBackend, *};
 
     use serde_json;
     use serde_test::{assert_de_tokens, Token};
@@ -80,7 +102,7 @@ mod tests {
     // But it works in real implementation (serde_json::from_str)
     // So we have to use this workaround
     impl Channel {
-        pub fn as_token(self) -> Token {
+        pub fn to_token(self) -> Token {
             Token::UnitVariant {
                 name: "Channel",
                 variant: match self {
@@ -98,30 +120,41 @@ mod tests {
             serde_json::from_str(r#"["stable", "beta", "alpha"]"#).unwrap();
         assert_eq!(channels, [Channel::Stable, Channel::Beta, Channel::Alpha],);
 
-        assert_de_tokens(&Channel::Stable, &[Channel::Stable.as_token()]);
-        assert_de_tokens(&Channel::Beta, &[Channel::Beta.as_token()]);
-        assert_de_tokens(&Channel::Alpha, &[Channel::Alpha.as_token()]);
+        assert_de_tokens(&Channel::Stable, &[Channel::Stable.to_token()]);
+        assert_de_tokens(&Channel::Beta, &[Channel::Beta.to_token()]);
+        assert_de_tokens(&Channel::Alpha, &[Channel::Alpha.to_token()]);
     }
 
     #[test]
     fn deserialize_installer_config() {
         assert_de_tokens(
-            &InstallerConfig::default(),
+            &CLIConfig::default(),
             &[Token::Map { len: Some(0) }, Token::MapEnd],
         );
 
         #[cfg(feature = "core_installer")]
         assert_de_tokens(
-            &InstallerConfig {
-                core: maa_core::Config::default().with_channel(Channel::Alpha),
+            &CLIConfig {
+                core: maa_core::tests::example_config(),
                 ..Default::default()
             },
             &[
-                Token::Map { len: Some(3) },
-                Token::Str("core"),
                 Token::Map { len: Some(1) },
+                Token::Str("core"),
+                Token::Map { len: Some(4) },
                 Token::Str("channel"),
-                Channel::Alpha.as_token(),
+                Channel::Beta.to_token(),
+                Token::Str("test_time"),
+                Token::I64(0),
+                Token::Str("api_url"),
+                Token::Str("https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version/"),
+                Token::Str("components"),
+                Token::Map { len: Some(2) },
+                Token::Str("library"),
+                Token::Bool(true),
+                Token::Str("resource"),
+                Token::Bool(true),
+                Token::MapEnd,
                 Token::MapEnd,
                 Token::MapEnd,
             ],
@@ -129,44 +162,71 @@ mod tests {
 
         #[cfg(feature = "cli_installer")]
         assert_de_tokens(
-            &InstallerConfig {
-                cli: maa_cli::Config::default().with_channel(Channel::Alpha),
+            &CLIConfig {
+                cli: maa_cli::tests::example_config(),
                 ..Default::default()
             },
             &[
-                Token::Map { len: Some(2) },
-                Token::Str("cli"),
                 Token::Map { len: Some(1) },
+                Token::Str("cli"),
+                Token::Map { len: Some(4) },
                 Token::Str("channel"),
-                Channel::Alpha.as_token(),
+                Channel::Alpha.to_token(),
+                Token::Str("api_url"),
+                Token::Str("https://cdn.jsdelivr.net/gh/MaaAssistantArknights/maa-cli@vversion/"),
+                Token::Str("download_url"),
+                Token::Str("https://github.com/MaaAssistantArknights/maa-cli/releases/download/"),
+                Token::Str("components"),
+                Token::Map { len: Some(1) },
+                Token::Str("binary"),
+                Token::Bool(false),
+                Token::MapEnd,
                 Token::MapEnd,
                 Token::MapEnd,
             ],
         );
+
+        assert_de_tokens(
+            &CLIConfig {
+                resource: resource::tests::example_config(),
+                ..Default::default()
+            },
+            &[
+                Token::Map { len: Some(1) },
+                Token::Str("resource"),
+                Token::Map { len: Some(3) },
+                Token::Str("auto_update"),
+                Token::Bool(true),
+                Token::Str("backend"),
+                GitBackend::Libgit2.to_token(),
+                Token::Str("remote"),
+                Token::Map { len: Some(3) },
+                Token::Str("branch"),
+                Token::Some,
+                Token::Str("main"),
+                Token::Str("ssh_key"),
+                Token::None,
+                Token::Str("url"),
+                Token::Str("https://github.com/MaaAssistantArknights/MaaResource.git"),
+                Token::MapEnd,
+                Token::MapEnd,
+                Token::MapEnd,
+            ],
+        )
     }
 
     #[test]
     fn deserialize_example() {
-        let config: InstallerConfig =
-            toml::from_str(&std::fs::read_to_string("../config_examples/cli.toml").unwrap())
+        let config: CLIConfig =
+            toml::from_str(&std::fs::read_to_string("./config_examples/cli.toml").unwrap())
                 .unwrap();
 
-        let expect = InstallerConfig {
+        let expect = CLIConfig {
             #[cfg(feature = "core_installer")]
-            core: maa_core::Config::default()
-                .with_channel(Channel::Beta)
-                .with_test_time(0)
-                .with_api_url(
-                    "https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version/"
-                ),
+            core: maa_core::tests::example_config(),
             #[cfg(feature = "cli_installer")]
-            cli: maa_cli::Config::default()
-                .with_channel(Channel::Alpha)
-                .with_api_url("https://cdn.jsdelivr.net/gh/MaaAssistantArknights/maa-cli@vversion/")
-                .with_download_url(
-                    "https://github.com/MaaAssistantArknights/maa-cli/releases/download/",
-                )
-                .with_components(maa_cli::CLIComponents { binary: false }),
+            cli: maa_cli::tests::example_config(),
+            resource: resource::tests::example_config(),
         };
 
         assert_eq!(config, expect);
@@ -176,12 +236,12 @@ mod tests {
     #[test]
     fn get_core_config() {
         assert_eq!(
-            InstallerConfig::default().core_config(),
+            CLIConfig::default().core_config(),
             maa_core::Config::default()
         );
 
         assert_eq!(
-            &InstallerConfig {
+            &CLIConfig {
                 core: {
                     let mut config = maa_core::Config::default();
                     config.set_channel(Channel::Beta);
@@ -198,7 +258,7 @@ mod tests {
     #[test]
     fn get_cli_config() {
         assert_eq!(
-            InstallerConfig {
+            CLIConfig {
                 cli: Default::default(),
                 ..Default::default()
             }
@@ -207,12 +267,24 @@ mod tests {
         );
 
         assert_eq!(
-            InstallerConfig {
-                cli: maa_cli::Config::default().with_channel(Channel::Alpha),
+            CLIConfig {
+                cli: maa_cli::tests::example_config(),
                 ..Default::default()
             }
             .cli_config(),
-            maa_cli::Config::default().with_channel(Channel::Alpha),
+            maa_cli::tests::example_config(),
+        );
+    }
+
+    #[test]
+    fn get_resource_config() {
+        assert_eq!(
+            CLIConfig {
+                resource: Default::default(),
+                ..Default::default()
+            }
+            .resource_config(),
+            resource::Config::default(),
         );
     }
 

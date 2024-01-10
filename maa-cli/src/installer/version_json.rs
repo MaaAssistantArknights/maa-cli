@@ -1,5 +1,3 @@
-use crate::normal;
-
 use semver::Version;
 use serde::Deserialize;
 
@@ -43,13 +41,13 @@ impl<D> VersionJSON<D> {
     pub fn can_update(&self, name: &str, current_version: &Version) -> Result<bool, semver::Error> {
         let version = self.version();
         if version > current_version {
-            normal!(format!(
+            println!(
                 "Found newer {} version: v{} (current: v{})",
                 name, version, current_version
-            ));
+            );
             Ok(true)
         } else {
-            normal!(format!("Up to date: {} v{}.", name, current_version));
+            println!("Up to date: {} v{}.", name, current_version);
             Ok(false)
         }
     }
