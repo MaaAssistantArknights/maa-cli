@@ -1,11 +1,13 @@
 pub mod summary;
 use summary::{edit_current_task_detail, end_current_task, start_task};
 
-use std::fmt::Write;
+use std::{fmt::Write, sync::atomic::AtomicBool};
 
 use log::{debug, error, info, trace, warn};
 use maa_sys::binding::{AsstMsgId, AsstTaskId};
 use serde_json::{Map, Value};
+
+pub const MAA_CORE_ERRORED: AtomicBool = AtomicBool::new(false);
 
 pub unsafe extern "C" fn default_callback(
     code: maa_sys::binding::AsstMsgId,
@@ -184,6 +186,7 @@ fn process_taskchain(code: AsstMsg, message: &Map<String, Value>) -> Option<()> 
         TaskChainError => {
             error!("{} {}", taskchain, "Error");
             end_current_task(summary::Reason::Error);
+            MAA_CORE_ERRORED.store(true, std::sync::atomic::Ordering::Relaxed);
         }
         TaskChainExtraInfo => {}
 

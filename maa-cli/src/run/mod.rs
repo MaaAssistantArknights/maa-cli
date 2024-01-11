@@ -211,6 +211,11 @@ where
 {
     let ret = run_core(f, args);
     summary::display();
+
+    if callback::MAA_CORE_ERRORED.load(atomic::Ordering::Relaxed) {
+        bail!("Some error occurred during running task!");
+    }
+
     ret
 }
 
