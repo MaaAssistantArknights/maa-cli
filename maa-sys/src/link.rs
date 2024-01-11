@@ -48,10 +48,14 @@ macro_rules! link {
             static SHARED_LIBRARY: RefCell<Option<Arc<SharedLibrary>>> = RefCell::new(None);
         }
 
-        pub fn load(path: impl AsRef<std::ffi::OsStr>) {
-                SHARED_LIBRARY.with(|lib| {
-                    *lib.borrow_mut() = Some(Arc::new(SharedLibrary::new(path).unwrap()));
+        pub fn load(path: impl AsRef<std::ffi::OsStr>) -> Result<(), libloading::Error> {
+                let lib = SharedLibrary::new(path)?;
+
+                SHARED_LIBRARY.with(|share_lib| {
+                    *share_lib.borrow_mut() = Some(Arc::new(lib));
                 });
+
+                Ok(())
         }
 
         pub fn unload() {
