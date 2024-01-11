@@ -7,7 +7,7 @@ use log::{debug, error, info, trace, warn};
 use maa_sys::binding::{AsstMsgId, AsstTaskId};
 use serde_json::{Map, Value};
 
-pub const MAA_CORE_ERRORED: AtomicBool = AtomicBool::new(false);
+pub static MAA_CORE_ERRORED: AtomicBool = AtomicBool::new(false);
 
 pub unsafe extern "C" fn default_callback(
     code: maa_sys::binding::AsstMsgId,
