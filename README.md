@@ -199,7 +199,7 @@ ln -s "$HOME/.config/maa" "$(maa dir config)"
 
 #### 基本结构
 
-一个任务文件包含多个子任务，每一个子任务是一个 [MAA 任务](https://maa.plus/docs/3.1-集成文档.html#asstappendtask)，其包含一下几个选项：
+一个任务文件包含多个子任务，每一个子任务是一个 [MAA 任务](https://maa.plus/docs/协议文档/集成文档.html#asstappendtask)，其包含一下几个选项：
 
 ```toml
 [[tasks]]
@@ -429,7 +429,7 @@ user_resource = true # 是否加载用户自定义的资源
 
 #### 静态选项
 
-`[static_options]` 相关字段用于指定 MaaCore 静态选项，详见 [MAA 文档](https://maa.plus/docs/3.1-集成文档.html#asstsetstaticoption)：
+`[static_options]` 相关字段用于指定 MaaCore 静态选项，详见 [MAA 文档](https://maa.plus/docs/协议文档/集成文档.html#asstsetstaticoption)：
 
 ```toml
 [static_options]
@@ -439,7 +439,7 @@ gpu_ocr = 1 # 使用 GPU OCR 时使用的 GPU ID，如果这个值被留空，�
 
 #### 实例选项
 
-`[instance_options]` 相关字段用于指定 MaaCore 实例的选项，详见 [MAA 文档](https://maa.plus/docs/3.1-集成文档.html#asstsetinstanceoption)：
+`[instance_options]` 相关字段用于指定 MaaCore 实例的选项，详见 [MAA 文档](https://maa.plus/docs/协议文档/集成文档.html#asstsetinstanceoption)：
 
 ```toml
 [instance_options]
