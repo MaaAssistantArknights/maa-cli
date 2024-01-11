@@ -210,8 +210,16 @@ where
     F: FnOnce(&AsstConfig) -> Result<TaskConfig>,
 {
     let ret = run_core(f, args);
+
     summary::display();
-    ret
+
+    ret?;
+
+    if callback::MAA_CORE_ERRORED.load(atomic::Ordering::Relaxed) {
+        bail!("Some error occurred during running task!");
+    }
+
+    Ok(())
 }
 
 pub fn run_custom(path: impl AsRef<std::path::Path>, args: CommonArgs) -> Result<()> {
