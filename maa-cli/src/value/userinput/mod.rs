@@ -125,7 +125,7 @@ mod input;
 pub use input::Input;
 
 mod select;
-pub use select::{Select, SelectD, Selectable, ValueWithDesc};
+pub use select::{SelectD, Selectable, ValueWithDesc};
 
 #[cfg(test)]
 mod tests {

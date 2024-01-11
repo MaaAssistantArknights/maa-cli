@@ -116,7 +116,7 @@ where
         }
     }
 
-    load_core();
+    load_core()?;
     with_asst_config(setup_core)?;
 
     let stop_bool = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -231,10 +231,10 @@ pub fn run_custom(path: impl AsRef<std::path::Path>, args: CommonArgs) -> Result
     )
 }
 
-pub fn core_version<'a>() -> Result<&'a str, maa_sys::Error> {
-    load_core();
+pub fn core_version<'a>() -> Result<&'a str> {
+    load_core()?;
 
-    Assistant::get_version()
+    Ok(Assistant::get_version()?)
 
     // BUG:
     // if we call maa_sys::binding::unload() here,
@@ -242,10 +242,10 @@ pub fn core_version<'a>() -> Result<&'a str, maa_sys::Error> {
     // So we don't unload MaaCore
 }
 
-fn load_core() {
+fn load_core() -> Result<()> {
     if maa_sys::binding::loaded() {
         debug!("MaaCore already loaded");
-        return;
+        return Ok(());
     }
 
     if let Some(lib_dir) = dirs::find_library() {
@@ -253,17 +253,18 @@ fn load_core() {
         // Set DLL directory on Windows
         #[cfg(target_os = "windows")]
         {
-            use std::os::windows::ffi::OsStrExt;
-            use windows_sys::Win32::System::LibraryLoader::SetDllDirectoryW;
+            use windows::core::HSTRING;
+            use windows::Win32::System::LibraryLoader::SetDllDirectoryW;
 
-            let lib_dir_w: Vec<u16> = lib_dir.as_os_str().encode_wide().chain(Some(0)).collect();
-            unsafe { SetDllDirectoryW(lib_dir_w.as_ptr()) };
+            unsafe { SetDllDirectoryW(&HSTRING::from(lib_dir.as_path()))? };
         }
         maa_sys::binding::load(lib_dir.join(MAA_CORE_LIB));
     } else {
         debug!("MaaCore not found, trying to load from system library path");
         maa_sys::binding::load(MAA_CORE_LIB);
     }
+
+    Ok(())
 }
 
 fn setup_core(config: &AsstConfig) -> Result<()> {
