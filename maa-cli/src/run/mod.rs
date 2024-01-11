@@ -116,7 +116,7 @@ where
         }
     }
 
-    load_core()?;
+    load_core().context("Failed to load MaaCore!")?;
     with_asst_config(setup_core)?;
 
     let stop_bool = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -240,7 +240,7 @@ pub fn run_custom(path: impl AsRef<std::path::Path>, args: CommonArgs) -> Result
 }
 
 pub fn core_version<'a>() -> Result<&'a str> {
-    load_core()?;
+    load_core().context("Failed to load MaaCore!")?;
 
     Ok(Assistant::get_version()?)
 
@@ -266,10 +266,10 @@ fn load_core() -> Result<()> {
 
             unsafe { SetDllDirectoryW(&HSTRING::from(lib_dir.as_path()))? };
         }
-        maa_sys::binding::load(lib_dir.join(MAA_CORE_LIB));
+        maa_sys::binding::load(lib_dir.join(MAA_CORE_LIB))?;
     } else {
         debug!("MaaCore not found, trying to load from system library path");
-        maa_sys::binding::load(MAA_CORE_LIB);
+        maa_sys::binding::load(MAA_CORE_LIB)?;
     }
 
     Ok(())
