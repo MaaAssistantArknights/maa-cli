@@ -253,11 +253,10 @@ fn load_core() {
         // Set DLL directory on Windows
         #[cfg(target_os = "windows")]
         {
-            use std::os::windows::ffi::OsStrExt;
+            use windows::core::HSTRING;
             use windows::Win32::System::LibraryLoader::SetDllDirectoryW;
 
-            let lib_dir_w: Vec<u16> = lib_dir.as_os_str().encode_wide().chain(Some(0)).collect();
-            unsafe { SetDllDirectoryW(lib_dir_w.as_ptr()) };
+            unsafe { SetDllDirectoryW(&HSTRING::from(lib_dir.as_path())) };
         }
         maa_sys::binding::load(lib_dir.join(MAA_CORE_LIB));
     } else {
