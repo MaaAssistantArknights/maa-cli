@@ -116,7 +116,7 @@ where
         }
     }
 
-    load_core();
+    load_core()?;
     with_asst_config(setup_core)?;
 
     let stop_bool = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -231,10 +231,10 @@ pub fn run_custom(path: impl AsRef<std::path::Path>, args: CommonArgs) -> Result
     )
 }
 
-pub fn core_version<'a>() -> Result<&'a str, maa_sys::Error> {
-    load_core();
+pub fn core_version<'a>() -> Result<&'a str> {
+    load_core()?;
 
-    Assistant::get_version()
+    Ok(Assistant::get_version()?)
 
     // BUG:
     // if we call maa_sys::binding::unload() here,
@@ -242,10 +242,10 @@ pub fn core_version<'a>() -> Result<&'a str, maa_sys::Error> {
     // So we don't unload MaaCore
 }
 
-fn load_core() {
+fn load_core() -> Result<()> {
     if maa_sys::binding::loaded() {
         debug!("MaaCore already loaded");
-        return;
+        return Ok(());
     }
 
     if let Some(lib_dir) = dirs::find_library() {
@@ -263,6 +263,8 @@ fn load_core() {
         debug!("MaaCore not found, trying to load from system library path");
         maa_sys::binding::load(MAA_CORE_LIB);
     }
+
+    Ok(())
 }
 
 fn setup_core(config: &AsstConfig) -> Result<()> {
