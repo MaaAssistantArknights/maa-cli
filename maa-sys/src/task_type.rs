@@ -112,6 +112,8 @@ impl crate::ToCString for TaskType {
 mod tests {
     use super::*;
 
+    use TaskType::*;
+
     use serde_test::{assert_de_tokens, Token};
 
     #[test]
