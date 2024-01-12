@@ -6,7 +6,10 @@ mod installer;
 mod run;
 mod value;
 
-use crate::{config::cli, dirs::Ensure, installer::resource, value::userinput::enable_batch_mode};
+use crate::{
+    config::cli, dirs::Ensure, installer::resource, run::preset,
+    value::userinput::enable_batch_mode,
+};
 
 #[cfg(feature = "cli_installer")]
 use crate::installer::maa_cli;
@@ -140,17 +143,31 @@ enum SubCommand {
         #[command(flatten)]
         common: run::CommonArgs,
     },
+    /// Startup Game and Enter Main Screen
+    #[command(name = "startup")]
+    StartUp {
+        /// Client type of the game client
+        ///
+        /// The client type of the game client, used to launch the game client.
+        /// If not specified, the client will not be launched.
+        client: Option<config::task::ClientType>,
+        /// Account name to switch to
+        #[arg(long)]
+        account: Option<String>,
+        #[command(flatten)]
+        common: run::CommonArgs,
+    },
+    /// Close game client
+    #[command(name = "closedown")]
+    CloseDown {
+        #[command(flatten)]
+        common: run::CommonArgs,
+    },
     /// Run fight task
     Fight {
         /// Stage to fight
         #[arg(default_value = "")]
         stage: String,
-        /// Run startup task before the fight
-        #[arg(long)]
-        startup: bool,
-        /// Close the game after the fight
-        #[arg(long)]
-        closedown: bool,
         #[command(flatten)]
         common: run::CommonArgs,
     },
@@ -165,9 +182,7 @@ enum SubCommand {
     /// Run rouge-like task
     Roguelike {
         /// Theme of the game
-        ///
-        /// The theme of the game, can be one of "Phantom", "Mizuki" and "Sami".
-        args: run::RoguelikeTheme,
+        args: preset::RoguelikeTheme,
         #[command(flatten)]
         common: run::CommonArgs,
     },
@@ -349,17 +364,18 @@ fn main() -> Result<()> {
             }
         },
         SubCommand::Run { task, common } => run::run_custom(task, common)?,
-        SubCommand::Fight {
-            stage,
-            startup,
-            closedown,
+        SubCommand::StartUp {
+            client,
+            account,
             common,
-        } => run::run(|_| run::fight(stage, startup, closedown), common)?,
+        } => run::run(|_| preset::startup(client, account), common)?,
+        SubCommand::CloseDown { common } => run::run(|_| preset::closedown(), common)?,
+        SubCommand::Fight { stage, common } => run::run(|_| preset::fight(stage), common)?,
         SubCommand::Copilot { uri, common } => run::run(
-            |config| run::copilot(uri, config.resource.base_dirs()),
+            |config| preset::copilot(uri, config.resource.base_dirs()),
             common,
         )?,
-        SubCommand::Roguelike { args, common } => run::run(|_| run::roguelike(args), common)?,
+        SubCommand::Roguelike { args, common } => run::run(|_| preset::roguelike(args), common)?,
         SubCommand::Convert {
             input,
             output,
@@ -711,18 +727,6 @@ mod test {
                     stage,
                     ..
                 } if stage == "1-7"
-            );
-
-            assert_matches!(
-                CLI::parse_from(["maa", "fight", "1-7", "--startup"]).command,
-                SubCommand::Fight { startup: true, .. }
-            );
-            assert_matches!(
-                CLI::parse_from(["maa", "fight", "1-7", "--closedown"]).command,
-                SubCommand::Fight {
-                    closedown: true,
-                    ..
-                }
             );
         }
 

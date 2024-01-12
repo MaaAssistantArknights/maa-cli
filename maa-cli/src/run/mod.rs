@@ -7,14 +7,7 @@ use callback::summary;
 #[cfg(target_os = "macos")]
 mod playcover;
 
-mod fight;
-pub use fight::fight;
-
-mod copilot;
-pub use copilot::copilot;
-
-mod roguelike;
-pub use roguelike::{roguelike, Theme as RoguelikeTheme};
+pub mod preset;
 
 use crate::{
     config::{
@@ -108,7 +101,7 @@ where
     let task = with_asst_config(f)?;
     let task_config = task.init()?;
     if let Some(client_type) = task_config.client_type {
-        debug!("Detected client type: {}", client_type.as_ref());
+        debug!("Detected client type: {}", client_type);
         if let Some(resource) = client_type.resource() {
             with_mut_asst_config(|config| {
                 config.resource.use_global_resource(resource);
