@@ -204,6 +204,11 @@ mod tests {
     }
 
     #[test]
+    fn to_string() {
+        assert_eq!(StartUp.to_string(), "StartUp");
+    }
+
+    #[test]
     fn to_cstring() {
         use crate::ToCString;
         use std::ffi::CString;
