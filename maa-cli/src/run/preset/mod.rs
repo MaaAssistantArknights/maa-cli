@@ -90,6 +90,19 @@ mod tests {
             .unwrap()
             .as_bool()
             .unwrap());
+
+        let task_config = startup(None, Some("test".to_owned())).unwrap();
+        let tasks = task_config.tasks();
+        let startup_task = tasks.first().unwrap();
+        assert_eq!(
+            startup_task
+                .params()
+                .get("account_name")
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "test"
+        );
     }
 
     #[test]
