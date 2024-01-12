@@ -169,7 +169,7 @@ enum SubCommand {
         #[arg(default_value = "")]
         stage: String,
         /// medicine to use
-        #[arg(long)]
+        #[arg(short, long)]
         medicine: Option<i64>,
         #[command(flatten)]
         common: run::CommonArgs,
@@ -185,7 +185,8 @@ enum SubCommand {
     /// Run rouge-like task
     Roguelike {
         /// Theme of the game
-        args: preset::RoguelikeTheme,
+        #[arg(ignore_case = true)]
+        theme: preset::RoguelikeTheme,
         #[command(flatten)]
         common: run::CommonArgs,
     },
@@ -382,7 +383,7 @@ fn main() -> Result<()> {
             |config| preset::copilot(uri, config.resource.base_dirs()),
             common,
         )?,
-        SubCommand::Roguelike { args, common } => run::run(|_| preset::roguelike(args), common)?,
+        SubCommand::Roguelike { theme, common } => run::run(|_| preset::roguelike(theme), common)?,
         SubCommand::Convert {
             input,
             output,
@@ -727,6 +728,45 @@ mod test {
         }
 
         #[test]
+        fn startup() {
+            assert_matches!(
+                CLI::parse_from(["maa", "startup"]).command,
+                SubCommand::StartUp {
+                    client: None,
+                    account: None,
+                    common: run::CommonArgs { .. },
+                }
+            );
+
+            assert_matches!(
+                CLI::parse_from(["maa", "startup", "YoStarEN"]).command,
+                SubCommand::StartUp {
+                    client: Some(client),
+                    ..
+                } if client == config::task::ClientType::YoStarEN
+            );
+
+            assert_matches!(
+                CLI::parse_from(["maa", "startup", "YoStarEN", "--account", "account"]).command,
+                SubCommand::StartUp {
+                    client: Some(client),
+                    account: Some(account),
+                    ..
+                } if client == config::task::ClientType::YoStarEN && account == "account"
+            );
+        }
+
+        #[test]
+        fn closedown() {
+            assert_matches!(
+                CLI::parse_from(["maa", "closedown"]).command,
+                SubCommand::CloseDown {
+                    common: run::CommonArgs { .. },
+                }
+            );
+        }
+
+        #[test]
         fn fight() {
             assert_matches!(
                 CLI::parse_from(["maa", "fight", "1-7"]).command,
@@ -734,6 +774,24 @@ mod test {
                     stage,
                     ..
                 } if stage == "1-7"
+            );
+
+            assert_matches!(
+                CLI::parse_from(["maa", "fight", "1-7", "-m", "1"]).command,
+                SubCommand::Fight {
+                    stage,
+                    medicine: Some(medicine),
+                    ..
+                } if stage == "1-7" && medicine == 1
+            );
+
+            assert_matches!(
+                CLI::parse_from(["maa", "fight", "1-7", "--medicine", "1"]).command,
+                SubCommand::Fight {
+                    stage,
+                    medicine: Some(medicine),
+                    ..
+                } if stage == "1-7" && medicine == 1
             );
         }
 
@@ -756,19 +814,16 @@ mod test {
             );
         }
 
-        // #[test]
-        // fn rougelike() {
-        //     assert_matches!(
-        //         CLI::parse_from(["maa", "roguelike", "phantom"]).command,
-        //         SubCommand::Roguelike {
-        //             args: run::RoguelikeArgs {
-        //                 theme: theme,
-        //                 ..
-        //             },
-        //             ..
-        //         } if matches!(theme, run::RoguelikeTheme::Phantom)
-        //     );
-        // }
+        #[test]
+        fn rougelike() {
+            assert_matches!(
+                CLI::parse_from(["maa", "roguelike", "phantom"]).command,
+                SubCommand::Roguelike {
+                    theme,
+                    ..
+                } if matches!(theme, preset::RoguelikeTheme::Phantom)
+            );
+        }
 
         #[test]
         fn convert() {
