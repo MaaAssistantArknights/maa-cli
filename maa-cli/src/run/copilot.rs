@@ -1,5 +1,5 @@
 use crate::{
-    config::task::{task_type::MAATask, Task, TaskConfig},
+    config::task::{Task, TaskConfig},
     dirs::{self, Ensure},
     object,
     value::{
@@ -16,6 +16,7 @@ use std::{
 
 use anyhow::{bail, Context, Result};
 use log::{debug, trace, warn};
+use maa_sys::TaskType;
 use prettytable::{format, row, Table};
 use serde_json::Value as JsonValue;
 
@@ -168,14 +169,14 @@ impl CopilotType {
     pub fn to_task(self, filename: impl AsRef<str>) -> Task {
         match self {
             CopilotType::Copilot => Task::new_with_default(
-                MAATask::Copilot,
+                TaskType::Copilot,
                 object!(
                     "filename" => filename.as_ref(),
                     "formation" => BoolInput::new(Some(true), Some("auto formation"))
                 ),
             ),
             CopilotType::SSSCopilot => Task::new_with_default(
-                MAATask::SSSCopilot,
+                TaskType::SSSCopilot,
                 object!(
                     "filename" => filename.as_ref(),
                     "loop_times" => Input::new(Some(1), Some("loop times"))
@@ -342,7 +343,7 @@ mod tests {
             assert_eq!(
                 CopilotType::Copilot.to_task("filename"),
                 Task::new_with_default(
-                    MAATask::Copilot,
+                    TaskType::Copilot,
                     object!(
                         "filename" => "filename",
                         "formation" => BoolInput::new(Some(true), Some("auto formation"))
@@ -353,7 +354,7 @@ mod tests {
             assert_eq!(
                 CopilotType::SSSCopilot.to_task("filename"),
                 Task::new_with_default(
-                    MAATask::SSSCopilot,
+                    TaskType::SSSCopilot,
                     object!(
                         "filename" => "filename",
                         "loop_times" => Input::<i64>::new(Some(1), Some("loop times"))
