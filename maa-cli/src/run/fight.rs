@@ -1,5 +1,5 @@
 use crate::{
-    config::task::{ClientType, Task, TaskConfig, TaskType},
+    config::task::{ClientType, Task, TaskConfig},
     object,
     value::{
         userinput::{BoolInput, Input, SelectD, ValueWithDesc},
@@ -8,6 +8,7 @@ use crate::{
 };
 
 use anyhow::Result;
+use maa_sys::TaskType::*;
 
 impl From<ClientType> for ValueWithDesc<String> {
     fn from(client: ClientType) -> Self {
@@ -22,7 +23,7 @@ pub fn fight(stage: String, startup: bool, closedown: bool) -> Result<TaskConfig
     if startup {
         use ClientType::*;
         task_config.push(Task::new_with_default(
-            TaskType::StartUp,
+            StartUp,
             object!(
                 "start_game_enabled" => BoolInput::new(Some(true), Some("start game")),
                 "client_type" => OptionalInput {
@@ -39,7 +40,7 @@ pub fn fight(stage: String, startup: bool, closedown: bool) -> Result<TaskConfig
     }
 
     task_config.push(Task::new_with_default(
-        TaskType::Fight,
+        Fight,
         object!(
             "stage" => stage,
             "medicine" => Input::new(Some(0), Some("the number of medicine to use")),
@@ -47,10 +48,7 @@ pub fn fight(stage: String, startup: bool, closedown: bool) -> Result<TaskConfig
     ));
 
     if closedown {
-        task_config.push(Task::new_with_default(
-            TaskType::CloseDown,
-            MAAValue::default(),
-        ));
+        task_config.push(Task::new_with_default(CloseDown, MAAValue::default()));
     }
 
     Ok(task_config)
@@ -77,20 +75,20 @@ mod tests {
                 close_app: true,
                 tasks: vec![
                     InitializedTask::new_noname(
-                        TaskType::StartUp,
+                        StartUp,
                         object!(
                             "start_game_enabled" => true,
                             "client_type" => Official.as_ref(),
                         ),
                     ),
                     InitializedTask::new_noname(
-                        TaskType::Fight,
+                        Fight,
                         object!(
                             "stage" => "1-7",
                             "medicine" => 0,
                         ),
                     ),
-                    InitializedTask::new_noname(TaskType::CloseDown, object!()),
+                    InitializedTask::new_noname(CloseDown, object!()),
                 ],
             }
         );
@@ -105,7 +103,7 @@ mod tests {
                 start_app: false,
                 close_app: false,
                 tasks: vec![InitializedTask::new_noname(
-                    TaskType::Fight,
+                    Fight,
                     object!(
                         "stage" => "CE-6",
                         "medicine" => 0,

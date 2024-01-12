@@ -1,13 +1,11 @@
 use super::IterJoin;
 
-use crate::config::task::TaskType;
-
 pub use std::collections::BTreeMap as Map;
 use std::sync::Mutex;
 
 use chrono;
 use lazy_static::lazy_static;
-use maa_sys::binding::AsstTaskId;
+use maa_sys::{binding::AsstTaskId, TaskType};
 
 lazy_static! {
     static ref SUMMARY: Mutex<Option<Summary>> = Mutex::new(None);

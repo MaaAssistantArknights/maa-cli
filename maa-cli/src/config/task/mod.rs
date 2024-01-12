@@ -1,6 +1,3 @@
-mod task_type;
-pub use task_type::TaskType;
-
 mod client_type;
 pub use client_type::ClientType;
 
@@ -12,6 +9,7 @@ use crate::{dirs, object, value::MAAValue};
 use std::path::PathBuf;
 
 use anyhow::Context;
+use maa_sys::TaskType;
 use serde::Deserialize;
 
 #[cfg_attr(test, derive(PartialEq, Debug))]
@@ -334,8 +332,6 @@ mod tests {
     use super::*;
 
     use crate::object;
-
-    use task_type::TaskType;
 
     impl TaskConfig {
         pub fn tasks(&self) -> &[Task] {

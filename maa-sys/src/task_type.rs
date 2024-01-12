@@ -102,8 +102,8 @@ impl std::fmt::Display for TaskType {
     }
 }
 
-impl maa_sys::ToCString for &TaskType {
-    fn to_cstring(self) -> maa_sys::Result<std::ffi::CString> {
+impl crate::ToCString for &TaskType {
+    fn to_cstring(self) -> crate::Result<std::ffi::CString> {
         self.to_str().to_cstring()
     }
 }
@@ -198,7 +198,7 @@ mod tests {
 
     #[test]
     fn to_cstring() {
-        use maa_sys::ToCString;
+        use crate::ToCString;
         use std::ffi::CString;
 
         assert_eq!(

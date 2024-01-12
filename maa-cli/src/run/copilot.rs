@@ -1,5 +1,5 @@
 use crate::{
-    config::task::{Task, TaskConfig, TaskType},
+    config::task::{Task, TaskConfig},
     dirs::{self, Ensure},
     object,
     value::{
@@ -16,6 +16,7 @@ use std::{
 
 use anyhow::{bail, Context, Result};
 use log::{debug, trace, warn};
+use maa_sys::TaskType;
 use prettytable::{format, row, Table};
 use serde_json::Value as JsonValue;
 

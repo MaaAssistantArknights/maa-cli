@@ -9,6 +9,9 @@ pub use asst_type::{InstanceOptionKey, StaticOptionKey, TouchMode};
 mod to_cstring;
 pub use to_cstring::ToCString;
 
+mod task_type;
+pub use task_type::TaskType;
+
 mod link;
 
 use std::ffi::CStr;
