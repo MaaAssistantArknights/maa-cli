@@ -1,5 +1,5 @@
 use crate::{
-    config::task::{task_type::MAATask, Task, TaskConfig},
+    config::task::{Task, TaskConfig, TaskType},
     object,
     value::{
         userinput::{BoolInput, Input, SelectD, ValueWithDesc},
@@ -79,7 +79,7 @@ pub fn roguelike(theme: Theme) -> Result<TaskConfig> {
         },
     );
 
-    task_config.push(Task::new_with_default(MAATask::Roguelike, params));
+    task_config.push(Task::new_with_default(TaskType::Roguelike, params));
 
     Ok(task_config)
 }
@@ -124,7 +124,7 @@ mod tests {
         let task_config = roguelike(Theme::Phantom).unwrap();
         let tasks = task_config.tasks();
         assert_eq!(tasks.len(), 1);
-        assert_eq!(tasks[0].task_type(), &MAATask::Roguelike);
+        assert_eq!(tasks[0].task_type(), &TaskType::Roguelike);
         assert_eq!(
             tasks[0].params().get("theme").unwrap(),
             &MAAValue::from("Phantom")

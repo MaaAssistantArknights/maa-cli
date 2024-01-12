@@ -1,7 +1,6 @@
-use serde::Deserialize;
-
-#[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MAATask {
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TaskType {
     StartUp,
     CloseDown,
     Fight,
@@ -19,63 +18,93 @@ pub enum MAATask {
     SingleStep,
     VideoRecognition,
 }
-use MAATask::*;
 
-impl MAATask {
+const TASK_TYPE_STRS: [&'static str; 16] = [
+    "StartUp",
+    "CloseDown",
+    "Fight",
+    "Recruit",
+    "Infrast",
+    "Mall",
+    "Award",
+    "Roguelike",
+    "Copilot",
+    "SSSCopilot",
+    "Depot",
+    "OperBox",
+    "ReclamationAlgorithm",
+    "Custom",
+    "SingleStep",
+    "VideoRecognition",
+];
+
+use TaskType::*;
+
+impl<'de> serde::Deserialize<'de> for TaskType {
+    fn deserialize<D>(deserializer: D) -> Result<TaskType, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct TaskTypeVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for TaskTypeVisitor {
+            type Value = TaskType;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a task type")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<TaskType, E>
+            where
+                E: serde::de::Error,
+            {
+                match value {
+                    "StartUp" | "startup" | "Startup" => Ok(StartUp),
+                    "CloseDown" | "closedown" | "Closedown" => Ok(CloseDown),
+                    "Fight" | "fight" => Ok(Fight),
+                    "Recruit" | "recruit" => Ok(Recruit),
+                    "Infrast" | "infrast" => Ok(Infrast),
+                    "Mall" | "mall" => Ok(Mall),
+                    "Award" | "award" => Ok(Award),
+                    "Roguelike" | "roguelike" => Ok(Roguelike),
+                    "Copilot" | "copilot" => Ok(Copilot),
+                    "SSSCopilot" | "ssscopilot" => Ok(SSSCopilot),
+                    "Depot" | "depot" => Ok(Depot),
+                    "OperBox" | "operbox" => Ok(OperBox),
+                    "ReclamationAlgorithm" | "reclamationalgorithm" => Ok(ReclamationAlgorithm),
+                    "Custom" | "custom" => Ok(Custom),
+                    "SingleStep" | "singlestep" => Ok(SingleStep),
+                    "VideoRecognition" | "videorecognition" => Ok(VideoRecognition),
+                    _ => Err(E::unknown_variant(value, &TASK_TYPE_STRS)),
+                }
+            }
+        }
+
+        deserializer.deserialize_str(TaskTypeVisitor)
+    }
+}
+
+impl TaskType {
     fn to_str(self) -> &'static str {
-        match self {
-            StartUp => "StartUp",
-            CloseDown => "CloseDown",
-            Fight => "Fight",
-            Recruit => "Recruit",
-            Infrast => "Infrast",
-            Mall => "Mall",
-            Award => "Award",
-            Roguelike => "Roguelike",
-            Copilot => "Copilot",
-            SSSCopilot => "SSSCopilot",
-            Depot => "Depot",
-            OperBox => "OperBox",
-            ReclamationAlgorithm => "ReclamationAlgorithm",
-            Custom => "Custom",
-            SingleStep => "SingleStep",
-            VideoRecognition => "VideoRecognition",
-        }
+        TASK_TYPE_STRS[self as usize]
     }
 }
 
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
-#[serde(untagged)]
-pub enum TaskOrUnknown {
-    Task(MAATask),
-    Unknown(String),
-}
-use TaskOrUnknown::*;
-
-impl From<MAATask> for TaskOrUnknown {
-    fn from(task: MAATask) -> Self {
-        Task(task)
-    }
-}
-
-impl AsRef<str> for TaskOrUnknown {
+impl AsRef<str> for TaskType {
     fn as_ref(&self) -> &str {
-        match self {
-            Task(task) => task.to_str(),
-            Unknown(s) => s.as_str(),
-        }
+        self.to_str()
     }
 }
 
-impl std::fmt::Display for TaskOrUnknown {
+impl std::fmt::Display for TaskType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_ref())
+        f.write_str(self.to_str())
     }
 }
 
-impl maa_sys::ToCString for &TaskOrUnknown {
+impl maa_sys::ToCString for &TaskType {
     fn to_cstring(self) -> maa_sys::Result<std::ffi::CString> {
-        self.as_ref().to_cstring()
+        self.to_str().to_cstring()
     }
 }
 
@@ -85,41 +114,31 @@ mod tests {
 
     use serde_test::{assert_de_tokens, Token};
 
-    impl PartialEq<MAATask> for TaskOrUnknown {
-        fn eq(&self, other: &MAATask) -> bool {
-            match self {
-                Task(task) => task == other,
-                Unknown(_) => false,
-            }
-        }
-    }
-
     #[test]
     fn deserialize() {
-        let types: [TaskOrUnknown; 17] = [
-            StartUp.into(),
-            CloseDown.into(),
-            Fight.into(),
-            Recruit.into(),
-            Infrast.into(),
-            Mall.into(),
-            Award.into(),
-            Roguelike.into(),
-            Copilot.into(),
-            SSSCopilot.into(),
-            Depot.into(),
-            OperBox.into(),
-            ReclamationAlgorithm.into(),
-            Custom.into(),
-            SingleStep.into(),
-            VideoRecognition.into(),
-            Unknown("Other".to_string()),
+        let types: [TaskType; 16] = [
+            StartUp,
+            CloseDown,
+            Fight,
+            Recruit,
+            Infrast,
+            Mall,
+            Award,
+            Roguelike,
+            Copilot,
+            SSSCopilot,
+            Depot,
+            OperBox,
+            ReclamationAlgorithm,
+            Custom,
+            SingleStep,
+            VideoRecognition,
         ];
 
         assert_de_tokens(
             &types,
             &[
-                Token::Seq { len: Some(17) },
+                Token::Seq { len: Some(16) },
                 Token::Str("StartUp"),
                 Token::Str("CloseDown"),
                 Token::Str("Fight"),
@@ -136,7 +155,19 @@ mod tests {
                 Token::Str("Custom"),
                 Token::Str("SingleStep"),
                 Token::Str("VideoRecognition"),
-                Token::Str("Other"),
+                Token::SeqEnd,
+            ],
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn deserialize_unknown_variance() {
+        assert_de_tokens(
+            &StartUp,
+            &[
+                Token::Seq { len: Some(1) },
+                Token::Str("Unknown"),
                 Token::SeqEnd,
             ],
         );
@@ -157,14 +188,12 @@ mod tests {
         assert_eq!(Depot.to_str(), "Depot");
         assert_eq!(OperBox.to_str(), "OperBox");
         assert_eq!(
-            MAATask::ReclamationAlgorithm.to_str(),
+            TaskType::ReclamationAlgorithm.to_str(),
             "ReclamationAlgorithm",
         );
         assert_eq!(Custom.to_str(), "Custom");
         assert_eq!(SingleStep.to_str(), "SingleStep");
         assert_eq!(VideoRecognition.to_str(), "VideoRecognition");
-        assert_eq!(Task(StartUp).as_ref(), "StartUp");
-        assert_eq!(Unknown("Other".into()).as_ref(), "Other");
     }
 
     #[test]
@@ -173,13 +202,8 @@ mod tests {
         use std::ffi::CString;
 
         assert_eq!(
-            Task(StartUp).to_cstring().unwrap(),
+            StartUp.to_cstring().unwrap(),
             CString::new("StartUp").unwrap(),
-        );
-
-        assert_eq!(
-            Unknown("Other".into()).to_cstring().unwrap(),
-            CString::new("Other").unwrap(),
         );
     }
 }

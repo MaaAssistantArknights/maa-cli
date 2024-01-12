@@ -1,6 +1,6 @@
 use super::IterJoin;
 
-use crate::config::task::task_type::{MAATask, TaskOrUnknown};
+use crate::config::task::TaskType;
 
 pub use std::collections::BTreeMap as Map;
 use std::sync::Mutex;
@@ -59,7 +59,7 @@ impl Summary {
         }
     }
 
-    pub fn insert(&mut self, id: AsstTaskId, name: Option<String>, task: impl Into<TaskOrUnknown>) {
+    pub fn insert(&mut self, id: AsstTaskId, name: Option<String>, task: impl Into<TaskType>) {
         self.task_summarys
             .insert(id, TaskSummary::new(name, task.into()));
     }
@@ -105,7 +105,7 @@ impl std::fmt::Display for Summary {
 
 pub struct TaskSummary {
     name: Option<String>,
-    task: TaskOrUnknown,
+    task: TaskType,
     detail: Detail,
     start_time: Option<chrono::DateTime<chrono::Local>>,
     end_time: Option<chrono::DateTime<chrono::Local>>,
@@ -113,15 +113,14 @@ pub struct TaskSummary {
 }
 
 impl TaskSummary {
-    pub fn new(name: Option<String>, task: TaskOrUnknown) -> Self {
-        use MAATask::*;
-        use TaskOrUnknown::Task;
+    pub fn new(name: Option<String>, task: TaskType) -> Self {
+        use TaskType::*;
 
         let detail = match task {
-            Task(Fight) => Detail::Fight(FightDetail::new()),
-            Task(Infrast) => Detail::Infrast(InfrastDetail::new()),
-            Task(Recruit) => Detail::Recruit(RecruitDetail::new()),
-            Task(Roguelike) => Detail::Roguelike(RoguelikeDetail::new()),
+            Fight => Detail::Fight(FightDetail::new()),
+            Infrast => Detail::Infrast(InfrastDetail::new()),
+            Recruit => Detail::Recruit(RecruitDetail::new()),
+            Roguelike => Detail::Roguelike(RoguelikeDetail::new()),
             _ => Detail::None,
         };
 
@@ -731,7 +730,7 @@ mod tests {
 
         #[test]
         fn task_summary() {
-            use MAATask::*;
+            use TaskType::*;
 
             let mut summary = Summary::new();
             summary.insert(1, Some("Fight TS".to_owned()), Fight);
