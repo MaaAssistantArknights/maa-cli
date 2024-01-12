@@ -930,6 +930,7 @@ dependencies = [
  "directories",
  "libloading",
  "serde",
+ "serde_test",
 ]
 
 [[package]]

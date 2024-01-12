@@ -168,6 +168,9 @@ enum SubCommand {
         /// Stage to fight
         #[arg(default_value = "")]
         stage: String,
+        /// medicine to use
+        #[arg(long)]
+        medicine: Option<i64>,
         #[command(flatten)]
         common: run::CommonArgs,
     },
@@ -370,7 +373,11 @@ fn main() -> Result<()> {
             common,
         } => run::run(|_| preset::startup(client, account), common)?,
         SubCommand::CloseDown { common } => run::run(|_| preset::closedown(), common)?,
-        SubCommand::Fight { stage, common } => run::run(|_| preset::fight(stage), common)?,
+        SubCommand::Fight {
+            stage,
+            medicine,
+            common,
+        } => run::run(|_| preset::fight(stage, medicine), common)?,
         SubCommand::Copilot { uri, common } => run::run(
             |config| preset::copilot(uri, config.resource.base_dirs()),
             common,

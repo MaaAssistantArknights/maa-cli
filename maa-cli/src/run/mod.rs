@@ -137,7 +137,7 @@ where
         let id = asst.append_task(task_type, serde_json::to_string(params)?)?;
 
         if let Some(s) = summarys.as_mut() {
-            s.insert(id, name.map(|s| s.to_owned()), task_type.clone());
+            s.insert(id, name.map(|s| s.to_owned()), task_type);
         }
     }
     if let Some(s) = summarys {
