@@ -38,8 +38,6 @@ const TASK_TYPE_STRS: [&str; 16] = [
     "VideoRecognition",
 ];
 
-use TaskType::*;
-
 #[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for TaskType {
     fn deserialize<D>(deserializer: D) -> Result<TaskType, D::Error>
@@ -59,6 +57,7 @@ impl<'de> serde::Deserialize<'de> for TaskType {
             where
                 E: serde::de::Error,
             {
+                use TaskType::*;
                 match value {
                     "StartUp" | "startup" | "Startup" => Ok(StartUp),
                     "CloseDown" | "closedown" | "Closedown" => Ok(CloseDown),
