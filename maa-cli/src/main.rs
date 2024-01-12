@@ -6,7 +6,10 @@ mod installer;
 mod run;
 mod value;
 
-use crate::{config::cli, dirs::Ensure, installer::resource, value::userinput::enable_batch_mode};
+use crate::{
+    config::cli, dirs::Ensure, installer::resource, run::preset,
+    value::userinput::enable_batch_mode,
+};
 
 #[cfg(feature = "cli_installer")]
 use crate::installer::maa_cli;
@@ -140,17 +143,34 @@ enum SubCommand {
         #[command(flatten)]
         common: run::CommonArgs,
     },
+    /// Startup Game and Enter Main Screen
+    #[command(name = "startup")]
+    StartUp {
+        /// Client type of the game client
+        ///
+        /// The client type of the game client, used to launch the game client.
+        /// If not specified, the client will not be launched.
+        client: Option<config::task::ClientType>,
+        /// Account name to switch to
+        #[arg(long)]
+        account: Option<String>,
+        #[command(flatten)]
+        common: run::CommonArgs,
+    },
+    /// Close game client
+    #[command(name = "closedown")]
+    CloseDown {
+        #[command(flatten)]
+        common: run::CommonArgs,
+    },
     /// Run fight task
     Fight {
         /// Stage to fight
         #[arg(default_value = "")]
         stage: String,
-        /// Run startup task before the fight
-        #[arg(long)]
-        startup: bool,
-        /// Close the game after the fight
-        #[arg(long)]
-        closedown: bool,
+        /// medicine to use
+        #[arg(short, long)]
+        medicine: Option<i64>,
         #[command(flatten)]
         common: run::CommonArgs,
     },
@@ -165,9 +185,8 @@ enum SubCommand {
     /// Run rouge-like task
     Roguelike {
         /// Theme of the game
-        ///
-        /// The theme of the game, can be one of "Phantom", "Mizuki" and "Sami".
-        args: run::RoguelikeTheme,
+        #[arg(ignore_case = true)]
+        theme: preset::RoguelikeTheme,
         #[command(flatten)]
         common: run::CommonArgs,
     },
@@ -349,17 +368,22 @@ fn main() -> Result<()> {
             }
         },
         SubCommand::Run { task, common } => run::run_custom(task, common)?,
+        SubCommand::StartUp {
+            client,
+            account,
+            common,
+        } => run::run(|_| preset::startup(client, account), common)?,
+        SubCommand::CloseDown { common } => run::run(|_| preset::closedown(), common)?,
         SubCommand::Fight {
             stage,
-            startup,
-            closedown,
+            medicine,
             common,
-        } => run::run(|_| run::fight(stage, startup, closedown), common)?,
+        } => run::run(|_| preset::fight(stage, medicine), common)?,
         SubCommand::Copilot { uri, common } => run::run(
-            |config| run::copilot(uri, config.resource.base_dirs()),
+            |config| preset::copilot(uri, config.resource.base_dirs()),
             common,
         )?,
-        SubCommand::Roguelike { args, common } => run::run(|_| run::roguelike(args), common)?,
+        SubCommand::Roguelike { theme, common } => run::run(|_| preset::roguelike(theme), common)?,
         SubCommand::Convert {
             input,
             output,
@@ -704,6 +728,45 @@ mod test {
         }
 
         #[test]
+        fn startup() {
+            assert_matches!(
+                CLI::parse_from(["maa", "startup"]).command,
+                SubCommand::StartUp {
+                    client: None,
+                    account: None,
+                    common: run::CommonArgs { .. },
+                }
+            );
+
+            assert_matches!(
+                CLI::parse_from(["maa", "startup", "YoStarEN"]).command,
+                SubCommand::StartUp {
+                    client: Some(client),
+                    ..
+                } if client == config::task::ClientType::YoStarEN
+            );
+
+            assert_matches!(
+                CLI::parse_from(["maa", "startup", "YoStarEN", "--account", "account"]).command,
+                SubCommand::StartUp {
+                    client: Some(client),
+                    account: Some(account),
+                    ..
+                } if client == config::task::ClientType::YoStarEN && account == "account"
+            );
+        }
+
+        #[test]
+        fn closedown() {
+            assert_matches!(
+                CLI::parse_from(["maa", "closedown"]).command,
+                SubCommand::CloseDown {
+                    common: run::CommonArgs { .. },
+                }
+            );
+        }
+
+        #[test]
         fn fight() {
             assert_matches!(
                 CLI::parse_from(["maa", "fight", "1-7"]).command,
@@ -714,15 +777,21 @@ mod test {
             );
 
             assert_matches!(
-                CLI::parse_from(["maa", "fight", "1-7", "--startup"]).command,
-                SubCommand::Fight { startup: true, .. }
-            );
-            assert_matches!(
-                CLI::parse_from(["maa", "fight", "1-7", "--closedown"]).command,
+                CLI::parse_from(["maa", "fight", "1-7", "-m", "1"]).command,
                 SubCommand::Fight {
-                    closedown: true,
+                    stage,
+                    medicine: Some(medicine),
                     ..
-                }
+                } if stage == "1-7" && medicine == 1
+            );
+
+            assert_matches!(
+                CLI::parse_from(["maa", "fight", "1-7", "--medicine", "1"]).command,
+                SubCommand::Fight {
+                    stage,
+                    medicine: Some(medicine),
+                    ..
+                } if stage == "1-7" && medicine == 1
             );
         }
 
@@ -745,19 +814,16 @@ mod test {
             );
         }
 
-        // #[test]
-        // fn rougelike() {
-        //     assert_matches!(
-        //         CLI::parse_from(["maa", "roguelike", "phantom"]).command,
-        //         SubCommand::Roguelike {
-        //             args: run::RoguelikeArgs {
-        //                 theme: theme,
-        //                 ..
-        //             },
-        //             ..
-        //         } if matches!(theme, run::RoguelikeTheme::Phantom)
-        //     );
-        // }
+        #[test]
+        fn rougelike() {
+            assert_matches!(
+                CLI::parse_from(["maa", "roguelike", "phantom"]).command,
+                SubCommand::Roguelike {
+                    theme,
+                    ..
+                } if matches!(theme, preset::RoguelikeTheme::Phantom)
+            );
+        }
 
         #[test]
         fn convert() {

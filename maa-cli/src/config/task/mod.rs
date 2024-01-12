@@ -529,9 +529,9 @@ mod tests {
                             deps: Map::from([("start_game_enabled".to_string(), true.into())]),
                             input: SelectD::<String>::new(
                                 vec![
-                                    Official,
-                                    YoStarEN,
-                                    YoStarJP,
+                                    Official.as_ref(),
+                                    YoStarEN.as_ref(),
+                                    YoStarJP.as_ref(),
                                 ],
                                 None,
                                 Some("a client type"),

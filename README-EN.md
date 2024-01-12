@@ -120,8 +120,11 @@ The main feature of `maa-cli` is to run tasks, including predefined tasks and cu
 
 #### Predefined tasks
 
+- `maa startup [client]`: start the game client and enter the main screen, the `client` is the client type of game, leave it empty to don't start the game;
+- `maa closedown`: close the game client;
 - `maa fight [stage]`: run a fight task, the `stage` is the stage to fight, like `1-7`, `CE-6`, etc; if not given, it will be queried from user;
 - `maa copilot <maa_uri>`: run a copilot task, the `maa_uri` is the URI of a copilot task; it can be `maa://1234` or local file path;
+- `maa roguelike [theme]`: run a roguelike task, the `theme` is the theme of roguelike, available themes are `Phantom`, `Mizuki` and `Sami`.
 
 #### Custom tasks
 
