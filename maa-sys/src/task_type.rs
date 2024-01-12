@@ -114,65 +114,70 @@ mod tests {
 
     use TaskType::*;
 
-    use serde_test::{assert_de_tokens, Token};
+    #[cfg(feature = "serde")]
+    mod serde {
+        use super::*;
 
-    #[test]
-    fn deserialize() {
-        let types: [TaskType; 16] = [
-            StartUp,
-            CloseDown,
-            Fight,
-            Recruit,
-            Infrast,
-            Mall,
-            Award,
-            Roguelike,
-            Copilot,
-            SSSCopilot,
-            Depot,
-            OperBox,
-            ReclamationAlgorithm,
-            Custom,
-            SingleStep,
-            VideoRecognition,
-        ];
+        use serde_test::{assert_de_tokens, Token};
 
-        assert_de_tokens(
-            &types,
-            &[
-                Token::Seq { len: Some(16) },
-                Token::Str("StartUp"),
-                Token::Str("CloseDown"),
-                Token::Str("Fight"),
-                Token::Str("Recruit"),
-                Token::Str("Infrast"),
-                Token::Str("Mall"),
-                Token::Str("Award"),
-                Token::Str("Roguelike"),
-                Token::Str("Copilot"),
-                Token::Str("SSSCopilot"),
-                Token::Str("Depot"),
-                Token::Str("OperBox"),
-                Token::Str("ReclamationAlgorithm"),
-                Token::Str("Custom"),
-                Token::Str("SingleStep"),
-                Token::Str("VideoRecognition"),
-                Token::SeqEnd,
-            ],
-        );
-    }
+        #[test]
+        fn deserialize() {
+            let types: [TaskType; 16] = [
+                StartUp,
+                CloseDown,
+                Fight,
+                Recruit,
+                Infrast,
+                Mall,
+                Award,
+                Roguelike,
+                Copilot,
+                SSSCopilot,
+                Depot,
+                OperBox,
+                ReclamationAlgorithm,
+                Custom,
+                SingleStep,
+                VideoRecognition,
+            ];
 
-    #[test]
-    #[should_panic]
-    fn deserialize_unknown_variance() {
-        assert_de_tokens(
-            &StartUp,
-            &[
-                Token::Seq { len: Some(1) },
-                Token::Str("Unknown"),
-                Token::SeqEnd,
-            ],
-        );
+            assert_de_tokens(
+                &types,
+                &[
+                    Token::Seq { len: Some(16) },
+                    Token::Str("StartUp"),
+                    Token::Str("CloseDown"),
+                    Token::Str("Fight"),
+                    Token::Str("Recruit"),
+                    Token::Str("Infrast"),
+                    Token::Str("Mall"),
+                    Token::Str("Award"),
+                    Token::Str("Roguelike"),
+                    Token::Str("Copilot"),
+                    Token::Str("SSSCopilot"),
+                    Token::Str("Depot"),
+                    Token::Str("OperBox"),
+                    Token::Str("ReclamationAlgorithm"),
+                    Token::Str("Custom"),
+                    Token::Str("SingleStep"),
+                    Token::Str("VideoRecognition"),
+                    Token::SeqEnd,
+                ],
+            );
+        }
+
+        #[test]
+        #[should_panic]
+        fn deserialize_unknown_variance() {
+            assert_de_tokens(
+                &StartUp,
+                &[
+                    Token::Seq { len: Some(1) },
+                    Token::Str("Unknown"),
+                    Token::SeqEnd,
+                ],
+            );
+        }
     }
 
     #[test]
