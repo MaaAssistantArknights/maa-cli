@@ -19,7 +19,7 @@ pub enum TaskType {
     VideoRecognition,
 }
 
-const TASK_TYPE_STRS: [&'static str; 16] = [
+const TASK_TYPE_STRS: [&str; 16] = [
     "StartUp",
     "CloseDown",
     "Fight",
@@ -40,6 +40,7 @@ const TASK_TYPE_STRS: [&'static str; 16] = [
 
 use TaskType::*;
 
+#[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for TaskType {
     fn deserialize<D>(deserializer: D) -> Result<TaskType, D::Error>
     where
@@ -102,7 +103,7 @@ impl std::fmt::Display for TaskType {
     }
 }
 
-impl crate::ToCString for &TaskType {
+impl crate::ToCString for TaskType {
     fn to_cstring(self) -> crate::Result<std::ffi::CString> {
         self.to_str().to_cstring()
     }

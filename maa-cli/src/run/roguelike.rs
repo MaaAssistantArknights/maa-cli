@@ -125,7 +125,7 @@ mod tests {
         let task_config = roguelike(Theme::Phantom).unwrap();
         let tasks = task_config.tasks();
         assert_eq!(tasks.len(), 1);
-        assert_eq!(tasks[0].task_type(), &Roguelike);
+        assert_eq!(tasks[0].task_type(), Roguelike);
         assert_eq!(
             tasks[0].params().get("theme").unwrap(),
             &MAAValue::from("Phantom")

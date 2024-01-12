@@ -119,8 +119,8 @@ impl Task {
         false
     }
 
-    pub fn task_type(&self) -> &TaskType {
-        &self.task_type
+    pub fn task_type(&self) -> TaskType {
+        self.task_type
     }
 
     pub fn params(&self) -> MAAValue {
@@ -250,11 +250,7 @@ impl TaskConfig {
                         }
                     }
                 }
-                tasks.push(InitializedTask::new(
-                    task.name.clone(),
-                    task_type.clone(),
-                    params,
-                ));
+                tasks.push(InitializedTask::new(task.name.clone(), task_type, params));
             }
         }
 
@@ -318,8 +314,8 @@ impl InitializedTask {
         self.name.as_deref()
     }
 
-    pub fn task_type(&self) -> &TaskType {
-        &self.task_type
+    pub fn task_type(&self) -> TaskType {
+        self.task_type
     }
 
     pub fn params(&self) -> &MAAValue {
@@ -385,7 +381,7 @@ mod tests {
         fn get_type() {
             assert_eq!(
                 Task::new_with_default(TaskType::StartUp, object!()).task_type(),
-                &TaskType::StartUp,
+                TaskType::StartUp,
             );
         }
 
@@ -790,7 +786,7 @@ mod tests {
                 object!("stage" => "1-7"),
             );
             assert_eq!(task.name(), Some("Fight Daily"));
-            assert_eq!(task.task_type(), &Fight);
+            assert_eq!(task.task_type(), Fight);
             assert_eq!(task.params(), &object!("stage" => "1-7"));
         }
     }
