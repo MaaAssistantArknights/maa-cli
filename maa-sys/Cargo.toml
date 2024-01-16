@@ -1,7 +1,7 @@
 [package]
 name = "maa-sys"
 authors = ["Loong Wang <wangl-cc@outlook.com>"]
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 description = "Low-level bindings to MAA (MaaAssistantArknights)"
 repository.workspace = true
