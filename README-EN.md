@@ -231,7 +231,7 @@ and the `params` field of matched variant will be merged into the parameters of 
 
 **Note**: If the `filename` field is a relative path, it will be relative to `$MAA_CONFIG_DIR/infrast`. Besides, the custom infrastructure plan file will not be read by `maa-cli` but `MaaCore`. So the format of the file must be `JSON` and time period defined in the file will not be used to select the corresponding sub-plan. So you must specify the `plan_index` field in the parameters of the task to use the correct infrastructure plan in the corresponding time period. This will ensure that the correct infrastructure plan is used in the appropriate time period.
 
-Besides of `Time` condition, there are also `DateTime`, `Weakday`, conditions. `DateTime` condition is used to specify a specific datetime period, `Weekday` condition is used to specify some days in a week.
+Besides of `Time` condition, there are also `DateTime`, `Weekday`, conditions. `DateTime` condition is used to specify a specific datetime period, `Weekday` condition is used to specify some days in a week.
 
 ```toml
 [[tasks]]
@@ -461,7 +461,7 @@ test_time = 0 # the time to test download mirrors in seconds, 0 to skip
 apit_url = "https://github.com/MaaAssistantArknights/maa-cli/raw/version/"
 [core.components]
 library = true # whether install MaaCore library
-resource = false # whether install resoruce resource
+resource = false # whether install resource resource
 
 # CLI update configurations
 [cli]

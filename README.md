@@ -243,7 +243,7 @@ params = { plan_index = 0 }
 
 **注意**：如果你的自定义基建计划文件使用相对路径，应该相对于 `$MAA_CONFIG_DIR/infrast`。此外，由于基建文件是由 `MaaCore` 而不是 `maa-cli` 读取的，因此这些文件的格式必须是 `JSON`。同时，`maa-cli` 不会读取基建文件，也不会根据其中定义的时间段来选择相应的子计划。因此，必须通过 `condition` 字段来指定在相应时间段使用正确的基建计划的参数中的 `plan_index` 字段。这样可以确保在适当的时间段使用正确的基建计划。
 
-除了 `Time` 条件，还有 `DateTime`，`Weakday` 条件。`DateTime` 条件用于指定一个时间段，`Weekday` 条件用于指定一周中的某些天。
+除了 `Time` 条件，还有 `DateTime`，`Weekday` 条件。`DateTime` 条件用于指定一个时间段，`Weekday` 条件用于指定一周中的某些天。
 
 ```toml
 [[tasks]]

@@ -288,7 +288,7 @@ mod tests {
         use serde_test::{assert_de_tokens, Token};
 
         #[test]
-        fn weakday() {
+        fn weekday() {
             let cond = Condition::Weekday {
                 weekdays: vec![Weekday::Mon, Weekday::Wed, Weekday::Fri],
             };

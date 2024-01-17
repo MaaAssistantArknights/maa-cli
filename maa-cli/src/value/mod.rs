@@ -59,7 +59,7 @@ impl Serialize for MAAValue {
             // Serialize as a map of key-value pairs and filter all the missing values
             Object(v) => v.serialize(serializer),
             // Input value should be initialized before serializing
-            _ => serr!("cannot serialize input value, you shoule initialize it first"),
+            _ => serr!("cannot serialize input value, you should initialize it first"),
         }
     }
 }
@@ -113,7 +113,7 @@ impl MAAValue {
                     .collect::<Vec<_>>();
 
                 // Initialize all the values with given order and put them into a new map
-                let mut initailized: Map<MAAValue> = Map::new();
+                let mut initialized: Map<MAAValue> = Map::new();
                 for key in sorted_keys {
                     let value = map.remove(&key).unwrap();
                     if let OptionalInput { deps, input } = value {
@@ -122,21 +122,21 @@ impl MAAValue {
                         for (dep_key, expected) in deps {
                             // If the dependency is not exist or the value is not equal to the expected values
                             // break the loop and mark status as unsatisfied
-                            if !initailized.get(&dep_key).is_some_and(|v| v == &expected) {
+                            if !initialized.get(&dep_key).is_some_and(|v| v == &expected) {
                                 satisfied = false;
                                 break;
                             }
                         }
                         // if all the dependencies are satisfied, initialize the value
                         if satisfied {
-                            initailized.insert(key, input.into_primate()?.into());
+                            initialized.insert(key, input.into_primate()?.into());
                         }
                     } else {
-                        initailized.insert(key, value.init()?);
+                        initialized.insert(key, value.init()?);
                     }
                 }
 
-                Ok(Object(initailized))
+                Ok(Object(initialized))
             }
             OptionalInput { .. } => Err(io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -495,7 +495,7 @@ mod tests {
                 "input_bool" => BoolInput::new(None, None),
             ),
             &[Token::Map { len: Some(1) }, Token::Str("input_bool")],
-            "cannot serialize input value, you shoule initialize it first",
+            "cannot serialize input value, you should initialize it first",
         );
     }
 
@@ -528,7 +528,7 @@ mod tests {
             "optional" => optional.clone(),
             "optional_no_satisfied" => optional_no_satisfied.clone(),
             "optional_no_exist" => optional_no_exist.clone(),
-            "optinal_chian" => optional_chianed.clone(),
+            "optional_chian" => optional_chianed.clone(),
         );
 
         assert_eq!(value.get("input").unwrap(), &MAAValue::from(input.clone()));
@@ -543,7 +543,7 @@ mod tests {
             &optional_no_satisfied
         );
         assert_eq!(value.get("optional_no_exist").unwrap(), &optional_no_exist);
-        assert_eq!(value.get("optinal_chian").unwrap(), &optional_chianed);
+        assert_eq!(value.get("optional_chian").unwrap(), &optional_chianed);
 
         let value = value.init().unwrap();
 
@@ -556,7 +556,7 @@ mod tests {
         assert_eq!(value.get("optional").unwrap(), &MAAValue::from(true));
         assert_eq!(value.get("optional_no_satisfied"), None);
         assert_eq!(value.get("optional_no_exist"), None);
-        assert_eq!(value.get("optinal_chian").unwrap(), &MAAValue::from(true));
+        assert_eq!(value.get("optional_chian").unwrap(), &MAAValue::from(true));
 
         assert_eq!(
             optional.init().unwrap_err().kind(),

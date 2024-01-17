@@ -59,8 +59,8 @@ enum CopilotJson<'a> {
 
 impl CopilotJson<'_> {
     pub fn new(uri: &str) -> Result<CopilotJson> {
-        let trimed = uri.trim();
-        if let Some(code_str) = trimed.strip_prefix("maa://") {
+        let trimmed = uri.trim();
+        if let Some(code_str) = trimmed.strip_prefix("maa://") {
             // just check if it's a number
             if code_str.parse::<i64>().is_ok() {
                 return Ok(CopilotJson::Code(code_str));
@@ -68,7 +68,7 @@ impl CopilotJson<'_> {
                 bail!("Invalid code: {}", code_str);
             }
         } else {
-            Ok(CopilotJson::File(Path::new(trimed)))
+            Ok(CopilotJson::File(Path::new(trimmed)))
         }
     }
 
