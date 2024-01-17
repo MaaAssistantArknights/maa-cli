@@ -43,7 +43,7 @@ brew install MaaAssistantArknights/tap/maa-cli
 ### Prebuilt binary
 
 You can install CLI by download prebuilt binary from
-[release page](https://github.com/wangl-cc/maa-cli/releases/latest) and extract it to your favourite location. The filename for different platform is:
+[release page](https://github.com/wangl-cc/maa-cli/releases/latest) and extract it to your favorite location. The filename for different platform is:
 
 <table>
     <thead>
@@ -122,7 +122,7 @@ The main feature of `maa-cli` is to run tasks, including predefined tasks and cu
 
 - `maa startup [client]`: start the game client and enter the main screen, the `client` is the client type of game, leave it empty to don't start the game;
 - `maa closedown`: close the game client;
-- `maa fight [stage]`: run a fight task, the `stage` is the stage to fight, like `1-7`, `CE-6`, etc; if not given, it will be queried from user;
+- `maa fight [stage]`: run a fight task, the `stage` is the stage to fight, like `1-7`, `CE-6`, etc.; if not given, it will be queried from user;
 - `maa copilot <maa_uri>`: run a copilot task, the `maa_uri` is the URI of a copilot task; it can be `maa://1234` or local file path;
 - `maa roguelike [theme]`: run a roguelike task, the `theme` is the theme of roguelike, available themes are `Phantom`, `Mizuki` and `Sami`.
 
@@ -150,14 +150,14 @@ You can update `maa-cli` by `maa self update`. For users who install `maa-cli` w
 
 More other commands can be found by `maa help`.
 
-### Other subcommands
+### Other sub-commands
 
 - `maa list`: list all available tasks;
 - `maa dir <subcommand>`: get the path of a specific directory;
 - `maa version`: print the version of `maa-cli` and `MaaCore`;
 - `maa convert <input> [output]`: convert a configuration file to another format, like `maa convert daily.toml daily.json`;
 - `maa complete <shell>`: generate completion script for specific shell;
-- `maa activity [client]`: get the current activity of game, the `client` is the client type of game, like `Official` (default), `Bilibili`, etc;
+- `maa activity [client]`: get the current activity of game, the `client` is the client type of game, like `Official` (default), `Bilibili`, etc.;
 
 ## Configurations
 
@@ -231,7 +231,7 @@ and the `params` field of matched variant will be merged into the parameters of 
 
 **Note**: If the `filename` field is a relative path, it will be relative to `$MAA_CONFIG_DIR/infrast`. Besides, the custom infrastructure plan file will not be read by `maa-cli` but `MaaCore`. So the format of the file must be `JSON` and time period defined in the file will not be used to select the corresponding sub-plan. So you must specify the `plan_index` field in the parameters of the task to use the correct infrastructure plan in the corresponding time period. This will ensure that the correct infrastructure plan is used in the appropriate time period.
 
-Besides of `Time` condition, there are also `DateTime`, `Weakday`, conditions. `DateTime` condition is used to specify a specific datetime period, `Weekday` condition is used to specify some days in a week.
+Besides of `Time` condition, there are also `DateTime`, `Weekday`, conditions. `DateTime` condition is used to specify a specific date-time period, `Weekday` condition is used to specify some days in a week.
 
 ```toml
 [[tasks]]
@@ -250,7 +250,7 @@ params = { stage = "CE-6" }
 params = { stage = "1-7" }
 ```
 
-Beside of above conditions, there is a condition `OnSideStory` which depends on hot update resource to check if there is any opening side story. Thus, the condition of fight `SL-8`can be simplified as `{ type = "OnSideStory", client = "Official" }`, where `client` is the client type of game. 
+Beside of above conditions, there is a condition `OnSideStory` which depends on hot update resource to check if there is any opening side story. Thus, the condition of fight `SL-8`can be simplified as `{ type = "OnSideStory", client = "Official" }`, where `client` is the client type of game.
 
 Beside of above basic condition, `{ type = "And", conditions = [...] }` `{ type = "Or", conditions = [...] }`, and `{ type = "Not", condition = ... }` can be used for logical combination of conditions.
 
@@ -348,7 +348,7 @@ description = "medicine to use"
 ```
 
 For `Input` type, a prompt will be shown to ask user to input a value. If the default value is given, it will be used if user input empty value, otherwise it will re-prompt.
-For `Select` type, a prompt will be shown to ask user to input a index or custom value (if `allow_custom` is `true`). If the default index is given, it will be used if user input empty value, otherwise it will re-prompt.
+For `Select` type, a prompt will be shown to ask user to input an index or custom value (if `allow_custom` is `true`). If the default index is given, it will be used if user input empty value, otherwise it will re-prompt.
 
 `--batch` option can be used to run tasks in batch mode, which will use default value for all inputs and panic if no default value is given.
 
@@ -461,7 +461,7 @@ test_time = 0 # the time to test download mirrors in seconds, 0 to skip
 apit_url = "https://github.com/MaaAssistantArknights/maa-cli/raw/version/"
 [core.components]
 library = true # whether install MaaCore library
-resource = false # whether install resoruce resource
+resource = false # whether install resource resource
 
 # CLI update configurations
 [cli]
@@ -495,7 +495,7 @@ url = "https://github.com/MaaAssistantArknights/MaaResource.git"
 - The hot update resource can not work separately, it should be used with basic resource that installed with `MaaCore`;
 - If you want to use `git` backend, `git` command is required;
 - If you want to fetch resource with ssh, the `ssh_key` is required;
-- The `resource.remote.url` only effect for first time installation, it will be ignored when updating resource. If you want to change the remote url, you should change it manually or delete the resource directory and reinstall resource. The directory of repository can be located by `maa dir hot-update`.
+- The `resource.remote.url` only effect for first time installation, it will be ignored when updating resource. If you want to change the remote URL, you should change it manually or delete the resource directory and reinstall resource. The directory of repository can be located by `maa dir hot-update`.
 
 ### Example of config file
 
@@ -508,4 +508,4 @@ The schema of task file is [`task.schema.json`](./maa-cli/schemas/task.schema.js
 the schema of MaaCore config file is [`asst.schema.json`](./maa-cli/schemas/asst.schema.json);
 the schema of CLI config file is [`cli.schema.json`](./maa-cli/schemas/cli.schema.json);
 
-With the help of JSON schema, you can get auto completion and validation in some editors with plugins.
+With the help of JSON schema, you can get auto-completion and validation in some editors with plugins.

@@ -121,7 +121,7 @@ fn process_connection_info(message: &Map<String, Value>) -> Option<()> {
     let what = message.get("what")?.as_str()?;
 
     match what {
-        // Resulution
+        // Resolution
         "UnsupportedResolution" => error!("{}", "UnsupportedResolution"),
         "ResolutionError" => error!("{}", "ResolutionAcquisitionFailure"),
 
