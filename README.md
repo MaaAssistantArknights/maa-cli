@@ -8,6 +8,8 @@
 
 [English](./README-EN.md)
 
+<!-- LTeX: language=zh-CN -->
+
 一个使用 Rust 编写的简单 [MAA](https://github.com/MaaAssistantArknights/MaaAssistantArknights) 命令行工具。
 
 ## 功能
@@ -125,7 +127,7 @@ OpenSSL 库是 `git2` 在所有平台和 `reqwest` 在 Linux 上的依赖。如�
 - `maa closedown`: 关闭游戏客户端；
 - `maa fight [stage]`: 运行战斗任务，`[stage]` 是关卡名称，例如 `1-7`；留空选择上次或者当前关卡；
 - `maa copilot <maa_uri>`: 运行自动战斗任务，其中 `<maa_uri>` 是作业的 URI，其可以是 `maa://1234` 或者本地文件路径 `./1234.json`；
-- `maa roguelike [theme]`: 运行 roguelike 模式的战斗任务，`[theme]` 是 roguelike 模式的主题，可选值为 `Phantom`，`Mizuki` 以及 `Sami`；
+- `maa roguelike [theme]`: 自动集成战略，`[theme]` 是集成战略的主题，可选值为 `Phantom`，`Mizuki` 以及 `Sami`；
 
 #### 自定义任务
 
@@ -504,8 +506,7 @@ url = "https://github.com/MaaAssistantArknights/MaaResource.git"
 - 资源热更新是通过 Git 来拉取远程仓库，如果后端设置为 `git` 那么 `git` 命令行工具必须可用。
 - 如果你想要使用 SSH 协议来拉取远程仓库，你必须配置 `ssh_key` 字段，这个字段应该是一个路径，指向你的 SSH 私钥。
 - 远程仓库的 `url` 设置目前只对首次安装资源有效，如果你想要更改远程仓库的地址，你需要通过 `git` 命令行工具手动更改，或者删除对应的仓库。仓库所在位置可以通过 `maa dir hot-update` 获取。
-- 远程仓库的 `url` 会根据你本机的语言自动设置，如果你的语言是简体中文，那么远程仓库的 `url` 将会被设置为国内的镜像 `https://git.maa-org.net/MAA/MaaResource.git`， 在其他情况则会被设置为 Github。如果你在国内但是使用的不是简体中文，或者在国外使用简体中文，那么你可能需要手动设置以获得最佳的体验。
-
+- 远程仓库的 `url` 会根据你本机的语言自动设置，如果你的语言是简体中文，那么远程仓库的 `url` 将会被设置为国内的镜像 `https://git.maa-org.net/MAA/MaaResource.git`，在其他情况则会被设置为 GitHub。如果你在国内但是使用的不是简体中文，或者在国外使用简体中文，那么你可能需要手动设置以获得最佳的体验。
 
 ### 参考配置
 
