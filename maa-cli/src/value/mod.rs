@@ -211,7 +211,7 @@ impl MAAValue {
     }
 
     pub fn as_str(&self) -> Option<&str> {
-        self.as_primate().and_then(MAAPrimate::as_string)
+        self.as_primate().and_then(MAAPrimate::as_str)
     }
 
     pub fn merge_mut(&mut self, other: &Self) {
