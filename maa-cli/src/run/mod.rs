@@ -257,7 +257,7 @@ fn load_core() -> Result<()> {
             use windows::core::HSTRING;
             use windows::Win32::System::LibraryLoader::SetDllDirectoryW;
 
-            unsafe { SetDllDirectoryW(&HSTRING::from(lib_dir.as_path()))? };
+            unsafe { SetDllDirectoryW(&HSTRING::from(lib_dir.as_ref()))? };
         }
         maa_sys::binding::load(lib_dir.join(MAA_CORE_LIB))?;
     } else {
