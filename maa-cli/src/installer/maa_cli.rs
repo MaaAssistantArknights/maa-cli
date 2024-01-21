@@ -26,7 +26,7 @@ pub fn version() -> Result<Version> {
 }
 
 pub fn update(args: &CommonArgs) -> Result<()> {
-    let config = cli_config().cli_config().clone().with_args(args);
+    let config = cli_config().cli_config().with_args(args);
 
     println!("Fetching maa-cli version info...");
     let version_json: VersionJSON<Details> = reqwest::blocking::get(config.api_url())
@@ -66,7 +66,7 @@ pub fn update(args: &CommonArgs) -> Result<()> {
             .context("Failed to download maa-cli")?;
     };
 
-    Archive::try_from(cache_path.as_path())?.extract(|path| {
+    Archive::new(cache_path.into())?.extract(|path| {
         if config.components().binary && path.ends_with(MAA_CLI_EXE) {
             Some(bin_path.clone())
         } else {

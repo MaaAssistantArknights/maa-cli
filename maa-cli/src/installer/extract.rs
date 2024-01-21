@@ -1,6 +1,7 @@
 use crate::dirs::Ensure;
 
 use std::{
+    borrow::Cow,
     fs::File,
     io::copy,
     path::{Path, PathBuf},
@@ -23,17 +24,12 @@ pub enum ArchiveType {
 /// It can be used to extract the archive file to a directory.
 /// The archive type can be specified manually or automatically detected from the file extension.
 /// Currently only zip and tar.gz are supported.
-pub struct Archive {
-    file: PathBuf,
-    file_type: ArchiveType,
+pub struct Archive<'f> {
+    file: Cow<'f, Path>,
+    archive_type: ArchiveType,
 }
 
-impl Archive {
-    /// Create a new `Archive` from a file with specified archive type.
-    pub fn new(file: PathBuf, file_type: ArchiveType) -> Self {
-        Self { file, file_type }
-    }
-
+impl<'f> Archive<'f> {
     /// Create a new `Archive` from a file with automatically detected archive type.
     ///
     /// The archive type is determined by the file extension.
@@ -43,8 +39,7 @@ impl Archive {
     /// Returns an error if the file extension is not supported.
     /// Currently only zip and tar.gz are supported.
     /// Or returns an error if the file extension cannot be determined.
-    pub fn try_from(file: impl AsRef<Path>) -> Result<Self> {
-        let file = file.as_ref();
+    pub fn new(file: Cow<'f, Path>) -> Result<Self> {
         if let Some(extension) = file.extension() {
             let archive_type = match extension.to_str() {
                 Some("zip") => ArchiveType::Zip,
@@ -58,7 +53,8 @@ impl Archive {
                 }
                 _ => bail!("Unsupported archive type"),
             };
-            Ok(Self::new(file.to_path_buf(), archive_type))
+
+            Ok(Self { file, archive_type })
         } else {
             Err(anyhow!("Failed to get file extension"))
         }
@@ -75,7 +71,7 @@ impl Archive {
     /// The file permissions will be preserved.
     pub fn extract(&self, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Result<()> {
         println!("Extracting archive file...");
-        match self.file_type {
+        match self.archive_type {
             ArchiveType::Zip => extract_zip(&self.file, mapper),
             ArchiveType::TarGz => extract_tar_gz(&self.file, mapper),
         }
