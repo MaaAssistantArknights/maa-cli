@@ -33,7 +33,7 @@ impl MAAPrimate {
         }
     }
 
-    pub(super) fn as_string(&self) -> Option<&str> {
+    pub(super) fn as_str(&self) -> Option<&str> {
         match self {
             Self::String(v) => Some(v),
             _ => None,
@@ -144,21 +144,21 @@ mod tests {
         assert_eq!(MAAPrimate::Bool(true).as_bool(), Some(true));
         assert_eq!(MAAPrimate::Bool(true).as_int(), None);
         assert_eq!(MAAPrimate::Bool(true).as_float(), None);
-        assert_eq!(MAAPrimate::Bool(true).as_string(), None);
+        assert_eq!(MAAPrimate::Bool(true).as_str(), None);
 
         assert_eq!(MAAPrimate::Int(1).as_bool(), None);
         assert_eq!(MAAPrimate::Int(1).as_int(), Some(1));
         assert_eq!(MAAPrimate::Int(1).as_float(), None);
-        assert_eq!(MAAPrimate::Int(1).as_string(), None);
+        assert_eq!(MAAPrimate::Int(1).as_str(), None);
 
         assert_eq!(MAAPrimate::Float(1.0).as_bool(), None);
         assert_eq!(MAAPrimate::Float(1.0).as_int(), None);
         assert_eq!(MAAPrimate::Float(1.0).as_float(), Some(1.0));
-        assert_eq!(MAAPrimate::Float(1.0).as_string(), None);
+        assert_eq!(MAAPrimate::Float(1.0).as_str(), None);
 
         assert_eq!(MAAPrimate::String("".to_string()).as_bool(), None);
         assert_eq!(MAAPrimate::String("".to_string()).as_int(), None);
         assert_eq!(MAAPrimate::String("".to_string()).as_float(), None);
-        assert_eq!(MAAPrimate::String("".to_string()).as_string(), Some(""));
+        assert_eq!(MAAPrimate::String("".to_string()).as_str(), Some(""));
     }
 }
