@@ -9,6 +9,7 @@ use crate::{
 };
 
 use std::{
+    borrow::Cow,
     fs,
     io::Write,
     path::{Path, PathBuf},
@@ -57,7 +58,7 @@ enum CopilotJson<'a> {
     File(&'a Path),
 }
 
-impl CopilotJson<'_> {
+impl<'a> CopilotJson<'a> {
     pub fn new(uri: &str) -> Result<CopilotJson> {
         let trimmed = uri.trim();
         if let Some(code_str) = trimmed.strip_prefix("maa://") {
@@ -72,14 +73,14 @@ impl CopilotJson<'_> {
         }
     }
 
-    pub fn get_json_and_file(&self, dir: impl AsRef<Path>) -> Result<(JsonValue, PathBuf)> {
+    pub fn get_json_and_file(self, dir: impl AsRef<Path>) -> Result<(JsonValue, Cow<'a, Path>)> {
         match self {
             CopilotJson::Code(code) => {
                 let json_file = dir.as_ref().join(code).with_extension("json");
 
                 if json_file.is_file() {
                     debug!("Cache hit, using cached json file {}", json_file.display());
-                    return Ok((json_from_file(&json_file)?, json_file));
+                    return Ok((json_from_file(&json_file)?, json_file.into()));
                 }
 
                 let url = format!("{}{}", MAA_COPILOT_API, code);
@@ -102,17 +103,17 @@ impl CopilotJson<'_> {
                         .write_all(context.as_bytes())
                         .context("Failed to write json file")?;
 
-                    Ok((value, json_file))
+                    Ok((value, json_file.into()))
                 } else {
                     bail!("Request Error, code: {}", code);
                 }
             }
             CopilotJson::File(file) => {
                 if file.is_absolute() {
-                    Ok((json_from_file(file)?, file.to_path_buf()))
+                    Ok((json_from_file(file)?, file.into()))
                 } else {
                     let path = dirs::copilot().join(file);
-                    Ok((json_from_file(&path)?, path))
+                    Ok((json_from_file(&path)?, path.into()))
                 }
             }
         }
@@ -286,7 +287,7 @@ mod tests {
                     .unwrap()
                     .get_json_and_file(&test_root)
                     .unwrap(),
-                (serde_json::json!({"type": "SSS"}), test_file.clone())
+                (serde_json::json!({"type": "SSS"}), test_file.clone().into())
             );
 
             // Local file
@@ -295,7 +296,7 @@ mod tests {
                     .unwrap()
                     .get_json_and_file(&test_root)
                     .unwrap(),
-                (serde_json::json!({"type": "SSS"}), test_file.clone())
+                (serde_json::json!({"type": "SSS"}), test_file.clone().into())
             );
 
             fs::remove_dir_all(&test_root).unwrap();

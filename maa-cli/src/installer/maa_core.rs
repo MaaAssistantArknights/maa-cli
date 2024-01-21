@@ -17,6 +17,7 @@ use crate::{
 };
 
 use std::{
+    borrow::Cow,
     env::consts::{ARCH, DLL_PREFIX, DLL_SUFFIX, OS},
     path::{self, Path, PathBuf},
     time::Duration,
@@ -93,7 +94,7 @@ pub fn install(force: bool, args: &CommonArgs) -> Result<()> {
     println!("Downloading MaaCore {}...", asset_version);
     let cache_dir = dirs::cache().ensure()?;
     let archive = download(
-        &cache_dir.join(asset_name),
+        cache_dir.join(asset_name).into(),
         asset.size(),
         asset.download_links(),
         &config,
@@ -157,7 +158,12 @@ pub fn update(args: &CommonArgs) -> Result<()> {
     println!("Downloading MaaCore {}...", asset_version);
     let cache_dir = dirs::cache().ensure()?;
     let asset_path = cache_dir.join(asset_name);
-    let archive = download(&asset_path, asset.size(), asset.download_links(), &config)?;
+    let archive = download(
+        asset_path.into(),
+        asset.size(),
+        asset.download_links(),
+        &config,
+    )?;
 
     println!("Installing MaaCore...");
     if components.library {
@@ -240,10 +246,15 @@ impl Asset {
     }
 }
 
-pub fn download(path: &Path, size: u64, links: Vec<String>, config: &Config) -> Result<Archive> {
-    if check_file_exists(path, size) {
+pub fn download<'p>(
+    path: Cow<'p, Path>,
+    size: u64,
+    links: Vec<String>,
+    config: &Config,
+) -> Result<Archive<'p>> {
+    if check_file_exists(&path, size) {
         println!("Already downloaded, skip downloading");
-        return Archive::try_from(path);
+        return Archive::new(path);
     }
 
     let client = reqwest::Client::builder()
@@ -255,14 +266,14 @@ pub fn download(path: &Path, size: u64, links: Vec<String>, config: &Config) -> 
         .block_on(download_mirrors(
             &client,
             links,
-            path,
+            &path,
             size,
             config.test_time(),
             None,
         ))
         .context("Failed to download asset")?;
 
-    Archive::try_from(path)
+    Archive::new(path)
 }
 
 #[cfg(test)]

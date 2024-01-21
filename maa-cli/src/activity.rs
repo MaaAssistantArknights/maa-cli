@@ -158,7 +158,7 @@ fn parse_time(time: &str, tz: i32) -> Option<DateTime<FixedOffset>> {
 fn load_item_index(client: ClientType) -> Result<JsonValue> {
     let hot_update_resource_dir = dirs::hot_update().join("resource");
     let base_resource_dir = if hot_update_resource_dir.exists() {
-        hot_update_resource_dir
+        hot_update_resource_dir.into()
     } else if let Some(resource_dir) = dirs::find_resource() {
         resource_dir
     } else {
@@ -166,7 +166,10 @@ fn load_item_index(client: ClientType) -> Result<JsonValue> {
     };
 
     let item_index_path = match client.resource() {
-        Some(global_resource) => base_resource_dir.join("global").join(global_resource),
+        Some(global_resource) => base_resource_dir
+            .join("global")
+            .join(global_resource)
+            .into(),
         None => base_resource_dir,
     }
     .join("item_index.json");

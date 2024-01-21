@@ -1,6 +1,7 @@
 use crate::consts::MAA_CORE_LIB;
 
 use std::{
+    borrow::Cow,
     env::{current_exe, var_os},
     fs::{create_dir, create_dir_all, remove_dir_all},
     path::{Path, PathBuf},
@@ -74,15 +75,15 @@ impl Dirs {
         let cache_dir = get_cache_dir(&proj);
 
         Self {
-            data: data_dir.clone(),
-            cache: cache_dir.clone(),
             copilot: cache_dir.join("copilot"),
+            cache: cache_dir,
             config: get_config_dir(&proj),
             library: data_dir.join("lib"),
             resource: data_dir.join("resource"),
             hot_update: data_dir.join("MaaResource"),
-            state: state_dir.clone(),
+            data: data_dir,
             log: state_dir.join("debug"),
+            state: state_dir,
         }
     }
 
@@ -105,20 +106,20 @@ impl Dirs {
     /// Then, assume the executable file is in the `bin` directory,
     /// try to find the `MaaCore` in the `lib` directory in the parent directory of the executable file.
     /// If the executable is a symbolic link, will try to find the `MaaCore` both in the symbolic link and the link target.
-    pub fn find_library(&self, exe_path: &Path) -> Option<PathBuf> {
-        if self.library.join(MAA_CORE_LIB).exists() {
-            return Some(self.library.clone());
+    pub fn find_library<'a>(&'a self, exe_path: &'a Path) -> Option<Cow<'a, Path>> {
+        if self.library().join(MAA_CORE_LIB).exists() {
+            return Some(self.library().into());
         }
 
         _find_from(exe_path, |exe_dir| {
             if exe_dir.join(MAA_CORE_LIB).exists() {
-                return Some(exe_dir.to_path_buf());
+                return Some(exe_dir);
             }
             if let Some(dir) = exe_dir.parent() {
                 let lib_dir = dir.join("lib");
                 let lib_path = lib_dir.join(MAA_CORE_LIB);
                 if lib_path.exists() {
-                    return Some(lib_dir);
+                    return Some(lib_dir.into());
                 }
             }
 
@@ -184,27 +185,27 @@ impl Dirs {
     /// Additionally, if maa is compiled with `MAA_EXTRA_SHARE_NAME` environment variable,
     /// try to find the resource directory in the `share/$MAA_EXTRA_SHARE_NAME` directory.
     /// This is used to support the situation that MaaCore is installed by other package manager.
-    pub fn find_resource(&self, exe_path: &Path) -> Option<PathBuf> {
-        if self.resource.exists() {
-            return Some(self.resource.clone());
+    pub fn find_resource<'a>(&'a self, exe_path: &'a Path) -> Option<Cow<'a, Path>> {
+        if self.resource().exists() {
+            return Some(Cow::Borrowed(self.resource()));
         }
 
         _find_from(exe_path, |exe_dir| {
             let resource_dir = exe_dir.join("resource");
             if resource_dir.exists() {
-                return Some(resource_dir);
+                return Some(resource_dir.into());
             }
             if let Some(dir) = exe_dir.parent() {
                 let share_dir = dir.join("share");
                 if let Some(extra_share) = option_env!("MAA_EXTRA_SHARE_NAME") {
                     let resource_dir = share_dir.join(extra_share).join("resource");
                     if resource_dir.exists() {
-                        return Some(resource_dir);
+                        return Some(resource_dir.into());
                     }
                 }
                 let resource_dir = share_dir.join("maa").join("resource");
                 if resource_dir.exists() {
-                    return Some(resource_dir);
+                    return Some(resource_dir.into());
                 }
             }
             None
@@ -229,6 +230,7 @@ impl Dirs {
 
 lazy_static! {
     pub static ref DIRS: Dirs = Dirs::new(ProjectDirs::from("com", "loong", "maa"));
+    static ref CURRENT_EXE: Option<PathBuf> = current_exe().ok();
 }
 
 pub fn data() -> &'static Path {
@@ -239,8 +241,8 @@ pub fn library() -> &'static Path {
     DIRS.library()
 }
 
-pub fn find_library() -> Option<PathBuf> {
-    DIRS.find_library(&current_exe().ok()?)
+pub fn find_library() -> Option<Cow<'static, Path>> {
+    DIRS.find_library(CURRENT_EXE.as_deref()?)
 }
 
 pub fn config() -> &'static Path {
@@ -263,8 +265,8 @@ pub fn resource() -> &'static Path {
     DIRS.resource()
 }
 
-pub fn find_resource() -> Option<PathBuf> {
-    DIRS.find_resource(&current_exe().ok()?)
+pub fn find_resource() -> Option<Cow<'static, Path>> {
+    DIRS.find_resource(CURRENT_EXE.as_deref()?)
 }
 
 pub fn hot_update() -> &'static Path {
@@ -286,27 +288,27 @@ lazy_static! {
         .to_path_buf();
 }
 
-pub fn expand_tilde(path: impl AsRef<Path>) -> PathBuf {
-    let path = path.as_ref();
+pub fn expand_tilde(path: &Path) -> Cow<Path> {
     if let Ok(path) = path.strip_prefix("~") {
-        HOME.join(path)
+        HOME.join(path).into()
     } else {
-        path.to_path_buf()
+        path.into()
     }
 }
 
 /// Similar to `finder(exe_path.parent()?)`, but try to canonicalize the path first.
-fn _find_from<F>(exe_path: &Path, finder: F) -> Option<PathBuf>
+fn _find_from<F>(exe_path: &Path, finder: F) -> Option<Cow<Path>>
 where
-    F: Fn(&Path) -> Option<PathBuf>,
+    F: Fn(Cow<Path>) -> Option<Cow<Path>>,
 {
     // Try to canonicalize the path first.
-    if let Ok(canonicalized_exe_path) = canonicalize(exe_path) {
-        if let Some(path) = finder(canonicalized_exe_path.parent()?) {
+    if let Ok(mut canonicalized_exe_path) = canonicalize(exe_path) {
+        canonicalized_exe_path.pop();
+        if let Some(path) = finder(canonicalized_exe_path.into()) {
             return Some(path);
         };
     }
-    finder(exe_path.parent()?)
+    finder(exe_path.parent()?.into())
 }
 
 pub trait Ensure: Sized {

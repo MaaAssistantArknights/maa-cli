@@ -229,7 +229,7 @@ fn default_resource_base_dirs() -> Vec<PathBuf> {
 
     if let Some(resource_dir) = dirs::find_resource() {
         debug!("Found resource directory: {}", resource_dir.display());
-        resource_dirs.push(resource_dir);
+        resource_dirs.push(resource_dir.into_owned());
     } else {
         warn!("Resource directory not found!")
     }
