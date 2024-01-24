@@ -79,9 +79,10 @@ jobs:
         uses: orhun/git-cliff-action@v2
         with:
           config: cliff.toml
-          # If the release is a prerelease, use unreleased commits
-          # otherwise use commits belonging to the last release
-          args: -vv ${{ fromJson(needs.meta.outputs.prerelease) && '-u' || '-l' }}
+          # If the release is triggered by a tag, process commits starting
+          # from the latest tag, otherwise tag will be create later, so use
+          # unreleased commits
+          args: -vv ${{ github.event_name == 'push' && '-l' || '-u' }}
       - name: Preview Release Notes
         if: ${{ !fromJson(needs.meta.outputs.publish) }}
         run: |
