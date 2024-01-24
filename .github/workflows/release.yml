@@ -144,8 +144,7 @@ jobs:
           CARGO_PROFILE_RELEASE_LTO: true
           CARGO_PROFILE_RELEASE_STRIP: true
         run: |
-          cargo build --release --package maa-cli --locked \
-            ${{ matrix.arch != 'x86_64' && '--features vendored-openssl' || '' }}
+          cargo build --release --package maa-cli --locked --features vendored-openssl
       - name: Tar Artifact
         run: |
           tar -cvf "$CARGO_BUILD_TARGET.tar" -C "target/$CARGO_BUILD_TARGET/release" maa
