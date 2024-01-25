@@ -56,7 +56,7 @@ jobs:
           echo "Dryrun: $dryrun"
           echo "dryrun=$dryrun" >> $GITHUB_OUTPUT
       - name: Get version
-        id : version
+        id: version
         run: |
           if [ "$GITHUB_EVENT_NAME" = "release" ]; then
             tag='${{ github.ref }}'
@@ -67,33 +67,26 @@ jobs:
           echo "Version: $version"
           echo "version=$version" >> $GITHUB_OUTPUT
 
-
-  formula:
-    name: Formula
+  bump:
+    name: Bump Formulae and Casks
     needs: [meta]
     runs-on: macos-latest
     steps:
       - name: Tap MaasistantArknights Tap
         run: brew tap MaaAssistantArknights/homebrew-tap
       - name: Bump Formula
-        run: >
-          brew bump-formula-pr maa-cli
-          ${{ fromJson(needs.meta.outputs.dryrun) && '--dry-run' || '' }}
-          --no-browse
-          --version='${{ needs.meta.outputs.version }}'
-          --message='Bump `maa-cli` to `${{ needs.meta.outputs.version }}`'
-
-  cask:
-    name: Cask
-    needs: [meta]
-    runs-on: macos-latest
-    steps:
-      - name: Tap MaasistantArknights Tap
-        run: brew tap MaaAssistantArknights/homebrew-tap
-      - name: Bump Cask
-        run: >
-          brew bump-cask-pr maa-cli-bin
-          ${{ fromJson(needs.meta.outputs.dryrun) && '--dry-run' || '' }}
-          --no-browse
-          --version='${{ needs.meta.outputs.version }}'
-          --message='Bump `maa-cli-bin` to `${{ needs.meta.outputs.version }}`'
+        run: |
+          for formula in maa-cli maa-cli-beta; do
+            brew bump-formula-pr $formula \
+              ${{ fromJson(needs.meta.outputs.dryrun) && '--dry-run' || '' }} \
+              --no-browse \
+              --version='${{ needs.meta.outputs.version }}'\
+              --message='Bump `$formula` to `${{ needs.meta.outputs.version }}`'
+          done
+          for cask in maa-cli-bin; do
+            brew bump-cask-pr $cask \
+              ${{ fromJson(needs.meta.outputs.dryrun) && '--dry-run' || '' }} \
+              --no-browse \
+              --version='${{ needs.meta.outputs.version }}'\
+              --message='Bump `$cask` to `${{ needs.meta.outputs.version }}`'
+          done
