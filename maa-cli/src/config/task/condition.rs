@@ -79,16 +79,16 @@ impl Condition {
                 match (start, end) {
                     (Some(s), Some(e)) => time_in_range(&now_time, s, e),
                     (Some(s), None) => now_time >= *s,
-                    (None, Some(e)) => now_time <= *e,
+                    (None, Some(e)) => now_time < *e,
                     (None, None) => true,
                 }
             }
             Condition::DateTime { start, end } => {
                 let now = Local::now().naive_local();
                 match (start, end) {
-                    (Some(s), Some(e)) => now >= *s && now <= *e,
+                    (Some(s), Some(e)) => now >= *s && now < *e,
                     (Some(s), None) => now >= *s,
-                    (None, Some(e)) => now <= *e,
+                    (None, Some(e)) => now < *e,
                     (None, None) => true,
                 }
             }
@@ -116,9 +116,9 @@ impl Condition {
 
 fn time_in_range(time: &NaiveTime, start: &NaiveTime, end: &NaiveTime) -> bool {
     if start <= end {
-        start <= time && time <= end
+        start <= time && time < end
     } else {
-        start <= time || time <= end
+        start <= time || time < end
     }
 }
 
@@ -210,22 +210,19 @@ mod tests {
             let end = time_from_hms(2, 59, 59);
 
             assert!(time_in_range(&time_from_hms(1, 0, 0), &start, &end));
-            assert!(time_in_range(&time_from_hms(2, 59, 59), &start, &end));
             assert!(time_in_range(&time_from_hms(1, 0, 1), &start, &end));
             assert!(time_in_range(&time_from_hms(2, 59, 58), &start, &end));
-
             assert!(!time_in_range(&time_from_hms(0, 59, 59), &start, &end));
-            assert!(!time_in_range(&time_from_hms(3, 0, 0), &start, &end));
+            assert!(!time_in_range(&time_from_hms(2, 59, 59), &start, &end));
 
             let start = time_from_hms(23, 0, 0);
             let end = time_from_hms(1, 59, 59);
 
             assert!(time_in_range(&time_from_hms(23, 0, 0), &start, &end));
-            assert!(time_in_range(&time_from_hms(1, 59, 59), &start, &end));
             assert!(time_in_range(&time_from_hms(23, 0, 1), &start, &end));
             assert!(time_in_range(&time_from_hms(1, 59, 58), &start, &end));
             assert!(!time_in_range(&time_from_hms(22, 59, 59), &start, &end));
-            assert!(!time_in_range(&time_from_hms(2, 0, 0), &start, &end));
+            assert!(!time_in_range(&time_from_hms(1, 59, 59), &start, &end));
         }
 
         #[test]
