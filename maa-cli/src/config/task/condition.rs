@@ -77,7 +77,7 @@ impl Condition {
                 let now = Local::now();
                 let now_time = now.time();
                 match (start, end) {
-                    (Some(s), Some(e)) => now_time >= *s && now_time <= *e,
+                    (Some(s), Some(e)) => time_in_range(&now_time, s, e),
                     (Some(s), None) => now_time >= *s,
                     (None, Some(e)) => now_time <= *e,
                     (None, None) => true,
@@ -111,6 +111,14 @@ impl Condition {
             }
             Condition::Not { condition } => !condition.is_active(),
         }
+    }
+}
+
+fn time_in_range(time: &NaiveTime, start: &NaiveTime, end: &NaiveTime) -> bool {
+    if start <= end {
+        start <= time && time <= end
+    } else {
+        start <= time || time <= end
     }
 }
 
@@ -156,18 +164,18 @@ mod tests {
             let now_time = now.time();
 
             assert!(Condition::Time {
-                start: Some(now_time + Duration::minutes(-10)),
-                end: Some(now_time + Duration::minutes(10)),
+                start: Some(now_time + Duration::seconds(-10)),
+                end: Some(now_time + Duration::seconds(10)),
             }
             .is_active());
             assert!(Condition::Time {
-                start: Some(now_time + Duration::minutes(-10)),
+                start: Some(now_time + Duration::seconds(-10)),
                 end: None,
             }
             .is_active());
             assert!(Condition::Time {
                 start: None,
-                end: Some(now_time + Duration::minutes(10)),
+                end: Some(now_time + Duration::seconds(10)),
             }
             .is_active());
             assert!(Condition::Time {
@@ -176,20 +184,48 @@ mod tests {
             }
             .is_active());
             assert!(!Condition::Time {
-                start: Some(now_time + Duration::minutes(10)),
-                end: Some(now_time + Duration::minutes(20)),
+                start: Some(now_time + Duration::seconds(10)),
+                end: Some(now_time + Duration::seconds(20)),
             }
             .is_active());
             assert!(!Condition::Time {
-                start: Some(now_time + Duration::minutes(10)),
+                start: Some(now_time + Duration::seconds(10)),
                 end: None,
             }
             .is_active());
             assert!(!Condition::Time {
                 start: None,
-                end: Some(now_time + Duration::minutes(-10)),
+                end: Some(now_time + Duration::seconds(-10)),
             }
             .is_active());
+        }
+
+        #[test]
+        fn test_time_in_range() {
+            fn time_from_hms(h: u32, m: u32, s: u32) -> NaiveTime {
+                NaiveTime::from_hms_opt(h, m, s).unwrap()
+            }
+
+            let start = time_from_hms(1, 0, 0);
+            let end = time_from_hms(2, 59, 59);
+
+            assert!(time_in_range(&time_from_hms(1, 0, 0), &start, &end));
+            assert!(time_in_range(&time_from_hms(2, 59, 59), &start, &end));
+            assert!(time_in_range(&time_from_hms(1, 0, 1), &start, &end));
+            assert!(time_in_range(&time_from_hms(2, 59, 58), &start, &end));
+
+            assert!(!time_in_range(&time_from_hms(0, 59, 59), &start, &end));
+            assert!(!time_in_range(&time_from_hms(3, 0, 0), &start, &end));
+
+            let start = time_from_hms(23, 0, 0);
+            let end = time_from_hms(1, 59, 59);
+
+            assert!(time_in_range(&time_from_hms(23, 0, 0), &start, &end));
+            assert!(time_in_range(&time_from_hms(1, 59, 59), &start, &end));
+            assert!(time_in_range(&time_from_hms(23, 0, 1), &start, &end));
+            assert!(time_in_range(&time_from_hms(1, 59, 58), &start, &end));
+            assert!(!time_in_range(&time_from_hms(22, 59, 59), &start, &end));
+            assert!(!time_in_range(&time_from_hms(2, 0, 0), &start, &end));
         }
 
         #[test]
@@ -349,7 +385,7 @@ mod tests {
         }
 
         #[test]
-        fn datatime() {
+        fn datetime() {
             assert_de_tokens(
                 &Condition::DateTime {
                     start: Some(naive_local_datetime(2021, 8, 1, 16, 0, 0)),
