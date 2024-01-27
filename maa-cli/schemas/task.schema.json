@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/MaaAssistantArknights/maa-cli/raw/v0.4.0/maa-cli/schemas/task.schema.json",
+  "$id": "https://github.com/MaaAssistantArknights/maa-cli/raw/v0.4.2/maa-cli/schemas/task.schema.json",
   "type": "object",
   "required": ["tasks"],
   "properties": {
@@ -132,6 +132,23 @@
           },
           "required": ["type", "weekdays"],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "DayMod" },
+            "divisor": {
+              "type": "number",
+              "description": "Divisor of day number",
+              "minimum": 1
+            },
+            "remainder": {
+              "type": "number",
+              "description": "Remainder of day number",
+              "minimum": 0,
+              "default": 0
+            }
+          }
         },
         {
           "type": "object",
