@@ -15,6 +15,16 @@ pub enum Condition {
     Always,
     /// The task is active on the specified weekdays
     Weekday { weekdays: Vec<Weekday> },
+    /// Day modula
+    ///
+    /// The task is active on `num_days % divisor == remainder`.
+    /// The `num_days` is the number of days since the Common Era, (i.e. 0001-01-01 is 1).
+    /// If `remainder` is not specified, it is 0.
+    DayMod {
+        divisor: u32,
+        #[serde(default)]
+        remainder: u32,
+    },
     /// The task is active on the specified time range
     ///
     /// If `start` is `None`, the task is active before `end`.
@@ -72,6 +82,11 @@ impl Condition {
                 let now = Local::now();
                 let weekday = now.date_naive().weekday();
                 weekdays.contains(&weekday)
+            }
+            Condition::DayMod { divisor, remainder } => {
+                let now = Local::now();
+                let day = now.date_naive().num_days_from_ce() as u32;
+                day % divisor == *remainder
             }
             Condition::Time { start, end } => {
                 let now = Local::now();
@@ -156,6 +171,36 @@ mod tests {
                 weekdays: vec![weekday.pred(), weekday.succ()]
             }
             .is_active());
+        }
+
+        #[test]
+        fn day_mod() {
+            let now = chrono::Local::now();
+            let num_days = now.date_naive().num_days_from_ce() as u32;
+
+            assert!(Condition::DayMod {
+                divisor: 1,
+                remainder: 0,
+            }
+            .is_active());
+
+            assert_eq!(
+                Condition::DayMod {
+                    divisor: 2,
+                    remainder: 0,
+                }
+                .is_active(),
+                num_days % 2 == 0
+            );
+
+            assert_eq!(
+                Condition::DayMod {
+                    divisor: 2,
+                    remainder: 1,
+                }
+                .is_active(),
+                num_days % 2 == 1
+            );
         }
 
         #[test]
