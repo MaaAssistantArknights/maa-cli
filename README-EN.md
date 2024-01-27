@@ -212,18 +212,18 @@ facility = ["Trade", "Reception", "Mfg", "Control", "Power", "Office", "Dorm"]
 dorm_trust_enabled = true
 filename = "normal.json" # the filename of custom infrast plan
 
-# use plan 1 before 12:00:00, use plan 2 between 12:00:00 and 18:00:00, use plan 0 after 18:00:00
+# use plan 0 from 18:00:00 to 04:00:00 of next day, use plan 1 before 12:00:00, use plan 2 after 12:00:00
 [[tasks.variants]]
-condition = { type = "Time", end = "12:00:00" } # if start is not defined, it will be 00:00:00
+condition = { type = "Time", start = "18:00:00", end = "04:00:00" } # when end time is less than start time, end time will be treated as time of next day
+params = { plan_index = 0 }
+
+[[tasks.variants]]
+condition = { type = "Time", end = "12:00:00" } # if start time is omitted, this condition will be matched if current time is less than end time
 params = { plan_index = 1 }
 
 [[tasks.variants]]
-condition = { type = "Time", start = "12:00:00", end = "18:00:00" }
+condition = { type = "Time", start = "12:00:00" } # if end time is omitted, this condition will be matched if current time is greater than start time
 params = { plan_index = 2 }
-
-[[tasks.variants]]
-condition = { type = "Time", start = "18:00:00" } # if end is not defined, it will be 23:59:59
-params = { plan_index = 0 }
 ```
 
 The `condition` field is used to determine whether the variant should be used,
