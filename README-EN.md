@@ -231,7 +231,10 @@ and the `params` field of matched variant will be merged into the parameters of 
 
 **Note**: If the `filename` field is a relative path, it will be relative to `$MAA_CONFIG_DIR/infrast`. Besides, the custom infrastructure plan file will not be read by `maa-cli` but `MaaCore`. So the format of the file must be `JSON` and time period defined in the file will not be used to select the corresponding sub-plan. So you must specify the `plan_index` field in the parameters of the task to use the correct infrastructure plan in the corresponding time period. This will ensure that the correct infrastructure plan is used in the appropriate time period.
 
-Besides of `Time` condition, there are also `DateTime`, `Weekday`, conditions. `DateTime` condition is used to specify a specific date-time period, `Weekday` condition is used to specify some days in a week.
+Besides of `Time` condition, there are also `DateTime`, `Weekday`, `DayMod` conditions.
+`DateTime` condition is used to specify a specific date-time period,
+`Weekday` condition is used to specify some days in a week,
+detail about `DayMod`, see below example of multi-day infrastructure plan
 
 ```toml
 [[tasks]]
@@ -253,6 +256,108 @@ params = { stage = "1-7" }
 Beside of above conditions, there is a condition `OnSideStory` which depends on hot update resource to check if there is any opening side story. Thus, the condition of fight `SL-8`can be simplified as `{ type = "OnSideStory", client = "Official" }`, where `client` is the client type of game.
 
 Beside of above basic condition, `{ type = "And", conditions = [...] }` `{ type = "Or", conditions = [...] }`, and `{ type = "Not", condition = ... }` can be used for logical combination of conditions.
+
+By the combination of of above conditions, you can define a infrastructure plan for multiple days,
+here is an example of 6 plan for 2 days:
+
+```toml
+[[tasks]]
+name = "Infrast (6 plan for 2 days)"
+type = "Infrast"
+
+[tasks.params]
+mode = 10000
+facility = ["Trade", "Reception", "Mfg", "Control", "Power", "Office", "Dorm"]
+dorm_trust_enabled = true
+filename = "normal.json"
+
+# First shift, 04:00:00 - 12:00:00 on the first day
+[[tasks.variants]]
+condition = {
+    type = "And",
+    conditions = [
+        # The divisor use to specify the period, the remainder use to specify the offset
+        # The offset is equal to num_days_since_ce % divisor
+        # The num_days_since_ce is the number of days since the Common Era, 0001-01-01 is the first day
+        # The offset of current day can be got by `maa remainder <divisor>`
+        # for 2024-01-27, num_days_since_ce is 738,912, 
+        # the offset of 2024-01-27 is 738,912 % 2 = 0
+        # so this condition will be matched on 2024-01-27
+        { type = "DayMod", divisor = 2, remainder = 0 },
+        { type = "Time", start = "04:00:00", end = "12:00:00" },
+
+    ]
+}
+params = { plan_index = 0 }
+
+# The second shift, 12:00:00 - 20:00:00 on the first day
+[[tasks.variants]]
+condition = {
+   type = "And",
+   conditions = [
+      { type = "DayMod", divisor = 2, remainder = 0 },
+      { type = "Time", start = "12:00:00", end = "20:00:00" },
+   ]
+}
+params = { plan_index = 1 }
+
+# The third shift, 20:00:00 (first day) - 04:00:00 (second day)
+[[tasks.variants]]
+# Note, we must use Or condition here, otherwise the second day 00:00:00 - 04:00:00 will not be matched
+condition = {
+   type = "Or",
+   conditions = [
+      { type = "And", conditions = [
+         { type = "DayMod", divisor = 2, remainder = 0 },
+         { type = "Time", start = "20:00:00" },
+      ] },
+      { type = "And", conditions = [
+         { type = "DayMod", divisor = 2, remainder = 1 },
+         { type = "Time", end = "04:00:00" },
+      ] },
+   ]
+}
+params = { plan_index = 2 }
+
+# The fourth shift, 04:00:00 - 12:00:00 on the second day
+[[tasks.variants]]
+condition = {
+   type = "And",
+   conditions = [
+      { type = "DayMod", divisor = 2, remainder = 1 },
+      { type = "Time", start = "04:00:00", end = "12:00:00" },
+   ]
+}
+params = { plan_index = 3 }
+
+# The fifth shift, 12:00:00 - 20:00:00 on the second day
+[[tasks.variants]]
+condition = {
+   type = "And",
+   conditions = [
+      { type = "DayMod", divisor = 2, remainder = 1 },
+      { type = "Time", start = "12:00:00", end = "20:00:00" },
+   ]
+}
+params = { plan_index = 4 }
+
+# The sixth shift, 20:00:00 (second day) - 04:00:00 (new first day)
+[[tasks.variants]]
+condition = {
+   type = "Or",
+   conditions = [
+      { type = "And", conditions = [
+         { type = "DayMod", divisor = 2, remainder = 1 },
+         { type = "Time", start = "20:00:00" },
+      ] },
+      { type = "And", conditions = [
+         { type = "DayMod", divisor = 2, remainder = 0 },
+         { type = "Time", end = "04:00:00" },
+      ] },
+   ]
+}
+params = { plan_index = 5 }
+```
 
 With default strategy, if multiple variants are matched, only the first one will be used. And if the condition is not given, the variant will always be matched. So you can put a variant without condition at the end of variants.
 
