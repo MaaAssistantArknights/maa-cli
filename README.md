@@ -285,90 +285,84 @@ filename = "normal.json"
 
 # 第一班，第一天 4:00:00 - 12:00:00
 [[tasks.variants]]
-condition = {
-    type = "And",
-    conditions = [
-        # 这里的 divisor 用来指定周期，remainder 用来指定偏移量
-        # 偏移量等于 num_days_since_ce % divisor
-        # 这里的 num_days_since_ce 是公元以来的天数，0001-01-01 是第一天
-        # 当天偏移量你可以通过 `maa remainder <divisor>` 来获取.
-        # 比如，2024-1-27 是第 738,912 天，那么 738912 % 2 = 0
-        # 当天的偏移量为 0，那么本条件将会被匹配
-        { type = "DayMod", divisor = 2, remainder = 0 },
-        { type = "Time", start = "04:00:00", end = "12:00:00" },
-    ]
-}
 params = { plan_index = 0 }
+[tasks.variants.condition]
+type = "And"
+conditions = [
+    # 这里的 divisor 用来指定周期，remainder 用来指定偏移量
+    # 偏移量等于 num_days_since_ce % divisor
+    # 这里的 num_days_since_ce 是公元以来的天数，0001-01-01 是第一天
+    # 当天偏移量你可以通过 `maa remainder <divisor>` 来获取.
+    # 比如，2024-1-27 是第 738,912 天，那么 738912 % 2 = 0
+    # 当天的偏移量为 0，那么本条件将会被匹配
+    { type = "DayMod", divisor = 2, remainder = 0 },
+    { type = "Time", start = "04:00:00", end = "12:00:00" },
+]
 
 # 第二班，第一天 12:00:00 - 20:00:00
 [[tasks.variants]]
-condition = {
-   type = "And",
-   conditions = [
-      { type = "DayMod", divisor = 2, remainder = 0 },
-      { type = "Time", start = "12:00:00", end = "20:00:00" },
-   ]
-}
 params = { plan_index = 1 }
+[tasks.variants.condition]
+type = "And"
+conditions = [
+  { type = "DayMod", divisor = 2, remainder = 0 },
+  { type = "Time", start = "12:00:00", end = "20:00:00" },
+]
 
 # 第三班，第一天 20:00:00 - 第二天 4:00:00
 [[tasks.variants]]
+params = { plan_index = 2 }
+[tasks.variants.condition]
 # 注意这里必须使用 Or 条件，不能直接使用 Time { start = "20:00:00", end = "04:00:00" }
 # 在这种情况下， 第二天的 00:00:00 - 04:00:00 不会被匹配
 # 当然通过调整你的排班时间避免跨天是更好的选择，这里只是为了演示
-condition = {
-   type = "Or",
-   conditions = [
-      { type = "And", conditions = [
-         { type = "DayMod", divisor = 2, remainder = 0 },
-         { type = "Time", start = "20:00:00" },
-      ] },
-      { type = "And", conditions = [
-         { type = "DayMod", divisor = 2, remainder = 1 },
-         { type = "Time", end = "04:00:00" },
-      ] },
-   ]
-}
-params = { plan_index = 2 }
+type = "Or"
+conditions = [
+  { type = "And", conditions = [
+     { type = "DayMod", divisor = 2, remainder = 0 },
+     { type = "Time", start = "20:00:00" },
+  ] },
+  { type = "And", conditions = [
+     { type = "DayMod", divisor = 2, remainder = 1 },
+     { type = "Time", end = "04:00:00" },
+  ] },
+]
 
 # 第四班，第二天 4:00:00 - 12:00:00
 [[tasks.variants]]
-condition = {
-   type = "And",
-   conditions = [
-      { type = "DayMod", divisor = 2, remainder = 1 },
-      { type = "Time", start = "04:00:00", end = "12:00:00" },
-   ]
-}
 params = { plan_index = 3 }
+[tasks.variants.condition]
+type = "And"
+conditions = [
+  { type = "DayMod", divisor = 2, remainder = 1 },
+  { type = "Time", start = "04:00:00", end = "12:00:00" },
+]
 
 # 第五班，第二天 12:00:00 - 20:00:00
 [[tasks.variants]]
-condition = {
-   type = "And",
-   conditions = [
-      { type = "DayMod", divisor = 2, remainder = 1 },
-      { type = "Time", start = "12:00:00", end = "20:00:00" },
-   ]
-}
 params = { plan_index = 4 }
+[tasks.variants.condition]
+type = "And"
+conditions = [
+  { type = "DayMod", divisor = 2, remainder = 1 },
+  { type = "Time", start = "12:00:00", end = "20:00:00" },
+]
 
 # 第六班，第二天 20:00:00 - 第三天（新的第一天）4:00:00
 [[tasks.variants]]
-condition = {
-   type = "Or",
-   conditions = [
-      { type = "And", conditions = [
-         { type = "DayMod", divisor = 2, remainder = 1 },
-         { type = "Time", start = "20:00:00" },
-      ] },
-      { type = "And", conditions = [
-         { type = "DayMod", divisor = 2, remainder = 0 },
-         { type = "Time", end = "04:00:00" },
-      ] },
-   ]
-}
 params = { plan_index = 5 }
+[tasks.variants.condition]
+type = "Or"
+conditions = [
+  { type = "And", conditions = [
+     { type = "DayMod", divisor = 2, remainder = 1 },
+     { type = "Time", start = "20:00:00" },
+  ] },
+  { type = "And", conditions = [
+     { type = "DayMod", divisor = 2, remainder = 0 },
+     { type = "Time", end = "04:00:00" },
+  ] },
+]
 ```
 
 在默认的策略下，如果有多个变体被匹配，第一个将会被使用。如果没有给出条件，那么变体将会总是被匹配，所以你可以把没有条件的变体放在最后，作为默认的情况。
