@@ -79,18 +79,14 @@ impl Condition {
         match self {
             Condition::Always => true,
             Condition::Weekday { weekdays } => {
-                let now = Local::now();
-                let weekday = now.date_naive().weekday();
+                let weekday = Local::now().weekday();
                 weekdays.contains(&weekday)
             }
             Condition::DayMod { divisor, remainder } => {
-                let now = Local::now();
-                let day = now.date_naive().num_days_from_ce() as u32;
-                day % divisor == *remainder
+                remainder_of_day_mod(*divisor) == *remainder
             }
             Condition::Time { start, end } => {
-                let now = Local::now();
-                let now_time = now.time();
+                let now_time = Local::now().time();
                 match (start, end) {
                     (Some(s), Some(e)) => time_in_range(&now_time, s, e),
                     (Some(s), None) => now_time >= *s,
@@ -137,6 +133,11 @@ fn time_in_range(time: &NaiveTime, start: &NaiveTime, end: &NaiveTime) -> bool {
     }
 }
 
+pub fn remainder_of_day_mod(divisor: u32) -> u32 {
+    let day = Local::now().date_naive().num_days_from_ce() as u32;
+    day % divisor
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -151,7 +152,7 @@ mod tests {
 
     mod active {
         use super::*;
-        use chrono::Duration;
+        use chrono::{Duration, NaiveDate};
 
         #[test]
         fn always() {
@@ -175,8 +176,36 @@ mod tests {
 
         #[test]
         fn day_mod() {
-            let now = chrono::Local::now();
-            let num_days = now.date_naive().num_days_from_ce() as u32;
+            // We don't care about the correctness of the num_days_from_ce() method
+            // We need to make sure it never changes during the update of chrono
+            assert_eq!(
+                NaiveDate::from_ymd_opt(1, 1, 1).unwrap().num_days_from_ce(),
+                1
+            );
+            assert_eq!(
+                NaiveDate::from_ymd_opt(1, 1, 2).unwrap().num_days_from_ce(),
+                2
+            );
+            assert_eq!(
+                NaiveDate::from_ymd_opt(2024, 1, 27)
+                    .unwrap()
+                    .num_days_from_ce(),
+                738912
+            );
+            assert_eq!(
+                NaiveDate::from_ymd_opt(2024, 2, 27)
+                    .unwrap()
+                    .num_days_from_ce(),
+                738943
+            );
+            assert_eq!(
+                NaiveDate::from_ymd_opt(2025, 1, 27)
+                    .unwrap()
+                    .num_days_from_ce(),
+                739278
+            );
+
+            let num_days = Local::now().num_days_from_ce() as u32;
 
             assert!(Condition::DayMod {
                 divisor: 1,
@@ -399,6 +428,40 @@ mod tests {
                     Token::Str("Wednesday"),
                     Token::Str("Friday"),
                     Token::SeqEnd,
+                    Token::MapEnd,
+                ],
+            );
+        }
+
+        #[test]
+        fn day_mod() {
+            let cond = Condition::DayMod {
+                divisor: 7,
+                remainder: 0,
+            };
+
+            assert_de_tokens(
+                &cond,
+                &[
+                    Token::Map { len: Some(3) },
+                    Token::Str("type"),
+                    Token::Str("DayMod"),
+                    Token::Str("divisor"),
+                    Token::U32(7),
+                    Token::Str("remainder"),
+                    Token::U32(0),
+                    Token::MapEnd,
+                ],
+            );
+
+            assert_de_tokens(
+                &cond,
+                &[
+                    Token::Map { len: Some(2) },
+                    Token::Str("type"),
+                    Token::Str("DayMod"),
+                    Token::Str("divisor"),
+                    Token::U32(7),
                     Token::MapEnd,
                 ],
             );

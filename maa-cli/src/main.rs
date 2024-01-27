@@ -215,6 +215,14 @@ enum SubCommand {
         #[arg(default_value_t = config::task::ClientType::Official)]
         client: config::task::ClientType,
     },
+    /// Get the remainder of given divisor and current date
+    ///
+    /// This command is used to calculate the value of remainder.
+    /// Which is may helpful to fill remainder in task condition.
+    Remainder {
+        /// The value of divisor
+        divisor: u32,
+    },
     /// List all available tasks
     List,
     /// Generate completion script for given shell
@@ -390,6 +398,9 @@ fn main() -> Result<()> {
             format,
         } => config::convert(&input, output.as_deref(), format)?,
         SubCommand::Activity { client } => activity::display_stage_activity(client)?,
+        SubCommand::Remainder { divisor } => {
+            println!("{}", config::task::remainder_of_day_mod(divisor));
+        }
         SubCommand::List => {
             let task_dir = dirs::config().join("tasks");
             if !task_dir.exists() {
@@ -876,6 +887,14 @@ mod test {
                 SubCommand::Activity {
                     client: config::task::ClientType::YoStarEN,
                 }
+            );
+        }
+
+        #[test]
+        fn remainder() {
+            assert_matches!(
+                CLI::parse_from(["maa", "remainder", "3"]).command,
+                SubCommand::Remainder { divisor: 3 }
             );
         }
 
