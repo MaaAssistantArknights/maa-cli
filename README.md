@@ -227,18 +227,18 @@ facility = ["Trade", "Reception", "Mfg", "Control", "Power", "Office", "Dorm"]
 dorm_trust_enabled = true
 filename = "normal.json" # 自定义的基建计划的文件名应该位于`$MAA_CONFIG_DIR/infrast`
 
-# 在12:00:00之前使用计划1，在12:00:00到18:00:00之间使用计划2，在18:00:00之后使用计划0
+# 在 18:00:00到第二天的 04:00:00 使用计划 0，在 12:00:00 之前使用计划 1，之后使用计划 2
 [[tasks.variants]]
-condition = { type = "Time", end = "12:00:00" } # 如果没有定义start，那么它将会是00:00:00
+condition = { type = "Time", start = "18:00:00", end = "04:00:00" } # 当结束时间小于开始时间时，结束时间被视为第二天的时间
+params = { plan_index = 0 }
+
+[[tasks.variants]]
+condition = { type = "Time", end = "12:00:00" } # 如果开始时间被省略，那么只要当前时间小于结束时间时，这个条件就会被匹配
 params = { plan_index = 1 }
 
 [[tasks.variants]]
-condition = { type = "Time", start = "12:00:00", end = "18:00:00" }
+condition = { type = "Time", start = "12:00:00" } # 如果结束时间被省略，那么只要当前时间大于开始时间时，这个条件就会被匹配
 params = { plan_index = 2 }
-
-[[tasks.variants]]
-condition = { type = "Time", start = "18:00:00" }
-params = { plan_index = 0 }
 ```
 
 这里的 `condition` 字段用于确定哪一个变体应该被使用，而匹配的变体的 `params` 字段将会被合并到任务的参数中。
