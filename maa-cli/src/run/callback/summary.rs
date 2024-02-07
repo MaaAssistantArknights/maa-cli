@@ -661,11 +661,12 @@ impl std::fmt::Display for RoguelikeDetail {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(times) = self.times {
             write!(f, "Explore {} times", times)?;
-        }
-        if let Some(invest) = self.invest {
-            if invest > 0 {
-                write!(f, " invest {} times", invest)?;
+            if let Some(invest) = self.invest {
+                if invest > 0 {
+                    write!(f, " invest {} times", invest)?;
+                }
             }
+            writeln!(f)?;
         }
         Ok(())
     }
@@ -977,7 +978,7 @@ mod tests {
             let mut detail = RoguelikeDetail::new();
             detail.set_times(2);
             detail.set_invest(1);
-            assert_eq!(detail.to_string(), "Explore 2 times invest 1 times");
+            assert_eq!(detail.to_string(), "Explore 2 times invest 1 times\n");
         }
     }
 }
