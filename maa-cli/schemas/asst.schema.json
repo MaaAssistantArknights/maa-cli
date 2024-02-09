@@ -1,13 +1,24 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/MaaAssistantArknights/maa-cli/raw/v0.4.0/maa-cli/schemas/asst.schema.json",
+  "$id": "https://github.com/MaaAssistantArknights/maa-cli/raw/v0.4.3/maa-cli/schemas/asst.schema.json",
   "type": "object",
   "properties": {
     "connection": {
-      "oneOf": [
-        { "$ref": "#/definitions/adbConnection" },
-        { "$ref": "#/definitions/playToolsConnection" }
-      ]
+      "type": "object",
+      "properties": {
+        "preset": {
+          "type": "string",
+          "enum": ["ADB", "PlayCover", "MuMuPro"],
+          "default": "ADB"
+        },
+        "adb_path": {
+          "type": "string",
+          "format": "path",
+          "default": "adb"
+        },
+        "address": { "type": "string" },
+        "config": { "type": "string" }
+      }
     },
     "resource": {
       "type": "object",
