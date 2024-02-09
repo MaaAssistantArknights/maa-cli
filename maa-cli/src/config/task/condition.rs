@@ -79,7 +79,7 @@ impl Condition {
         match self {
             Condition::Always => true,
             Condition::Weekday { weekdays } => {
-                let weekday = Local::now().weekday();
+                let weekday = WeekdayCutter::new(4, 0).get_amended_weekday();
                 weekdays.contains(&weekday)
             }
             Condition::DayMod { divisor, remainder } => {
@@ -138,6 +138,36 @@ pub fn remainder_of_day_mod(divisor: u32) -> u32 {
     day % divisor
 }
 
+struct WeekdayCutter {
+    current_weekday: Weekday,
+    current_time: NaiveTime,
+    boundary_time: NaiveTime,
+}
+
+impl WeekdayCutter {
+    pub fn new(hour: u32, minute: u32) -> Self {
+        let time = match NaiveTime::from_hms_opt(hour, minute, 0) {
+            Some(t) => t,
+            None => NaiveTime::from_hms_opt(4, 0, 0).unwrap(),
+        };
+        Self {
+            boundary_time: time,
+            current_time: Local::now().time(),
+            current_weekday: Local::now().weekday(),
+        }
+    }
+
+    pub fn get_amended_weekday(&self) -> Weekday {
+        let mut weekday = self.current_weekday;
+        if let std::cmp::Ordering::Less | std::cmp::Ordering::Equal =
+            self.current_time.cmp(&self.boundary_time)
+        {
+            weekday = weekday.pred();
+        }
+        weekday
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -161,6 +191,7 @@ mod tests {
 
         #[test]
         fn weekday() {
+            //This test case is outdate
             let now = chrono::Local::now();
             let weekday = now.date_naive().weekday();
 
@@ -625,6 +656,39 @@ mod tests {
                     Token::MapEnd,
                 ],
             );
+        }
+    }
+
+    mod weekday_cutter {
+        use chrono::{NaiveTime, Timelike, Weekday};
+
+        use crate::config::task::condition::WeekdayCutter;
+
+        #[test]
+        fn construct() {
+            let cutter = WeekdayCutter::new(12, 30);
+            assert_eq!(cutter.boundary_time.hour(), 12);
+            assert_eq!(cutter.boundary_time.minute(), 30);
+            let cutter = WeekdayCutter::new(114, 514);
+            assert_eq!(cutter.boundary_time.hour(), 4);
+            assert_eq!(cutter.boundary_time.minute(), 0);
+        }
+
+        #[test]
+        fn weekday_divide() {
+            let cutter = WeekdayCutter {
+                current_weekday: Weekday::Mon,
+                current_time: NaiveTime::from_hms_opt(2, 0, 0).unwrap(),
+                boundary_time: NaiveTime::from_hms_opt(4, 0, 0).unwrap(),
+            };
+            assert_eq!(cutter.get_amended_weekday(), Weekday::Sun);
+
+            let cutter = WeekdayCutter {
+                current_weekday: Weekday::Mon,
+                current_time: NaiveTime::from_hms_opt(18, 0, 0).unwrap(),
+                boundary_time: NaiveTime::from_hms_opt(4, 0, 0).unwrap(),
+            };
+            assert_eq!(cutter.get_amended_weekday(), Weekday::Mon);
         }
     }
 }
