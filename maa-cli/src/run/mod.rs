@@ -11,9 +11,8 @@ pub mod preset;
 
 use crate::{
     config::{
-        asst::{AsstConfig, Preset},
+        asst::{with_asst_config, with_mut_asst_config, AsstConfig},
         task::TaskConfig,
-        FindFileOrDefault,
     },
     consts::MAA_CORE_LIB,
     dirs::{self, Ensure},
@@ -95,29 +94,24 @@ fn run_core<F>(f: F, args: CommonArgs) -> Result<()>
 where
     F: FnOnce(&AsstConfig) -> Result<TaskConfig>,
 {
-    // Auto update hot update resource
     resource::update(true)?;
 
-    // Load asst config
-    let mut asst_config = AsstConfig::find_file_or_default(&dirs::config().join("asst"))
-        .context("Failed to find asst config file!")?;
-
-    args.apply_to(&mut asst_config);
-
-    let task = f(&asst_config)?;
+    // Prepare config
+    with_mut_asst_config(|config| args.apply_to(config));
+    let task = with_asst_config(f)?;
     let task_config = task.init()?;
     if let Some(client_type) = task_config.client_type {
         debug!("Detected client type: {}", client_type);
         if let Some(resource) = client_type.resource() {
-            asst_config.resource.use_global_resource(resource);
+            with_mut_asst_config(|config| {
+                config.resource.use_global_resource(resource);
+            });
         }
     }
 
-    // Load and setup MaaCore
     load_core().context("Failed to load MaaCore!")?;
-    setup_core(&asst_config)?;
+    with_asst_config(setup_core)?;
 
-    // Register signal handlers
     let stop_bool = Arc::new(std::sync::atomic::AtomicBool::new(false));
     for sig in TERM_SIGNALS {
         signal_hook::flag::register_conditional_default(*sig, Arc::clone(&stop_bool))
@@ -126,11 +120,10 @@ where
             .context("Failed to register signal handler!")?;
     }
 
-    // Create and setup Assistant
     let asst = Assistant::new(Some(callback::default_callback), None);
-    asst_config.instance_options.apply_to(&asst)?;
 
-    // Register tasks
+    with_asst_config(|config| config.instance_options.apply_to(&asst))?;
+
     let mut summarys = (!args.no_summary).then(summary::Summary::new);
     for task in task_config.tasks.iter() {
         let name = task.name();
@@ -151,33 +144,34 @@ where
         summary::init(s);
     }
 
-    // Prepare connection
-    let (adb, addr, config) = asst_config.connection.connect_args();
-
-    // Launch external app like PlayCover or Emulator
-    // Only support PlayCover on macOS now, may support more in the future
     #[cfg(target_os = "macos")]
-    let app = match asst_config.connection.preset() {
-        Preset::PlayCover => playcover::PlayCoverApp::new(
-            task_config.start_app,
-            task_config.close_app,
-            task_config.client_type.unwrap_or_default(),
-            addr,
-        ),
-        _ => None,
-    };
+    let app = with_asst_config(|config| {
+        use crate::config::asst::ConnectionConfig::PlayTools;
+        if let PlayTools { ref address, .. } = config.connection {
+            playcover::PlayCoverApp::new(
+                task_config.start_app,
+                task_config.close_app,
+                task_config.client_type.unwrap_or_default(),
+                address.to_owned(),
+            )
+        } else {
+            None
+        }
+    });
 
     if !args.dry_run {
-        // Startup external app
         #[cfg(target_os = "macos")]
         let rt = Runtime::new().context("Failed to create tokio runtime")?;
+
         #[cfg(target_os = "macos")]
         if let Some(app) = app.as_ref() {
             rt.block_on(app.open())?;
         }
 
-        // Connect to game or emulator
-        asst.async_connect(adb, addr, config, true)?;
+        with_asst_config(|config| {
+            let (adb, addr, config) = config.connection.connect_args();
+            asst.async_connect(adb, addr, config, true)
+        })?;
 
         asst.start()?;
 
@@ -190,7 +184,6 @@ where
 
         asst.stop()?;
 
-        // Close external app
         #[cfg(target_os = "macos")]
         if let Some(app) = app.as_ref() {
             rt.block_on(app.close())?;

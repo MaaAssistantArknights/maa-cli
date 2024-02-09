@@ -8,15 +8,15 @@ use tokio::{io::AsyncWriteExt, net::TcpStream};
 const TERMINATE: &[u8] = &[0x4d, 0x41, 0x41, 0x00, 0x00, 0x04, 0x54, 0x45, 0x52, 0x4d];
 
 #[cfg_attr(test, derive(PartialEq, Debug))]
-pub struct PlayCoverApp<'a> {
+pub struct PlayCoverApp {
     client: ClientType,
-    address: &'a str,
+    address: String,
     start: bool,
     close: bool,
 }
 
-impl<'a> PlayCoverApp<'a> {
-    pub fn new(start: bool, close: bool, client: ClientType, address: &'a str) -> Option<Self> {
+impl PlayCoverApp {
+    pub fn new(start: bool, close: bool, client: ClientType, address: String) -> Option<Self> {
         if start || close {
             Some(Self {
                 client,
@@ -30,7 +30,7 @@ impl<'a> PlayCoverApp<'a> {
     }
 
     async fn connect(&self) -> Result<TcpStream> {
-        let stream = TcpStream::connect(self.address)
+        let stream = TcpStream::connect(&self.address)
             .await
             .context("Failed to connect to game!")?;
 
@@ -89,27 +89,27 @@ mod tests {
     fn from() {
         use crate::config::task::ClientType::*;
         assert_eq!(
-            PlayCoverApp::new(true, true, Official, "localhost:1717"),
+            PlayCoverApp::new(true, true, Official, "localhost:1717".to_string(),),
             Some(PlayCoverApp {
                 start: true,
                 close: true,
                 client: Official,
-                address: "localhost:1717",
+                address: "localhost:1717".to_string(),
             })
         );
 
         assert_eq!(
-            PlayCoverApp::new(false, true, Official, "localhost:1717"),
+            PlayCoverApp::new(false, true, Official, "localhost:1717".to_string(),),
             Some(PlayCoverApp {
                 start: false,
                 close: true,
                 client: Official,
-                address: "localhost:1717",
+                address: "localhost:1717".to_string(),
             })
         );
 
         assert_eq!(
-            PlayCoverApp::new(false, false, Official, "localhost:1717"),
+            PlayCoverApp::new(false, false, Official, "localhost:1717".to_string(),),
             None
         );
     }
