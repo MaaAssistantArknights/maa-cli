@@ -438,75 +438,80 @@ mod test {
         use super::*;
 
         use crate::config::cli::Channel;
+
         use std::env;
 
-        #[test]
-        fn global_options() {
-            let old = if let Some(val) = env::var_os("MAA_LOG") {
-                env::remove_var("MAA_LOG");
-                Some(val)
-            } else {
-                None
-            };
+        use rusty_fork::rusty_fork_test;
 
-            assert_eq!(
-                CLI::parse_from(["maa", "list"]).verbose.log_level_filter(),
-                log::LevelFilter::Warn
-            );
-            assert_eq!(
-                CLI::parse_from(["maa", "-v", "list"])
-                    .verbose
-                    .log_level_filter(),
-                log::LevelFilter::Info
-            );
-            assert_eq!(
-                CLI::parse_from(["maa", "list", "-v"])
-                    .verbose
-                    .log_level_filter(),
-                log::LevelFilter::Info
-            );
-            assert_eq!(
-                CLI::parse_from(["maa", "list", "--verbose"])
-                    .verbose
-                    .log_level_filter(),
-                log::LevelFilter::Info
-            );
+        rusty_fork_test! {
+            #[test]
+            fn global_options() {
+                let old = if let Some(val) = env::var_os("MAA_LOG") {
+                    env::remove_var("MAA_LOG");
+                    Some(val)
+                } else {
+                    None
+                };
 
-            assert_eq!(
-                CLI::parse_from(["maa", "list", "-vv"])
-                    .verbose
-                    .log_level_filter(),
-                log::LevelFilter::Debug
-            );
+                assert_eq!(
+                    CLI::parse_from(["maa", "list"]).verbose.log_level_filter(),
+                    log::LevelFilter::Warn
+                );
+                assert_eq!(
+                    CLI::parse_from(["maa", "-v", "list"])
+                        .verbose
+                        .log_level_filter(),
+                    log::LevelFilter::Info
+                );
+                assert_eq!(
+                    CLI::parse_from(["maa", "list", "-v"])
+                        .verbose
+                        .log_level_filter(),
+                    log::LevelFilter::Info
+                );
+                assert_eq!(
+                    CLI::parse_from(["maa", "list", "--verbose"])
+                        .verbose
+                        .log_level_filter(),
+                    log::LevelFilter::Info
+                );
 
-            assert_eq!(
-                CLI::parse_from(["maa", "list", "-q"])
-                    .verbose
-                    .log_level_filter(),
-                log::LevelFilter::Error
-            );
+                assert_eq!(
+                    CLI::parse_from(["maa", "list", "-vv"])
+                        .verbose
+                        .log_level_filter(),
+                    log::LevelFilter::Debug
+                );
 
-            env::set_var("MAA_LOG", "Info");
-            assert_eq!(
-                CLI::parse_from(["maa", "list"]).verbose.log_level_filter(),
-                log::LevelFilter::Info
-            );
+                assert_eq!(
+                    CLI::parse_from(["maa", "list", "-q"])
+                        .verbose
+                        .log_level_filter(),
+                    log::LevelFilter::Error
+                );
 
-            // Restore the environment variable
-            if let Some(old) = old {
-                env::set_var("MAA_LOG", old);
+                env::set_var("MAA_LOG", "Info");
+                assert_eq!(
+                    CLI::parse_from(["maa", "list"]).verbose.log_level_filter(),
+                    log::LevelFilter::Info
+                );
+
+                // Restore the environment variable
+                if let Some(old) = old {
+                    env::set_var("MAA_LOG", old);
+                }
+
+                assert!(!CLI::parse_from(["maa", "list"]).batch);
+                assert!(CLI::parse_from(["maa", "list", "--batch"]).batch);
+
+                assert!(CLI::parse_from(["maa", "list"]).log_file.is_none());
+                assert!(CLI::parse_from(["maa", "list", "--log-file"])
+                    .log_file
+                    .is_some_and(|x| x.is_none()));
+                assert!(CLI::parse_from(["maa", "list", "--log-file=path"])
+                    .log_file
+                    .is_some_and(|x| x.is_some_and(|x| x == PathBuf::from("path"))));
             }
-
-            assert!(!CLI::parse_from(["maa", "list"]).batch);
-            assert!(CLI::parse_from(["maa", "list", "--batch"]).batch);
-
-            assert!(CLI::parse_from(["maa", "list"]).log_file.is_none());
-            assert!(CLI::parse_from(["maa", "list", "--log-file"])
-                .log_file
-                .is_some_and(|x| x.is_none()));
-            assert!(CLI::parse_from(["maa", "list", "--log-file=path"])
-                .log_file
-                .is_some_and(|x| x.is_some_and(|x| x == PathBuf::from("path"))));
         }
 
         #[cfg(feature = "core_installer")]

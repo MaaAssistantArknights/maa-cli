@@ -117,3 +117,4 @@ features = ["rt"]
 [dev-dependencies]
 regex = "1.10.2"
 serde_test = "1"
+rusty-fork = "0.3"

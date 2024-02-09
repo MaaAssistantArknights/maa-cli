@@ -39,6 +39,7 @@ jobs:
           - windows-latest
     env:
       MAA_EXTRA_SHARE_NAME: maa-test
+      MAA_LOG: trace
     steps:
       - name: Checkout
         uses: actions/checkout@v4
