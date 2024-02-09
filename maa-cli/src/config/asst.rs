@@ -23,8 +23,7 @@ impl AsstConfig {
         static_options: StaticOptions,
         mut instance_options: InstanceOptions,
     ) -> Self {
-        if matches!(connection.preset, Preset::PlayCover)
-        {
+        if matches!(connection.preset, Preset::PlayCover) {
             info!("Detected connection with PlayTools");
             instance_options.force_playtools();
             resource.use_platform_diff_resource("iOS");
@@ -83,6 +82,7 @@ pub struct ConnectionConfig {
 }
 
 impl ConnectionConfig {
+    #[cfg(target_os = "macos")]
     pub fn preset(&self) -> Preset {
         self.preset
     }
@@ -93,12 +93,25 @@ impl ConnectionConfig {
     }
 
     pub fn connect_args(&self) -> (&str, &str, &str) {
-        let adb_path = self.adb_path.as_deref().unwrap_or_else(|| self.preset.default_adb_path());
-        let address = self.address.as_deref().unwrap_or_else(|| self.preset.default_address());
-        let config = self.config.as_deref().unwrap_or_else(|| self.preset.default_config());
+        let adb_path = self
+            .adb_path
+            .as_deref()
+            .unwrap_or_else(|| self.preset.default_adb_path());
+        let address = self
+            .address
+            .as_deref()
+            .unwrap_or_else(|| self.preset.default_address());
+        let config = self
+            .config
+            .as_deref()
+            .unwrap_or_else(|| self.preset.default_config());
         debug!(
             "Connecting to {address} with config {config} via {}",
-            if matches!(self.preset, Preset::PlayCover) { "PlayTools" } else { adb_path }
+            if matches!(self.preset, Preset::PlayCover) {
+                "PlayTools"
+            } else {
+                adb_path
+            }
         );
 
         (adb_path, address, config)
@@ -144,7 +157,7 @@ impl<'de> Deserialize<'de> for Preset {
                 }
             }
         }
-        
+
         deserializer.deserialize_str(PresetVisitor)
     }
 }
@@ -152,8 +165,7 @@ impl<'de> Deserialize<'de> for Preset {
 impl Preset {
     fn default_adb_path(self) -> &'static str {
         match self {
-            Preset::MuMuPro => 
-                "/Applications/MuMuPlayer.app/Contents/MacOS/MuMuEmulator.app/Contents/MacOS/tools/adb",
+            Preset::MuMuPro => "/Applications/MuMuPlayer.app/Contents/MacOS/MuMuEmulator.app/Contents/MacOS/tools/adb",
             Preset::PlayCover => "",
             Preset::ADB => "adb",
         }
@@ -534,10 +546,7 @@ mod tests {
         fn connection_config() {
             assert_de_tokens(
                 &ConnectionConfig::default(),
-                &[
-                    Token::Map { len: Some(0) },
-                    Token::MapEnd,
-                ],
+                &[Token::Map { len: Some(0) }, Token::MapEnd],
             );
 
             assert_de_tokens(
@@ -602,7 +611,6 @@ mod tests {
                     Token::MapEnd,
                 ],
             );
-
         }
 
         #[test]
@@ -793,7 +801,6 @@ mod tests {
                 ("adb", "emulator-5554", config_based_on_os()),
             );
 
-
             assert_eq!(
                 ConnectionConfig {
                     preset: Preset::MuMuPro,
@@ -809,8 +816,6 @@ mod tests {
                 ),
             );
 
-
-
             assert_eq!(
                 ConnectionConfig {
                     preset: Preset::ADB,
@@ -821,7 +826,6 @@ mod tests {
                 .connect_args(),
                 ("/path/to/adb", "127.0.0.1:11111", "SomeConfig"),
             );
-
         }
     }
 

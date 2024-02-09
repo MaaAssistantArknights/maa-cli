@@ -10,11 +10,7 @@ mod playcover;
 pub mod preset;
 
 use crate::{
-    config::{
-        asst::{AsstConfig, Preset},
-        task::TaskConfig,
-        FindFileOrDefault,
-    },
+    config::{asst::AsstConfig, task::TaskConfig, FindFileOrDefault},
     consts::MAA_CORE_LIB,
     dirs::{self, Ensure},
     installer::resource,
@@ -158,7 +154,7 @@ where
     // Only support PlayCover on macOS now, may support more in the future
     #[cfg(target_os = "macos")]
     let app = match asst_config.connection.preset() {
-        Preset::PlayCover => playcover::PlayCoverApp::new(
+        crate::config::asst::Preset::PlayCover => playcover::PlayCoverApp::new(
             task_config.start_app,
             task_config.close_app,
             task_config.client_type.unwrap_or_default(),
