@@ -463,7 +463,7 @@ The related configurations of `MaaCore` is located in `$MAA_CONFIG_DIR/asst.toml
 
 ```toml
 [connection]
-type = "ADB"
+preset = "MuMuPro"
 adb_path = "adb"
 device = "emulator-5554"
 config = "CompatMac"
@@ -486,33 +486,32 @@ kill_adb_on_exit = false
 
 #### Connection
 
-The `connection` section is used to specify how to connect to the game. Currently, there are two types of connection: `ADB` and `PlayTools`.
-
-If you use `ADB`, you should set `adb_path` and `device` fields:
+The `connection` section is used to specify how to connect to the game:
 
 ```toml
 [connection]
-type = "ADB"
-adb_path = "adb" # the path of adb executable
-device = "emulator-5554" # the serial of your android device
-config = "General" # the config of maa
+adb_path = "adb" # the path of adb executable, default to "adb", which means use adb in PATH
+address = "emulator-5554" # the address of device, such as "emulator-5554" or "127.0.0.1:5555"
+config = "General" # the config of maa, should not be changed most of time
 ```
 
-Note, the `device` field is any valid input of `-s` option of `adb` command, like `emulator-5554` or `127.0.0.1:5555`.
+`adb_path` is the path of `adb` executable, you can set it to the absolute path of `adb` or or leave it empty if it is in PATH.
+You can use `adb` shipped by emulator, like `address` is the address of device used by `adb`, like `emulator-5554` or `127.0.0.1:[port]`.
+`config` used to specify some configurations of host and emulator. It's default value is `CompatMac` on macOS, `CompatPOSIXShell` on Linux and `General` on other platforms. More optional configs can be found in `config.json` in resource directory.
 
-If you use `PlayTools`, you should set `address`
-which is the address of `MaaTools` set in `PlayCover`,
-more details can be found at
-[here](https://maa.plus/docs/en-us/1.4-EMULATOR_SUPPORTS_FOR_MAC.html#✅-playcover-the-software-runs-most-fluently-for-its-nativity-🚀):
+For some common emulators, you can use `preset` to use predefined configurations:
 
 ```toml
 [connection]
-type = "PlayTools"
-address = "localhost:1717" # the address of MaaTools
-config = "CompatMac" # the same as above
+preset = "MuMuPro"
+adb_path = "/path/to/other/adb" # override predefined adb executable path
+address = "127.0.0.1:7777" # override the predefined address
 ```
 
-Both `ADB` and `PlayTools` share the `config` field, which is a parameter of `connect` function of MAA. Its default value is `CompatMac` on macOS, `CompatPOSIXShell` on Linux and `General` on other platforms. More optional configs can be found in `config.json` in resource directory.
+Currently, there is only one preset `MuMuPro` for emulators. Issue and PR are welcome for new preset.
+
+There is a special preset `PlayCover`, used for iOS App running on macOS by PlayCover.
+In this case, `adb_path` is ignored and `address` is used to specify the address of `MaaTools` set in `PlayCover`,
 
 #### Resource
 
