@@ -465,7 +465,7 @@ description = "medicine to use"
 
 ```toml
 [connection]
-type = "ADB"
+preset = "MuMuPro"
 adb_path = "adb"
 device = "emulator-5554"
 config = "CompatMac"
@@ -488,30 +488,31 @@ kill_adb_on_exit = false
 
 #### 连接配置
 
-`[connection]` 相关字段用于指定 MaaCore 连接游戏的方式和参数。目前可用的连接方式有 `ADB` 和 `PlayTools`。
-
-当你使用 `ADB` 连接时，你需要提供 `adb` 的路径和设备的序列号：
+`[connection]` 相关字段用于指定 MaaCore 连接游戏的参数：
 
 ```toml
 [connection]
-type = "ADB"
-adb_path = "adb" # adb可执行文件的路径
-device = "emulator-5554" # 你的android设备的序列号
-config = "General" # maa connect的配置
+adb_path = "adb" # adb 可执行文件的路径，默认值为 "adb"，这意味着 adb 可执行文件在环境变量 PATH 中
+address = = "emulator-5554" # 连接地址，比如 "emulator-5554" 或者 "127.0.0.1:5555"
+config = "General" # 连接配置，通常不需要修改
 ```
 
-注意，此处的 device 是任何 `adb -s` 可以接受的值，比如 `emulator-5554` 和 `127.0.0.1:5555`。
+`adb_path` 是 `adb` 可执行文件的路径，你可以指定其路径，或者将其添加到环境变量 `PATH` 中，以便 `MaaCore` 可以找到它。大多数模拟器自带 `adb`，你可以直接使用其自带的 `adb`，而不需要额外安装，否则你需要自行安装 `adb`。
+`address` 是 `adb` 的连接地址。对于模拟器，你可以使用 `127.0.0.1:[端口号]`，常用的模拟器端口号参见[常见问题](`https://maa.plus/docs/用户手册/常见问题.html#模拟器调试端口`)。
+`config` 用于指定一些平台和模拟器相关的配置。对于 Linux 他默认为 `CompatPOSIXShell`，对于 macOS 他默认为 `CompatMac`，对于 Windows 他默认为 `General`。更多可选配置可以在资源文件夹中的 `config.json` 文件中找到。
 
-当你使用 `PlayTools` 连接时，你需要提供 `PlayTools` 的地址：
+对于一些常用的模拟器，你可以直接使用 `preset` 来使用预设的配置：
 
 ```toml
 [connection]
-type = "PlayCover"
-address = "localhost:1717" # PlayTools的地址
-config = "CompatMac" # maa connect的配置
+preset = "MuMuPro" # 使用 MuMuPro 预设的连接配置
+adb_path = "/path/to/adb" # 如果你需要的话，你可以覆盖预设的 adb 路径，大多数情况下你不需要这么做
+address = "127.0.0.1:7777" # 如果你需要的话，你可以覆盖预设的地址
 ```
 
-两者都需要提供 `config`，这个值将被传给 MaaCore, 用于指定一些平台和模拟器相关的配置。对于 Linux 他默认为 `CompatPOSIXShell`，对于 macOS 他默认为 `CompatMac`，对于 Windows 他默认为 `General`。更多可选配置可以在资源文件夹中的 `config.json` 文件中找到。
+目前只有 `MuMuPro` 一个模拟器的预设，如果有其他常用模拟器的预设，欢迎提交 issue 或者 PR。
+
+此处有一个特殊的预设 `PlayCover`，其用于在 macOS 上连接直接通过 `PlayCover` 原生运行的游戏客户端。这种情况下不需要指定 `adb_path` 且 `address` 不是 `adb` l连接的地址而是 `PlayTools` 的地址，具体使用参见 [PlayCover 支持文档](https://maa.plus/docs/用户手册/模拟器和设备支持/Mac模拟器.html#✅-playcover-原生运行最流畅-🚀).
 
 #### 资源配置
 

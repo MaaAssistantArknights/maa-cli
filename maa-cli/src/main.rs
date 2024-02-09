@@ -442,7 +442,12 @@ mod test {
 
         #[test]
         fn global_options() {
-            env::remove_var("MAA_LOG");
+            let old = if let Some(val) = env::var_os("MAA_LOG") {
+                env::remove_var("MAA_LOG");
+                Some(val)
+            } else {
+                None
+            };
 
             assert_eq!(
                 CLI::parse_from(["maa", "list"]).verbose.log_level_filter(),
@@ -486,7 +491,11 @@ mod test {
                 CLI::parse_from(["maa", "list"]).verbose.log_level_filter(),
                 log::LevelFilter::Info
             );
-            env::remove_var("MAA_LOG");
+
+            // Restore the environment variable
+            if let Some(old) = old {
+                env::set_var("MAA_LOG", old);
+            }
 
             assert!(!CLI::parse_from(["maa", "list"]).batch);
             assert!(CLI::parse_from(["maa", "list", "--batch"]).batch);

@@ -1,11 +1,8 @@
-use super::FindFileOrDefault;
-
 use crate::dirs::{self, global_path};
 
-use std::{path::PathBuf, sync::Mutex};
+use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use lazy_static::lazy_static;
 use log::{debug, info, warn};
 use maa_sys::{Assistant, InstanceOptionKey, StaticOptionKey, TouchMode};
 use serde::Deserialize;
@@ -17,6 +14,28 @@ pub struct AsstConfig {
     pub resource: ResourceConfig,
     pub static_options: StaticOptions,
     pub instance_options: InstanceOptions,
+}
+
+impl AsstConfig {
+    pub fn new(
+        connection: ConnectionConfig,
+        mut resource: ResourceConfig,
+        static_options: StaticOptions,
+        mut instance_options: InstanceOptions,
+    ) -> Self {
+        if matches!(connection.preset, Preset::PlayCover) {
+            info!("Detected connection with PlayTools");
+            instance_options.force_playtools();
+            resource.use_platform_diff_resource("iOS");
+        }
+
+        Self {
+            connection,
+            resource,
+            static_options,
+            instance_options,
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for AsstConfig {
@@ -36,133 +55,143 @@ impl<'de> Deserialize<'de> for AsstConfig {
             instance_options: InstanceOptions,
         }
 
-        let mut config = AsstConfigHelper::deserialize(deserializer)?;
+        let config = AsstConfigHelper::deserialize(deserializer)?;
 
-        if matches!(config.connection, ConnectionConfig::PlayTools { .. }) {
-            info!("Detected connection with PlayTools");
-            config.instance_options.force_playtools();
-            config.resource.use_platform_diff_resource("iOS");
-        }
-
-        Ok(Self {
-            connection: config.connection,
-            resource: config.resource,
-            static_options: config.static_options,
-            instance_options: config.instance_options,
-        })
+        Ok(AsstConfig::new(
+            config.connection,
+            config.resource,
+            config.static_options,
+            config.instance_options,
+        ))
     }
 }
 
 impl super::FromFile for AsstConfig {}
 
-lazy_static! {
-    static ref ASST_CONFIG: Mutex<AsstConfig> = Mutex::new(
-        AsstConfig::find_file_or_default(&dirs::config().join("asst"))
-            .expect("Failed to load asst config")
-    );
-}
-
-pub fn with_asst_config<R>(f: impl FnOnce(&AsstConfig) -> R) -> R {
-    let asst_config = ASST_CONFIG.lock().unwrap();
-    f(&asst_config)
-}
-
-pub fn with_mut_asst_config<R>(f: impl FnOnce(&mut AsstConfig) -> R) -> R {
-    let mut asst_config = ASST_CONFIG.lock().unwrap();
-    f(&mut asst_config)
-}
-
 #[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Deserialize, Clone)]
-#[serde(tag = "type")]
-#[serde(deny_unknown_fields)]
-#[allow(clippy::upper_case_acronyms)]
-pub enum ConnectionConfig {
-    ADB {
-        #[serde(default = "default_adb_path")]
-        adb_path: String,
-        #[serde(default = "default_device")]
-        device: String,
-        #[serde(default = "default_config")]
-        config: String,
-    },
-    #[serde(alias = "PlayCover")]
-    PlayTools {
-        #[serde(default = "default_playcover_address")]
-        address: String,
-        #[serde(default = "default_config")]
-        config: String,
-    },
+#[derive(Deserialize, Clone, Default)]
+pub struct ConnectionConfig {
+    #[serde(default, alias = "type")]
+    preset: Preset,
+    #[serde(default)]
+    adb_path: Option<String>,
+    #[serde(default, alias = "device")]
+    address: Option<String>,
+    #[serde(default)]
+    config: Option<String>,
 }
-
-const EMPTY_STR: &str = "";
 
 impl ConnectionConfig {
-    pub fn set_address(&mut self, addr: impl Into<String>) -> &Self {
-        match self {
-            ConnectionConfig::ADB { device, .. } => {
-                *device = addr.into();
-            }
-            ConnectionConfig::PlayTools { address, .. } => {
-                *address = addr.into();
-            }
-        }
+    #[cfg(target_os = "macos")]
+    pub fn preset(&self) -> Preset {
+        self.preset
+    }
+
+    pub fn set_address(&mut self, address: impl Into<String>) -> &mut Self {
+        self.address = Some(address.into());
         self
     }
 
     pub fn connect_args(&self) -> (&str, &str, &str) {
+        let adb_path = self
+            .adb_path
+            .as_deref()
+            .unwrap_or_else(|| self.preset.default_adb_path());
+        let address = self
+            .address
+            .as_deref()
+            .unwrap_or_else(|| self.preset.default_address());
+        let config = self
+            .config
+            .as_deref()
+            .unwrap_or_else(|| self.preset.default_config());
+        debug!(
+            "Connecting to {address} with config {config} via {}",
+            if matches!(self.preset, Preset::PlayCover) {
+                "PlayTools"
+            } else {
+                adb_path
+            }
+        );
+
+        (adb_path, address, config)
+    }
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Default, Clone, Copy)]
+#[allow(clippy::upper_case_acronyms)]
+pub enum Preset {
+    MuMuPro,
+    PlayCover,
+    #[default]
+    ADB,
+}
+
+impl<'de> Deserialize<'de> for Preset {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct PresetVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for PresetVisitor {
+            type Value = Preset;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a connection preset name")
+            }
+
+            fn visit_str<E>(self, value: &str) -> std::result::Result<Preset, E>
+            where
+                E: serde::de::Error,
+            {
+                match value {
+                    "MuMuPro" => Ok(Preset::MuMuPro),
+                    "PlayCover" | "PlayTools" => Ok(Preset::PlayCover),
+                    "ADB" => Ok(Preset::ADB),
+                    _ => {
+                        warn!("Unknown connection preset: {}, ignoring", value);
+                        Ok(Preset::ADB)
+                    }
+                }
+            }
+        }
+
+        deserializer.deserialize_str(PresetVisitor)
+    }
+}
+
+impl Preset {
+    fn default_adb_path(self) -> &'static str {
         match self {
-            ConnectionConfig::ADB {
-                adb_path,
-                device,
-                config,
-            } => {
-                debug!(
-                    "Connecting to {} with config {} via {}",
-                    device, config, adb_path
-                );
-                (adb_path, device, config)
-            }
-            ConnectionConfig::PlayTools { address, config } => {
-                debug!(
-                    "Connecting to {} with config {} via PlayTools",
-                    address, config
-                );
-                (EMPTY_STR, address, config)
-            }
+            Preset::MuMuPro => "/Applications/MuMuPlayer.app/Contents/MacOS/MuMuEmulator.app/Contents/MacOS/tools/adb",
+            Preset::PlayCover => "",
+            Preset::ADB => "adb",
         }
+    }
+
+    fn default_address(self) -> &'static str {
+        match self {
+            Preset::MuMuPro => "127.0.0.1:16384",
+            Preset::PlayCover => "localhost:1717",
+            Preset::ADB => "emulator-5554",
+        }
+    }
+
+    fn default_config(self) -> &'static str {
+        // May be preset specific in the future
+        config_based_on_os()
     }
 }
 
-impl Default for ConnectionConfig {
-    fn default() -> Self {
-        ConnectionConfig::ADB {
-            adb_path: default_adb_path(),
-            device: default_device(),
-            config: default_config(),
-        }
-    }
-}
-
-fn default_adb_path() -> String {
-    String::from("adb")
-}
-
-fn default_device() -> String {
-    String::from("emulator-5554")
-}
-
-fn default_playcover_address() -> String {
-    String::from("localhost:1717")
-}
-
-fn default_config() -> String {
+fn config_based_on_os() -> &'static str {
     if cfg!(target_os = "macos") {
-        String::from("CompatMac")
+        "CompatMac"
     } else if cfg!(target_os = "linux") {
-        String::from("CompatPOSIXShell")
+        "CompatLinux"
     } else {
-        String::from("General")
+        "General"
     }
 }
 
@@ -454,6 +483,8 @@ mod tests {
 
     use crate::assert_matches;
 
+    use lazy_static::lazy_static;
+
     lazy_static! {
         static ref USER_RESOURCE_DIR: PathBuf = {
             let user_resource_dir = dirs::config().join("resource");
@@ -481,10 +512,11 @@ mod tests {
             assert_eq!(
                 config,
                 AsstConfig {
-                    connection: ConnectionConfig::ADB {
-                        adb_path: String::from("adb"),
-                        device: String::from("emulator-5554"),
-                        config: String::from("CompatMac"),
+                    connection: ConnectionConfig {
+                        preset: Preset::ADB,
+                        adb_path: Some(String::from("adb")),
+                        address: Some(String::from("emulator-5554")),
+                        config: Some(String::from("CompatMac")),
                     },
                     resource: ResourceConfig {
                         resource_base_dirs: {
@@ -513,10 +545,14 @@ mod tests {
         #[test]
         fn connection_config() {
             assert_de_tokens(
-                &ConnectionConfig::ADB {
-                    adb_path: default_adb_path(),
-                    device: default_device(),
-                    config: default_config(),
+                &ConnectionConfig::default(),
+                &[Token::Map { len: Some(0) }, Token::MapEnd],
+            );
+
+            assert_de_tokens(
+                &ConnectionConfig {
+                    preset: Preset::ADB,
+                    ..Default::default()
                 },
                 &[
                     Token::Map { len: Some(1) },
@@ -527,54 +563,54 @@ mod tests {
             );
 
             assert_de_tokens(
-                &ConnectionConfig::ADB {
-                    adb_path: String::from("/path/to/adb"),
-                    device: String::from("127.0.0.1:5555"),
-                    config: String::from("SomeConfig"),
+                &ConnectionConfig {
+                    preset: Preset::ADB,
+                    ..Default::default()
+                },
+                &[
+                    Token::Map { len: Some(1) },
+                    Token::Str("preset"),
+                    Token::Str("ADB"),
+                    Token::MapEnd,
+                ],
+            );
+
+            assert_de_tokens(
+                &ConnectionConfig {
+                    preset: Preset::MuMuPro,
+                    ..Default::default()
+                },
+                &[
+                    Token::Map { len: Some(4) },
+                    Token::Str("preset"),
+                    Token::Str("MuMuPro"),
+                    Token::MapEnd,
+                ],
+            );
+
+            assert_de_tokens(
+                &ConnectionConfig {
+                    preset: Preset::ADB,
+                    adb_path: Some(String::from("/path/to/adb")),
+                    address: Some(String::from("127.0.0.1:5555")),
+                    config: Some(String::from("SomeConfig")),
                 },
                 &[
                     Token::Map { len: Some(4) },
                     Token::Str("type"),
                     Token::Str("ADB"),
                     Token::Str("adb_path"),
+                    Token::Some,
                     Token::Str("/path/to/adb"),
                     Token::Str("device"),
+                    Token::Some,
                     Token::Str("127.0.0.1:5555"),
                     Token::Str("config"),
+                    Token::Some,
                     Token::Str("SomeConfig"),
                     Token::MapEnd,
                 ],
             );
-
-            assert_de_tokens(
-                &ConnectionConfig::PlayTools {
-                    address: default_playcover_address(),
-                    config: default_config(),
-                },
-                &[
-                    Token::Map { len: Some(1) },
-                    Token::Str("type"),
-                    Token::Str("PlayTools"),
-                    Token::MapEnd,
-                ],
-            );
-
-            assert_de_tokens(
-                &ConnectionConfig::PlayTools {
-                    address: String::from("localhost:7777"),
-                    config: String::from("SomeConfig"),
-                },
-                &[
-                    Token::Map { len: Some(3) },
-                    Token::Str("type"),
-                    Token::Str("PlayTools"),
-                    Token::Str("address"),
-                    Token::Str("localhost:7777"),
-                    Token::Str("config"),
-                    Token::Str("SomeConfig"),
-                    Token::MapEnd,
-                ],
-            )
         }
 
         #[test]
@@ -691,11 +727,7 @@ mod tests {
         fn asst_config() {
             assert_de_tokens(
                 &AsstConfig {
-                    connection: ConnectionConfig::ADB {
-                        adb_path: default_adb_path(),
-                        device: default_device(),
-                        config: default_config(),
-                    },
+                    connection: ConnectionConfig::default(),
                     resource: ResourceConfig {
                         resource_base_dirs: default_resource_base_dirs(),
                         global_resource: None,
@@ -719,9 +751,9 @@ mod tests {
             // Auto load iOS resource and set touch mode to MacPlayTools
             assert_de_tokens(
                 &AsstConfig {
-                    connection: ConnectionConfig::PlayTools {
-                        address: default_playcover_address(),
-                        config: default_config(),
+                    connection: ConnectionConfig {
+                        preset: Preset::PlayCover,
+                        ..Default::default()
                     },
                     resource: ResourceConfig {
                         platform_diff_resource: Some(PathBuf::from("iOS")),
@@ -753,57 +785,82 @@ mod tests {
         fn default() {
             assert_matches!(
                 ConnectionConfig::default(),
-                ConnectionConfig::ADB {
-                    adb_path,
-                    device,
-                    config,
-                } if adb_path == default_adb_path()
-                    && device == default_device()
-                    && config == default_config()
+                ConnectionConfig {
+                    preset: Preset::ADB,
+                    adb_path: None,
+                    address: None,
+                    config: None,
+                }
+            );
+        }
+
+        #[cfg(target_os = "macos")]
+        #[test]
+        fn preset() {
+            assert_eq!(ConnectionConfig::default().preset(), Preset::ADB);
+
+            assert_eq!(
+                ConnectionConfig {
+                    preset: Preset::MuMuPro,
+                    ..Default::default()
+                }
+                .preset(),
+                Preset::MuMuPro
             );
         }
 
         #[test]
         fn set_address() {
-            assert_matches!(
-                ConnectionConfig::default().set_address("127.0.0.1:5555"),
-                ConnectionConfig::ADB {
-                    device,
-                    ..
-                } if device == "127.0.0.1:5555"
+            let mut config = ConnectionConfig::default();
+            assert_eq!(config.address, None);
+            assert_eq!(
+                config.set_address("127.0.0.1:12345").address,
+                Some("127.0.0.1:12345".to_owned())
             );
-
-            assert_matches!(
-                ConnectionConfig::PlayTools {
-                    address: default_playcover_address(),
-                    config: default_config(),
-                }.set_address("localhost:7777"),
-                ConnectionConfig::PlayTools {
-                    address,
-                    ..
-                } if address == "localhost:7777"
-            )
         }
 
         #[test]
         fn connect_args() {
             assert_eq!(
-                ConnectionConfig::ADB {
-                    adb_path: "adb".to_owned(),
-                    device: "emulator-5554".to_owned(),
-                    config: "General".to_owned(),
-                }
-                .connect_args(),
-                ("adb", "emulator-5554", "General")
+                ConnectionConfig::default().connect_args(),
+                ("adb", "emulator-5554", config_based_on_os()),
             );
 
             assert_eq!(
-                ConnectionConfig::PlayTools {
-                    address: "localhost:7777".to_owned(),
-                    config: "SomeConfig".to_owned(),
+                ConnectionConfig {
+                    preset: Preset::MuMuPro,
+                    adb_path: None,
+                    address: None,
+                    config: None,
                 }
                 .connect_args(),
-                (EMPTY_STR, "localhost:7777", "SomeConfig")
+                (
+                    "/Applications/MuMuPlayer.app/Contents/MacOS/MuMuEmulator.app/Contents/MacOS/tools/adb",
+                    "127.0.0.1:16384",
+                    config_based_on_os(),
+                ),
+            );
+
+            assert_eq!(
+                ConnectionConfig {
+                    preset: Preset::PlayCover,
+                    adb_path: None,
+                    address: None,
+                    config: None,
+                }
+                .connect_args(),
+                ("", "localhost:1717", config_based_on_os()),
+            );
+
+            assert_eq!(
+                ConnectionConfig {
+                    preset: Preset::ADB,
+                    adb_path: Some("/path/to/adb".to_owned()),
+                    address: Some("127.0.0.1:11111".to_owned()),
+                    config: Some("SomeConfig".to_owned()),
+                }
+                .connect_args(),
+                ("/path/to/adb", "127.0.0.1:11111", "SomeConfig"),
             );
         }
     }
