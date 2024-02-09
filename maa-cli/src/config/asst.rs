@@ -794,6 +794,7 @@ mod tests {
             );
         }
 
+        #[cfg(target_os = "macos")]
         #[test]
         fn preset() {
             assert_eq!(ConnectionConfig::default().preset(), Preset::ADB);
