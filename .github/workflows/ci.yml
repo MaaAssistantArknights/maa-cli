@@ -21,6 +21,7 @@ on:
 env:
   RUST_BACKTRACE: full
   CARGO_TERM_COLOR: always
+  MAA_LOG: trace
 
 defaults:
   run:

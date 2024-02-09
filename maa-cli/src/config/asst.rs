@@ -795,6 +795,30 @@ mod tests {
         }
 
         #[test]
+        fn preset() {
+            assert_eq!(ConnectionConfig::default().preset(), Preset::ADB);
+
+            assert_eq!(
+                ConnectionConfig {
+                    preset: Preset::MuMuPro,
+                    ..Default::default()
+                }
+                .preset(),
+                Preset::MuMuPro
+            );
+        }
+
+        #[test]
+        fn set_address() {
+            let mut config = ConnectionConfig::default();
+            assert_eq!(config.address, None);
+            assert_eq!(
+                config.set_address("127.0.0.1:12345").address,
+                Some("127.0.0.1:12345".to_owned())
+            );
+        }
+
+        #[test]
         fn connect_args() {
             assert_eq!(
                 ConnectionConfig::default().connect_args(),
@@ -814,6 +838,17 @@ mod tests {
                     "127.0.0.1:16384",
                     config_based_on_os(),
                 ),
+            );
+
+            assert_eq!(
+                ConnectionConfig {
+                    preset: Preset::PlayCover,
+                    adb_path: None,
+                    address: None,
+                    config: None,
+                }
+                .connect_args(),
+                ("", "localhost:1717", config_based_on_os()),
             );
 
             assert_eq!(
