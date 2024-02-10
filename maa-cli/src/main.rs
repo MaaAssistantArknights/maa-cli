@@ -170,7 +170,7 @@ enum SubCommand {
         stage: String,
         /// medicine to use
         #[arg(short, long)]
-        medicine: Option<i64>,
+        medicine: Option<i32>,
         #[command(flatten)]
         common: run::CommonArgs,
     },
