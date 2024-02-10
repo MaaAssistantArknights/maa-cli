@@ -148,7 +148,18 @@ jobs:
           cargo build --release --package maa-cli --locked --features vendored-openssl
       - name: Tar Artifact
         run: |
-          tar -cvf "$CARGO_BUILD_TARGET.tar" -C "target/$CARGO_BUILD_TARGET/release" maa
+          target_dir="target/$CARGO_BUILD_TARGET/release"
+          if [[ "${{ matrix.os }}" == "windows"* ]]; then
+            exe="maa.exe"
+          else
+            exe="maa"
+          fi
+          file "$target_dir/$exe" # check file status
+          # dry run on x86_64 to check file status
+          if [[ "${{ matrix.arch }}" == "x86_64" ]]; then
+            "$target_dir/$exe" --version
+          fi
+          tar -cvf "$CARGO_BUILD_TARGET.tar" -C "$target_dir" "$exe"
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -239,13 +250,24 @@ jobs:
             dir="maa_cli-$target"
             tar -xvf "$dir/$target.tar" -C "$dir"
             # use tar on linux and zip on other platforms
-            if [[ "$target" == *"linux"* ]]; then
-              archive_name="maa_cli-v$VERSION-$target.tar.gz"
-              tar -czvf "$archive_name" "$dir/maa"
-            else
-              archive_name="maa_cli-v$VERSION-$target.zip"
-              zip -r "$archive_name" "$dir/maa"
-            fi
+            case "$target" in
+              *-linux-*)
+                archive_name="maa_cli-v$VERSION-$target.tar.gz"
+                tar -czvf "$archive_name" "$dir/maa"
+                ;;
+              *-apple-darwin)
+                archive_name="maa_cli-v$VERSION-$target.zip"
+                zip -vr "$archive_name" "$dir/maa"
+                ;;
+              *-windows-msvc)
+                archive_name="maa_cli-v$VERSION-$target.zip"
+                zip -vr "$archive_name" "$dir/maa.exe"
+                ;;
+              *)
+                echo "Unknown target: $target"
+                exit 1
+                ;;
+            esac
             checksum=$(sha256sum "$archive_name")
             checksum_hash=${checksum:0:64}
             size=$(stat -c%s "$archive_name")
