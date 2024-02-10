@@ -149,16 +149,17 @@ jobs:
       - name: Tar Artifact
         run: |
           target_dir="target/$CARGO_BUILD_TARGET/release"
-          case "$CAROG_BUILD_TARGET" in
-            *-windows-*)
-              exe="maa.exe"
-              ;;
-            *)
-              exe="maa"
-              ;;
-          esac
-          "$target_dir/$exe" --version # dry run to make sure the binary is correct
-          tar -cvf "$CARGO_BUILD_TARGET.tar" -C "target/$CARGO_BUILD_TARGET/release" "$exe"
+          if [[ "${{ matrix.os }}" == "windows"* ]]; then
+            exe="maa.exe"
+          else
+            exe="maa"
+          fi
+          file "$target_dir/$exe" # check file status
+          # dry run on x86_64 to check file status
+          if [[ "${{ matrix.arch }}" == "x86_64" ]]; then
+            "$target_dir/$exe" --version
+          fi
+          tar -cvf "$CARGO_BUILD_TARGET.tar" -C "$target_dir" "$exe"
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
