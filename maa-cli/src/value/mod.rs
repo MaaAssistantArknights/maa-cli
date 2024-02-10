@@ -202,11 +202,11 @@ impl MAAValue {
         self.as_primate().and_then(MAAPrimate::as_bool)
     }
 
-    pub fn as_int(&self) -> Option<i64> {
+    pub fn as_int(&self) -> Option<i32> {
         self.as_primate().and_then(MAAPrimate::as_int)
     }
 
-    pub fn as_float(&self) -> Option<f64> {
+    pub fn as_float(&self) -> Option<f32> {
         self.as_primate().and_then(MAAPrimate::as_float)
     }
 
@@ -278,16 +278,16 @@ impl<'a> TryFromMAAValue<'a> for bool {
     }
 }
 
-impl<'a> TryFromMAAValue<'a> for i64 {
-    type Value = i64;
+impl<'a> TryFromMAAValue<'a> for i32 {
+    type Value = Self;
 
     fn try_from_value(value: &MAAValue) -> Option<Self::Value> {
         value.as_int()
     }
 }
 
-impl<'a> TryFromMAAValue<'a> for f64 {
-    type Value = f64;
+impl<'a> TryFromMAAValue<'a> for f32 {
+    type Value = Self;
 
     fn try_from_value(value: &MAAValue) -> Option<Self::Value> {
         value.as_float()
@@ -356,15 +356,15 @@ mod tests {
                 Token::Map { len: Some(15) },
                 Token::Str("array"),
                 Token::Seq { len: Some(2) },
-                Token::I64(1),
-                Token::I64(2),
+                Token::I32(1),
+                Token::I32(2),
                 Token::SeqEnd,
                 Token::Str("bool"),
                 Token::Bool(true),
                 Token::Str("float"),
-                Token::F64(1.0),
+                Token::F32(1.0),
                 Token::Str("int"),
-                Token::I64(1),
+                Token::I32(1),
                 Token::Str("object"),
                 Token::Map { len: Some(1) },
                 Token::Str("key"),
@@ -380,12 +380,12 @@ mod tests {
                 Token::Str("input_int"),
                 Token::Map { len: Some(1) },
                 Token::Str("default"),
-                Token::I64(1),
+                Token::I32(1),
                 Token::MapEnd,
                 Token::Str("input_float"),
                 Token::Map { len: Some(1) },
                 Token::Str("default"),
-                Token::F64(1.0),
+                Token::F32(1.0),
                 Token::MapEnd,
                 Token::Str("input_string"),
                 Token::Map { len: Some(1) },
@@ -396,8 +396,8 @@ mod tests {
                 Token::Map { len: Some(2) },
                 Token::Str("alternatives"),
                 Token::Seq { len: Some(2) },
-                Token::I64(1),
-                Token::I64(2),
+                Token::I32(1),
+                Token::I32(2),
                 Token::SeqEnd,
                 Token::Str("default_index"),
                 Token::U64(2),
@@ -406,8 +406,8 @@ mod tests {
                 Token::Map { len: Some(2) },
                 Token::Str("alternatives"),
                 Token::Seq { len: Some(2) },
-                Token::F64(1.0),
-                Token::F64(2.0),
+                Token::F32(1.0),
+                Token::F32(2.0),
                 Token::SeqEnd,
                 Token::Str("default_index"),
                 Token::U64(2),
@@ -430,7 +430,7 @@ mod tests {
                 Token::Bool(true),
                 Token::MapEnd,
                 Token::Str("default"),
-                Token::I64(1),
+                Token::I32(1),
                 Token::MapEnd,
                 Token::Str("optional_no_satisfied"),
                 Token::Map { len: Some(2) },
@@ -440,7 +440,7 @@ mod tests {
                 Token::Bool(false),
                 Token::MapEnd,
                 Token::Str("default"),
-                Token::I64(1),
+                Token::I32(1),
                 Token::MapEnd,
                 Token::MapEnd,
             ],
@@ -454,34 +454,34 @@ mod tests {
                 Token::Map { len: Some(14) },
                 Token::Str("array"),
                 Token::Seq { len: Some(2) },
-                Token::I64(1),
-                Token::I64(2),
+                Token::I32(1),
+                Token::I32(2),
                 Token::SeqEnd,
                 Token::Str("bool"),
                 Token::Bool(true),
                 Token::Str("float"),
-                Token::F64(1.0),
+                Token::F32(1.0),
                 Token::Str("input_bool"),
                 Token::Bool(true),
                 Token::Str("input_float"),
-                Token::F64(1.0),
+                Token::F32(1.0),
                 Token::Str("input_int"),
-                Token::I64(1),
+                Token::I32(1),
                 Token::Str("input_string"),
                 Token::Str("string"),
                 Token::Str("int"),
-                Token::I64(1),
+                Token::I32(1),
                 Token::Str("object"),
                 Token::Map { len: Some(1) },
                 Token::Str("key"),
                 Token::Str("value"),
                 Token::MapEnd,
                 Token::Str("optional"),
-                Token::I64(1),
+                Token::I32(1),
                 Token::Str("select_float"),
-                Token::F64(2.0),
+                Token::F32(2.0),
                 Token::Str("select_int"),
-                Token::I64(2),
+                Token::I32(2),
                 Token::Str("select_string"),
                 Token::Str("string2"),
                 Token::Str("string"),
@@ -614,22 +614,22 @@ mod tests {
     fn try_from() {
         // Bool
         assert_eq!(bool::try_from_value(&true.into()), Some(true));
-        assert_eq!(i64::try_from_value(&true.into()), None);
+        assert_eq!(i32::try_from_value(&true.into()), None);
         assert_eq!(
             bool::try_from_value(&BoolInput::new(Some(true), None).into()),
             None
         );
 
         // Int
-        assert_eq!(i64::try_from_value(&1.into()), Some(1));
-        assert_eq!(f64::try_from_value(&1.into()), None);
-        assert_eq!(i64::try_from_value(&Input::new(Some(1), None).into()), None);
+        assert_eq!(i32::try_from_value(&1.into()), Some(1));
+        assert_eq!(f32::try_from_value(&1.into()), None);
+        assert_eq!(i32::try_from_value(&Input::new(Some(1), None).into()), None);
 
         // Float
-        assert_eq!(f64::try_from_value(&1.0.into()), Some(1.0));
-        assert_eq!(i64::try_from_value(&1.0.into()), None);
+        assert_eq!(f32::try_from_value(&1.0.into()), Some(1.0));
+        assert_eq!(i32::try_from_value(&1.0.into()), None);
         assert_eq!(
-            f64::try_from_value(&Input::new(Some(1.0), None).into()),
+            f32::try_from_value(&Input::new(Some(1.0), None).into()),
             None
         );
 

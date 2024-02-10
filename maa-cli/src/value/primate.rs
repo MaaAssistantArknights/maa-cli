@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 #[serde(untagged)]
 pub enum MAAPrimate {
     Bool(bool),
-    Int(i64),
-    Float(f64),
+    Int(i32),
+    Float(f32),
     String(String),
 }
 
@@ -19,14 +19,14 @@ impl MAAPrimate {
             _ => None,
         }
     }
-    pub(super) fn as_int(&self) -> Option<i64> {
+    pub(super) fn as_int(&self) -> Option<i32> {
         match self {
             Self::Int(v) => Some(*v),
             _ => None,
         }
     }
 
-    pub(super) fn as_float(&self) -> Option<f64> {
+    pub(super) fn as_float(&self) -> Option<f32> {
         match self {
             Self::Float(v) => Some(*v),
             _ => None,
@@ -45,8 +45,8 @@ impl Serialize for MAAPrimate {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             Self::Bool(v) => serializer.serialize_bool(*v),
-            Self::Int(v) => serializer.serialize_i64(*v),
-            Self::Float(v) => serializer.serialize_f64(*v),
+            Self::Int(v) => serializer.serialize_i32(*v),
+            Self::Float(v) => serializer.serialize_f32(*v),
             Self::String(v) => serializer.serialize_str(v),
         }
     }
@@ -67,14 +67,14 @@ impl From<bool> for MAAPrimate {
     }
 }
 
-impl From<i64> for MAAPrimate {
-    fn from(v: i64) -> Self {
+impl From<i32> for MAAPrimate {
+    fn from(v: i32) -> Self {
         Self::Int(v)
     }
 }
 
-impl From<f64> for MAAPrimate {
-    fn from(v: f64) -> Self {
+impl From<f32> for MAAPrimate {
+    fn from(v: f32) -> Self {
         Self::Float(v)
     }
 }
@@ -109,7 +109,7 @@ macro_rules! impl_from {
     };
 }
 
-impl_from!(bool, i64, f64, String, &str);
+impl_from!(bool, i32, f32, String, &str);
 
 #[cfg(test)]
 mod tests {
@@ -131,8 +131,8 @@ mod tests {
             &[
                 Token::Seq { len: Some(4) },
                 Token::Bool(true),
-                Token::I64(1),
-                Token::F64(1.0),
+                Token::I32(1),
+                Token::F32(1.0),
                 Token::Str(""),
                 Token::SeqEnd,
             ],

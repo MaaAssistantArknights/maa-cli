@@ -34,7 +34,7 @@ pub fn closedown() -> Result<TaskConfig> {
     Ok(task_config)
 }
 
-pub fn fight(stage: String, medicine: Option<i64>) -> Result<TaskConfig> {
+pub fn fight(stage: String, medicine: Option<i32>) -> Result<TaskConfig> {
     let mut task_config = TaskConfig::new();
 
     let mut params = MAAValue::new();

@@ -45,17 +45,17 @@ pub fn roguelike(theme: Theme) -> Result<TaskConfig> {
     use MAAValue::OptionalInput;
     let params = object!(
         "theme" => theme.to_str(),
-        "mode" => SelectD::<i64>::new([
+        "mode" => SelectD::<i32>::new([
             ValueWithDesc::new(0, Some("Clear as many stages as possible with stable strategy")),
             ValueWithDesc::new(1, Some("Invest ingots and exits after first level")),
             ValueWithDesc::new(3, Some("Clear as many stages as possible with agrressive strategy")),
             ValueWithDesc::new(4, Some("Exit after entering 3rd level")),
         ], Some(1), Some("Roguelike mode"), false).unwrap(),
-        "start_count" => Input::<i64>::new(Some(999), Some("number of times to start a new run")),
+        "start_count" => Input::<i32>::new(Some(999), Some("number of times to start a new run")),
         "investment_disabled" => BoolInput::new(Some(false), Some("disable investment")),
         "investments_count" => OptionalInput {
             deps: Map::from([("investment_disabled".to_string(), false.into())]),
-            input: Input::<i64>::new(Some(999), Some("number of times to invest")).into(),
+            input: Input::<i32>::new(Some(999), Some("number of times to invest")).into(),
         },
         "stop_when_investment_full" => OptionalInput {
             deps: Map::from([("investment_disabled".to_string(), false.into())]),
