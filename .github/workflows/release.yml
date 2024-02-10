@@ -148,7 +148,17 @@ jobs:
           cargo build --release --package maa-cli --locked --features vendored-openssl
       - name: Tar Artifact
         run: |
-          tar -cvf "$CARGO_BUILD_TARGET.tar" -C "target/$CARGO_BUILD_TARGET/release" maa
+          target_dir="target/$CARGO_BUILD_TARGET/release"
+          case "$CAROG_BUILD_TARGET" in
+            *-windows-*)
+              exe="maa.exe"
+              ;;
+            *)
+              exe="maa"
+              ;;
+          esac
+          "$target_dir/$exe" --version # dry run to make sure the binary is correct
+          tar -cvf "$CARGO_BUILD_TARGET.tar" -C "target/$CARGO_BUILD_TARGET/release" "$exe"
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -244,7 +254,7 @@ jobs:
               tar -czvf "$archive_name" "$dir/maa"
             else
               archive_name="maa_cli-v$VERSION-$target.zip"
-              zip -r "$archive_name" "$dir/maa"
+              zip -vr "$archive_name" "$dir/maa*"
             fi
             checksum=$(sha256sum "$archive_name")
             checksum_hash=${checksum:0:64}
