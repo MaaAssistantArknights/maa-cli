@@ -555,6 +555,7 @@ mod tests {
                         TaskVariant {
                             condition: Condition::Weekday {
                                 weekdays: vec![Weekday::Sun],
+                                client: None,
                             },
                             params: object!("expiring_medicine" => 5),
                         },
@@ -570,6 +571,7 @@ mod tests {
                         TaskVariant {
                             condition: Condition::Weekday {
                                 weekdays: vec![Weekday::Tue, Weekday::Thu, Weekday::Sat],
+                                client: None,
                             },
                             params: object!("stage" => "CE-6"),
                         },

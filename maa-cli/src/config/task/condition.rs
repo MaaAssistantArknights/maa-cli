@@ -2,7 +2,10 @@ use super::client_type::ClientType;
 
 use crate::activity::has_side_story_open;
 
-use chrono::{Datelike, Local, NaiveDateTime, NaiveTime, Weekday};
+use chrono::{
+    DateTime, Datelike, Duration, Local, NaiveDateTime, NaiveTime, TimeZone, Utc, Weekday,
+};
+use log::debug;
 use serde::Deserialize;
 
 #[cfg_attr(test, derive(PartialEq, Debug))]
@@ -14,7 +17,11 @@ pub enum Condition {
     #[default]
     Always,
     /// The task is active on the specified weekdays
-    Weekday { weekdays: Vec<Weekday> },
+    Weekday {
+        weekdays: Vec<Weekday>,
+        #[serde(default)]
+        client: Option<ClientType>,
+    },
     /// Day modula
     ///
     /// The task is active on `num_days % divisor == remainder`.
@@ -78,8 +85,12 @@ impl Condition {
     pub fn is_active(&self) -> bool {
         match self {
             Condition::Always => true,
-            Condition::Weekday { weekdays } => {
-                let weekday = WeekdayCutter::new(4, 0).get_amended_weekday();
+            Condition::Weekday { weekdays, client } => {
+                let weekday: Weekday = if let Some(client) = client {
+                    WeekdayCutter::new(client).get_amended_weekday()
+                } else {
+                    Local::now().weekday()
+                };
                 weekdays.contains(&weekday)
             }
             Condition::DayMod { divisor, remainder } => {
@@ -138,33 +149,57 @@ pub fn remainder_of_day_mod(divisor: u32) -> u32 {
     day % divisor
 }
 
-struct WeekdayCutter {
+struct WeekdayCutter<'a> {
     current_weekday: Weekday,
-    current_time: NaiveTime,
-    boundary_time: NaiveTime,
+    utc_now: DateTime<Utc>,
+    client: &'a ClientType,
 }
 
-impl WeekdayCutter {
-    pub fn new(hour: u32, minute: u32) -> Self {
-        let time = match NaiveTime::from_hms_opt(hour, minute, 0) {
-            Some(t) => t,
-            None => NaiveTime::from_hms_opt(4, 0, 0).unwrap(),
-        };
+impl<'a> WeekdayCutter<'a> {
+    pub fn new(client: &'a ClientType) -> Self {
         Self {
-            boundary_time: time,
-            current_time: Local::now().time(),
-            current_weekday: Local::now().weekday(),
+            utc_now: Utc::now(),
+            current_weekday: Utc::now().weekday(),
+            client,
         }
     }
 
     pub fn get_amended_weekday(&self) -> Weekday {
-        let mut weekday = self.current_weekday;
-        if let std::cmp::Ordering::Less | std::cmp::Ordering::Equal =
-            self.current_time.cmp(&self.boundary_time)
-        {
-            weekday = weekday.pred();
+        let reset_time = self.get_server_reset_time();
+
+        debug!("Now: {} {}", self.utc_now, self.current_weekday);
+        debug!("Server reset time: {} {}", reset_time, self.current_weekday);
+
+        match self.utc_now.cmp(&reset_time) {
+            std::cmp::Ordering::Less => self.current_weekday,
+            std::cmp::Ordering::Equal => self.current_weekday,
+            std::cmp::Ordering::Greater => self.current_weekday.succ(),
         }
-        weekday
+    }
+
+    // I don't know how it works, but it passes the test
+    fn get_server_reset_time(&self) -> DateTime<Utc> {
+        let f = |i: i64| {
+            let utc_time = self.utc_now;
+            let mut reset_time = Utc
+                .with_ymd_and_hms(utc_time.year(), utc_time.month(), utc_time.day(), 4, 0, 0)
+                .unwrap();
+
+            reset_time -= Duration::hours(i);
+            if i > 0 {
+                reset_time += Duration::days(1);
+            }
+
+            reset_time
+        };
+        match self.client {
+            ClientType::Official => f(8),  // utc+8
+            ClientType::Bilibili => f(8),  // utc+8
+            ClientType::Txwy => f(8),      // utc+8
+            ClientType::YoStarEN => f(-7), // utc-7
+            ClientType::YoStarJP => f(9),  // utc+9
+            ClientType::YoStarKR => f(9),  // utc+9
+        }
     }
 }
 
@@ -191,16 +226,17 @@ mod tests {
 
         #[test]
         fn weekday() {
-            //This test case is outdate
             let now = chrono::Local::now();
             let weekday = now.date_naive().weekday();
 
             assert!(Condition::Weekday {
-                weekdays: vec![weekday]
+                weekdays: vec![weekday],
+                client: None
             }
             .is_active());
             assert!(!Condition::Weekday {
-                weekdays: vec![weekday.pred(), weekday.succ()]
+                weekdays: vec![weekday.pred(), weekday.succ()],
+                client: None
             }
             .is_active());
         }
@@ -429,6 +465,7 @@ mod tests {
         fn weekday() {
             let cond = Condition::Weekday {
                 weekdays: vec![Weekday::Mon, Weekday::Wed, Weekday::Fri],
+                client: None,
             };
 
             assert_de_tokens(
@@ -660,35 +697,107 @@ mod tests {
     }
 
     mod weekday_cutter {
-        use chrono::{NaiveTime, Timelike, Weekday};
+        use chrono::{Datelike, TimeZone, Utc, Weekday};
 
-        use crate::config::task::condition::WeekdayCutter;
-
-        #[test]
-        fn construct() {
-            let cutter = WeekdayCutter::new(12, 30);
-            assert_eq!(cutter.boundary_time.hour(), 12);
-            assert_eq!(cutter.boundary_time.minute(), 30);
-            let cutter = WeekdayCutter::new(114, 514);
-            assert_eq!(cutter.boundary_time.hour(), 4);
-            assert_eq!(cutter.boundary_time.minute(), 0);
-        }
+        use crate::config::task::{condition::WeekdayCutter, ClientType};
 
         #[test]
-        fn weekday_divide() {
-            let cutter = WeekdayCutter {
-                current_weekday: Weekday::Mon,
-                current_time: NaiveTime::from_hms_opt(2, 0, 0).unwrap(),
-                boundary_time: NaiveTime::from_hms_opt(4, 0, 0).unwrap(),
+        fn reset_check() {
+            let f = |i: u32| {
+                let time = Utc::now();
+                Utc.with_ymd_and_hms(time.year(), time.month(), time.day(), i, 0, 0)
+                    .unwrap()
             };
-            assert_eq!(cutter.get_amended_weekday(), Weekday::Sun);
 
+            // Reset UTC time: 20:00
             let cutter = WeekdayCutter {
                 current_weekday: Weekday::Mon,
-                current_time: NaiveTime::from_hms_opt(18, 0, 0).unwrap(),
-                boundary_time: NaiveTime::from_hms_opt(4, 0, 0).unwrap(),
+                utc_now: f(6),
+                client: &ClientType::Official,
             };
             assert_eq!(cutter.get_amended_weekday(), Weekday::Mon);
+
+            let cutter = WeekdayCutter {
+                current_weekday: Weekday::Mon,
+                utc_now: f(22),
+                client: &ClientType::Official,
+            };
+            assert_eq!(cutter.get_amended_weekday(), Weekday::Tue);
+
+            // Reset UTC time: 20:00
+            let cutter = WeekdayCutter {
+                current_weekday: Weekday::Mon,
+                utc_now: f(6),
+                client: &ClientType::Bilibili,
+            };
+            assert_eq!(cutter.get_amended_weekday(), Weekday::Mon);
+
+            let cutter = WeekdayCutter {
+                current_weekday: Weekday::Mon,
+                utc_now: f(22),
+                client: &ClientType::Bilibili,
+            };
+            assert_eq!(cutter.get_amended_weekday(), Weekday::Tue);
+
+            // Reset UTC time: 20:00
+            let cutter = WeekdayCutter {
+                current_weekday: Weekday::Mon,
+                utc_now: f(6),
+                client: &ClientType::Txwy,
+            };
+            assert_eq!(cutter.get_amended_weekday(), Weekday::Mon);
+
+            let cutter = WeekdayCutter {
+                current_weekday: Weekday::Mon,
+                utc_now: f(22),
+                client: &ClientType::Txwy,
+            };
+            assert_eq!(cutter.get_amended_weekday(), Weekday::Tue);
+
+            // Reset UTC time: 11:00
+            let cutter = WeekdayCutter {
+                current_weekday: Weekday::Mon,
+                utc_now: f(8),
+                client: &ClientType::YoStarEN,
+            };
+            assert_eq!(cutter.get_amended_weekday(), Weekday::Mon);
+
+            let cutter = WeekdayCutter {
+                current_weekday: Weekday::Mon,
+                utc_now: f(14),
+                client: &ClientType::YoStarEN,
+            };
+            assert_eq!(cutter.get_amended_weekday(), Weekday::Tue);
+
+            // Reset UTC time: 19:00
+            let cutter = WeekdayCutter {
+                current_weekday: Weekday::Mon,
+                utc_now: f(6),
+                client: &ClientType::YoStarJP,
+            };
+            assert_eq!(cutter.get_amended_weekday(), Weekday::Mon);
+
+            let cutter = WeekdayCutter {
+                current_weekday: Weekday::Mon,
+                utc_now: f(22),
+                client: &ClientType::YoStarJP,
+            };
+            assert_eq!(cutter.get_amended_weekday(), Weekday::Tue);
+
+            // Reset UTC time: 19:00
+            let cutter = WeekdayCutter {
+                current_weekday: Weekday::Mon,
+                utc_now: f(6),
+                client: &ClientType::YoStarKR,
+            };
+            assert_eq!(cutter.get_amended_weekday(), Weekday::Mon);
+
+            let cutter = WeekdayCutter {
+                current_weekday: Weekday::Mon,
+                utc_now: f(22),
+                client: &ClientType::YoStarKR,
+            };
+            assert_eq!(cutter.get_amended_weekday(), Weekday::Tue);
         }
     }
 }
