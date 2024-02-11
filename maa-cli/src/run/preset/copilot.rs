@@ -358,7 +358,7 @@ mod tests {
                     TaskType::SSSCopilot,
                     object!(
                         "filename" => "filename",
-                        "loop_times" => Input::<i64>::new(Some(1), Some("loop times"))
+                        "loop_times" => Input::<i32>::new(Some(1), Some("loop times"))
                     )
                 )
             );

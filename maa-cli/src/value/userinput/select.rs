@@ -297,15 +297,15 @@ impl From<&str> for ValueWithDesc<String> {
     }
 }
 
-impl Selectable for ValueWithDesc<i64> {
-    type Value = i64;
-    type Error = <i64 as FromStr>::Err;
+impl Selectable for ValueWithDesc<i32> {
+    type Value = i32;
+    type Error = <i32 as FromStr>::Err;
 
-    fn value(self) -> i64 {
+    fn value(self) -> i32 {
         self.value()
     }
 
-    fn parse(input: &str) -> Result<i64, Self::Error> {
+    fn parse(input: &str) -> Result<i32, Self::Error> {
         input.parse()
     }
 }
@@ -319,15 +319,15 @@ impl<T: Display> Display for ValueWithDesc<T> {
     }
 }
 
-impl Selectable for ValueWithDesc<f64> {
-    type Value = f64;
-    type Error = <f64 as FromStr>::Err;
+impl Selectable for ValueWithDesc<f32> {
+    type Value = f32;
+    type Error = <f32 as FromStr>::Err;
 
-    fn value(self) -> f64 {
+    fn value(self) -> f32 {
         self.value()
     }
 
-    fn parse(input: &str) -> Result<f64, Self::Error> {
+    fn parse(input: &str) -> Result<f32, Self::Error> {
         input.parse()
     }
 }
@@ -548,18 +548,18 @@ mod tests {
 
         #[test]
         fn int() {
-            let value = ValueWithDesc::<i64>::new(1, None);
+            let value = ValueWithDesc::<i32>::new(1, None);
             assert_eq!(value.value(), 1);
-            assert_eq!(ValueWithDesc::<i64>::parse("1").unwrap(), 1);
-            assert!(ValueWithDesc::<i64>::parse("a").is_err())
+            assert_eq!(ValueWithDesc::<i32>::parse("1").unwrap(), 1);
+            assert!(ValueWithDesc::<i32>::parse("a").is_err())
         }
 
         #[test]
         fn float() {
-            let value = ValueWithDesc::<f64>::new(1.0, None);
+            let value = ValueWithDesc::<f32>::new(1.0, None);
             assert_eq!(value.value(), 1.0);
-            assert_eq!(ValueWithDesc::<f64>::parse("1.0").unwrap(), 1.0);
-            assert!(ValueWithDesc::<f64>::parse("a").is_err())
+            assert_eq!(ValueWithDesc::<f32>::parse("1.0").unwrap(), 1.0);
+            assert!(ValueWithDesc::<f32>::parse("a").is_err())
         }
 
         #[test]

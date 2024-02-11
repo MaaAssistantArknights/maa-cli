@@ -149,14 +149,14 @@ mod tests {
         );
 
         assert_eq!(
-            SelectD::<i64>::new([1, 2], Some(2), Some(""), true)
+            SelectD::<i32>::new([1, 2], Some(2), Some(""), true)
                 .unwrap()
                 .value()
                 .unwrap(),
             2
         );
         assert_eq!(
-            SelectD::<i64>::new([1, 2], None, Some(""), true)
+            SelectD::<i32>::new([1, 2], None, Some(""), true)
                 .unwrap()
                 .value()
                 .unwrap(),

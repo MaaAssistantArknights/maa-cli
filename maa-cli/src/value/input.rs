@@ -14,10 +14,10 @@ use serde::Deserialize;
 pub enum MAAInput {
     InputString(Input<String>),
     InputBool(BoolInput),
-    InputInt(Input<i64>),
-    InputFloat(Input<f64>),
-    SelectInt(SelectD<i64>),
-    SelectFloat(SelectD<f64>),
+    InputInt(Input<i32>),
+    InputFloat(Input<f32>),
+    SelectInt(SelectD<i32>),
+    SelectFloat(SelectD<f32>),
     SelectString(SelectD<String>),
 }
 
@@ -43,14 +43,14 @@ impl From<BoolInput> for MAAInput {
     }
 }
 
-impl From<Input<i64>> for MAAInput {
-    fn from(v: Input<i64>) -> Self {
+impl From<Input<i32>> for MAAInput {
+    fn from(v: Input<i32>) -> Self {
         Self::InputInt(v)
     }
 }
 
-impl From<Input<f64>> for MAAInput {
-    fn from(v: Input<f64>) -> Self {
+impl From<Input<f32>> for MAAInput {
+    fn from(v: Input<f32>) -> Self {
         Self::InputFloat(v)
     }
 }
@@ -61,14 +61,14 @@ impl From<Input<String>> for MAAInput {
     }
 }
 
-impl From<SelectD<i64>> for MAAInput {
-    fn from(v: SelectD<i64>) -> Self {
+impl From<SelectD<i32>> for MAAInput {
+    fn from(v: SelectD<i32>) -> Self {
         Self::SelectInt(v)
     }
 }
 
-impl From<SelectD<f64>> for MAAInput {
-    fn from(v: SelectD<f64>) -> Self {
+impl From<SelectD<f32>> for MAAInput {
+    fn from(v: SelectD<f32>) -> Self {
         Self::SelectFloat(v)
     }
 }
@@ -93,11 +93,11 @@ macro_rules! impl_into_maa_value {
 
 impl_into_maa_value!(
     BoolInput,
-    Input<i64>,
-    Input<f64>,
+    Input<i32>,
+    Input<f32>,
     Input<String>,
-    SelectD<i64>,
-    SelectD<f64>,
+    SelectD<i32>,
+    SelectD<f32>,
     SelectD<String>,
     // MAAInput,
 );
@@ -138,11 +138,11 @@ mod tests {
                 Token::MapEnd,
                 Token::Map { len: Some(1) },
                 Token::String("default"),
-                Token::I64(1),
+                Token::I32(1),
                 Token::MapEnd,
                 Token::Map { len: Some(1) },
                 Token::String("default"),
-                Token::F64(1.0),
+                Token::F32(1.0),
                 Token::MapEnd,
                 Token::Map { len: Some(1) },
                 Token::String("default"),
@@ -153,8 +153,8 @@ mod tests {
                 Token::U64(2),
                 Token::String("alternatives"),
                 Token::Seq { len: Some(2) },
-                Token::I64(1),
-                Token::I64(2),
+                Token::I32(1),
+                Token::I32(2),
                 Token::SeqEnd,
                 Token::MapEnd,
                 Token::Map { len: Some(2) },
@@ -162,8 +162,8 @@ mod tests {
                 Token::U64(2),
                 Token::String("alternatives"),
                 Token::Seq { len: Some(2) },
-                Token::F64(1.0),
-                Token::F64(2.0),
+                Token::F32(1.0),
+                Token::F32(2.0),
                 Token::SeqEnd,
                 Token::MapEnd,
                 Token::Map { len: Some(2) },
