@@ -1,4 +1,6 @@
+use chrono::{DateTime, FixedOffset, Local, Timelike};
 use clap::ValueEnum;
+use log::debug;
 use serde::Deserialize;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -30,6 +32,37 @@ impl ClientType {
             ClientType::YoStarJP => Some("YoStarJP"),
             ClientType::YoStarKR => Some("YoStarKR"),
             _ => None,
+        }
+    }
+
+    pub fn reset_time(&self) -> DateTime<Local> {
+        let timezone = self.timezone();
+        let server_reset_hour = 4;
+
+        let fixed_offset = FixedOffset::east_opt(timezone * 3600).unwrap();
+        let local_time = chrono::Local::now()
+            .with_timezone(&fixed_offset)
+            .with_hour(server_reset_hour)
+            .unwrap()
+            .with_nanosecond(0)
+            .unwrap()
+            .with_minute(0)
+            .unwrap()
+            .with_second(0)
+            .unwrap();
+
+        debug!("Server {} reset time: {}", &self, local_time);
+        local_time.into()
+    }
+
+    pub fn timezone(self) -> i32 {
+        match self {
+            ClientType::Official => 8,  // utc+8
+            ClientType::Bilibili => 8,  // utc+8
+            ClientType::Txwy => 8,      // utc+8
+            ClientType::YoStarEN => -7, // utc-7
+            ClientType::YoStarJP => 9,  // utc+9
+            ClientType::YoStarKR => 9,  // utc+9
         }
     }
 
@@ -194,5 +227,22 @@ mod tests {
         assert_eq!(ClientType::YoStarEN.to_string(), "YoStarEN");
         assert_eq!(ClientType::YoStarJP.to_string(), "YoStarJP");
         assert_eq!(ClientType::YoStarKR.to_string(), "YoStarKR");
+    }
+
+    #[test]
+    fn time() {
+        let today = Local::now()
+            .with_hour(4)
+            .unwrap()
+            .with_minute(0)
+            .unwrap()
+            .with_second(0)
+            .unwrap()
+            .with_nanosecond(0)
+            .unwrap();
+
+        assert_eq!(ClientType::Official.reset_time(), today);
+        assert_eq!(ClientType::Bilibili.reset_time(), today);
+        assert_eq!(ClientType::Txwy.reset_time(), today);
     }
 }

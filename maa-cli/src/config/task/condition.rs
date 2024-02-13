@@ -2,9 +2,7 @@ use super::client_type::ClientType;
 
 use crate::activity::has_side_story_open;
 
-use chrono::{
-    DateTime, Datelike, Duration, Local, NaiveDateTime, NaiveTime, TimeZone, Utc, Weekday,
-};
+use chrono::{DateTime, Datelike, FixedOffset, Local, NaiveDateTime, NaiveTime, Utc, Weekday};
 use log::debug;
 use serde::Deserialize;
 
@@ -87,7 +85,7 @@ impl Condition {
             Condition::Always => true,
             Condition::Weekday { weekdays, client } => {
                 let weekday: Weekday = if let Some(client) = client {
-                    WeekdayCutter::new(client).get_amended_weekday()
+                    game_date(Utc::now(), client)
                 } else {
                     Local::now().weekday()
                 };
@@ -149,57 +147,18 @@ pub fn remainder_of_day_mod(divisor: u32) -> u32 {
     day % divisor
 }
 
-struct WeekdayCutter<'a> {
-    current_weekday: Weekday,
-    utc_now: DateTime<Utc>,
-    client: &'a ClientType,
-}
+fn game_date(datetime: DateTime<Utc>, client: &ClientType) -> Weekday {
+    let reset_time = client.reset_time();
+    let time_zone = client.timezone();
+    let fixed_offset_time =
+        datetime.with_timezone(&FixedOffset::east_opt(time_zone * 3600).unwrap());
 
-impl<'a> WeekdayCutter<'a> {
-    pub fn new(client: &'a ClientType) -> Self {
-        Self {
-            utc_now: Utc::now(),
-            current_weekday: Utc::now().weekday(),
-            client,
-        }
-    }
+    debug!("Client time in UTC{} {}", time_zone, fixed_offset_time);
 
-    pub fn get_amended_weekday(&self) -> Weekday {
-        let reset_time = self.get_server_reset_time();
-
-        debug!("Now: {} {}", self.utc_now, self.current_weekday);
-        debug!("Server reset time: {} {}", reset_time, self.current_weekday);
-
-        match self.utc_now.cmp(&reset_time) {
-            std::cmp::Ordering::Less => self.current_weekday,
-            std::cmp::Ordering::Equal => self.current_weekday,
-            std::cmp::Ordering::Greater => self.current_weekday.succ(),
-        }
-    }
-
-    // I don't know how it works, but it passes the test
-    fn get_server_reset_time(&self) -> DateTime<Utc> {
-        let f = |i: i64| {
-            let utc_time = self.utc_now;
-            let mut reset_time = Utc
-                .with_ymd_and_hms(utc_time.year(), utc_time.month(), utc_time.day(), 4, 0, 0)
-                .unwrap();
-
-            reset_time -= Duration::hours(i);
-            if i > 0 {
-                reset_time += Duration::days(1);
-            }
-
-            reset_time
-        };
-        match self.client {
-            ClientType::Official => f(8),  // utc+8
-            ClientType::Bilibili => f(8),  // utc+8
-            ClientType::Txwy => f(8),      // utc+8
-            ClientType::YoStarEN => f(-7), // utc-7
-            ClientType::YoStarJP => f(9),  // utc+9
-            ClientType::YoStarKR => f(9),  // utc+9
-        }
+    let current_weekday = fixed_offset_time.weekday();
+    match datetime <= reset_time {
+        true => current_weekday.pred(),
+        false => current_weekday,
     }
 }
 
@@ -697,107 +656,37 @@ mod tests {
     }
 
     mod weekday_cutter {
-        use chrono::{Datelike, TimeZone, Utc, Weekday};
+        use chrono::{Datelike, Duration, TimeZone, Utc};
+        use log::debug;
 
-        use crate::config::task::{condition::WeekdayCutter, ClientType};
+        use crate::config::task::{condition::game_date, ClientType};
 
+        //Need more test cases
         #[test]
         fn reset_check() {
-            let f = |i: u32| {
-                let time = Utc::now();
-                Utc.with_ymd_and_hms(time.year(), time.month(), time.day(), i, 0, 0)
-                    .unwrap()
+            let _f = |i: u32| {
+                let now = Utc::now();
+                let time = Utc
+                    .with_ymd_and_hms(now.year(), now.month(), now.day(), i, 0, 0)
+                    .unwrap();
+                time
             };
 
-            // Reset UTC time: 20:00
-            let cutter = WeekdayCutter {
-                current_weekday: Weekday::Mon,
-                utc_now: f(6),
-                client: &ClientType::Official,
-            };
-            assert_eq!(cutter.get_amended_weekday(), Weekday::Mon);
+            let test_weekday = Utc::now().weekday();
+            debug!("{}", test_weekday);
+            debug!("{}", _f(6));
+            debug!("{}", _f(22));
+            assert_eq!(
+                game_date(_f(6) - Duration::days(1), &ClientType::Official),
+                test_weekday.pred()
+            );
+            assert_eq!(
+                game_date(_f(22) - Duration::days(1), &ClientType::Official),
+                test_weekday
+            );
 
-            let cutter = WeekdayCutter {
-                current_weekday: Weekday::Mon,
-                utc_now: f(22),
-                client: &ClientType::Official,
-            };
-            assert_eq!(cutter.get_amended_weekday(), Weekday::Tue);
-
-            // Reset UTC time: 20:00
-            let cutter = WeekdayCutter {
-                current_weekday: Weekday::Mon,
-                utc_now: f(6),
-                client: &ClientType::Bilibili,
-            };
-            assert_eq!(cutter.get_amended_weekday(), Weekday::Mon);
-
-            let cutter = WeekdayCutter {
-                current_weekday: Weekday::Mon,
-                utc_now: f(22),
-                client: &ClientType::Bilibili,
-            };
-            assert_eq!(cutter.get_amended_weekday(), Weekday::Tue);
-
-            // Reset UTC time: 20:00
-            let cutter = WeekdayCutter {
-                current_weekday: Weekday::Mon,
-                utc_now: f(6),
-                client: &ClientType::Txwy,
-            };
-            assert_eq!(cutter.get_amended_weekday(), Weekday::Mon);
-
-            let cutter = WeekdayCutter {
-                current_weekday: Weekday::Mon,
-                utc_now: f(22),
-                client: &ClientType::Txwy,
-            };
-            assert_eq!(cutter.get_amended_weekday(), Weekday::Tue);
-
-            // Reset UTC time: 11:00
-            let cutter = WeekdayCutter {
-                current_weekday: Weekday::Mon,
-                utc_now: f(8),
-                client: &ClientType::YoStarEN,
-            };
-            assert_eq!(cutter.get_amended_weekday(), Weekday::Mon);
-
-            let cutter = WeekdayCutter {
-                current_weekday: Weekday::Mon,
-                utc_now: f(14),
-                client: &ClientType::YoStarEN,
-            };
-            assert_eq!(cutter.get_amended_weekday(), Weekday::Tue);
-
-            // Reset UTC time: 19:00
-            let cutter = WeekdayCutter {
-                current_weekday: Weekday::Mon,
-                utc_now: f(6),
-                client: &ClientType::YoStarJP,
-            };
-            assert_eq!(cutter.get_amended_weekday(), Weekday::Mon);
-
-            let cutter = WeekdayCutter {
-                current_weekday: Weekday::Mon,
-                utc_now: f(22),
-                client: &ClientType::YoStarJP,
-            };
-            assert_eq!(cutter.get_amended_weekday(), Weekday::Tue);
-
-            // Reset UTC time: 19:00
-            let cutter = WeekdayCutter {
-                current_weekday: Weekday::Mon,
-                utc_now: f(6),
-                client: &ClientType::YoStarKR,
-            };
-            assert_eq!(cutter.get_amended_weekday(), Weekday::Mon);
-
-            let cutter = WeekdayCutter {
-                current_weekday: Weekday::Mon,
-                utc_now: f(22),
-                client: &ClientType::YoStarKR,
-            };
-            assert_eq!(cutter.get_amended_weekday(), Weekday::Tue);
+            assert_eq!(game_date(_f(6), &ClientType::YoStarEN), test_weekday.pred());
+            assert_eq!(game_date(_f(22), &ClientType::YoStarEN), test_weekday);
         }
     }
 }
