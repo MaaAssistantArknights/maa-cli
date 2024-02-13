@@ -163,6 +163,26 @@ fn game_date(datetime: DateTime<Utc>, client: &ClientType) -> Weekday {
 }
 
 #[cfg(test)]
+fn game_date_for_debug(
+    datetime: DateTime<Utc>,
+    client: &ClientType,
+    test_weekday: Weekday,
+) -> Weekday {
+    let reset_time = client.reset_time();
+    let time_zone = client.timezone();
+    let fixed_offset_time =
+        datetime.with_timezone(&FixedOffset::east_opt(time_zone * 3600).unwrap());
+
+    debug!("Client time in UTC{} {}", time_zone, fixed_offset_time);
+
+    let current_weekday = test_weekday;
+    match datetime <= reset_time {
+        true => current_weekday.pred(),
+        false => current_weekday,
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use chrono::{Local, TimeZone};
@@ -656,10 +676,9 @@ mod tests {
     }
 
     mod weekday_cutter {
-        use chrono::{Datelike, Duration, TimeZone, Utc};
-        use log::debug;
+        use chrono::{Datelike, TimeZone, Utc, Weekday};
 
-        use crate::config::task::{condition::game_date, ClientType};
+        use crate::config::task::{condition::game_date_for_debug, ClientType};
 
         //Need more test cases
         #[test]
@@ -672,21 +691,28 @@ mod tests {
                 time
             };
 
-            let test_weekday = Utc::now().weekday();
-            debug!("{}", test_weekday);
-            debug!("{}", _f(6));
-            debug!("{}", _f(22));
+            let test_weekday = Weekday::Mon;
+
             assert_eq!(
-                game_date(_f(6) - Duration::days(1), &ClientType::Official),
-                test_weekday.pred()
+                // 2024-02-14 02:00:00 +08:00
+                game_date_for_debug(_f(18), &ClientType::Official, test_weekday),
+                Weekday::Sun
             );
             assert_eq!(
-                game_date(_f(22) - Duration::days(1), &ClientType::Official),
-                test_weekday
+                // 2024-02-14 06:00:00 +08:00
+                game_date_for_debug(_f(22), &ClientType::Official, test_weekday),
+                Weekday::Mon
             );
 
-            assert_eq!(game_date(_f(6), &ClientType::YoStarEN), test_weekday.pred());
-            assert_eq!(game_date(_f(22), &ClientType::YoStarEN), test_weekday);
+            assert_eq!(
+                // 2024-02-13 02:00:00 -07:00
+                game_date_for_debug(_f(9), &ClientType::YoStarEN, test_weekday),
+                Weekday::Sun
+            );
+            assert_eq!(
+                game_date_for_debug(_f(13), &ClientType::YoStarEN, test_weekday),
+                Weekday::Mon
+            );
         }
     }
 }

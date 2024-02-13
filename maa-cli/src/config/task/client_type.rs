@@ -1,4 +1,4 @@
-use chrono::{DateTime, FixedOffset, Local, Timelike};
+use chrono::{DateTime, FixedOffset, Local, Timelike, Utc};
 use clap::ValueEnum;
 use log::debug;
 use serde::Deserialize;
@@ -40,7 +40,7 @@ impl ClientType {
         let server_reset_hour = 4;
 
         let fixed_offset = FixedOffset::east_opt(timezone * 3600).unwrap();
-        let local_time = chrono::Local::now()
+        let local_time = Utc::now()
             .with_timezone(&fixed_offset)
             .with_hour(server_reset_hour)
             .unwrap()
