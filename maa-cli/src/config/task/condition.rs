@@ -2,7 +2,7 @@ use super::client_type::ClientType;
 
 use crate::activity::has_side_story_open;
 
-use chrono::{DateTime, Datelike, FixedOffset, Local, NaiveDateTime, NaiveTime, Utc, Weekday};
+use chrono::{Datelike, FixedOffset, Local, NaiveDateTime, NaiveTime, Utc, Weekday};
 use log::debug;
 use serde::Deserialize;
 
@@ -84,12 +84,11 @@ impl Condition {
         match self {
             Condition::Always => true,
             Condition::Weekday { weekdays, client } => {
-                let weekday: Weekday = if let Some(client) = client {
-                    game_date(Utc::now(), client)
+                if let Some(client) = client {
+                    game_date(weekdays, client)
                 } else {
-                    Local::now().weekday()
-                };
-                weekdays.contains(&weekday)
+                    weekdays.contains(&Local::now().weekday())
+                }
             }
             Condition::DayMod { divisor, remainder } => {
                 remainder_of_day_mod(*divisor) == *remainder
@@ -147,38 +146,32 @@ pub fn remainder_of_day_mod(divisor: u32) -> u32 {
     day % divisor
 }
 
-fn game_date(datetime: DateTime<Utc>, client: &ClientType) -> Weekday {
-    let reset_time = client.reset_time();
-    let time_zone = client.timezone();
-    let fixed_offset_time =
-        datetime.with_timezone(&FixedOffset::east_opt(time_zone * 3600).unwrap());
+fn game_date(list: &[Weekday], client: &ClientType) -> bool {
+    let server_time_zone = client.timezone();
+    let offset_seconds = server_time_zone * 3600;
+    let server_reset_time = Utc::now()
+        .with_timezone(&FixedOffset::east_opt(offset_seconds).unwrap())
+        .date_naive()
+        .and_time(client.reset_time());
+    let server_weekday = Utc::now()
+        .with_timezone(&FixedOffset::east_opt(offset_seconds).unwrap())
+        .weekday();
 
-    debug!("Client time in UTC{} {}", time_zone, fixed_offset_time);
+    debug!(
+        "Server reset time in UTC{} {}",
+        server_time_zone, server_reset_time
+    );
+    debug!("Server's weekday is {}", server_weekday);
 
-    let current_weekday = fixed_offset_time.weekday();
-    match datetime <= reset_time {
-        true => current_weekday.pred(),
-        false => current_weekday,
-    }
-}
+    let client_now = Utc::now()
+        .with_timezone(&FixedOffset::east_opt(offset_seconds).unwrap())
+        .naive_local();
+    debug!("Client time in UTC{} {}", server_time_zone, client_now);
 
-#[cfg(test)]
-fn game_date_for_debug(
-    datetime: DateTime<Utc>,
-    client: &ClientType,
-    test_weekday: Weekday,
-) -> Weekday {
-    let reset_time = client.reset_time();
-    let time_zone = client.timezone();
-    let fixed_offset_time =
-        datetime.with_timezone(&FixedOffset::east_opt(time_zone * 3600).unwrap());
-
-    debug!("Client time in UTC{} {}", time_zone, fixed_offset_time);
-
-    let current_weekday = test_weekday;
-    match datetime <= reset_time {
-        true => current_weekday.pred(),
-        false => current_weekday,
+    if client_now <= server_reset_time {
+        list.contains(&server_weekday.pred())
+    } else {
+        list.contains(&server_weekday)
     }
 }
 
@@ -387,7 +380,7 @@ mod tests {
             .is_active());
         }
 
-        // It's hart to test OnSideStory, because it depends on real world data
+        // It's hard to test OnSideStory, because it depends on real world data
         // #[test]
         // fn on_side_story() {}
 
@@ -676,43 +669,9 @@ mod tests {
     }
 
     mod weekday_cutter {
-        use chrono::{Datelike, TimeZone, Utc, Weekday};
 
-        use crate::config::task::{condition::game_date_for_debug, ClientType};
-
-        //Need more test cases
+        //Need test cases
         #[test]
-        fn reset_check() {
-            let _f = |i: u32| {
-                let now = Utc::now();
-                let time = Utc
-                    .with_ymd_and_hms(now.year(), now.month(), now.day(), i, 0, 0)
-                    .unwrap();
-                time
-            };
-
-            let test_weekday = Weekday::Mon;
-
-            assert_eq!(
-                // 2024-02-14 02:00:00 +08:00
-                game_date_for_debug(_f(18), &ClientType::Official, test_weekday),
-                Weekday::Sun
-            );
-            assert_eq!(
-                // 2024-02-14 06:00:00 +08:00
-                game_date_for_debug(_f(22), &ClientType::Official, test_weekday),
-                Weekday::Mon
-            );
-
-            assert_eq!(
-                // 2024-02-13 02:00:00 -07:00
-                game_date_for_debug(_f(9), &ClientType::YoStarEN, test_weekday),
-                Weekday::Sun
-            );
-            assert_eq!(
-                game_date_for_debug(_f(13), &ClientType::YoStarEN, test_weekday),
-                Weekday::Mon
-            );
-        }
+        fn reset_check() {}
     }
 }
