@@ -2,7 +2,7 @@ use super::client_type::ClientType;
 
 use crate::activity::has_side_story_open;
 
-use chrono::{Datelike, Local, NaiveDateTime, NaiveTime, Weekday};
+use chrono::{DateTime, Datelike, Local, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Weekday};
 use serde::Deserialize;
 
 #[cfg_attr(test, derive(PartialEq, Debug))]
@@ -14,7 +14,14 @@ pub enum Condition {
     #[default]
     Always,
     /// The task is active on the specified weekdays
-    Weekday { weekdays: Vec<Weekday> },
+    ///
+    /// By default, use the weekday in user local time zone.
+    /// If client is specified, use the weekday in the server time zone and start of the day will be
+    /// 04:00:00 instead of 00:00:00 in server time zone, and the end of the day will be 03:59:59.
+    Weekday {
+        weekdays: Vec<Weekday>,
+        client: Option<ClientType>,
+    },
     /// Day modula
     ///
     /// The task is active on `num_days % divisor == remainder`.
@@ -78,8 +85,15 @@ impl Condition {
     pub fn is_active(&self) -> bool {
         match self {
             Condition::Always => true,
-            Condition::Weekday { weekdays } => {
-                let weekday = Local::now().weekday();
+            Condition::Weekday {
+                weekdays,
+                ref client,
+            } => {
+                let weekday = if let Some(client) = client {
+                    game_date(Local::now(), *client).weekday()
+                } else {
+                    Local::now().weekday()
+                };
                 weekdays.contains(&weekday)
             }
             Condition::DayMod { divisor, remainder } => {
@@ -125,6 +139,19 @@ impl Condition {
     }
 }
 
+/// Get the date in the game server time
+fn game_date<TZ: TimeZone>(now: DateTime<TZ>, client: ClientType) -> NaiveDate {
+    let server_start_of_day = client.server_start_of_day();
+    let server_time_zone = client.server_time_zone();
+    let now = now.with_timezone(&server_time_zone);
+    let date = now.date_naive();
+    if now.time() < server_start_of_day {
+        date.pred_opt().unwrap()
+    } else {
+        date
+    }
+}
+
 fn time_in_range(time: &NaiveTime, start: &NaiveTime, end: &NaiveTime) -> bool {
     if start <= end {
         start <= time && time < end
@@ -152,7 +179,7 @@ mod tests {
 
     mod active {
         use super::*;
-        use chrono::{Duration, NaiveDate};
+        use chrono::{Duration, FixedOffset};
 
         #[test]
         fn always() {
@@ -163,15 +190,92 @@ mod tests {
         fn weekday() {
             let now = chrono::Local::now();
             let weekday = now.date_naive().weekday();
+            let cn_tz = FixedOffset::east_opt(8 * 3600).unwrap();
+            let now_in_cn = now.with_timezone(&cn_tz);
+            let weekday_in_cn = now_in_cn.weekday();
+            let server_start_of_day = ClientType::Official.server_start_of_day();
+            let should_be_prev_day = now_in_cn.time() < server_start_of_day;
 
             assert!(Condition::Weekday {
-                weekdays: vec![weekday]
+                weekdays: vec![weekday],
+                client: None,
             }
             .is_active());
             assert!(!Condition::Weekday {
-                weekdays: vec![weekday.pred(), weekday.succ()]
+                weekdays: vec![weekday.pred(), weekday.succ()],
+                client: None,
             }
             .is_active());
+
+            assert_eq!(
+                Condition::Weekday {
+                    weekdays: vec![weekday_in_cn],
+                    client: Some(ClientType::Official),
+                }
+                .is_active(),
+                !should_be_prev_day
+            );
+
+            assert_eq!(
+                Condition::Weekday {
+                    weekdays: vec![weekday_in_cn.pred(), weekday_in_cn.succ()],
+                    client: Some(ClientType::Official),
+                }
+                .is_active(),
+                should_be_prev_day
+            );
+        }
+
+        #[test]
+        fn test_game_date() {
+            fn datetime(tz: i32, y: i32, m: u32, d: u32, h: u32, mi: u32) -> DateTime<FixedOffset> {
+                FixedOffset::east_opt(tz * 3600)
+                    .unwrap()
+                    .with_ymd_and_hms(y, m, d, h, mi, 0)
+                    .unwrap()
+            }
+
+            fn naive_date(y: i32, m: u32, d: u32) -> NaiveDate {
+                NaiveDate::from_ymd_opt(y, m, d).unwrap()
+            }
+
+            // local and server in the same time zone
+            assert_eq!(
+                game_date(datetime(8, 2024, 2, 14, 0, 0), ClientType::Official),
+                naive_date(2024, 2, 13),
+            );
+            assert_eq!(
+                game_date(datetime(8, 2024, 2, 14, 4, 1), ClientType::Official),
+                naive_date(2024, 2, 14),
+            );
+
+            // local is late than server
+            assert_eq!(
+                game_date(datetime(-7, 2024, 2, 13, 10, 0), ClientType::YoStarJP),
+                naive_date(2024, 2, 13),
+            );
+            assert_eq!(
+                game_date(datetime(-7, 2024, 2, 13, 19, 0), ClientType::YoStarJP),
+                naive_date(2024, 2, 14),
+            );
+
+            // local is early than server
+            assert_eq!(
+                game_date(datetime(8, 2024, 2, 14, 4, 0), ClientType::YoStarEN),
+                naive_date(2024, 2, 13),
+            );
+            assert_eq!(
+                game_date(datetime(8, 2024, 2, 14, 20, 0), ClientType::YoStarEN),
+                naive_date(2024, 2, 14),
+            );
+
+            // This is a very unusual case that the local time zone is UTC+14 and server time zone is UTC-7
+            // For local time 2024-02-15 00:00:00, the server time is 2024-02-14 03:00:00
+            // Thus the game date is 2024-02-13 even though the local date is 2024-02-15
+            assert_eq!(
+                game_date(datetime(14, 2024, 2, 15, 0, 0), ClientType::YoStarEN),
+                naive_date(2024, 2, 13),
+            );
         }
 
         #[test]
@@ -396,12 +500,11 @@ mod tests {
 
         #[test]
         fn weekday() {
-            let cond = Condition::Weekday {
-                weekdays: vec![Weekday::Mon, Weekday::Wed, Weekday::Fri],
-            };
-
             assert_de_tokens(
-                &cond,
+                &Condition::Weekday {
+                    weekdays: vec![Weekday::Mon, Weekday::Wed, Weekday::Fri],
+                    client: Some(ClientType::Official),
+                },
                 &[
                     Token::Map { len: Some(2) },
                     Token::Str("type"),
@@ -412,12 +515,18 @@ mod tests {
                     Token::Str("Wed"),
                     Token::Str("Fri"),
                     Token::SeqEnd,
+                    Token::Str("client"),
+                    Token::Some,
+                    Token::Str("Official"),
                     Token::MapEnd,
                 ],
             );
 
             assert_de_tokens(
-                &cond,
+                &Condition::Weekday {
+                    weekdays: vec![Weekday::Mon, Weekday::Wed, Weekday::Fri],
+                    client: None,
+                },
                 &[
                     Token::Map { len: Some(2) },
                     Token::Str("type"),

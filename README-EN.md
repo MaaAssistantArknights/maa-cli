@@ -246,7 +246,12 @@ params = { stage = "SL-8" }
 condition = { type = "DateTime", start = "2023-08-01T16:00:00", end = "2023-08-21T03:59:59" }
 # fight CE-6 on Tue, Thu, Sat if not on summer event
 [[tasks.variants]]
-condition = { type = "Weekday", weekdays = ["Tue", "Thu", "Sat"] }
+# By default the weekday is determined by the local time of your system,
+# however, the start of the day in game is 04:00:00 instead of 00:00:00,
+# and your local time zone may be different from the time zone of the game server.
+# In this case, you may get wrong date of the game and some stage may not open as expected.
+# So you can specify the `client` field, which is used to calculate the date of the game.
+condition = { type = "Weekday", weekdays = ["Tue", "Thu", "Sat"], client = "Official"}
 params = { stage = "CE-6" }
 # fight 1-7 otherwise
 [[tasks.variants]]

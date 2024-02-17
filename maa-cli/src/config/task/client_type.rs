@@ -42,6 +42,19 @@ impl ClientType {
             ClientType::YoStarKR => "명일방주",
         }
     }
+
+    pub fn server_start_of_day(self) -> chrono::NaiveTime {
+        chrono::NaiveTime::from_hms_opt(4, 0, 0).unwrap()
+    }
+
+    pub fn server_time_zone(self) -> chrono::FixedOffset {
+        use ClientType::*;
+        match self {
+            Official | Bilibili | Txwy => chrono::FixedOffset::east_opt(8 * 3600).unwrap(),
+            YoStarEN => chrono::FixedOffset::west_opt(7 * 3600).unwrap(),
+            YoStarJP | YoStarKR => chrono::FixedOffset::east_opt(9 * 3600).unwrap(),
+        }
+    }
 }
 
 impl AsRef<str> for ClientType {
@@ -184,6 +197,62 @@ mod tests {
         assert_eq!(ClientType::YoStarEN.app(), "Arknights");
         assert_eq!(ClientType::YoStarJP.app(), "アークナイツ");
         assert_eq!(ClientType::YoStarKR.app(), "명일방주");
+    }
+
+    #[test]
+    fn client_to_server_start_of_day() {
+        assert_eq!(
+            ClientType::Official.server_start_of_day(),
+            chrono::NaiveTime::from_hms_opt(4, 0, 0).unwrap()
+        );
+        assert_eq!(
+            ClientType::Bilibili.server_start_of_day(),
+            chrono::NaiveTime::from_hms_opt(4, 0, 0).unwrap()
+        );
+        assert_eq!(
+            ClientType::Txwy.server_start_of_day(),
+            chrono::NaiveTime::from_hms_opt(4, 0, 0).unwrap()
+        );
+        assert_eq!(
+            ClientType::YoStarEN.server_start_of_day(),
+            chrono::NaiveTime::from_hms_opt(4, 0, 0).unwrap()
+        );
+        assert_eq!(
+            ClientType::YoStarJP.server_start_of_day(),
+            chrono::NaiveTime::from_hms_opt(4, 0, 0).unwrap()
+        );
+        assert_eq!(
+            ClientType::YoStarKR.server_start_of_day(),
+            chrono::NaiveTime::from_hms_opt(4, 0, 0).unwrap()
+        );
+    }
+
+    #[test]
+    fn client_to_server_time_zone() {
+        assert_eq!(
+            ClientType::Official.server_time_zone(),
+            chrono::FixedOffset::east_opt(8 * 3600).unwrap()
+        );
+        assert_eq!(
+            ClientType::Bilibili.server_time_zone(),
+            chrono::FixedOffset::east_opt(8 * 3600).unwrap()
+        );
+        assert_eq!(
+            ClientType::Txwy.server_time_zone(),
+            chrono::FixedOffset::east_opt(8 * 3600).unwrap()
+        );
+        assert_eq!(
+            ClientType::YoStarEN.server_time_zone(),
+            chrono::FixedOffset::west_opt(7 * 3600).unwrap()
+        );
+        assert_eq!(
+            ClientType::YoStarJP.server_time_zone(),
+            chrono::FixedOffset::east_opt(9 * 3600).unwrap()
+        );
+        assert_eq!(
+            ClientType::YoStarKR.server_time_zone(),
+            chrono::FixedOffset::east_opt(9 * 3600).unwrap()
+        );
     }
 
     #[test]

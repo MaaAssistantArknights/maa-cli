@@ -29,8 +29,11 @@ description = "a stage to fight"
 
 # fight CE-6 on Tue, Thu, Sat
 [[tasks.variants]]
-condition = { type = "Weekday", weekdays = ["Tue", "Thu", "Sat"] }
 params = { stage = "CE-6" }
+[tasks.variants.condition]
+type = "Weekday"
+client = "Official"
+weekdays = ["Tue", "Thu", "Sat"]
 
 # fight the last stage if on event period
 [[tasks.variants]]

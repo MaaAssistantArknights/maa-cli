@@ -258,7 +258,10 @@ condition = { type = "DateTime", start = "2023-08-01T16:00:00", end = "2023-08-2
 
 # 在夏活期间以外的周二、周四和周六，刷CE-6
 [[tasks.variants]]
-condition = { type = "Weekday", weekdays = ["Tue", "Thu", "Sat"] }
+# 默认情况下，使用你本地的日期判断周几，但是由于游戏中每天开始时间是 04:00:00 而不是 00:00:00，
+# 且你本地的时区可能和服务器不同， 因此有时候关卡的开放时间可能和你本地的日期不一致。
+# 因此，你可以设定 `client` 参数来指定你使用的客户端，这样会通过服务端的时间来判断。
+condition = { type = "Weekday", weekdays = ["Tue", "Thu", "Sat"], client = "Official"}
 params = { stage = "CE-6" }
 
 # 其他时间，刷1-7

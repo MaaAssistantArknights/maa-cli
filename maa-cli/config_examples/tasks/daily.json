@@ -42,7 +42,8 @@
         {
           "condition": {
             "type": "Weekday",
-            "weekdays": ["Tue", "Thu", "Sat"]
+            "weekdays": ["Tue", "Thu", "Sat"],
+            "client": "Official"
           },
           "params": {
             "stage": "CE-6"
