@@ -128,7 +128,8 @@
                   }
                 ]
               }
-            }
+            },
+            "client": { "$ref": "#/definitions/client" }
           },
           "required": ["type", "weekdays"],
           "additionalProperties": false
