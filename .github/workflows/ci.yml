@@ -102,23 +102,6 @@ jobs:
           core: true
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
-      - name: Install MaaCore
-        env:
-          MAA_CONFIG_DIR: ${{ github.workspace }}/maa-cli/config_examples
-        run: |
-          cargo run -- install stable
-          ls -l "$(cargo run -- dir library)"
-          ls -l "$(cargo run -- dir resource)"
-          ls -l "$(cargo run -- dir cache)"
-          package_name=$(basename "$(ls "$(cargo run -- dir cache)")")
-          echo "Downloaded MaaCore package: $package_name"
-          version=${package_name#MAA-v}
-          version=${version%%-*}
-          if [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Downloaded MaaCore version: $version"
-            echo "MAA_CORE_VERSION=v$version" >> "$GITHUB_ENV"
-          fi
-          echo "MAA_CORE_INSTALLED=true" >> "$GITHUB_ENV"
       - name: Coverage
         run: |
           cargo tarpaulin --out xml --all --timeout 120 \

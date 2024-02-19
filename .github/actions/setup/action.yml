@@ -67,7 +67,6 @@ runs:
       run: |
         cli_version=v0.4.3
         url="https://github.com/MaaAssistantArknights/maa-cli/releases/download/$cli_version"
-
         case "$CARGO_BUILD_TARGET" in
           *-unknown-linux-gnu)
             aria2c "$url/maa_cli-$cli_version-$CARGO_BUILD_TARGET.tar.gz"
@@ -76,12 +75,12 @@ runs:
           ;;
           *-apple-darwin)
             aria2c "$url/maa_cli-$cli_version-$CARGO_BUILD_TARGET.zip"
-            unzip -v maa_cli-$cli_version-$CARGO_BUILD_TARGET.zip
+            unzip maa_cli-$cli_version-$CARGO_BUILD_TARGET.zip
             cp -v maa_cli-$CARGO_BUILD_TARGET/maa .
           ;;
           *-pc-windows-msvc)
             aria2c "$url/maa_cli-$cli_version-$CARGO_BUILD_TARGET.zip"
-            unzip -v maa_cli-$cli_version-$CARGO_BUILD_TARGET.zip
+            unzip maa_cli-$cli_version-$CARGO_BUILD_TARGET.zip
             cp -v maa_cli-$CARGO_BUILD_TARGET/maa.exe .
           ;;
         esac
@@ -102,9 +101,10 @@ runs:
 
         package_name=$(basename "$(ls "$(./maa dir cache)")")
         echo "Downloaded MaaCore package: $package_name"
-        version=${package_name#MAA-v}
-        version=${version%%-*}
-        if [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-          echo "Downloaded MaaCore version: $version"
-          echo "MAA_CORE_VERSION=v$version" >> "$GITHUB_ENV"
+        core_version=${package_name#MAA-v}
+        core_version=${version%%-*}
+        if [[ $core_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "Downloaded MaaCore version: $core_version"
+          echo "MAA_CORE_VERSION=v$core_version" >> "$GITHUB_ENV"
         fi
+        echo "MAA_CORE_INSTALLED=true" >> "$GITHUB_ENV"
