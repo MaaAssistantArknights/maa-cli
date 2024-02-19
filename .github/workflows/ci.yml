@@ -187,8 +187,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: Coverage
         run: |
-          cargo tarpaulin --out xml --all --timeout 120 \
-            ${{ github.run_attempt == 1 && '--skip-clean' || '' }}
+          cargo tarpaulin --out xml --workspace --timeout 120 \
+            ${{ github.run_attempt == 1 && '--skip-clean' || '' }} \
+            -- --include-ignored
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v4
         with:
