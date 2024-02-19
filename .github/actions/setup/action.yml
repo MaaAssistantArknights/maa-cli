@@ -89,7 +89,6 @@ runs:
       shell: bash
       run: |
         export MAA_CONFIG_DIR="$GITHUB_WORKSPACE/maa-cli/config_examples"
-        export MAA_LOG="debug"
 
         ./maa install stable
         MAA_CORE_DIR="$(./maa dir lib)"

@@ -182,7 +182,7 @@ jobs:
           os: ${{ matrix.os }}
           arch: x86_64
           coverage: ${{ !startsWith(matrix.os , 'windows') }}
-          core: ${{ !startsWith(matrix.os , 'windows') }}
+          core: true
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
       - name: Build
