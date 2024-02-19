@@ -79,39 +79,6 @@ jobs:
         run: |
           cargo test -- --include-ignored
 
-  coverage:
-    name: Coverage
-    needs: build
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Rust
-        uses: ./.github/actions/setup
-        with:
-          os: ${{ matrix.os }}
-          arch: x86_64
-          coverage: true
-          core: true
-      - name: Setup Cache
-        uses: Swatinem/rust-cache@v2
-      - name: Coverage
-        run: |
-          cargo tarpaulin --out xml --all --timeout 120 \
-            ${{ github.run_attempt == 1 && '--skip-clean' || '' }}
-      - name: Upload to codecov.io
-        uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: true
-
   build-aarch64:
     name: Build (aarch64)
     runs-on: ${{ matrix.os }}
@@ -181,7 +148,6 @@ jobs:
         with:
           os: ${{ matrix.os }}
           arch: x86_64
-          coverage: ${{ !startsWith(matrix.os , 'windows') }}
           core: true
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
@@ -197,13 +163,35 @@ jobs:
         # https://stackoverflow.com/questions/63394094/rust-linker-seeks-a-lib-rather-than-a-dll
         if: ${{ !startsWith(matrix.os, 'windows') }}
         run: cargo test --package maa-sys
+
+  coverage:
+    name: Coverage
+    needs: [build, build-sys]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: ./.github/actions/setup
+        with:
+          os: ${{ matrix.os }}
+          arch: x86_64
+          coverage: true
+          core: true
+      - name: Setup Cache
+        uses: Swatinem/rust-cache@v2
       - name: Coverage
-        if: ${{ !startsWith(matrix.os, 'windows') }}
         run: |
-          cargo tarpaulin --packages maa-sys --timeout 120 --out xml \
+          cargo tarpaulin --out xml --all --timeout 120 \
             ${{ github.run_attempt == 1 && '--skip-clean' || '' }}
       - name: Upload to codecov.io
-        if: ${{ !startsWith(matrix.os, 'windows') }}
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
