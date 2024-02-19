@@ -63,10 +63,28 @@ runs:
         tool: cargo-tarpaulin
     - name: Install Prebuilt CLI
       if: fromJson(inputs.core)
-      uses: jaxxstorm/action-install-gh-release@v1
-      with:
-        repo: MaaAssistantArknights/maa-cli
-        tag: v0.4.3
+      shell: bash
+      run: |
+        cli_version=v0.4.3
+        url="https://github.com/MaaAssistantArknights/maa-cli/releases/download/$cli_version"
+
+        case "$CARGO_BUILD_TARGET" in
+          *-unknown-linux-gnu)
+            aria2c "$url/maa_cli-$cli_version-$CARGO_BUILD_TARGET.tar.gz"
+            tar -xzvf maa_cli-$cli_version-$CARGO_BUILD_TARGET.tar.gz
+            cp -v maa_cli-$cli_version-$CARGO_BUILD_TARGET/maa .
+          ;;
+          *-apple-darwin)
+            aria2c "$url/maa_cli-$cli_version-$CARGO_BUILD_TARGET.zip"
+            unzip -v maa_cli-$cli_version-$CARGO_BUILD_TARGET.zip
+            cp -v maa_cli-$cli_version-$CARGO_BUILD_TARGET/maa .
+          ;;
+          *-pc-windows-msvc)
+            aria2c "$url/maa_cli-$cli_version-$CARGO_BUILD_TARGET.zip"
+            unzip -v maa_cli-$cli_version-$CARGO_BUILD_TARGET.zip
+            cp -v maa_cli-$cli_version-$CARGO_BUILD_TARGET/maa.exe .
+          ;;
+        esac
     - name: Install MaaCore and resource
       if: fromJson(inputs.core)
       shell: bash
@@ -74,15 +92,15 @@ runs:
         export MAA_CONFIG_DIR="$GITHUB_WORKSPACE/maa-cli/config_examples"
         export MAA_LOG="debug"
 
-        maa install stable
-        MAA_CORE_DIR="$(maa dir lib)"
-        MAA_RESOURCE_DIR="$(maa dir resource)"
+        ./maa install stable
+        MAA_CORE_DIR="$(./maa dir lib)"
+        MAA_RESOURCE_DIR="$(./maa dir resource)"
         ls -l "$MAA_CORE_DIR"
         ls -l "$MAA_RESOURCE_DIR"
         echo "MAA_CORE_DIR=$MAA_CORE_DIR" >> $GITHUB_ENV
         echo "MAA_RESOURCE_DIR=$MAA_RESOURCE_DIR" >> $GITHUB_ENV
 
-        package_name=$(basename "$(ls "$(maa dir cache)")")
+        package_name=$(basename "$(ls "$(./maa dir cache)")")
         echo "Downloaded MaaCore package: $package_name"
         version=${package_name#MAA-v}
         version=${version%%-*}
