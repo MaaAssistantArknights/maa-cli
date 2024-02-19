@@ -406,9 +406,7 @@ fn main() -> Result<()> {
             println!(
                 "{}",
                 remainder_of_day_mod(
-                    timezone
-                        .map(|x| TimeOffset::TimeZone(x))
-                        .unwrap_or_default(),
+                    timezone.map(TimeOffset::TimeZone).unwrap_or_default(),
                     divisor
                 )
             );
