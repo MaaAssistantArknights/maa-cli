@@ -222,6 +222,9 @@ enum SubCommand {
     Remainder {
         /// The value of divisor
         divisor: u32,
+        /// Time zone of the date
+        #[arg(long)]
+        timezone: Option<i8>,
     },
     /// List all available tasks
     List,
@@ -398,8 +401,15 @@ fn main() -> Result<()> {
             format,
         } => config::convert(&input, output.as_deref(), format)?,
         SubCommand::Activity { client } => activity::display_stage_activity(client)?,
-        SubCommand::Remainder { divisor } => {
-            println!("{}", config::task::remainder_of_day_mod(divisor));
+        SubCommand::Remainder { divisor, timezone } => {
+            use crate::config::task::{remainder_of_day_mod, TimeOffset};
+            println!(
+                "{}",
+                remainder_of_day_mod(
+                    timezone.map(TimeOffset::TimeZone).unwrap_or_default(),
+                    divisor
+                )
+            );
         }
         SubCommand::List => {
             let task_dir = dirs::config().join("tasks");
@@ -903,7 +913,18 @@ mod test {
         fn remainder() {
             assert_matches!(
                 CLI::parse_from(["maa", "remainder", "3"]).command,
-                SubCommand::Remainder { divisor: 3 }
+                SubCommand::Remainder {
+                    divisor: 3,
+                    timezone: None,
+                }
+            );
+
+            assert_matches!(
+                CLI::parse_from(["maa", "remainder", "3", "--timezone", "8"]).command,
+                SubCommand::Remainder {
+                    divisor: 3,
+                    timezone: Some(8),
+                }
             );
         }
 

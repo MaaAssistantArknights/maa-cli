@@ -32,12 +32,16 @@ description = "a stage to fight"
 params = { stage = "CE-6" }
 [tasks.variants.condition]
 type = "Weekday"
-client = "Official"
+timezone = "Official"
 weekdays = ["Tue", "Thu", "Sat"]
 
 # fight the last stage if on event period
 [[tasks.variants]]
-condition = { type = "DateTime", start = "2023-08-01T16:00:00", end = "2023-08-21T03:59:59" }
+[tasks.variants.condition]
+type = "DateTime"
+start = "2023-08-01T16:00:00"
+end = "2023-08-21T03:59:59"
+timezone = 8
 [tasks.variants.params.stage]
 alternatives = ["SL-6", "SL-7", "SL-8"]
 default_index = 2

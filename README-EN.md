@@ -246,17 +246,14 @@ params = { stage = "SL-8" }
 condition = { type = "DateTime", start = "2023-08-01T16:00:00", end = "2023-08-21T03:59:59" }
 # fight CE-6 on Tue, Thu, Sat if not on summer event
 [[tasks.variants]]
-# By default the weekday is determined by the local time of your system,
-# however, the start of the day in game is 04:00:00 instead of 00:00:00,
-# and your local time zone may be different from the time zone of the game server.
-# In this case, you may get wrong date of the game and some stage may not open as expected.
-# So you can specify the `client` field, which is used to calculate the date of the game.
-condition = { type = "Weekday", weekdays = ["Tue", "Thu", "Sat"], client = "Official"}
+condition = { type = "Weekday", weekdays = ["Tue", "Thu", "Sat"], timezone = "Official"}
 params = { stage = "CE-6" }
 # fight 1-7 otherwise
 [[tasks.variants]]
 params = { stage = "1-7" }
 ```
+
+All above conditions related to time have a `timezone` field, which is used to specify the timezone of the condition. The value of `timezone` can be an offset of UTC, like `8` or `-7`, or a name of client type of game, like `Official`. Note, even the official server is in China, but the timezone of official server is `UTC+4` instead of `UTC+8`, because the start of the game day is `04:00:00` instead of `00:00:00`. When the `timezone` is omitted, the condition will be matched in the local timezone of the system.
 
 Beside of above conditions, there is a condition `OnSideStory` which depends on hot update resource to check if there is any opening side story. Thus, the condition of fight `SL-8`can be simplified as `{ type = "OnSideStory", client = "Official" }`, where `client` is the client type of game.
 

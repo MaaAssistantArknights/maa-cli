@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/MaaAssistantArknights/maa-cli/raw/v0.4.2/maa-cli/schemas/task.schema.json",
+  "$id": "https://github.com/MaaAssistantArknights/maa-cli/raw/v0.4.4/maa-cli/schemas/task.schema.json",
   "type": "object",
   "required": ["tasks"],
   "properties": {
@@ -36,6 +36,19 @@
         "YoStarEN",
         "YoStarJP",
         "YoStarKR"
+      ]
+    },
+    "timezone": {
+      "oneOf": [
+        {
+          "type": "integer",
+          "description": "Timezone offset in hours",
+          "minimum": -24,
+          "maximum": 24
+        },
+        {
+          "$ref": "#/definitions/client"
+        }
       ]
     },
     "task": {
@@ -129,7 +142,7 @@
                 ]
               }
             },
-            "client": { "$ref": "#/definitions/client" }
+            "timezone": { "$ref": "#/definitions/timezone" }
           },
           "required": ["type", "weekdays"],
           "additionalProperties": false
@@ -148,7 +161,8 @@
               "description": "Remainder of day number",
               "minimum": 0,
               "default": 0
-            }
+            },
+            "timezone": { "$ref": "#/definitions/timezone" }
           }
         },
         {
@@ -156,7 +170,8 @@
           "properties": {
             "type": { "const": "Time" },
             "start": { "$ref": "#/definitions/time" },
-            "end": { "$ref": "#/definitions/time" }
+            "end": { "$ref": "#/definitions/time" },
+            "timezone": { "$ref": "#/definitions/timezone" }
           },
           "required": ["type"],
           "additionalProperties": false
@@ -166,7 +181,8 @@
           "properties": {
             "type": { "const": "DateTime" },
             "start": { "$ref": "#/definitions/date-time" },
-            "end": { "$ref": "#/definitions/date-time" }
+            "end": { "$ref": "#/definitions/date-time" },
+            "timezone": { "$ref": "#/definitions/timezone" }
           },
           "required": ["type"],
           "additionalProperties": false

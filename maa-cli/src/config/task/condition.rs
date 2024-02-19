@@ -2,7 +2,7 @@ use super::client_type::ClientType;
 
 use crate::activity::has_side_story_open;
 
-use chrono::{DateTime, Datelike, Local, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Weekday};
+use chrono::{DateTime, Datelike, NaiveDateTime, NaiveTime, TimeZone, Utc, Weekday};
 use serde::Deserialize;
 
 #[cfg_attr(test, derive(PartialEq, Debug))]
@@ -20,7 +20,8 @@ pub enum Condition {
     /// 04:00:00 instead of 00:00:00 in server time zone, and the end of the day will be 03:59:59.
     Weekday {
         weekdays: Vec<Weekday>,
-        client: Option<ClientType>,
+        #[serde(default, alias = "client")]
+        timezone: TimeOffset,
     },
     /// Day modula
     ///
@@ -31,26 +32,32 @@ pub enum Condition {
         divisor: u32,
         #[serde(default)]
         remainder: u32,
+        #[serde(default)]
+        timezone: TimeOffset,
     },
     /// The task is active on the specified time range
     ///
     /// If `start` is `None`, the task is active before `end`.
     /// If `end` is `None`, the task is active after `start`.
     Time {
-        #[serde(default, deserialize_with = "deserialize_from_str")]
+        #[serde(default)]
         start: Option<NaiveTime>,
-        #[serde(default, deserialize_with = "deserialize_from_str")]
+        #[serde(default)]
         end: Option<NaiveTime>,
+        #[serde(default)]
+        timezone: TimeOffset,
     },
     /// The task is active on the specified datetime range
     ///
     /// If `start` is `None`, the task is active before `end`.
     /// If `end` is `None`, the task is active after `start`.
     DateTime {
-        #[serde(default, deserialize_with = "deserialize_from_str")]
+        #[serde(default)]
         start: Option<NaiveDateTime>,
-        #[serde(default, deserialize_with = "deserialize_from_str")]
+        #[serde(default)]
         end: Option<NaiveDateTime>,
+        #[serde(default)]
+        timezone: TimeOffset,
     },
     OnSideStory {
         #[serde(default)]
@@ -65,60 +72,82 @@ pub enum Condition {
     Not { condition: Box<Condition> },
 }
 
-fn deserialize_from_str<'de, S, D>(deserializer: D) -> Result<Option<S>, D::Error>
-where
-    S: std::str::FromStr,
-    S::Err: std::fmt::Display,
-    D: serde::Deserializer<'de>,
-{
-    let s: Option<String> = Option::deserialize(deserializer)?;
-    match s {
-        Some(s) => match s.parse::<S>() {
-            Ok(t) => Ok(Some(t)),
-            Err(e) => Err(serde::de::Error::custom(format!("Invalid format: {}", e))),
-        },
-        None => Ok(None),
+#[cfg_attr(test, derive(PartialEq, Debug))]
+#[derive(Clone, Copy, Default, Deserialize)]
+#[serde(untagged)]
+pub enum TimeOffset {
+    Client(ClientType),
+    TimeZone(i8),
+    #[default]
+    Local,
+}
+
+impl TimeOffset {
+    /// Get the current date time in given time zone
+    fn naive_now(self) -> NaiveDateTime {
+        self.date_time(Utc::now())
     }
+
+    /// Get the naive date time of the given date time in the given time zone
+    fn date_time<TZ: TimeZone>(self, datetime: DateTime<TZ>) -> NaiveDateTime {
+        use TimeOffset::*;
+        match self {
+            TimeZone(tz) => datetime.with_timezone(&tz_to_offset(tz)).naive_local(),
+            Client(client) => datetime
+                .with_timezone(&tz_to_offset(client.server_time_zone()))
+                .naive_local(),
+            Local => datetime.with_timezone(&chrono::Local).naive_local(),
+        }
+    }
+}
+
+fn tz_to_offset(tz: i8) -> chrono::FixedOffset {
+    chrono::FixedOffset::east_opt(tz as i32 * 3600).unwrap()
 }
 
 impl Condition {
     pub fn is_active(&self) -> bool {
-        match self {
-            Condition::Always => true,
-            Condition::Weekday {
-                weekdays,
-                ref client,
+        use Condition::*;
+        match *self {
+            Always => true,
+            Weekday {
+                ref weekdays,
+                timezone,
+            } => weekdays.contains(&timezone.naive_now().weekday()),
+            DayMod {
+                divisor,
+                remainder,
+                timezone,
+            } => remainder_of_day_mod(timezone, divisor) == remainder,
+            Time {
+                start,
+                end,
+                timezone,
             } => {
-                let weekday = if let Some(client) = client {
-                    game_date(Local::now(), *client).weekday()
-                } else {
-                    Local::now().weekday()
-                };
-                weekdays.contains(&weekday)
-            }
-            Condition::DayMod { divisor, remainder } => {
-                remainder_of_day_mod(*divisor) == *remainder
-            }
-            Condition::Time { start, end } => {
-                let now_time = Local::now().time();
+                let now_time = timezone.naive_now().time();
+
                 match (start, end) {
-                    (Some(s), Some(e)) => time_in_range(&now_time, s, e),
-                    (Some(s), None) => now_time >= *s,
-                    (None, Some(e)) => now_time < *e,
+                    (Some(s), Some(e)) => time_in_range(now_time, s, e),
+                    (Some(s), None) => now_time >= s,
+                    (None, Some(e)) => now_time < e,
                     (None, None) => true,
                 }
             }
-            Condition::DateTime { start, end } => {
-                let now = Local::now().naive_local();
+            DateTime {
+                start,
+                end,
+                timezone,
+            } => {
+                let now = timezone.naive_now();
                 match (start, end) {
-                    (Some(s), Some(e)) => now >= *s && now < *e,
-                    (Some(s), None) => now >= *s,
-                    (None, Some(e)) => now < *e,
+                    (Some(s), Some(e)) => now >= s && now < e,
+                    (Some(s), None) => now >= s,
+                    (None, Some(e)) => now < e,
                     (None, None) => true,
                 }
             }
-            Condition::OnSideStory { client } => has_side_story_open(*client),
-            Condition::And { conditions } => {
+            OnSideStory { client } => has_side_story_open(client),
+            And { ref conditions } => {
                 for condition in conditions {
                     if !condition.is_active() {
                         return false;
@@ -126,7 +155,7 @@ impl Condition {
                 }
                 true
             }
-            Condition::Or { conditions } => {
+            Or { ref conditions } => {
                 for condition in conditions {
                     if condition.is_active() {
                         return true;
@@ -134,25 +163,12 @@ impl Condition {
                 }
                 false
             }
-            Condition::Not { condition } => !condition.is_active(),
+            Not { ref condition } => !condition.is_active(),
         }
     }
 }
 
-/// Get the date in the game server time
-fn game_date<TZ: TimeZone>(now: DateTime<TZ>, client: ClientType) -> NaiveDate {
-    let server_start_of_day = client.server_start_of_day();
-    let server_time_zone = client.server_time_zone();
-    let now = now.with_timezone(&server_time_zone);
-    let date = now.date_naive();
-    if now.time() < server_start_of_day {
-        date.pred_opt().unwrap()
-    } else {
-        date
-    }
-}
-
-fn time_in_range(time: &NaiveTime, start: &NaiveTime, end: &NaiveTime) -> bool {
+fn time_in_range(time: NaiveTime, start: NaiveTime, end: NaiveTime) -> bool {
     if start <= end {
         start <= time && time < end
     } else {
@@ -160,9 +176,8 @@ fn time_in_range(time: &NaiveTime, start: &NaiveTime, end: &NaiveTime) -> bool {
     }
 }
 
-pub fn remainder_of_day_mod(divisor: u32) -> u32 {
-    let day = Local::now().date_naive().num_days_from_ce() as u32;
-    day % divisor
+pub fn remainder_of_day_mod(tz: TimeOffset, divisor: u32) -> u32 {
+    tz.naive_now().num_days_from_ce() as u32 % divisor
 }
 
 #[cfg(test)]
@@ -179,7 +194,7 @@ mod tests {
 
     mod active {
         use super::*;
-        use chrono::{Duration, FixedOffset};
+        use chrono::{Duration, FixedOffset, NaiveDate};
 
         #[test]
         fn always() {
@@ -193,24 +208,25 @@ mod tests {
             let cn_tz = FixedOffset::east_opt(8 * 3600).unwrap();
             let now_in_cn = now.with_timezone(&cn_tz);
             let weekday_in_cn = now_in_cn.weekday();
-            let server_start_of_day = ClientType::Official.server_start_of_day();
+            let server_start_of_day = NaiveTime::from_hms_opt(4, 0, 0).unwrap();
             let should_be_prev_day = now_in_cn.time() < server_start_of_day;
 
+            use TimeOffset::*;
             assert!(Condition::Weekday {
                 weekdays: vec![weekday],
-                client: None,
+                timezone: Local
             }
             .is_active());
             assert!(!Condition::Weekday {
                 weekdays: vec![weekday.pred(), weekday.succ()],
-                client: None,
+                timezone: Local,
             }
             .is_active());
 
             assert_eq!(
                 Condition::Weekday {
                     weekdays: vec![weekday_in_cn],
-                    client: Some(ClientType::Official),
+                    timezone: Client(ClientType::Official),
                 }
                 .is_active(),
                 !should_be_prev_day
@@ -219,7 +235,7 @@ mod tests {
             assert_eq!(
                 Condition::Weekday {
                     weekdays: vec![weekday_in_cn.pred(), weekday_in_cn.succ()],
-                    client: Some(ClientType::Official),
+                    timezone: Client(ClientType::Official),
                 }
                 .is_active(),
                 should_be_prev_day
@@ -227,7 +243,7 @@ mod tests {
         }
 
         #[test]
-        fn test_game_date() {
+        fn time_offset() {
             fn datetime(tz: i32, y: i32, m: u32, d: u32, h: u32, mi: u32) -> DateTime<FixedOffset> {
                 FixedOffset::east_opt(tz * 3600)
                     .unwrap()
@@ -237,6 +253,36 @@ mod tests {
 
             fn naive_date(y: i32, m: u32, d: u32) -> NaiveDate {
                 NaiveDate::from_ymd_opt(y, m, d).unwrap()
+            }
+
+            assert_eq!(
+                TimeOffset::Client(ClientType::Official).date_time(datetime(8, 2024, 2, 14, 4, 0)),
+                naive_local_datetime(2024, 2, 14, 0, 0, 0),
+            );
+
+            assert_eq!(
+                TimeOffset::Client(ClientType::YoStarJP).date_time(datetime(8, 2024, 2, 14, 4, 0)),
+                naive_local_datetime(2024, 2, 14, 1, 0, 0),
+            );
+
+            assert_eq!(
+                TimeOffset::TimeZone(8).date_time(datetime(8, 2024, 2, 14, 4, 0)),
+                naive_local_datetime(2024, 2, 14, 4, 0, 0),
+            );
+
+            assert_eq!(
+                TimeOffset::TimeZone(0).date_time(datetime(8, 2024, 2, 14, 4, 0)),
+                naive_local_datetime(2024, 2, 13, 20, 0, 0),
+            );
+
+            assert_eq!(
+                TimeOffset::TimeZone(-7).date_time(datetime(8, 2024, 2, 14, 4, 0)),
+                naive_local_datetime(2024, 2, 13, 13, 0, 0),
+            );
+
+            // Campat test for old implementation of Weekday
+            fn game_date(datetime: DateTime<FixedOffset>, client: ClientType) -> NaiveDate {
+                TimeOffset::Client(client).date_time(datetime).date()
             }
 
             // local and server in the same time zone
@@ -314,6 +360,7 @@ mod tests {
             assert!(Condition::DayMod {
                 divisor: 1,
                 remainder: 0,
+                timezone: TimeOffset::Local,
             }
             .is_active());
 
@@ -321,6 +368,7 @@ mod tests {
                 Condition::DayMod {
                     divisor: 2,
                     remainder: 0,
+                    timezone: TimeOffset::Local
                 }
                 .is_active(),
                 num_days % 2 == 0
@@ -330,6 +378,7 @@ mod tests {
                 Condition::DayMod {
                     divisor: 2,
                     remainder: 1,
+                    timezone: TimeOffset::Local
                 }
                 .is_active(),
                 num_days % 2 == 1
@@ -344,36 +393,43 @@ mod tests {
             assert!(Condition::Time {
                 start: Some(now_time + Duration::seconds(-10)),
                 end: Some(now_time + Duration::seconds(10)),
+                timezone: TimeOffset::Local,
             }
             .is_active());
             assert!(Condition::Time {
                 start: Some(now_time + Duration::seconds(-10)),
                 end: None,
+                timezone: TimeOffset::Local
             }
             .is_active());
             assert!(Condition::Time {
                 start: None,
                 end: Some(now_time + Duration::seconds(10)),
+                timezone: TimeOffset::Local
             }
             .is_active());
             assert!(Condition::Time {
                 start: None,
                 end: None,
+                timezone: TimeOffset::Local
             }
             .is_active());
             assert!(!Condition::Time {
                 start: Some(now_time + Duration::seconds(10)),
                 end: Some(now_time + Duration::seconds(20)),
+                timezone: TimeOffset::Local
             }
             .is_active());
             assert!(!Condition::Time {
                 start: Some(now_time + Duration::seconds(10)),
                 end: None,
+                timezone: TimeOffset::Local
             }
             .is_active());
             assert!(!Condition::Time {
                 start: None,
                 end: Some(now_time + Duration::seconds(-10)),
+                timezone: TimeOffset::Local
             }
             .is_active());
         }
@@ -387,20 +443,20 @@ mod tests {
             let start = time_from_hms(1, 0, 0);
             let end = time_from_hms(2, 59, 59);
 
-            assert!(time_in_range(&time_from_hms(1, 0, 0), &start, &end));
-            assert!(time_in_range(&time_from_hms(1, 0, 1), &start, &end));
-            assert!(time_in_range(&time_from_hms(2, 59, 58), &start, &end));
-            assert!(!time_in_range(&time_from_hms(0, 59, 59), &start, &end));
-            assert!(!time_in_range(&time_from_hms(2, 59, 59), &start, &end));
+            assert!(time_in_range(time_from_hms(1, 0, 0), start, end));
+            assert!(time_in_range(time_from_hms(1, 0, 1), start, end));
+            assert!(time_in_range(time_from_hms(2, 59, 58), start, end));
+            assert!(!time_in_range(time_from_hms(0, 59, 59), start, end));
+            assert!(!time_in_range(time_from_hms(2, 59, 59), start, end));
 
             let start = time_from_hms(23, 0, 0);
             let end = time_from_hms(1, 59, 59);
 
-            assert!(time_in_range(&time_from_hms(23, 0, 0), &start, &end));
-            assert!(time_in_range(&time_from_hms(23, 0, 1), &start, &end));
-            assert!(time_in_range(&time_from_hms(1, 59, 58), &start, &end));
-            assert!(!time_in_range(&time_from_hms(22, 59, 59), &start, &end));
-            assert!(!time_in_range(&time_from_hms(1, 59, 59), &start, &end));
+            assert!(time_in_range(time_from_hms(23, 0, 0), start, end));
+            assert!(time_in_range(time_from_hms(23, 0, 1), start, end));
+            assert!(time_in_range(time_from_hms(1, 59, 58), start, end));
+            assert!(!time_in_range(time_from_hms(22, 59, 59), start, end));
+            assert!(!time_in_range(time_from_hms(1, 59, 59), start, end));
         }
 
         #[test]
@@ -411,36 +467,43 @@ mod tests {
             assert!(Condition::DateTime {
                 start: Some(now_datetime + Duration::minutes(-10)),
                 end: Some(now_datetime + Duration::minutes(10)),
+                timezone: TimeOffset::Local,
             }
             .is_active());
             assert!(Condition::DateTime {
                 start: Some(now_datetime + Duration::minutes(-10)),
                 end: None,
+                timezone: TimeOffset::Local
             }
             .is_active());
             assert!(Condition::DateTime {
                 start: None,
                 end: Some(now_datetime + Duration::minutes(10)),
+                timezone: TimeOffset::Local
             }
             .is_active());
             assert!(Condition::DateTime {
                 start: None,
                 end: None,
+                timezone: TimeOffset::Local
             }
             .is_active());
             assert!(!Condition::DateTime {
                 start: Some(now_datetime + Duration::minutes(10)),
                 end: Some(now_datetime + Duration::minutes(20)),
+                timezone: TimeOffset::Local
             }
             .is_active());
             assert!(!Condition::DateTime {
                 start: Some(now_datetime + Duration::minutes(10)),
                 end: None,
+                timezone: TimeOffset::Local
             }
             .is_active());
             assert!(!Condition::DateTime {
                 start: None,
                 end: Some(now_datetime + Duration::minutes(-10)),
+                timezone: TimeOffset::Local
             }
             .is_active());
         }
@@ -503,7 +566,7 @@ mod tests {
             assert_de_tokens(
                 &Condition::Weekday {
                     weekdays: vec![Weekday::Mon, Weekday::Wed, Weekday::Fri],
-                    client: Some(ClientType::Official),
+                    timezone: TimeOffset::Client(ClientType::Official),
                 },
                 &[
                     Token::Map { len: Some(2) },
@@ -516,7 +579,6 @@ mod tests {
                     Token::Str("Fri"),
                     Token::SeqEnd,
                     Token::Str("client"),
-                    Token::Some,
                     Token::Str("Official"),
                     Token::MapEnd,
                 ],
@@ -525,7 +587,28 @@ mod tests {
             assert_de_tokens(
                 &Condition::Weekday {
                     weekdays: vec![Weekday::Mon, Weekday::Wed, Weekday::Fri],
-                    client: None,
+                    timezone: TimeOffset::Client(ClientType::Official),
+                },
+                &[
+                    Token::Map { len: Some(2) },
+                    Token::Str("type"),
+                    Token::Str("Weekday"),
+                    Token::Str("weekdays"),
+                    Token::Seq { len: Some(3) },
+                    Token::Str("Mon"),
+                    Token::Str("Wed"),
+                    Token::Str("Fri"),
+                    Token::SeqEnd,
+                    Token::Str("timezone"),
+                    Token::Str("Official"),
+                    Token::MapEnd,
+                ],
+            );
+
+            assert_de_tokens(
+                &Condition::Weekday {
+                    weekdays: vec![Weekday::Mon, Weekday::Wed, Weekday::Fri],
+                    timezone: TimeOffset::Local,
                 },
                 &[
                     Token::Map { len: Some(2) },
@@ -547,6 +630,7 @@ mod tests {
             let cond = Condition::DayMod {
                 divisor: 7,
                 remainder: 0,
+                timezone: TimeOffset::Local,
             };
 
             assert_de_tokens(
@@ -578,13 +662,12 @@ mod tests {
 
         #[test]
         fn time() {
-            let cond = Condition::Time {
-                start: Some(NaiveTime::from_hms_opt(1, 0, 0).unwrap()),
-                end: Some(NaiveTime::from_hms_opt(2, 59, 59).unwrap()),
-            };
-
             assert_de_tokens(
-                &cond,
+                &Condition::Time {
+                    start: Some(NaiveTime::from_hms_opt(1, 0, 0).unwrap()),
+                    end: Some(NaiveTime::from_hms_opt(2, 59, 59).unwrap()),
+                    timezone: TimeOffset::Local,
+                },
                 &[
                     Token::Map { len: Some(3) },
                     Token::Str("type"),
@@ -596,6 +679,24 @@ mod tests {
                     Token::MapEnd,
                 ],
             );
+
+            assert_de_tokens(
+                &Condition::Time {
+                    start: Some(NaiveTime::from_hms_opt(1, 0, 0).unwrap()),
+                    end: None,
+                    timezone: TimeOffset::Client(ClientType::Official),
+                },
+                &[
+                    Token::Map { len: Some(3) },
+                    Token::Str("type"),
+                    Token::Str("Time"),
+                    Token::Str("start"),
+                    Token::Str("01:00:00"),
+                    Token::Str("timezone"),
+                    Token::Str("Official"),
+                    Token::MapEnd,
+                ],
+            );
         }
 
         #[test]
@@ -604,6 +705,7 @@ mod tests {
                 &Condition::DateTime {
                     start: Some(naive_local_datetime(2021, 8, 1, 16, 0, 0)),
                     end: Some(naive_local_datetime(2021, 8, 21, 4, 0, 0)),
+                    timezone: TimeOffset::Local,
                 },
                 &[
                     Token::Map { len: Some(3) },
@@ -613,6 +715,24 @@ mod tests {
                     Token::Str("2021-08-01T16:00:00"),
                     Token::Str("end"),
                     Token::Str("2021-08-21T04:00:00"),
+                    Token::MapEnd,
+                ],
+            );
+
+            assert_de_tokens(
+                &Condition::DateTime {
+                    start: None,
+                    end: Some(naive_local_datetime(2021, 8, 21, 4, 0, 0)),
+                    timezone: TimeOffset::TimeZone(8),
+                },
+                &[
+                    Token::Map { len: Some(3) },
+                    Token::Str("type"),
+                    Token::Str("DateTime"),
+                    Token::Str("end"),
+                    Token::Str("2021-08-21T04:00:00"),
+                    Token::Str("timezone"),
+                    Token::I8(8),
                     Token::MapEnd,
                 ],
             );
