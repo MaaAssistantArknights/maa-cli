@@ -101,7 +101,7 @@ runs:
         package_name=$(basename "$(ls "$(./maa dir cache)")")
         echo "Downloaded MaaCore package: $package_name"
         core_version=${package_name#MAA-v}
-        core_version=${version%%-*}
+        core_version=${core_version%%-*}
         if [[ $core_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
           echo "Downloaded MaaCore version: $core_version"
           echo "MAA_CORE_VERSION=v$core_version" >> "$GITHUB_ENV"
