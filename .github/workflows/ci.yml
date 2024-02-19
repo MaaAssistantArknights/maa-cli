@@ -149,8 +149,6 @@ jobs:
           os: ${{ matrix.os }}
           arch: x86_64
           core: true
-      - name: Setup Cache
-        uses: Swatinem/rust-cache@v2
       - name: Build
         run: cargo build --package maa-sys --locked
       - name: Lint (clippy)
