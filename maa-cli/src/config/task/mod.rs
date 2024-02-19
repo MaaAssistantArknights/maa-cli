@@ -498,6 +498,8 @@ mod tests {
         mod serde {
             use super::*;
 
+            use condition::TimeOffset;
+
             use crate::value::userinput::{BoolInput, Input, SelectD};
 
             use chrono::{NaiveDateTime, NaiveTime, TimeZone, Weekday};
@@ -555,7 +557,7 @@ mod tests {
                         TaskVariant {
                             condition: Condition::Weekday {
                                 weekdays: vec![Weekday::Sun],
-                                client: None,
+                                timezone: TimeOffset::Local,
                             },
                             params: object!("expiring_medicine" => 5),
                         },
@@ -571,7 +573,7 @@ mod tests {
                         TaskVariant {
                             condition: Condition::Weekday {
                                 weekdays: vec![Weekday::Tue, Weekday::Thu, Weekday::Sat],
-                                client: Some(Official),
+                                timezone: TimeOffset::Client(ClientType::Official),
                             },
                             params: object!("stage" => "CE-6"),
                         },
@@ -579,6 +581,7 @@ mod tests {
                             condition: Condition::DateTime {
                                 start: Some(naive_local_datetime(2023, 8, 1, 16, 0, 0)),
                                 end: Some(naive_local_datetime(2023, 8, 21, 3, 59, 59)),
+                                timezone: TimeOffset::TimeZone(8),
                             },
                             params: object!(
                                 "stage" => SelectD::<String>::new(
@@ -617,6 +620,7 @@ mod tests {
                         condition: Condition::Time {
                             start: Some(NaiveTime::from_hms_opt(16, 0, 0).unwrap()),
                             end: None,
+                            timezone: TimeOffset::Local,
                         },
                         params: object!(),
                     }],

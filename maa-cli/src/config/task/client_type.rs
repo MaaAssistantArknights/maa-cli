@@ -16,9 +16,21 @@ pub enum ClientType {
 
 impl<'de> Deserialize<'de> for ClientType {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        String::deserialize(deserializer)?
-            .parse()
-            .map_err(serde::de::Error::custom)
+        struct ClientTypeVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for ClientTypeVisitor {
+            type Value = ClientType;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a string representing a client type")
+            }
+
+            fn visit_str<E: serde::de::Error>(self, value: &str) -> Result<Self::Value, E> {
+                value.parse().map_err(serde::de::Error::custom)
+            }
+        }
+
+        deserializer.deserialize_str(ClientTypeVisitor)
     }
 }
 
@@ -43,16 +55,12 @@ impl ClientType {
         }
     }
 
-    pub fn server_start_of_day(self) -> chrono::NaiveTime {
-        chrono::NaiveTime::from_hms_opt(4, 0, 0).unwrap()
-    }
-
-    pub fn server_time_zone(self) -> chrono::FixedOffset {
+    pub fn server_time_zone(self) -> i8 {
         use ClientType::*;
         match self {
-            Official | Bilibili | Txwy => chrono::FixedOffset::east_opt(8 * 3600).unwrap(),
-            YoStarEN => chrono::FixedOffset::west_opt(7 * 3600).unwrap(),
-            YoStarJP | YoStarKR => chrono::FixedOffset::east_opt(9 * 3600).unwrap(),
+            Official | Bilibili | Txwy => 4,
+            YoStarEN => -11,
+            YoStarJP | YoStarKR => 5,
         }
     }
 }
@@ -121,7 +129,7 @@ mod tests {
 
     use super::*;
 
-    use serde_test::{assert_de_tokens, Token};
+    use serde_test::{assert_de_tokens, assert_de_tokens_error, Token};
 
     impl ClientType {
         fn to_token(self) -> Token {
@@ -144,6 +152,16 @@ mod tests {
         assert_de_tokens(&ClientType::YoStarEN, &[ClientType::YoStarEN.to_token()]);
         assert_de_tokens(&ClientType::YoStarJP, &[ClientType::YoStarJP.to_token()]);
         assert_de_tokens(&ClientType::YoStarKR, &[ClientType::YoStarKR.to_token()]);
+
+        assert_de_tokens_error::<ClientType>(
+            &[Token::Str("UnknownClientType")],
+            "Unknown client type",
+        );
+
+        assert_de_tokens_error::<ClientType>(
+            &[Token::I8(0)],
+            "invalid type: integer `0`, expected a string representing a client type",
+        );
     }
 
     #[test]
@@ -200,59 +218,13 @@ mod tests {
     }
 
     #[test]
-    fn client_to_server_start_of_day() {
-        assert_eq!(
-            ClientType::Official.server_start_of_day(),
-            chrono::NaiveTime::from_hms_opt(4, 0, 0).unwrap()
-        );
-        assert_eq!(
-            ClientType::Bilibili.server_start_of_day(),
-            chrono::NaiveTime::from_hms_opt(4, 0, 0).unwrap()
-        );
-        assert_eq!(
-            ClientType::Txwy.server_start_of_day(),
-            chrono::NaiveTime::from_hms_opt(4, 0, 0).unwrap()
-        );
-        assert_eq!(
-            ClientType::YoStarEN.server_start_of_day(),
-            chrono::NaiveTime::from_hms_opt(4, 0, 0).unwrap()
-        );
-        assert_eq!(
-            ClientType::YoStarJP.server_start_of_day(),
-            chrono::NaiveTime::from_hms_opt(4, 0, 0).unwrap()
-        );
-        assert_eq!(
-            ClientType::YoStarKR.server_start_of_day(),
-            chrono::NaiveTime::from_hms_opt(4, 0, 0).unwrap()
-        );
-    }
-
-    #[test]
     fn client_to_server_time_zone() {
-        assert_eq!(
-            ClientType::Official.server_time_zone(),
-            chrono::FixedOffset::east_opt(8 * 3600).unwrap()
-        );
-        assert_eq!(
-            ClientType::Bilibili.server_time_zone(),
-            chrono::FixedOffset::east_opt(8 * 3600).unwrap()
-        );
-        assert_eq!(
-            ClientType::Txwy.server_time_zone(),
-            chrono::FixedOffset::east_opt(8 * 3600).unwrap()
-        );
-        assert_eq!(
-            ClientType::YoStarEN.server_time_zone(),
-            chrono::FixedOffset::west_opt(7 * 3600).unwrap()
-        );
-        assert_eq!(
-            ClientType::YoStarJP.server_time_zone(),
-            chrono::FixedOffset::east_opt(9 * 3600).unwrap()
-        );
-        assert_eq!(
-            ClientType::YoStarKR.server_time_zone(),
-            chrono::FixedOffset::east_opt(9 * 3600).unwrap()
-        );
+        assert_eq!(ClientType::Official.server_time_zone(), 4);
+        assert_eq!(ClientType::Bilibili.server_time_zone(), 4);
+        assert_eq!(ClientType::Txwy.server_time_zone(), 4);
+        assert_eq!(ClientType::YoStarEN.server_time_zone(), -11);
+        assert_eq!(ClientType::YoStarJP.server_time_zone(), 5);
+        assert_eq!(ClientType::YoStarKR.server_time_zone(), 5);
     }
 
     #[test]
