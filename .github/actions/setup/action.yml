@@ -72,17 +72,17 @@ runs:
           *-unknown-linux-gnu)
             aria2c "$url/maa_cli-$cli_version-$CARGO_BUILD_TARGET.tar.gz"
             tar -xzvf maa_cli-$cli_version-$CARGO_BUILD_TARGET.tar.gz
-            cp -v maa_cli-$cli_version-$CARGO_BUILD_TARGET/maa .
+            cp -v maa_cli-$CARGO_BUILD_TARGET/maa .
           ;;
           *-apple-darwin)
             aria2c "$url/maa_cli-$cli_version-$CARGO_BUILD_TARGET.zip"
             unzip -v maa_cli-$cli_version-$CARGO_BUILD_TARGET.zip
-            cp -v maa_cli-$cli_version-$CARGO_BUILD_TARGET/maa .
+            cp -v maa_cli-$CARGO_BUILD_TARGET/maa .
           ;;
           *-pc-windows-msvc)
             aria2c "$url/maa_cli-$cli_version-$CARGO_BUILD_TARGET.zip"
             unzip -v maa_cli-$cli_version-$CARGO_BUILD_TARGET.zip
-            cp -v maa_cli-$cli_version-$CARGO_BUILD_TARGET/maa.exe .
+            cp -v maa_cli-$CARGO_BUILD_TARGET/maa.exe .
           ;;
         esac
     - name: Install MaaCore and resource
