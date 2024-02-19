@@ -2,8 +2,8 @@ mod client_type;
 pub use client_type::ClientType;
 
 mod condition;
-pub use condition::remainder_of_day_mod;
 use condition::Condition;
+pub use condition::{remainder_of_day_mod, TimeOffset};
 
 use crate::{dirs, object, value::MAAValue};
 

@@ -2,7 +2,7 @@ use super::client_type::ClientType;
 
 use crate::activity::has_side_story_open;
 
-use chrono::{DateTime, Datelike, Local, NaiveDateTime, NaiveTime, TimeZone, Utc, Weekday};
+use chrono::{DateTime, Datelike, NaiveDateTime, NaiveTime, TimeZone, Utc, Weekday};
 use serde::Deserialize;
 
 #[cfg_attr(test, derive(PartialEq, Debug))]
@@ -108,14 +108,17 @@ fn tz_to_offset(tz: i8) -> chrono::FixedOffset {
 impl Condition {
     pub fn is_active(&self) -> bool {
         use Condition::*;
-        match self {
+        match *self {
             Always => true,
-            Weekday { weekdays, timezone } => weekdays.contains(&timezone.naive_now().weekday()),
+            Weekday {
+                ref weekdays,
+                timezone,
+            } => weekdays.contains(&timezone.naive_now().weekday()),
             DayMod {
                 divisor,
                 remainder,
                 timezone,
-            } => timezone.naive_now().num_days_from_ce() as u32 % divisor == *remainder,
+            } => remainder_of_day_mod(timezone, divisor) == remainder,
             Time {
                 start,
                 end,
@@ -124,9 +127,9 @@ impl Condition {
                 let now_time = timezone.naive_now().time();
 
                 match (start, end) {
-                    (Some(s), Some(e)) => time_in_range(&now_time, s, e),
-                    (Some(s), None) => now_time >= *s,
-                    (None, Some(e)) => now_time < *e,
+                    (Some(s), Some(e)) => time_in_range(now_time, s, e),
+                    (Some(s), None) => now_time >= s,
+                    (None, Some(e)) => now_time < e,
                     (None, None) => true,
                 }
             }
@@ -137,14 +140,14 @@ impl Condition {
             } => {
                 let now = timezone.naive_now();
                 match (start, end) {
-                    (Some(s), Some(e)) => now >= *s && now < *e,
-                    (Some(s), None) => now >= *s,
-                    (None, Some(e)) => now < *e,
+                    (Some(s), Some(e)) => now >= s && now < e,
+                    (Some(s), None) => now >= s,
+                    (None, Some(e)) => now < e,
                     (None, None) => true,
                 }
             }
-            OnSideStory { client } => has_side_story_open(*client),
-            And { conditions } => {
+            OnSideStory { client } => has_side_story_open(client),
+            And { ref conditions } => {
                 for condition in conditions {
                     if !condition.is_active() {
                         return false;
@@ -152,7 +155,7 @@ impl Condition {
                 }
                 true
             }
-            Or { conditions } => {
+            Or { ref conditions } => {
                 for condition in conditions {
                     if condition.is_active() {
                         return true;
@@ -160,12 +163,12 @@ impl Condition {
                 }
                 false
             }
-            Not { condition } => !condition.is_active(),
+            Not { ref condition } => !condition.is_active(),
         }
     }
 }
 
-fn time_in_range(time: &NaiveTime, start: &NaiveTime, end: &NaiveTime) -> bool {
+fn time_in_range(time: NaiveTime, start: NaiveTime, end: NaiveTime) -> bool {
     if start <= end {
         start <= time && time < end
     } else {
@@ -173,9 +176,8 @@ fn time_in_range(time: &NaiveTime, start: &NaiveTime, end: &NaiveTime) -> bool {
     }
 }
 
-pub fn remainder_of_day_mod(divisor: u32) -> u32 {
-    let day = Local::now().date_naive().num_days_from_ce() as u32;
-    day % divisor
+pub fn remainder_of_day_mod(tz: TimeOffset, divisor: u32) -> u32 {
+    tz.naive_now().num_days_from_ce() as u32 % divisor
 }
 
 #[cfg(test)]
@@ -441,20 +443,20 @@ mod tests {
             let start = time_from_hms(1, 0, 0);
             let end = time_from_hms(2, 59, 59);
 
-            assert!(time_in_range(&time_from_hms(1, 0, 0), &start, &end));
-            assert!(time_in_range(&time_from_hms(1, 0, 1), &start, &end));
-            assert!(time_in_range(&time_from_hms(2, 59, 58), &start, &end));
-            assert!(!time_in_range(&time_from_hms(0, 59, 59), &start, &end));
-            assert!(!time_in_range(&time_from_hms(2, 59, 59), &start, &end));
+            assert!(time_in_range(time_from_hms(1, 0, 0), start, end));
+            assert!(time_in_range(time_from_hms(1, 0, 1), start, end));
+            assert!(time_in_range(time_from_hms(2, 59, 58), start, end));
+            assert!(!time_in_range(time_from_hms(0, 59, 59), start, end));
+            assert!(!time_in_range(time_from_hms(2, 59, 59), start, end));
 
             let start = time_from_hms(23, 0, 0);
             let end = time_from_hms(1, 59, 59);
 
-            assert!(time_in_range(&time_from_hms(23, 0, 0), &start, &end));
-            assert!(time_in_range(&time_from_hms(23, 0, 1), &start, &end));
-            assert!(time_in_range(&time_from_hms(1, 59, 58), &start, &end));
-            assert!(!time_in_range(&time_from_hms(22, 59, 59), &start, &end));
-            assert!(!time_in_range(&time_from_hms(1, 59, 59), &start, &end));
+            assert!(time_in_range(time_from_hms(23, 0, 0), start, end));
+            assert!(time_in_range(time_from_hms(23, 0, 1), start, end));
+            assert!(time_in_range(time_from_hms(1, 59, 58), start, end));
+            assert!(!time_in_range(time_from_hms(22, 59, 59), start, end));
+            assert!(!time_in_range(time_from_hms(1, 59, 59), start, end));
         }
 
         #[test]
