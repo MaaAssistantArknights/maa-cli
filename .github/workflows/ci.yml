@@ -131,7 +131,7 @@ jobs:
           cargo test -- --include-ignored
 
   build-sys:
-    name: Build and test (maa-sys, static)
+    name: Build and Test (maa-sys, static)
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
