@@ -61,27 +61,16 @@ runs:
       uses: taiki-e/install-action@v2
       with:
         tool: cargo-tarpaulin
+    - name: Install Prebuilt CLI
+      if: fromJson(inputs.core)
+      uses: jaxxstorm/action-install-gh-release@v1
+      with:
+        repo: MaaAssistantArknights/maa-cli
+        tag: v0.4.3
     - name: Install MaaCore and resource
       if: fromJson(inputs.core)
       shell: bash
       run: |
-        version=0.4.2
-        url="https://github.com/MaaAssistantArknights/maa-cli/releases/download/$version/"
-        case "$CARGO_BUILD_TARGET" in
-          *-unknown-linux-gnu)
-            curl -sL $url/maa_cli-$version-$CARGO_BUILD_TARGET.tar.gz | tar xz
-            export PATH="maa_cli-$version-$CARGO_BUILD_TARGET:$PATH"
-            ;;
-          *-apple-darwin)
-            curl -sL $url/maa_cli-$version-$CARGO_BUILD_TARGET.zip | unzip -q -
-            export PATH="maa_cli-$version-$CARGO_BUILD_TARGET:$PATH"
-            ;;
-          *-pc-windows-msvc)
-            curl -sL $url/maa_cli-$version-$CARGO_BUILD_TARGET.zip | unzip -q -
-            export PATH="maa_cli-$version-$CARGO_BUILD_TARGET:$PATH"
-            ;;
-        esac
-
         export MAA_CONFIG_DIR="$GITHUB_WORKSPACE/maa-cli/config_examples"
         export MAA_LOG="debug"
 
