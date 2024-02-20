@@ -189,7 +189,7 @@ fn config_based_on_os() -> &'static str {
     if cfg!(target_os = "macos") {
         "CompatMac"
     } else if cfg!(target_os = "linux") {
-        "CompatLinux"
+        "CompatPOSIXShell"
     } else {
         "General"
     }
