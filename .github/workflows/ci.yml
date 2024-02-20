@@ -35,7 +35,8 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - macos-latest
+          - macos-12 # x86_64 runner
+          - macos-14 # aarch64 runner
           - windows-latest
     env:
       MAA_EXTRA_SHARE_NAME: maa-test
@@ -46,7 +47,7 @@ jobs:
         uses: ./.github/actions/setup
         with:
           os: ${{ matrix.os }}
-          arch: x86_64
+          arch: ${{ matrix.os == 'macos-14' && 'aarch64' || 'x86_64' }}
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
       - name: Build (maa-cli)
@@ -87,7 +88,6 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -109,7 +109,7 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - macos-latest
+          - macos-12
           - windows-latest
         feature:
           - core_installer # disabled cli_installer and git2, used by package manager
@@ -138,7 +138,7 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - macos-latest
+          - macos-12
           - windows-latest
     steps:
       - name: Checkout
@@ -171,7 +171,8 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - macos-latest
+          - macos-12 # x86_64 runner
+          - macos-14 # aarch64 runner
           - windows-latest
     steps:
       - name: Checkout
@@ -180,7 +181,7 @@ jobs:
         uses: ./.github/actions/setup
         with:
           os: ${{ matrix.os }}
-          arch: x86_64
+          arch: ${{ matrix.os == 'macos-14' && 'aarch64' || 'x86_64' }}
           coverage: true
           core: true
       - name: Setup Cache
