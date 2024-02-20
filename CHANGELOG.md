@@ -1,5 +1,21 @@
 # Release Notes
 
+## Release 0.4.4
+
+### Features
+
+- Support `timezone` for all time related conditions by @wangl-cc in [#207](https://github.com/MaaAssistantArknights/maa-cli/pull/207)
+
+### Bug Fixes
+
+- Default connection config for linux by @wangl-cc in [#212](https://github.com/MaaAssistantArknights/maa-cli/pull/212)
+
+### Miscellaneous
+
+- Improve changelog generation by @wangl-cc in [#216](https://github.com/MaaAssistantArknights/maa-cli/pull/216)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.4.3...v0.4.4>
+
 ## Release 0.4.3
 
 ### Features
