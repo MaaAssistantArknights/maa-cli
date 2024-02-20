@@ -102,11 +102,15 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - macos-latest
           - windows-latest
         arch:
           - x86_64
           - aarch64
+        include:
+          - os: macos-12 # x86_64 runner
+            arch: x86_64
+          - os: macos-14 # aaarch64 runner
+            arch: aarch64
         exclude:
           # Failed to cross compile ring on Windows
           - os: windows-latest
