@@ -863,6 +863,18 @@ mod tests {
                 ("/path/to/adb", "127.0.0.1:11111", "SomeConfig"),
             );
         }
+
+        #[test]
+        fn test_default_config() {
+            #[cfg(target_os = "macos")]
+            assert_eq!(config_based_on_os(), "CompatMac");
+
+            #[cfg(target_os = "linux")]
+            assert_eq!(config_based_on_os(), "CompatPOSIXShell");
+
+            #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+            assert_eq!(config_based_on_os(), "General");
+        }
     }
 
     mod resource_config {
