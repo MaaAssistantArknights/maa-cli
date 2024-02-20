@@ -138,7 +138,8 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - macos-12
+          - macos-12 # x86_64 runner
+          - macos-14 # aarch64 runner
           - windows-latest
     steps:
       - name: Checkout
@@ -147,7 +148,7 @@ jobs:
         uses: ./.github/actions/setup
         with:
           os: ${{ matrix.os }}
-          arch: x86_64
+          arch: ${{ matrix.os == 'macos-14' && 'aarch64' || 'x86_64' }}
           core: true
       - name: Build
         run: cargo build --package maa-sys --locked
