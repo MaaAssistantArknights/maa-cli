@@ -14,7 +14,12 @@ body = """
   {%- if version -%}
     Release {{ version | trim_start_matches(pat="v") }}
   {%- else -%}
-    Unreleased
+    {%- set version = get_env(name="MAA_VERSION", default="") -%}
+    {%- if version -%}
+      Release {{ version | trim_start_matches(pat="v") }}
+    {%- else -%}
+      Unreleased
+    {%- endif -%}
   {%- endif -%}
 {%- endmacro -%}
 
@@ -26,7 +31,7 @@ body = """
   {%- if commit.breaking -%} **BREAKING**: {%- endif -%}
   {{ commit.message | upper_first }}
   {%- if commit.github.username %} by @{{ commit.github.username }} {%- endif -%}
-  {%- if commit.github.pr_number %}\
+  {%- if commit.github.pr_number %} \
     in {{ self::pr_link(pr=commit.github.pr_number) }}
   {%- endif -%}
 {%- endmacro -%}
@@ -35,7 +40,7 @@ body = """
   {%- if version -%}
     {{ version }}
   {%- else -%}
-    {{ get_env(name="MAA_REF", default="main") }}
+    {{ get_env(name="MAA_TAG", default="main") }}
   {%- endif -%}
 {%- endmacro -%}
 
