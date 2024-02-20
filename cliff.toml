@@ -35,7 +35,7 @@ body = """
   {%- if version -%}
     {{ version }}
   {%- else -%}
-    {{ get_env(name="MAA_REF", default="HEAD") }}
+    {{ get_env(name="MAA_REF", default="main") }}
   {%- endif -%}
 {%- endmacro -%}
 
