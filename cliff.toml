@@ -23,11 +23,12 @@ body = """
 {%- endmacro -%}
 
 {%- macro format_commit(commit) -%}
-  {%- set github = commit.github -%}
   {%- if commit.breaking -%} **BREAKING**: {%- endif -%}
   {{ commit.message | upper_first }}
-  {%- if github.username %} by @{{ commit.github.username }} {%- endif -%}
-  {%- if github.pr_number %} in {{ self::pr_link(pr=github.pr_number) }} {%- endif -%}
+  {%- if commit.github.username %} by @{{ commit.github.username }} {%- endif -%}
+  {%- if commit.github.pr_number %}\
+    in {{ self::pr_link(pr=commit.github.pr_number) }}
+  {%- endif -%}
 {%- endmacro -%}
 
 {%- macro current_ref() -%}
