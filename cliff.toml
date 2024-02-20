@@ -6,18 +6,63 @@ header = """
 # template for the changelog body
 # https://keats.github.io/tera/docs/#introduction
 body = """
-{% for group in ["Features", "Bug Fixes", "Performance",
-"Refactor", "Documentation", "Testing", "Miscellaneous", "Security", "Revert"] -%}
-    {% set grouped_commits = commits | filter(attribute="group", value=group) -%}
-    {% if grouped_commits | length > 0 -%}
-        ## {{ group }}\n
-        {% for commit in grouped_commits -%}
-          - {% if commit.breaking %}**BREAKING**: {% endif -%}
-            {{ commit.message | upper_first }}
+{%- macro remote_url() -%}
+  https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
+{%- endmacro -%}
+
+{%- macro version_title() -%}
+  {%- if version -%}
+    Release {{ version | trim_start_matches(pat="v") }}
+  {%- else -%}
+    {%- set version = get_env(name="MAA_VERSION", default="") -%}
+    {%- if version -%}
+      Release {{ version | trim_start_matches(pat="v") }}
+    {%- else -%}
+      Unreleased
+    {%- endif -%}
+  {%- endif -%}
+{%- endmacro -%}
+
+{%- macro pr_link(pr) -%}
+  [#{{ pr }}]({{ self::remote_url() }}/pull/{{ pr }})
+{%- endmacro -%}
+
+{%- macro format_commit(commit) -%}
+  {%- if commit.breaking -%} **BREAKING**: {%- endif -%}
+  {{ commit.message | upper_first }}
+  {%- if commit.github.username %} by @{{ commit.github.username }} {%- endif -%}
+  {%- if commit.github.pr_number %} \
+    in {{ self::pr_link(pr=commit.github.pr_number) }}
+  {%- endif -%}
+{%- endmacro -%}
+
+{%- macro current_ref() -%}
+  {%- if version -%}
+    {{ version }}
+  {%- else -%}
+    {{ get_env(name="MAA_TAG", default="main") }}
+  {%- endif -%}
+{%- endmacro -%}
+
+{%- macro full_changelog(prev, current) -%}
+  **Full Changelog**: <{{ self::remote_url() }}/compare/{{ prev }}...{{ current }}>
+{%- endmacro -%}
+
+## {{ self::version_title()  }}
+
+{% for group, commits in commits | group_by(attribute="group") -%}
+    {%- if commits | length > 0 -%}
+        ### {{ group | striptags | trim | upper_first }}\n
+        {% for commit in commits -%}
+          - {{ self::format_commit(commit = commit) }}
         {% endfor -%}
-        {{ "" }}
-    {% endif -%}
-{% endfor -%}
+        {{ "\n" }}
+    {%- endif -%}
+{%- endfor -%}
+
+{%- if previous.version -%}
+  {{ self::full_changelog(prev=previous.version, current=self::current_ref()) }}\n
+{% endif -%}
 """
 # remove the leading and trailing whitespace from the template
 trim = true
@@ -35,26 +80,42 @@ filter_unconventional = true
 split_commits = false
 # replace the patterns in the commit message
 commit_preprocessors = [
-  { pattern = '\(#([0-9]+)\)', replace = "([#${1}](https://github.com/MaaAssistantArknights/maa-cli/issues/${1}))" },
+  { pattern = ' \(#([0-9]+)\)', replace = "" }, # remove pr references
 ]
 # regex for parsing and grouping commits
 commit_parsers = [
-  { message = "^feat", group = "Features" },
-  { message = "^fix", group = "Bug Fixes" },
-  { message = "^perf", group = "Performance" },
-  { message = "^refactor", group = "Refactor" },
-  { message = "^doc", group = "Documentation" },
-  { message = "^test", group = "Testing" },
+  { message = "^feat", group = "<!-- 0 -->Features" },
+  { message = "^fix", group = "<!-- 1 -->Bug Fixes" },
+  { message = "^perf", group = "<!-- 2 -->Performance" },
+  { message = "^pref", group = "<!-- 2 -->Performance" },  # a typo of "perf"
+  { message = "^refactor", group = "<!-- 3 -->Refactor" },
+  { message = "^doc", group = "<!-- 4 -->Documentation" },
+  { message = "^test", group = "<!-- 5 -->Testing" },
+
+  { body = ".*security", group = "<!-- 6 --> Security" },
+  { message = "^[Rr]evert", group = "<!-- 7 --> Revert" },
+
+  # skip code style changes
   { message = "^style", skip = true },
+  { message = "^chore\\(style\\)", skip = true },
+  { message = "^chore\\(format\\)", skip = true },
+  { message = "^chore:.*format", skip = true },
+
+  # skip release preparation commits and dependency updates
   { message = "^chore\\(release\\): prepare for", skip = true },
   { message = "^chore\\(deps\\)", skip = true },
+  { message = "^[Bb]ump", skip = true },
+  { message = "^chore: bump", skip = true },
+
+  # skip ci commits
   { message = "^ci", skip = true },
-  { message = "^chore", group = "Miscellaneous" },
 
-  { body = ".*security", group = "Security" },
-  { message = "^[Rr]evert", group = "Revert" },
+  # skip changelog commits
+  { message = "^chore\\(changelog\\)", skip = true },
+  { message = "^chore: update changelog", skip = true },
 
-  { message = "^Bump", skip = true },
+  # chore should be the last one to avoid overriding above rules
+  { message = "^chore", group = "<!-- 99 -->Miscellaneous" },
 ] # regex for parsing and grouping commits
 # protect breaking changes from being skipped due to matching a skipping commit_parser
 protect_breaking_commits = false
@@ -72,3 +133,7 @@ topo_order = false
 sort_commits = "oldest"
 # limit the number of commits included in the changelog.
 # limit_commits = 42
+
+[remote.github]
+owner = "MaaAssistantArknights"
+repo = "maa-cli"

@@ -76,7 +76,11 @@ jobs:
           fetch-depth: 0
       - name: Generate Release Notes
         id: git_cliff
-        uses: orhun/git-cliff-action@v2
+        uses: orhun/git-cliff-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MAA_VERSION: ${{ needs.meta.outputs.version }}
+          MAA_TAG: ${{ needs.meta.outputs.tag }}
         with:
           config: cliff.toml
           # If the release is triggered by a tag, process commits starting
