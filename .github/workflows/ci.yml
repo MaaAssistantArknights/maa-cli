@@ -80,8 +80,8 @@ jobs:
         run: |
           cargo test -- --include-ignored
 
-  build-aarch64:
-    name: Build (aarch64)
+  build-cross:
+    name: Cross Build to aarch64
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
