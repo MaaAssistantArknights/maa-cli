@@ -1,7 +1,10 @@
-use crate::dirs::Ensure;
+use crate::dirs::{self, Ensure};
+use crate::value::userinput::BoolInput;
+use crate::value::MAAValue;
 
 use std::fs::{self, File};
-use std::path::Path;
+use std::io;
+use std::path::{Path, PathBuf};
 
 use clap::ValueEnum;
 use serde_json::Value as JsonValue;
@@ -212,6 +215,81 @@ pub fn convert(file: &Path, out: Option<&Path>, ft: Option<Filetype>) -> Result<
     }
 }
 
+pub fn cleanup(inquire: bool) -> Result<(), io::Error> {
+    let state = dirs::state().to_path_buf();
+    let debug = dirs::log().to_path_buf();
+
+    let tarsh_list = vec![
+        (
+            "maa-cli cache (e.g. \x1B[33mupdate and copliot files\x1B[0m)",
+            vec![dirs::cache().to_path_buf()],
+        ),
+        (
+            "maa-core avatars cache",
+            vec![state.join("cache").join("avatars")],
+        ),
+        (
+            "maa-core log files (\x1B[33masst.log and asst.bak.log\x1B[0m)",
+            vec![debug.join("asst.log"), debug.join("asst.bak.log")],
+        ),
+        (
+            "maa-core screenshot cache",
+            vec![
+                debug.join("drops"),
+                debug.join("map"),
+                debug.join("other"),
+                debug.join("Roguelike"),
+            ],
+        ),
+    ];
+
+    del_list(&tarsh_list, inquire)
+}
+
+fn clear_inquiry(description: &str) -> Result<bool, io::Error> {
+    let bool_input = BoolInput::new(Some(false), Some(&format!("{}{}", "clear ", description)));
+    let mut value = MAAValue::new();
+    value.insert("key", bool_input);
+    let result = value.init()?.get_or("key", false);
+    Ok(result)
+}
+
+fn del_list(tarsh_list: &Vec<(&str, Vec<PathBuf>)>, inquire: bool) -> Result<(), io::Error> {
+    let mut has_err = false;
+    for (description, paths) in tarsh_list {
+        if inquire || clear_inquiry(description)? {
+            has_err = del_cache(paths);
+        }
+    }
+
+    if has_err {
+        Err(io::Error::new(
+            io::ErrorKind::Other,
+            "At least one path has not been deleted.",
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn del_cache(paths: &Vec<PathBuf>) -> bool {
+    let mut has_err = false;
+    for path in paths {
+        print!("Delete {:?}... ", path);
+        if let Err(e) = if path.is_file() {
+            fs::remove_file(path)
+        } else {
+            fs::remove_dir_all(path)
+        } {
+            println!("\x1B[31m{}\x1B[0m", e);
+            has_err = true;
+        } else {
+            println!("\x1B[34mDone.\x1B[0m");
+        }
+    }
+    has_err
+}
+
 pub mod asst;
 
 pub mod cli;
@@ -353,5 +431,26 @@ mod tests {
             convert(&input, None, None).unwrap_err(),
             Error::FormatNotGiven
         );
+    }
+
+    #[test]
+    fn test_cleanup() {
+        let temp_dir = std::env::temp_dir();
+        let temp_file_path = temp_dir.join("test_file.txt");
+        let temp_dir_path = temp_dir.join("test_dir");
+
+        std::fs::File::create(&temp_file_path).unwrap();
+        std::fs::create_dir(&temp_dir_path).unwrap();
+
+        let tarsh_list = vec![
+            ("file", vec![temp_file_path.clone()]),
+            ("dir", vec![temp_dir_path.clone()]),
+        ];
+
+        let result = del_list(&tarsh_list, true);
+        assert!(result.is_ok());
+
+        let _ = std::fs::remove_file(&temp_file_path);
+        let _ = std::fs::remove_dir_all(&temp_dir_path);
     }
 }

@@ -226,6 +226,12 @@ enum SubCommand {
         #[arg(long)]
         timezone: Option<i8>,
     },
+    /// Clearing the caches of maa-cli and maa core
+    Cleanup {
+        /// Does not ask for deletion
+        #[arg(short, long)]
+        inquire: bool,
+    },
     /// List all available tasks
     List,
     /// Generate completion script for given shell
@@ -411,6 +417,7 @@ fn main() -> Result<()> {
                 )
             );
         }
+        SubCommand::Cleanup { inquire } => config::cleanup(inquire)?,
         SubCommand::List => {
             let task_dir = dirs::config().join("tasks");
             if !task_dir.exists() {
