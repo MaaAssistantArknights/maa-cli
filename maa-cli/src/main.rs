@@ -947,5 +947,18 @@ mod test {
                 SubCommand::Complete { shell: Shell::Bash }
             );
         }
+
+        #[test]
+        fn cleanup() {
+            assert_matches!(
+                CLI::parse_from(["maa", "cleanup"]).command,
+                SubCommand::Cleanup { inquire: _ }
+            );
+
+            assert_matches!(
+                CLI::parse_from(["maa", "cleanup", "--inquire"]).command,
+                SubCommand::Cleanup { inquire: true }
+            );
+        }
     }
 }

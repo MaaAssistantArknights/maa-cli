@@ -435,12 +435,14 @@ mod tests {
 
     #[test]
     fn test_cleanup() {
+        assert!(cleanup(true).is_err());
+
         let temp_dir = std::env::temp_dir();
         let temp_file_path = temp_dir.join("test_file.txt");
         let temp_dir_path = temp_dir.join("test_dir");
 
-        std::fs::File::create(&temp_file_path).unwrap();
-        std::fs::create_dir(&temp_dir_path).unwrap();
+        let _ = std::fs::File::create(&temp_file_path);
+        let _ = std::fs::create_dir(&temp_dir_path);
 
         let tarsh_list = vec![
             ("file", vec![temp_file_path.clone()]),
