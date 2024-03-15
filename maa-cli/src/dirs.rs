@@ -1,12 +1,18 @@
-use crate::consts::MAA_CORE_LIB;
+use crate::{
+    consts::MAA_CORE_LIB,
+    run,
+    value::{userinput::BoolInput, MAAValue},
+};
 
 use std::{
     borrow::Cow,
     env::{current_exe, var_os},
-    fs::{create_dir, create_dir_all, remove_dir_all},
+    fs::{self, create_dir, create_dir_all, remove_dir_all, DirEntry},
     path::{Path, PathBuf},
 };
 
+use anyhow::anyhow;
+use anyhow::Result;
 use directories::ProjectDirs;
 use dunce::canonicalize;
 use lazy_static::lazy_static;
@@ -394,6 +400,99 @@ fn ensure_name(name: &str) -> &str {
     name
 }
 
+pub fn cleanup(specify: &Option<Vec<String>>) -> Result<()> {
+    let avatars_cache = state().join("cache").join("avatars");
+    let default_tarsh_list = vec![cache(), log(), &avatars_cache];
+    let tarsh_list = match specify {
+        Some(paths) => paths.iter().map(Path::new).collect(),
+        None => default_tarsh_list,
+    };
+
+    tarsh_list.iter().enumerate().for_each(|(i, p)| {
+        println!("{}. {}", i + 1, p.to_str().unwrap());
+    });
+
+    if !clear_inquiry("files or folders mentioned above?")? {
+        println!("No files or folders have been deleted.");
+        return Ok(());
+    }
+
+    let mut has_err = false;
+    for path in tarsh_list {
+        print!("Delete {:?}... ", path);
+        let exclude = if path == cache() {
+            // Keep the latest packages
+            Some(run::core_version()?)
+        } else {
+            None
+        };
+
+        let result = del_item(path, exclude);
+
+        match result {
+            Err(e) => {
+                println!("\x1B[31m{}\x1B[0m", e);
+                has_err = true;
+            }
+            Ok(_) => {
+                println!("\x1B[34mDone.\x1B[0m");
+            }
+        }
+    }
+
+    if !has_err {
+        Ok(())
+    } else {
+        Err(anyhow!("At least one path has not been deleted."))
+    }
+}
+
+fn del_item(path: &Path, exclude: Option<&str>) -> Result<()> {
+    let exclude_logic = |entry: DirEntry| match exclude {
+        Some(str) => {
+            let binding = entry.file_name();
+            if !binding.to_str()?.contains(str) {
+                Some(entry.path())
+            } else {
+                None
+            }
+        }
+        None => Some(entry.path()),
+    };
+
+    if path.is_file() {
+        std::fs::remove_file(path)?;
+        return Ok(());
+    }
+
+    let filtered_dir_list: Vec<PathBuf> = fs::read_dir(path)?
+        .filter_map(|e| e.ok())
+        .filter_map(exclude_logic)
+        .collect();
+    log::debug!("{:?}", filtered_dir_list);
+
+    if filtered_dir_list.is_empty() {
+        return Err(anyhow!("Folder is empty."));
+    }
+
+    for path in filtered_dir_list {
+        if path.is_file() {
+            std::fs::remove_file(path)?;
+        } else {
+            std::fs::remove_dir_all(path)?
+        }
+    }
+    Ok(())
+}
+
+fn clear_inquiry(description: &str) -> Result<bool, std::io::Error> {
+    let bool_input = BoolInput::new(Some(true), Some(&format!("{}{}", "clear ", description)));
+    let mut value = MAAValue::new();
+    value.insert("key", bool_input);
+    let result = value.init()?.get_or("key", true);
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -733,5 +832,49 @@ mod tests {
         ensure_name("foo/bar");
         #[cfg(windows)]
         ensure_name("foo\\bar");
+    }
+
+    #[test]
+    fn test_cleanup() {
+        let dir = std::env::temp_dir().join("maa-test-convert");
+        let file_path = dir.join("test_file.txt");
+        let dir_path = dir.join("test_dir");
+        let file_in_dir = dir_path.join("test_file2.txt");
+
+        let _ = std::fs::File::create(&file_path);
+        let _ = std::fs::create_dir(&dir_path);
+        let _ = std::fs::File::create(&file_in_dir);
+
+        let dir_str: String = dir.into_os_string().into_string().unwrap();
+        let tarsh_list: &Option<Vec<String>> = &Some(vec![
+            dir_str.clone() + "/test_file.txt",
+            dir_str.clone() + "/test_dir",
+        ]);
+
+        let result = cleanup(tarsh_list);
+        assert!(result.is_ok());
+        assert!(!file_path.exists());
+        assert!(dir_path.exists());
+        assert!(!file_in_dir.exists());
+
+        let tarsh_list2 = &Some(vec![dir_str.clone() + "/incorrect"]);
+        let result = cleanup(tarsh_list2);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn clean_excluded_file() {
+        let cache = cache();
+        let name = format!("MAA-{}-linux-x86_64.temp", run::core_version().unwrap());
+        let download_file = cache.join(name.clone());
+
+        let _ = std::fs::File::create(download_file.clone());
+        let cache_str = String::from(cache.to_str().unwrap());
+        let tarsh_list = &Some(vec![cache_str]);
+        let result = cleanup(tarsh_list);
+        assert!(result.is_err());
+        assert!(download_file.exists());
+
+        let _ = std::fs::remove_file(download_file);
     }
 }
