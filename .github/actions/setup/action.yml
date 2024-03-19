@@ -65,24 +65,27 @@ runs:
       if: fromJson(inputs.core)
       shell: bash
       run: |
-        cli_version=v0.4.3
-        url="https://github.com/MaaAssistantArknights/maa-cli/releases/download/$cli_version"
-        case "$CARGO_BUILD_TARGET" in
-          *-unknown-linux-gnu)
-            aria2c "$url/maa_cli-$cli_version-$CARGO_BUILD_TARGET.tar.gz"
-            tar -xzvf maa_cli-$cli_version-$CARGO_BUILD_TARGET.tar.gz
-            cp -v maa_cli-$CARGO_BUILD_TARGET/maa .
-          ;;
-          *-apple-darwin)
-            aria2c "$url/maa_cli-$cli_version-$CARGO_BUILD_TARGET.zip"
-            unzip maa_cli-$cli_version-$CARGO_BUILD_TARGET.zip
-            cp -v maa_cli-$CARGO_BUILD_TARGET/maa .
-          ;;
-          *-pc-windows-msvc)
-            aria2c "$url/maa_cli-$cli_version-$CARGO_BUILD_TARGET.zip"
-            unzip maa_cli-$cli_version-$CARGO_BUILD_TARGET.zip
-            cp -v maa_cli-$CARGO_BUILD_TARGET/maa.exe .
-          ;;
+        # get the latest stable release information
+        aria2c https://github.com/MaaAssistantArknights/maa-cli/raw/version/stable.json
+        tag=$(jq -r .details.tag stable.json)
+        name=$(jq -r ".details.assets.\"$CARGO_BUILD_TARGET\".name" stable.json)
+        checksum=$(jq -r ".details.assets.\"$CARGO_BUILD_TARGET\".sha256" stable.json)
+
+        echo "Download maa-cli $tag for $CARGO_BUILD_TARGET"
+        aria2c "https://github.com/MaaAssistantArknights/maa-cli/releases/download/$tag/$name"
+
+        # use openssl to verify the checksum because it's cross-platform and available on all runners
+        echo "Verify the checksum of $name with $checksum"
+        openssl dgst -sha256 -c "$name" | grep "$checksum"
+
+        echo "Extracting $name"
+        case "$name" in
+          *.tar.gz)
+            tar -xzvf "$name"
+            ;;
+          *.zip)
+            unzip "$name"
+            ;;
         esac
     - name: Install MaaCore and resource
       if: fromJson(inputs.core)
