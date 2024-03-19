@@ -22,6 +22,7 @@ use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::{generate, Shell};
 use clap_verbosity_flag::{LogLevel, Verbosity};
+use dirs::CleanupTarget;
 
 struct EnvLevel;
 
@@ -228,9 +229,9 @@ enum SubCommand {
     },
     /// Clearing the caches of maa-cli and maa core
     Cleanup {
-        /// Does not ask for deletion
+        /// Specify the path for deletion
         #[clap(short, long, value_delimiter = ' ', num_args = 1..)]
-        specify: Option<Vec<String>>,
+        targets: Vec<CleanupTarget>,
     },
     /// List all available tasks
     List,
@@ -318,7 +319,7 @@ fn main() -> Result<()> {
             dir.ensure().unwrap();
             dir.join(format!("{}.log", now.format("%H:%M:%S")))
         });
-        println!("{:?}", log_file);
+        println!("{}", log_file.display());
 
         let file = std::fs::OpenOptions::new()
             .create(true)
@@ -418,7 +419,7 @@ fn main() -> Result<()> {
                 )
             );
         }
-        SubCommand::Cleanup { specify } => dirs::cleanup(&specify)?,
+        SubCommand::Cleanup { targets } => dirs::cleanup(&targets)?,
         SubCommand::List => {
             let task_dir = dirs::config().join("tasks");
             if !task_dir.exists() {

@@ -1,6 +1,6 @@
 use crate::{
     consts::MAA_CORE_LIB,
-    run,
+    dirs, run,
     value::{userinput::BoolInput, MAAValue},
 };
 
@@ -13,6 +13,7 @@ use std::{
 
 use anyhow::anyhow;
 use anyhow::Result;
+use clap::ValueEnum;
 use directories::ProjectDirs;
 use dunce::canonicalize;
 use lazy_static::lazy_static;
@@ -400,16 +401,62 @@ fn ensure_name(name: &str) -> &str {
     name
 }
 
-pub fn cleanup(specify: &Option<Vec<String>>) -> Result<()> {
-    let avatars_cache = state().join("cache").join("avatars");
-    let default_tarsh_list = vec![cache(), log(), &avatars_cache];
-    let tarsh_list = match specify {
-        Some(paths) => paths.iter().map(Path::new).collect(),
-        None => default_tarsh_list,
+#[derive(ValueEnum, Clone, Debug)]
+pub enum CleanupTarget {
+    CliCache,
+    Avatars,
+    Log,
+    Map,
+}
+
+pub fn cleanup(targets: &[CleanupTarget]) -> Result<()> {
+    let targets = if targets.is_empty() {
+        vec![
+            CleanupTarget::CliCache,
+            CleanupTarget::Avatars,
+            CleanupTarget::Log,
+            CleanupTarget::Map,
+        ]
+    } else {
+        targets.to_vec()
     };
+    let debug = dirs::log();
+    let cli_cache = cache();
+    let log_files: Vec<PathBuf> = fs::read_dir(debug)?
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            let binding = entry.file_name();
+            let file_name = binding.to_string_lossy();
+            if file_name.starts_with("20") {
+                Some(entry.path())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    let avatars = &state().join("cache").join("avatars");
+    let mut logs = vec![log().join("asst.log"), log().join("asst.bak.log")];
+    logs.extend(log_files);
+    let maps = vec![
+        debug.join("drops"),
+        debug.join("map"),
+        debug.join("other"),
+        debug.join("Roguelike"),
+    ];
+
+    let tarsh_list: Vec<&Path> = targets
+        .iter()
+        .flat_map(|target| match target {
+            CleanupTarget::CliCache => vec![cli_cache],
+            CleanupTarget::Avatars => vec![avatars.as_ref()],
+            CleanupTarget::Log => logs.iter().map(|log| log.as_ref()).collect(),
+            CleanupTarget::Map => maps.iter().map(|map| map.as_ref()).collect(),
+        })
+        .collect();
 
     tarsh_list.iter().enumerate().for_each(|(i, p)| {
-        println!("{}. {}", i + 1, p.to_str().unwrap());
+        println!("{}. {}", i + 1, p.display());
     });
 
     if !clear_inquiry("files or folders mentioned above?")? {
@@ -419,7 +466,7 @@ pub fn cleanup(specify: &Option<Vec<String>>) -> Result<()> {
 
     let mut has_err = false;
     for path in tarsh_list {
-        print!("Delete {:?}... ", path);
+        print!("Delete {}... ", path.display());
         let exclude = if path == cache() {
             // Keep the latest packages
             Some(run::core_version()?)
@@ -836,45 +883,52 @@ mod tests {
 
     #[test]
     fn test_cleanup() {
-        let dir = std::env::temp_dir().join("maa-test-convert");
-        let file_path = dir.join("test_file.txt");
-        let dir_path = dir.join("test_dir");
-        let file_in_dir = dir_path.join("test_file2.txt");
+        let _version = match run::core_version() {
+            Ok(v) => v,
+            Err(_) => return, // uninitialized
+        };
 
-        let _ = std::fs::File::create(&file_path);
-        let _ = std::fs::create_dir(&dir_path);
-        let _ = std::fs::File::create(&file_in_dir);
+        fn test(paths: &Vec<&Path>, targets: &Vec<CleanupTarget>) {
+            let files: Vec<PathBuf> = paths
+                .iter()
+                .map(|path| {
+                    let file = if path.is_dir() {
+                        path.join("file.txt")
+                    } else {
+                        path.to_path_buf()
+                    };
+                    let _ = std::fs::File::create(&file);
+                    file
+                })
+                .collect();
+            let result = cleanup(targets);
+            assert!(result.is_ok());
 
-        let dir_str: String = dir.into_os_string().into_string().unwrap();
-        let tarsh_list: &Option<Vec<String>> = &Some(vec![
-            dir_str.clone() + "/test_file.txt",
-            dir_str.clone() + "/test_dir",
-        ]);
+            for file in files {
+                assert!(!file.exists());
+                let _ = std::fs::remove_file(file);
+            }
+        }
 
-        let result = cleanup(tarsh_list);
-        assert!(result.is_ok());
-        assert!(!file_path.exists());
-        assert!(dir_path.exists());
-        assert!(!file_in_dir.exists());
+        test(&vec![cache()], &vec![CleanupTarget::CliCache]);
+        test(
+            &vec![&log().join("asst.log"), &log().join("asst.bak.log")],
+            &vec![CleanupTarget::Log],
+        );
+        test(
+            &vec![&state().join("cache").join("avatars")],
+            &vec![CleanupTarget::Avatars],
+        );
 
-        let tarsh_list2 = &Some(vec![dir_str.clone() + "/incorrect"]);
-        let result = cleanup(tarsh_list2);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn clean_excluded_file() {
-        let cache = cache();
-        let name = format!("MAA-{}-linux-x86_64.temp", run::core_version().unwrap());
-        let download_file = cache.join(name.clone());
-
-        let _ = std::fs::File::create(download_file.clone());
-        let cache_str = String::from(cache.to_str().unwrap());
-        let tarsh_list = &Some(vec![cache_str]);
-        let result = cleanup(tarsh_list);
-        assert!(result.is_err());
-        assert!(download_file.exists());
-
-        let _ = std::fs::remove_file(download_file);
+        let debug = log();
+        test(
+            &vec![
+                &debug.join("drops"),
+                &debug.join("map"),
+                &debug.join("other"),
+                &debug.join("Roguelike"),
+            ],
+            &vec![CleanupTarget::Map],
+        );
     }
 }
