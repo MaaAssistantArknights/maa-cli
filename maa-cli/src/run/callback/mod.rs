@@ -237,15 +237,6 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
                 });
                 info!("{} {} {}", "MissionStart", exec_times, "times");
             }
-            "MedicineConfirm" => {
-                let exec_times = details.get("exec_times")?.as_i64()?;
-                edit_current_task_detail(|detail| {
-                    if let Some(detail) = detail.as_fight_mut() {
-                        detail.set_medicine(exec_times)
-                    }
-                });
-                info!("{} {} {}", "medicine used", exec_times, "times",)
-            }
             "StoneConfirm" => {
                 let exec_times = details.get("exec_times")?.as_i64()?;
                 edit_current_task_detail(|detail| {
@@ -253,7 +244,7 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
                         detail.set_stone(exec_times)
                     }
                 });
-                info!("{} {} {}", "stone used", exec_times, "times",)
+                info!("Use {} stones", exec_times);
             }
             "AbandonAction" => warn!("{}", "PRTS error"),
             // Recruit
@@ -375,6 +366,28 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
                     detail.set_stage(stage);
                 }
             });
+        }
+
+        // Sanity and Medicines
+        "SanityBeforeStage" => info!(
+            "Current sanity: {}/{}",
+            details.get("current_sanity")?.as_i64()?,
+            details.get("max_sanity")?.as_i64()?
+        ),
+        "UseMedicine" => {
+            let count = details.get("count")?.as_i64()?;
+            let is_expiring = details.get("is_expiring")?.as_bool()?;
+            edit_current_task_detail(|detail| {
+                if let Some(detail) = detail.as_fight_mut() {
+                    detail.use_medicine(count, is_expiring);
+                }
+            });
+
+            if is_expiring {
+                info!("Use {} expiring medicine", count);
+            } else {
+                info!("Use {} medicine", count);
+            }
         }
 
         // Infrast

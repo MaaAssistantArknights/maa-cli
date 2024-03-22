@@ -470,7 +470,7 @@ pub struct FightDetail {
     // times of fight
     times: Option<i64>,
     // used medicine
-    medicine: Option<i64>,
+    medicine: Option<(i64, i64)>,
     // used stone
     stone: Option<i64>,
     // [(item, count), ...], each element is corresponding to a fight
@@ -501,8 +501,13 @@ impl FightDetail {
         self.times = Some(times);
     }
 
-    pub fn set_medicine(&mut self, medicine: i64) {
-        self.medicine = Some(medicine);
+    pub fn use_medicine(&mut self, count: i64, is_expiring: bool) {
+        let (mut all, mut expiring) = self.medicine.unwrap_or((0, 0));
+        all += count;
+        if is_expiring {
+            expiring += count
+        }
+        self.medicine = Some((all, expiring))
     }
 
     pub fn set_stone(&mut self, stone: i64) {
@@ -525,8 +530,8 @@ impl std::fmt::Display for FightDetail {
         if let Some(times) = self.times {
             write!(f, " {times} times")?;
         }
-        if let Some(medicine) = self.medicine {
-            write!(f, ", used {medicine} medicine")?;
+        if let Some((all, expiring)) = self.medicine {
+            write!(f, ", used {all} medicine ({expiring} expiring)")?;
         }
         if let Some(stone) = self.stone {
             write!(f, ", used {stone} stone")?;
@@ -686,36 +691,28 @@ mod tests {
 
     #[test]
     fn format_duration() {
+        fn seconds(s: i64) -> chrono::Duration {
+            chrono::TimeDelta::try_seconds(s).unwrap()
+        }
+
+        assert_eq!(FormattedDuration::from(seconds(0)).to_string(), "0s");
+        assert_eq!(FormattedDuration::from(seconds(1)).to_string(), "1s");
+        assert_eq!(FormattedDuration::from(seconds(60)).to_string(), "1m");
+        assert_eq!(FormattedDuration::from(seconds(60 * 60)).to_string(), "1h");
         assert_eq!(
-            FormattedDuration::from(chrono::Duration::seconds(0)).to_string(),
-            "0s"
-        );
-        assert_eq!(
-            FormattedDuration::from(chrono::Duration::seconds(1)).to_string(),
-            "1s"
-        );
-        assert_eq!(
-            FormattedDuration::from(chrono::Duration::seconds(60)).to_string(),
-            "1m"
-        );
-        assert_eq!(
-            FormattedDuration::from(chrono::Duration::seconds(60 * 60)).to_string(),
-            "1h"
-        );
-        assert_eq!(
-            FormattedDuration::from(chrono::Duration::seconds(60 * 60 + 1)).to_string(),
+            FormattedDuration::from(seconds(60 * 60 + 1)).to_string(),
             "1h 1s"
         );
         assert_eq!(
-            FormattedDuration::from(chrono::Duration::seconds(60 * 60 + 60)).to_string(),
+            FormattedDuration::from(seconds(60 * 60 + 60)).to_string(),
             "1h 1m"
         );
         assert_eq!(
-            FormattedDuration::from(chrono::Duration::seconds(60 * 60 + 60 + 1)).to_string(),
+            FormattedDuration::from(seconds(60 * 60 + 60 + 1)).to_string(),
             "1h 1m 1s"
         );
         assert_eq!(
-            FormattedDuration::from(chrono::Duration::seconds(60 * 60 * 48)).to_string(),
+            FormattedDuration::from(seconds(60 * 60 * 48)).to_string(),
             "48h"
         );
     }
@@ -896,7 +893,8 @@ mod tests {
             let mut detail = FightDetail::new();
             detail.set_stage("TS-9");
             detail.set_times(2);
-            detail.set_medicine(1);
+            detail.use_medicine(1, true);
+            detail.use_medicine(1, false);
             detail.set_stone(1);
             detail.push_drop(
                 [("A", 1), ("B", 2)]
@@ -912,7 +910,7 @@ mod tests {
             );
             assert_eq!(
                 detail.to_string(),
-                "Fight TS-9 2 times, used 1 medicine, used 1 stone, drops:\n\
+                "Fight TS-9 2 times, used 2 medicine (1 expiring), used 1 stone, drops:\n\
                  1. A × 1, B × 2\n\
                  2. A × 1, C × 3\n\
                  total drops: A × 2, B × 2, C × 3\n",
