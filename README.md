@@ -9,6 +9,7 @@
 [English](./README-EN.md)
 
 <!-- LTeX: language=zh-CN -->
+<!-- markdownlint-disable MD013 MD033 -->
 
 一个使用 Rust 编写的简单 [MAA](https://github.com/MaaAssistantArknights/MaaAssistantArknights) 命令行工具。
 
@@ -147,9 +148,11 @@ OpenSSL 库是 `git2` 在所有平台和 `reqwest` 在 Linux 上的依赖。如�
 
 #### 日志输出
 
-`maa-cli` 默认会向 stderr 输出日志。日志输出级别从低到高分别为 `Error`，`Warn`，`Info`，`Debug` 和 `Trace`。默认的日志输出级别为 `Warn`。日志级别可以通过 `MAA_LOG` 环境变量来设置，例如 `MAA_LOG=debug`。你也可以通过 `-v` 或者 `-q` 来增加或者减少日志输出级别。
+日志输出级别从低到高分别为 `Error`，`Warn`，`Info`，`Debug` 和 `Trace`。默认的日志输出级别为 `Warn`。日志级别可以通过 `MAA_LOG` 环境变量来设置，例如 `MAA_LOG=debug`。你也可以通过 `-v` 或者 `-q` 来增加或者减少日志输出级别。
 
-`--log-file` 选项可以将日志输出到文件中，日志保存在 `$(maa dir log)/YYYY/MM/DD/HH:MM:SS.log` 中，其中 `$(maa dir log)` 是日志目录，你可以通过 `maa dir log` 获取。你也可以通过 `--log-file=path/to/log` 来指定日志文件的路径。
+`maa-cli` 默认会向 stderr 输出日志。`--log-file` 选项可以将日志输出到文件中，日志保存在 `$(maa dir log)/YYYY/MM/DD/HH:MM:SS.log` 中，其中 `$(maa dir log)` 是日志目录，你可以通过 `maa dir log` 获取。你也可以通过 `--log-file=path/to/log` 来指定日志文件的路径。
+
+默认情况下，向 stderr 输出的日志不会包含时间戳和日志级别，但是向文件输出的日志会包含时间戳和日志级别的前缀。你可以通过环境变量 `MAA_LOG_PREFIX` 来改变这个行为。设置为 `Always` 时，总是会包含前缀，而设置为 `Never` 时即使是写入日志文件时也不会包含前缀。
 
 ### 安装和更新
 
