@@ -11,8 +11,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::anyhow;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::ValueEnum;
 use directories::ProjectDirs;
 use dunce::canonicalize;
@@ -401,6 +400,10 @@ fn ensure_name(name: &str) -> &str {
     name
 }
 
+pub trait PathProvider {
+    fn get_path(&self) -> Vec<PathBuf>;
+}
+
 #[derive(ValueEnum, Clone, Debug)]
 pub enum CleanupTarget {
     CliCache,
@@ -409,53 +412,70 @@ pub enum CleanupTarget {
     Map,
 }
 
-pub fn cleanup(targets: &[CleanupTarget]) -> Result<()> {
-    let targets = if targets.is_empty() {
+impl PathProvider for CleanupTarget {
+    fn get_path(&self) -> Vec<PathBuf> {
+        let debug = dirs::log();
+
+        match self {
+            CleanupTarget::CliCache => {
+                vec![cache().to_path_buf()]
+            }
+            CleanupTarget::Avatars => {
+                vec![state().join("cache").join("avatars")]
+            }
+            CleanupTarget::Log => {
+                let log_files = match fs::read_dir(debug) {
+                    Ok(dir) => dir
+                        .filter_map(|entry| {
+                            let entry = entry.ok()?;
+                            let binding = entry.file_name();
+                            let file_name = binding.to_string_lossy();
+                            if file_name.starts_with("20") {
+                                Some(entry.path())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect(),
+                    Err(_) => Vec::new(),
+                };
+                let mut logs = vec![log().join("asst.log"), log().join("asst.bak.log")];
+                logs.extend(log_files);
+                logs
+            }
+            CleanupTarget::Map => {
+                vec![
+                    debug.join("drops"),
+                    debug.join("map"),
+                    debug.join("other"),
+                    debug.join("Roguelike"),
+                ]
+            }
+        }
+    }
+}
+
+pub fn cleanup<T>(targets: &[T]) -> Result<()>
+where
+    T: PathProvider + 'static,
+{
+    let targets_to_use: Vec<&dyn PathProvider> = if targets.is_empty() {
         vec![
-            CleanupTarget::CliCache,
-            CleanupTarget::Avatars,
-            CleanupTarget::Log,
-            CleanupTarget::Map,
+            &CleanupTarget::CliCache,
+            &CleanupTarget::Avatars,
+            &CleanupTarget::Log,
+            &CleanupTarget::Map,
         ]
     } else {
-        targets.to_vec()
+        targets.iter().map(|x| x as &dyn PathProvider).collect()
     };
-    let debug = dirs::log();
-    let cli_cache = cache();
-    let log_files: Vec<PathBuf> = fs::read_dir(debug)?
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let binding = entry.file_name();
-            let file_name = binding.to_string_lossy();
-            if file_name.starts_with("20") {
-                Some(entry.path())
-            } else {
-                None
-            }
-        })
-        .collect();
 
-    let avatars = &state().join("cache").join("avatars");
-    let mut logs = vec![log().join("asst.log"), log().join("asst.bak.log")];
-    logs.extend(log_files);
-    let maps = vec![
-        debug.join("drops"),
-        debug.join("map"),
-        debug.join("other"),
-        debug.join("Roguelike"),
-    ];
-
-    let tarsh_list: Vec<&Path> = targets
+    let trash_list: Vec<PathBuf> = targets_to_use
         .iter()
-        .flat_map(|target| match target {
-            CleanupTarget::CliCache => vec![cli_cache],
-            CleanupTarget::Avatars => vec![avatars.as_ref()],
-            CleanupTarget::Log => logs.iter().map(|log| log.as_ref()).collect(),
-            CleanupTarget::Map => maps.iter().map(|map| map.as_ref()).collect(),
-        })
+        .flat_map(|target| target.get_path())
         .collect();
 
-    tarsh_list.iter().enumerate().for_each(|(i, p)| {
+    trash_list.iter().enumerate().for_each(|(i, p)| {
         println!("{}. {}", i + 1, p.display());
     });
 
@@ -465,7 +485,7 @@ pub fn cleanup(targets: &[CleanupTarget]) -> Result<()> {
     }
 
     let mut has_err = false;
-    for path in tarsh_list {
+    for path in trash_list {
         print!("Delete {}... ", path.display());
         let exclude = if path == cache() {
             // Keep the latest packages
@@ -474,7 +494,7 @@ pub fn cleanup(targets: &[CleanupTarget]) -> Result<()> {
             None
         };
 
-        let result = del_item(path, exclude);
+        let result = del_item(path.as_path(), exclude);
 
         match result {
             Err(e) => {
@@ -883,51 +903,39 @@ mod tests {
 
     #[test]
     fn test_cleanup() {
-        let _version = match run::core_version() {
-            Ok(v) => v,
-            Err(_) => return, // uninitialized
-        };
+        struct MockCleanupTarget {
+            paths: Vec<PathBuf>,
+        }
 
-        fn test(paths: &Vec<&Path>, targets: &Vec<CleanupTarget>) {
-            let files: Vec<PathBuf> = paths
-                .iter()
-                .map(|path| {
-                    let file = if path.is_dir() {
-                        path.join("file.txt")
-                    } else {
-                        path.to_path_buf()
-                    };
-                    let _ = std::fs::File::create(&file);
-                    file
-                })
-                .collect();
-            let _result = cleanup(targets);
-
-            for file in files {
-                assert!(!file.exists());
-                let _ = std::fs::remove_file(file);
+        impl PathProvider for MockCleanupTarget {
+            fn get_path(&self) -> Vec<PathBuf> {
+                self.paths.clone()
             }
         }
 
-        test(&vec![cache()], &vec![CleanupTarget::CliCache]);
-        test(
-            &vec![&log().join("asst.log"), &log().join("asst.bak.log")],
-            &vec![CleanupTarget::Log],
-        );
-        test(
-            &vec![&state().join("cache").join("avatars")],
-            &vec![CleanupTarget::Avatars],
-        );
+        impl MockCleanupTarget {
+            pub fn new(paths: Vec<PathBuf>) -> Self {
+                MockCleanupTarget { paths }
+            }
+        }
 
-        let debug = log();
-        test(
-            &vec![
-                &debug.join("drops"),
-                &debug.join("map"),
-                &debug.join("other"),
-                &debug.join("Roguelike"),
-            ],
-            &vec![CleanupTarget::Map],
-        );
+        let dir = std::env::temp_dir().join("maa-test-convert");
+        let file_path = dir.join("test_file.txt");
+        let dir_path = dir.join("test_dir");
+        let file_in_dir = dir_path.join("test_file2.txt");
+
+        let _ = std::fs::File::create(&file_path);
+        let _ = std::fs::create_dir(&dir_path);
+        let _ = std::fs::File::create(&file_in_dir);
+
+        let paths = vec![file_path.clone(), dir_path.clone()];
+        let targets: Vec<MockCleanupTarget> = vec![MockCleanupTarget::new(paths)];
+        assert!(cleanup(&targets).is_ok());
+        assert!(!file_path.exists());
+        assert!(!file_in_dir.exists());
+
+        let err_path = dir.join("err_dir");
+        let targets: Vec<MockCleanupTarget> = vec![MockCleanupTarget::new(vec![err_path])];
+        assert!(cleanup(&targets).is_err());
     }
 }

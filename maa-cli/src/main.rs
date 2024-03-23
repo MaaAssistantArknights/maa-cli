@@ -22,7 +22,6 @@ use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::{generate, Shell};
 use clap_verbosity_flag::{LogLevel, Verbosity};
-use dirs::CleanupTarget;
 
 struct EnvLevel;
 
@@ -230,8 +229,7 @@ enum SubCommand {
     /// Clearing the caches of maa-cli and maa core
     Cleanup {
         /// Specify the path for deletion
-        #[clap(short, long, value_delimiter = ' ', num_args = 1..)]
-        targets: Vec<CleanupTarget>,
+        targets: Vec<dirs::CleanupTarget>,
     },
     /// List all available tasks
     List,
