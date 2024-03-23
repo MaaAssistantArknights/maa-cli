@@ -290,9 +290,9 @@ pub enum Dir {
 #[derive(Clone, Copy, Default)]
 enum LogPrefix {
     /// Print log prefix if log to file, not print log prefix if log to stderr
-    #[default]
     Auto,
     /// Always print log prefix
+    #[default]
     Always,
     /// Never print log prefix
     Never,
@@ -515,7 +515,7 @@ mod test {
         #[test]
         fn from_env() {
             std::env::remove_var("MAA_LOG_PREFIX");
-            assert_eq!(LogPrefix::from_env(), LogPrefix::Auto);
+            assert_eq!(LogPrefix::from_env(), LogPrefix::Always);
 
             std::env::set_var("MAA_LOG_PREFIX", "Always");
             assert_eq!(LogPrefix::from_env(), LogPrefix::Always);
@@ -525,6 +525,9 @@ mod test {
 
             std::env::set_var("MAA_LOG_PREFIX", "Auto");
             assert_eq!(LogPrefix::from_env(), LogPrefix::Auto);
+
+            std::env::set_var("MAA_LOG_PREFIX", "unknown");
+            assert_eq!(LogPrefix::from_env(), LogPrefix::Always);
         }
 
         #[test]
