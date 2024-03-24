@@ -3,7 +3,8 @@ description: Install MaaCore and resource by prebuilt CLI
 inputs:
   target:
     description: Target triple used for downloading prebuilt CLI
-    required: true
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -13,6 +14,10 @@ runs:
       working-directory: ${{ runner.temp }}
       run: |
         target='${{ inputs.target }}'
+        if [[ -z "$target" ]]; then
+          target=$(rustc -vV | sed -n 's|host: ||p')
+        fi
+
         # get the latest stable release information
         aria2c https://github.com/MaaAssistantArknights/maa-cli/raw/version/stable.json
         tag=$(jq -r .details.tag stable.json)
