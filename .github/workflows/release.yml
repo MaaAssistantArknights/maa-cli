@@ -142,7 +142,7 @@ jobs:
           NE=$((NL + 3))
           $SED "$NS,$NE s/(version${S}*=${S}*)\"[^\"]+\"/\1\"$VERSION\"/" Cargo.lock
           {
-            echo "Patch Version (${{ matrix.os }}, ${{ matrix.arch }})"
+            echo 'Patch Version (${{ matrix.os }}, ${{ matrix.arch }})'
             echo '```diff'
             git diff
             echo '```'
@@ -339,7 +339,7 @@ jobs:
             git diff ./*.json
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          git commit ./*.json -m "chore: bump version to v${{ needs.meta.outputs.version }}"
+          git commit ./*.json -m 'chore: bump version to v${{ needs.meta.outputs.version }}'
           git push --verbose ${{ !fromJson(needs.meta.outputs.publish) && '--dry-run' || ''}}
 
   publish-homebrew:

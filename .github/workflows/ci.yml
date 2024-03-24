@@ -118,7 +118,7 @@ jobs:
       - name: Build
         run: |
           cargo build --package maa-cli --locked \
-            --no-default-features --features ${{ matrix.feature }}
+            --no-default-features --features '${{ matrix.feature }}'
       - name: Test
         run: |
           cargo test -- --include-ignored
