@@ -45,7 +45,7 @@ runs:
             unzip "$name"
             ;;
         esac
-        mv -v maa_cli-$CARGO_BUILD_TARGET/maa* .
+        mv -v maa_cli-$target/maa* .
     - name: Install MaaCore and resource
       shell: bash
       working-directory: ${{ runner.temp }}
