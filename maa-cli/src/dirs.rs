@@ -457,7 +457,7 @@ impl PathProvider for CleanupTarget {
 
 pub fn cleanup<T>(targets: &[T]) -> Result<()>
 where
-    T: PathProvider + 'static,
+    T: PathProvider,
 {
     let targets_to_use: Vec<&dyn PathProvider> = if targets.is_empty() {
         vec![
@@ -937,5 +937,34 @@ mod tests {
         let err_path = dir.join("err_dir");
         let targets: Vec<MockCleanupTarget> = vec![MockCleanupTarget::new(vec![err_path])];
         assert!(cleanup(&targets).is_err());
+    }
+
+    #[test]
+    fn test_cleanup_target() {
+        let _version = match run::core_version() {
+            Ok(v) => v,
+            Err(_) => return, // uninitialized
+        };
+        let enum_list = [
+            CleanupTarget::Avatars,
+            CleanupTarget::CliCache,
+            CleanupTarget::Log,
+            CleanupTarget::Map,
+        ];
+        let binding = enum_list[0].get_path();
+        let avatars = binding.get(0).unwrap().parent().unwrap().parent().unwrap();
+        assert_eq!(state(), avatars);
+
+        let binding = enum_list[1].get_path();
+        let cli_cache = binding.get(0).unwrap();
+        assert_eq!(cache(), cli_cache);
+
+        let binding = enum_list[2].get_path();
+        let logs = binding.get(0).unwrap().parent().unwrap();
+        assert_eq!(log(), logs);
+
+        let binding = enum_list[3].get_path();
+        let map = binding.get(0).unwrap().parent().unwrap();
+        assert_eq!(log(), map);
     }
 }
