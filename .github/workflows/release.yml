@@ -9,7 +9,7 @@ on:
       - main
     paths:
       - ".github/workflows/release.yml"
-      - ".github/actions/setup/action.yml"
+      - ".github/actions/setup/**"
   workflow_dispatch:
     inputs:
       channel:
@@ -79,8 +79,6 @@ jobs:
         uses: orhun/git-cliff-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MAA_VERSION: ${{ needs.meta.outputs.version }}
-          MAA_TAG: ${{ needs.meta.outputs.tag }}
         with:
           config: cliff.toml
           # If the release is triggered by a tag, process commits starting
@@ -92,7 +90,7 @@ jobs:
         run: |
           {
             echo '```markdown'
-            cat ${{ steps.git_cliff.outputs.changelog }}
+            cat '${{ steps.git_cliff.outputs.changelog }}'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -122,27 +120,29 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Rust
+      - name: Setup Cross Compilation Toolchains
         uses: ./.github/actions/setup
         with:
           os: ${{ matrix.os }}
-          arch: ${{ matrix.arch }}
+          host_arch: ${{ matrix.os == 'macos-14' && 'aarch64' || 'x86_64' }}
+          target_arch: ${{ matrix.arch }}
       - name: Patch Version
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
         run: |
-          MAA_VERSION="${{ needs.meta.outputs.version }}"
-          if [ $(uname) == "Darwin" ]; then
+          if [ "$(uname -s)" == "Darwin" ]; then
             SED="sed -i '' -E" # BSD sed should use '' as backup extension
           else
             SED="sed -i -E"
           fi
           S="[[:space:]]" # BSD sed doesn't support \s
-          $SED "1,6 s/(version${S}*=${S}*)\"[^\"]+\"/\1\"$MAA_VERSION\"/" maa-cli/Cargo.toml
+          $SED "1,6 s/(version${S}*=${S}*)\"[^\"]+\"/\1\"$VERSION\"/" maa-cli/Cargo.toml
           NL=$(grep -n -E "name${S}*=${S}*\"maa-cli\"" Cargo.lock | cut -d: -f1)
           NS=$((NL - 1))
           NE=$((NL + 3))
-          $SED "$NS,$NE s/(version${S}*=${S}*)\"[^\"]+\"/\1\"$MAA_VERSION\"/" Cargo.lock
+          $SED "$NS,$NE s/(version${S}*=${S}*)\"[^\"]+\"/\1\"$VERSION\"/" Cargo.lock
           {
-            echo "Patch Version (${{ matrix.os }}, ${{ matrix.arch }})"
+            echo 'Patch Version (${{ matrix.os }}, ${{ matrix.arch }})'
             echo '```diff'
             git diff
             echo '```'
@@ -155,16 +155,19 @@ jobs:
         run: |
           cargo build --release --package maa-cli --locked --features vendored-openssl
       - name: Tar Artifact
+        env:
+          TARGET_OS: ${{ matrix.os }}
+          TARGET_ARCH: ${{ matrix.arch }}
         run: |
           target_dir="target/$CARGO_BUILD_TARGET/release"
-          if [[ "${{ matrix.os }}" == "windows"* ]]; then
+          if [[ "$TARGET_OS" == "windows"* ]]; then
             exe="maa.exe"
           else
             exe="maa"
           fi
           file "$target_dir/$exe" # check file status
-          # dry run on x86_64 to check file status
-          if [[ "${{ matrix.arch }}" == "x86_64" ]]; then
+          # dry run if not cross compiling
+          if [[ "$TARGET_ARCH" == "x86_64" || "$TARGET_OS" == "macos-14" ]]; then
             "$target_dir/$exe" --version
           fi
           tar -cvf "$CARGO_BUILD_TARGET.tar" -C "$target_dir" "$exe"
@@ -179,7 +182,7 @@ jobs:
   build-universal:
     name: Build Universal Binary
     if: ${{ !fromJson(needs.meta.outputs.skip) }}
-    runs-on: macos-latest
+    runs-on: macos-14
     needs: [meta, build]
     steps:
       # download all artifacts, even if not all are used,
@@ -311,7 +314,7 @@ jobs:
               exit 1
             fi
           fi
-          sleep 5 # wait to avoid the release becames draft
+          sleep 5 # wait to avoid the release becomes draft
       - name: Create Release
         uses: softprops/action-gh-release@v2
         if: ${{ fromJson(needs.meta.outputs.publish) }}
@@ -336,7 +339,7 @@ jobs:
             git diff ./*.json
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          git commit ./*.json -m "chore: bump version to v${{ needs.meta.outputs.version }}"
+          git commit ./*.json -m 'chore: bump version to v${{ needs.meta.outputs.version }}'
           git push --verbose ${{ !fromJson(needs.meta.outputs.publish) && '--dry-run' || ''}}
 
   publish-homebrew:
