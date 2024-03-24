@@ -11,7 +11,7 @@ inputs:
   target_arch:
     description: Target architecture # default to host architecture
     required: false
-    default: ${{ inputs.host_arch }}
+    default: "x86_64"
 
 runs:
   using: composite

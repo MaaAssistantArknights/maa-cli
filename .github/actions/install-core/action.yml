@@ -12,7 +12,7 @@ runs:
       shell: bash
       working-directory: ${{ runner.temp }}
       run: |
-        target='{{ inputs.target }}'
+        target='${{ inputs.target }}'
         # get the latest stable release information
         aria2c https://github.com/MaaAssistantArknights/maa-cli/raw/version/stable.json
         tag=$(jq -r .details.tag stable.json)

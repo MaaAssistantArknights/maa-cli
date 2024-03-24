@@ -89,11 +89,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Rust
+      - name: Setup Cross Compilation Toolchains
         uses: ./.github/actions/setup
         with:
           os: ${{ matrix.os }}
-          arch: aarch64
+          target_arch: aarch64
       - name: Build
         run: |
           cargo build --package maa-cli --locked \
