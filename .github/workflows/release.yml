@@ -129,8 +129,8 @@ jobs:
           arch: ${{ matrix.arch }}
       - name: Patch Version
         run: |
-          MAA_VERSION="${{ needs.meta.outputs.version }}"
-          if [ $(uname) == "Darwin" ]; then
+          MAA_VERSION='${{ needs.meta.outputs.version }}'
+          if [ "$(uname -s)" == "Darwin" ]; then
             SED="sed -i '' -E" # BSD sed should use '' as backup extension
           else
             SED="sed -i -E"
@@ -156,8 +156,9 @@ jobs:
           cargo build --release --package maa-cli --locked --features vendored-openssl
       - name: Tar Artifact
         run: |
+          runner='${{ matrix.os }}'
           target_dir="target/$CARGO_BUILD_TARGET/release"
-          if [[ "${{ matrix.os }}" == "windows"* ]]; then
+          if [[ "$runner" == "windows"* ]]; then
             exe="maa.exe"
           else
             exe="maa"
@@ -179,7 +180,7 @@ jobs:
   build-universal:
     name: Build Universal Binary
     if: ${{ !fromJson(needs.meta.outputs.skip) }}
-    runs-on: macos-latest
+    runs-on: macos-14
     needs: [meta, build]
     steps:
       # download all artifacts, even if not all are used,
@@ -311,7 +312,7 @@ jobs:
               exit 1
             fi
           fi
-          sleep 5 # wait to avoid the release becames draft
+          sleep 5 # wait to avoid the release becomes draft
       - name: Create Release
         uses: softprops/action-gh-release@v2
         if: ${{ fromJson(needs.meta.outputs.publish) }}
