@@ -69,7 +69,7 @@ runs:
         aria2c https://github.com/MaaAssistantArknights/maa-cli/raw/version/stable.json
         tag=$(jq -r .details.tag stable.json)
         name=$(jq -r ".details.assets.\"$CARGO_BUILD_TARGET\".name" stable.json)
-        checksum=$(jq -r ".details.assets.\"$CARGO_BUILD_TARGET\".sha256" stable.json)
+        checksum=$(jq -r ".details.assets.\"$CARGO_BUILD_TARGET\".sha256sum" stable.json)
 
         echo "Download maa-cli $tag for $CARGO_BUILD_TARGET"
         aria2c "https://github.com/MaaAssistantArknights/maa-cli/releases/download/$tag/$name"
