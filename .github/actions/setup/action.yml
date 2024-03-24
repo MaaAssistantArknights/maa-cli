@@ -92,6 +92,8 @@ runs:
             unzip "$name"
             ;;
         esac
+        mv maa-cli-$CARGO_BUILD_TARGET/maa* .)
+
     - name: Install MaaCore and resource
       if: fromJson(inputs.core)
       shell: bash
