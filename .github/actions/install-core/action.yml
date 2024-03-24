@@ -1,0 +1,71 @@
+name: Install MaaCore and resource
+description: Install MaaCore and resource by prebuilt CLI
+inputs:
+  target:
+    description: Target triple used for downloading prebuilt CLI
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install Prebuilt CLI
+      shell: bash
+      working-directory: ${{ runner.temp }}
+      run: |
+        target='{{ inputs.target }}'
+        # get the latest stable release information
+        aria2c https://github.com/MaaAssistantArknights/maa-cli/raw/version/stable.json
+        tag=$(jq -r .details.tag stable.json)
+        name=$(jq -r ".details.assets.\"$target\".name" stable.json)
+        checksum=$(jq -r ".details.assets.\"$target\".sha256sum" stable.json)
+
+        echo "Download maa-cli $tag for $target"
+        aria2c "https://github.com/MaaAssistantArknights/maa-cli/releases/download/$tag/$name"
+
+        # use openssl to verify the checksum because it's cross-platform and available on all runners
+        echo "Verify the checksum of $name with $checksum"
+        dgst=$(openssl dgst -sha256 "$name")
+        file_checksum=${dgst#*= }
+        if [[ $file_checksum != "$checksum" ]]; then
+          echo "Checksum mismatch: $file_checksum"
+          exit 1
+        fi
+
+        echo "Extracting $name"
+        case "$name" in
+          *.tar.gz)
+            tar -xzvf "$name"
+            ;;
+          *.zip)
+            unzip "$name"
+            ;;
+        esac
+        mv -v maa_cli-$CARGO_BUILD_TARGET/maa* .
+    - name: Install MaaCore and resource
+      shell: bash
+      working-directory: ${{ runner.temp }}
+      run: |
+        ./maa install stable -t0 \
+          --api-url https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version/
+
+        MAA_CORE_DIR="$(./maa dir lib)"
+        MAA_RESOURCE_DIR="$(./maa dir resource)"
+        ls -l "$MAA_CORE_DIR"
+        ls -l "$MAA_RESOURCE_DIR"
+        echo "MAA_CORE_DIR=$MAA_CORE_DIR" >> $GITHUB_ENV
+        echo "MAA_RESOURCE_DIR=$MAA_RESOURCE_DIR" >> $GITHUB_ENV
+
+        package_name=$(basename "$(ls "$(./maa dir cache)")")
+        echo "Downloaded MaaCore package: $package_name"
+        core_version=${package_name#MAA-v}
+        core_version=${core_version%%-*}
+        if [[ $core_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "Downloaded MaaCore version: $core_version"
+          echo "MAA_CORE_VERSION=v$core_version" >> "$GITHUB_ENV"
+        fi
+        echo "MAA_CORE_INSTALLED=true" >> "$GITHUB_ENV"
+    - name: Remove Prebuilt CLI
+      shell: bash
+      working-directory: ${{ runner.temp }}
+      run: |
+        rm -vrf maa_cli* stable.json maa*
