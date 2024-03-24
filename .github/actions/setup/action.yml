@@ -76,7 +76,11 @@ runs:
 
         # use openssl to verify the checksum because it's cross-platform and available on all runners
         echo "Verify the checksum of $name with $checksum"
-        openssl dgst -sha256 -c "$name" | grep "$checksum"
+        file_checksum=$(openssl dgst -sha256 -r "$name")
+        if [[ $file_checksum != *"$checksum" ]]; then
+          echo "Checksum mismatch: $file_checksum"
+          exit 1
+        fi
 
         echo "Extracting $name"
         case "$name" in
