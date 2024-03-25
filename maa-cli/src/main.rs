@@ -230,6 +230,12 @@ enum SubCommand {
     List,
     /// Generate completion script for given shell
     Complete { shell: Shell },
+    /// Generate man page
+    Mangen {
+        /// Path of the output file
+        #[arg(long)]
+        path: PathBuf,
+    },
 }
 
 #[cfg(feature = "cli_installer")]
@@ -481,6 +487,9 @@ fn main() -> Result<()> {
         }
         SubCommand::Complete { shell } => {
             generate(shell, &mut CLI::command(), "maa", &mut std::io::stdout());
+        }
+        SubCommand::Mangen { path } => {
+            clap_mangen::generate_to(CLI::command(), path)?;
         }
     }
 
@@ -1042,6 +1051,15 @@ mod test {
             assert_matches!(
                 CLI::parse_from(["maa", "complete", "bash"]).command,
                 SubCommand::Complete { shell: Shell::Bash }
+            );
+        }
+
+        #[test]
+        fn mangen() {
+            let _path_buf = PathBuf::from(".");
+            assert_matches!(
+                CLI::parse_from(["maa", "mangen", "--path", "."]).command,
+                SubCommand::Mangen { path: _path_buf }
             );
         }
     }
