@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD013 MD024 -->
+
 # Release Notes
 
 ## Release 0.4.4
@@ -238,7 +240,7 @@
 
 ### Features
 
-- Load resources based on `cilent_type` and if use `PlayTools` by @wangl-cc in [#33](https://github.com/MaaAssistantArknights/maa-cli/pull/33)
+- Load resources based on `client_type` and if use `PlayTools` by @wangl-cc in [#33](https://github.com/MaaAssistantArknights/maa-cli/pull/33)
 
 ### Bug Fixes
 
@@ -309,7 +311,7 @@
 - **BREAKING**:Maa-updater can only install from prebuilt package by @wangl-cc
 - Download from GitHub release in CI by @wangl-cc
 - **BREAKING**:Remove mod type by @wangl-cc
-- Imporve build script by @wangl-cc
+- Improve build script by @wangl-cc
 - **BREAKING**:Drop support for windows and fix test on macOS by @wangl-cc in [#5](https://github.com/MaaAssistantArknights/maa-cli/pull/5)
 - **BREAKING**:Maa-run as a subcommand of maa-helper to set env vars for maa-run by @wangl-cc in [#7](https://github.com/MaaAssistantArknights/maa-cli/pull/7)
 - **BREAKING**:Import help and version will only show MaaCore version by @wangl-cc in [#12](https://github.com/MaaAssistantArknights/maa-cli/pull/12)
@@ -342,7 +344,7 @@
 ### Refactor
 
 - Better error handle by @wangl-cc
-- **BREAKING**:Remove maa-util, split maa-sys and other imporves by @wangl-cc
+- **BREAKING**:Remove maa-util, split maa-sys and other improves by @wangl-cc
 - **BREAKING**:Rename `maa-runner` to `maa-cli` by @wangl-cc
 - **BREAKING**:Rename workspace members to avoid confusion by @wangl-cc in [#9](https://github.com/MaaAssistantArknights/maa-cli/pull/9)
 - **BREAKING**:Remove maa-run and use dlopen to load MaaCore by @wangl-cc in [#24](https://github.com/MaaAssistantArknights/maa-cli/pull/24)
@@ -369,7 +371,7 @@
 
 - Lint by clippy and fmt by @wangl-cc
 - Apply clippy by @wangl-cc
-- Move example to config_exmaples to avoid confusion by @wangl-cc
+- Move example to config_examples to avoid confusion by @wangl-cc
 - Change package name to maa-cli by @wangl-cc
 - Update comment by @wangl-cc
 
