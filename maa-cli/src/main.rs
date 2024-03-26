@@ -1083,6 +1083,7 @@ mod test {
             );
         }
 
+        #[test]
         fn mangen() {
             let _path_buf = PathBuf::from(".");
             assert_matches!(
