@@ -23,6 +23,10 @@ body = """
   {%- endif -%}
 {%- endmacro -%}
 
+{%- macro user_link(username) -%}
+  [@{{ username }}](https://github.com/{{ username }})
+{%- endmacro -%}
+
 {%- macro pr_link(pr) -%}
   [#{{ pr }}]({{ self::remote_url() }}/pull/{{ pr }})
 {%- endmacro -%}
@@ -30,7 +34,9 @@ body = """
 {%- macro format_commit(commit) -%}
   {%- if commit.breaking -%} **BREAKING**: {%- endif -%}
   {{ commit.message | upper_first }}
-  {%- if commit.github.username %} by @{{ commit.github.username }} {%- endif -%}
+  {%- if commit.github.username %} \
+    by {{ self::user_link(username=commit.github.username) }}
+  {%- endif -%}
   {%- if commit.github.pr_number %} \
     in {{ self::pr_link(pr=commit.github.pr_number) }}
   {%- endif -%}
