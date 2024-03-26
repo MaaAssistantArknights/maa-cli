@@ -145,7 +145,7 @@ If no log level is set, the default log level is `Warn`, which means only `Warn`
 
 By default, `maa-cli` will print logs to stderr. You can redirect logs to a file by `--log-file` option, the default log path is `$(maa dir log)/YYYY/MM/DD/HH:MM:SS.log` where `$(maa dir log)` is the log directory. You can also specify the log path by `--log-file=<path>`.
 
-When log print to file, there will be a prefix with timestamp and log level, whereas log print to stderr, there will be no prefix. You can change this behavior by `MAA_LOG_PREFIX` environment variable. Set it to `Always` to always print prefix, set it to `Never` to never print prefix, set it to `Auto` (default) to print prefix only when log to file.
+There is a prefix with timestamp and log level in each log message. You can hide it by environment variable `MAA_LOG_PREFIX`. When set to `Always` (default), the prefix will always be printed, when set to `Auto` the prefix will be printed only when log to file, when set to `Never` the prefix will never be printed.
 
 ### Install and update
 
