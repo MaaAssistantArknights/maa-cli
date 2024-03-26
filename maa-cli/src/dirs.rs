@@ -941,19 +941,19 @@ mod tests {
             CleanupTarget::Misc,
         ];
         let binding = enum_list[0].get_path();
-        let avatars = binding.get(0).unwrap().parent().unwrap().parent().unwrap();
+        let avatars = binding.first().unwrap().parent().unwrap().parent().unwrap();
         assert_eq!(state(), avatars);
 
         let binding = enum_list[1].get_path();
-        let cli_cache = binding.get(0).unwrap();
+        let cli_cache = binding.first().unwrap();
         assert_eq!(cache(), cli_cache);
 
         let binding = enum_list[2].get_path();
-        let logs = binding.get(0).unwrap().parent().unwrap();
+        let logs = binding.first().unwrap().parent().unwrap();
         assert_eq!(log(), logs);
 
         let binding = enum_list[3].get_path();
-        let map = binding.get(0).unwrap().parent().unwrap();
+        let map = binding.first().unwrap().parent().unwrap();
         assert_eq!(log(), map);
     }
 }
