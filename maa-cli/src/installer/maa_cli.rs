@@ -15,7 +15,7 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, Context, Result};
 use dunce::canonicalize;
 use semver::Version;
 use serde::Deserialize;
@@ -109,19 +109,20 @@ struct Assets {
 
 impl Assets {
     fn asset(&self) -> Result<&Asset> {
-        match consts::OS {
-            "macos" => match consts::ARCH {
+        use consts::{ARCH, OS};
+        match OS {
+            "macos" => match ARCH {
                 "x86_64" => Ok(&self.x86_64_apple_darwin),
                 "aarch64" => Ok(&self.aarch64_apple_darwin),
-                _ => bail!("Unsupported architecture: {}", consts::ARCH),
+                _ => Err(anyhow!("Unsupported architecture: {ARCH}")),
             },
             "linux" => match consts::ARCH {
                 "x86_64" => Ok(&self.x86_64_unknown_linux_gnu),
                 "aarch64" => Ok(&self.aarch64_unknown_linux_gnu),
-                _ => bail!("Unsupported architecture: {}", consts::ARCH),
+                _ => Err(anyhow!("Unsupported architecture: {ARCH}")),
             },
             "windows" if consts::ARCH == "x86_64" => Ok(&self.x86_64_pc_windows_msvc),
-            _ => bail!("Unsupported platform: {} {}", consts::OS, consts::ARCH),
+            _ => Err(anyhow!("Unsupported platform: {OS} {ARCH}")),
         }
     }
 }

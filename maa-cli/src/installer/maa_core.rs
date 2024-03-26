@@ -48,17 +48,16 @@ fn extract_mapper(
                     for c in path_components.by_ref() {
                         dest.push(c);
                     }
-                    debug!( "Extracting {} => {}", src.display(), dest.display());
+                    debug!("Extracting {} => {}", src.display(), dest.display());
                     return Some(dest);
-                } else if config.library && c
+                }
+                if config.library && c
                     .to_str() // The DLL suffix may not the last part of the file name
                     .is_some_and(|s| s.starts_with(DLL_PREFIX) && s.contains(DLL_SUFFIX))
                 {
                     let dest = lib_dir.join(src.file_name()?);
                     debug!( "Extracting {} => {}", src.display(), dest.display());
                     return Some(dest);
-                } else {
-                    continue;
                 }
             }
             _ => continue,
