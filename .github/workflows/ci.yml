@@ -9,6 +9,7 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/ci.yml"
+      - ".github/actions/setup/**"
   pull_request:
     branches: ["main"]
     paths:
@@ -17,6 +18,8 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/ci.yml"
+      - ".github/actions/setup/**"
+      - ".github/actions/install-core/**"
 
 env:
   RUST_BACKTRACE: full
@@ -43,11 +46,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Rust
-        uses: ./.github/actions/setup
-        with:
-          os: ${{ matrix.os }}
-          arch: ${{ matrix.os == 'macos-14' && 'aarch64' || 'x86_64' }}
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
       - name: Build (maa-cli)
@@ -55,10 +53,10 @@ jobs:
           cargo build --package maa-cli --locked
       - name: Lint (clippy)
         run: |
-          cargo clippy -- -D warnings
+          cargo clippy --package maa-cli -- -D warnings
       - name: Lint (rustfmt)
         run: |
-          cargo fmt --all -- --check
+          cargo fmt --package maa-cli -- --check
       - name: Install MaaCore
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/maa-cli/config_examples
@@ -91,11 +89,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Rust
+      - name: Setup Cross Compilation Toolchains
         uses: ./.github/actions/setup
         with:
           os: ${{ matrix.os }}
-          arch: aarch64
+          target_arch: aarch64
       - name: Build
         run: |
           cargo build --package maa-cli --locked \
@@ -117,15 +115,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Setup Rust
-        uses: ./.github/actions/setup
-        with:
-          os: ${{ matrix.os }}
-          arch: x86_64
       - name: Build
         run: |
           cargo build --package maa-cli --locked \
-            --no-default-features --features ${{ matrix.feature }}
+            --no-default-features --features '${{ matrix.feature }}'
       - name: Test
         run: |
           cargo test -- --include-ignored
@@ -144,12 +137,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Rust
-        uses: ./.github/actions/setup
-        with:
-          os: ${{ matrix.os }}
-          arch: ${{ matrix.os == 'macos-14' && 'aarch64' || 'x86_64' }}
-          core: true
+      - name: Install MaaCore
+        uses: ./.github/actions/install-core
       - name: Build
         run: cargo build --package maa-sys --locked
       - name: Lint (clippy)
@@ -178,13 +167,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Rust
-        uses: ./.github/actions/setup
+      - name: Install Cargo tarpaulin
+        uses: taiki-e/install-action@v2
         with:
-          os: ${{ matrix.os }}
-          arch: ${{ matrix.os == 'macos-14' && 'aarch64' || 'x86_64' }}
-          coverage: true
-          core: true
+          tool: cargo-tarpaulin
+      - name: Install MaaCore
+        uses: ./.github/actions/install-core
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
       - name: Coverage
@@ -192,7 +180,7 @@ jobs:
           cargo tarpaulin --out xml --workspace --timeout 120 \
             ${{ github.run_attempt == 1 && '--skip-clean' || '' }} \
             -- --include-ignored
-      - name: Upload to codecov.io
+      - name: Upload to Codecov
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

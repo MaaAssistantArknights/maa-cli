@@ -6,6 +6,8 @@
 ![Beta Release](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fgithub.com%2FMaaAssistantArknights%2Fmaa-cli%2Fraw%2Fversion%2Fbeta.json&query=%24.version&prefix=v&label=beta)
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blueviolet)
 
+<!-- markdownlint-disable MD013 MD033 -->
+
 A simple CLI for [MAA](https://github.com/MaaAssistantArknights/MaaAssistantArknights) by Rust.
 
 ## Feature
@@ -133,6 +135,17 @@ You can run a custom task by `maa run <task>`. Here `<task>` is the name of a ta
 #### Task Summary
 
 `maa-cli` will print a summary of each task to stdout when finished. The summary can be disabled by `--no-summary` option.
+
+#### Logging
+
+There are 5 levels of logging: `Trace`, `Debug`, `Info`, `Warn`, `Error`, which determine the verbosity of logging.
+You can set the log level by environment variable `MAA_LOG`, such as `MAA_LOG=debug`.
+You can also increase and decrease the log level by `-v` and `-q` option.
+If no log level is set, the default log level is `Warn`, which means only `Warn` and `Error` logs will be printed.
+
+By default, `maa-cli` will print logs to stderr. You can redirect logs to a file by `--log-file` option, the default log path is `$(maa dir log)/YYYY/MM/DD/HH:MM:SS.log` where `$(maa dir log)` is the log directory. You can also specify the log path by `--log-file=<path>`.
+
+When log print to file, there will be a prefix with timestamp and log level, whereas log print to stderr, there will be no prefix. You can change this behavior by `MAA_LOG_PREFIX` environment variable. Set it to `Always` to always print prefix, set it to `Never` to never print prefix, set it to `Auto` (default) to print prefix only when log to file.
 
 ### Install and update
 
@@ -283,7 +296,7 @@ condition = {
         # The offset is equal to num_days_since_ce % divisor
         # The num_days_since_ce is the number of days since the Common Era, 0001-01-01 is the first day
         # The offset of current day can be got by `maa remainder <divisor>`
-        # for 2024-01-27, num_days_since_ce is 738,912, 
+        # for 2024-01-27, num_days_since_ce is 738,912,
         # the offset of 2024-01-27 is 738,912 % 2 = 0
         # so this condition will be matched on 2024-01-27
         { type = "DayMod", divisor = 2, remainder = 0 },

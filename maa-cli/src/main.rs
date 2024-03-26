@@ -16,7 +16,7 @@ use crate::installer::maa_cli;
 #[cfg(feature = "core_installer")]
 use crate::installer::maa_core;
 
-use std::path::PathBuf;
+use std::{io::Write, path::PathBuf};
 
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
@@ -235,6 +235,12 @@ enum SubCommand {
     List,
     /// Generate completion script for given shell
     Complete { shell: Shell },
+    /// Generate man page
+    Mangen {
+        /// Path of the output file
+        #[arg(long)]
+        path: PathBuf,
+    },
 }
 
 #[cfg(feature = "cli_installer")]
@@ -290,22 +296,78 @@ pub enum Dir {
     Log,
 }
 
+/// Whether or not to print log prefix [YYYY-MM-DD HH:MM:SS LEVEL]
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone, Copy, Default)]
+enum LogPrefix {
+    /// Print log prefix if log to file, not print log prefix if log to stderr
+    Auto,
+    /// Always print log prefix
+    #[default]
+    Always,
+    /// Never print log prefix
+    Never,
+}
+
+impl LogPrefix {
+    fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "ALWAYS" | "Always" | "always" => Some(LogPrefix::Always),
+            "NEVER" | "Never" | "never" => Some(LogPrefix::Never),
+            "AUTO" | "Auto" | "auto" => Some(LogPrefix::Auto),
+            _ => None,
+        }
+    }
+
+    fn from_env() -> Self {
+        std::env::var_os("MAA_LOG_PREFIX")
+            .and_then(|s| s.to_str().and_then(LogPrefix::from_str))
+            .unwrap_or_default()
+    }
+
+    fn format(
+        &self,
+        log_file: bool,
+    ) -> fn(&mut env_logger::fmt::Formatter, &log::Record) -> std::io::Result<()> {
+        match self {
+            LogPrefix::Always => prefixed_format,
+            LogPrefix::Never => plain_format,
+            LogPrefix::Auto => {
+                if log_file {
+                    prefixed_format
+                } else {
+                    plain_format
+                }
+            }
+        }
+    }
+}
+
+fn prefixed_format(
+    buf: &mut env_logger::fmt::Formatter,
+    record: &log::Record,
+) -> std::io::Result<()> {
+    writeln!(
+        buf,
+        "[{} {:<5}] {}",
+        chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+        buf.default_styled_level(record.level()),
+        record.args()
+    )
+}
+
+fn plain_format(buf: &mut env_logger::fmt::Formatter, record: &log::Record) -> std::io::Result<()> {
+    writeln!(buf, "{}", record.args())
+}
+
 fn main() -> Result<()> {
     let cli = CLI::parse();
 
     let mut builder = env_logger::Builder::new();
 
     builder.filter_level(cli.verbose.log_level_filter());
-    builder.format(|buf, record| {
-        use std::io::Write;
-        writeln!(
-            buf,
-            "[{} {:<5}] {}",
-            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-            buf.default_styled_level(record.level()),
-            record.args()
-        )
-    });
+
+    builder.format(LogPrefix::from_env().format(cli.log_file.is_some()));
 
     if let Some(opt) = cli.log_file {
         let now = chrono::Local::now();
@@ -332,9 +394,7 @@ fn main() -> Result<()> {
         enable_batch_mode()
     }
 
-    let subcommand = cli.command;
-
-    match subcommand {
+    match cli.command {
         #[cfg(feature = "core_installer")]
         SubCommand::Install { force, common } => {
             maa_core::install(force, &common)?;
@@ -434,6 +494,9 @@ fn main() -> Result<()> {
         SubCommand::Complete { shell } => {
             generate(shell, &mut CLI::command(), "maa", &mut std::io::stdout());
         }
+        SubCommand::Mangen { path } => {
+            clap_mangen::generate_to(CLI::command(), path)?;
+        }
     }
 
     Ok(())
@@ -448,6 +511,56 @@ mod test {
         ($value:expr, $pattern:pat $(if $guard:expr)? $(,)?) => {
             assert!(matches!($value, $pattern $(if $guard)?))
         };
+    }
+
+    mod log_prefix {
+        use super::*;
+
+        #[test]
+        fn from_str() {
+            assert_eq!(LogPrefix::from_str("Always"), Some(LogPrefix::Always));
+            assert_eq!(LogPrefix::from_str("always"), Some(LogPrefix::Always));
+            assert_eq!(LogPrefix::from_str("NEVER"), Some(LogPrefix::Never));
+            assert_eq!(LogPrefix::from_str("never"), Some(LogPrefix::Never));
+            assert_eq!(LogPrefix::from_str("AUTO"), Some(LogPrefix::Auto));
+            assert_eq!(LogPrefix::from_str("auto"), Some(LogPrefix::Auto));
+            assert_eq!(LogPrefix::from_str("unknown"), None);
+        }
+
+        #[test]
+        fn from_env() {
+            std::env::remove_var("MAA_LOG_PREFIX");
+            assert_eq!(LogPrefix::from_env(), LogPrefix::Always);
+
+            std::env::set_var("MAA_LOG_PREFIX", "Always");
+            assert_eq!(LogPrefix::from_env(), LogPrefix::Always);
+
+            std::env::set_var("MAA_LOG_PREFIX", "Never");
+            assert_eq!(LogPrefix::from_env(), LogPrefix::Never);
+
+            std::env::set_var("MAA_LOG_PREFIX", "Auto");
+            assert_eq!(LogPrefix::from_env(), LogPrefix::Auto);
+
+            std::env::set_var("MAA_LOG_PREFIX", "unknown");
+            assert_eq!(LogPrefix::from_env(), LogPrefix::Always);
+        }
+
+        #[test]
+        fn format() {
+            let pff = prefixed_format
+                as fn(&mut env_logger::fmt::Formatter, &log::Record) -> std::io::Result<()>;
+            let plf = plain_format
+                as fn(&mut env_logger::fmt::Formatter, &log::Record) -> std::io::Result<()>;
+
+            assert_eq!(LogPrefix::Always.format(true), pff);
+            assert_eq!(LogPrefix::Always.format(false), pff);
+
+            assert_eq!(LogPrefix::Never.format(true), plf);
+            assert_eq!(LogPrefix::Never.format(false), plf);
+
+            assert_eq!(LogPrefix::Auto.format(true), pff);
+            assert_eq!(LogPrefix::Auto.format(false), plf);
+        }
     }
 
     mod parser {
@@ -967,6 +1080,14 @@ mod test {
             assert_matches!(
                 CLI::parse_from(["maa", "cleanup", "cli-cache", "avatars", "log", "misc"]).command,
                 SubCommand::Cleanup { targets } if targets == vec![CleanupTarget::CliCache,CleanupTarget::Avatars,CleanupTarget::Log,CleanupTarget::Misc]
+            );
+        }
+
+        fn mangen() {
+            let _path_buf = PathBuf::from(".");
+            assert_matches!(
+                CLI::parse_from(["maa", "mangen", "--path", "."]).command,
+                SubCommand::Mangen { path: _path_buf }
             );
         }
     }

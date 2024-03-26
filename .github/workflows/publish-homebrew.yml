@@ -54,7 +54,7 @@ jobs:
             dryrun='${{ inputs.dryrun }}'
           fi
           echo "Dryrun: $dryrun"
-          echo "dryrun=$dryrun" >> $GITHUB_OUTPUT
+          echo "dryrun=$dryrun" >> "$GITHUB_OUTPUT"
       - name: Get version
         id: version
         run: |
@@ -65,7 +65,7 @@ jobs:
             version='${{ inputs.version }}'
           fi
           echo "Version: $version"
-          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
   bump:
     name: Bump Formulae and Casks
@@ -77,16 +77,14 @@ jobs:
       - name: Bump Formula
         run: |
           for formula in maa-cli maa-cli-beta; do
-            brew bump-formula-pr $formula \
+            brew bump-formula-pr "$formula" \
               ${{ fromJson(needs.meta.outputs.dryrun) && '--dry-run' || '' }} \
               --no-browse \
-              --version='${{ needs.meta.outputs.version }}'\
-              --message='Bump `$formula` to `${{ needs.meta.outputs.version }}`'
+              --version='${{ needs.meta.outputs.version }}'
           done
           for cask in maa-cli-bin; do
-            brew bump-cask-pr $cask \
+            brew bump-cask-pr "$cask" \
               ${{ fromJson(needs.meta.outputs.dryrun) && '--dry-run' || '' }} \
               --no-browse \
-              --version='${{ needs.meta.outputs.version }}'\
-              --message='Bump `$cask` to `${{ needs.meta.outputs.version }}`'
+              --version='${{ needs.meta.outputs.version }}'
           done

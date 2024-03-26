@@ -55,6 +55,7 @@ prettytable = { version = "0.10.0", default-features = false }
 
 clap = { version = "4.4", features = ["derive"] }
 clap_complete = { version = "4.4" }
+clap_mangen = "0.2.20"
 clap-verbosity-flag = "2.1"
 
 toml = "0.8"
@@ -99,7 +100,7 @@ features = ["deflate"]
 version = "1.31"
 optional = true
 default-features = false
-features = ["rt"]
+features = ["rt", "rt-multi-thread"]
 
 [dependencies.reqwest]
 version = "0.11"
@@ -112,7 +113,7 @@ features = ["Win32_Foundation", "Win32_System_LibraryLoader"]
 [target.'cfg(target_os = "macos")'.dependencies.tokio]
 version = "1.31"
 default-features = false
-features = ["rt"]
+features = ["rt", "rt-multi-thread"]
 
 [dev-dependencies]
 regex = "1.10.2"
