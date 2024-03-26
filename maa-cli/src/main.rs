@@ -317,7 +317,6 @@ fn main() -> Result<()> {
             dir.ensure().unwrap();
             dir.join(format!("{}.log", now.format("%H:%M:%S")))
         });
-        println!("{}", log_file.display());
 
         let file = std::fs::OpenOptions::new()
             .create(true)
@@ -454,7 +453,7 @@ mod test {
     mod parser {
         use super::*;
 
-        use crate::config::cli::Channel;
+        use crate::{config::cli::Channel, dirs::CleanupTarget};
         use std::env;
 
         #[test]
@@ -950,15 +949,25 @@ mod test {
 
         #[test]
         fn cleanup() {
-            // assert_matches!(
-            //     CLI::parse_from(["maa", "cleanup"]).command,
-            //     SubCommand::Cleanup { inquire: _ }
-            // );
+            assert_matches!(
+                CLI::parse_from(["maa", "cleanup"]).command,
+                SubCommand::Cleanup { targets: _ }
+            );
 
-            // assert_matches!(
-            //     CLI::parse_from(["maa", "cleanup", "--inquire"]).command,
-            //     SubCommand::Cleanup { inquire: true }
-            // );
+            assert_matches!(
+                CLI::parse_from(["maa", "cleanup", "log"]).command,
+                SubCommand::Cleanup { targets } if targets == vec![CleanupTarget::Log]
+            );
+
+            assert_matches!(
+                CLI::parse_from(["maa", "cleanup", "cli-cache", "log"]).command,
+                SubCommand::Cleanup { targets } if targets == vec![CleanupTarget::CliCache,CleanupTarget::Log]
+            );
+
+            assert_matches!(
+                CLI::parse_from(["maa", "cleanup", "cli-cache", "avatars", "log", "misc"]).command,
+                SubCommand::Cleanup { targets } if targets == vec![CleanupTarget::CliCache,CleanupTarget::Avatars,CleanupTarget::Log,CleanupTarget::Misc]
+            );
         }
     }
 }

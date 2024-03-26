@@ -1,7 +1,7 @@
 use crate::{
     consts::MAA_CORE_LIB,
-    dirs, run,
-    value::{userinput::BoolInput, MAAValue},
+    run,
+    value::userinput::{BoolInput, UserInput},
 };
 
 use std::{
@@ -404,17 +404,17 @@ pub trait PathProvider {
     fn get_path(&self) -> Vec<PathBuf>;
 }
 
-#[derive(ValueEnum, Clone, Debug)]
+#[derive(ValueEnum, Clone, Debug, PartialEq)]
 pub enum CleanupTarget {
     CliCache,
     Avatars,
     Log,
-    Map,
+    Misc,
 }
 
 impl PathProvider for CleanupTarget {
     fn get_path(&self) -> Vec<PathBuf> {
-        let debug = dirs::log();
+        let debug = log();
 
         match self {
             CleanupTarget::CliCache => {
@@ -443,7 +443,7 @@ impl PathProvider for CleanupTarget {
                 logs.extend(log_files);
                 logs
             }
-            CleanupTarget::Map => {
+            CleanupTarget::Misc => {
                 vec![
                     debug.join("drops"),
                     debug.join("map"),
@@ -464,7 +464,7 @@ where
             &CleanupTarget::CliCache,
             &CleanupTarget::Avatars,
             &CleanupTarget::Log,
-            &CleanupTarget::Map,
+            &CleanupTarget::Misc,
         ]
     } else {
         targets.iter().map(|x| x as &dyn PathProvider).collect()
@@ -479,7 +479,7 @@ where
         println!("{}. {}", i + 1, p.display());
     });
 
-    if !clear_inquiry("files or folders mentioned above?")? {
+    if !BoolInput::new(Some(true), Some("clear files or folders mentioned above")).value()? {
         println!("No files or folders have been deleted.");
         return Ok(());
     }
@@ -494,9 +494,7 @@ where
             None
         };
 
-        let result = del_item(path.as_path(), exclude);
-
-        match result {
+        match del_item(path.as_path(), exclude) {
             Err(e) => {
                 println!("\x1B[31m{}\x1B[0m", e);
                 has_err = true;
@@ -536,7 +534,6 @@ fn del_item(path: &Path, exclude: Option<&str>) -> Result<()> {
         .filter_map(|e| e.ok())
         .filter_map(exclude_logic)
         .collect();
-    log::debug!("{:?}", filtered_dir_list);
 
     if filtered_dir_list.is_empty() {
         return Err(anyhow!("Folder is empty."));
@@ -550,14 +547,6 @@ fn del_item(path: &Path, exclude: Option<&str>) -> Result<()> {
         }
     }
     Ok(())
-}
-
-fn clear_inquiry(description: &str) -> Result<bool, std::io::Error> {
-    let bool_input = BoolInput::new(Some(true), Some(&format!("{}{}", "clear ", description)));
-    let mut value = MAAValue::new();
-    value.insert("key", bool_input);
-    let result = value.init()?.get_or("key", true);
-    Ok(result)
 }
 
 #[cfg(test)]
@@ -949,7 +938,7 @@ mod tests {
             CleanupTarget::Avatars,
             CleanupTarget::CliCache,
             CleanupTarget::Log,
-            CleanupTarget::Map,
+            CleanupTarget::Misc,
         ];
         let binding = enum_list[0].get_path();
         let avatars = binding.get(0).unwrap().parent().unwrap().parent().unwrap();
