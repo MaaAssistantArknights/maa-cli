@@ -179,6 +179,7 @@ OpenSSL 库是 `git2` 在所有平台和 `reqwest` 在 Linux 上的依赖。如�
 - `maa complete <shell>`: 生成自动补全脚本;
 - `maa activity [client]`: 获取游戏的当前活动信息，`client` 是客户端类型，默认为 `Official`。
 - `maa cleanup`: 清除 `maa-cli` 和 `MaaCore` 的缓存。
+
 ## 配置
 
 ### 配置目录
