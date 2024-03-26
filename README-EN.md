@@ -171,6 +171,7 @@ More other commands can be found by `maa help`.
 - `maa convert <input> [output]`: convert a configuration file to another format, like `maa convert daily.toml daily.json`;
 - `maa complete <shell>`: generate completion script for specific shell;
 - `maa activity [client]`: get the current activity of game, the `client` is the client type of game, like `Official` (default), `Bilibili`, etc.;
+- `maa cleanup`: clears the `maa-cli` and `MaaCore` caches.
 
 ## Configurations
 

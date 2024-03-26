@@ -226,6 +226,11 @@ enum SubCommand {
         #[arg(long)]
         timezone: Option<i8>,
     },
+    /// Clearing the caches of maa-cli and maa core
+    Cleanup {
+        /// Specify the path for deletion
+        targets: Vec<dirs::CleanupTarget>,
+    },
     /// List all available tasks
     List,
     /// Generate completion script for given shell
@@ -471,6 +476,7 @@ fn main() -> Result<()> {
                 )
             );
         }
+        SubCommand::Cleanup { targets } => dirs::cleanup(&targets)?,
         SubCommand::List => {
             let task_dir = dirs::config().join("tasks");
             if !task_dir.exists() {
@@ -560,7 +566,7 @@ mod test {
     mod parser {
         use super::*;
 
-        use crate::config::cli::Channel;
+        use crate::{config::cli::Channel, dirs::CleanupTarget};
         use std::env;
 
         #[test]
@@ -1055,6 +1061,28 @@ mod test {
         }
 
         #[test]
+        fn cleanup() {
+            assert_matches!(
+                CLI::parse_from(["maa", "cleanup"]).command,
+                SubCommand::Cleanup { targets: _ }
+            );
+
+            assert_matches!(
+                CLI::parse_from(["maa", "cleanup", "log"]).command,
+                SubCommand::Cleanup { targets } if targets == vec![CleanupTarget::Log]
+            );
+
+            assert_matches!(
+                CLI::parse_from(["maa", "cleanup", "cli-cache", "log"]).command,
+                SubCommand::Cleanup { targets } if targets == vec![CleanupTarget::CliCache,CleanupTarget::Log]
+            );
+
+            assert_matches!(
+                CLI::parse_from(["maa", "cleanup", "cli-cache", "avatars", "log", "misc"]).command,
+                SubCommand::Cleanup { targets } if targets == vec![CleanupTarget::CliCache,CleanupTarget::Avatars,CleanupTarget::Log,CleanupTarget::Misc]
+            );
+        }
+
         fn mangen() {
             let _path_buf = PathBuf::from(".");
             assert_matches!(
