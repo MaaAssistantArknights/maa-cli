@@ -410,4 +410,33 @@ mod tests {
             _ => (),
         }
     }
+
+    #[test]
+    fn test_extract_mapper() {
+        let config = Components::default();
+        let lib_dir = PathBuf::from("/home/user/.local/share/maa/lib");
+        let resource_dir = PathBuf::from("/home/user/.local/share/maa/resource");
+
+        #[cfg(unix)]
+        {
+            #[cfg(target_os = "linux")]
+            assert_eq!(
+                extract_mapper(Path::new("libM.so"), &lib_dir, &resource_dir, &config),
+                Some(lib_dir.join("libM.so"))
+            );
+            assert_eq!(
+                extract_mapper(
+                    Path::new("resource/config.json"),
+                    &lib_dir,
+                    &resource_dir,
+                    &config
+                ),
+                Some(resource_dir.join("config.json"))
+            );
+            assert_eq!(
+                extract_mapper(Path::new("misc"), &lib_dir, &resource_dir, &config),
+                None
+            );
+        }
+    }
 }

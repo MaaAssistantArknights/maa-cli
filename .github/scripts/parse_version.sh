@@ -64,7 +64,7 @@ fi
 if [[ "$channel" == "stable" ]]; then
   echo "Creating stable release"
 else
-  echo "Creating $1 pre-release"
+  echo "Creating $channel pre-release"
 fi
 
 if [[ $publish == "true" ]]; then
