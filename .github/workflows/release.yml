@@ -232,16 +232,12 @@ jobs:
           path: version
       - name: Extract files, Generate checksums and Update version.json
         run: |
-          # When release channel is stable, update all channel version info
-          # When release channel is beta, update beta version info only
-          # (don't update alpha version info, because alpha version is nightly,
-          # once a beta version is installed, alpha version will be considered
-          # as outdated)
-          # When release channel is alpha, update alpha version info only
-          version_files=()
-          [ "$CHANNEL" != "beta" ] && version_files+=(version/alpha.json)
-          [ "$CHANNEL" != "alpha" ] && version_files+=(version/beta.json)
-          [ "$CHANNEL" == "stable" ] && version_files+=(version/stable.json)
+          # alpha version info will be updated in all cases
+          version_files=(version/alpha.json)
+          # beta version info will be updated in non-alpha releases
+          [[ "$CHANNEL" != "alpha" ]] && version_files+=(version/beta.json)
+          # stable version info will only be updated in stable releases
+          [[ "$CHANNEL" == "stable" ]] && version_files+=(version/stable.json)
 
           # target independent version info
           for version_file in "${version_files[@]}"; do
