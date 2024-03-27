@@ -79,6 +79,8 @@ jobs:
         uses: orhun/git-cliff-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.meta.outputs.version }}
+          TAG: ${{ needs.meta.outputs.tag }}
         with:
           config: cliff.toml
           # If the release is triggered by a tag, process commits starting
