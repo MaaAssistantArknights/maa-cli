@@ -14,7 +14,7 @@ body = """
   {%- if version -%}
     Release {{ version | trim_start_matches(pat="v") }}
   {%- else -%}
-    {%- set version = get_env(name="MAA_VERSION", default="") -%}
+    {%- set version = get_env(name="VERSION", default="") -%}
     {%- if version -%}
       Release {{ version | trim_start_matches(pat="v") }}
     {%- else -%}
@@ -24,7 +24,11 @@ body = """
 {%- endmacro -%}
 
 {%- macro user_link(username) -%}
-  [@{{ username }}](https://github.com/{{ username }})
+  {%- if get_env(name="CI", default="false") == "true" -%}
+    @{{ username }}
+  {%- else -%}
+    [@{{ username }}](https://github.com/{{ username }})
+  {%- endif -%}
 {%- endmacro -%}
 
 {%- macro pr_link(pr) -%}
@@ -46,7 +50,7 @@ body = """
   {%- if version -%}
     {{ version }}
   {%- else -%}
-    {{ get_env(name="MAA_TAG", default="main") }}
+    {{ get_env(name="TAG", default="main") }}
   {%- endif -%}
 {%- endmacro -%}
 
