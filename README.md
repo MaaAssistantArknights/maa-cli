@@ -39,6 +39,12 @@ Arch Linux 用户可以安装 [AUR 包](https://aur.archlinux.org/packages/maa-c
 yay -S maa-cli
 ```
 
+❄️ Nix 用户可以直接运行:
+
+```bash
+nix run nixpkgs#maa-cli
+```
+
 对于 Linux Brew 用户，可以使用 [Linux Brew](https://docs.brew.sh/Homebrew-on-Linux) 安装：
 
 ```bash
