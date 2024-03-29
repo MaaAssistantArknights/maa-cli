@@ -1,5 +1,4 @@
 #[cfg(feature = "runtime")]
-#[macro_export]
 macro_rules! link {
     (
         $(
@@ -48,6 +47,7 @@ macro_rules! link {
             static SHARED_LIBRARY: RefCell<Option<Arc<SharedLibrary>>> = RefCell::new(None);
         }
 
+        /// Load the shared library of MaaCore from the given path in this thread.
         pub fn load(path: impl AsRef<std::ffi::OsStr>) -> Result<(), libloading::Error> {
                 let lib = SharedLibrary::new(path)?;
 
@@ -58,12 +58,14 @@ macro_rules! link {
                 Ok(())
         }
 
+        /// Unload the shared library of MaaCore in this thread.
         pub fn unload() {
             SHARED_LIBRARY.with(|lib| {
                 *lib.borrow_mut() = None;
             });
         }
 
+        /// Check if the shared library of MaaCore is loaded in this thread.
         pub fn loaded() -> bool {
             SHARED_LIBRARY.with(|lib| {
                 lib.borrow().is_some()
@@ -71,8 +73,15 @@ macro_rules! link {
         }
 
         $(
+            /// See the documentation of safe wrapper function for usage.
+            ///
             /// # Safety
+            ///
             /// This function is unsafe because it calls a function from a shared library.
+            ///
+            /// # Panics
+            ///
+            /// This function will panic if the shared library is not loaded in this thread.
             #[allow(non_snake_case)]
             pub unsafe fn $name($($pname: $pty), *) $(-> $ret)* {
                 SHARED_LIBRARY.with(|lib| match lib.borrow().as_ref() {

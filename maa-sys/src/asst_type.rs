@@ -5,11 +5,14 @@
 
 use crate::{impl_to_cstring_by_as_ref, Assistant, Result, ToCString};
 
+/// Available static option key
 #[repr(i32)]
 #[derive(Clone, Copy)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum StaticOptionKey {
+    /// set to true to enable CPU OCR
     CpuOCR = 1,
+    /// set to CPU ID to enable GPU OCR
     GpuOCR = 2,
 }
 
@@ -28,12 +31,17 @@ impl StaticOptionKey {
     }
 }
 
+/// Available instance option key
 #[repr(i32)]
 #[derive(Clone, Copy)]
 pub enum InstanceOptionKey {
+    /// set touch mode of instance
     TouchMode = 2,
+    /// set to true to pause deployment
     DeploymentWithPause = 3,
+    /// set to true to enable AdbLite
     AdbLiteEnabled = 4,
+    /// set to true to kill ADB on exit
     KillAdbOnExit = 5,
 }
 
@@ -53,6 +61,7 @@ impl InstanceOptionKey {
     }
 }
 
+/// Available touch mode
 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 #[derive(Default, Clone, Copy, PartialEq, Debug)]
 #[allow(clippy::upper_case_acronyms)]
@@ -90,11 +99,11 @@ mod tests {
 
     // #[cfg(not(feature = "runtime"))]
     // #[test]
-    // fn apply() {
+    // fn apply_to() {
     //     // Apply static options
-    //     // We can't apply GPU OCR option because it requires a GPU which is not available in CI.
-    //     StaticOptionKey::CpuOCR.apply(true).unwrap();
-    //     // StaticOptionKey::GpuOCR.apply(1).unwrap();
+    //     // We can't apply_to GPU OCR option because it requires a GPU which is not available in CI.
+    //     StaticOptionKey::CpuOCR.apply_to(true).unwrap();
+    //     // StaticOptionKey::GpuOCR.apply_to(1).unwrap();
     //
     //     use std::{env, path::Path};
     //     if let Some(Some(path)) =
