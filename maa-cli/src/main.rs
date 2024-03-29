@@ -176,7 +176,7 @@ enum SubCommand {
     },
     /// Run copilot task
     Copilot {
-        /// A code copied from "https://prts.plus" or a json file,
+        /// A code copied from <https://prts.plus> or a json file,
         /// such as "maa://12345" or "/your/json/path.json".
         uri: String,
         #[command(flatten)]

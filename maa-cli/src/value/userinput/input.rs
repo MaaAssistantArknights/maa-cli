@@ -17,7 +17,7 @@ use serde::Deserialize;
 /// that queries the user for an integer input, with default value 0 and description "medicine to
 /// use".
 ///
-/// If you want to query a boolean input, use [`BoolInput`].
+/// If you want to query a boolean input, use [`super::BoolInput`].
 pub struct Input<F> {
     /// Default value for this parameter.
     default: Option<F>,

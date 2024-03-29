@@ -84,13 +84,13 @@ pub struct CommonArgs {
     /// Url of api to get version information
     ///
     /// This flag is used to set the URL of api to get version information.
-    /// Default to https://github.com/MaaAssistantArknights/maa-cli/raw/release/.
+    /// Default to <https://github.com/MaaAssistantArknights/maa-cli/raw/version/>.
     #[arg(long)]
     pub api_url: Option<String>,
     /// Url of download to download prebuilt CLI binary
     ///
     /// This flag is used to set the URL of download to download prebuilt CLI binary.
-    /// Default to https://github.com/MaaAssistantArknights/maa-cli/releases/download/.
+    /// Default to <https://github.com/MaaAssistantArknights/maa-cli/releases/download/>.
     #[arg(long)]
     pub download_url: Option<String>,
 }
