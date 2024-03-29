@@ -1,11 +1,17 @@
 use std::{ffi::NulError, str::Utf8Error};
 
+/// Error type for MAA
 #[derive(Debug, Clone)]
 pub enum Error {
+    /// MAA returned an error
     MAAError,
+    /// Buffer too small
     BufferTooSmall,
+    /// Nul byte found in string
     NulError(NulError),
+    /// Invalid UTF-8
     Utf8Error(Option<Utf8Error>),
+    /// Custom error message
     Custom(String),
 }
 
@@ -17,7 +23,7 @@ impl std::fmt::Display for Error {
             Error::NulError(err) => write!(f, "{}", err),
             Error::Utf8Error(Some(err)) => write!(f, "{}", err),
             Error::Utf8Error(None) => f.write_str("Invalid UTF-8"),
-            Error::Custom(msg) => f.write_str(msg),
+            Error::Custom(custom) => write!(f, "{}", custom),
         }
     }
 }
@@ -42,4 +48,5 @@ impl Error {
     }
 }
 
+/// Similar to `anyhow::Result<T>` but the default error type is [`Error`].
 pub type Result<T> = std::result::Result<T, Error>;

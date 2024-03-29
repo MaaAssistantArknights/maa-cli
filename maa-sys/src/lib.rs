@@ -1,5 +1,3 @@
-pub mod binding;
-
 mod error;
 pub use error::{Error, Result};
 
@@ -12,7 +10,11 @@ pub use to_cstring::ToCString;
 mod task_type;
 pub use task_type::TaskType;
 
+#[macro_use]
 mod link;
+
+/// Raw binding
+pub mod binding;
 
 use std::ffi::CStr;
 
@@ -26,6 +28,7 @@ fn handle_asst(code: binding::AsstBool) -> Result<()> {
     }
 }
 
+/// A wrapper of the assistant instance.
 pub struct Assistant {
     handle: binding::AsstHandle,
 }
@@ -39,6 +42,7 @@ impl Drop for Assistant {
 }
 
 impl Assistant {
+    /// Create a new assistant instance with the given callback and argument.
     pub fn new(callback: binding::AsstApiCallback, arg: Option<*mut std::os::raw::c_void>) -> Self {
         match callback {
             Some(cb) => unsafe {
@@ -63,8 +67,8 @@ impl Assistant {
     ///
     /// # Errors
     ///
-    /// This function will raise and error if the path is not a valid UTF-8 string.
-    /// And raise an error if set the user directory failed.
+    /// This function will raise an error if the path is not a valid UTF-8 string,
+    /// or raise an error if set the user directory failed.
     pub fn set_user_dir(path: impl ToCString) -> Result<()> {
         handle_asst(unsafe { binding::AsstSetUserDir(path.to_cstring()?.as_ptr()) })
     }
@@ -78,7 +82,8 @@ impl Assistant {
     ///
     /// # Errors
     ///
-    /// This function will raise and error if the value is not a valid UTF-8 string.
+    /// This function will raise an error if the value is not a valid UTF-8 string,
+    /// or raise an error if set the static option failed.
     pub fn set_static_option(
         key: binding::AsstStaticOptionKey,
         value: impl ToCString,
@@ -86,14 +91,28 @@ impl Assistant {
         handle_asst(unsafe { binding::AsstSetStaticOption(key, value.to_cstring()?.as_ptr()) })
     }
 
+    /// Load resource from the given directory.
+    ///
+    /// The given directory should be the parent directory of the `resource` directory.
+    ///
+    /// # Errors
+    ///
+    /// This function will raise an error if the path is not a valid UTF-8 string,
+    /// or raise an error if load resource failed.
     pub fn load_resource(path: impl ToCString) -> Result<()> {
         handle_asst(unsafe { binding::AsstLoadResource(path.to_cstring()?.as_ptr()) })
     }
 
+    /// Get the null size of the assistant.
     pub fn get_null_size() -> AsstSize {
         unsafe { binding::AsstGetNullSize() }
     }
 
+    /// Get the version of the assistant.
+    ///
+    /// # Errors
+    ///
+    /// This function will raise an error if the version is not a valid UTF-8 string.
     pub fn get_version<'a>() -> Result<&'a str> {
         unsafe {
             let c_str = binding::AsstGetVersion();
@@ -102,12 +121,14 @@ impl Assistant {
         }
     }
 
+    /// Log a message to the assistant log.
     pub fn log(level: impl ToCString, msg: impl ToCString) -> Result<()> {
         unsafe { binding::AsstLog(level.to_cstring()?.as_ptr(), msg.to_cstring()?.as_ptr()) };
         Ok(())
     }
 
     /*------------------------ Instance Methods ------------------------*/
+    //// Set the instance option of the assistant.
     pub fn set_instance_option(
         &self,
         key: binding::AsstInstanceOptionKey,
@@ -118,6 +139,7 @@ impl Assistant {
         })
     }
 
+    /// Connect to device with the given adb path, address and config.
     #[deprecated(note = "use async_connect instead")]
     pub fn connect(
         &self,
@@ -136,6 +158,7 @@ impl Assistant {
         })
     }
 
+    /// Append a task to the assistant, return the task id.
     pub fn append_task(&self, task: impl ToCString, params: impl ToCString) -> Result<AsstTaskId> {
         Ok(unsafe {
             binding::AsstAppendTask(
@@ -145,25 +168,32 @@ impl Assistant {
             )
         })
     }
+
+    /// Set the parameters of the given task.
     pub fn set_task_params(&self, task_id: AsstTaskId, params: impl ToCString) -> Result<()> {
         handle_asst(unsafe {
             binding::AsstSetTaskParams(self.handle, task_id, params.to_cstring()?.as_ptr())
         })
     }
 
+    /// Start the assistant.
     pub fn start(&self) -> Result<()> {
         handle_asst(unsafe { binding::AsstStart(self.handle) })
     }
+    /// Stop the assistant.
     pub fn stop(&self) -> Result<()> {
         handle_asst(unsafe { binding::AsstStop(self.handle) })
     }
+    /// Check if the assistant is running.
     pub fn running(&self) -> bool {
         unsafe { binding::AsstRunning(self.handle) != 0 }
     }
+    /// Check if the assistant is connected.
     pub fn connected(&self) -> bool {
         unsafe { binding::AsstConnected(self.handle) != 0 }
     }
 
+    /// Connect to device with the given adb path, address and config asynchronously
     pub fn async_connect(
         &self,
         adb_path: impl ToCString,
@@ -181,13 +211,18 @@ impl Assistant {
             )
         })
     }
+
+    /// Click the screen at the given position
     pub fn async_click(&self, x: i32, y: i32, block: bool) -> Result<AsstAsyncCallId> {
         Ok(unsafe { binding::AsstAsyncClick(self.handle, x, y, block.into()) })
     }
+
+    /// Take a screenshot
     pub fn async_screncap(&self, block: bool) -> Result<AsstAsyncCallId> {
         Ok(unsafe { binding::AsstAsyncScreencap(self.handle, block.into()) })
     }
 
+    /// Take a screenshot and save it to the given buffer
     pub fn get_image(&self, buff: &mut [u8], buff_size: AsstSize) -> Result<AsstSize> {
         Ok(unsafe {
             binding::AsstGetImage(
@@ -197,6 +232,8 @@ impl Assistant {
             )
         })
     }
+
+    /// Get the UUID of the device
     pub fn get_uuid(&self, buff: &mut [u8], buff_size: AsstSize) -> Result<AsstSize> {
         Ok(unsafe {
             binding::AsstGetUUID(
