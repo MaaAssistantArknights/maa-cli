@@ -1,14 +1,14 @@
-# Install and Build `maa-cli`
+# Install and Build maa-cli
 
-There are multiple ways to install `maa-cli`, including package managers, precompiled binaries, and building from source with `cargo`.
+There are multiple ways to install maa-cli, including package managers, precompiled binaries, and building from source with `cargo`.
 
 ## Install via Package Manager
 
-For macOS and supported Linux distributions, it is recommended to install `maa-cli` using a package manager.
+For macOS and supported Linux distributions, it is recommended to install maa-cli using a package manager.
 
 ### macOS
 
-Homebrew users can install `maa-cli` via the unofficial [tap](https://github.com/MaaAssistantArknights/homebrew-tap/):
+Homebrew users can install maa-cli via the unofficial [tap](https://github.com/MaaAssistantArknights/homebrew-tap/):
 
 - Stable release:
 
@@ -42,7 +42,7 @@ Homebrew users can install `maa-cli` via the unofficial [tap](https://github.com
   nix run github:Cryolitia/nur-packages#maa-cli-nightly
   ```
 
-  Stable is the `maa-cli` that packaged in [nixpkgs](https://github.com/NixOS/nixpkgs/blob/nixos-unstable/pkgs/by-name/ma/maa-cli/package.nix), using the nixpkgs's Rust toolchain；Nightly is in [NUR](https://github.com/Cryolitia/nur-packages/blob/master/pkgs/maa-assistant-arknights/maa-cli.nix), use the Beta Channel of Rust toolchain, automatically update and builds for verification by Github Action daily.
+  Stable is the maa-cli packaged in [nixpkgs](https://github.com/NixOS/nixpkgs/blob/nixos-unstable/pkgs/by-name/ma/maa-cli/package.nix), using the nixpkgs's Rust toolchain; Nightly is in [NUR](https://github.com/Cryolitia/nur-packages/blob/master/pkgs/maa-assistant-arknights/maa-cli.nix), uses the Beta Channel of Rust toolchain, automatically updates and builds for verification by Github Action daily.
 
 - Users using Homebrew on Linux please refer to the macOS installation method above.
 
@@ -59,7 +59,7 @@ If your platform is not listed above, you can try to compile and install it your
 
 ## Build from Source
 
-Rust developers can compile and install `maa-cli` themselves via `cargo`:
+Rust developers can compile and install maa-cli themselves via `cargo`:
 
 - Stable version:
 
@@ -78,20 +78,19 @@ Rust developers can compile and install `maa-cli` themselves via `cargo`:
 When compiling from source, you can disable the default features with `--no-default-features` and then enable specific features with `--features`. The available features are:
 
 - `cli_installer`: Provide `maa self update` command to update self, this feature is enabled by default;
-- `core_installer`: Provide `maa install` and `maa update` commands to install and update `MaaCore` and resources, this feature is enabled by default;
+- `core_installer`: Provide `maa install` and `maa update` commands to install and update MaaCore and resources, this feature is enabled by default;
 - `git2`: Provide `libgit2` resource backend, this feature is enabled by default;
-- `vendored-openssl`: Build `openssl` library by self instead of using system `openssl` library, this feature is disabled by default;
+- `vendored-openssl`: Build OpenSSL library by self instead of using system library, this feature is disabled by default;
 
 ## Install MaaCore
 
-`maa-cli` only provides an interface for MaaCore, it needs `MaaCore` and
-resources to run tasks, which can be installed by `maa-cli` once it is installed:
+maa-cli only provides an interface for MaaCore, it needs MaaCore and resources to run tasks, which can be installed by maa-cli once it is installed:
 
 ```bash
 maa install
 ```
 
-For users who installed via package managers, `MaaCore` can be installed via package managers:
+For users who installed via package managers, MaaCore can be installed via package managers:
 
 - Homebrew：
 
@@ -111,6 +110,6 @@ For users who installed via package managers, `MaaCore` can be installed via pac
   nix-env -iA nixpkgs.maa-assistant-arknights
   ```
 
-**NOTE**: Only users who installed `maa-cli` via package managers can install `MaaCore` via package managers. Otherwise, please use the `maa install` command to install. In addition, `maa install` downloads the official precompiled `MaaCore`, while the `MaaCore` installed by package managers has different compilation options and dependency versions from the official precompiled version. This does not affect the use of `maa-cli`, but may cause differences in the functionality and performance of `MaaCore`. For example, the `MaaCore` installed by package managers uses a newer version of `fastdeploy`, while the official precompiled `MaaCore` uses an older version of `fastdeploy`. In the new version of `fastdeploy`, logs can be hidden, which can eliminate some unnecessary log output.
+**NOTE**: Only users who installed maa-cli via package managers can install MaaCore via package managers. Otherwise, please use the `maa install` command to install. In addition, the `maa install` downloads the official precompiled MaaCore, while the MaaCore installed by package managers has different compilation options and dependency versions from the official precompiled version. This does not affect the use of maa-cli but may cause differences in the functionality and performance of MaaCore. For example, the MaaCore installed by package managers uses a newer version of `fastdeploy`, while the official precompiled MaaCore uses an older version of `fastdeploy`. In the new version of `fastdeploy`, logs can be hidden, which can eliminate some unnecessary log output.
 
 <!-- markdownlint-disable-file MD013 -->
