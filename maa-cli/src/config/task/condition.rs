@@ -385,26 +385,30 @@ mod tests {
             );
         }
 
+        fn seconds(s: i64) -> Duration {
+            chrono::TimeDelta::try_seconds(s).unwrap()
+        }
+
         #[test]
         fn time() {
             let now = chrono::Local::now();
             let now_time = now.time();
 
             assert!(Condition::Time {
-                start: Some(now_time + Duration::seconds(-10)),
-                end: Some(now_time + Duration::seconds(10)),
+                start: Some(now_time + seconds(-10)),
+                end: Some(now_time + seconds(10)),
                 timezone: TimeOffset::Local,
             }
             .is_active());
             assert!(Condition::Time {
-                start: Some(now_time + Duration::seconds(-10)),
+                start: Some(now_time + seconds(-10)),
                 end: None,
                 timezone: TimeOffset::Local
             }
             .is_active());
             assert!(Condition::Time {
                 start: None,
-                end: Some(now_time + Duration::seconds(10)),
+                end: Some(now_time + seconds(10)),
                 timezone: TimeOffset::Local
             }
             .is_active());
@@ -415,20 +419,20 @@ mod tests {
             }
             .is_active());
             assert!(!Condition::Time {
-                start: Some(now_time + Duration::seconds(10)),
-                end: Some(now_time + Duration::seconds(20)),
+                start: Some(now_time + seconds(10)),
+                end: Some(now_time + seconds(20)),
                 timezone: TimeOffset::Local
             }
             .is_active());
             assert!(!Condition::Time {
-                start: Some(now_time + Duration::seconds(10)),
+                start: Some(now_time + seconds(10)),
                 end: None,
                 timezone: TimeOffset::Local
             }
             .is_active());
             assert!(!Condition::Time {
                 start: None,
-                end: Some(now_time + Duration::seconds(-10)),
+                end: Some(now_time + seconds(-10)),
                 timezone: TimeOffset::Local
             }
             .is_active());
@@ -465,20 +469,20 @@ mod tests {
             let now_datetime = now.naive_local();
 
             assert!(Condition::DateTime {
-                start: Some(now_datetime + Duration::minutes(-10)),
-                end: Some(now_datetime + Duration::minutes(10)),
+                start: Some(now_datetime + seconds(-10)),
+                end: Some(now_datetime + seconds(10)),
                 timezone: TimeOffset::Local,
             }
             .is_active());
             assert!(Condition::DateTime {
-                start: Some(now_datetime + Duration::minutes(-10)),
+                start: Some(now_datetime + seconds(-10)),
                 end: None,
                 timezone: TimeOffset::Local
             }
             .is_active());
             assert!(Condition::DateTime {
                 start: None,
-                end: Some(now_datetime + Duration::minutes(10)),
+                end: Some(now_datetime + seconds(10)),
                 timezone: TimeOffset::Local
             }
             .is_active());
@@ -489,20 +493,20 @@ mod tests {
             }
             .is_active());
             assert!(!Condition::DateTime {
-                start: Some(now_datetime + Duration::minutes(10)),
-                end: Some(now_datetime + Duration::minutes(20)),
+                start: Some(now_datetime + seconds(10)),
+                end: Some(now_datetime + seconds(20)),
                 timezone: TimeOffset::Local
             }
             .is_active());
             assert!(!Condition::DateTime {
-                start: Some(now_datetime + Duration::minutes(10)),
+                start: Some(now_datetime + seconds(10)),
                 end: None,
                 timezone: TimeOffset::Local
             }
             .is_active());
             assert!(!Condition::DateTime {
                 start: None,
-                end: Some(now_datetime + Duration::minutes(-10)),
+                end: Some(now_datetime + seconds(-10)),
                 timezone: TimeOffset::Local
             }
             .is_active());

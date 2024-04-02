@@ -4,4 +4,5 @@ members = ["maa-cli", "maa-sys"]
 
 [workspace.package]
 license = "AGPL-3.0-only"
+homepage = "https://github.com/MaaAssistantArknights/maa-cli"
 repository = "https://github.com/MaaAssistantArknights/maa-cli"

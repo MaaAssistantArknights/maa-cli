@@ -1,3 +1,4 @@
+/// Available task type for MAA
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TaskType {

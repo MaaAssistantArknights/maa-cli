@@ -48,17 +48,16 @@ fn extract_mapper(
                     for c in path_components.by_ref() {
                         dest.push(c);
                     }
-                    debug!( "Extracting {} => {}", src.display(), dest.display());
+                    debug!("Extracting {} => {}", src.display(), dest.display());
                     return Some(dest);
-                } else if config.library && c
+                }
+                if config.library && c
                     .to_str() // The DLL suffix may not the last part of the file name
                     .is_some_and(|s| s.starts_with(DLL_PREFIX) && s.contains(DLL_SUFFIX))
                 {
                     let dest = lib_dir.join(src.file_name()?);
                     debug!( "Extracting {} => {}", src.display(), dest.display());
                     return Some(dest);
-                } else {
-                    continue;
                 }
             }
             _ => continue,
@@ -409,6 +408,35 @@ mod tests {
                 _ => (),
             },
             _ => (),
+        }
+    }
+
+    #[test]
+    fn test_extract_mapper() {
+        let config = Components::default();
+        let lib_dir = PathBuf::from("/home/user/.local/share/maa/lib");
+        let resource_dir = PathBuf::from("/home/user/.local/share/maa/resource");
+
+        #[cfg(unix)]
+        {
+            #[cfg(target_os = "linux")]
+            assert_eq!(
+                extract_mapper(Path::new("libM.so"), &lib_dir, &resource_dir, &config),
+                Some(lib_dir.join("libM.so"))
+            );
+            assert_eq!(
+                extract_mapper(
+                    Path::new("resource/config.json"),
+                    &lib_dir,
+                    &resource_dir,
+                    &config
+                ),
+                Some(resource_dir.join("config.json"))
+            );
+            assert_eq!(
+                extract_mapper(Path::new("misc"), &lib_dir, &resource_dir, &config),
+                None
+            );
         }
     }
 }

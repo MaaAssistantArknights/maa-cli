@@ -14,12 +14,20 @@ body = """
   {%- if version -%}
     Release {{ version | trim_start_matches(pat="v") }}
   {%- else -%}
-    {%- set version = get_env(name="MAA_VERSION", default="") -%}
+    {%- set version = get_env(name="VERSION", default="") -%}
     {%- if version -%}
       Release {{ version | trim_start_matches(pat="v") }}
     {%- else -%}
       Unreleased
     {%- endif -%}
+  {%- endif -%}
+{%- endmacro -%}
+
+{%- macro user_link(username) -%}
+  {%- if get_env(name="CI", default="false") == "true" -%}
+    @{{ username }}
+  {%- else -%}
+    [@{{ username }}](https://github.com/{{ username }})
   {%- endif -%}
 {%- endmacro -%}
 
@@ -30,7 +38,9 @@ body = """
 {%- macro format_commit(commit) -%}
   {%- if commit.breaking -%} **BREAKING**: {%- endif -%}
   {{ commit.message | upper_first }}
-  {%- if commit.github.username %} by @{{ commit.github.username }} {%- endif -%}
+  {%- if commit.github.username %} \
+    by {{ self::user_link(username=commit.github.username) }}
+  {%- endif -%}
   {%- if commit.github.pr_number %} \
     in {{ self::pr_link(pr=commit.github.pr_number) }}
   {%- endif -%}
@@ -40,7 +50,7 @@ body = """
   {%- if version -%}
     {{ version }}
   {%- else -%}
-    {{ get_env(name="MAA_TAG", default="main") }}
+    {{ get_env(name="TAG", default="main") }}
   {%- endif -%}
 {%- endmacro -%}
 

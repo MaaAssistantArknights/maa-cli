@@ -1,51 +1,52 @@
-name: Setup Rust
-description: Setup Rust for cross-compilation
+name: Setup Cross Compilation Toolchains
+description: Setup Cross Compilation Toolchains for Rust and C
 inputs:
   os:
-    description: Host and target OS
+    description: Host and target OS # cross system compilation are not supported
     required: true
-  arch:
-    description: Target architecture
-    required: true
-  coverage:
-    description: Whether to install cargo-tarpaulin
+  host_arch:
+    description: Host architecture
     required: false
-    default: "false"
-  core:
-    description: Whether to install MaaCore and resource
+    default: "x86_64"
+  target_arch:
+    description: Target architecture # default to host architecture
     required: false
-    default: "false"
+    default: "x86_64"
 
 runs:
   using: composite
   steps:
     - name: Compute Target Triple
       shell: bash
+      env:
+        TARGET_OS: ${{ inputs.os }}
+        TARGET_ARCH: ${{ inputs.target_arch }}
       run: |
-        os=${{ inputs.os }}
-        arch=${{ inputs.arch }}
-        case "$os" in
+        case "$TARGET_OS" in
           ubuntu*)
-            target="$arch-unknown-linux-gnu"
+            target="$TARGET_ARCH-unknown-linux-gnu"
             ;;
           macos*)
-            target="$arch-apple-darwin"
+            target="$TARGET_ARCH-apple-darwin"
             ;;
           windows*)
-            target="$arch-pc-windows-msvc"
+            target="$TARGET_ARCH-pc-windows-msvc"
             ;;
           *)
-            echo "Unknown OS: $os"
+            echo "Unknown target OS: $TARGET_OS"
             exit 1
             ;;
         esac
         echo "CARGO_BUILD_TARGET=$target" >> $GITHUB_ENV
-    - name: Install Target
-      if: inputs.arch != 'x86_64'
+    - name: Setup Cross Compiling Toolchain (Rust)
+      if: inputs.host_arch != inputs.target_arch
       shell: bash
       run: rustup target add $CARGO_BUILD_TARGET
-    - name: Setup Cross Compiling Toolchain (Linux x86_64 to aarch64)
-      if: inputs.arch == 'aarch64' && startsWith(inputs.os, 'ubuntu')
+    - name: Setup Cross Compiling Toolchain (gcc and libc for aarch64 on x86_64 Linux)
+      if: >
+        inputs.target_arch == 'aarch64' &&
+          inputs.host_arch == 'x86_64' &&
+          startsWith(inputs.os, 'ubuntu')
       shell: bash
       run: |
         sudo apt-get update
@@ -56,54 +57,3 @@ runs:
         echo "AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar" >> $GITHUB_ENV
         echo "CFLAGS_aarch64_unknown_linux_gnu=--sysroot=/usr/aarch64-linux-gnu" >> $GITHUB_ENV
         echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-    - name: Install Cargo tarpaulin
-      if: fromJson(inputs.coverage)
-      uses: taiki-e/install-action@v2
-      with:
-        tool: cargo-tarpaulin
-    - name: Install Prebuilt CLI
-      if: fromJson(inputs.core)
-      shell: bash
-      run: |
-        cli_version=v0.4.3
-        url="https://github.com/MaaAssistantArknights/maa-cli/releases/download/$cli_version"
-        case "$CARGO_BUILD_TARGET" in
-          *-unknown-linux-gnu)
-            aria2c "$url/maa_cli-$cli_version-$CARGO_BUILD_TARGET.tar.gz"
-            tar -xzvf maa_cli-$cli_version-$CARGO_BUILD_TARGET.tar.gz
-            cp -v maa_cli-$CARGO_BUILD_TARGET/maa .
-          ;;
-          *-apple-darwin)
-            aria2c "$url/maa_cli-$cli_version-$CARGO_BUILD_TARGET.zip"
-            unzip maa_cli-$cli_version-$CARGO_BUILD_TARGET.zip
-            cp -v maa_cli-$CARGO_BUILD_TARGET/maa .
-          ;;
-          *-pc-windows-msvc)
-            aria2c "$url/maa_cli-$cli_version-$CARGO_BUILD_TARGET.zip"
-            unzip maa_cli-$cli_version-$CARGO_BUILD_TARGET.zip
-            cp -v maa_cli-$CARGO_BUILD_TARGET/maa.exe .
-          ;;
-        esac
-    - name: Install MaaCore and resource
-      if: fromJson(inputs.core)
-      shell: bash
-      run: |
-        export MAA_CONFIG_DIR="$GITHUB_WORKSPACE/maa-cli/config_examples"
-
-        ./maa install stable
-        MAA_CORE_DIR="$(./maa dir lib)"
-        MAA_RESOURCE_DIR="$(./maa dir resource)"
-        ls -l "$MAA_CORE_DIR"
-        ls -l "$MAA_RESOURCE_DIR"
-        echo "MAA_CORE_DIR=$MAA_CORE_DIR" >> $GITHUB_ENV
-        echo "MAA_RESOURCE_DIR=$MAA_RESOURCE_DIR" >> $GITHUB_ENV
-
-        package_name=$(basename "$(ls "$(./maa dir cache)")")
-        echo "Downloaded MaaCore package: $package_name"
-        core_version=${package_name#MAA-v}
-        core_version=${core_version%%-*}
-        if [[ $core_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-          echo "Downloaded MaaCore version: $core_version"
-          echo "MAA_CORE_VERSION=v$core_version" >> "$GITHUB_ENV"
-        fi
-        echo "MAA_CORE_INSTALLED=true" >> "$GITHUB_ENV"

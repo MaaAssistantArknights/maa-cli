@@ -176,7 +176,7 @@ enum SubCommand {
     },
     /// Run copilot task
     Copilot {
-        /// A code copied from "https://prts.plus" or a json file,
+        /// A code copied from <https://prts.plus> or a json file,
         /// such as "maa://12345" or "/your/json/path.json".
         uri: String,
         #[command(flatten)]
@@ -226,10 +226,21 @@ enum SubCommand {
         #[arg(long)]
         timezone: Option<i8>,
     },
+    /// Clearing the caches of maa-cli and maa core
+    Cleanup {
+        /// Specify the path for deletion
+        targets: Vec<dirs::CleanupTarget>,
+    },
     /// List all available tasks
     List,
     /// Generate completion script for given shell
     Complete { shell: Shell },
+    /// Generate man page
+    Mangen {
+        /// Path of the output file
+        #[arg(long)]
+        path: PathBuf,
+    },
 }
 
 #[cfg(feature = "cli_installer")]
@@ -290,9 +301,9 @@ pub enum Dir {
 #[derive(Clone, Copy, Default)]
 enum LogPrefix {
     /// Print log prefix if log to file, not print log prefix if log to stderr
-    #[default]
     Auto,
     /// Always print log prefix
+    #[default]
     Always,
     /// Never print log prefix
     Never,
@@ -465,6 +476,7 @@ fn main() -> Result<()> {
                 )
             );
         }
+        SubCommand::Cleanup { targets } => dirs::cleanup(&targets)?,
         SubCommand::List => {
             let task_dir = dirs::config().join("tasks");
             if !task_dir.exists() {
@@ -481,6 +493,9 @@ fn main() -> Result<()> {
         }
         SubCommand::Complete { shell } => {
             generate(shell, &mut CLI::command(), "maa", &mut std::io::stdout());
+        }
+        SubCommand::Mangen { path } => {
+            clap_mangen::generate_to(CLI::command(), path)?;
         }
     }
 
@@ -515,7 +530,7 @@ mod test {
         #[test]
         fn from_env() {
             std::env::remove_var("MAA_LOG_PREFIX");
-            assert_eq!(LogPrefix::from_env(), LogPrefix::Auto);
+            assert_eq!(LogPrefix::from_env(), LogPrefix::Always);
 
             std::env::set_var("MAA_LOG_PREFIX", "Always");
             assert_eq!(LogPrefix::from_env(), LogPrefix::Always);
@@ -525,6 +540,9 @@ mod test {
 
             std::env::set_var("MAA_LOG_PREFIX", "Auto");
             assert_eq!(LogPrefix::from_env(), LogPrefix::Auto);
+
+            std::env::set_var("MAA_LOG_PREFIX", "unknown");
+            assert_eq!(LogPrefix::from_env(), LogPrefix::Always);
         }
 
         #[test]
@@ -548,7 +566,7 @@ mod test {
     mod parser {
         use super::*;
 
-        use crate::config::cli::Channel;
+        use crate::{config::cli::Channel, dirs::CleanupTarget};
         use std::env;
 
         #[test]
@@ -1039,6 +1057,38 @@ mod test {
             assert_matches!(
                 CLI::parse_from(["maa", "complete", "bash"]).command,
                 SubCommand::Complete { shell: Shell::Bash }
+            );
+        }
+
+        #[test]
+        fn cleanup() {
+            assert_matches!(
+                CLI::parse_from(["maa", "cleanup"]).command,
+                SubCommand::Cleanup { targets: _ }
+            );
+
+            assert_matches!(
+                CLI::parse_from(["maa", "cleanup", "log"]).command,
+                SubCommand::Cleanup { targets } if targets == vec![CleanupTarget::Log]
+            );
+
+            assert_matches!(
+                CLI::parse_from(["maa", "cleanup", "cli-cache", "log"]).command,
+                SubCommand::Cleanup { targets } if targets == vec![CleanupTarget::CliCache,CleanupTarget::Log]
+            );
+
+            assert_matches!(
+                CLI::parse_from(["maa", "cleanup", "cli-cache", "avatars", "log", "misc"]).command,
+                SubCommand::Cleanup { targets } if targets == vec![CleanupTarget::CliCache,CleanupTarget::Avatars,CleanupTarget::Log,CleanupTarget::Misc]
+            );
+        }
+
+        #[test]
+        fn mangen() {
+            let _path_buf = PathBuf::from(".");
+            assert_matches!(
+                CLI::parse_from(["maa", "mangen", "--path", "."]).command,
+                SubCommand::Mangen { path: _path_buf }
             );
         }
     }

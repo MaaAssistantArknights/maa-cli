@@ -1,12 +1,18 @@
-use crate::consts::MAA_CORE_LIB;
+use crate::{
+    consts::MAA_CORE_LIB,
+    run,
+    value::userinput::{BoolInput, UserInput},
+};
 
 use std::{
     borrow::Cow,
     env::{current_exe, var_os},
-    fs::{create_dir, create_dir_all, remove_dir_all},
+    fs::{self, create_dir, create_dir_all, remove_dir_all, DirEntry},
     path::{Path, PathBuf},
 };
 
+use anyhow::{anyhow, Result};
+use clap::ValueEnum;
 use directories::ProjectDirs;
 use dunce::canonicalize;
 use lazy_static::lazy_static;
@@ -100,12 +106,12 @@ impl Dirs {
     /// Find the library directory.
     ///
     /// By default, the library directory is the `lib` directory in the data directory.
-    /// If the library `MaaCore` is not found in the default library directory,
+    /// If the library MaaCore is not found in the default library directory,
     /// Try to find it in the directory relative to the executable file.
-    /// First, try to find the `MaaCore` in the same directory as the executable file.
+    /// First, try to find the MaaCore in the same directory as the executable file.
     /// Then, assume the executable file is in the `bin` directory,
-    /// try to find the `MaaCore` in the `lib` directory in the parent directory of the executable file.
-    /// If the executable is a symbolic link, will try to find the `MaaCore` both in the symbolic link and the link target.
+    /// try to find the MaaCore in the `lib` directory in the parent directory of the executable file.
+    /// If the executable is a symbolic link, will try to find the MaaCore both in the symbolic link and the link target.
     pub fn find_library<'a>(&'a self, exe_path: &'a Path) -> Option<Cow<'a, Path>> {
         if self.library().join(MAA_CORE_LIB).exists() {
             return Some(self.library().into());
@@ -392,6 +398,155 @@ fn ensure_name(name: &str) -> &str {
         "The given name should not contain path separator"
     );
     name
+}
+
+pub trait PathProvider {
+    fn get_path(&self) -> Vec<PathBuf>;
+}
+
+#[derive(ValueEnum, Clone, Debug, PartialEq)]
+pub enum CleanupTarget {
+    CliCache,
+    Avatars,
+    Log,
+    Misc,
+}
+
+impl PathProvider for CleanupTarget {
+    fn get_path(&self) -> Vec<PathBuf> {
+        let debug = log();
+
+        match self {
+            CleanupTarget::CliCache => {
+                vec![cache().to_path_buf()]
+            }
+            CleanupTarget::Avatars => {
+                vec![state().join("cache").join("avatars")]
+            }
+            CleanupTarget::Log => {
+                let log_files = match fs::read_dir(debug) {
+                    Ok(dir) => dir
+                        .filter_map(|entry| {
+                            let entry = entry.ok()?;
+                            let binding = entry.file_name();
+                            let file_name = binding.to_string_lossy();
+                            if file_name.starts_with("20") {
+                                Some(entry.path())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect(),
+                    Err(_) => Vec::new(),
+                };
+                let mut logs = vec![log().join("asst.log"), log().join("asst.bak.log")];
+                logs.extend(log_files);
+                logs
+            }
+            CleanupTarget::Misc => {
+                vec![
+                    debug.join("drops"),
+                    debug.join("map"),
+                    debug.join("other"),
+                    debug.join("Roguelike"),
+                ]
+            }
+        }
+    }
+}
+
+pub fn cleanup<T>(targets: &[T]) -> Result<()>
+where
+    T: PathProvider,
+{
+    let targets_to_use: Vec<&dyn PathProvider> = if targets.is_empty() {
+        vec![
+            &CleanupTarget::CliCache,
+            &CleanupTarget::Avatars,
+            &CleanupTarget::Log,
+            &CleanupTarget::Misc,
+        ]
+    } else {
+        targets.iter().map(|x| x as &dyn PathProvider).collect()
+    };
+
+    let trash_list: Vec<PathBuf> = targets_to_use
+        .iter()
+        .flat_map(|target| target.get_path())
+        .collect();
+
+    trash_list.iter().enumerate().for_each(|(i, p)| {
+        println!("{}. {}", i + 1, p.display());
+    });
+
+    if !BoolInput::new(Some(true), Some("clear files or folders mentioned above")).value()? {
+        println!("No files or folders have been deleted.");
+        return Ok(());
+    }
+
+    let mut has_err = false;
+    for path in trash_list {
+        print!("Delete {}... ", path.display());
+        let exclude = if path == cache() {
+            // Keep the latest packages
+            Some(run::core_version()?)
+        } else {
+            None
+        };
+
+        match del_item(path.as_path(), exclude) {
+            Err(e) => {
+                println!("\x1B[31m{}\x1B[0m", e);
+                has_err = true;
+            }
+            Ok(_) => {
+                println!("\x1B[34mDone.\x1B[0m");
+            }
+        }
+    }
+
+    if !has_err {
+        Ok(())
+    } else {
+        Err(anyhow!("At least one path has not been deleted."))
+    }
+}
+
+fn del_item(path: &Path, exclude: Option<&str>) -> Result<()> {
+    let exclude_logic = |entry: DirEntry| match exclude {
+        Some(str) => {
+            let binding = entry.file_name();
+            if !binding.to_str()?.contains(str) {
+                Some(entry.path())
+            } else {
+                None
+            }
+        }
+        None => Some(entry.path()),
+    };
+
+    if path.is_file() {
+        std::fs::remove_file(path)?;
+        return Ok(());
+    }
+
+    let filtered_dir_list: Vec<PathBuf> = fs::read_dir(path)?
+        .filter_map(|e| e.ok())
+        .filter_map(exclude_logic)
+        .collect();
+
+    if filtered_dir_list.is_empty() {
+        return Err(anyhow!("Folder is empty."));
+    }
+
+    for path in filtered_dir_list {
+        if path.is_file() {
+            std::fs::remove_file(path)?;
+        } else {
+            std::fs::remove_dir_all(path)?
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -733,5 +888,72 @@ mod tests {
         ensure_name("foo/bar");
         #[cfg(windows)]
         ensure_name("foo\\bar");
+    }
+
+    #[test]
+    fn test_cleanup() {
+        struct MockCleanupTarget {
+            paths: Vec<PathBuf>,
+        }
+
+        impl PathProvider for MockCleanupTarget {
+            fn get_path(&self) -> Vec<PathBuf> {
+                self.paths.clone()
+            }
+        }
+
+        impl MockCleanupTarget {
+            pub fn new(paths: Vec<PathBuf>) -> Self {
+                MockCleanupTarget { paths }
+            }
+        }
+
+        let dir = std::env::temp_dir().join("maa-test-convert");
+        let file_path = dir.join("test_file.txt");
+        let dir_path = dir.join("test_dir");
+        let file_in_dir = dir_path.join("test_file2.txt");
+
+        let _ = std::fs::File::create(&file_path);
+        let _ = std::fs::create_dir(&dir_path);
+        let _ = std::fs::File::create(&file_in_dir);
+
+        let paths = vec![file_path.clone(), dir_path.clone()];
+        let targets: Vec<MockCleanupTarget> = vec![MockCleanupTarget::new(paths)];
+        assert!(cleanup(&targets).is_ok());
+        assert!(!file_path.exists());
+        assert!(!file_in_dir.exists());
+
+        let err_path = dir.join("err_dir");
+        let targets: Vec<MockCleanupTarget> = vec![MockCleanupTarget::new(vec![err_path])];
+        assert!(cleanup(&targets).is_err());
+    }
+
+    #[test]
+    fn test_cleanup_target() {
+        let _version = match run::core_version() {
+            Ok(v) => v,
+            Err(_) => return, // uninitialized
+        };
+        let enum_list = [
+            CleanupTarget::Avatars,
+            CleanupTarget::CliCache,
+            CleanupTarget::Log,
+            CleanupTarget::Misc,
+        ];
+        let binding = enum_list[0].get_path();
+        let avatars = binding.first().unwrap().parent().unwrap().parent().unwrap();
+        assert_eq!(state(), avatars);
+
+        let binding = enum_list[1].get_path();
+        let cli_cache = binding.first().unwrap();
+        assert_eq!(cache(), cli_cache);
+
+        let binding = enum_list[2].get_path();
+        let logs = binding.first().unwrap().parent().unwrap();
+        assert_eq!(log(), logs);
+
+        let binding = enum_list[3].get_path();
+        let map = binding.first().unwrap().parent().unwrap();
+        assert_eq!(log(), map);
     }
 }
