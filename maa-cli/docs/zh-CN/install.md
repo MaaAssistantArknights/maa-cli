@@ -1,14 +1,14 @@
-# 安装及编译 `maa-cli`
+# 安装及编译 maa-cli
 
-`maa-cli` 提供多种方式安装，包括包管理器、预编译二进制文件和通过 `cargo` 自行编译安装。
+maa-cli 提供多种方式安装，包括包管理器、预编译二进制文件和通过 `cargo` 自行编译安装。
 
 ## 通过包管理器安装
 
-对于 macOS 和受支持的 Linux 发行版用户，推荐使用包管理器安装 `maa-cli`。
+对于 macOS 和受支持的 Linux 发行版用户，推荐使用包管理器安装 maa-cli。
 
 ### macOS
 
-Homebrew 用户可以通过非官方的 [tap](https://github.com/MaaAssistantArknights/homebrew-tap/) 安装 `maa-cli`：
+Homebrew 用户可以通过非官方的 [tap](https://github.com/MaaAssistantArknights/homebrew-tap/) 安装 maa-cli：
 
 - 稳定版本：
 
@@ -59,7 +59,7 @@ Homebrew 用户可以通过非官方的 [tap](https://github.com/MaaAssistantArk
 
 ## 编译安装
 
-Rust 开发者可以通过 `cargo` 自行编译安装 `maa-cli`：
+Rust 开发者可以通过 `cargo` 自行编译安装 maa-cli：
 
 - 稳定版本：
 
@@ -78,19 +78,19 @@ Rust 开发者可以通过 `cargo` 自行编译安装 `maa-cli`：
 从源码编译时，你可以通过 `--no-default-features` 禁用默认的特性，然后通过 `--features` 来启用特定的特性。目前可用的特性有：
 
 - `cli_installer`: 启用 `maa self update` 命令，用于更新自身，这个特性默认启用；
-- `core_installer`: 启用 `maa install` 和 `maa update` 命令，用于安装和更新 `MaaCore` 及资源，这个特性默认启用；
+- `core_installer`: 启用 `maa install` 和 `maa update` 命令，用于安装和更新 MaaCore 及资源，这个特性默认启用；
 - `git2`: 提供 `libgit2` 资源更新后端，这个特性默认启用；
 - `vendored-openssl`: 自行编译 `openssl` 库，而不是使用系统的 `openssl` 库，这个特性默认禁用，这个特性通常在你的系统没有安装 `openssl` 库或者 `openssl` 版本过低时启用。
 
 ## 安装 MaaCore 及资源
 
-`maa-cli` 只提供了一个命令行界面，它需要 `MaaCore` 和资源来运行任务。一旦 `maa-cli` 安装完成，你可以通过它安装 `MaaCore` 及资源：
+maa-cli 只提供了一个命令行界面，它需要 MaaCore 和资源来运行任务。一旦 maa-cli 安装完成，你可以通过它安装 MaaCore 及资源：
 
 ```bash
 maa install
 ```
 
-对于使用包管理器安装的用户，可以通过包管理器安装 `MaaCore`：
+对于使用包管理器安装的用户，可以通过包管理器安装 MaaCore：
 
 - Homebrew：
 
@@ -110,6 +110,6 @@ maa install
   nix-env -iA nixpkgs.maa-assistant-arknights
   ```
 
-**注意**：只有使用包管理器安装 `maa-cli` 的用户才能使用包管理器安装 `MaaCore`，否则请使用 `maa install` 命令安装。此外，`maa install` 通过下载官方预编译的 `MaaCore`，而包管理器安装的 `MaaCore` 的编译选项和依赖版本与官方预编译的版本不同。这不会影响 `maa-cli` 的使用，但可能会导致 `MaaCore` 的功能和性能有所不同。比如，包管理器安装的 `MaaCore` 使用较新版本的 `fastdeploy`，而官方预编译的 `MaaCore` 使用较旧版本的 `fastdeploy`。而在新版本的 `fastdeploy` 中，日志可以被隐藏，这可以消除了一些不必要的日志输出。
+**注意**：只有使用包管理器安装 maa-cli 的用户才能使用包管理器安装 MaaCore，否则请使用 `maa install` 命令安装。此外，`maa install` 通过下载官方预编译的 MaaCore，而包管理器安装的 MaaCore 的编译选项和依赖版本与官方预编译的版本不同。这不会影响 maa-cli 的使用，但可能会导致 MaaCore 的功能和性能有所不同。比如，包管理器安装的 MaaCore 使用较新版本的 `fastdeploy`，而官方预编译的 MaaCore 使用较旧版本的 `fastdeploy`。而在新版本的 `fastdeploy` 中，日志可以被隐藏，这可以消除了一些不必要的日志输出。
 
 <!-- markdownlint-disable-file MD013 -->

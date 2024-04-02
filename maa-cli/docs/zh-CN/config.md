@@ -2,7 +2,7 @@
 
 ## 配置目录
 
-`maa-cli` 配置文件位于特定的配置目录中，你可以通过 `maa dir config` 获取配置目录。配置目录也可以通过环境变量 `MAA_CONFIG_DIR` 更改。在下面的例子中，我们将用 `$MAA_CONFIG_DIR` 来表示配置目录。
+maa-cli 配置文件位于特定的配置目录中，你可以通过 `maa dir config` 获取配置目录。配置目录也可以通过环境变量 `MAA_CONFIG_DIR` 更改。在下面的例子中，我们将用 `$MAA_CONFIG_DIR` 来表示配置目录。
 
 所有的配置文件都可以使用 TOML，YAML 或者 JSON 格式，在下面的例子中，我们将使用 TOML 格式，并使用 `.toml` 作为文件扩展名。但是你可以混合这三种格式中的任意一种，只要你的文件扩展名正确。
 
@@ -23,7 +23,7 @@ type = "StartUp" # 任务的类型
 params = { client_type = "Official", start_game_enabled = true } # 对应任务的参数
 ```
 
-具体的任务类型和参数可以在 [MAA 集成文档][task-types] 中找到。注意，目前 `maa-cli` 并不会验证参数名和参数值是否正确，即使出错也不会产生任何错误信息，除非 `MaaCore` 在运行时检测到错误。
+具体的任务类型和参数可以在 [MAA 集成文档][task-types] 中找到。注意，目前 maa-cli 并不会验证参数名和参数值是否正确，即使出错也不会产生任何错误信息，除非 MaaCore 在运行时检测到错误。
 
 ### 任务条件
 
@@ -56,7 +56,7 @@ params = { plan_index = 2 }
 
 这里的 `condition` 字段用于确定哪一个变体应该被使用，而匹配的变体的 `params` 字段将会被合并到任务的参数中。
 
-**注意**：如果你的自定义基建计划文件使用相对路径，应该相对于 `$MAA_CONFIG_DIR/infrast`。此外，由于基建文件是由 `MaaCore` 而不是 `maa-cli` 读取的，因此这些文件的格式必须是 JSON。同时，`maa-cli` 不会读取基建文件，也不会根据其中定义的时间段来选择相应的子计划。因此，必须通过 `condition` 字段来指定在相应时间段使用正确的基建计划的参数中的 `plan_index` 字段。这样可以确保在适当的时间段使用正确的基建计划。
+**注意**：如果你的自定义基建计划文件使用相对路径，应该相对于 `$MAA_CONFIG_DIR/infrast`。此外，由于基建文件是由 MaaCore 而不是 maa-cli 读取的，因此这些文件的格式必须是 JSON。同时，maa-cli 不会读取基建文件，也不会根据其中定义的时间段来选择相应的子计划。因此，必须通过 `condition` 字段来指定在相应时间段使用正确的基建计划的参数中的 `plan_index` 字段。这样可以确保在适当的时间段使用正确的基建计划。
 
 除了 `Time` 条件，还有 `DateTime`，`Weekday`，`DayMod`条件。`DateTime` 条件用于指定一个时间段，`Weekday` 条件用于指定一周中的某些天，`DayMod` 用于指定一个自定义周期的某些天。
 
@@ -81,7 +81,7 @@ params = { stage = "1-7" }
 
 对与上述所有时间相关的条件，其都可以通过 `timezone` 参数来指定时区，这个参数的值可以是一个数字，表示与 UTC 的偏移量，如果你的时区是东八区，那么你可以指定 `timezone = 8`。这个参数也可以是一个客户端类型，比如 `timezone = "Official"`，这样将会使用官服对应的服务器时间来判断。**注意**，官服的时区不是东八区而是东四区，因为游戏中每天开始时间是 04:00:00 而不是 00:00:00。如果不指定时区，那么直接使用你的本地时区。
 
-除了上述确定的条件之外，还有一个依赖于热更新资源的条件 `OnSideStory`，当你启动该条件后，`maa-cli` 会尝试读取相应的资源来判断当前是否有正在开启的活动，如果有那么对应的变体会被匹配。 比如上述夏活期间刷 `SL-8` 的条件就可以简化为 `{ type = "OnSideStory", client = "Official" }`，这里的 `client` 参数用于确定你使用的客户端，因为不同的客户端的活动时间不同，对于使用官服或者 b 服的用户，这可以省略。通过这个条件，每次活动更新之后你可以只需要更新需要刷的关卡而不需要手动编辑对应活动的开放时间。
+除了上述确定的条件之外，还有一个依赖于热更新资源的条件 `OnSideStory`，当你启动该条件后，maa-cli 会尝试读取相应的资源来判断当前是否有正在开启的活动，如果有那么对应的变体会被匹配。 比如上述夏活期间刷 `SL-8` 的条件就可以简化为 `{ type = "OnSideStory", client = "Official" }`，这里的 `client` 参数用于确定你使用的客户端，因为不同的客户端的活动时间不同，对于使用官服或者 b 服的用户，这可以省略。通过这个条件，每次活动更新之后你可以只需要更新需要刷的关卡而不需要手动编辑对应活动的开放时间。
 
 除了以上基础条件之外，你可以使用 `{ type = "And", conditions = [...] }`，`{ type = "Or", conditions = [...] }`, `{ type = "Not", condition = ... }` 来对条件进行逻辑运算。
 对于想要基建多天排班的用户，可以将 `DayMod` 和 `Time` 组合使用，可以实现多天排班。比如，你想要实现每两天换六次班，那么你可以这样写：
@@ -310,7 +310,7 @@ address = = "emulator-5554" # 连接地址，比如 "emulator-5554" 或者 "127.
 config = "General" # 连接配置，通常不需要修改
 ```
 
-`adb_path` 是 `adb` 可执行文件的路径，你可以指定其路径，或者将其添加到环境变量 `PATH` 中，以便 `MaaCore` 可以找到它。大多数模拟器自带 `adb`，你可以直接使用其自带的 `adb`，而不需要额外安装，否则你需要自行安装 `adb`。`address` 是 `adb` 的连接地址。对于模拟器，你可以使用 `127.0.0.1:[端口号]`，常用的模拟器端口号参见[常见问题][emulator-ports]。`config` 用于指定一些平台和模拟器相关的配置。对于 Linux 他默认为 `CompatPOSIXShell`，对于 macOS 他默认为 `CompatMac`，对于 Windows 他默认为 `General`。更多可选配置可以在资源文件夹中的 `config.json` 文件中找到。
+`adb_path` 是 `adb` 可执行文件的路径，你可以指定其路径，或者将其添加到环境变量 `PATH` 中，以便 MaaCore 可以找到它。大多数模拟器自带 `adb`，你可以直接使用其自带的 `adb`，而不需要额外安装，否则你需要自行安装 `adb`。`address` 是 `adb` 的连接地址。对于模拟器，你可以使用 `127.0.0.1:[端口号]`，常用的模拟器端口号参见[常见问题][emulator-ports]。`config` 用于指定一些平台和模拟器相关的配置。对于 Linux 他默认为 `CompatPOSIXShell`，对于 macOS 他默认为 `CompatMac`，对于 Windows 他默认为 `General`。更多可选配置可以在资源文件夹中的 `config.json` 文件中找到。
 
 对于一些常用的模拟器，你可以直接使用 `preset` 来使用预设的配置：
 
@@ -336,7 +336,7 @@ platform_diff_resource = "iOS" # 非安卓版本的资源
 user_resource = true # 是否加载用户自定义的资源
 ```
 
-当使用非简体中文游戏客户端时，由于 `MaaCore` 默认加载的资源是简体中文的，你需要指定 `global_resource` 字段来加载非中文版本的资源。当使用 iOS 版本的游戏客户端时，你需要指定 `platform_diff_resource` 字段来加载 iOS 版本的资源。这两者都是可选的，如果你不需要加载这些资源，你可以将这两个字段设置为空。其次，这两者也会被自动设置，如果你的 `startup` 任务中指定了 `client_type` 字段，那么 `global_resource` 将会被设置为对应客户端的资源，而当你使用 `PlayTools` 连接时，`platform_diff_resource` 将会被设置为 `iOS`。最后，当你想要加载用户自定义的资源时，你需要将 `user_resource` 字段设置为 `true`。
+当使用非简体中文游戏客户端时，由于 MaaCore 默认加载的资源是简体中文的，你需要指定 `global_resource` 字段来加载非中文版本的资源。当使用 iOS 版本的游戏客户端时，你需要指定 `platform_diff_resource` 字段来加载 iOS 版本的资源。这两者都是可选的，如果你不需要加载这些资源，你可以将这两个字段设置为空。其次，这两者也会被自动设置，如果你的 `startup` 任务中指定了 `client_type` 字段，那么 `global_resource` 将会被设置为对应客户端的资源，而当你使用 `PlayTools` 连接时，`platform_diff_resource` 将会被设置为 `iOS`。最后，当你想要加载用户自定义的资源时，你需要将 `user_resource` 字段设置为 `true`。
 
 ### 静态选项
 
@@ -409,7 +409,7 @@ url = "https://github.com/MaaAssistantArknights/MaaResource.git"
 
 - MaaCore 的更新通道中 `Alpha` 只在 Windows 上可用；
 - 由于 CLI 默认的 API 链接和下载链接都是 GitHub 的链接，因此在国内可能会有一些问题，你可以通过配置 `api_url` 和 `download_url` 来使用镜像。
-- 即使启动了资源热更新，你依然需要安装 `MaaCore` 的资源，因为资源热更新并不包含所有的资源文件，只是包含部份可更新的资源文件，基础资源文件仍然需要安装。
+- 即使启动了资源热更新，你依然需要安装 MaaCore 的资源，因为资源热更新并不包含所有的资源文件，只是包含部份可更新的资源文件，基础资源文件仍然需要安装。
 - 资源热更新是通过 Git 来拉取远程仓库，如果后端设置为 `git` 那么 `git` 命令行工具必须可用。
 - 如果你想要使用 SSH 协议来拉取远程仓库，你必须配置 `ssh_key` 字段，这个字段应该是一个路径，指向你的 SSH 私钥。
 - 远程仓库的 `url` 设置目前只对首次安装资源有效，如果你想要更改远程仓库的地址，你需要通过 `git` 命令行工具手动更改，或者删除对应的仓库。仓库所在位置可以通过 `maa dir hot-update` 获取。
@@ -422,7 +422,7 @@ url = "https://github.com/MaaAssistantArknights/MaaResource.git"
 
 ## JSON Schema
 
-你可以在 [`schemas` 目录][schema-dir] 中找到 `maa-cli` 的 JSON Schema 文件，你可以使用这些文件来验证你的配置文件，或者在编辑器中获得自动补全。
+你可以在 [`schemas` 目录][schema-dir] 中找到 maa-cli 的 JSON Schema 文件，你可以使用这些文件来验证你的配置文件，或者在编辑器中获得自动补全。
 
 - 自定任务文件的 JSON Schema 文件为 [`task.schema.json`][task-schema]；
 - MaaCore 配置的 JSON Schema 文件为 [`asst.schema.json`][asst-schema]；

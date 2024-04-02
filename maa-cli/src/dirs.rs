@@ -106,12 +106,12 @@ impl Dirs {
     /// Find the library directory.
     ///
     /// By default, the library directory is the `lib` directory in the data directory.
-    /// If the library `MaaCore` is not found in the default library directory,
+    /// If the library MaaCore is not found in the default library directory,
     /// Try to find it in the directory relative to the executable file.
-    /// First, try to find the `MaaCore` in the same directory as the executable file.
+    /// First, try to find the MaaCore in the same directory as the executable file.
     /// Then, assume the executable file is in the `bin` directory,
-    /// try to find the `MaaCore` in the `lib` directory in the parent directory of the executable file.
-    /// If the executable is a symbolic link, will try to find the `MaaCore` both in the symbolic link and the link target.
+    /// try to find the MaaCore in the `lib` directory in the parent directory of the executable file.
+    /// If the executable is a symbolic link, will try to find the MaaCore both in the symbolic link and the link target.
     pub fn find_library<'a>(&'a self, exe_path: &'a Path) -> Option<Cow<'a, Path>> {
         if self.library().join(MAA_CORE_LIB).exists() {
             return Some(self.library().into());

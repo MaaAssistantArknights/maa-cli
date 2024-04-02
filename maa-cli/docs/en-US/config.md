@@ -1,8 +1,8 @@
-# Configuring `maa-cli`
+# Configuring maa-cli
 
 ## Configuration Directory
 
-The `maa-cli` configuration files are located in a specific configuration directory, which you can get by running `maa dir config`. The configuration directory can also be changed by the environment variable `MAA_CONFIG_DIR`. In the following examples, we will use `$MAA_CONFIG_DIR` to represent the configuration directory.
+The maa-cli configuration files are located in a specific configuration directory, which you can get by running `maa dir config`. The configuration directory can also be changed by the environment variable `MAA_CONFIG_DIR`. In the following examples, we will use `$MAA_CONFIG_DIR` to represent the configuration directory.
 
 All configuration files can be in TOML, YAML, or JSON format. In the following examples, we will use the TOML format and use `.toml` as the file extension. But you can mix these three formats, as long as your file extension is correct.
 
@@ -23,11 +23,11 @@ type = "StartUp" # The type of the task
 params = { client_type = "Official", start_game_enabled = true } # The parameters of the task
 ```
 
-The specific task types and parameters can be found in the [MAA Integration Document][task-types]. Note that `maa-cli` does not validate parameter names and values, and no error message will be generated even if an error occurs, unless `MaaCore` detects an error at runtime.
+The specific task types and parameters can be found in the [MAA Integration Document][task-types]. Note that maa-cli does not validate parameter names and values, and no error message will be generated even if an error occurs unless MaaCore` detects an error at runtime.
 
 ### Task variants and conditions
 
-In some cases, you may want to run a task with different parameters in different conditions. You can define multiple variants for a task, and use the `condition` field to determine whether the variant should be used. For example, you may want to use a different infrastructure plan in different time periods of a day:
+In some cases, you may want to run a task with different parameters in different conditions. You can define multiple variants for a task, and use the `condition` field to determine whether the variant should be used. For example, you may want to use a different infrastructure plan at different periods of the day:
 
 ```toml
 [[tasks]]
@@ -54,14 +54,14 @@ params = { plan_index = 2 }
 ```
 
 The `condition` field is used to determine whether the variant should be used,
-and the `params` field of matched variant will be merged into the parameters of the task.
+and the `params` field of the matched variant will be merged into the parameters of the task.
 
-**Note**: If the `filename` field is a relative path, it will be relative to `$MAA_CONFIG_DIR/infrast`. Besides, the custom infrastructure plan file will not be read by `maa-cli` but `MaaCore`. So the format of the file must be `JSON` and time period defined in the file will not be used to select the corresponding sub-plan. So you must specify the `plan_index` field in the parameters of the task to use the correct infrastructure plan in the corresponding time period. This will ensure that the correct infrastructure plan is used in the appropriate time period.
+**Note**: If the `filename` field is a relative path, it will be relative to `$MAA_CONFIG_DIR/infrast`. Besides, the custom infrastructure plan file will not be read by `maa-cli` but MaaCore. So the format of the file must be `JSON` and the time period defined in the file will not be used to select the corresponding sub-plan. So you must specify the `plan_index` field in the parameters of the task to use the correct infrastructure plan in the corresponding time period. This will ensure that the correct infrastructure plan is used in the appropriate time period.
 
 Besides of `Time` condition, there are also `DateTime`, `Weekday`, `DayMod` conditions.
 `DateTime` condition is used to specify a specific date-time period,
 `Weekday` condition is used to specify some days in a week,
-detail about `DayMod`, see below example of multi-day infrastructure plan
+`DayMod` condition is similar to `Weekday`, but the period can be specified by `divisor` and `remainder`.
 
 ```toml
 [[tasks]]
@@ -80,14 +80,13 @@ params = { stage = "CE-6" }
 params = { stage = "1-7" }
 ```
 
-All above conditions related to time have a `timezone` field, which is used to specify the timezone of the condition. The value of `timezone` can be an offset of UTC, like `8` or `-7`, or a name of client type of game, like `Official`. Note, even the official server is in China, but the timezone of official server is `UTC+4` instead of `UTC+8`, because the start of the game day is `04:00:00` instead of `00:00:00`. When the `timezone` is omitted, the condition will be matched in the local timezone of the system.
-
-Beside of above conditions, there is a condition `OnSideStory` which depends on hot update resource to check if there is any opening side story. Thus, the condition of fight `SL-8`can be simplified as `{ type = "OnSideStory", client = "Official" }`, where `client` is the client type of game.
+All the above conditions related to time have a `timezone` field, which is used to specify the timezone of the condition. The value of `timezone` can be an offset of UTC, like `8` or `-7`, or a name of the client type of game, like `Official`. Note, even though the official server is in China, the timezone of the official server is `UTC+4` instead of `UTC+8`, because the start of the game day is `04:00:00` instead of `00:00:00`. When the `timezone` is omitted, the condition will be matched in the local timezone of the system.
+Besides of above conditions, there is a condition `OnSideStory` which depends on hot update resource to check if there is any opening side story. Thus, the condition of fight `SL-8` can be simplified as `{ type = "OnSideStory", client = "Official" }`, where the `client` is the client type of game.
 
 Beside of above basic condition, `{ type = "And", conditions = [...] }` `{ type = "Or", conditions = [...] }`, and `{ type = "Not", condition = ... }` can be used for logical combination of conditions.
 
-By the combination of of above conditions, you can define a infrastructure plan for multiple days,
-here is an example of 6 plan for 2 days:
+By the combination of of above conditions, you can define an infrastructure plan for multiple days,
+here is an example of 6 plans for 2 days:
 
 ```toml
 [[tasks]]
@@ -188,7 +187,7 @@ condition = {
 params = { plan_index = 5 }
 ```
 
-With default strategy, if multiple variants are matched, only the first one will be used. And if the condition is not given, the variant will always be matched. So you can put a variant without condition at the end of variants.
+With the default strategy, if multiple variants are matched, only the first one will be used. If the condition is not given, the variant will always be matched. So you can put a variant without condition at the end of variants.
 
 The strategy of matching variants can be changed by `strategy` field:
 
@@ -239,7 +238,7 @@ condition = { type = "Time", start = "18:00:00" }
 
 ### User input
 
-In some case, you may want to input some value at runtime, instead of hard code it in the task file. Such as the stage to fight, the item to buy, etc. You can specify the value as `Input` or `Select` type:
+In some cases, you may want to input some value at runtime, instead of hard code it in the task file. Such as the stage to fight, the item to buy, etc. You can specify the value as `Input` or `Select` type:
 
 ```toml
 [[tasks]]
@@ -281,14 +280,14 @@ default = 1000
 description = "medicine to use"
 ```
 
-For `Input` type, a prompt will be shown to ask user to input a value. If the default value is given, it will be used if user input empty value, otherwise it will re-prompt.
-For `Select` type, a prompt will be shown to ask user to input an index or custom value (if `allow_custom` is `true`). If the default index is given, it will be used if user input empty value, otherwise it will re-prompt.
+For an `Input` type, a prompt will be shown to ask the user to input a value. If the default value is given, it will be used if the user inputs an empty value, otherwise, it will re-prompt.
+For `Select` type, a prompt will be shown to ask the user to input an index or custom value (if `allow_custom` is `true`). If the default index is given, it will be used if the user inputs an empty value, otherwise, it will re-prompt.
 
-`--batch` option can be used to run tasks in batch mode, which will use default value for all inputs and panic if no default value is given.
+`--batch` option can be used to run tasks in batch mode, which will use the default value for all inputs and panic if no default value is given.
 
-## `MaaCore` related configurations
+## MaaCore related configurations
 
-The related configurations of `MaaCore` is located in `$MAA_CONFIG_DIR/asst.toml`. The current available configurations are:
+The related configuration file of MaaCore is located in `$MAA_CONFIG_DIR/asst.toml`. The currently available configurations are:
 
 ```toml
 [connection]
@@ -324,7 +323,7 @@ address = "emulator-5554" # the address of device, such as "emulator-5554" or "1
 config = "General" # the config of maa, should not be changed most of time
 ```
 
-`adb_path` is the path of `adb` executable, you can set it to the absolute path of `adb` or or leave it empty if it is in PATH. `address` is the address of device used by `adb`, like `emulator-5554` or `127.0.0.1:[port]`, the port of some common emulators can be found in the [MAA FAQ][emulator-ports]. `config` used to specify some configurations of host and emulator. It's default value is `CompatMac` on macOS, `CompatPOSIXShell` on Linux and `General` on other platforms. More optional configs can be found in `config.json` in resource directory.
+`adb_path` is the path of `adb` executable, you can set it to the absolute path of `adb` or or leave it empty if it is in PATH. The `address` is the address of the device used by `adb`, like `emulator-5554` or `127.0.0.1:[port]`, the port of some common emulators can be found in the [MAA FAQ][emulator-ports]. The `config` is used to specify some configurations of the host and emulator, whose default value is `CompatMac` on macOS, `CompatPOSIXShell` on Linux and `General` on other platforms. More optional configs can be found in `config.json` in the resource directory.
 
 For some common emulators, you can use `preset` to use predefined configurations:
 
@@ -335,9 +334,9 @@ adb_path = "/path/to/other/adb" # override predefined adb executable path
 address = "127.0.0.1:7777" # override the predefined address
 ```
 
-Currently, there is only one preset `MuMuPro` for emulators. Issue and PR are welcome for new preset.
+Currently, there is only one preset `MuMuPro` for emulators. Issue and PR are welcome for the new preset.
 
-There is a special preset `PlayCover`, used for iOS App running on macOS by PlayCover. In this case, `adb_path` is ignored and `address` is used to specify the address of `MaaTools` set in `PlayCover`, more details can be found in the [PlayCover documentation][playcover-doc].
+There is a special preset `PlayCover`, used for the iOS app running on macOS by PlayCover. In this case, `adb_path` is ignored and `address` is used to specify the address of `MaaTools` set in `PlayCover`, more details can be found in the [PlayCover documentation][playcover-doc].
 
 ### Resource
 
@@ -351,8 +350,8 @@ user_resource = true # whether use user resource
 ```
 
 When your game is not in Simplified Chinese, you should set `global_resource` to non-Chinese resource. If you connect to the game with `PlayCover`, you should set `platform_diff_resource` to `iOS`.
-Leave those two fields to empty if you don't want to use global resource or platform diff resource. Besides, those two fields will also be setup automatically by `maa-cli` based on your task and connection type.
-Lastly, if you want to use user resource, you should set `user_resource` to `true`. When `user_resource` is `true`, `maa-cli` will try to find user resource in `$MAA_CONFIG_DIR/resource` directory.
+Leave those two fields empty if you don't want to use global resource or platform diff resource. Besides, those two fields will also be set up automatically by maa-cli based on your task and connection type.
+Lastly, if you want to use user resources, you should set `user_resource` to `true`. When `user_resource` is `true`, maa-cli will try to find user resources in `$MAA_CONFIG_DIR/resource` directory.
 
 ### Static options
 
@@ -378,9 +377,9 @@ kill_adb_on_exit = false # whether kill adb when exit
 
 Note: If you connect to the game with `PlayCover`, the `touch_mode` will be ignored and `MacPlayTools` will be used.
 
-## `maa-cli` related configurations
+## CLI related configurations
 
-The `maa-cli` related configurations should be located in `$MAA_CONFIG_DIR/cli.toml`. Currently, it only contains one section: `core`:
+The CLI related configurations should be located in `$MAA_CONFIG_DIR/cli.toml`. Currently, it only contains one section: `core`:
 
 ```toml
 # MaaCore install and update  configurations
@@ -421,11 +420,11 @@ url = "https://github.com/MaaAssistantArknights/MaaResource.git"
 
 **NOTE**:
 
-- The `Alpha` channel of `MaaCore` is only available on Windows;
-- The hot update resource can not work separately, it should be used with basic resource that installed with `MaaCore`;
+- The `Alpha` channel of MaaCore is only available on Windows;
+- The hot update resource can not work separately, it should be used with basic resources installed with MaaCore;
 - If you want to use `git` backend, `git` command is required;
-- If you want to fetch resource with ssh, the `ssh_key` is required;
-- The `resource.remote.url` only effect for first time installation, it will be ignored when updating resource. If you want to change the remote URL, you should change it manually or delete the resource directory and reinstall resource. The directory of repository can be located by `maa dir hot-update`.
+- If you want to fetch resources with ssh, the `ssh_key` is required;
+- The `resource.remote.url` only affects first-time installation, it will be ignored when updating resource. If you want to change the remote URL, you should change it manually or delete the resource directory and reinstall the resources. The directory of the repository can be located by `maa dir hot-update`.
 
 ## Example of config file
 
@@ -434,11 +433,11 @@ url = "https://github.com/MaaAssistantArknights/MaaResource.git"
 
 ## JSON schema
 
-The JSON schema of config file can be found at [`schemas` directory][schema-dir]:
+The JSON schema of configuration files can be found at [`schemas` directory][schema-dir]:
 
-- The schema of task file is [`task.schema.json`][task-schema];
-- the schema of MaaCore config file is [`asst.schema.json`][asst-schema];
-- the schema of CLI config file is [`cli.schema.json`][cli-schema].
+- The schema of the task configuration is [`task.schema.json`][task-schema];
+- the schema of the MaaCore configuration file is [`asst.schema.json`][asst-schema];
+- the schema of the CLI configuration file is [`cli.schema.json`][cli-schema].
 
 With the help of JSON schema, you can get auto-completion and validation in some editors with plugins.
 
