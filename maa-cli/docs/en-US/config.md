@@ -1,232 +1,31 @@
-# maa-cli
+# Configuring `maa-cli`
 
-![CI](https://img.shields.io/github/actions/workflow/status/MaaAssistantArknights/maa-cli/ci.yml)
-![Code coverage](https://img.shields.io/codecov/c/github/MaaAssistantArknights/maa-cli)
-![Stable Release](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fgithub.com%2FMaaAssistantArknights%2Fmaa-cli%2Fraw%2Fversion%2Fstable.json&query=%24.version&prefix=v&label=stable)
-![Beta Release](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fgithub.com%2FMaaAssistantArknights%2Fmaa-cli%2Fraw%2Fversion%2Fbeta.json&query=%24.version&prefix=v&label=beta)
-![platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blueviolet)
+## Configuration Directory
 
-<!-- markdownlint-disable MD013 MD033 -->
+The `maa-cli` configuration files are located in a specific configuration directory, which you can get by running `maa dir config`. The configuration directory can also be changed by the environment variable `MAA_CONFIG_DIR`. In the following examples, we will use `$MAA_CONFIG_DIR` to represent the configuration directory.
 
-A simple CLI for [MAA](https://github.com/MaaAssistantArknights/MaaAssistantArknights) by Rust.
+All configuration files can be in TOML, YAML, or JSON format. In the following examples, we will use the TOML format and use `.toml` as the file extension. But you can mix these three formats, as long as your file extension is correct.
 
-## Feature
+In addition, some tasks accept `filename` as a parameter. When the relative path is used, the relative path will be relative to the corresponding subdirectory of the configuration directory. For example, the custom infrastructure plan files should be relative to `$MAA_CONFIG_DIR/infrast`, while the copilot files of Stationary Security Service should be relative to `$MAA_CONFIG_DIR/ssscopilot`.
 
-- Run predefined or custom tasks, like `maa fight` or `maa run <task>`;
-- Install and update `MaaCore` and resources with `maa install` and `maa update`;
-- Update self with `maa self update`.
+## Custom Tasks
 
-## Installation
+A custom task is a separate file located in the `$MAA_CONFIG_DIR/tasks` directory.
 
-### Package manager
+### Basic Structure
 
-#### macOS
-
-Install with [Homebrew](https://brew.sh/):
-
-```bash
-brew install MaaAssistantArknights/tap/maa-cli
-```
-
-#### Linux
-
-- Arch Linux users can install [AUR package](https://aur.archlinux.org/packages/maa-cli/):
-
-   ```bash
-   yay -S maa-cli
-   ```
-
-- Nix users can run directly:
-
-  ```bash
-  # Stable
-  nix run nixpkgs#maa-cli
-  ```
-
-  ```bash
-  # Nightly
-  nix run github:Cryolitia/nur-packages#maa-cli-nightly
-  ```
-
-  Stable is the `maa-cli` that packaged in [nixpkgs](https://github.com/NixOS/nixpkgs/blob/nixos-unstable/pkgs/by-name/ma/maa-cli/package.nix), using the nixpkgs's Rust toolchain；Nightly is in [NUR](https://github.com/Cryolitia/nur-packages/blob/master/pkgs/maa-assistant-arknights/maa-cli.nix), use the Beta Channel of Rust toolchain, automatically update and builds for verification by Github Action daily.
-
-- For Linux Brew users, you can install with [Linux Brew](https://docs.brew.sh/Homebrew-on-Linux):
-
-   ```bash
-   brew install MaaAssistantArknights/tap/maa-cli
-   ```
-
-### Prebuilt binary
-
-You can install CLI by download prebuilt binary from
-[release page](https://github.com/wangl-cc/maa-cli/releases/latest) and extract it to your favorite location. The filename for different platform is:
-
-<table>
-    <thead>
-        <tr>
-            <th>Operation System</th>
-            <th>Architecture</th>
-            <th>Filename</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td rowspan=2>Linux</td>
-            <td>x86_64</td>
-            <td>maa_cli-x86_64-unknown-linux-gnu.tar.gz</td>
-        </tr>
-        <tr>
-            <td>aarch64</td>
-            <td>maa_cli-aarch64-unknown-linux-gnu.tar.gz</td>
-        </tr>
-        <tr>
-            <td rowspan=2>macOS</td>
-            <td>x86_64</td>
-            <td rowspan=2>
-              maa_cli-universal-apple-darwin.zip
-            </td>
-        </tr>
-        <tr>
-            <td>aaarch64</td>
-        </tr>
-        <tr>
-            <td rowspan=2>Windows</td>
-            <td>x86_64</td>
-            <td>maa_cli-x86_64-pc-windows-msvc.zip</td>
-        </tr>
-    </tbody>
-</table>
-
-### Build from source
-
-You can also build from source by yourself with `cargo`:
-
-```bash
-cargo install --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --locked
-```
-
-#### Build options
-
-When building from source, you can disable default features with `--no-default-features` option and enable specific features with `--features` option. Currently, the available features are:
-
-- `cli_installer`: Provide `maa self update` command to update self, this feature is enabled by default;
-- `core_installer`: Provide `maa install` and `maa update` commands to install and update `MaaCore` and resources, this feature is enabled by default;
-- `git2`: Provide `libgit2` resource backend, this feature is enabled by default;
-- `vendored-openssl`: Build `openssl` library by self instead of using system `openssl` library, this feature is disabled by default;
-
-### Dependencies
-
-#### MaaCore
-
-`maa-cli` only provides an interface for MaaCore, it needs `MaaCore` and resources to run tasks, which can be installed by `maa install`:
-
-```bash
-maa install
-```
-
-#### OpenSSL
-
-`git2` depends on the `openssl` library on all platforms. On Linux, it is also required by `maa-cli` itself. So you should install the `openssl` library or use the `vendored-openssl` feature when building from source.
-
-## Usage
-
-### Run Tasks
-
-The main feature of `maa-cli` is to run tasks, including predefined tasks and custom tasks.
-
-#### Predefined tasks
-
-- `maa startup [client]`: start the game client and enter the main screen, the `client` is the client type of game, leave it empty to don't start the game;
-- `maa closedown`: close the game client;
-- `maa fight [stage]`: run a fight task, the `stage` is the stage to fight, like `1-7`, `CE-6`, etc.; if not given, it will be queried from user;
-- `maa copilot <maa_uri>`: run a copilot task, the `maa_uri` is the URI of a copilot task; it can be `maa://1234` or local file path;
-- `maa roguelike [theme]`: run a roguelike task, the `theme` is the theme of roguelike, available themes are `Phantom`, `Mizuki` and `Sami`.
-
-#### Custom tasks
-
-You can run a custom task by `maa run <task>`. Here `<task>` is the name of a task, you can list all available tasks by `maa list`.
-
-#### Task Summary
-
-`maa-cli` will print a summary of each task to stdout when finished. The summary can be disabled by `--no-summary` option.
-
-#### Logging
-
-There are 5 levels of logging: `Trace`, `Debug`, `Info`, `Warn`, `Error`, which determine the verbosity of logging.
-You can set the log level by environment variable `MAA_LOG`, such as `MAA_LOG=debug`.
-You can also increase and decrease the log level by `-v` and `-q` option.
-If no log level is set, the default log level is `Warn`, which means only `Warn` and `Error` logs will be printed.
-
-By default, `maa-cli` will print logs to stderr. You can redirect logs to a file by `--log-file` option, the default log path is `$(maa dir log)/YYYY/MM/DD/HH:MM:SS.log` where `$(maa dir log)` is the log directory. You can also specify the log path by `--log-file=<path>`.
-
-There is a prefix with timestamp and log level in each log message. You can hide it by environment variable `MAA_LOG_PREFIX`. When set to `Always` (default), the prefix will always be printed, when set to `Auto` the prefix will be printed only when log to file, when set to `Never` the prefix will never be printed.
-
-### Install and update
-
-#### Install and update for MaaCore and resources
-
-You can install and update `MaaCore` and resources by `maa install` and `maa update`. See `maa help install` and `maa help update` for more details.
-
-#### Resource hot update
-
-You can hot update resources by `maa  hot-update`. It can be configured to run every time before running in config file.
-
-#### Self update
-
-You can update `maa-cli` by `maa self update`. For users who install `maa-cli` with package manager, this feature is disabled, you should update `maa-cli` with package manager.
-
-More other commands can be found by `maa help`.
-
-### Other sub-commands
-
-- `maa list`: list all available tasks;
-- `maa dir <subcommand>`: get the path of a specific directory;
-- `maa version`: print the version of `maa-cli` and `MaaCore`;
-- `maa convert <input> [output]`: convert a configuration file to another format, like `maa convert daily.toml daily.json`;
-- `maa complete <shell>`: generate completion script for specific shell;
-- `maa activity [client]`: get the current activity of game, the `client` is the client type of game, like `Official` (default), `Bilibili`, etc.;
-- `maa cleanup`: clears the `maa-cli` and `MaaCore` caches.
-
-## Configurations
-
-### Configuration directory
-
-All configurations of `maa-cli` are located in a specific configuration directory, which can be got by `maa dir config`.
-The configuration directory can be changed by environment variable `MAA_CONFIG_DIR`. In below examples, we will use `$MAA_CONFIG_DIR` to represent the configuration directory.
-
-All configuration files can be written in TOML, YAML or JSON format. In below examples, we will use TOML format and `.toml` as file extension. But you can mix these three formats as long as the file extension is correct.
-
-<details>
-
-<summary> XDG style configuration directory on macOS </summary>
-
-Due to the limitation of [Directories](https://github.com/dirs-dev/directories-rs/), `maa-cli` use Apple style configuration directory on macOS by default. But XDG style configuration directory is more suitable for command line program. If you want to use XDG style configuration directory, you can set `XDG_CONFIG_HOME` environment variable, such as `export XDG_CONFIG_HOME="$HOME/.config"`, this will make `maa-cli` use XDG style configuration directory. Or you can use below command to create a symbolic link:
-
-```bash
-mkdir -p "$HOME/.config/maa"
-ln -s "$HOME/.config/maa" "$(maa dir config)"
-```
-
-</details>
-
-### Define tasks
-
-A `maa-cli` task should be defined in a single file, which should be located in `$MAA_CONFIG_DIR/tasks` directory.
-
-#### Basic structure
-
-A `maa-cli` task is a sequence of `MAA` tasks, each `MAA` task is defined by `name`, `type` and `params` fields:
+A task file contains multiple subtasks, each of which is an MAA task, which contains the following options:
 
 ```toml
 [[tasks]]
-name = "Start Game" # the name this task, default to the type of the task
-type = "StartUp" # the type of maa task
-params = { client_type = "Official", start_game_enabled = true } # the params of given task
+name = "Start the game" # The name of the task, optional, defaults to the task type
+type = "StartUp" # The type of the task
+params = { client_type = "Official", start_game_enabled = true } # The parameters of the task
 ```
 
-See documentation of [MAA](https://maa.plus/docs/en-us/3.1-INTEGRATION.html#asstappendtask) for all available task types and parameters.
+The specific task types and parameters can be found in the [MAA Integration Document][task-types]. Note that `maa-cli` does not validate parameter names and values, and no error message will be generated even if an error occurs, unless `MaaCore` detects an error at runtime.
 
-#### Task variants and conditions
+### Task variants and conditions
 
 In some cases, you may want to run a task with different parameters in different conditions. You can define multiple variants for a task, and use the `condition` field to determine whether the variant should be used. For example, you may want to use a different infrastructure plan in different time periods of a day:
 
@@ -438,7 +237,7 @@ type = "Mall"
 condition = { type = "Time", start = "18:00:00" }
 ```
 
-#### User input
+### User input
 
 In some case, you may want to input some value at runtime, instead of hard code it in the task file. Such as the stage to fight, the item to buy, etc. You can specify the value as `Input` or `Select` type:
 
@@ -487,7 +286,7 @@ For `Select` type, a prompt will be shown to ask user to input an index or custo
 
 `--batch` option can be used to run tasks in batch mode, which will use default value for all inputs and panic if no default value is given.
 
-### `MaaCore` related configurations
+## `MaaCore` related configurations
 
 The related configurations of `MaaCore` is located in `$MAA_CONFIG_DIR/asst.toml`. The current available configurations are:
 
@@ -514,7 +313,7 @@ adb_lite_enabled = false
 kill_adb_on_exit = false
 ```
 
-#### Connection
+### Connection
 
 The `connection` section is used to specify how to connect to the game:
 
@@ -525,9 +324,7 @@ address = "emulator-5554" # the address of device, such as "emulator-5554" or "1
 config = "General" # the config of maa, should not be changed most of time
 ```
 
-`adb_path` is the path of `adb` executable, you can set it to the absolute path of `adb` or or leave it empty if it is in PATH.
-You can use `adb` shipped by emulator, like `address` is the address of device used by `adb`, like `emulator-5554` or `127.0.0.1:[port]`.
-`config` used to specify some configurations of host and emulator. It's default value is `CompatMac` on macOS, `CompatPOSIXShell` on Linux and `General` on other platforms. More optional configs can be found in `config.json` in resource directory.
+`adb_path` is the path of `adb` executable, you can set it to the absolute path of `adb` or or leave it empty if it is in PATH. `address` is the address of device used by `adb`, like `emulator-5554` or `127.0.0.1:[port]`, the port of some common emulators can be found in the [MAA FAQ][emulator-ports]. `config` used to specify some configurations of host and emulator. It's default value is `CompatMac` on macOS, `CompatPOSIXShell` on Linux and `General` on other platforms. More optional configs can be found in `config.json` in resource directory.
 
 For some common emulators, you can use `preset` to use predefined configurations:
 
@@ -540,10 +337,9 @@ address = "127.0.0.1:7777" # override the predefined address
 
 Currently, there is only one preset `MuMuPro` for emulators. Issue and PR are welcome for new preset.
 
-There is a special preset `PlayCover`, used for iOS App running on macOS by PlayCover.
-In this case, `adb_path` is ignored and `address` is used to specify the address of `MaaTools` set in `PlayCover`,
+There is a special preset `PlayCover`, used for iOS App running on macOS by PlayCover. In this case, `adb_path` is ignored and `address` is used to specify the address of `MaaTools` set in `PlayCover`, more details can be found in the [PlayCover documentation][playcover-doc].
 
-#### Resource
+### Resource
 
 The `resource` section is used to specify the resource to use:
 
@@ -558,9 +354,9 @@ When your game is not in Simplified Chinese, you should set `global_resource` to
 Leave those two fields to empty if you don't want to use global resource or platform diff resource. Besides, those two fields will also be setup automatically by `maa-cli` based on your task and connection type.
 Lastly, if you want to use user resource, you should set `user_resource` to `true`. When `user_resource` is `true`, `maa-cli` will try to find user resource in `$MAA_CONFIG_DIR/resource` directory.
 
-#### Static options
+### Static options
 
-The `static_options` section is used to configure MAA [static options](https://maa.plus/docs/en-us/3.1-INTEGRATION.html#asstsetstaticoption):
+The `static_options` section is used to configure MAA static options:
 
 ```toml
 [static_options]
@@ -568,9 +364,9 @@ cpu_ocr = false # whether use CPU OCR, CPU OCR is enabled by default
 gpu_ocr = 1 # the ID of your GPU, leave it to empty if you don't want to use GPU OCR
 ```
 
-#### Instance options
+### Instance options
 
-The `instance_options` section is used to configure MAA [instance options](https://maa.plus/docs/en-us/3.1-INTEGRATION.html#asstsetinstanceoption):
+The `instance_options` section is used to configure MAA instance options:
 
 ```toml
 [instance_options]
@@ -582,7 +378,7 @@ kill_adb_on_exit = false # whether kill adb when exit
 
 Note: If you connect to the game with `PlayCover`, the `touch_mode` will be ignored and `MacPlayTools` will be used.
 
-### `maa-cli` related configurations
+## `maa-cli` related configurations
 
 The `maa-cli` related configurations should be located in `$MAA_CONFIG_DIR/cli.toml`. Currently, it only contains one section: `core`:
 
@@ -631,15 +427,29 @@ url = "https://github.com/MaaAssistantArknights/MaaResource.git"
 - If you want to fetch resource with ssh, the `ssh_key` is required;
 - The `resource.remote.url` only effect for first time installation, it will be ignored when updating resource. If you want to change the remote URL, you should change it manually or delete the resource directory and reinstall resource. The directory of repository can be located by `maa dir hot-update`.
 
-### Example of config file
+## Example of config file
 
-Example of config file can be found at [`config_examples` directory](./maa-cli/config_examples). Another example can be found at my [dotfiles](https://github.com/wangl-cc/dotfiles/tree/master/.config/maa).
+- [Example configuration][example-config];
+- [Configuration used by maintainer][wangl-cc-dotfiles].
 
-### JSON schema
+## JSON schema
 
-The JSON schema of config file can be found at [`schemas` directory](./maa-cli/schemas/).
-The schema of task file is [`task.schema.json`](./maa-cli/schemas/task.schema.json);
-the schema of MaaCore config file is [`asst.schema.json`](./maa-cli/schemas/asst.schema.json);
-the schema of CLI config file is [`cli.schema.json`](./maa-cli/schemas/cli.schema.json);
+The JSON schema of config file can be found at [`schemas` directory][schema-dir]:
+
+- The schema of task file is [`task.schema.json`][task-schema];
+- the schema of MaaCore config file is [`asst.schema.json`][asst-schema];
+- the schema of CLI config file is [`cli.schema.json`][cli-schema].
 
 With the help of JSON schema, you can get auto-completion and validation in some editors with plugins.
+
+[task-types]: https://maa.plus/docs/en-us/3.1-INTEGRATION.html#list-of-task-types
+[emulator-ports]: https://maa.plus/docs/en-us/1.2-FAQ.html#common-adb-ports-for-popular-android-emulators
+[playcover-doc]: https://maa.plus/docs/en-us/1.4-EMULATOR_SUPPORTS_FOR_MAC.html#✅-playcover-the-software-runs-most-fluently-for-its-nativity-🚀
+[example-config]: ../../config_examples
+[wangl-cc-dotfiles]: https://github.com/wangl-cc/dotfiles/tree/master/.config/maa
+[schema-dir]: ../../schemas/
+[task-schema]: ../../schemas/task.schema.json
+[asst-schema]: ../../schemas/asst.schema.json
+[cli-schema]: ../../schemas/cli.schema.json
+
+<!-- markdownlint-disable-file MD013 -->
