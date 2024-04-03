@@ -33,6 +33,22 @@ parse_semver() {
   fi
 }
 
+# Check if the version in Cargo.toml is bumped
+# If the version in Cargo.toml is the same as the published version,
+# then no pre-release is allowed for the same version.
+#
+# For example, if the published version and the version in Cargo.toml is `0.4.5`,
+# then an alpha version will be `0.4.5-alpha.1+sha.abcdef` which is less than `0.4.5`
+check_version_bumped() {
+  local published_version=$1
+  if [[ "$CARGO_PKG_VERSION" == "$published_version" ]]; then
+    echo "The version in Cargo.toml is the same as the published version"
+    echo "No pre-release is allowed for the same version"
+    echo "skip=true" >> "$GITHUB_OUTPUT"
+    exit 0
+  fi
+}
+
 # determine the channel and whether to publish
 if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
   echo "PR detected"
@@ -81,8 +97,12 @@ if [[ "$published_commit" == "$COMMIT_SHA" ]]; then
   exit 0
 fi
 
+# skip if published version is the same as the Cargo.toml version
+# this happens when a stable release is already published
+# and the
 published_version=$(yq -oy ".version" "version/$channel.json")
 if [[ "$channel" == "beta" ]]; then
+  check_version_bumped "$published_version"
   parse_semver "$published_version"
   if [[ "$CARGO_PKG_VERSION" == "$core" ]]; then
     if [[ -z "$pre_release" ]]; then
@@ -97,6 +117,7 @@ if [[ "$channel" == "beta" ]]; then
   fi
   tag="v$version"
 elif [[ "$channel" == "alpha" ]]; then
+  check_version_bumped "$published_version"
   parse_semver "$published_version"
   if [[ "$CARGO_PKG_VERSION" == "$core" ]]; then
     if [[ -z $pre_release ]]; then
