@@ -97,9 +97,6 @@ if [[ "$published_commit" == "$COMMIT_SHA" ]]; then
   exit 0
 fi
 
-# skip if published version is the same as the Cargo.toml version
-# this happens when a stable release is already published
-# and the
 published_version=$(yq -oy ".version" "version/$channel.json")
 if [[ "$channel" == "beta" ]]; then
   check_version_bumped "$published_version"

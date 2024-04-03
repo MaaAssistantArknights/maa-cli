@@ -9,7 +9,7 @@ inputs:
     required: false
     default: "x86_64"
   target_arch:
-    description: Target architecture # default to host architecture
+    description: Target architecture
     required: false
     default: "x86_64"
 
