@@ -48,7 +48,7 @@ impl super::FromFile for CLIConfig {}
 
 lazy_static! {
     static ref INSTALLER_CONFIG: CLIConfig =
-        CLIConfig::find_file_or_default(&dirs::config().join("cli"))
+        CLIConfig::find_file_or_default(dirs::config().join("cli"))
             .expect("Failed to load installer config");
 }
 

@@ -10,13 +10,16 @@ mod playcover;
 pub mod preset;
 
 use crate::{
-    config::{asst::AsstConfig, task::TaskConfig, FindFileOrDefault},
+    config::{asst::AsstConfig, task::TaskConfig, FindFile},
     consts::MAA_CORE_LIB,
     dirs::{self, Ensure},
     installer::resource,
 };
 
-use std::sync::{atomic, Arc};
+use std::{
+    path::Path,
+    sync::{atomic, Arc},
+};
 
 use anyhow::{bail, Context, Result};
 use clap::Args;
@@ -40,6 +43,16 @@ pub struct CommonArgs {
     /// and then you can specify the address of MaaTools here.
     #[arg(short, long, verbatim_doc_comment)]
     pub addr: Option<String>,
+    /// Profile (asst config file) name
+    ///
+    /// A profile is a config file that contains the configuration passed to MaaCore.
+    /// By default, we will try to load the config file `$MAA_CONFIG_DIR/profiles/default.toml`.
+    /// If the file does not exist, we will try to load the config file `$MAA_CONFIG_DIR/asst.toml`
+    /// for backward compatibility, which is the old config file name.
+    /// If you want to use another config file, you can specify the profile name here.
+    /// The config file should be placed in the directory `$MAA_CONFIG_DIR/profiles/`.
+    #[arg(short, long, verbatim_doc_comment)]
+    pub profile: Option<String>,
     /// Load resources from the config directory
     ///
     /// By default, MaaCore loads resources from the resource installed with MaaCore.
@@ -87,6 +100,21 @@ impl CommonArgs {
     }
 }
 
+fn find_profile(root: impl AsRef<Path>, profile: Option<&str>) -> Result<AsstConfig> {
+    let root = root.as_ref();
+    if let Some(profile) = profile {
+        AsstConfig::find_file(root.join("profiles").join(profile))
+            .context("Failed to find profile file!")
+    } else {
+        for file in &[root.join("profiles").join("default"), root.join("asst")] {
+            if let Some(config) = AsstConfig::find_file_or_none(file)? {
+                return Ok(config);
+            }
+        }
+        Ok(AsstConfig::default())
+    }
+}
+
 fn run_core<F>(f: F, args: CommonArgs) -> Result<()>
 where
     F: FnOnce(&AsstConfig) -> Result<TaskConfig>,
@@ -95,8 +123,7 @@ where
     resource::update(true)?;
 
     // Load asst config
-    let mut asst_config = AsstConfig::find_file_or_default(&dirs::config().join("asst"))
-        .context("Failed to find asst config file!")?;
+    let mut asst_config = find_profile(dirs::config(), args.profile.as_deref())?;
 
     args.apply_to(&mut asst_config);
 
@@ -218,11 +245,9 @@ where
     Ok(())
 }
 
-pub fn run_custom(path: impl AsRef<std::path::Path>, args: CommonArgs) -> Result<()> {
+pub fn run_custom(path: impl AsRef<Path>, args: CommonArgs) -> Result<()> {
     run(
         |_| {
-            use crate::config::FindFile;
-
             let path = path.as_ref();
             if let Some(abs_path) = dirs::abs_config(path, Some("tasks")) {
                 TaskConfig::find_file(abs_path)
@@ -285,16 +310,61 @@ fn setup_core(config: &AsstConfig) -> Result<()> {
 mod tests {
     use super::*;
 
-    mod run {
-        use std::env;
+    use std::env::{self, temp_dir};
 
-        use super::*;
-
-        #[test]
-        fn version() {
-            if let Some(version) = env::var_os("MAA_CORE_VERSION") {
-                assert_eq!(core_version().unwrap(), version);
-            }
+    #[test]
+    fn version() {
+        if let Some(version) = env::var_os("MAA_CORE_VERSION") {
+            assert_eq!(core_version().unwrap(), version);
         }
+    }
+
+    #[test]
+    fn test_find_profile() {
+        let test_dir = temp_dir().join("maa_test_find_profile");
+        test_dir.ensure_clean().unwrap();
+
+        let sample_str = r#"
+            [connection]
+            address = "test_addr"
+        "#;
+
+        let sample_config = {
+            let mut config = AsstConfig::default();
+            config.connection.set_address("test_addr");
+            config
+        };
+
+        assert_eq!(
+            find_profile(&test_dir, None).unwrap(),
+            AsstConfig::default()
+        );
+
+        let backcompat_path = test_dir.join("asst.toml");
+        let default_path = test_dir.join("profiles").join("default.toml");
+        let test_path = test_dir.join("profiles").join("test.toml");
+
+        std::fs::write(&backcompat_path, sample_str).unwrap();
+        assert_eq!(find_profile(&test_dir, None).unwrap(), sample_config);
+        std::fs::remove_file(&backcompat_path).unwrap();
+
+        std::fs::create_dir(test_dir.join("profiles")).unwrap();
+
+        std::fs::write(&default_path, sample_str).unwrap();
+        assert_eq!(find_profile(&test_dir, None).unwrap(), sample_config);
+        std::fs::remove_file(&default_path).unwrap();
+
+        std::fs::write(&test_path, sample_str).unwrap();
+        assert_eq!(
+            find_profile(&test_dir, None).unwrap(),
+            AsstConfig::default()
+        );
+        assert_eq!(
+            find_profile(&test_dir, Some("test")).unwrap(),
+            sample_config
+        );
+        std::fs::remove_file(&test_path).unwrap();
+
+        std::fs::remove_dir_all(&test_dir).unwrap();
     }
 }

@@ -274,7 +274,9 @@ description = "medicine to use"
 
 ## MaaCore 相关配置
 
-和 MaaCore 相关的配置需要放在 `$MAA_CONFIG_DIR/asst.toml` 中。目前其包含的配置有：
+和 MaaCore 相关的配置需要放在 `$MAA_CONFIG_DIR/profiles` 目录中。该目录下的每一个文件都是一个配置文件，你可以通过 `-p` 或者 `--profile` 选项来指定配置文件名，不指定时尝试读取 `default` 配置文件。
+
+目前支持的配置字段如下：
 
 ```toml
 [connection]

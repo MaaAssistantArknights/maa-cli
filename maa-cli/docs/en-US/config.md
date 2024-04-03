@@ -287,7 +287,9 @@ For `Select` type, a prompt will be shown to ask the user to input an index or c
 
 ## MaaCore related configurations
 
-The related configuration file of MaaCore is located in `$MAA_CONFIG_DIR/asst.toml`. The currently available configurations are:
+The related configuration files of MaaCore is called "Profile" and located in `$MAA_CONFIG_DIR/profiles` directory. Each files in this directory is a profile, while the default profile is `default.toml`. If you want to use a profile other than the default one, you can specify it by `-p` or `--profile` option.
+
+The currently available configurations are:
 
 ```toml
 [connection]
