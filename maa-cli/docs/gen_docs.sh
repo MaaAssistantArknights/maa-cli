@@ -30,7 +30,6 @@ for lang in "$original_dir"/zh-CN; do
   for filename in "${files[@]}"; do
     echo "-> Generating documentation for $filename"
     file="$lang/$filename"
-
     index=$order
     order=$((order+1))
     out_file="$output_dir/cli-$filename"
@@ -45,7 +44,7 @@ for lang in "$original_dir"/zh-CN; do
     } > "$out_file"
     # remap some links to the original repo
     sed -I '' -E 's|\.\./\.\./|https://github.com/MaaAssistantArknights/maa-cli/blob/main/maa-cli/|g' "$out_file"
-    sed -I '' -E 's|https://maa\.plus/docs/|../../|g' "$out_file"
+    sed -I '' -E 's|https://maa\.plus/docs/(.+)\.html|../../\1.md|g' "$out_file"
     for filename_md in "${files[@]}"; do
       sed -i '' -E "s|$filename_md|cli-$filename_md|g" "$out_file"
     done
