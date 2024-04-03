@@ -4,18 +4,19 @@ on:
   push:
     branches: ["main"]
     paths:
-      - "maa-cli/**"
-      - "maa-sys/**"
-      - "Cargo.toml"
+      - "*/src/**"
+      - "*/Cargo.toml"
+      - "*/build.rs"
       - "Cargo.lock"
       - ".github/workflows/ci.yml"
       - ".github/actions/setup/**"
+      - ".github/actions/install-core/**"
   pull_request:
     branches: ["main"]
     paths:
-      - "maa-cli/**"
-      - "maa-sys/**"
-      - "Cargo.toml"
+      - "*/src/**"
+      - "*/Cargo.toml"
+      - "*/build.rs"
       - "Cargo.lock"
       - ".github/workflows/ci.yml"
       - ".github/actions/setup/**"
