@@ -158,27 +158,30 @@ pub trait FindFile: FromFile {
     /// Find file with supported extension and deserialize it.
     ///
     /// The file should not have extension. If it has extension, it will be ignored.
-    fn find_file(path: impl AsRef<Path>) -> Result<Self> {
+    /// If file not found, return Ok(None).
+    fn find_file_or_none(path: impl AsRef<Path>) -> Result<Option<Self>> {
         let path = path.as_ref();
         for filetype in SUPPORTED_EXTENSION.iter() {
             let path = path.with_extension(filetype);
             if path.exists() {
-                return Self::from_file(&path);
+                return Ok(Some(Self::from_file(&path)?));
             }
         }
-        Err(file_not_found(path))
+        Ok(None)
+    }
+    /// Find file with supported extension and deserialize it.
+    ///
+    /// The file should not have extension. If it has extension, it will be ignored.
+    /// Return error if file not found.
+    fn find_file(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref();
+        Self::find_file_or_none(path)?.ok_or_else(|| file_not_found(path))
     }
 }
 
 pub trait FindFileOrDefault: FromFile + Default {
-    fn find_file_or_default(path: &Path) -> Result<Self> {
-        for filetype in SUPPORTED_EXTENSION.iter() {
-            let path = path.with_extension(filetype);
-            if path.exists() {
-                return Self::from_file(&path);
-            }
-        }
-        Ok(Self::default())
+    fn find_file_or_default(path: impl AsRef<Path>) -> Result<Self> {
+        Self::find_file_or_none(path).map(|opt| opt.unwrap_or_default())
     }
 }
 
@@ -294,6 +297,17 @@ mod tests {
             }"#,
         )
         .unwrap();
+
+        assert!(TestConfig::find_file_or_none(&non_exist_file)
+            .unwrap()
+            .is_none());
+        assert_eq!(
+            TestConfig::find_file_or_none(&test_file).unwrap().unwrap(),
+            TestConfig {
+                a: 1,
+                b: "test".to_string()
+            }
+        );
 
         assert_eq!(
             TestConfig::find_file(&test_file).unwrap(),

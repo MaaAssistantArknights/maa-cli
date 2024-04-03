@@ -69,6 +69,7 @@ set -l clients Official Bilibili Txwy YoStarEN YoStarJP YoStarKR
 ## Common options
 set -l run_commands run startup closedown fight copilot roguelike
 complete -c maa -n "__fish_seen_subcommand_from $run_commands" -s a -l addr -d 'ADB serial number of device or MaaTools address set in PlayCover' -r
+complete -c maa -n "__fish_seen_subcommand_from $run_commands" -s p -l profile -d 'Profile to use' -r
 complete -c maa -n "__fish_seen_subcommand_from $run_commands" -l user-resource -d 'Load resources from the config directory'
 complete -c maa -n "__fish_seen_subcommand_from $run_commands" -l dry-run -d 'Parse the your config but do not connect to the game'
 complete -c maa -n "__fish_seen_subcommand_from $run_commands" -l no-summary -d 'Do not print summary when finnish'
