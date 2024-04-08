@@ -11,7 +11,6 @@ use crate::{
         cli_config,
         maa_core::{CommonArgs, Components, Config},
     },
-    consts::MAA_CORE_LIB,
     dirs::{self, Ensure},
     run,
 };
@@ -67,17 +66,24 @@ fn extract_mapper(
     None
 }
 
+/// Get installed MaaCore version
 pub fn version() -> Result<Version> {
     let ver_str = run::core_version()?.trim();
-    Version::parse(&ver_str[1..]).context("Failed to parse version")
+
+    ver_str
+        .strip_prefix('v')
+        .unwrap_or(ver_str)
+        .parse()
+        .context("Failed to get version")
 }
 
 pub fn install(force: bool, args: &CommonArgs) -> Result<()> {
     let config = cli_config().core_config().apply_args(args);
 
     let lib_dir = dirs::library();
+    let lib_name = format!("{}MaaCore{}", DLL_PREFIX, DLL_SUFFIX);
 
-    if lib_dir.join(MAA_CORE_LIB).exists() && !force {
+    if lib_dir.join(lib_name).exists() && !force {
         bail!("MaaCore already exists, use `maa update` to update it or `maa install --force` to force reinstall")
     }
 
@@ -189,7 +195,7 @@ fn get_version_json(config: &Config) -> Result<VersionJSON<Details>> {
 }
 
 /// Get the name of the asset for the current platform
-fn name(version: &Version) -> Result<String> {
+pub fn name(version: &Version) -> Result<String> {
     match OS {
         "macos" => Ok(format!("MAA-v{}-macos-runtime-universal.zip", version)),
         "linux" => match ARCH {

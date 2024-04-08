@@ -6,7 +6,6 @@ use super::{
 
 use crate::{
     config::cli::{cli_config, maa_cli::CommonArgs},
-    consts::{MAA_CLI_EXE, MAA_CLI_VERSION},
     dirs::{self, Ensure},
 };
 
@@ -21,10 +20,6 @@ use semver::Version;
 use serde::Deserialize;
 use tokio::runtime::Runtime;
 
-pub fn version() -> Result<Version> {
-    Version::parse(MAA_CLI_VERSION).context("Failed to parse maa-cli version")
-}
-
 pub fn update(args: &CommonArgs) -> Result<()> {
     let config = cli_config().cli_config().with_args(args);
 
@@ -33,7 +28,7 @@ pub fn update(args: &CommonArgs) -> Result<()> {
         .context("Failed to fetch version info")?
         .json()
         .context("Failed to parse version info")?;
-    let current_version = version()?;
+    let current_version: Version = env!("CARGO_PKG_VERSION").parse()?;
     if !version_json.can_update("maa-cli", &current_version)? {
         return Ok(());
     }
@@ -66,8 +61,9 @@ pub fn update(args: &CommonArgs) -> Result<()> {
             .context("Failed to download maa-cli")?;
     };
 
+    let cli_exe = format!("maa{}", consts::EXE_SUFFIX);
     Archive::new(cache_path.into())?.extract(|path| {
-        if config.components().binary && path.ends_with(MAA_CLI_EXE) {
+        if config.components().binary && path.ends_with(&cli_exe) {
             Some(bin_path.clone())
         } else {
             None

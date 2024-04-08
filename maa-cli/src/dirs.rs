@@ -1,66 +1,90 @@
-use crate::{
-    consts::MAA_CORE_LIB,
-    run,
-    value::userinput::{BoolInput, UserInput},
-};
-
 use std::{
     borrow::Cow,
     env::{current_exe, var_os},
-    fs::{self, create_dir, create_dir_all, remove_dir_all, DirEntry},
+    ffi::OsStr,
+    fs::{create_dir, create_dir_all, remove_dir_all},
     path::{Path, PathBuf},
+    sync::OnceLock,
 };
 
-use anyhow::{anyhow, Result};
-use clap::ValueEnum;
 use directories::ProjectDirs;
 use dunce::canonicalize;
 use lazy_static::lazy_static;
-use paste::paste;
 
-macro_rules! matct_loc {
-    (state, $dirs:ident) => {
-        $dirs
-            .state_dir()
-            .unwrap_or_else(|| $dirs.data_dir())
-            .to_path_buf()
-    };
-    (config, $dirs:ident) => {
-        if cfg!(target_os = "macos") {
-            $dirs.config_dir().join("config")
-        } else {
-            $dirs.config_dir().to_path_buf()
-        }
-    };
-    ($loc:ident, $dirs:ident) => {
-        paste! {
-            $dirs.[<$loc _dir>]().to_path_buf()
-        }
-    };
+/// Get the MaaCore library file name (with prefix and suffix)
+pub fn maa_lib_name() -> &'static str {
+    use std::env::consts::{DLL_PREFIX, DLL_SUFFIX};
+
+    static MAA_CORE_LIB: OnceLock<String> = OnceLock::new();
+    MAA_CORE_LIB.get_or_init(|| format!("{DLL_PREFIX}MaaCore{DLL_SUFFIX}"))
 }
 
-macro_rules! get_dir {
-    ($loc:ident) => {
-        paste! {
-            fn [<get_ $loc _dir>](proj: &Option<ProjectDirs>) -> PathBuf {
-                if let Some(dir) = var_os(stringify!([<MAA_ $loc:upper _DIR>])) {
-                    PathBuf::from(dir)
-                } else if let Some(dir) = var_os(stringify!([<XDG_ $loc:upper _HOME>])) {
-                    PathBuf::from(dir).join("maa")
-                } else if let Some(dirs) = proj {
-                    matct_loc!($loc, dirs)
+/// A convenient macro to join paths, avoiding intermediate `PathBuf` allocation.
+///
+/// If the first path is a PathBuf, it will be reused.
+/// Otherwise, a new PathBuf will be created from the first path.
+/// This is useful to avoid unnecessary allocation when the first path is a PathBuf,
+/// and when multiple paths are joined.
+///
+/// Note: Because we reuse the first path, the first path will be consumed.
+/// Thus, if you want to reuse the first path, you should pass a Path instead of a PathBuf.
+macro_rules! join {
+    ($path:expr, $($paths:expr),+) => {{
+        let mut path: ::std::path::PathBuf = $path.into();
+        $(
+            path.push($paths);
+        )+
+        path
+    }}
+}
+
+/// Get the directory from environment variables.
+///
+/// The `maa_env` usually is `MAA_XXX_DIR`, and the `xdg_env` usually is `XDG_XXX_HOME`.
+/// If the `maa_env` is set, return the directory `maa_env`.
+/// If the `xdg_env` is set, return the directory `xdg_env/maa`.
+/// Otherwise, return `None`.
+fn dir_from_env(maa_env: impl AsRef<OsStr>, xdg_env: impl AsRef<OsStr>) -> Option<PathBuf> {
+    var_os(maa_env)
+        .map(PathBuf::from)
+        .or_else(|| var_os(xdg_env).map(|xdg| join!(xdg, "maa")))
+}
+
+/// Get the data directory.
+fn get_data_dir(proj: Option<&ProjectDirs>) -> PathBuf {
+    dir_from_env("MAA_DATA_DIR", "XDG_DATA_HOME")
+        .or_else(|| proj.map(|dirs| dirs.data_dir().into()))
+        .expect("Failed to get data directory!")
+}
+
+/// Get the state directory.
+fn get_state_dir(proj: Option<&ProjectDirs>) -> PathBuf {
+    dir_from_env("MAA_STATE_DIR", "XDG_STATE_HOME")
+        .or_else(|| proj.map(|dirs| dirs.state_dir().unwrap_or_else(|| dirs.data_dir()).into()))
+        .expect("Failed to get state directory!")
+}
+
+/// Get the cache directory.
+fn get_cache_dir(proj: Option<&ProjectDirs>) -> PathBuf {
+    dir_from_env("MAA_CACHE_DIR", "XDG_CACHE_HOME")
+        .or_else(|| proj.map(|dirs| dirs.cache_dir().into()))
+        .expect("Failed to get cache directory!")
+}
+
+/// Get the config directory.
+fn get_config_dir(proj: Option<&ProjectDirs>) -> PathBuf {
+    dir_from_env("MAA_CONFIG_DIR", "XDG_CONFIG_HOME")
+        .or_else(|| {
+            proj.map(|dirs| {
+                if cfg!(target_os = "macos") {
+                    dirs.config_dir().join("config")
                 } else {
-                    panic!("Failed to get {} directory!", stringify!($loc))
+                    dirs.config_dir().into()
                 }
-            }
-        }
-    };
+            })
+        })
+        .expect("Failed to get config directory!")
 }
-
-get_dir!(state);
-get_dir!(data);
-get_dir!(config);
-get_dir!(cache);
 
 pub struct Dirs {
     data: PathBuf,
@@ -76,14 +100,15 @@ pub struct Dirs {
 
 impl Dirs {
     pub fn new(proj: Option<ProjectDirs>) -> Self {
-        let data_dir = get_data_dir(&proj);
-        let state_dir = get_state_dir(&proj);
-        let cache_dir = get_cache_dir(&proj);
+        let proj = proj.as_ref();
+        let data_dir = get_data_dir(proj);
+        let state_dir = get_state_dir(proj);
+        let cache_dir = get_cache_dir(proj);
 
         Self {
             copilot: cache_dir.join("copilot"),
             cache: cache_dir,
-            config: get_config_dir(&proj),
+            config: get_config_dir(proj),
             library: data_dir.join("lib"),
             resource: data_dir.join("resource"),
             hot_update: data_dir.join("MaaResource"),
@@ -113,17 +138,18 @@ impl Dirs {
     /// try to find the MaaCore in the `lib` directory in the parent directory of the executable file.
     /// If the executable is a symbolic link, will try to find the MaaCore both in the symbolic link and the link target.
     pub fn find_library<'a>(&'a self, exe_path: &'a Path) -> Option<Cow<'a, Path>> {
-        if self.library().join(MAA_CORE_LIB).exists() {
+        let lib_name = maa_lib_name();
+        if self.library().join(lib_name).exists() {
             return Some(self.library().into());
         }
 
         _find_from(exe_path, |exe_dir| {
-            if exe_dir.join(MAA_CORE_LIB).exists() {
+            if exe_dir.join(lib_name).exists() {
                 return Some(exe_dir);
             }
             if let Some(dir) = exe_dir.parent() {
                 let lib_dir = dir.join("lib");
-                let lib_path = lib_dir.join(MAA_CORE_LIB);
+                let lib_path = lib_dir.join(lib_name);
                 if lib_path.exists() {
                     return Some(lib_dir.into());
                 }
@@ -204,12 +230,12 @@ impl Dirs {
             if let Some(dir) = exe_dir.parent() {
                 let share_dir = dir.join("share");
                 if let Some(extra_share) = option_env!("MAA_EXTRA_SHARE_NAME") {
-                    let resource_dir = share_dir.join(extra_share).join("resource");
+                    let resource_dir = join!(&share_dir, extra_share, "resource");
                     if resource_dir.exists() {
                         return Some(resource_dir.into());
                     }
                 }
-                let resource_dir = share_dir.join("maa").join("resource");
+                let resource_dir = join!(share_dir, "maa", "resource");
                 if resource_dir.exists() {
                     return Some(resource_dir.into());
                 }
@@ -400,159 +426,22 @@ fn ensure_name(name: &str) -> &str {
     name
 }
 
-pub trait PathProvider {
-    fn get_path(&self) -> Vec<PathBuf>;
-}
-
-#[derive(ValueEnum, Clone, Debug, PartialEq)]
-pub enum CleanupTarget {
-    CliCache,
-    Avatars,
-    Log,
-    Misc,
-}
-
-impl PathProvider for CleanupTarget {
-    fn get_path(&self) -> Vec<PathBuf> {
-        let debug = log();
-
-        match self {
-            CleanupTarget::CliCache => {
-                vec![cache().to_path_buf()]
-            }
-            CleanupTarget::Avatars => {
-                vec![state().join("cache").join("avatars")]
-            }
-            CleanupTarget::Log => {
-                let log_files = match fs::read_dir(debug) {
-                    Ok(dir) => dir
-                        .filter_map(|entry| {
-                            let entry = entry.ok()?;
-                            let binding = entry.file_name();
-                            let file_name = binding.to_string_lossy();
-                            if file_name.starts_with("20") {
-                                Some(entry.path())
-                            } else {
-                                None
-                            }
-                        })
-                        .collect(),
-                    Err(_) => Vec::new(),
-                };
-                let mut logs = vec![log().join("asst.log"), log().join("asst.bak.log")];
-                logs.extend(log_files);
-                logs
-            }
-            CleanupTarget::Misc => {
-                vec![
-                    debug.join("drops"),
-                    debug.join("map"),
-                    debug.join("other"),
-                    debug.join("Roguelike"),
-                ]
-            }
-        }
-    }
-}
-
-pub fn cleanup<T>(targets: &[T]) -> Result<()>
-where
-    T: PathProvider,
-{
-    let targets_to_use: Vec<&dyn PathProvider> = if targets.is_empty() {
-        vec![
-            &CleanupTarget::CliCache,
-            &CleanupTarget::Avatars,
-            &CleanupTarget::Log,
-            &CleanupTarget::Misc,
-        ]
-    } else {
-        targets.iter().map(|x| x as &dyn PathProvider).collect()
-    };
-
-    let trash_list: Vec<PathBuf> = targets_to_use
-        .iter()
-        .flat_map(|target| target.get_path())
-        .collect();
-
-    trash_list.iter().enumerate().for_each(|(i, p)| {
-        println!("{}. {}", i + 1, p.display());
-    });
-
-    if !BoolInput::new(Some(true), Some("clear files or folders mentioned above")).value()? {
-        println!("No files or folders have been deleted.");
-        return Ok(());
-    }
-
-    let mut has_err = false;
-    for path in trash_list {
-        print!("Delete {}... ", path.display());
-        let exclude = if path == cache() {
-            // Keep the latest packages
-            Some(run::core_version()?)
-        } else {
-            None
-        };
-
-        match del_item(path.as_path(), exclude) {
-            Err(e) => {
-                println!("\x1B[31m{}\x1B[0m", e);
-                has_err = true;
-            }
-            Ok(_) => {
-                println!("\x1B[34mDone.\x1B[0m");
-            }
-        }
-    }
-
-    if !has_err {
-        Ok(())
-    } else {
-        Err(anyhow!("At least one path has not been deleted."))
-    }
-}
-
-fn del_item(path: &Path, exclude: Option<&str>) -> Result<()> {
-    let exclude_logic = |entry: DirEntry| match exclude {
-        Some(str) => {
-            let binding = entry.file_name();
-            if !binding.to_str()?.contains(str) {
-                Some(entry.path())
-            } else {
-                None
-            }
-        }
-        None => Some(entry.path()),
-    };
-
-    if path.is_file() {
-        std::fs::remove_file(path)?;
-        return Ok(());
-    }
-
-    let filtered_dir_list: Vec<PathBuf> = fs::read_dir(path)?
-        .filter_map(|e| e.ok())
-        .filter_map(exclude_logic)
-        .collect();
-
-    if filtered_dir_list.is_empty() {
-        return Err(anyhow!("Folder is empty."));
-    }
-
-    for path in filtered_dir_list {
-        if path.is_file() {
-            std::fs::remove_file(path)?;
-        } else {
-            std::fs::remove_dir_all(path)?
-        }
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::env::{self, temp_dir};
+
+    #[test]
+    fn test_maa_lib_name() {
+        #[cfg(target_os = "macos")]
+        assert_eq!(maa_lib_name(), "libMaaCore.dylib");
+
+        #[cfg(target_os = "linux")]
+        assert_eq!(maa_lib_name(), "libMaaCore.so");
+
+        #[cfg(target_os = "windows")]
+        assert_eq!(maa_lib_name(), "MaaCore.dll");
+    }
 
     mod get_dir {
         use super::*;
@@ -668,7 +557,7 @@ mod tests {
             resource_dir.ensure_clean().unwrap();
             let bin_exe = bin_dir.join("maa");
             File::create(&bin_exe).unwrap();
-            File::create(library_dir.join(MAA_CORE_LIB)).unwrap();
+            File::create(library_dir.join(maa_lib_name())).unwrap();
             assert_eq!(dirs.find_library(&bin_exe).unwrap(), library_dir);
             assert_eq!(dirs.find_resource(&bin_exe).unwrap(), resource_dir);
 
@@ -676,19 +565,19 @@ mod tests {
             test_root.ensure_clean().unwrap();
             let bin_dir = test_root.join("bin");
             let library_dir = test_root.join("lib");
-            let share_dir = test_root.join("share").join("maa");
+            let share_dir = join!(&test_root, "share", "maa");
             let resource_dir = share_dir.join("resource");
             bin_dir.ensure_clean().unwrap();
             library_dir.ensure_clean().unwrap();
             resource_dir.ensure_clean().unwrap();
             let bin_exe = bin_dir.join("maa");
             File::create(bin_dir.join("maa")).unwrap();
-            File::create(library_dir.join(MAA_CORE_LIB)).unwrap();
+            File::create(library_dir.join(maa_lib_name())).unwrap();
             assert_eq!(dirs.find_library(&bin_exe).unwrap(), library_dir);
             assert_eq!(dirs.find_resource(&bin_exe).unwrap(), resource_dir);
 
             if let Some(name) = option_env!("MAA_EXTRA_SHARE_NAME") {
-                let extra_share_dir = test_root.join("share").join(ensure_name(name));
+                let extra_share_dir = join!(&test_root, "share", ensure_name(name));
                 let extra_resource_dir = extra_share_dir.join("resource");
                 create_dir_all(&extra_resource_dir).unwrap();
                 assert_eq!(dirs.find_resource(&bin_exe).unwrap(), extra_resource_dir);
@@ -707,7 +596,7 @@ mod tests {
                 let cellar = test_root.join("Cellar");
                 let bin_dir = cellar.join("bin");
                 let library_dir = cellar.join("lib");
-                let share_dir = test_root.join("share").join("maa");
+                let share_dir = join!(&test_root, "share", "maa");
                 let resource_dir = share_dir.join("resource");
                 let linked_dir = test_root.join("bin");
                 bin_dir.ensure_clean().unwrap();
@@ -717,7 +606,7 @@ mod tests {
                 let bin_exe = bin_dir.join("maa");
                 let linked_exe = linked_dir.join("maa");
                 File::create(&bin_exe).unwrap();
-                File::create(library_dir.join(MAA_CORE_LIB)).unwrap();
+                File::create(library_dir.join(maa_lib_name())).unwrap();
                 symlink(&bin_exe, &linked_exe).unwrap();
                 assert_eq!(dirs.find_library(&linked_exe).unwrap(), library_dir);
                 assert_eq!(dirs.find_resource(&linked_exe).unwrap(), resource_dir);
@@ -729,11 +618,11 @@ mod tests {
                 remove_dir_all(&share_dir).unwrap();
 
                 let library_dir = test_root.join("lib");
-                let share_dir = test_root.join("share").join("maa");
+                let share_dir = join!(&test_root, "share", "maa");
                 let resource_dir = share_dir.join("resource");
                 std::fs::create_dir_all(&library_dir).unwrap();
                 std::fs::create_dir_all(&resource_dir).unwrap();
-                File::create(library_dir.join(MAA_CORE_LIB)).unwrap();
+                File::create(library_dir.join(maa_lib_name())).unwrap();
                 assert_eq!(dirs.find_library(&linked_exe).unwrap(), library_dir);
                 assert_eq!(dirs.find_resource(&linked_exe).unwrap(), resource_dir);
             }
@@ -759,7 +648,7 @@ mod tests {
             );
             assert_eq!(
                 TEST_DIRS.abs_config("foo", Some("bar")).unwrap(),
-                TEST_DIRS.config().join("bar").join("foo")
+                join!(TEST_DIRS.config(), "bar", "foo")
             );
 
             #[cfg(unix)]
@@ -771,7 +660,7 @@ mod tests {
             assert_eq!(config(), TEST_DIRS.config());
             assert_eq!(
                 abs_config("foo", Some("bar")).unwrap(),
-                config().join("bar").join("foo")
+                join!(config(), "bar", "foo")
             );
 
             env::set_var("XDG_CONFIG_HOME", "/xdg");
@@ -888,72 +777,5 @@ mod tests {
         ensure_name("foo/bar");
         #[cfg(windows)]
         ensure_name("foo\\bar");
-    }
-
-    #[test]
-    fn test_cleanup() {
-        struct MockCleanupTarget {
-            paths: Vec<PathBuf>,
-        }
-
-        impl PathProvider for MockCleanupTarget {
-            fn get_path(&self) -> Vec<PathBuf> {
-                self.paths.clone()
-            }
-        }
-
-        impl MockCleanupTarget {
-            pub fn new(paths: Vec<PathBuf>) -> Self {
-                MockCleanupTarget { paths }
-            }
-        }
-
-        let dir = std::env::temp_dir().join("maa-test-convert");
-        let file_path = dir.join("test_file.txt");
-        let dir_path = dir.join("test_dir");
-        let file_in_dir = dir_path.join("test_file2.txt");
-
-        let _ = std::fs::File::create(&file_path);
-        let _ = std::fs::create_dir(&dir_path);
-        let _ = std::fs::File::create(&file_in_dir);
-
-        let paths = vec![file_path.clone(), dir_path.clone()];
-        let targets: Vec<MockCleanupTarget> = vec![MockCleanupTarget::new(paths)];
-        assert!(cleanup(&targets).is_ok());
-        assert!(!file_path.exists());
-        assert!(!file_in_dir.exists());
-
-        let err_path = dir.join("err_dir");
-        let targets: Vec<MockCleanupTarget> = vec![MockCleanupTarget::new(vec![err_path])];
-        assert!(cleanup(&targets).is_err());
-    }
-
-    #[test]
-    fn test_cleanup_target() {
-        let _version = match run::core_version() {
-            Ok(v) => v,
-            Err(_) => return, // uninitialized
-        };
-        let enum_list = [
-            CleanupTarget::Avatars,
-            CleanupTarget::CliCache,
-            CleanupTarget::Log,
-            CleanupTarget::Misc,
-        ];
-        let binding = enum_list[0].get_path();
-        let avatars = binding.first().unwrap().parent().unwrap().parent().unwrap();
-        assert_eq!(state(), avatars);
-
-        let binding = enum_list[1].get_path();
-        let cli_cache = binding.first().unwrap();
-        assert_eq!(cache(), cli_cache);
-
-        let binding = enum_list[2].get_path();
-        let logs = binding.first().unwrap().parent().unwrap();
-        assert_eq!(log(), logs);
-
-        let binding = enum_list[3].get_path();
-        let map = binding.first().unwrap().parent().unwrap();
-        assert_eq!(log(), map);
     }
 }

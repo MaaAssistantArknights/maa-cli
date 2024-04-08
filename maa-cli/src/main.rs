@@ -1,7 +1,9 @@
-mod activity;
-mod config;
-mod consts;
+#[macro_use]
 mod dirs;
+
+mod activity;
+mod cleanup;
+mod config;
 mod installer;
 mod run;
 mod value;
@@ -229,7 +231,7 @@ enum SubCommand {
     /// Clearing the caches of maa-cli and maa core
     Cleanup {
         /// Specify the path for deletion
-        targets: Vec<dirs::CleanupTarget>,
+        targets: Vec<cleanup::CleanupTarget>,
     },
     /// List all available tasks
     List,
@@ -476,7 +478,7 @@ fn main() -> Result<()> {
                 )
             );
         }
-        SubCommand::Cleanup { targets } => dirs::cleanup(&targets)?,
+        SubCommand::Cleanup { targets } => cleanup::cleanup(&targets)?,
         SubCommand::List => {
             let task_dir = dirs::config().join("tasks");
             if !task_dir.exists() {
@@ -566,7 +568,7 @@ mod test {
     mod parser {
         use super::*;
 
-        use crate::{config::cli::Channel, dirs::CleanupTarget};
+        use crate::config::cli::Channel;
         use std::env;
 
         #[test]
@@ -1062,24 +1064,20 @@ mod test {
 
         #[test]
         fn cleanup() {
+            use cleanup::CleanupTarget::*;
             assert_matches!(
                 CLI::parse_from(["maa", "cleanup"]).command,
-                SubCommand::Cleanup { targets: _ }
+                SubCommand::Cleanup { .. }
             );
 
             assert_matches!(
                 CLI::parse_from(["maa", "cleanup", "log"]).command,
-                SubCommand::Cleanup { targets } if targets == vec![CleanupTarget::Log]
+                SubCommand::Cleanup { targets } if targets == vec![Log]
             );
 
             assert_matches!(
                 CLI::parse_from(["maa", "cleanup", "cli-cache", "log"]).command,
-                SubCommand::Cleanup { targets } if targets == vec![CleanupTarget::CliCache,CleanupTarget::Log]
-            );
-
-            assert_matches!(
-                CLI::parse_from(["maa", "cleanup", "cli-cache", "avatars", "log", "misc"]).command,
-                SubCommand::Cleanup { targets } if targets == vec![CleanupTarget::CliCache,CleanupTarget::Avatars,CleanupTarget::Log,CleanupTarget::Misc]
+                SubCommand::Cleanup { targets } if targets == vec![CliCache, Log]
             );
         }
 

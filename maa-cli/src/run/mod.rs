@@ -11,8 +11,7 @@ pub mod preset;
 
 use crate::{
     config::{asst::AsstConfig, task::TaskConfig, FindFile},
-    consts::MAA_CORE_LIB,
-    dirs::{self, Ensure},
+    dirs::{self, maa_lib_name, Ensure},
     installer::resource,
 };
 
@@ -103,10 +102,10 @@ impl CommonArgs {
 fn find_profile(root: impl AsRef<Path>, profile: Option<&str>) -> Result<AsstConfig> {
     let root = root.as_ref();
     if let Some(profile) = profile {
-        AsstConfig::find_file(root.join("profiles").join(profile))
+        AsstConfig::find_file(join!(root, "profiles", profile))
             .context("Failed to find profile file!")
     } else {
-        for file in &[root.join("profiles").join("default"), root.join("asst")] {
+        for file in &[join!(root, "profiles", "default"), join!(root, "asst")] {
             if let Some(config) = AsstConfig::find_file_or_none(file)? {
                 return Ok(config);
             }
@@ -261,14 +260,9 @@ pub fn run_custom(path: impl AsRef<Path>, args: CommonArgs) -> Result<()> {
 }
 
 pub fn core_version<'a>() -> Result<&'a str> {
-    load_core().context("Failed to load MaaCore!")?;
+    load_core()?;
 
-    Ok(Assistant::get_version()?)
-
-    // BUG:
-    // if we call maa_sys::binding::unload() here,
-    // program will crash with signal SIGSEGV (Address boundary error)
-    // So we don't unload MaaCore
+    Assistant::get_version().context("Failed to get MaaCore version!")
 }
 
 fn load_core() -> Result<()> {
@@ -287,11 +281,12 @@ fn load_core() -> Result<()> {
 
             unsafe { SetDllDirectoryW(&HSTRING::from(lib_dir.as_ref()))? };
         }
-        maa_sys::binding::load(lib_dir.join(MAA_CORE_LIB))?;
+        maa_sys::binding::load(lib_dir.join(maa_lib_name()))
     } else {
         debug!("MaaCore not found, trying to load from system library path");
-        maa_sys::binding::load(MAA_CORE_LIB)?;
+        maa_sys::binding::load(maa_lib_name())
     }
+    .context("Failed to load MaaCore!")?;
 
     Ok(())
 }
