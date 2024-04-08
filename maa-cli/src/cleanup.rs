@@ -421,22 +421,25 @@ mod tests {
             if let Some(version) = std::env::var_os("MAA_CORE_VERSION") {
                 let name =
                     maa_core::name(&version.to_str().unwrap()[1..].parse().unwrap()).unwrap();
-                std::fs::File::create(join!(state(), "cache", &name)).unwrap();
+                std::fs::File::create(join!(cache(), &name)).unwrap();
             }
-
-            std::fs::File::create(join!(state(), "cache", "avatars")).unwrap();
-            std::fs::create_dir_all(join!(log(), "2024")).unwrap();
-            std::fs::File::create(join!(log(), "asst.log")).unwrap();
-            std::fs::File::create(join!(log(), "asst.bak.log")).unwrap();
-
-            let target: Vec<CleanupTarget> = Vec::new();
-            cleanup(&target).unwrap();
-
-            assert!(!join!(cache(), "test.tar.gz").exists());
-            assert!(!join!(state(), "cache", "avatars").exists());
-            assert!(!join!(log(), "2024").exists());
-            assert!(!join!(log(), "asst.log").exists());
-            assert!(!join!(log(), "asst.bak.log").exists());
         }
+
+        let core_cache = join!(state(), "cache");
+        core_cache.ensure().unwrap();
+
+        std::fs::File::create(join!(&core_cache, "avatars")).unwrap();
+        std::fs::create_dir_all(join!(log(), "2024")).unwrap();
+        std::fs::File::create(join!(log(), "asst.log")).unwrap();
+        std::fs::File::create(join!(log(), "asst.bak.log")).unwrap();
+
+        let target: Vec<CleanupTarget> = Vec::new();
+        cleanup(&target).unwrap();
+
+        assert!(!join!(cache(), "test.tar.gz").exists());
+        assert!(!join!(core_cache, "avatars").exists());
+        assert!(!join!(log(), "2024").exists());
+        assert!(!join!(log(), "asst.log").exists());
+        assert!(!join!(log(), "asst.bak.log").exists());
     }
 }
