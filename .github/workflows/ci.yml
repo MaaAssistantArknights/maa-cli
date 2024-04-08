@@ -165,6 +165,8 @@ jobs:
           - macos-12 # x86_64 runner
           - macos-14 # aarch64 runner
           - windows-latest
+    env:
+      MAA_EXTRA_SHARE_NAME: maa-test
     steps:
       - name: Checkout
         uses: actions/checkout@v4

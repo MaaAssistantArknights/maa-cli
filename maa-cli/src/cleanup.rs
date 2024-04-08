@@ -441,5 +441,7 @@ mod tests {
         assert!(!join!(log(), "2024").exists());
         assert!(!join!(log(), "asst.log").exists());
         assert!(!join!(log(), "asst.bak.log").exists());
+
+        cleanup(&target).unwrap(); // Cleanup again to test no files left
     }
 }
