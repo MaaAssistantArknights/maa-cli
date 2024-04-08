@@ -1,26 +1,31 @@
-use std::{io::Write, path::Path};
-
 use crate::{config::task::ClientType, dirs};
+
+use std::{io::Write, path::Path, sync::OnceLock};
 
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, FixedOffset, NaiveDateTime};
-use lazy_static::lazy_static;
 use log::warn;
 use serde::Deserialize;
 use serde_json::Value as JsonValue;
 
-lazy_static! {
-    static ref STAGE_ACTIVITY: Option<StageActivityJson> = load_stage_activity(
-        dirs::hot_update()
-            .join("cache")
-            .join("gui")
-            .join("StageActivity.json")
-    )
-    .warn_err();
+fn stage_activity() -> Option<&'static StageActivityJson> {
+    static STAGE_ACTIVITY: OnceLock<Option<StageActivityJson>> = OnceLock::new();
+
+    STAGE_ACTIVITY
+        .get_or_init(|| {
+            load_stage_activity(
+                dirs::hot_update()
+                    .join("cache")
+                    .join("gui")
+                    .join("StageActivity.json"),
+            )
+            .warn_err()
+        })
+        .as_ref()
 }
 
 pub fn has_side_story_open(client: ClientType) -> bool {
-    STAGE_ACTIVITY
+    stage_activity()
         .as_ref()
         .map(|stage_activity| {
             stage_activity
@@ -31,7 +36,7 @@ pub fn has_side_story_open(client: ClientType) -> bool {
 }
 
 pub fn display_stage_activity(client: ClientType) -> std::io::Result<()> {
-    if let Some(stage_activity) = STAGE_ACTIVITY.as_ref() {
+    if let Some(stage_activity) = stage_activity().as_ref() {
         stage_activity.display(std::io::stdout(), client)?;
         std::io::stdout().flush()?;
     }
@@ -166,15 +171,22 @@ fn load_item_index(client: ClientType) -> Result<JsonValue> {
     };
 
     let item_index_path = match client.resource() {
-        Some(global_resource) => base_resource_dir
-            .join("global")
-            .join(global_resource)
-            .into(),
-        None => base_resource_dir,
-    }
-    .join("item_index.json");
+        Some(global_resource) => join!(
+            base_resource_dir,
+            "global",
+            global_resource,
+            "resource",
+            "item_index.json"
+        ),
+        None => join!(base_resource_dir, "item_index.json"),
+    };
 
-    let file = std::fs::File::open(item_index_path).context("Failed to open item_index.json")?;
+    let file = std::fs::File::open(&item_index_path).with_context(|| {
+        format!(
+            "Failed to open item_index.json: {}",
+            item_index_path.display()
+        )
+    })?;
 
     serde_json::from_reader(file).context("Failed to parse item_index.json")
 }
@@ -426,6 +438,24 @@ mod tests {
             },
         }
         .has_side_story_open());
+    }
+
+    #[test]
+    fn test_load_stage_activity() {
+        if std::env::var_os("MAA_CORE_INSTALLED").is_some() {
+            stage_activity().unwrap();
+        }
+    }
+
+    #[test]
+    fn test_item_index() {
+        if std::env::var_os("MAA_CORE_INSTALLED").is_some() {
+            load_item_index(ClientType::Official).unwrap();
+            load_item_index(ClientType::YoStarEN).unwrap();
+            load_item_index(ClientType::YoStarJP).unwrap();
+            load_item_index(ClientType::YoStarKR).unwrap();
+            load_item_index(ClientType::Txwy).unwrap();
+        }
     }
 
     #[test]
