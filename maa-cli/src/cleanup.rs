@@ -302,37 +302,41 @@ mod tests {
 
     #[test]
     fn test_cleanup() {
-        enum TestTarget {
-            All,
-            // Entries in the blacklist will be deleted
-            BlackList(Vec<&'static str>),
-            // Entries in the whitelist will not be deleted
-            WhiteList(Vec<&'static str>),
+        struct All;
+
+        impl PathProvider for All {
+            fn target_dir(&self) -> Cow<Path> {
+                join!(temp_dir(), "maa-cli-test-cleanup").into()
+            }
         }
 
-        impl PathProvider for TestTarget {
+        struct BlackList(Vec<&'static str>);
+
+        impl PathProvider for BlackList {
             fn target_dir(&self) -> Cow<Path> {
                 join!(temp_dir(), "maa-cli-test-cleanup").into()
             }
 
             fn should_delete(&self, entry: &DirEntry) -> bool {
-                match self {
-                    TestTarget::BlackList(list) => entry
-                        .file_name()
-                        .to_str()
-                        .is_some_and(|x| list.contains(&x)),
-                    _ => true,
-                }
+                entry
+                    .file_name()
+                    .to_str()
+                    .is_some_and(|x| self.0.contains(&x))
+            }
+        }
+
+        struct WhiteList(Vec<&'static str>);
+
+        impl PathProvider for WhiteList {
+            fn target_dir(&self) -> Cow<Path> {
+                join!(temp_dir(), "maa-cli-test-cleanup").into()
             }
 
             fn should_keep(&self, entry: &DirEntry) -> bool {
-                match self {
-                    TestTarget::WhiteList(list) => entry
-                        .file_name()
-                        .to_str()
-                        .is_some_and(|x| list.contains(&x)),
-                    _ => false,
-                }
+                entry
+                    .file_name()
+                    .to_str()
+                    .is_some_and(|x| self.0.contains(&x))
             }
         }
 
@@ -348,11 +352,11 @@ mod tests {
         };
 
         create_test_files();
-        cleanup(&[TestTarget::All]).unwrap();
+        cleanup(&[All]).unwrap();
         assert!(test_root.read_dir().unwrap().next().is_none());
 
         create_test_files();
-        cleanup(&[TestTarget::BlackList(vec!["test1", "test2"])]).unwrap();
+        cleanup(&[BlackList(vec!["test1", "test2"])]).unwrap();
         assert_eq!(
             test_root
                 .read_dir()
@@ -361,10 +365,10 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["test3"]
         );
-        cleanup(&[TestTarget::All]).unwrap();
+        cleanup(&[All]).unwrap();
 
         create_test_files();
-        cleanup(&[TestTarget::WhiteList(vec!["test1", "test2"])]).unwrap();
+        cleanup(&[WhiteList(vec!["test1", "test2"])]).unwrap();
         assert_eq!(
             test_root
                 .read_dir()
@@ -373,7 +377,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["test1", "test2"]
         );
-        cleanup(&[TestTarget::All]).unwrap();
+        cleanup(&[All]).unwrap();
 
         std::fs::remove_dir(&test_root).unwrap();
     }
