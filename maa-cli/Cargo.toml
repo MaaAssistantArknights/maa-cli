@@ -45,7 +45,6 @@ maa-sys = { path = "../maa-sys", version = "0.3.1", features = [
 ] }
 
 directories = "5"
-paste = "1"
 anyhow = "1"
 signal-hook = "0.3.17"
 dunce = "1.0.4"

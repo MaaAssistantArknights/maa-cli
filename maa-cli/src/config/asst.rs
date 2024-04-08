@@ -1,4 +1,4 @@
-use crate::dirs::{self, global_path};
+use crate::dirs;
 
 use std::path::PathBuf;
 
@@ -269,8 +269,8 @@ fn default_resource_base_dirs() -> Vec<PathBuf> {
             "Found hot update resource directory: {}",
             hot_update_dir.display()
         );
-        resource_dirs.push(hot_update_dir.join("resource"));
-        resource_dirs.push(hot_update_dir.join("cache").join("resource"));
+        resource_dirs.push(join!(hot_update_dir, "resource"));
+        resource_dirs.push(join!(hot_update_dir, "cache", "resource"));
     } else {
         warn!("Hot update resource directory not found!");
     }
@@ -333,10 +333,8 @@ impl ResourceConfig {
         let base_dirs = self.base_dirs();
         let mut resource_dirs = base_dirs.clone();
         if let Some(global_resource) = self.global_resource.as_ref() {
-            let global_resource_dir = PathBuf::from("global")
-                .join(global_resource)
-                .join("resource");
-            let full_paths = global_path(base_dirs, global_resource_dir);
+            let global_resource_dir = join!("global", global_resource, "resource");
+            let full_paths = dirs::global_path(base_dirs, global_resource_dir);
             if full_paths.is_empty() {
                 warn!("Global resource {} not found", global_resource.display(),);
             } else {
@@ -344,10 +342,9 @@ impl ResourceConfig {
             }
         }
         if let Some(platform_diff_resource) = self.platform_diff_resource.as_ref() {
-            let platform_diff_resource_dir = PathBuf::from("platform_diff")
-                .join(platform_diff_resource)
-                .join("resource");
-            let full_paths = global_path(base_dirs, platform_diff_resource_dir);
+            let platform_diff_resource_dir =
+                join!("platform_diff", platform_diff_resource, "resource");
+            let full_paths = dirs::global_path(base_dirs, platform_diff_resource_dir);
             if full_paths.is_empty() {
                 warn!(
                     "Platform diff resource {} not found",
