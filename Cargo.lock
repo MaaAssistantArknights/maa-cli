@@ -938,7 +938,6 @@ dependencies = [
  "futures-util",
  "git2",
  "indicatif",
- "lazy_static",
  "log",
  "maa-sys",
  "prettytable",

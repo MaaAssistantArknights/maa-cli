@@ -9,8 +9,9 @@ use super::FindFileOrDefault;
 
 use crate::dirs;
 
+use std::sync::OnceLock;
+
 use clap::ValueEnum;
-use lazy_static::lazy_static;
 use serde::Deserialize;
 
 /// Configuration for the CLI (cli.toml)
@@ -46,14 +47,12 @@ impl CLIConfig {
 
 impl super::FromFile for CLIConfig {}
 
-lazy_static! {
-    static ref INSTALLER_CONFIG: CLIConfig =
-        CLIConfig::find_file_or_default(dirs::config().join("cli"))
-            .expect("Failed to load installer config");
-}
-
 pub fn cli_config() -> &'static CLIConfig {
-    &INSTALLER_CONFIG
+    static INSTALLER_CONFIG: OnceLock<CLIConfig> = OnceLock::new();
+    INSTALLER_CONFIG.get_or_init(|| {
+        CLIConfig::find_file_or_default(dirs::config().join("cli"))
+            .expect("Failed to load installer config")
+    })
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]

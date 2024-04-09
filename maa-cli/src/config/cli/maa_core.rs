@@ -159,7 +159,7 @@ pub struct CommonArgs {
 pub mod tests {
     use super::*;
 
-    use lazy_static::lazy_static;
+    use std::sync::OnceLock;
 
     pub fn example_config() -> Config {
         Config {
@@ -173,12 +173,9 @@ pub mod tests {
         }
     }
 
-    lazy_static! {
-        static ref DEFAULT_CONFIG: Config = Config::default();
-    }
-
     fn default_config() -> Config {
-        DEFAULT_CONFIG.clone()
+        static DEFAULT_CONFIG: OnceLock<Config> = OnceLock::new();
+        DEFAULT_CONFIG.get_or_init(Config::default).clone()
     }
 
     mod serde {
