@@ -4,12 +4,9 @@ pub use std::collections::BTreeMap as Map;
 use std::sync::Mutex;
 
 use chrono;
-use lazy_static::lazy_static;
 use maa_sys::{binding::AsstTaskId, TaskType};
 
-lazy_static! {
-    static ref SUMMARY: Mutex<Option<Summary>> = Mutex::new(None);
-}
+static SUMMARY: Mutex<Option<Summary>> = Mutex::new(None);
 
 // It's safe to unwarp the mutex all there, because lock() returns a error only when
 // another thread failed inside the lock, which is impossible in this case, because

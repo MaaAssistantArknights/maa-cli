@@ -480,16 +480,19 @@ mod tests {
 
     use crate::assert_matches;
 
-    use lazy_static::lazy_static;
+    use std::sync::OnceLock;
 
-    lazy_static! {
-        static ref USER_RESOURCE_DIR: PathBuf = {
-            let user_resource_dir = dirs::config().join("resource");
-            if !user_resource_dir.exists() {
-                std::fs::create_dir_all(&user_resource_dir).unwrap();
-            }
-            user_resource_dir
-        };
+    fn user_resource_dir() -> PathBuf {
+        static USER_RESOURCE_DIR: OnceLock<PathBuf> = OnceLock::new();
+        USER_RESOURCE_DIR
+            .get_or_init(|| {
+                let user_resource_dir = dirs::config().join("resource");
+                if !user_resource_dir.exists() {
+                    std::fs::create_dir_all(&user_resource_dir).unwrap();
+                }
+                user_resource_dir
+            })
+            .clone()
     }
 
     mod serde {
@@ -500,7 +503,7 @@ mod tests {
         #[test]
         #[ignore = "attempt to create a directory in user space"]
         fn deserialize_example() {
-            let user_resource_dir = USER_RESOURCE_DIR.clone();
+            let user_resource_dir = user_resource_dir();
 
             let config: AsstConfig =
                 toml::from_str(&std::fs::read_to_string("./config_examples/asst.toml").unwrap())
@@ -623,7 +626,7 @@ mod tests {
                 &[Token::Map { len: Some(0) }, Token::MapEnd],
             );
 
-            let user_resource_dir = USER_RESOURCE_DIR.clone();
+            let user_resource_dir = user_resource_dir();
 
             assert_de_tokens(
                 &ResourceConfig {
@@ -897,14 +900,14 @@ mod tests {
         #[test]
         #[ignore = "attempt to create a directory in user space"]
         fn use_user_resource() {
-            let user_resource_dir = USER_RESOURCE_DIR.clone();
+            let user_resource_dir = user_resource_dir();
 
             assert_eq!(
                 *ResourceConfig::default().use_user_resource(),
                 ResourceConfig {
                     resource_base_dirs: {
                         let mut base_dirs = default_resource_base_dirs();
-                        base_dirs.push(user_resource_dir.to_path_buf());
+                        base_dirs.push(user_resource_dir);
                         base_dirs
                     },
                     global_resource: None,
