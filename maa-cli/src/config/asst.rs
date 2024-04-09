@@ -476,11 +476,11 @@ impl InstanceOptions {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::OnceLock;
-
     use super::*;
 
     use crate::assert_matches;
+
+    use std::sync::OnceLock;
 
     fn user_resource_dir() -> PathBuf {
         static USER_RESOURCE_DIR: OnceLock<PathBuf> = OnceLock::new();
