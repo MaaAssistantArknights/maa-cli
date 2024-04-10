@@ -84,7 +84,7 @@ complete -c maa -n "__fish_seen_subcommand_from roguelike" -a "phantom mizuki sa
 # Misc commands
 complete -c maa -n "__fish_seen_subcommand_from complete" -f -a "bash fish zsh powershell"
 complete -c maa -n "__fish_seen_subcommand_from mangen" -l path -r -d 'Directory to save man pages'
-complete -c maa -n "__fish_seen_subcommand_from cleanup" -f -a "cli-cache avatars log misc"
+complete -c maa -n "__fish_seen_subcommand_from cleanup" -f -a "cli-cache core-cache debug log"
 complete -c maa -n "__fish_seen_subcommand_from convert" -f -s f -l format -a "j json y yaml t toml" -r
 complete -c maa -n "__fish_seen_subcommand_from activity" -f -a "$clients"
 complete -c maa -n "__fish_seen_subcommand_from remainder" -f -l timezone -d 'Timezone to determine the current date' -r
