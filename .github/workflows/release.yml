@@ -86,7 +86,11 @@ jobs:
           # If the release is triggered by a tag, process commits starting
           # from the latest tag, otherwise tag will be create later, so use
           # unreleased commits
-          args: -vv ${{ github.event_name == 'push' && '-l' || '-u' }}
+          args: >
+            -v
+            ${{ github.event_name == 'push' && '-l' || '-u' }}
+            ${{ needs.meta.outputs.channel != 'stable' && '--tag-pattern="^v"' || '' }}
+
       - name: Preview Release Notes
         if: ${{ !fromJson(needs.meta.outputs.publish) }}
         run: |
