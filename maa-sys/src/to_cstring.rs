@@ -55,7 +55,7 @@ impl ToCString for &Path {
 macro_rules! impl_to_cstring_by_as_ref {
     ($ref_t:ty, $($t:ty),*) => {
         $(
-            impl ToCString for $t {
+            impl $crate::ToCString for $t {
                 fn to_cstring(self) -> Result<std::ffi::CString> {
                     let r: &$ref_t = self.as_ref();
                     r.to_cstring()
@@ -82,7 +82,7 @@ impl ToCString for bool {
 macro_rules! impl_to_cstring_by_to_string {
     ($($t:ty),*) => {
         $(
-            impl ToCString for $t {
+            impl $crate::ToCString for $t {
                 fn to_cstring(self) -> Result<std::ffi::CString> {
                     self.to_string().to_cstring()
                 }
