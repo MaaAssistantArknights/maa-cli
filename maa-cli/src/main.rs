@@ -351,9 +351,11 @@ fn prefixed_format(
 ) -> std::io::Result<()> {
     writeln!(
         buf,
-        "[{} {:<5}] {}",
+        "[{} {}{:<5}{}] {}",
         chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-        buf.default_styled_level(record.level()),
+        buf.default_level_style(record.level()),
+        record.level(),
+        env_logger::fmt::style::Reset,
         record.args()
     )
 }
