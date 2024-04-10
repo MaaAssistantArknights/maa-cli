@@ -188,3 +188,28 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
+
+  msrv:
+    name: Verify MSRV
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - maa-cli
+          - maa-sys
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Read MSRV from Cargo.toml
+        id: read-msrv
+        run: |
+          echo "MSRV=$(yq -r '.package.rust-version' '${{ matrix.package }}/Cargo.toml')" >> "$GITHUB_ENV"
+      - name: Install Rust Toolchain of MSRV
+        run: |
+          rustup toolchain install "$MSRV"
+      - name: Install MaaCore
+        uses: ./.github/actions/install-core
+      - name: Run Tests
+        run: |
+          cargo "+$MSRV" test --package "${{ matrix.package }}" -- --include-ignored
