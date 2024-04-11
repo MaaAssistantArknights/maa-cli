@@ -188,3 +188,38 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
+
+  musl:
+    name: Build and Test (musl)
+    runs-on: ubuntu-latest
+    env:
+      CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Rust
+        run: rustup target add $CARGO_BUILD_TARGET
+      - name: Build
+        run: |
+          cargo build --package maa-cli --locked \
+            --features vendored-openssl
+      - name: Install MaaCore
+        env:
+          MAA_CONFIG_DIR: ${{ github.workspace }}/maa-cli/config_examples
+        run: |
+          cargo run -- install stable
+          ls -l "$(cargo run -- dir library)"
+          ls -l "$(cargo run -- dir resource)"
+          ls -l "$(cargo run -- dir cache)"
+          package_name=$(basename "$(ls "$(cargo run -- dir cache)")")
+          echo "Downloaded MaaCore package: $package_name"
+          version=${package_name#MAA-v}
+          version=${version%%-*}
+          if [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Downloaded MaaCore version: $version"
+            echo "MAA_CORE_VERSION=v$version" >> "$GITHUB_ENV"
+          fi
+          echo "MAA_CORE_INSTALLED=true" >> "$GITHUB_ENV"
+      - name: Test
+        run: |
+          cargo test -- --include-ignored
