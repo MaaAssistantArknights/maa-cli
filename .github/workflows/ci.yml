@@ -211,7 +211,9 @@ jobs:
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/maa-cli/config_examples
         run: |
-          cargo run -- install stable --features vendored-openssl
+          cargo run \
+            --features vendored-openssl \
+            -- install stable
           echo "MAA_CORE_INSTALLED=true" >> "$GITHUB_ENV"
       - name: Test
         run: |
