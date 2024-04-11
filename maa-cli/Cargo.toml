@@ -3,7 +3,6 @@ name = "maa-cli"
 authors = ["Loong Wang <wangl-cc@outlook.com>"]
 version = "0.4.6"
 edition = "2021"
-rust-version = "1.71.0"
 readme = "../README-EN.md"
 description = "A simple CLI for MAA (MaaAssistantArknights)"
 repository.workspace = true

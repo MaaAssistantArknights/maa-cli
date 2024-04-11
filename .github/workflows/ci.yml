@@ -196,7 +196,6 @@ jobs:
       fail-fast: false
       matrix:
         package:
-          - maa-cli
           - maa-sys
     steps:
       - name: Checkout
@@ -211,5 +210,6 @@ jobs:
       - name: Install MaaCore
         uses: ./.github/actions/install-core
       - name: Run Tests
+        working-directory: ${{ matrix.package }}
         run: |
-          cargo "+$MSRV" test --package "${{ matrix.package }}" -- --include-ignored
+          cargo "+$MSRV" test -- --include-ignored
