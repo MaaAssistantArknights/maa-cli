@@ -212,5 +212,5 @@ jobs:
       - name: Test
         run: |
           cargo test --package maa-cli --locked \
-            --features vendored-openssl
+            --features vendored-openssl \
             -- --include-ignored
