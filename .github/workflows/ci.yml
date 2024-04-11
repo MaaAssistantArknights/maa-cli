@@ -96,9 +96,8 @@ jobs:
           os: ${{ matrix.os }}
           target_arch: aarch64
       - name: Build
-        run: |
-          cargo build --package maa-cli --locked \
-            --features vendored-openssl
+        run: >
+          cargo build --package maa-cli --locked --features vendored-openssl
 
   build-feature:
     name: Build and Test (no default features)
@@ -204,9 +203,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y musl-tools
       - name: Build
-        run: |
-          cargo build --package maa-cli --locked \
-            --features vendored-openssl
+        run: >
+          cargo build --package maa-cli --locked --features vendored-openssl
       - name: Install MaaCore
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/maa-cli/config_examples
@@ -226,5 +224,6 @@ jobs:
           fi
           echo "MAA_CORE_INSTALLED=true" >> "$GITHUB_ENV"
       - name: Test
-        run: |
-          cargo test -- --include-ignored
+        run: >
+          cargo test --package maa-cli --locked --features vendored-openssl
+            -- --include-ignored
