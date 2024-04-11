@@ -211,11 +211,12 @@ jobs:
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/maa-cli/config_examples
         run: |
-          cargo run -- install stable
-          ls -l "$(cargo run -- dir library)"
-          ls -l "$(cargo run -- dir resource)"
-          ls -l "$(cargo run -- dir cache)"
-          package_name=$(basename "$(ls "$(cargo run -- dir cache)")")
+          maa=target/"$CARGO_BUILD_TARGET"/debug/maa
+          $maa install stable
+          ls -l "$($maa dir library)"
+          ls -l "$($maa dir resource)"
+          ls -l "$($maa dir cache)"
+          package_name=$(basename "$(ls "$($maa dir cache)")")
           echo "Downloaded MaaCore package: $package_name"
           version=${package_name#MAA-v}
           version=${version%%-*}
