@@ -126,10 +126,10 @@ elif [[ "$channel" == "alpha" ]]; then
         beta_number=${beta_rest%%.*}
         alpha_rest=${beta_rest#*.}
         if [[ $beta_number == "$alpha_rest" ]]; then
-          version="$core-beta.$beta_number-alpha.1+sha.$COMMIT_SHORT_SHA"
+          version="$core-beta.$beta_number.alpha.1+sha.$COMMIT_SHORT_SHA"
         else
           alpha_number=${alpha_rest#*.}
-          version="$core-beta.$beta_number-alpha.$((alpha_number + 1))+sha.$COMMIT_SHORT_SHA"
+          version="$core-beta.$beta_number.alpha.$((alpha_number + 1))+sha.$COMMIT_SHORT_SHA"
         fi
       elif [[ $head == "alpha" ]]; then
         alpha_number=${pre_release#*.}
