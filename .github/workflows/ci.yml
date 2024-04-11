@@ -204,10 +204,13 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Toolchain
         run: |
-          apk add musl-dev openssl openssl-dev
+          apk add perl make musl-dev
       - name: Build
         run: |
-          cargo build --package maa-cli --locked
+          cargo build --package maa-cli --locked \
+            --features vendored-openssl
       - name: Test
         run: |
-          cargo test --package maa-cli --locked -- --include-ignored
+          cargo test --package maa-cli --locked \
+            --features vendored-openssl
+            -- --include-ignored
