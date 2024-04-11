@@ -8,7 +8,7 @@ pub struct Args {
         action = clap::ArgAction::Count,
         global = true,
     )]
-    ///
+    /// Increase verbosity, repeat for more verbosity
     verbose: u8,
     #[arg(
         short = 'q',
@@ -16,7 +16,12 @@ pub struct Args {
         action = clap::ArgAction::Count,
         global = true,
     )]
+    /// Decrease verbosity, repeat for more quiet
     quiet: u8,
+    /// Redirect log to file instead of stderr
+    ///
+    /// If no log file is specified, the log will be written to
+    /// `$(maa dir log)/YYYY/MM/DD/HH:MM:SS.log`.
     #[arg(long, global = true, require_equals = true, value_name = "PATH")]
     log_file: Option<Option<PathBuf>>,
 }
