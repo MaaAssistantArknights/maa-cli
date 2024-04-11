@@ -198,7 +198,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Rust
-        run: rustup target add $CARGO_BUILD_TARGET
+        run: rustup target add "$CARGO_BUILD_TARGET"
+      - name: Setup MUSL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
       - name: Build
         run: |
           cargo build --package maa-cli --locked \
