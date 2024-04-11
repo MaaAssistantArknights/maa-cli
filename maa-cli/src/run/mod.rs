@@ -309,8 +309,11 @@ mod tests {
 
     #[test]
     fn version() {
-        if let Some(version) = env::var_os("MAA_CORE_VERSION") {
-            assert_eq!(core_version().unwrap(), version);
+        if env::var_os("MAA_CORE_INSTALLED").is_some() {
+            let version = core_version().unwrap();
+            if let Some(expect) = env::var_os("MAA_CORE_VERSION") {
+                assert_eq!(version, expect);
+            }
         }
     }
 
