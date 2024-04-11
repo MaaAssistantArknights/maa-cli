@@ -1,6 +1,8 @@
 #[macro_use]
 mod dirs;
 
+mod log;
+
 mod activity;
 mod cleanup;
 mod config;
@@ -8,32 +10,18 @@ mod installer;
 mod run;
 mod value;
 
-use crate::{
-    config::cli, dirs::Ensure, installer::resource, run::preset,
-    value::userinput::enable_batch_mode,
-};
+use crate::{config::cli, installer::resource, run::preset, value::userinput::enable_batch_mode};
 
 #[cfg(feature = "cli_installer")]
 use crate::installer::maa_cli;
 #[cfg(feature = "core_installer")]
 use crate::installer::maa_core;
 
-use std::{io::Write, path::PathBuf};
+use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::{generate, Shell};
-use clap_verbosity_flag::{LogLevel, Verbosity};
-
-struct EnvLevel;
-
-impl LogLevel for EnvLevel {
-    fn default() -> Option<log::Level> {
-        std::env::var_os("MAA_LOG")
-            .and_then(|s| s.to_str().and_then(|s| s.parse().ok()))
-            .or(Some(log::Level::Warn))
-    }
-}
 
 #[derive(Parser)]
 #[command(name = "maa", author, version, about = "A tool for Arknights.")]
@@ -49,14 +37,8 @@ struct CLI {
     /// and parameters will be set to default values.
     #[arg(long, global = true)]
     batch: bool,
-    /// Redirect log to file instead of stderr
-    ///
-    /// If no log file is specified, the log will be written to
-    /// `$(maa dir log)/YYYY/MM/DD/HH:MM:SS.log`.
-    #[arg(long, global = true, require_equals = true)]
-    log_file: Option<Option<PathBuf>>,
     #[command(flatten)]
-    verbose: Verbosity<EnvLevel>,
+    log: log::Args,
 }
 
 #[derive(Subcommand)]
@@ -298,101 +280,10 @@ pub enum Dir {
     Log,
 }
 
-/// Whether or not to print log prefix [YYYY-MM-DD HH:MM:SS LEVEL]
-#[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Clone, Copy, Default)]
-enum LogPrefix {
-    /// Print log prefix if log to file, not print log prefix if log to stderr
-    Auto,
-    /// Always print log prefix
-    #[default]
-    Always,
-    /// Never print log prefix
-    Never,
-}
-
-impl LogPrefix {
-    fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "ALWAYS" | "Always" | "always" => Some(LogPrefix::Always),
-            "NEVER" | "Never" | "never" => Some(LogPrefix::Never),
-            "AUTO" | "Auto" | "auto" => Some(LogPrefix::Auto),
-            _ => None,
-        }
-    }
-
-    fn from_env() -> Self {
-        std::env::var_os("MAA_LOG_PREFIX")
-            .and_then(|s| s.to_str().and_then(LogPrefix::from_str))
-            .unwrap_or_default()
-    }
-
-    fn format(
-        &self,
-        log_file: bool,
-    ) -> fn(&mut env_logger::fmt::Formatter, &log::Record) -> std::io::Result<()> {
-        match self {
-            LogPrefix::Always => prefixed_format,
-            LogPrefix::Never => plain_format,
-            LogPrefix::Auto => {
-                if log_file {
-                    prefixed_format
-                } else {
-                    plain_format
-                }
-            }
-        }
-    }
-}
-
-fn prefixed_format(
-    buf: &mut env_logger::fmt::Formatter,
-    record: &log::Record,
-) -> std::io::Result<()> {
-    writeln!(
-        buf,
-        "[{} {}{:<5}{}] {}",
-        chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-        buf.default_level_style(record.level()),
-        record.level(),
-        env_logger::fmt::style::Reset,
-        record.args()
-    )
-}
-
-fn plain_format(buf: &mut env_logger::fmt::Formatter, record: &log::Record) -> std::io::Result<()> {
-    writeln!(buf, "{}", record.args())
-}
-
 fn main() -> Result<()> {
     let cli = CLI::parse();
 
-    let mut builder = env_logger::Builder::new();
-
-    builder.filter_level(cli.verbose.log_level_filter());
-
-    builder.format(LogPrefix::from_env().format(cli.log_file.is_some()));
-
-    if let Some(opt) = cli.log_file {
-        let now = chrono::Local::now();
-        let log_file = opt.unwrap_or_else(|| {
-            let dir = dirs::log()
-                .join(now.format("%Y").to_string())
-                .join(now.format("%m").to_string())
-                .join(now.format("%d").to_string());
-            dir.ensure().unwrap();
-            dir.join(format!("{}.log", now.format("%H:%M:%S")))
-        });
-
-        let file = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(log_file)?;
-
-        builder.target(env_logger::Target::Pipe(Box::new(file)));
-    }
-
-    builder.init();
+    cli.log.init_logger()?;
 
     if cli.batch {
         enable_batch_mode()
@@ -507,6 +398,15 @@ fn main() -> Result<()> {
 }
 
 #[cfg(test)]
+fn parse_from<I, T>(args: I) -> CLI
+where
+    I: IntoIterator<Item = T>,
+    T: Into<std::ffi::OsString> + Clone,
+{
+    CLI::parse_from(args)
+}
+
+#[cfg(test)]
 mod test {
     use super::*;
 
@@ -517,136 +417,22 @@ mod test {
         };
     }
 
-    mod log_prefix {
-        use super::*;
-
-        #[test]
-        fn from_str() {
-            assert_eq!(LogPrefix::from_str("Always"), Some(LogPrefix::Always));
-            assert_eq!(LogPrefix::from_str("always"), Some(LogPrefix::Always));
-            assert_eq!(LogPrefix::from_str("NEVER"), Some(LogPrefix::Never));
-            assert_eq!(LogPrefix::from_str("never"), Some(LogPrefix::Never));
-            assert_eq!(LogPrefix::from_str("AUTO"), Some(LogPrefix::Auto));
-            assert_eq!(LogPrefix::from_str("auto"), Some(LogPrefix::Auto));
-            assert_eq!(LogPrefix::from_str("unknown"), None);
-        }
-
-        #[test]
-        fn from_env() {
-            std::env::remove_var("MAA_LOG_PREFIX");
-            assert_eq!(LogPrefix::from_env(), LogPrefix::Always);
-
-            std::env::set_var("MAA_LOG_PREFIX", "Always");
-            assert_eq!(LogPrefix::from_env(), LogPrefix::Always);
-
-            std::env::set_var("MAA_LOG_PREFIX", "Never");
-            assert_eq!(LogPrefix::from_env(), LogPrefix::Never);
-
-            std::env::set_var("MAA_LOG_PREFIX", "Auto");
-            assert_eq!(LogPrefix::from_env(), LogPrefix::Auto);
-
-            std::env::set_var("MAA_LOG_PREFIX", "unknown");
-            assert_eq!(LogPrefix::from_env(), LogPrefix::Always);
-        }
-
-        #[test]
-        fn format() {
-            let pff = prefixed_format
-                as fn(&mut env_logger::fmt::Formatter, &log::Record) -> std::io::Result<()>;
-            let plf = plain_format
-                as fn(&mut env_logger::fmt::Formatter, &log::Record) -> std::io::Result<()>;
-
-            assert_eq!(LogPrefix::Always.format(true), pff);
-            assert_eq!(LogPrefix::Always.format(false), pff);
-
-            assert_eq!(LogPrefix::Never.format(true), plf);
-            assert_eq!(LogPrefix::Never.format(false), plf);
-
-            assert_eq!(LogPrefix::Auto.format(true), pff);
-            assert_eq!(LogPrefix::Auto.format(false), plf);
-        }
-    }
-
     mod parser {
         use super::*;
 
         use crate::config::cli::Channel;
-        use std::env;
 
         #[test]
-        fn global_options() {
-            let old = if let Some(val) = env::var_os("MAA_LOG") {
-                env::remove_var("MAA_LOG");
-                Some(val)
-            } else {
-                None
-            };
-
-            assert_eq!(
-                CLI::parse_from(["maa", "list"]).verbose.log_level_filter(),
-                log::LevelFilter::Warn
-            );
-            assert_eq!(
-                CLI::parse_from(["maa", "-v", "list"])
-                    .verbose
-                    .log_level_filter(),
-                log::LevelFilter::Info
-            );
-            assert_eq!(
-                CLI::parse_from(["maa", "list", "-v"])
-                    .verbose
-                    .log_level_filter(),
-                log::LevelFilter::Info
-            );
-            assert_eq!(
-                CLI::parse_from(["maa", "list", "--verbose"])
-                    .verbose
-                    .log_level_filter(),
-                log::LevelFilter::Info
-            );
-
-            assert_eq!(
-                CLI::parse_from(["maa", "list", "-vv"])
-                    .verbose
-                    .log_level_filter(),
-                log::LevelFilter::Debug
-            );
-
-            assert_eq!(
-                CLI::parse_from(["maa", "list", "-q"])
-                    .verbose
-                    .log_level_filter(),
-                log::LevelFilter::Error
-            );
-
-            env::set_var("MAA_LOG", "Info");
-            assert_eq!(
-                CLI::parse_from(["maa", "list"]).verbose.log_level_filter(),
-                log::LevelFilter::Info
-            );
-
-            // Restore the environment variable
-            if let Some(old) = old {
-                env::set_var("MAA_LOG", old);
-            }
-
-            assert!(!CLI::parse_from(["maa", "list"]).batch);
-            assert!(CLI::parse_from(["maa", "list", "--batch"]).batch);
-
-            assert!(CLI::parse_from(["maa", "list"]).log_file.is_none());
-            assert!(CLI::parse_from(["maa", "list", "--log-file"])
-                .log_file
-                .is_some_and(|x| x.is_none()));
-            assert!(CLI::parse_from(["maa", "list", "--log-file=path"])
-                .log_file
-                .is_some_and(|x| x.is_some_and(|x| x == PathBuf::from("path"))));
+        fn batch() {
+            assert!(!parse_from(["maa", "list"]).batch);
+            assert!(parse_from(["maa", "list", "--batch"]).batch);
         }
 
         #[cfg(feature = "core_installer")]
         #[test]
         fn install() {
             assert_matches!(
-                CLI::parse_from(["maa", "install"]).command,
+                parse_from(["maa", "install"]).command,
                 SubCommand::Install {
                     common: cli::maa_core::CommonArgs { .. },
                     force: false,
@@ -654,7 +440,7 @@ mod test {
             );
 
             assert_matches!(
-                CLI::parse_from(["maa", "install", "beta"]).command,
+                parse_from(["maa", "install", "beta"]).command,
                 SubCommand::Install {
                     common: cli::maa_core::CommonArgs {
                         channel: Some(Channel::Beta),
@@ -665,7 +451,7 @@ mod test {
             );
 
             assert_matches!(
-                CLI::parse_from(["maa", "install", "--no-resource"]).command,
+                parse_from(["maa", "install", "--no-resource"]).command,
                 SubCommand::Install {
                     common: cli::maa_core::CommonArgs {
                         no_resource: true,
@@ -676,7 +462,7 @@ mod test {
             );
 
             assert_matches!(
-                CLI::parse_from(["maa", "install", "-t5"]).command,
+                parse_from(["maa", "install", "-t5"]).command,
                 SubCommand::Install {
                     common: cli::maa_core::CommonArgs {
                         test_time: Some(5),
@@ -687,7 +473,7 @@ mod test {
             );
 
             assert_matches!(
-                CLI::parse_from(["maa", "install", "--test-time", "5"]).command,
+                parse_from(["maa", "install", "--test-time", "5"]).command,
                 SubCommand::Install {
                     common: cli::maa_core::CommonArgs {
                         test_time: Some(5),
@@ -698,7 +484,7 @@ mod test {
             );
 
             assert_matches!(
-                CLI::parse_from(["maa", "install", "--api-url", "url"]).command,
+                parse_from(["maa", "install", "--api-url", "url"]).command,
                 SubCommand::Install {
                     common: cli::maa_core::CommonArgs {
                         api_url: Some(url),
@@ -709,7 +495,7 @@ mod test {
             );
 
             assert!(matches!(
-                CLI::parse_from(["maa", "install", "--force"]).command,
+                parse_from(["maa", "install", "--force"]).command,
                 SubCommand::Install { force: true, .. }
             ));
         }
@@ -718,7 +504,7 @@ mod test {
         #[test]
         fn update() {
             assert_matches!(
-                CLI::parse_from(["maa", "update"]).command,
+                parse_from(["maa", "update"]).command,
                 SubCommand::Update {
                     common: cli::maa_core::CommonArgs { .. },
                 }
@@ -729,12 +515,12 @@ mod test {
         #[test]
         fn self_command() {
             assert_matches!(
-                CLI::parse_from(["maa", "self", "update"]).command,
+                parse_from(["maa", "self", "update"]).command,
                 SubCommand::SelfCommand(SelfCommand::Update { .. })
             );
 
             assert_matches!(
-                CLI::parse_from(["maa", "self", "update", "beta"]).command,
+                parse_from(["maa", "self", "update", "beta"]).command,
                 SubCommand::SelfCommand(SelfCommand::Update {
                     common: cli::maa_cli::CommonArgs {
                         channel: Some(Channel::Beta),
@@ -744,7 +530,7 @@ mod test {
             );
 
             assert_matches!(
-                CLI::parse_from(["maa", "self", "update", "--api-url", "url"]).command,
+                parse_from(["maa", "self", "update", "--api-url", "url"]).command,
                 SubCommand::SelfCommand(
                     SelfCommand::Update {
                         common: cli::maa_cli::CommonArgs {
@@ -759,37 +545,37 @@ mod test {
         #[test]
         fn dir() {
             assert_matches!(
-                CLI::parse_from(["maa", "dir", "data"]).command,
+                parse_from(["maa", "dir", "data"]).command,
                 SubCommand::Dir { dir: Dir::Data }
             );
             assert_matches!(
-                CLI::parse_from(["maa", "dir", "library"]).command,
+                parse_from(["maa", "dir", "library"]).command,
                 SubCommand::Dir { dir: Dir::Library }
             );
             assert_matches!(
-                CLI::parse_from(["maa", "dir", "lib"]).command,
+                parse_from(["maa", "dir", "lib"]).command,
                 SubCommand::Dir { dir: Dir::Library }
             );
             assert_matches!(
-                CLI::parse_from(["maa", "dir", "config"]).command,
+                parse_from(["maa", "dir", "config"]).command,
                 SubCommand::Dir { dir: Dir::Config }
             );
             assert_matches!(
-                CLI::parse_from(["maa", "dir", "cache"]).command,
+                parse_from(["maa", "dir", "cache"]).command,
                 SubCommand::Dir { dir: Dir::Cache }
             );
             assert_matches!(
-                CLI::parse_from(["maa", "dir", "resource"]).command,
+                parse_from(["maa", "dir", "resource"]).command,
                 SubCommand::Dir { dir: Dir::Resource }
             );
             assert_matches!(
-                CLI::parse_from(["maa", "dir", "hot-update"]).command,
+                parse_from(["maa", "dir", "hot-update"]).command,
                 SubCommand::Dir {
                     dir: Dir::HotUpdate
                 }
             );
             assert_matches!(
-                CLI::parse_from(["maa", "dir", "log"]).command,
+                parse_from(["maa", "dir", "log"]).command,
                 SubCommand::Dir { dir: Dir::Log }
             );
         }
@@ -797,37 +583,37 @@ mod test {
         #[test]
         fn version() {
             assert_matches!(
-                CLI::parse_from(["maa", "version"]).command,
+                parse_from(["maa", "version"]).command,
                 SubCommand::Version {
                     component: Component::All
                 }
             );
             assert_matches!(
-                CLI::parse_from(["maa", "version", "all"]).command,
+                parse_from(["maa", "version", "all"]).command,
                 SubCommand::Version {
                     component: Component::All
                 }
             );
             assert_matches!(
-                CLI::parse_from(["maa", "version", "maa-cli"]).command,
+                parse_from(["maa", "version", "maa-cli"]).command,
                 SubCommand::Version {
                     component: Component::MaaCLI
                 }
             );
             assert_matches!(
-                CLI::parse_from(["maa", "version", "cli"]).command,
+                parse_from(["maa", "version", "cli"]).command,
                 SubCommand::Version {
                     component: Component::MaaCLI
                 }
             );
             assert_matches!(
-                CLI::parse_from(["maa", "version", "maa-core"]).command,
+                parse_from(["maa", "version", "maa-core"]).command,
                 SubCommand::Version {
                     component: Component::MaaCore
                 }
             );
             assert_matches!(
-                CLI::parse_from(["maa", "version", "core"]).command,
+                parse_from(["maa", "version", "core"]).command,
                 SubCommand::Version {
                     component: Component::MaaCore
                 }
@@ -837,7 +623,7 @@ mod test {
         #[test]
         fn run() {
             assert_matches!(
-                CLI::parse_from(["maa", "run", "task"]).command,
+                parse_from(["maa", "run", "task"]).command,
                 SubCommand::Run {
                     task,
                     common: run::CommonArgs { .. },
@@ -845,7 +631,7 @@ mod test {
             );
 
             assert!(matches!(
-                CLI::parse_from(["maa", "run", "task", "-a", "addr"]).command,
+                parse_from(["maa", "run", "task", "-a", "addr"]).command,
                 SubCommand::Run {
                     task,
                     common: run::CommonArgs {
@@ -856,7 +642,7 @@ mod test {
                 } if task == "task" && addr == "addr"
             ));
             assert!(matches!(
-                CLI::parse_from(["maa", "run", "task", "--addr", "addr"]).command,
+                parse_from(["maa", "run", "task", "--addr", "addr"]).command,
                 SubCommand::Run {
                     task,
                     common: run::CommonArgs {
@@ -868,7 +654,7 @@ mod test {
             ));
 
             assert!(matches!(
-                CLI::parse_from(["maa", "run", "task", "--user-resource"]).command,
+                parse_from(["maa", "run", "task", "--user-resource"]).command,
                 SubCommand::Run {
                     task,
                     common: run::CommonArgs {
@@ -883,7 +669,7 @@ mod test {
         #[test]
         fn startup() {
             assert_matches!(
-                CLI::parse_from(["maa", "startup"]).command,
+                parse_from(["maa", "startup"]).command,
                 SubCommand::StartUp {
                     client: None,
                     account: None,
@@ -892,7 +678,7 @@ mod test {
             );
 
             assert_matches!(
-                CLI::parse_from(["maa", "startup", "YoStarEN"]).command,
+                parse_from(["maa", "startup", "YoStarEN"]).command,
                 SubCommand::StartUp {
                     client: Some(client),
                     ..
@@ -900,7 +686,7 @@ mod test {
             );
 
             assert_matches!(
-                CLI::parse_from(["maa", "startup", "YoStarEN", "--account", "account"]).command,
+                parse_from(["maa", "startup", "YoStarEN", "--account", "account"]).command,
                 SubCommand::StartUp {
                     client: Some(client),
                     account: Some(account),
@@ -912,7 +698,7 @@ mod test {
         #[test]
         fn closedown() {
             assert_matches!(
-                CLI::parse_from(["maa", "closedown"]).command,
+                parse_from(["maa", "closedown"]).command,
                 SubCommand::CloseDown {
                     common: run::CommonArgs { .. },
                 }
@@ -922,7 +708,7 @@ mod test {
         #[test]
         fn fight() {
             assert_matches!(
-                CLI::parse_from(["maa", "fight", "1-7"]).command,
+                parse_from(["maa", "fight", "1-7"]).command,
                 SubCommand::Fight {
                     stage,
                     ..
@@ -930,7 +716,7 @@ mod test {
             );
 
             assert_matches!(
-                CLI::parse_from(["maa", "fight", "1-7", "-m", "1"]).command,
+                parse_from(["maa", "fight", "1-7", "-m", "1"]).command,
                 SubCommand::Fight {
                     stage,
                     medicine: Some(medicine),
@@ -939,7 +725,7 @@ mod test {
             );
 
             assert_matches!(
-                CLI::parse_from(["maa", "fight", "1-7", "--medicine", "1"]).command,
+                parse_from(["maa", "fight", "1-7", "--medicine", "1"]).command,
                 SubCommand::Fight {
                     stage,
                     medicine: Some(medicine),
@@ -951,7 +737,7 @@ mod test {
         #[test]
         fn copilot() {
             assert_matches!(
-                CLI::parse_from(["maa", "copilot", "maa://12345"]).command,
+                parse_from(["maa", "copilot", "maa://12345"]).command,
                 SubCommand::Copilot {
                     uri,
                     ..
@@ -959,7 +745,7 @@ mod test {
             );
 
             assert_matches!(
-                CLI::parse_from(["maa", "copilot", "/your/json/path.json"]).command,
+                parse_from(["maa", "copilot", "/your/json/path.json"]).command,
                 SubCommand::Copilot {
                     uri,
                     common: run::CommonArgs { .. },
@@ -970,7 +756,7 @@ mod test {
         #[test]
         fn rougelike() {
             assert_matches!(
-                CLI::parse_from(["maa", "roguelike", "phantom"]).command,
+                parse_from(["maa", "roguelike", "phantom"]).command,
                 SubCommand::Roguelike {
                     theme,
                     ..
@@ -981,7 +767,7 @@ mod test {
         #[test]
         fn convert() {
             assert_matches!(
-                CLI::parse_from(["maa", "convert", "input.toml"]).command,
+                parse_from(["maa", "convert", "input.toml"]).command,
                 SubCommand::Convert {
                     input,
                     output: None,
@@ -990,7 +776,7 @@ mod test {
             );
 
             assert_matches!(
-                CLI::parse_from(["maa", "convert", "input.toml", "output.json"]).command,
+                parse_from(["maa", "convert", "input.toml", "output.json"]).command,
                 SubCommand::Convert {
                     output: Some(output),
                     ..
@@ -998,7 +784,7 @@ mod test {
             );
 
             assert_matches!(
-                CLI::parse_from(["maa", "convert", "input.toml", "--format", "json"]).command,
+                parse_from(["maa", "convert", "input.toml", "--format", "json"]).command,
                 SubCommand::Convert {
                     format: Some(config::Filetype::Json),
                     ..
@@ -1006,7 +792,7 @@ mod test {
             );
 
             assert_matches!(
-                CLI::parse_from(["maa", "convert", "input.toml", "output.json", "-fy"]).command,
+                parse_from(["maa", "convert", "input.toml", "output.json", "-fy"]).command,
                 SubCommand::Convert {
                     output: Some(output),
                     format: Some(config::Filetype::Yaml),
@@ -1018,14 +804,14 @@ mod test {
         #[test]
         fn activity() {
             assert_matches!(
-                CLI::parse_from(["maa", "activity"]).command,
+                parse_from(["maa", "activity"]).command,
                 SubCommand::Activity {
                     client: config::task::ClientType::Official,
                 }
             );
 
             assert_matches!(
-                CLI::parse_from(["maa", "activity", "YoStarEN"]).command,
+                parse_from(["maa", "activity", "YoStarEN"]).command,
                 SubCommand::Activity {
                     client: config::task::ClientType::YoStarEN,
                 }
@@ -1035,7 +821,7 @@ mod test {
         #[test]
         fn remainder() {
             assert_matches!(
-                CLI::parse_from(["maa", "remainder", "3"]).command,
+                parse_from(["maa", "remainder", "3"]).command,
                 SubCommand::Remainder {
                     divisor: 3,
                     timezone: None,
@@ -1043,7 +829,7 @@ mod test {
             );
 
             assert_matches!(
-                CLI::parse_from(["maa", "remainder", "3", "--timezone", "8"]).command,
+                parse_from(["maa", "remainder", "3", "--timezone", "8"]).command,
                 SubCommand::Remainder {
                     divisor: 3,
                     timezone: Some(8),
@@ -1053,13 +839,13 @@ mod test {
 
         #[test]
         fn list() {
-            assert_matches!(CLI::parse_from(["maa", "list"]).command, SubCommand::List);
+            assert_matches!(parse_from(["maa", "list"]).command, SubCommand::List);
         }
 
         #[test]
         fn complete() {
             assert_matches!(
-                CLI::parse_from(["maa", "complete", "bash"]).command,
+                parse_from(["maa", "complete", "bash"]).command,
                 SubCommand::Complete { shell: Shell::Bash }
             );
         }
@@ -1068,17 +854,17 @@ mod test {
         fn cleanup() {
             use cleanup::CleanupTarget::*;
             assert_matches!(
-                CLI::parse_from(["maa", "cleanup"]).command,
+                parse_from(["maa", "cleanup"]).command,
                 SubCommand::Cleanup { .. }
             );
 
             assert_matches!(
-                CLI::parse_from(["maa", "cleanup", "log"]).command,
+                parse_from(["maa", "cleanup", "log"]).command,
                 SubCommand::Cleanup { targets } if targets == vec![Log]
             );
 
             assert_matches!(
-                CLI::parse_from(["maa", "cleanup", "cli-cache", "log"]).command,
+                parse_from(["maa", "cleanup", "cli-cache", "log"]).command,
                 SubCommand::Cleanup { targets } if targets == vec![CliCache, Log]
             );
         }
@@ -1087,7 +873,7 @@ mod test {
         fn mangen() {
             let _path_buf = PathBuf::from(".");
             assert_matches!(
-                CLI::parse_from(["maa", "mangen", "--path", "."]).command,
+                parse_from(["maa", "mangen", "--path", "."]).command,
                 SubCommand::Mangen { path: _path_buf }
             );
         }

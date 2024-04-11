@@ -54,7 +54,6 @@ prettytable = { version = "0.10.0", default-features = false }
 clap = { version = "4.4", features = ["derive"] }
 clap_complete = { version = "4.4" }
 clap_mangen = "0.2.20"
-clap-verbosity-flag = "2.1"
 
 toml = "0.8"
 serde = { version = "1", features = ["derive"] }
