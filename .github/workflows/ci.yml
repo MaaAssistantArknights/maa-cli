@@ -96,8 +96,9 @@ jobs:
           os: ${{ matrix.os }}
           target_arch: aarch64
       - name: Build
-        run: >
-          cargo build --package maa-cli --locked --features vendored-openssl
+        run: |
+          cargo build --package maa-cli --locked \
+            --features vendored-openssl
 
   build-feature:
     name: Build and Test (no default features)
@@ -203,11 +204,10 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Toolchain
         run: |
-          apk add --no-cache perl make musl-dev
+          apk add musl-dev openssl-dev
       - name: Build
-        run: >
-          cargo build --package maa-cli --locked --features vendored-openssl
+        run: |
+          cargo build --package maa-cli --locked
       - name: Test
-        run: >
-          cargo test --package maa-cli --locked --features vendored-openssl
-            -- --include-ignored
+        run: |
+          cargo test --package maa-cli --locked -- --include-ignored
