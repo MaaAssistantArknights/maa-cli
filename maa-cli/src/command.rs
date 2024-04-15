@@ -86,7 +86,7 @@ pub(crate) enum Command {
     /// This command will print the version of given component.
     /// If no component is given, it will print the version of all components.
     Version {
-        #[arg(default_value_t = Component::All)]
+        #[arg(default_value = "all")]
         component: Component,
     },
     /// Run a custom task
@@ -231,16 +231,6 @@ pub(crate) enum Component {
     MaaCLI,
     #[value(alias("core"))]
     MaaCore,
-}
-
-impl std::fmt::Display for Component {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Component::All => write!(f, "all"),
-            Component::MaaCLI => write!(f, "maa-cli"),
-            Component::MaaCore => write!(f, "maa-core"),
-        }
-    }
 }
 
 #[derive(ValueEnum, Clone)]
