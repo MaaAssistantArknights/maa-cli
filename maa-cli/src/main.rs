@@ -11,7 +11,7 @@ mod installer;
 mod run;
 mod value;
 
-use crate::command::{Command, Component, Dir, SelfCommand, CLI};
+use crate::command::{Command, Component, Dir, CLI};
 
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser};
@@ -38,7 +38,7 @@ fn main() -> Result<()> {
         }
         #[cfg(feature = "cli_installer")]
         Command::SelfC(self_c) => match self_c {
-            SelfCommand::Update { common } => installer::maa_cli::update(&common)?,
+            command::SelfCommand::Update { common } => installer::maa_cli::update(&common)?,
         },
         Command::HotUpdate => installer::resource::update(false)?,
         Command::Dir { dir } => match dir {
