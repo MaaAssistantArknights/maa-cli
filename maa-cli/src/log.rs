@@ -163,7 +163,7 @@ mod tests {
     use super::*;
 
     mod cmd_args {
-        use crate::parse_from;
+        use crate::command::parse_from;
 
         use std::env;
 
