@@ -1,19 +1,5 @@
 version: 2
 updates:
-  # group all non breaking updates into a single PR
-  - package-ecosystem: "cargo"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    versioning-strategy: "lockfile-only"
-    groups:
-      no-breaking-dependencies:
-        patterns:
-          - "*"
-        update-types:
-          - minor
-          - patch
-
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
