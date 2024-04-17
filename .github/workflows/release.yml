@@ -132,32 +132,12 @@ jobs:
           os: ${{ matrix.os }}
           host_arch: ${{ matrix.os == 'macos-14' && 'aarch64' || 'x86_64' }}
           target_arch: ${{ matrix.arch }}
-      - name: Patch Version
-        env:
-          VERSION: ${{ needs.meta.outputs.version }}
-        run: |
-          if [ "$(uname -s)" == "Darwin" ]; then
-            SED="sed -i '' -E" # BSD sed should use '' as backup extension
-          else
-            SED="sed -i -E"
-          fi
-          S="[[:space:]]" # BSD sed doesn't support \s
-          $SED "1,6 s/(version${S}*=${S}*)\"[^\"]+\"/\1\"$VERSION\"/" maa-cli/Cargo.toml
-          NL=$(grep -n -E "name${S}*=${S}*\"maa-cli\"" Cargo.lock | cut -d: -f1)
-          NS=$((NL - 1))
-          NE=$((NL + 3))
-          $SED "$NS,$NE s/(version${S}*=${S}*)\"[^\"]+\"/\1\"$VERSION\"/" Cargo.lock
-          {
-            echo 'Patch Version (${{ matrix.os }}, ${{ matrix.arch }})'
-            echo '```diff'
-            git diff
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
       - name: Build
         env:
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 1
           CARGO_PROFILE_RELEASE_LTO: true
           CARGO_PROFILE_RELEASE_STRIP: true
+          MAA_VERSION: ${{ needs.meta.outputs.version }}
         run: |
           cargo build --release --package maa-cli --locked --features vendored-openssl
       - name: Tar Artifact

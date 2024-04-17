@@ -28,7 +28,7 @@ pub fn update(args: &CommonArgs) -> Result<()> {
         .context("Failed to fetch version info")?
         .json()
         .context("Failed to parse version info")?;
-    let current_version: Version = env!("CARGO_PKG_VERSION").parse()?;
+    let current_version: Version = env!("MAA_VERSION").parse()?;
     if !version_json.can_update("maa-cli", &current_version)? {
         return Ok(());
     }

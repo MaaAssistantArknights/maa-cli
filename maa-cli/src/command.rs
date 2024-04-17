@@ -6,7 +6,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use clap_complete::Shell;
 
 #[derive(Parser)]
-#[command(name = "maa", author, version, about = "A tool for Arknights.")]
+#[command(name = "maa", author, version = env!("MAA_VERSION"), about = "A tool for Arknights.")]
 #[allow(clippy::upper_case_acronyms)]
 pub(crate) struct CLI {
     #[command(subcommand)]
