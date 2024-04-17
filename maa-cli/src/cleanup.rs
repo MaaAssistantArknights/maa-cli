@@ -206,7 +206,7 @@ mod tests {
 
     use crate::dirs::Ensure;
 
-    use std::env::temp_dir;
+    use std::{collections::BTreeSet, env::temp_dir};
 
     mod cleanup_target {
         use super::*;
@@ -378,8 +378,11 @@ mod tests {
                 .read_dir()
                 .unwrap()
                 .map(|x| x.unwrap().file_name().to_str().unwrap().to_string())
-                .collect::<Vec<_>>(),
-            vec!["test1", "test2"]
+                .collect::<BTreeSet<_>>(),
+            ["test1", "test2"]
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<BTreeSet<_>>()
         );
         cleanup(&[All]).unwrap();
 
