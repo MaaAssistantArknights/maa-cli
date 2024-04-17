@@ -64,11 +64,11 @@ fn main() -> Result<()> {
         },
         Command::Version { component } => match component {
             Component::All => {
-                println!("maa-cli v{}", env!("CARGO_PKG_VERSION"));
+                println!("maa-cli v{}", env!("MAA_VERSION"));
                 println!("MaaCore {}", run::core_version()?);
             }
             Component::MaaCLI => {
-                println!("maa-cli v{}", env!("CARGO_PKG_VERSION"));
+                println!("maa-cli v{}", env!("MAA_VERSION"));
             }
             Component::MaaCore => {
                 println!("MaaCore {}", run::core_version()?);
