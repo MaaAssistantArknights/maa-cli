@@ -62,6 +62,10 @@ impl Args {
         builder.format(LogPrefix::from_env().format(self.log_file.is_some()));
 
         if let Some(path) = log_path(self.log_file) {
+            if let Some(dir) = path.parent() {
+                use crate::dirs::Ensure;
+                dir.ensure()?;
+            }
             let file = std::fs::OpenOptions::new()
                 .create(true)
                 .append(true)
@@ -76,16 +80,13 @@ impl Args {
 }
 
 fn log_path(path: Option<Option<PathBuf>>) -> Option<PathBuf> {
-    use crate::dirs::{log, Ensure};
     path.map(|path| {
         path.unwrap_or_else(|| {
             let now = chrono::Local::now();
-            let dir = log()
+            let dir = crate::dirs::log()
                 .join(now.format("%Y").to_string())
                 .join(now.format("%m").to_string())
                 .join(now.format("%d").to_string());
-
-            dir.ensure().unwrap();
 
             dir.join(format!("{}.log", now.format("%H:%M:%S")))
         })
