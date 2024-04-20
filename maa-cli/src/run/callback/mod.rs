@@ -121,7 +121,16 @@ fn process_connection_info(message: &Map<String, Value>) -> Option<()> {
     let what = message.get("what")?.as_str()?;
 
     match what {
+        "UuidGot" => debug!(
+            "Got UUID: {}",
+            message.get("details")?.get("uuid")?.as_str()?
+        ),
         // Resolution
+        "ResolutionGot" => debug!(
+            "Got Resolution: {} × {}",
+            message.get("details")?.get("width")?.as_i64()?,
+            message.get("details")?.get("height")?.as_i64()?
+        ),
         "UnsupportedResolution" => error!("{}", "UnsupportedResolution"),
         "ResolutionError" => error!("{}", "ResolutionAcquisitionFailure"),
 
