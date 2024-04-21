@@ -124,6 +124,11 @@ fn main() -> Result<()> {
                 }
             }
         }
+        Command::Import {
+            path,
+            force,
+            config_type,
+        } => config::import(&path, force, &config_type)?,
         Command::Complete { shell } => {
             clap_complete::generate(shell, &mut CLI::command(), "maa", &mut std::io::stdout());
         }

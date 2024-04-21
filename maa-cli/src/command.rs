@@ -199,6 +199,31 @@ pub(crate) enum Command {
     },
     /// List all available tasks
     List,
+    /// Import configuration files
+    Import {
+        /// Path of the configuration file
+        path: PathBuf,
+        /// Force to import even if a file with the same name already exists
+        #[arg(short, long)]
+        force: bool,
+        /// Type of the configuration file
+        ///
+        /// All possible values are listed below:
+        ///
+        /// - `task`: Task configuration file (default), used to define custom tasks;
+        /// - `cli`: CLI configuration file, CLI related configuration;
+        /// - `asst` or `profile`: MaaCore configuration file;
+        /// - `infrast`: Infrastructure plan file;
+        /// - `copilot` or `ssscopilot`: Copilot or SSSCopilot task file;
+        /// - `resource`: user resource files.
+        ///
+        /// Other values are supported, but not recommended.
+        /// It will be treated as a subdirectory of the config directory,
+        /// and show a warning message.
+        /// If you think it is correct, please open an issue to let us know.
+        #[arg(short = 't', long, default_value = "task", verbatim_doc_comment)]
+        config_type: String,
+    },
     /// Generate completion script for given shell
     Complete { shell: Shell },
     /// Generate man page
