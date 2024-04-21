@@ -9,7 +9,6 @@
 - Impl `FromStr` for `TaskType` by [@wangl-cc](https://github.com/wangl-cc) in [#262](https://github.com/MaaAssistantArknights/maa-cli/pull/262)
 - Read version from environment variable by [@wangl-cc](https://github.com/wangl-cc) in [#273](https://github.com/MaaAssistantArknights/maa-cli/pull/273)
 - Handle ResolutionGot and UuidGot messages by [@wangl-cc](https://github.com/wangl-cc) in [#274](https://github.com/MaaAssistantArknights/maa-cli/pull/274)
-- Update documentation generation script and titles by [@wangl-cc](https://github.com/wangl-cc)
 
 ### Bug Fixes
 
@@ -29,6 +28,7 @@
 - Fix markdown link in doc comments by [@wangl-cc](https://github.com/wangl-cc)
 - Split readme and move into `maa-cli/docs` by [@wangl-cc](https://github.com/wangl-cc)
 - Fix grammar by [@wangl-cc](https://github.com/wangl-cc) in [#250](https://github.com/MaaAssistantArknights/maa-cli/pull/250)
+- Update documentation generation script and titles by [@wangl-cc](https://github.com/wangl-cc)
 
 ### Testing
 
