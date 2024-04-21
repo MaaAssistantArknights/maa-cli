@@ -56,6 +56,21 @@ maa-cli will output logs to stderr by default. The `--log-file` option can outpu
 
 By default, all output logs will include a timestamp and a log-level prefix. You can change this behavior by the `MAA_LOG_PREFIX` environment variable. When set to `Always`, the prefix will always be included, when set to `Auto`, the prefix will be included when writing to the log file, and not included when writing to stderr, and when set to `Never`, the prefix will not be included even when writing to the log file.
 
+### Other subcommands
+
+Except for the above subcommands, maa-cli also provides other subcommands:
+
+- `maa list`: list all available tasks;
+- `maa dir <dir>`: get the path of a specific directory, for example, `maa dir config` can be used to get the path of the configuration directory;
+- `maa version`: get the version information of `maa-cli` and `MaaCore`;
+- `maa convert <input> [output]`: convert a file in `JSON`, `YAML`, or `TOML` format to another format;
+- `maa complete <shell>`: generate an auto-completion script;
+- `maa activity [client]`: get the current activity information of the game, the `client` is the client type, default is `Official`.
+- `maa cleanup`: clean up the cache of `maa-cli` and `MaaCore`.
+- `maa import <file> [-t <type>]`: import a configuration file, the `file` is the path of the configuration file. The `-t` option can specify the type of the configuration file, such as `cli`, `profile`, `infrast`, etc.
+
+More command usage can be viewed by `maa help`, and the usage of specific commands can be viewed by `maa help <command>`.
+
 [custom-task]: config.md#custom-task
 
 <!-- markdownlint-disable-file MD013 -->

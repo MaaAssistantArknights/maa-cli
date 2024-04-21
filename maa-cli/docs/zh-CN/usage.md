@@ -61,6 +61,21 @@ maa-cli 默认会向标准误 (stderr) 输出日志。`--log-file` 选项可以�
 
 默认情况下，所有输出的日志会包含时间戳和日志级别的前缀。你可以通过环境变量 `MAA_LOG_PREFIX` 来改变这个行为。设置为 `Always` 时，总是会包含前缀，设置为 `Auto` 时输出到日志文件时会包含前缀，而输出到 stderr 时不会包含前缀，而设置为 `Never` 时即使是写入日志文件时也不会包含前缀。
 
+### 其他子命令
+
+除了上述的命令外，maa-cli 还提供了其他一些子命令：
+
+- `maa list`: 列出所有可用的任务；
+- `maa dir <dir>`: 获取特定目录的路径，比如 `maa dir config` 可以用来获取配置目录的路径;
+- `maa version`: 获取 `maa-cli` 以及 `MaaCore` 的版本信息；
+- `maa convert <input> [output]`: 将 `JSON`，`YAML` 或者 `TOML` 格式的文件转换为其他格式;
+- `maa complete <shell>`: 生成自动补全脚本;
+- `maa activity [client]`: 获取游戏的当前活动信息，`client` 是客户端类型，默认为 `Official`。
+- `maa cleanup`: 清除 `maa-cli` 和 `MaaCore` 的缓存。
+- `maa import <file> [-t <type>]:` 导入配置文件，`file` 是配置文件的路径。`-t` 选项可以指定配置文件的类型，如 `cli`, `profile`, `infrast` 等。
+
+更多命令的使用方法可以通过 `maa help` 查看，具体命令的使用方法可以 通过 `maa help <command>` 查看。
+
 [custom-task]: config.md#自定义任务
 
 <!-- markdownlint-disable-file MD013 -->
