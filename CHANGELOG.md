@@ -1,5 +1,57 @@
 # Release Notes
 
+## Release 0.4.6
+
+### Features
+
+- Support multiple profiles by [@wangl-cc](https://github.com/wangl-cc) in [#251](https://github.com/MaaAssistantArknights/maa-cli/pull/251)
+- Add new cleanup targets and some refactoring for `dirs` by [@wangl-cc](https://github.com/wangl-cc) in [#254](https://github.com/MaaAssistantArknights/maa-cli/pull/254)
+- Impl `FromStr` for `TaskType` by [@wangl-cc](https://github.com/wangl-cc) in [#262](https://github.com/MaaAssistantArknights/maa-cli/pull/262)
+- Read version from environment variable by [@wangl-cc](https://github.com/wangl-cc) in [#273](https://github.com/MaaAssistantArknights/maa-cli/pull/273)
+- Handle ResolutionGot and UuidGot messages by [@wangl-cc](https://github.com/wangl-cc) in [#274](https://github.com/MaaAssistantArknights/maa-cli/pull/274)
+- Update documentation generation script and titles by [@wangl-cc](https://github.com/wangl-cc)
+
+### Bug Fixes
+
+- Wrong path to item_index.json for non-official clients by [@wangl-cc](https://github.com/wangl-cc) in [#256](https://github.com/MaaAssistantArknights/maa-cli/pull/256)
+- Use `$crate::ToCString` in impl_to_cstring macros by [@wangl-cc](https://github.com/wangl-cc)
+- Ensure log directory exists before creating log file by [@wangl-cc](https://github.com/wangl-cc) in [#269](https://github.com/MaaAssistantArknights/maa-cli/pull/269)
+
+### Refactor
+
+- Replace lazy_static with OnceLock or normal static by [@wangl-cc](https://github.com/wangl-cc) in [#257](https://github.com/MaaAssistantArknights/maa-cli/pull/257)
+- Remove clap_verbosity_flag by [@wangl-cc](https://github.com/wangl-cc) in [#265](https://github.com/MaaAssistantArknights/maa-cli/pull/265)
+
+### Documentation
+
+- Add Nix/Linux by [@Cryolitia](https://github.com/Cryolitia) in [#248](https://github.com/MaaAssistantArknights/maa-cli/pull/248)
+- Update README for maa-sys and add more docs by [@wangl-cc](https://github.com/wangl-cc)
+- Fix markdown link in doc comments by [@wangl-cc](https://github.com/wangl-cc)
+- Split readme and move into `maa-cli/docs` by [@wangl-cc](https://github.com/wangl-cc)
+- Fix grammar by [@wangl-cc](https://github.com/wangl-cc) in [#250](https://github.com/MaaAssistantArknights/maa-cli/pull/250)
+
+### Testing
+
+- Compare `BTreeSet` instead of `Vec` in cleanup by [@wangl-cc](https://github.com/wangl-cc) in [#271](https://github.com/MaaAssistantArknights/maa-cli/pull/271)
+
+### Security
+
+- Bump h2 from 0.4.3 to 0.4.4 by [@dependabot[bot]](https://github.com/dependabot[bot]) in [#252](https://github.com/MaaAssistantArknights/maa-cli/pull/252)
+
+### Miscellaneous
+
+- Use AGPL-3.0-only License by [@wangl-cc](https://github.com/wangl-cc) in [#234](https://github.com/MaaAssistantArknights/maa-cli/pull/234)
+- Bump DavidAnson/markdownlint-cli2-action from 15 to 16 by [@dependabot[bot]](https://github.com/dependabot[bot]) in [#253](https://github.com/MaaAssistantArknights/maa-cli/pull/253)
+- Bump Cargo.lock by [@wangl-cc](https://github.com/wangl-cc) in [#258](https://github.com/MaaAssistantArknights/maa-cli/pull/258)
+- Remove some unnecessary comments by [@wangl-cc](https://github.com/wangl-cc)
+- Fix relative links in generated docs by [@wangl-cc](https://github.com/wangl-cc)
+- Use relative md links for generated docs by [@wangl-cc](https://github.com/wangl-cc)
+- Update documentation of some methods in cleanup.rs by [@wangl-cc](https://github.com/wangl-cc)
+- Update fish completion for cleanup target by [@wangl-cc](https://github.com/wangl-cc)
+- Split command definition by [@wangl-cc](https://github.com/wangl-cc) in [#267](https://github.com/MaaAssistantArknights/maa-cli/pull/267)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.4.5...v0.4.6>
+
 ## Release 0.4.5
 
 ### Features
