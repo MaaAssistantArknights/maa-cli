@@ -492,10 +492,24 @@ mod tests {
 
         std::fs::create_dir_all(&tmp_dir).unwrap();
 
+        std::fs::create_dir_all(tmp_dir.join("test")).unwrap();
         std::fs::write(tmp_dir.join("cli.json"), "{}").unwrap();
         std::fs::write(tmp_dir.join("test.json"), "{}").unwrap();
         std::fs::write(tmp_dir.join("test.yml"), "").unwrap();
         std::fs::write(tmp_dir.join("test.ini"), "").unwrap();
+
+        assert_eq!(
+            import(&tmp_dir.join("test"), false, "cli")
+                .unwrap_err()
+                .kind(),
+            ErrorKind::InvalidInput
+        );
+        assert_eq!(
+            import(&tmp_dir.join("test.toml"), false, "cli")
+                .unwrap_err()
+                .kind(),
+            ErrorKind::InvalidInput
+        );
 
         assert_eq!(
             import(&tmp_dir.join("test.json"), false, "cli")
