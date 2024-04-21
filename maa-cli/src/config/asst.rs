@@ -505,9 +505,10 @@ mod tests {
         fn deserialize_example() {
             let user_resource_dir = user_resource_dir();
 
-            let config: AsstConfig =
-                toml::from_str(&std::fs::read_to_string("./config_examples/asst.toml").unwrap())
-                    .unwrap();
+            let config: AsstConfig = toml::from_str(
+                &std::fs::read_to_string("./config_examples/profiles/default.toml").unwrap(),
+            )
+            .unwrap();
 
             assert_eq!(
                 config,
