@@ -1,4 +1,4 @@
-# FAQ
+# FAQs for maa-cli
 
 ## 1. How to use `$HOME/.config/maa` as the configuration directory on macOS?
 
