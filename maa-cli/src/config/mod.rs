@@ -1,4 +1,4 @@
-use crate::dirs::Ensure;
+use crate::dirs::{self, Ensure};
 
 use std::fs::{self, File};
 use std::path::Path;
@@ -90,6 +90,10 @@ pub enum Filetype {
 }
 
 impl Filetype {
+    fn is_valid_file(path: impl AsRef<Path>) -> bool {
+        Self::parse_filetype(path).is_some()
+    }
+
     fn parse_filetype(path: impl AsRef<Path>) -> Option<Self> {
         path.as_ref()
             .extension()
@@ -212,6 +216,117 @@ pub fn convert(file: &Path, out: Option<&Path>, ft: Option<Filetype>) -> Result<
         }
     } else {
         Err(Error::FormatNotGiven)
+    }
+}
+
+pub fn import(path: &Path, force: bool, config_type: &str) -> std::io::Result<()> {
+    use std::io::{Error as IOError, ErrorKind};
+
+    if !path.is_file() {
+        return Err(IOError::new(
+            ErrorKind::InvalidInput,
+            "Given path is not a file or not exists",
+        ));
+    };
+
+    let file: &Path = path
+        .file_name()
+        .ok_or_else(|| IOError::new(ErrorKind::InvalidInput, "Invalid file path"))?
+        .as_ref();
+
+    // CLI configuration is unique, only one file is allowed
+    if config_type == "cli" {
+        // check if the file name is cli with supported extension for cli configuration
+        if file
+            .file_stem()
+            .is_some_and(|stem| stem.to_str().map_or(false, |stem| stem == "cli"))
+            && Filetype::is_valid_file(file)
+        {
+            let cli_path = dirs::config().join("cli");
+            if !force
+                && SUPPORTED_EXTENSION
+                    .iter()
+                    .any(|ext| cli_path.with_extension(ext).exists())
+            {
+                return Err(IOError::new(
+                    ErrorKind::AlreadyExists,
+                    "CLI configuration file already exists, use --force to overwrite",
+                ));
+            }
+
+            fs::copy(path, dirs::config().join(file))?;
+        } else {
+            return Err(IOError::new(
+                ErrorKind::InvalidInput,
+                "A CLI configuration file should be named as `cli` with supported extension",
+            ));
+        }
+    }
+
+    let (read_by_cli, dir) = type_to_dir(config_type);
+
+    // check if the configuration file read by CLI is valid
+    if read_by_cli && !Filetype::is_valid_file(file) {
+        return Err(IOError::new(
+            ErrorKind::InvalidInput,
+            format!(
+                "File with unsupported extension: {}, supported extensions: {}",
+                file.display(),
+                SUPPORTED_EXTENSION.join(", ")
+            ),
+        ));
+    }
+
+    // Check if directory exists
+    if dir.exists() {
+        // Check if file with same name already exists
+        if read_by_cli {
+            let possible_duplicated = dir.join(file);
+            for ext in SUPPORTED_EXTENSION.iter() {
+                if possible_duplicated.with_extension(ext).exists() && !force {
+                    return Err(IOError::new(
+                        ErrorKind::AlreadyExists,
+                        format!(
+                            "File with same name already exists: {}, use --force to overwrite",
+                            possible_duplicated.display()
+                        ),
+                    ));
+                }
+            }
+        } else {
+            let possible_duplicated = dir.join(file);
+            if !force && possible_duplicated.exists() {
+                return Err(IOError::new(
+                    ErrorKind::AlreadyExists,
+                    format!(
+                        "File already exists: {}, use --force to overwrite",
+                        possible_duplicated.display()
+                    ),
+                ));
+            }
+        }
+    } else {
+        fs::create_dir_all(&dir)?;
+    }
+
+    fs::copy(path, dir.join(file))?;
+
+    Ok(())
+}
+
+/// Convert configuration type to directory path and whether it is a configuration read by CLI.
+fn type_to_dir(config_type: &str) -> (bool, std::path::PathBuf) {
+    match config_type {
+        // No need to check config_type == "cli" here, it is handled in import function
+        "asst" | "profile" => (true, dirs::config().join("profiles")),
+        "task" => (true, dirs::config().join("tasks")),
+        "infrast" | "resource" | "copilot" | "ssscopilot" => {
+            (false, dirs::config().join(config_type))
+        }
+        _ => {
+            log::warn!("Unknown configuration type: {}", config_type);
+            (false, dirs::config().join(config_type))
+        }
     }
 }
 
@@ -366,6 +481,108 @@ mod tests {
         assert_matches!(
             convert(&input, None, None).unwrap_err(),
             Error::FormatNotGiven
+        );
+    }
+
+    #[test]
+    #[ignore = "write file to user's config directory"]
+    fn test_import() {
+        use std::io::ErrorKind;
+        let tmp_dir = temp_dir().join("maa-test-import");
+
+        std::fs::create_dir_all(&tmp_dir).unwrap();
+
+        std::fs::create_dir_all(tmp_dir.join("test")).unwrap();
+        std::fs::write(tmp_dir.join("cli.json"), "{}").unwrap();
+        std::fs::write(tmp_dir.join("test.json"), "{}").unwrap();
+        std::fs::write(tmp_dir.join("test.yml"), "").unwrap();
+        std::fs::write(tmp_dir.join("test.ini"), "").unwrap();
+
+        assert_eq!(
+            import(&tmp_dir.join("test"), false, "cli")
+                .unwrap_err()
+                .kind(),
+            ErrorKind::InvalidInput
+        );
+        assert_eq!(
+            import(&tmp_dir.join("test.toml"), false, "cli")
+                .unwrap_err()
+                .kind(),
+            ErrorKind::InvalidInput
+        );
+
+        assert_eq!(
+            import(&tmp_dir.join("test.json"), false, "cli")
+                .unwrap_err()
+                .kind(),
+            ErrorKind::InvalidInput
+        );
+        assert!(import(&tmp_dir.join("cli.json"), false, "cli").is_ok());
+        assert_eq!(
+            import(&tmp_dir.join("cli.json"), false, "cli")
+                .unwrap_err()
+                .kind(),
+            ErrorKind::AlreadyExists
+        );
+        assert!(import(&tmp_dir.join("cli.json"), true, "cli").is_ok());
+
+        assert!(import(&tmp_dir.join("test.json"), false, "asst").is_ok());
+        assert_eq!(
+            import(&tmp_dir.join("test.yml"), false, "profile")
+                .unwrap_err()
+                .kind(),
+            ErrorKind::AlreadyExists
+        );
+        assert!(import(&tmp_dir.join("test.yml"), true, "profile").is_ok());
+        assert_eq!(
+            import(&tmp_dir.join("test.ini"), false, "task")
+                .unwrap_err()
+                .kind(),
+            ErrorKind::InvalidInput
+        );
+
+        assert!(import(&tmp_dir.join("test.json"), false, "infrast").is_ok());
+        assert_eq!(
+            import(&tmp_dir.join("test.json"), false, "infrast")
+                .unwrap_err()
+                .kind(),
+            ErrorKind::AlreadyExists
+        );
+        assert!(import(&tmp_dir.join("test.json"), true, "infrast").is_ok());
+
+        assert!(import(&tmp_dir.join("test.json"), false, "resource").is_ok());
+    }
+
+    #[test]
+    fn test_type_to_dir() {
+        assert_eq!(type_to_dir("asst"), (true, dirs::config().join("profiles")));
+        assert_eq!(
+            type_to_dir("profile"),
+            (true, dirs::config().join("profiles"))
+        );
+
+        assert_eq!(type_to_dir("task"), (true, dirs::config().join("tasks")));
+
+        assert_eq!(
+            type_to_dir("infrast"),
+            (false, dirs::config().join("infrast"))
+        );
+        assert_eq!(
+            type_to_dir("resource"),
+            (false, dirs::config().join("resource"))
+        );
+        assert_eq!(
+            type_to_dir("copilot"),
+            (false, dirs::config().join("copilot"))
+        );
+        assert_eq!(
+            type_to_dir("ssscopilot"),
+            (false, dirs::config().join("ssscopilot"))
+        );
+
+        assert_eq!(
+            type_to_dir("unknown"),
+            (false, dirs::config().join("unknown"))
         );
     }
 }
