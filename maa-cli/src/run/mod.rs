@@ -22,7 +22,7 @@ use std::{
 
 use anyhow::{bail, Context, Result};
 use clap::Args;
-use log::debug;
+use log::{debug, warn};
 use maa_sys::Assistant;
 use signal_hook::consts::TERM_SIGNALS;
 
@@ -104,12 +104,13 @@ fn find_profile(root: impl AsRef<Path>, profile: Option<&str>) -> Result<AsstCon
     if let Some(profile) = profile {
         AsstConfig::find_file(join!(root, "profiles", profile))
             .context("Failed to find profile file!")
+    } else if let Some(config) = AsstConfig::find_file_or_none(join!(root, "profiles", "default"))?
+    {
+        Ok(config)
+    } else if let Some(config) = AsstConfig::find_file_or_none(join!(root, "asst"))? {
+        warn!("The config file `asst.toml` is deprecated, please use `profiles/default.toml` instead!");
+        Ok(config)
     } else {
-        for file in &[join!(root, "profiles", "default"), join!(root, "asst")] {
-            if let Some(config) = AsstConfig::find_file_or_none(file)? {
-                return Ok(config);
-            }
-        }
         Ok(AsstConfig::default())
     }
 }
