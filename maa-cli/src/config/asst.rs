@@ -1,6 +1,6 @@
 use crate::dirs;
 
-use std::path::PathBuf;
+use std::{borrow::Cow, path::PathBuf};
 
 use anyhow::{Context, Result};
 use log::{debug, info, warn};
@@ -92,7 +92,7 @@ impl ConnectionConfig {
         self
     }
 
-    pub fn connect_args(&self) -> (&str, &str, &str) {
+    pub fn connect_args(&self) -> (&str, Cow<str>, &str) {
         let adb_path = self
             .adb_path
             .as_deref()
@@ -100,7 +100,8 @@ impl ConnectionConfig {
         let address = self
             .address
             .as_deref()
-            .unwrap_or_else(|| self.preset.default_address());
+            .map(Cow::Borrowed)
+            .unwrap_or_else(|| self.preset.default_address(adb_path));
         let config = self
             .config
             .as_deref()
@@ -171,11 +172,21 @@ impl Preset {
         }
     }
 
-    fn default_address(self) -> &'static str {
+    fn default_address(self, adb_path: &str) -> Cow<'static, str> {
         match self {
-            Preset::MuMuPro => "127.0.0.1:16384",
-            Preset::PlayCover => "localhost:1717",
-            Preset::ADB => "emulator-5554",
+            Preset::MuMuPro => "127.0.0.1:16384".into(),
+            Preset::PlayCover => "127.0.0.1:1717".into(),
+            Preset::ADB => std::process::Command::new(adb_path)
+                .arg("devices")
+                .output()
+                .ok()
+                .and_then(|output| String::from_utf8(output.stdout).ok())
+                .and_then(parse_adb_devices)
+                .map(Cow::Owned)
+                .unwrap_or_else(|| {
+                    warn!("Failed to detect device address, using emulator-5554");
+                    "emulator-5554".into()
+                }),
         }
     }
 
@@ -183,6 +194,21 @@ impl Preset {
         // May be preset specific in the future
         config_based_on_os()
     }
+}
+
+fn parse_adb_devices(output: impl AsRef<str>) -> Option<String> {
+    let mut lines = output.as_ref().lines().skip(1);
+    for line in lines.by_ref() {
+        if line.ends_with("device") {
+            let mut parts = line.split_whitespace();
+            if let Some(address) = parts.next() {
+                info!("Detected online device: {}", address);
+                return Some(address.to_owned());
+            }
+        }
+    }
+
+    None
 }
 
 fn config_based_on_os() -> &'static str {
@@ -822,12 +848,30 @@ mod tests {
 
         #[test]
         fn connect_args() {
-            assert_eq!(
+            fn args_eq(
+                args: (&str, Cow<str>, &str),
+                (adb_path, address, config): (&str, &str, &str),
+            ) {
+                assert_eq!(args.0, adb_path);
+                assert_eq!(args.1, address);
+                assert_eq!(args.2, config);
+            }
+
+            // check if a adb device is connected
+            let device = std::process::Command::new("adb")
+                .arg("devices")
+                .output()
+                .ok()
+                .and_then(|output| String::from_utf8(output.stdout).ok())
+                .and_then(parse_adb_devices)
+                .map_or_else(|| "emulator-5554".into(), Cow::Owned);
+
+            args_eq(
                 ConnectionConfig::default().connect_args(),
-                ("adb", "emulator-5554", config_based_on_os()),
+                ("adb", &device, config_based_on_os()),
             );
 
-            assert_eq!(
+            args_eq(
                 ConnectionConfig {
                     preset: Preset::MuMuPro,
                     adb_path: None,
@@ -842,7 +886,7 @@ mod tests {
                 ),
             );
 
-            assert_eq!(
+            args_eq(
                 ConnectionConfig {
                     preset: Preset::PlayCover,
                     adb_path: None,
@@ -850,10 +894,10 @@ mod tests {
                     config: None,
                 }
                 .connect_args(),
-                ("", "localhost:1717", config_based_on_os()),
+                ("", "127.0.0.1:1717", config_based_on_os()),
             );
 
-            assert_eq!(
+            args_eq(
                 ConnectionConfig {
                     preset: Preset::ADB,
                     adb_path: Some("/path/to/adb".to_owned()),
@@ -863,6 +907,21 @@ mod tests {
                 .connect_args(),
                 ("/path/to/adb", "127.0.0.1:11111", "SomeConfig"),
             );
+        }
+
+        #[test]
+        fn test_parse_adb_devices() {
+            assert_eq!(
+                parse_adb_devices("List of devices attached\nemulator-5554\tdevice\n"),
+                Some("emulator-5554".to_owned())
+            );
+
+            assert_eq!(
+                parse_adb_devices("List of devices attached\nemulator-5554\toffline\n"),
+                None
+            );
+
+            assert_eq!(parse_adb_devices("List of devices attached\n"), None);
         }
 
         #[test]
