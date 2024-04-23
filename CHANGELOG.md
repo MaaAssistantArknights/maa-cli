@@ -1,5 +1,23 @@
 # Release Notes
 
+## Release 0.4.7
+
+### Features
+
+- Mark the old config file `asst.toml` deprecated by [@wangl-cc](https://github.com/wangl-cc) in [#275](https://github.com/MaaAssistantArknights/maa-cli/pull/275)
+- New command `import` to import configuration files by [@wangl-cc](https://github.com/wangl-cc) in [#276](https://github.com/MaaAssistantArknights/maa-cli/pull/276)
+- Detect device address by `adb devices` by [@wangl-cc](https://github.com/wangl-cc) in [#277](https://github.com/MaaAssistantArknights/maa-cli/pull/277)
+
+### Documentation
+
+- Add docs for other subcommands by [@wangl-cc](https://github.com/wangl-cc)
+
+### Miscellaneous
+
+- Use new file structure for config examples by [@wangl-cc](https://github.com/wangl-cc)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.4.6...v0.4.7>
+
 ## Release 0.4.6
 
 ### Features
