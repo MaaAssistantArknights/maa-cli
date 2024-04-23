@@ -185,7 +185,7 @@ where
             task_config.start_app,
             task_config.close_app,
             task_config.client_type.unwrap_or_default(),
-            addr,
+            addr.as_ref(),
         ),
         _ => None,
     };
@@ -200,7 +200,7 @@ where
         }
 
         // Connect to game or emulator
-        asst.async_connect(adb, addr, config, true)?;
+        asst.async_connect(adb, addr.as_ref(), config, true)?;
 
         asst.start()?;
 

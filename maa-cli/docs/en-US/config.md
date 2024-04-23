@@ -325,7 +325,7 @@ address = "emulator-5554" # the address of device, such as "emulator-5554" or "1
 config = "General" # the config of maa, should not be changed most of time
 ```
 
-`adb_path` is the path of `adb` executable, you can set it to the absolute path of `adb` or or leave it empty if it is in PATH. The `address` is the address of the device used by `adb`, like `emulator-5554` or `127.0.0.1:[port]`, the port of some common emulators can be found in the [MAA FAQ][emulator-ports]. The `config` is used to specify some configurations of the host and emulator, whose default value is `CompatMac` on macOS, `CompatPOSIXShell` on Linux and `General` on other platforms. More optional configs can be found in `config.json` in the resource directory.
+`adb_path` is the path of `adb` executable, you can set it to the absolute path of `adb` or or leave it empty if it is in PATH. The `address` is the address of the device used by `adb`, like `emulator-5554` or `127.0.0.1:[port]`, the port of some common emulators can be found in the [MAA FAQ][emulator-ports]. If the `address` is absent, the cli will try to find the device automatically by `adb devices`, if there are multiple online devices, the first one will be used. If cli can not find any device, it will try to use the default address `emulator-5554`. The `config` is used to specify some configurations of the host and emulator, whose default value is `CompatMac` on macOS, `CompatPOSIXShell` on Linux and `General` on other platforms. More optional configs can be found in `config.json` in the resource directory.
 
 For some common emulators, you can use `preset` to use predefined configurations:
 
