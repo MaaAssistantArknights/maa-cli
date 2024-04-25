@@ -45,7 +45,7 @@ for filename in "${files[@]}"; do
   sed -I '' -E 's|\.\./\.\./|https://github.com/MaaAssistantArknights/maa-cli/blob/main/maa-cli/|g' "$out_file"
 
   if [[ $lang == "zh-CN" ]]; then
-    sed -i '' -E 's|https://maa\.plus/docs/(.+)\.html|../../\1.html|g' "$out_file"
+    sed -i '' -E 's|https://maa\.plus/docs/(.+)\.html|../../\1.md|g' "$out_file"
   elif [[ $lang == "en-US" ]]; then
     sed -I '' -E 's|https://maa\.plus/docs/[^/]+/(.+)\.html|../\1.md|g' "$out_file"
   fi
