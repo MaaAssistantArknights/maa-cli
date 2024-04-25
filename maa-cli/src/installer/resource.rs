@@ -50,10 +50,14 @@ pub fn update(is_auto: bool) -> Result<()> {
                 .check()
                 .is_err() =>
         {
-            if cfg!(feature = "git2") {
+            #[cfg(feature = "git2")]
+            {
                 warn!("Failed to execute git, falling back to libgit2 backend");
                 GitBackend::Libgit2
-            } else {
+            }
+
+            #[cfg(not(feature = "git2"))]
+            {
                 bail!("Failed to execute git, please check your `git` installation");
             }
         }
