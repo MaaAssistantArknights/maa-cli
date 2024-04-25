@@ -3,8 +3,28 @@ use crate::{
     dirs,
 };
 
-use anyhow::Result;
-use log::debug;
+use anyhow::{bail, Result};
+use log::{debug, warn};
+
+trait StatusExt {
+    /// If error, return the error, otherwise return an error if the status is not successful
+    fn check(self) -> std::io::Result<()>;
+}
+
+impl StatusExt for std::io::Result<std::process::ExitStatus> {
+    fn check(self) -> std::io::Result<()> {
+        self.and_then(|status| {
+            if !status.success() {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "Command failed",
+                ))
+            } else {
+                Ok(())
+            }
+        })
+    }
+}
 
 pub fn update(is_auto: bool) -> Result<()> {
     let config = cli_config().resource_config();
@@ -19,6 +39,31 @@ pub fn update(is_auto: bool) -> Result<()> {
     let branch = config.remote().branch();
     let ssh_key = config.remote().ssh_key().map(dirs::expand_tilde);
     let dest = dirs::hot_update();
+
+    // check if git is available when using git backend
+    let backend = match backend {
+        GitBackend::Git
+            if std::process::Command::new("git")
+                .arg("--version")
+                .stdout(std::process::Stdio::null()) // ignore normal output
+                .status()
+                .check()
+                .is_err() =>
+        {
+            if cfg!(feature = "git2") {
+                warn!("Failed to execute git, falling back to libgit2 backend");
+                GitBackend::Libgit2
+            } else {
+                bail!("Failed to execute git, please check your `git` installation");
+            }
+        }
+        _ => backend,
+    };
+
+    // check if ssh key is available
+    if url.starts_with("git@") && ssh_key.is_none() {
+        bail!("SSH key is required for git repository with ssh url");
+    }
 
     if dest.exists() {
         debug!("Fetching resource repository...");
@@ -40,9 +85,11 @@ pub fn update(is_auto: bool) -> Result<()> {
 }
 
 mod git {
+    use super::StatusExt;
+
     use std::path::Path;
 
-    use anyhow::{bail, Context, Result};
+    use anyhow::{Context, Result};
 
     pub fn clone(
         url: &str,
@@ -70,13 +117,9 @@ mod git {
             );
         }
 
-        let status = cmd
-            .status()
+        cmd.status()
+            .check()
             .context("Failed to clone resource repository")?;
-
-        if !status.success() {
-            bail!("Failed to clone resource repository")
-        }
 
         Ok(())
     }
@@ -99,14 +142,10 @@ mod git {
             );
         }
 
-        let status = cmd
-            .current_dir(repo)
+        cmd.current_dir(repo)
             .status()
+            .check()
             .context("Failed to pull resource repository")?;
-
-        if !status.success() {
-            bail!("Failed to pull resource repository")
-        }
 
         Ok(())
     }
