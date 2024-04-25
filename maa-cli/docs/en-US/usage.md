@@ -23,7 +23,7 @@ maa self update
 
 ## Run Tasks
 
-The main feature of maa-cli is to run tasks, including predefined tasks and custom tasks.
+Once MaaCore is installed, you can run tasks directly without additional configuration. The default configuration may not be suitable for all users. If you encounter problems when running tasks, you can refer to the [Configuration Document][config] to modify the configuration.
 
 ### Predefined tasks
 
@@ -33,9 +33,18 @@ The main feature of maa-cli is to run tasks, including predefined tasks and cust
 - `maa copilot <maa_uri>`: run a "copilot" task, the `maa_uri` is the URI of a copilot task; it can be `maa://1234` or local file path;
 - `maa roguelike [theme]`: run a "roguelike" task, the `theme` is the theme of roguelike, and available themes are `Phantom`, `Mizuki` and `Sami`.
 
+The above tasks accept some parameters, you can view the specific parameters by `maa <task> --help`.
+
+For example, if you want to open the game, use 3 sanity medicines to farm BB-7, and then close the game, you can run the following command:
+
+```bash
+maa startup YoStarEN && maa fight BB-7 -m 3 && maa closedown
+```
+
 ### Custom Tasks
 
-You can run custom tasks by `maa run <task>`. The `<task>` is the name of the custom task, which is defined in the configuration file. The location and format of the configuration file are described in the [Custom Task Document][custom-task]. After defining the custom task, you can list all available tasks by `maa list`.
+Due to the multitude of tasks supported by MAA, maa-cli cannot provide predefined options for all tasks. Additionally, you may need to run multiple tasks as shown in the example above. To address this issue, maa-cli offers custom task functionality. Custom tasks allow for the combination of different tasks and provide finer control over the parameters of each task as well as the execution order. Furthermore, custom tasks support conditional statements, enabling you to decide whether to execute a task based on certain conditions or to execute a task with specific parameters. This can be used to automate your daily tasks.
+A custom task is defined in a configuration file. The location and format of the configuration file are described in the [Custom Task Document][custom-task]. After defining the configuration file, you can run the custom task by `maa run <task>`, where `<task>` is the name of the custom task, excluding the extension.
 
 ### Task Summary
 
@@ -71,6 +80,7 @@ Except for the above subcommands, maa-cli also provides other subcommands:
 
 More command usage can be viewed by `maa help`, and the usage of specific commands can be viewed by `maa help <command>`.
 
+[config]: config.md
 [custom-task]: config.md#custom-task
 
 <!-- markdownlint-disable-file MD013 -->
