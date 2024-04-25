@@ -23,7 +23,7 @@ maa self update
 
 ## 运行任务
 
-一旦完成了 MaaCore 的安装，通常情况下，你无需额外配置就可以直接运行任务。默认配置可能不适用于所有用户，如果你在运行任务时遇到问题，你可以参考 [配置文档][config] 修改配置。
+一旦完成了 MaaCore 的安装，通常情况下，你无需额外配置就可以直接运行任务。默认配置可能不适用于所有用户，如果你在运行任务时遇到问题，你可以参考 [配置文档][config-core] 修改配置。
 
 ### 预定义任务
 
@@ -82,7 +82,7 @@ maa-cli 默认会向标准误 (stderr) 输出日志。`--log-file` 选项可以�
 
 更多命令的使用方法可以通过 `maa help` 查看，具体命令的使用方法可以 通过 `maa help <command>` 查看。
 
-[config]: config.md
+[config-core]: config.md#MaaCore-相关配置
 [custom-task]: config.md#自定义任务
 
 <!-- markdownlint-disable-file MD013 -->

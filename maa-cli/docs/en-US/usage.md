@@ -23,7 +23,7 @@ maa self update
 
 ## Run Tasks
 
-Once MaaCore is installed, you can run tasks directly without additional configuration. The default configuration may not be suitable for all users. If you encounter problems when running tasks, you can refer to the [Configuration Document][config] to modify the configuration.
+Once MaaCore is installed, you can run tasks directly without additional configuration. The default configuration may not be suitable for all users. If you encounter problems when running tasks, you can refer to the [Configuration Document][config-core] to modify the configuration.
 
 ### Predefined tasks
 
@@ -80,7 +80,7 @@ Except for the above subcommands, maa-cli also provides other subcommands:
 
 More command usage can be viewed by `maa help`, and the usage of specific commands can be viewed by `maa help <command>`.
 
-[config]: config.md
+[config-core]: config.md#MaaCore-related-configurations
 [custom-task]: config.md#custom-task
 
 <!-- markdownlint-disable-file MD013 -->
