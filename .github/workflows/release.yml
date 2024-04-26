@@ -324,6 +324,21 @@ jobs:
           git commit ./*.json -m 'chore: bump version to v${{ needs.meta.outputs.version }}'
           git push --verbose ${{ !fromJson(needs.meta.outputs.publish) && '--dry-run' || ''}}
 
+  update-stable:
+    name: Update Stable Tag
+    if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'stable' }}
+    needs: [meta, release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.meta.outputs.commit }}
+      - name: Update Stable Tag
+        run: |
+          git tag -f stable ${{ needs.meta.outputs.commit }}
+          git push --verbose --force origin stable
+
   publish-homebrew:
     needs: [meta, release]
     if: ${{ fromJson(needs.meta.outputs.publish) && !fromJson(needs.meta.outputs.prerelease) }}
