@@ -519,18 +519,19 @@ mod tests {
             }
 
             fn example_task_config() -> TaskConfig {
-                use crate::value::Map;
                 use ClientType::*;
-                use MAAValue::OptionalInput;
 
                 let mut task_list = TaskConfig::new();
 
                 task_list.push(Task::new_with_default(
                     StartUp,
                     object!(
-                        "client_type" => OptionalInput {
-                            deps: Map::from([("start_game_enabled".to_string(), true.into())]),
-                            input: SelectD::<String>::new(
+                        "start_game_enabled" => BoolInput::new(
+                            Some(true),
+                            Some("start the game"),
+                        ),
+                        "client_type" if "start_game_enabled" == true =>
+                            SelectD::<String>::new(
                                 vec![
                                     Official.as_ref(),
                                     YoStarEN.as_ref(),
@@ -539,12 +540,7 @@ mod tests {
                                 None,
                                 Some("a client type"),
                                 false
-                            ).unwrap().into(),
-                        },
-                        "start_game_enabled" => BoolInput::new(
-                            Some(true),
-                            Some("start the game"),
-                        ),
+                            ).unwrap(),
                     ),
                 ));
 
