@@ -6,11 +6,10 @@ pub use primate::MAAPrimate;
 mod input;
 pub use input::MAAInput;
 
+pub use std::collections::BTreeMap as Map;
 use std::io;
 
 use serde::{Deserialize, Serialize};
-
-pub type Map<T> = std::collections::BTreeMap<String, T>;
 
 #[cfg_attr(test, derive(PartialEq, Debug))]
 #[derive(Deserialize, Clone)]
@@ -32,13 +31,13 @@ pub enum MAAValue {
         ///
         /// Keys are the keys of the dependencies in the sam object and values are the expected
         #[serde(alias = "deps")]
-        conditions: Map<MAAPrimate>,
+        conditions: Map<String, MAAPrimate>,
         /// Input value query from user when all the dependencies are satisfied
         #[serde(alias = "input", flatten)]
         value: BoxedMAAValue,
     },
     /// Object is a map of key-value pair
-    Object(Map<MAAValue>),
+    Object(Map<String, MAAValue>),
     /// Primate json types: bool, int, float, string
     Primate(MAAPrimate),
 }
@@ -125,28 +124,17 @@ impl MAAValue {
                 Ok(Array(ret))
             }
             Object(mut map) => {
-                // current sort implementation is "wrong",
-                // the sort_by is only used to sort elements with total order,
-                // while the dependencies are partial order.
-                // In current implementation, the order is not transitive even no circular dependencies.
-                // For example, A depends on B, B depends on C, and C depends on D;
-                // Thus it should be A < B < C < D.
-                // C and A are both `Optional` and not directly depend on each other.
-                // Thus, the will be compared by their keys, and the order may be C > A,
-                // which is contrary to the dependencies.
-                // We should not use key to compare the elements, but the dependencies.
-                // Even the dependencies are partial order, we must sort them by topological sort.
-
                 enum Mark {
                     Visiting,
                     Visited,
                 }
 
-                fn visit<'a>(
+                // Depth-first search to sort the keys
+                fn visit<'key>(
                     sorted_keys: &mut Vec<String>,
-                    key: &'a str,
-                    map: &'a Map<MAAValue>,
-                    marks: &mut std::collections::BTreeMap<&'a str, Mark>,
+                    key: &'key str,
+                    map: &'key Map<String, MAAValue>,
+                    marks: &mut Map<&'key str, Mark>,
                 ) -> io::Result<()> {
                     match marks.get(key) {
                         Some(Mark::Visited) => return Ok(()),
@@ -188,7 +176,7 @@ impl MAAValue {
                 println!("{:?}", sorted_keys);
 
                 // Initialize all the values with given order and put them into a new map
-                let mut initialized: Map<MAAValue> = Map::new();
+                let mut initialized: Map<String, MAAValue> = Map::new();
                 for key in sorted_keys {
                     let value = map.remove(&key).unwrap();
                     if let Optional { conditions, value } = value {
@@ -222,7 +210,7 @@ impl MAAValue {
     }
 
     /// Get inner value if the value is an object
-    pub fn as_object(&self) -> Option<&Map<MAAValue>> {
+    pub fn as_object(&self) -> Option<&Map<String, MAAValue>> {
         match self {
             Self::Object(v) => Some(v),
             _ => None,
@@ -426,12 +414,14 @@ mod tests {
             "select_string" => SelectD::<String>::new(["string1", "string2"], Some(2), None, false).unwrap(),
             "optional" if "input_bool" == true => Input::new(Some(1), None),
             "optional_no_satisfied" if "input_bool" == false => Input::new(Some(1), None),
+            "optional_object" if "input_bool" == true =>
+                object!("key1" => "value1", "key2" => "value2"),
         );
 
         serde_test::assert_de_tokens(
             &obj,
             &[
-                Token::Map { len: Some(15) },
+                Token::Map { len: Some(16) },
                 Token::Str("array"),
                 Token::Seq { len: Some(2) },
                 Token::I32(1),
@@ -502,7 +492,7 @@ mod tests {
                 Token::MapEnd,
                 Token::Str("optional"),
                 Token::Map { len: Some(2) },
-                Token::Str("deps"),
+                Token::Str("conditions"),
                 Token::Map { len: Some(1) },
                 Token::Str("input_bool"),
                 Token::Bool(true),
@@ -512,13 +502,25 @@ mod tests {
                 Token::MapEnd,
                 Token::Str("optional_no_satisfied"),
                 Token::Map { len: Some(2) },
-                Token::Str("deps"),
+                Token::Str("conditions"),
                 Token::Map { len: Some(1) },
                 Token::Str("input_bool"),
                 Token::Bool(false),
                 Token::MapEnd,
                 Token::Str("default"),
                 Token::I32(1),
+                Token::MapEnd,
+                Token::Str("optional_object"),
+                Token::Map { len: Some(3) },
+                Token::Str("conditions"),
+                Token::Map { len: Some(1) },
+                Token::Str("input_bool"),
+                Token::Bool(true),
+                Token::MapEnd,
+                Token::Str("key1"),
+                Token::Str("value1"),
+                Token::Str("key2"),
+                Token::Str("value2"),
                 Token::MapEnd,
                 Token::MapEnd,
             ],
@@ -529,7 +531,7 @@ mod tests {
         serde_test::assert_ser_tokens(
             &obj,
             &[
-                Token::Map { len: Some(14) },
+                Token::Map { len: Some(15) },
                 Token::Str("array"),
                 Token::Seq { len: Some(2) },
                 Token::I32(1),
@@ -556,6 +558,13 @@ mod tests {
                 Token::MapEnd,
                 Token::Str("optional"),
                 Token::I32(1),
+                Token::Str("optional_object"),
+                Token::Map { len: Some(2) },
+                Token::Str("key1"),
+                Token::Str("value1"),
+                Token::Str("key2"),
+                Token::Str("value2"),
+                Token::MapEnd,
                 Token::Str("select_float"),
                 Token::F32(2.0),
                 Token::Str("select_int"),

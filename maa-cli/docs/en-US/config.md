@@ -272,10 +272,14 @@ params = { stage = "CE-6" }
 [tasks.variants.params.stage]
 default = "1-7" # default value of stage, optional (if not given, user can input empty value to re-prompt)
 description = "a stage to fight" # description of the input, optional
+
+# query the medicine to use only when stage is 1-7
 [tasks.variants.params.medicine]
-# dependency of parameters, the key is the name of parameter, the value is the expected value of dependency parameter
-# when set, the parameter will be required to input only if all dependency parameters are satisfied
-deps = { stage = "1-7" }
+# a parameter can be optional with `optional` field
+# if the condition is not matched, the parameter will be ignored
+# the `condition` field can be used to specify the condition of the parameter
+# where the condition can be a table, whose keys are name of other parameters and values are the expected value
+conditions = { stage = "1-7" }
 default = 1000
 description = "medicine to use"
 ```
