@@ -219,17 +219,17 @@ pub fn convert(file: &Path, out: Option<&Path>, ft: Option<Filetype>) -> Result<
     }
 }
 
-pub fn import(path: &Path, force: bool, config_type: &str) -> std::io::Result<()> {
+pub fn import(src: &Path, force: bool, config_type: &str) -> std::io::Result<()> {
     use std::io::{Error as IOError, ErrorKind};
 
-    if !path.is_file() {
+    if !src.is_file() {
         return Err(IOError::new(
             ErrorKind::InvalidInput,
             "Given path is not a file or not exists",
         ));
     };
 
-    let file: &Path = path
+    let file: &Path = src
         .file_name()
         .ok_or_else(|| IOError::new(ErrorKind::InvalidInput, "Invalid file path"))?
         .as_ref();
@@ -254,7 +254,7 @@ pub fn import(path: &Path, force: bool, config_type: &str) -> std::io::Result<()
                 ));
             }
 
-            fs::copy(path, dirs::config().join(file))?;
+            fs::copy(src, dirs::config().join(file))?;
         } else {
             return Err(IOError::new(
                 ErrorKind::InvalidInput,
@@ -277,39 +277,54 @@ pub fn import(path: &Path, force: bool, config_type: &str) -> std::io::Result<()
         ));
     }
 
+    let dest = dir.join(file);
+    let mut tobe_removed = Vec::new();
+
     // Check if directory exists
     if dir.exists() {
         // Check if file with same name already exists
         if read_by_cli {
-            let possible_duplicated = dir.join(file);
             for ext in SUPPORTED_EXTENSION.iter() {
-                if possible_duplicated.with_extension(ext).exists() && !force {
-                    return Err(IOError::new(
-                        ErrorKind::AlreadyExists,
-                        format!(
-                            "File with same name already exists: {}, use --force to overwrite",
-                            possible_duplicated.display()
-                        ),
-                    ));
+                let path = dest.with_extension(ext);
+                if path.exists() {
+                    if force {
+                        // Add file with same name but different extension
+                        // to tobe_removed list to remove after copying
+                        if path != dest {
+                            tobe_removed.push(path);
+                        }
+                    } else {
+                        return Err(IOError::new(
+                            ErrorKind::AlreadyExists,
+                            format!(
+                                "File with same  name (`{}`) already exists, use --force to overwrite",
+                                dest.display()
+                            ),
+                        ));
+                    }
                 }
             }
-        } else {
-            let possible_duplicated = dir.join(file);
-            if !force && possible_duplicated.exists() {
-                return Err(IOError::new(
-                    ErrorKind::AlreadyExists,
-                    format!(
-                        "File already exists: {}, use --force to overwrite",
-                        possible_duplicated.display()
-                    ),
-                ));
-            }
+        } else if !force && dest.exists() {
+            return Err(IOError::new(
+                ErrorKind::AlreadyExists,
+                format!(
+                    "File {} already exists, use --force to overwrite",
+                    dest.display()
+                ),
+            ));
         }
     } else {
         fs::create_dir_all(&dir)?;
     }
 
-    fs::copy(path, dir.join(file))?;
+    match fs::copy(src, dest) {
+        Ok(_) => {
+            for path in tobe_removed {
+                fs::remove_file(path)?;
+            }
+        }
+        Err(e) => return Err(e),
+    }
 
     Ok(())
 }
@@ -540,6 +555,8 @@ mod tests {
                 .kind(),
             ErrorKind::InvalidInput
         );
+        assert!(dirs::config().join("profiles").join("test.yml").exists());
+        assert!(!dirs::config().join("profiles").join("test.json").exists());
 
         assert!(import(&tmp_dir.join("test.json"), false, "infrast").is_ok());
         assert_eq!(
