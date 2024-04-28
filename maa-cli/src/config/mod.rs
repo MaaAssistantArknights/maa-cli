@@ -304,16 +304,14 @@ pub fn import(src: &Path, force: bool, config_type: &str) -> std::io::Result<()>
                     }
                 }
             }
-        } else {
-            if !force && dest.exists() {
-                return Err(IOError::new(
-                    ErrorKind::AlreadyExists,
-                    format!(
-                        "File already exists: {}, use --force to overwrite",
-                        dest.display()
-                    ),
-                ));
-            }
+        } else if !force && dest.exists() {
+            return Err(IOError::new(
+                ErrorKind::AlreadyExists,
+                format!(
+                    "File {} already exists, use --force to overwrite",
+                    dest.display()
+                ),
+            ));
         }
     } else {
         fs::create_dir_all(&dir)?;
@@ -557,6 +555,8 @@ mod tests {
                 .kind(),
             ErrorKind::InvalidInput
         );
+        assert!(dirs::config().join("profiles").join("test.yml").exists());
+        assert!(!dirs::config().join("profiles").join("test.json").exists());
 
         assert!(import(&tmp_dir.join("test.json"), false, "infrast").is_ok());
         assert_eq!(
