@@ -173,8 +173,6 @@ impl MAAValue {
                     visit(&mut sorted_keys, key, &map, &mut marks)?;
                 }
 
-                println!("{:?}", sorted_keys);
-
                 // Initialize all the values with given order and put them into a new map
                 let mut initialized: Map<String, MAAValue> = Map::new();
                 for key in sorted_keys {
