@@ -72,13 +72,13 @@ impl super::FromFile for AsstConfig {}
 #[derive(Deserialize, Clone, Default)]
 pub struct ConnectionConfig {
     #[serde(default, alias = "type")]
-    preset: Preset,
+    pub(super) preset: Preset,
     #[serde(default)]
-    adb_path: Option<String>,
+    pub(super) adb_path: Option<String>,
     #[serde(default, alias = "device")]
-    address: Option<String>,
+    pub(super) address: Option<String>,
     #[serde(default)]
-    config: Option<String>,
+    pub(super) config: Option<String>,
 }
 
 impl ConnectionConfig {
@@ -341,6 +341,7 @@ impl ResourceConfig {
                 );
             }
             None => {
+                // should not push to resource_base_dirs as this is not a base resource directory
                 let resource = resource.into();
                 info!("Using platform diff resource: {}", resource.display());
                 self.platform_diff_resource = Some(resource);
@@ -414,9 +415,9 @@ fn push_resource(resource_dirs: &mut Vec<PathBuf>, dir: impl Into<PathBuf>) -> &
 #[derive(Deserialize, Default, Clone)]
 pub struct StaticOptions {
     #[serde(default)]
-    cpu_ocr: Option<bool>,
+    pub(super) cpu_ocr: Option<bool>,
     #[serde(default)]
-    gpu_ocr: Option<u32>,
+    pub(super) gpu_ocr: Option<u32>,
 }
 
 impl StaticOptions {
@@ -448,10 +449,10 @@ impl StaticOptions {
 #[derive(Deserialize, Default, Clone)]
 pub struct InstanceOptions {
     #[serde(default)]
-    touch_mode: Option<TouchMode>,
-    deployment_with_pause: Option<bool>,
-    adb_lite_enabled: Option<bool>,
-    kill_adb_on_exit: Option<bool>,
+    pub(super) touch_mode: Option<TouchMode>,
+    pub(super) deployment_with_pause: Option<bool>,
+    pub(super) adb_lite_enabled: Option<bool>,
+    pub(super) kill_adb_on_exit: Option<bool>,
 }
 
 impl InstanceOptions {

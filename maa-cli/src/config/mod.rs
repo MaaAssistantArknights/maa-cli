@@ -317,13 +317,10 @@ pub fn import(src: &Path, force: bool, config_type: &str) -> std::io::Result<()>
         fs::create_dir_all(&dir)?;
     }
 
-    match fs::copy(src, dest) {
-        Ok(_) => {
-            for path in tobe_removed {
-                fs::remove_file(path)?;
-            }
-        }
-        Err(e) => return Err(e),
+    fs::copy(src, dest)?;
+
+    for path in tobe_removed {
+        fs::remove_file(path)?;
     }
 
     Ok(())
@@ -350,6 +347,8 @@ pub mod asst;
 pub mod cli;
 
 pub mod task;
+
+pub mod init;
 
 #[cfg(test)]
 mod tests {
@@ -513,19 +512,13 @@ mod tests {
         std::fs::write(tmp_dir.join("test.yml"), "").unwrap();
         std::fs::write(tmp_dir.join("test.ini"), "").unwrap();
 
+        // test cli configuration file
         assert_eq!(
             import(&tmp_dir.join("test"), false, "cli")
                 .unwrap_err()
                 .kind(),
             ErrorKind::InvalidInput
         );
-        assert_eq!(
-            import(&tmp_dir.join("test.toml"), false, "cli")
-                .unwrap_err()
-                .kind(),
-            ErrorKind::InvalidInput
-        );
-
         assert_eq!(
             import(&tmp_dir.join("test.json"), false, "cli")
                 .unwrap_err()
@@ -539,35 +532,35 @@ mod tests {
                 .kind(),
             ErrorKind::AlreadyExists
         );
-        assert!(import(&tmp_dir.join("cli.json"), true, "cli").is_ok());
+        import(&tmp_dir.join("cli.json"), true, "cli").unwrap();
 
-        assert!(import(&tmp_dir.join("test.json"), false, "asst").is_ok());
+        // test file read by CLI
+        import(&tmp_dir.join("test.json"), false, "task").unwrap();
         assert_eq!(
-            import(&tmp_dir.join("test.yml"), false, "profile")
+            import(&tmp_dir.join("test.yml"), false, "task")
                 .unwrap_err()
                 .kind(),
             ErrorKind::AlreadyExists
         );
-        assert!(import(&tmp_dir.join("test.yml"), true, "profile").is_ok());
+        import(&tmp_dir.join("test.yml"), true, "task").unwrap();
         assert_eq!(
             import(&tmp_dir.join("test.ini"), false, "task")
                 .unwrap_err()
                 .kind(),
             ErrorKind::InvalidInput
         );
-        assert!(dirs::config().join("profiles").join("test.yml").exists());
-        assert!(!dirs::config().join("profiles").join("test.json").exists());
+        assert!(join!(dirs::config(), "tasks", "test.yml").exists());
+        assert!(!join!(dirs::config(), "tasks", "test.json").exists());
 
-        assert!(import(&tmp_dir.join("test.json"), false, "infrast").is_ok());
+        // test file not read by CLI
+        import(&tmp_dir.join("test.json"), false, "infrast").unwrap();
         assert_eq!(
             import(&tmp_dir.join("test.json"), false, "infrast")
                 .unwrap_err()
                 .kind(),
             ErrorKind::AlreadyExists
         );
-        assert!(import(&tmp_dir.join("test.json"), true, "infrast").is_ok());
-
-        assert!(import(&tmp_dir.join("test.json"), false, "resource").is_ok());
+        import(&tmp_dir.join("test.json"), true, "infrast").unwrap();
     }
 
     #[test]
