@@ -235,17 +235,22 @@ mod test {
 
     use super::super::Filetype;
 
+    use crate::dirs::Ensure;
+
     #[test]
     #[ignore = "write to user's config directory"]
     fn test_init() {
         let profile_dir = join!(crate::dirs::config(), "profiles");
+
+        profile_dir.ensure().unwrap();
+
         let name = PathBuf::from("test");
 
-        assert!(init(Some(name.clone()), None, false).is_ok());
+        init(Some(name.clone()), None, false).expect("failed to init profile");
         assert!(join!(&profile_dir, "test"; "json").exists());
 
         assert!(init(Some(name.clone()), None, false).is_err());
-        assert!(init(Some(name.clone()), Some(Filetype::Toml), true).is_ok());
+        init(Some(name.clone()), Some(Filetype::Toml), true).expect("failed to init profile");
         assert!(join!(&profile_dir, "test"; "toml").exists());
     }
 }
