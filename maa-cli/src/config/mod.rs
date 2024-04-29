@@ -549,8 +549,8 @@ mod tests {
                 .kind(),
             ErrorKind::InvalidInput
         );
-        assert!(dirs::config().join("test").join("test.yml").exists());
-        assert!(!dirs::config().join("test").join("test.json").exists());
+        assert!(join!(dirs::config(), "tasks", "test.yml").exists());
+        assert!(!join!(dirs::config(), "tasks", "test.json").exists());
 
         // test file not read by CLI
         import(&tmp_dir.join("test.json"), false, "infrast").unwrap();
