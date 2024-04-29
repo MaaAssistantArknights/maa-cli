@@ -317,13 +317,10 @@ pub fn import(src: &Path, force: bool, config_type: &str) -> std::io::Result<()>
         fs::create_dir_all(&dir)?;
     }
 
-    match fs::copy(src, dest) {
-        Ok(_) => {
-            for path in tobe_removed {
-                fs::remove_file(path)?;
-            }
-        }
-        Err(e) => return Err(e),
+    fs::copy(src, dest)?;
+
+    for path in tobe_removed {
+        fs::remove_file(path)?;
     }
 
     Ok(())
@@ -350,6 +347,8 @@ pub mod asst;
 pub mod cli;
 
 pub mod task;
+
+pub mod init;
 
 #[cfg(test)]
 mod tests {

@@ -218,11 +218,28 @@ pub(crate) enum Command {
         /// - `resource`: user resource files.
         ///
         /// Other values are supported, but not recommended.
-        /// It will be treated as a subdirectory of the config directory,
-        /// and show a warning message.
+        /// It will be treated as a subdirectory of the config directory and show a warning message.
         /// If you think it is correct, please open an issue to let us know.
         #[arg(short = 't', long, default_value = "task", verbatim_doc_comment)]
         config_type: String,
+    },
+    /// Initialize configurations for maa-cli
+    Init {
+        /// Name of the profile
+        ///
+        /// The name of the profile to initialize.
+        /// If not specified, the default profile will be initialized.
+        #[arg(short, long)]
+        name: Option<PathBuf>,
+        /// Format of the configuration file
+        ///
+        /// The type of the configuration file to save can be one of "toml", "yaml" and "json".
+        /// If not specified, default to "json".
+        #[arg(short, long)]
+        format: Option<config::Filetype>,
+        /// Force to initialize even if the profile already exists
+        #[arg(long)]
+        force: bool,
     },
     /// Generate completion script for given shell
     Complete { shell: Shell },
@@ -715,19 +732,6 @@ mod test {
     }
 
     #[test]
-    fn list() {
-        assert_matches!(parse_from(["maa", "list"]).command, Command::List);
-    }
-
-    #[test]
-    fn complete() {
-        assert_matches!(
-            parse_from(["maa", "complete", "bash"]).command,
-            Command::Complete { shell: Shell::Bash }
-        );
-    }
-
-    #[test]
     fn cleanup() {
         use cleanup::CleanupTarget::*;
         assert_matches!(
@@ -743,6 +747,85 @@ mod test {
         assert_matches!(
             parse_from(["maa", "cleanup", "cli-cache", "log"]).command,
             Command::Cleanup { targets } if targets == vec![CliCache, Log]
+        );
+    }
+
+    #[test]
+    fn list() {
+        assert_matches!(parse_from(["maa", "list"]).command, Command::List);
+    }
+
+    #[test]
+    fn import() {
+        assert_matches!(
+            parse_from(["maa", "import", "path"]).command,
+            Command::Import {
+                path,
+                force: false,
+                config_type,
+            } if path == PathBuf::from("path") && config_type == "task"
+        );
+
+        assert_matches!(
+            parse_from(["maa", "import", "path", "--force"]).command,
+            Command::Import { force: true, .. }
+        );
+
+        assert_matches!(
+            parse_from(["maa", "import", "path", "-t", "cli"]).command,
+            Command::Import {
+                config_type,
+                ..
+            } if config_type == "cli"
+        );
+    }
+
+    #[test]
+    fn init() {
+        assert_matches!(
+            parse_from(["maa", "init"]).command,
+            Command::Init {
+                name: None,
+                format: None,
+                force: false,
+            }
+        );
+
+        assert_matches!(
+            parse_from(["maa", "init", "--name", "name"]).command,
+            Command::Init {
+                name: Some(name),
+                ..
+            } if name == PathBuf::from("name")
+        );
+
+        assert_matches!(
+            parse_from(["maa", "init", "--format", "yaml"]).command,
+            Command::Init {
+                format: Some(config::Filetype::Yaml),
+                ..
+            }
+        );
+
+        assert_matches!(
+            parse_from(["maa", "init", "-ft"]).command,
+            Command::Init {
+                format: Some(config::Filetype::Toml),
+                ..
+            }
+        );
+
+        assert_matches!(
+            parse_from(["maa", "init", "--force"]).command,
+            Command::Init { force: true, .. }
+        );
+    }
+
+    #[test]
+    fn complete() {
+        assert_matches!(
+            parse_from(["maa", "complete", "bash"]).command,
+            Command::Complete { shell: Shell::Bash }
         );
     }
 

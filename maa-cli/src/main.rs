@@ -132,6 +132,11 @@ fn main() -> Result<()> {
         Command::Complete { shell } => {
             clap_complete::generate(shell, &mut CLI::command(), "maa", &mut std::io::stdout());
         }
+        Command::Init {
+            name,
+            format,
+            force,
+        } => config::init::init(name, format, force)?,
         Command::Mangen { path } => {
             clap_mangen::generate_to(CLI::command(), path)?;
         }

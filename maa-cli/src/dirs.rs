@@ -25,14 +25,19 @@ pub fn maa_lib_name() -> &'static str {
 /// This is useful to avoid unnecessary allocation when the first path is a PathBuf,
 /// and when multiple paths are joined.
 ///
+/// The expression after `;` is optional, which is used to set the extension of the final path.
+///
 /// Note: Because we reuse the first path, the first path will be consumed.
 /// Thus, if you want to reuse the first path, you should pass a Path instead of a PathBuf.
 macro_rules! join {
-    ($path:expr, $($paths:expr),+) => {{
+    ($path:expr, $($paths:expr),+ $(; $ext:expr)?) => {{
         let mut path: ::std::path::PathBuf = $path.into();
         $(
             path.push($paths);
         )+
+        $(
+            path.set_extension($ext);
+        )?
         path
     }}
 }
