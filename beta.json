@@ -1,39 +1,39 @@
 {
-  "version": "0.4.7",
+  "version": "0.4.8-beta.1",
   "details": {
-    "tag": "v0.4.7",
+    "tag": "v0.4.8-beta.1",
     "assets": {
       "universal-apple-darwin": {
-        "name": "maa_cli-v0.4.7-universal-apple-darwin.zip",
-        "size": 8507297,
-        "sha256sum": "d7157b95878bd74aabe3a7701ff9bafd22c2c5ec7579cad7eca61b9b2dcb9ea0"
+        "name": "maa_cli-v0.4.8-beta.1-universal-apple-darwin.zip",
+        "size": 8547429,
+        "sha256sum": "08f068aa3469d116133be917511b7078ced9f10af2e2996c821e302ae15e9b9d"
       },
       "x86_64-unknown-linux-gnu": {
-        "name": "maa_cli-v0.4.7-x86_64-unknown-linux-gnu.tar.gz",
-        "size": 4942821,
-        "sha256sum": "79656db894ff58c6fdf3ddb744460e2dd713b1f440bd3f5aff9a665aedbbd112"
+        "name": "maa_cli-v0.4.8-beta.1-x86_64-unknown-linux-gnu.tar.gz",
+        "size": 4963219,
+        "sha256sum": "7bb800f12951ac1526344abce2cfe25edb08c886bb84be10a84a9afd33560b73"
       },
       "aarch64-unknown-linux-gnu": {
-        "name": "maa_cli-v0.4.7-aarch64-unknown-linux-gnu.tar.gz",
-        "size": 5153248,
-        "sha256sum": "8f99b3cad530376a89e67d325ae5a1b9f128379927b01abbbe620395cbbe1230"
+        "name": "maa_cli-v0.4.8-beta.1-aarch64-unknown-linux-gnu.tar.gz",
+        "size": 5168927,
+        "sha256sum": "e049ee0510c8bacadfb775407681661d01be8cdbe57b4de2bc694e9b0d3f11ad"
       },
       "x86_64-pc-windows-msvc": {
-        "name": "maa_cli-v0.4.7-x86_64-pc-windows-msvc.zip",
-        "size": 3260160,
-        "sha256sum": "d1dfee184f04976e0d51d924a8f3d9340295679fa7b5109328e6075a182a23d3"
+        "name": "maa_cli-v0.4.8-beta.1-x86_64-pc-windows-msvc.zip",
+        "size": 3285137,
+        "sha256sum": "8c4f32914ee45a54897358d64d3eeb501351618d8a694df3bf7fa52fc0a496b7"
       },
       "x86_64-apple-darwin": {
-        "name": "maa_cli-v0.4.7-x86_64-apple-darwin.zip",
-        "size": 4190011,
-        "sha256sum": "f5c29239d2b09c4ce537049a66de2248e9ef7f000b6a97c8ef0eef094f66d5a8"
+        "name": "maa_cli-v0.4.8-beta.1-x86_64-apple-darwin.zip",
+        "size": 4215549,
+        "sha256sum": "8acd0dc5917d452f8a6a2a6ae0a18a0838786974792f9de17a15af71f325ef71"
       },
       "aarch64-apple-darwin": {
-        "name": "maa_cli-v0.4.7-aarch64-apple-darwin.zip",
-        "size": 4316305,
-        "sha256sum": "295c1fb46661b76d69d56fdf96cec387e538556c6bcf8c56ee12db88d4852d56"
+        "name": "maa_cli-v0.4.8-beta.1-aarch64-apple-darwin.zip",
+        "size": 4333868,
+        "sha256sum": "f2015f1dfb8c94629805864b5f1beedc9d9a769de842a329610054e07b0165df"
       }
     },
-    "commit": "611040925a9940d981293a09bab7174d2304f326"
+    "commit": "d7b20842347b9835a540e6ce66d7bd5e8d8e4424"
   }
 }
