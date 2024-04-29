@@ -143,24 +143,29 @@ pub fn init(name: Option<PathBuf>, filetype: Option<super::Filetype>, force: boo
     let name = name.unwrap_or_else(|| PathBuf::from("default"));
     let filetype = filetype.unwrap_or(super::Filetype::Json);
     let profile_dir = join!(crate::dirs::config(), "profiles");
-    let dest = join!(profile_dir, &name; filetype.to_str());
+    let dest = join!(&profile_dir, &name; filetype.to_str());
 
     // check if profiles with same name already exists
     let mut tobe_removed = Vec::new();
-    for ext in super::SUPPORTED_EXTENSION.iter() {
-        let path = dest.with_extension(ext);
-        if path.exists() {
-            if force {
-                if path != dest {
-                    tobe_removed.push(path);
-                }
-            } else {
-                bail!(
+
+    if profile_dir.exists() {
+        for ext in super::SUPPORTED_EXTENSION.iter() {
+            let path = dest.with_extension(ext);
+            if path.exists() {
+                if force {
+                    if path != dest {
+                        tobe_removed.push(path);
+                    }
+                } else {
+                    bail!(
                     "profile `{}` already exists or use another name to create a new profile or use --force to overwrite the existing profile.",
                     name.display()
                 );
+                }
             }
         }
+    } else {
+        std::fs::create_dir_all(&profile_dir)?;
     }
 
     let asst_config = asst_config_template().init()?;
@@ -235,15 +240,10 @@ mod test {
 
     use super::super::Filetype;
 
-    use crate::dirs::Ensure;
-
     #[test]
     #[ignore = "write to user's config directory"]
     fn test_init() {
         let profile_dir = join!(crate::dirs::config(), "profiles");
-
-        profile_dir.ensure().unwrap();
-
         let name = PathBuf::from("test");
 
         init(Some(name.clone()), None, false).expect("failed to init profile");
