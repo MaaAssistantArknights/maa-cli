@@ -166,7 +166,7 @@ pub(crate) enum Command {
         #[command(flatten)]
         common: run::CommonArgs,
     },
-    OperBox {
+    Operbox {
         #[command(flatten)]
         common: run::CommonArgs,
     },
@@ -678,6 +678,26 @@ mod test {
                 theme,
                 ..
             } if matches!(theme, run::preset::RoguelikeTheme::Phantom)
+        );
+    }
+
+    #[test]
+    fn depot() {
+        assert_matches!(
+            parse_from(["maa", "depot"]).command,
+            Command::Depot {
+                common: run::CommonArgs { .. }
+            }
+        );
+    }
+
+    #[test]
+    fn operbox() {
+        assert_matches!(
+            parse_from(["maa", "operbox"]).command,
+            Command::Operbox {
+                common: run::CommonArgs { .. }
+            }
         );
     }
 

@@ -96,7 +96,7 @@ fn main() -> Result<()> {
             run::run(|_| run::preset::roguelike(theme), common)?
         }
         Command::Depot { common } => run::run(|_| run::preset::depot(), common)?,
-        Command::OperBox { common } => run::run(|_| run::preset::oper_box(), common)?,
+        Command::Operbox { common } => run::run(|_| run::preset::oper_box(), common)?,
         Command::Convert {
             input,
             output,
