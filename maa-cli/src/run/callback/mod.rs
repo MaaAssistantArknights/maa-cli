@@ -339,23 +339,86 @@ fn process_subtask_completed(_: &Map<String, Value>) -> Option<()> {
 }
 fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
     let taskchain = message.get("taskchain")?.as_str()?;
-
-    match taskchain {
-        "Depot" => info!(
-            "{}: {}",
-            "Depot",
-            serde_json::to_string_pretty(message).unwrap()
-        ),
-        "OperBox" => info!(
-            "{}: {}",
-            "OperBox",
-            serde_json::to_string_pretty(message).unwrap()
-        ),
-        _ => {}
-    }
-
     let what = message.get("what")?.as_str()?;
     let details = message.get("details")?;
+
+    match taskchain {
+        "Depot" => {
+            if !details.get("done")?.as_bool()? {
+                return Some(());
+            }
+
+            let items = details
+                .get("arkplanner")?
+                .get("object")?
+                .get("items")?
+                .as_array()?;
+
+            let mut all_items = summary::Map::new();
+
+            for item in items {
+                let name = item.get("name")?.as_str()?;
+                let have = item.get("have")?.as_i64()?;
+                all_items.insert(name.to_owned(), have);
+            }
+
+            debug!(
+                "Depot: {}",
+                serde_json::to_string_pretty(&all_items).unwrap()
+            );
+
+            edit_current_task_detail(|detail| {
+                if let Some(detail) = detail.as_depot_mut() {
+                    detail.set_depot(all_items);
+                }
+            });
+        }
+        "OperBox" => {
+            if !details.get("done")?.as_bool()? {
+                return Some(());
+            }
+
+            let all_opers = details.get("all_opers")?.as_array()?;
+            let owned_opers = details.get("own_opers")?.as_array()?;
+
+            use summary::OperInfo;
+
+            let mut opers_by_rarity = Vec::with_capacity(6);
+            for _ in 0..6 {
+                let opers = summary::Map::<String, Option<OperInfo>>::new();
+                opers_by_rarity.push(opers);
+            }
+
+            for oper in all_opers {
+                let oper_info = oper.as_object()?;
+                let name = oper_info.get("name")?.as_str()?;
+                let rarity = oper_info.get("rarity")?.as_i64()? as usize;
+                opers_by_rarity[rarity - 1].insert(name.to_owned(), None);
+            }
+
+            for oper in owned_opers {
+                let oper_info = oper.as_object()?;
+                let name = oper_info.get("name")?.as_str()?;
+                let rarity = oper_info.get("rarity")?.as_i64()? as usize;
+
+                opers_by_rarity[rarity - 1]
+                    .get_mut(name)
+                    .unwrap()
+                    .replace(OperInfo {
+                        potential: oper_info.get("potential")?.as_i64()?,
+                        elite: oper_info.get("elite")?.as_i64()?,
+                        level: oper_info.get("level")?.as_i64()?,
+                    });
+            }
+
+            edit_current_task_detail(|detail| {
+                if let Some(detail) = detail.as_operbox_mut() {
+                    detail.set_operbox(opers_by_rarity);
+                }
+            });
+        }
+        _ => {}
+    }
 
     match what {
         "StageDrops" => {

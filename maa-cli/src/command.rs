@@ -162,6 +162,14 @@ pub(crate) enum Command {
         #[command(flatten)]
         common: run::CommonArgs,
     },
+    Depot {
+        #[command(flatten)]
+        common: run::CommonArgs,
+    },
+    OperBox {
+        #[command(flatten)]
+        common: run::CommonArgs,
+    },
     /// Convert file format between TOML, YAML and JSON
     ///
     /// This command will convert a file from TOML, YAML or JSON format to another format.
