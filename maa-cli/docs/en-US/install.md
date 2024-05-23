@@ -50,10 +50,10 @@ Homebrew users can install maa-cli via the unofficial [tap](https://github.com/M
 
 If package managers are not available on your system or you prefer not to use them, you can download the precompiled binaries for your platform from the following links. After decompressing, place the executable file in your `PATH` to use.
 
-- [macOS](https://github.com/MaaAssistantArknights/maa-cli/releases/latest/download/maa_cli-v0.4.5-universal-apple-darwin.zip)
-- [Linux x86_64 (x64, amd64)](https://github.com/MaaAssistantArknights/maa-cli/releases/latest/download/maa_cli-v0.4.5-x86_64-unknown-linux-gnu.tar.gz)
-- [Linux aarch64 (arm64)](https://github.com/MaaAssistantArknights/maa-cli/releases/latest/download/maa_cli-v0.4.5-aarch64-unknown-linux-gnu.tar.gz)
-- [Windows x86_64 (x64, amd64)](https://github.com/MaaAssistantArknights/maa-cli/releases/latest/download/maa_cli-v0.4.5-x86_64-pc-windows-msvc.zip)
+- [macOS](https://github.com/MaaAssistantArknights/maa-cli/releases/latest/download/maa_cli-v0.4.7-universal-apple-darwin.zip)
+- [Linux x86_64 (x64, amd64)](https://github.com/MaaAssistantArknights/maa-cli/releases/latest/download/maa_cli-v0.4.7-x86_64-unknown-linux-gnu.tar.gz)
+- [Linux aarch64 (arm64)](https://github.com/MaaAssistantArknights/maa-cli/releases/latest/download/maa_cli-v0.4.7-aarch64-unknown-linux-gnu.tar.gz)
+- [Windows x86_64 (x64, amd64)](https://github.com/MaaAssistantArknights/maa-cli/releases/latest/download/maa_cli-v0.4.7-x86_64-pc-windows-msvc.zip)
 
 If your platform is not listed above, you can try to compile and install it yourself (see below).
 
