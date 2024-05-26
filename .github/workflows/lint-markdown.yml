@@ -25,3 +25,6 @@ jobs:
           globs: "**/*.md"
       - name: Check Dead Link
         uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          file-path: "README.md, maa-sys/README.md"
+          folder-path: "maa-cli/docs"
