@@ -13,6 +13,7 @@ on:
       - ".github/workflows/lint-markdown.yml"
   schedule:
     - cron: "44 7 * * 2"
+  workflow_dispatch:
 
 jobs:
   lint:
@@ -37,7 +38,6 @@ jobs:
         with:
           # Use github-pr-review when triggered by a pull request; otherwise, use github-check
           reporter: ${{ github.event_name == 'pull_request' && 'github-pr-review' || 'github-check' }}
-          # Check all files in the repository for schedule; otherwise, check only changed files
-          # filter_mode: ${{ github.event_name == 'schedule' && 'nofilter' || 'diff_context'}}
-          filter_mode: nofilter
+          # Check only the diff when triggered by a push or pull request; otherwise, check all files
+          filter_mode: ${{ contains(fromJSON('["push", "pull_request"]'), github.event_name) && 'diff_context' || 'nofilter' }}
           fail_on_error: true
