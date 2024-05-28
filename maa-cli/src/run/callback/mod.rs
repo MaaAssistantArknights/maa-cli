@@ -27,6 +27,7 @@ enum AsstMsg {
     ConnectionInfo = 2,
     AllTasksCompleted = 3,
     AsyncCallInfo = 4,
+    Destroyed = 5,
 
     /* TaskChain Info */
     TaskChainError = 10000,
@@ -54,6 +55,7 @@ impl From<AsstMsgId> for AsstMsg {
             2 => AsstMsg::ConnectionInfo,
             3 => AsstMsg::AllTasksCompleted,
             4 => AsstMsg::AsyncCallInfo,
+            5 => AsstMsg::Destroyed,
 
             10000 => AsstMsg::TaskChainError,
             10001 => AsstMsg::TaskChainStart,
@@ -93,6 +95,10 @@ fn process_message(code: AsstMsgId, json: Value) {
             Some(())
         }
         AsyncCallInfo => Some(()),
+        Destroyed => {
+            debug!("Instance destroyed");
+            Some(())
+        }
 
         TaskChainError | TaskChainStart | TaskChainCompleted | TaskChainExtraInfo
         | TaskChainStopped => process_taskchain(code.into(), message),
