@@ -92,7 +92,7 @@ maa-cli 默认会向标准误 (stderr) 输出日志。`--log-file` 选项可以�
 
 更多命令的使用方法可以通过 `maa help` 查看，具体命令的使用方法可以 通过 `maa help <command>` 查看。
 
-[config-core]: config.md#MaaCore-相关配置
+[config-core]: config.md#maacore-相关配置
 [custom-task]: config.md#自定义任务
 
 <!-- markdownlint-disable-file MD013 -->

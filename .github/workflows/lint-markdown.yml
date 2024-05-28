@@ -4,16 +4,15 @@ on:
   push:
     branches: ["main"]
     paths:
-      - "*.md"
+      - "**/*.md"
       - ".github/workflows/lint-markdown.yml"
   pull_request:
     branches: ["main"]
     paths:
-      - "*.md"
+      - "**/*.md"
       - ".github/workflows/lint-markdown.yml"
   schedule:
-    - cron: "12 9 * * 4"
-  workflow_dispatch:
+    - cron: "44 7 * * 2"
 
 jobs:
   lint:

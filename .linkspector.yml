@@ -1,0 +1,2 @@
+ignorePatterns:
+  - pattern: "^https://github.com/dependabot\\[bot\\]$"
