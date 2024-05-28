@@ -4,13 +4,15 @@ on:
   push:
     branches: ["main"]
     paths:
-      - "*.md"
+      - "**/*.md"
       - ".github/workflows/lint-markdown.yml"
   pull_request:
     branches: ["main"]
     paths:
-      - "*.md"
+      - "**/*.md"
       - ".github/workflows/lint-markdown.yml"
+  schedule:
+    - cron: "44 7 * * 2"
 
 jobs:
   lint:
@@ -23,3 +25,19 @@ jobs:
         uses: DavidAnson/markdownlint-cli2-action@v16
         with:
           globs: "**/*.md"
+
+  check-links:
+    name: Check Dead Links
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Check Dead Link
+        uses: umbrelladocs/action-linkspector@v1
+        with:
+          # Use github-pr-review when triggered by a pull request; otherwise, use github-check
+          reporter: ${{ github.event_name == 'pull_request' && 'github-pr-review' || 'github-check' }}
+          # Check all files in the repository for schedule; otherwise, check only changed files
+          # filter_mode: ${{ github.event_name == 'schedule' && 'nofilter' || 'diff_context'}}
+          filter_mode: nofilter
+          fail_on_error: true
