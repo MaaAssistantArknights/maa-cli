@@ -423,8 +423,8 @@ pub struct StaticOptions {
 impl StaticOptions {
     pub fn apply(&self) -> Result<()> {
         match (self.cpu_ocr, self.gpu_ocr) {
-            (Some(cpu_ocr), Some(gpu_id)) => {
-                if cpu_ocr {
+            (cpu_ocr, Some(gpu_id)) => {
+                if cpu_ocr.is_some_and(|cpu_ocr| cpu_ocr) {
                     warn!("Both CPU OCR and GPU OCR are enabled, CPU OCR will be ignored");
                 }
                 debug!("Using GPU OCR with GPU ID {}", gpu_id);
@@ -432,7 +432,7 @@ impl StaticOptions {
                     .apply(gpu_id)
                     .with_context(|| format!("Failed to enable GPU OCR with GPU ID {}", gpu_id))?;
             }
-            (Some(cpu_core), None) if cpu_core => {
+            (Some(cpu_ocr), None) if cpu_ocr => {
                 debug!("Using CPU OCR");
                 StaticOptionKey::CpuOCR
                     .apply(true)
