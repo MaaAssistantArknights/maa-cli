@@ -50,6 +50,22 @@ pub fn fight(stage: String, medicine: Option<i32>) -> Result<TaskConfig> {
     Ok(task_config)
 }
 
+pub fn depot() -> Result<TaskConfig> {
+    let mut task_config = TaskConfig::new();
+
+    task_config.push(Task::new_with_default(Depot, object!()));
+
+    Ok(task_config)
+}
+
+pub fn oper_box() -> Result<TaskConfig> {
+    let mut task_config = TaskConfig::new();
+
+    task_config.push(Task::new_with_default(OperBox, object!()));
+
+    Ok(task_config)
+}
+
 mod copilot;
 pub use copilot::copilot;
 
@@ -143,5 +159,27 @@ mod tests {
                 .unwrap(),
             1
         );
+    }
+
+    #[test]
+    fn test_depot() {
+        let task_config = depot().unwrap();
+        let tasks = task_config.tasks();
+
+        assert_eq!(tasks.len(), 1);
+        let depot_task = tasks.first().unwrap();
+
+        assert_eq!(depot_task.task_type(), Depot);
+    }
+
+    #[test]
+    fn test_oper_box() {
+        let task_config = oper_box().unwrap();
+        let tasks = task_config.tasks();
+
+        assert_eq!(tasks.len(), 1);
+        let oper_box_task = tasks.first().unwrap();
+
+        assert_eq!(oper_box_task.task_type(), OperBox);
     }
 }

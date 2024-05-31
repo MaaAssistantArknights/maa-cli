@@ -116,6 +116,8 @@ impl TaskSummary {
             Infrast => Detail::Infrast(InfrastDetail::new()),
             Recruit => Detail::Recruit(RecruitDetail::new()),
             Roguelike => Detail::Roguelike(RoguelikeDetail::new()),
+            Depot => Detail::Depot(DepotDetail::new()),
+            OperBox => Detail::OperBox(OperBoxDetail::new()),
             _ => Detail::None,
         };
 
@@ -243,6 +245,8 @@ pub enum Detail {
     Fight(FightDetail),
     Recruit(RecruitDetail),
     Roguelike(RoguelikeDetail),
+    Depot(DepotDetail),
+    OperBox(OperBoxDetail),
 }
 
 impl Detail {
@@ -277,6 +281,22 @@ impl Detail {
             None
         }
     }
+
+    pub fn as_depot_mut(&mut self) -> Option<&mut DepotDetail> {
+        if let Detail::Depot(detail) = self {
+            Some(detail)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_operbox_mut(&mut self) -> Option<&mut OperBoxDetail> {
+        if let Detail::OperBox(detail) = self {
+            Some(detail)
+        } else {
+            None
+        }
+    }
 }
 
 impl std::fmt::Display for Detail {
@@ -287,6 +307,8 @@ impl std::fmt::Display for Detail {
             Detail::Infrast(detail) => detail.fmt(f)?,
             Detail::Recruit(detail) => detail.fmt(f)?,
             Detail::Roguelike(detail) => detail.fmt(f)?,
+            Detail::Depot(detail) => detail.fmt(f)?,
+            Detail::OperBox(detail) => detail.fmt(f)?,
         }
 
         Ok(())
@@ -674,6 +696,68 @@ impl std::fmt::Display for RoguelikeDetail {
     }
 }
 
+pub struct DepotDetail(Option<Map<String, i64>>);
+
+impl DepotDetail {
+    pub fn new() -> Self {
+        Self(None)
+    }
+
+    pub fn set_depot(&mut self, map: Map<String, i64>) {
+        self.0 = Some(map);
+    }
+}
+
+impl std::fmt::Display for DepotDetail {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(map) = &self.0 {
+            writeln!(f, "ITEM\tCOUNT")?;
+            for (item, count) in map {
+                writeln!(f, "{}\t{}", item, count)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+pub struct OperBoxDetail(Vec<Map<String, Option<OperInfo>>>);
+
+impl OperBoxDetail {
+    pub fn new() -> Self {
+        Self(Vec::with_capacity(6))
+    }
+
+    pub fn set_operbox(&mut self, operbox: Vec<Map<String, Option<OperInfo>>>) {
+        self.0.extend(operbox);
+    }
+}
+
+impl std::fmt::Display for OperBoxDetail {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "NAME\tPOTENTIAL\tELITE\tLEVEL")?;
+        for map in self.0.iter().rev() {
+            if !map.is_empty() {
+                for (name, info) in map {
+                    write!(f, "{}\t", name)?;
+                    if let Some(info) = info {
+                        write!(f, "{}\t{}\t{}", info.potential, info.elite, info.level)?;
+                    } else {
+                        write!(f, "\t\t")?;
+                    }
+                    writeln!(f)?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+pub struct OperInfo {
+    pub(super) potential: i64,
+    pub(super) elite: i64,
+    pub(super) level: i64,
+}
+
 pub fn insert_or_add_by_ref(map: &mut Map<String, i64>, key: &str, value: i64) {
     if let Some(old) = map.get_mut(key) {
         *old += value;
@@ -974,6 +1058,47 @@ mod tests {
             detail.set_times(2);
             detail.set_invest(1);
             assert_eq!(detail.to_string(), "Explore 2 times invest 1 times\n");
+        }
+
+        #[test]
+        fn depot() {
+            let mut detail = DepotDetail::new();
+            detail.set_depot(
+                [("A", 1), ("B", 2)]
+                    .into_iter()
+                    .map(|(k, v)| (k.to_owned(), v))
+                    .collect(),
+            );
+            assert_eq!(detail.to_string(), "ITEM\tCOUNT\nA\t1\nB\t2\n");
+        }
+
+        #[test]
+        fn operbox() {
+            let mut detail = OperBoxDetail::new();
+            detail.set_operbox(vec![
+                [(
+                    "A",
+                    Some(OperInfo {
+                        potential: 1,
+                        elite: 0,
+                        level: 1,
+                    }),
+                )]
+                .into_iter()
+                .map(|(k, v)| (k.to_owned(), v))
+                .collect(),
+                [("B", None)]
+                    .into_iter()
+                    .map(|(k, v)| (k.to_owned(), v))
+                    .collect(),
+            ]);
+            assert_eq!(
+                detail.to_string(),
+                "NAME\tPOTENTIAL\tELITE\tLEVEL\n\
+                 B\t\t\t\n\
+                 A\t1\t0\t1\n\
+                ",
+            );
         }
     }
 }
