@@ -433,9 +433,9 @@ url = "https://github.com/MaaAssistantArknights/MaaResource.git"
 - MaaCore 配置的 JSON Schema 文件为 [`asst.schema.json`][asst-schema]；
 - CLI 配置的 JSON Schema 文件为 [`cli.schema.json`][cli-schema]。
 
-[task-types]: https://maa.plus/docs/协议文档/集成文档.html#任务类型一览
-[emulator-ports]: https://maa.plus/docs/用户手册/常见问题.html#模拟器调试端口
-[playcover-doc]: https://maa.plus/docs/用户手册/模拟器和设备支持/Mac模拟器.html#✅-playcover-原生运行最流畅-🚀
+[task-types]: https://maa.plus/docs/zh-cn/protocol/integration.html#任务类型一览
+[emulator-ports]: https://maa.plus/docs/zh-cn/manual/faq.html#模拟器调试端口
+[playcover-doc]: https://maa.plus/docs/zh-cn/manual/device/macos.html#✅-playcover-原生运行最流畅-🚀
 [example-config]: ../../config_examples
 [wangl-cc-dotfiles]: https://github.com/wangl-cc/dotfiles/tree/master/.config/maa
 [schema-dir]: ../../schemas/
