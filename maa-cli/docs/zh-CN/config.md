@@ -434,7 +434,7 @@ url = "https://github.com/MaaAssistantArknights/MaaResource.git"
 - CLI 配置的 JSON Schema 文件为 [`cli.schema.json`][cli-schema]。
 
 [task-types]: https://maa.plus/docs/zh-cn/protocol/integration.html#任务类型一览
-[emulator-ports]: https://maa.plus/docs/zh-cn/manual/faq.html#模拟器调试端口
+[emulator-ports]: https://maa.plus/docs/zh-cn/manual/connection.html#获取端口号
 [playcover-doc]: https://maa.plus/docs/zh-cn/manual/device/macos.html#✅-playcover-原生运行最流畅-🚀
 [example-config]: ../../config_examples
 [wangl-cc-dotfiles]: https://github.com/wangl-cc/dotfiles/tree/master/.config/maa

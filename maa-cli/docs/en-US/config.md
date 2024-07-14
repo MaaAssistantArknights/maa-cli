@@ -447,9 +447,9 @@ The JSON schema of configuration files can be found at [`schemas` directory][sch
 
 With the help of JSON schema, you can get auto-completion and validation in some editors with plugins.
 
-[task-types]: https://maa.plus/docs/en-us/3.1-INTEGRATION.html#list-of-task-types
-[emulator-ports]: https://maa.plus/docs/en-us/1.2-FAQ.html#common-adb-ports-for-popular-android-emulators
-[playcover-doc]: https://maa.plus/docs/en-us/1.4-EMULATOR_SUPPORTS_FOR_MAC.html#✅-playcover-the-software-runs-most-fluently-for-its-nativity-🚀
+[task-types]: https://maa.plus/docs/zh-cn/protocol/integration.html#list-of-task-types
+[emulator-ports]: https://maa.plus/docs/en-us/manual/connection.html#obtain-port-number
+[playcover-doc]: https://maa.plus/docs/en-us/manual/device/macos.html#%E2%9C%85-playcover-the-software-runs-most-fluently-for-its-nativity-%F0%9F%9A%80
 [example-config]: ../../config_examples
 [wangl-cc-dotfiles]: https://github.com/wangl-cc/dotfiles/tree/master/.config/maa
 [schema-dir]: ../../schemas/
