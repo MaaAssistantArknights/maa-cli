@@ -254,13 +254,13 @@ jobs:
                 archive_name="maa_cli-v$VERSION-$target.zip"
                 archive_name_unversioned="maa_cli-$target.zip"
                 zip -vr "$archive_name" "$dir/maa"
-                cp "$archive_name" "$dir/maa.zip"
+                cp "$archive_name" "$archive_name_unversioned"
                 ;;
               *-windows-msvc)
                 archive_name="maa_cli-v$VERSION-$target.zip"
                 archive_name_unversioned="maa_cli-$target.zip"
                 zip -vr "$archive_name" "$dir/maa.exe"
-                cp "$archive_name" "$dir/maa.exe.zip"
+                cp "$archive_name" "$archive_name_unversioned"
                 ;;
               *)
                 echo "Unknown target: $target"
