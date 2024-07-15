@@ -15,6 +15,10 @@ on:
     - cron: "44 7 * * 2"
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   lint:
     name: Lint Markdown
