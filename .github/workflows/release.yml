@@ -271,7 +271,7 @@ jobs:
             checksum_hash=${checksum:0:64}
             size=$(stat -c%s "$archive_name")
             echo "$checksum" > "$archive_name.sha256"
-            echo "$checksum" > "$archive_name_unversioned.sha256"
+            sha256sum "archive_name_unversioned" > "$archive_name_unversioned.sha256"
 
             # old version info (deprecated)
             # only update when a stable release is published
