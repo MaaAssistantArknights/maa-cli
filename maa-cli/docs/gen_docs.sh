@@ -52,6 +52,6 @@ for lang in en-US zh-CN zh-TW ja-JP ko-KR; do
     # remap some relative links to github links
     sed -I '' -E 's|\.\./\.\./|https://github.com/MaaAssistantArknights/maa-cli/blob/main/maa-cli/|g' "$out_file"
     # remap maa docs links to the relative links
-    sed -I '' -E 's|https://maa\.plus/docs/[^/]+/(.+)\.html|../\1.md|g' "$out_file"
+    sed -I '' -E 's|https://maa\.plus/docs/[^/]+/(.+)\.html|../../\1.md|g' "$out_file"
   done
 done
