@@ -1,4 +1,4 @@
-# 配置 maa-cli
+# 配置
 
 ## 配置目录
 
@@ -442,5 +442,3 @@ url = "https://github.com/MaaAssistantArknights/MaaResource.git"
 [task-schema]: ../../schemas/task.schema.json
 [asst-schema]: ../../schemas/asst.schema.json
 [cli-schema]: ../../schemas/cli.schema.json
-
-<!-- markdownlint-disable-file MD013 -->

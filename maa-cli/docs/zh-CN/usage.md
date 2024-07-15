@@ -1,4 +1,4 @@
-# 使用 maa-cli
+# 使用
 
 maa-cli 主要功能是通过调用 MaaCore，自动化完成明日方舟的游戏任务。此外，为了方便使用，maa-cli 还提供了管理 MaaCore 的功能。
 
@@ -94,5 +94,3 @@ maa-cli 默认会向标准误 (stderr) 输出日志。`--log-file` 选项可以�
 
 [config-core]: config.md#maacore-相关配置
 [custom-task]: config.md#自定义任务
-
-<!-- markdownlint-disable-file MD013 -->

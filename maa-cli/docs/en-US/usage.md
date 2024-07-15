@@ -1,4 +1,4 @@
-# Use maa-cli
+# Usage
 
 maa-cli is a command-line interface for MaaCore that automates tasks in the game Arknights. Additionally, maa-cli can manage MaaCore.
 
@@ -91,5 +91,3 @@ More command usage can be viewed by `maa help`, and the usage of specific comman
 
 [config-core]: config.md#maacore-related-configurations
 [custom-task]: config.md#custom-tasks
-
-<!-- markdownlint-disable-file MD013 -->

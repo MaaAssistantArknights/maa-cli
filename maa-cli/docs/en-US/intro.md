@@ -1,4 +1,4 @@
-# maa-cli
+# Introduction
 
 A simple CLI for [MAA][maa-home] written in Rust.
 
