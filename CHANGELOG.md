@@ -1,5 +1,34 @@
 # Release Notes
 
+## Release 0.4.8
+
+### Features
+
+- Check git and ssh key availability before hot update by [@wangl-cc](https://github.com/wangl-cc) in [#279](https://github.com/MaaAssistantArknights/maa-cli/pull/279)
+- Improve optional value by [@wangl-cc](https://github.com/wangl-cc) in [#280](https://github.com/MaaAssistantArknights/maa-cli/pull/280)
+- Subcommand `init` to init profile (asst config) by [@wangl-cc](https://github.com/wangl-cc) in [#282](https://github.com/MaaAssistantArknights/maa-cli/pull/282)
+- Support callback message `Destroyed` by [@wangl-cc](https://github.com/wangl-cc)
+
+### Bug Fixes
+
+- Ensure config file are unique after importing by [@wangl-cc](https://github.com/wangl-cc) in [#281](https://github.com/MaaAssistantArknights/maa-cli/pull/281)
+- Respect gpu ocr when cpu ocr is not specified by [@wangl-cc](https://github.com/wangl-cc) in [#287](https://github.com/MaaAssistantArknights/maa-cli/pull/287)
+
+### Documentation
+
+- Improve usage guide about running tasks by [@wangl-cc](https://github.com/wangl-cc)
+- Fix the link document in the generated docs by [@wangl-cc](https://github.com/wangl-cc)
+- Change link target of configuration document by [@wangl-cc](https://github.com/wangl-cc)
+- 采用新的文档地址 by [@Alan-Charred](https://github.com/Alan-Charred) in [#289](https://github.com/MaaAssistantArknights/maa-cli/pull/289)
+- Fix dead link by [@Cryolitia](https://github.com/Cryolitia)
+
+### Miscellaneous
+
+- Remove debug print by [@wangl-cc](https://github.com/wangl-cc)
+- Fix asset links by [@wangl-cc](https://github.com/wangl-cc)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.4.7...v0.4.8>
+
 ## Release 0.4.7
 
 ### Features
