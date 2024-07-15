@@ -246,15 +246,21 @@ jobs:
             case "$target" in
               *-linux-*)
                 archive_name="maa_cli-v$VERSION-$target.tar.gz"
+                archive_name_unversioned="maa_cli-$target.tar.gz"
                 tar -czvf "$archive_name" "$dir/maa"
+                cp "$archive_name" "$archive_name_unversioned"
                 ;;
               *-apple-darwin)
                 archive_name="maa_cli-v$VERSION-$target.zip"
+                archive_name_unversioned="maa_cli-$target.zip"
                 zip -vr "$archive_name" "$dir/maa"
+                cp "$archive_name" "$dir/maa.zip"
                 ;;
               *-windows-msvc)
                 archive_name="maa_cli-v$VERSION-$target.zip"
+                archive_name_unversioned="maa_cli-$target.zip"
                 zip -vr "$archive_name" "$dir/maa.exe"
+                cp "$archive_name" "$dir/maa.exe.zip"
                 ;;
               *)
                 echo "Unknown target: $target"
@@ -265,6 +271,7 @@ jobs:
             checksum_hash=${checksum:0:64}
             size=$(stat -c%s "$archive_name")
             echo "$checksum" > "$archive_name.sha256"
+            echo "$checksum" > "$archive_name_unversioned.sha256"
 
             # old version info (deprecated)
             # only update when a stable release is published
@@ -307,9 +314,9 @@ jobs:
           body: ${{ needs.release-note.outputs.content }}
           fail_on_unmatched_files: true
           files: |
-            maa_cli-v${{ needs.meta.outputs.version }}-*-unknown-linux-gnu.tar.gz*
-            maa_cli-v${{ needs.meta.outputs.version }}-*-apple-darwin.zip*
-            maa_cli-v${{ needs.meta.outputs.version }}-*-pc-windows-msvc.zip*
+            maa_cli-*-unknown-linux-gnu.tar.gz*
+            maa_cli-*-apple-darwin.zip*
+            maa_cli-*-pc-windows-msvc.zip*
       - name: Commit version.json and Push
         working-directory: version
         run: |
