@@ -335,6 +335,8 @@ jobs:
     name: Update Stable Tag
     if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'stable' }}
     needs: [meta, release]
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
