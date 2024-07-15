@@ -8,14 +8,6 @@ resolve_dir() {
   cd -- "$old_dir" &> /dev/null
 }
 
-# language of the documentation
-lang=$1
-lang_lower=$(echo "$lang" | tr '[:upper:]' '[:lower:]')
-# output to the specified directory, default is the same as the language
-output_dir=$(resolve_dir "${2:-"$lang_lower/manual/cli"}")
-# the original directory of docs is at the same directory as this script
-original_dir=$(resolve_dir "$(dirname "${BASH_SOURCE[0]}")")
-
 files=(
   intro.md
   install.md
@@ -32,26 +24,34 @@ icons=(
   ph:question-fill
 )
 
-echo "Generating documentation for $lang"
-order=0
-for filename in "${files[@]}"; do
-  echo "-> Generating documentation for $filename"
-  file="$original_dir/$lang/$filename"
-  index=$order
-  order=$((order+1))
-  out_file="$output_dir/$filename"
-  # insert metadata of markdown file to the beginning of the file
-  {
-    echo "---"
-    echo "order: $order"
-    echo "icon: ${icons[$index]}"
-    echo "---"
-    echo
-    cat "$file"
-  } > "$out_file"
-  # remap some relative links to github links
-  sed -I '' -E 's|\.\./\.\./|https://github.com/MaaAssistantArknights/maa-cli/blob/main/maa-cli/|g' "$out_file"
+# language of the documentation
+for lang in en-US zh-CN zh-TW ja-JP ko-KR; do
+  lang_lower=$(echo "$lang" | tr '[:upper:]' '[:lower:]')
+  # output to the specified directory, default is the same as the language
+  output_dir=$(resolve_dir "${2:-"$lang_lower/manual/cli"}")
+  # the original directory of docs is at the same directory as this script
+  original_dir=$(resolve_dir "$(dirname "${BASH_SOURCE[0]}")")
 
-  # remap maa docs links to the relative links
-  sed -I '' -E 's|https://maa\.plus/docs/[^/]+/(.+)\.html|../\1.md|g' "$out_file"
+  echo "Generating documentation for $lang"
+  order=0
+  for filename in "${files[@]}"; do
+    echo "-> Generating documentation for $filename"
+    file="$original_dir/$lang/$filename"
+    index=$order
+    order=$((order+1))
+    out_file="$output_dir/$filename"
+    # insert metadata of markdown file to the beginning of the file
+    {
+      echo "---"
+      echo "order: $order"
+      echo "icon: ${icons[$index]}"
+      echo "---"
+      echo
+      cat "$file"
+    } > "$out_file"
+    # remap some relative links to github links
+    sed -I '' -E 's|\.\./\.\./|https://github.com/MaaAssistantArknights/maa-cli/blob/main/maa-cli/|g' "$out_file"
+    # remap maa docs links to the relative links
+    sed -I '' -E 's|https://maa\.plus/docs/[^/]+/(.+)\.html|../\1.md|g' "$out_file"
+  done
 done
