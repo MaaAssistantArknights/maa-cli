@@ -3,3 +3,4 @@
 /cobertura.xml
 /tarpaulin-report.html
 .vscode/ltex*
+.lycheecache
