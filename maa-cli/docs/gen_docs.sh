@@ -9,7 +9,6 @@ resolve_dir() {
 }
 
 files=(
-  intro.md
   install.md
   usage.md
   config.md
@@ -17,7 +16,6 @@ files=(
 )
 
 icons=(
-  material-symbols:toc
   material-symbols:download
   material-symbols:summarize
   material-symbols:settings
