@@ -1,5 +1,9 @@
 # 安装及编译
 
+::: important Translation Required
+This page is outdated and maybe still in Simplified Chinese. Translation is needed.
+:::
+
 maa-cli 提供多种方式安装，包括包管理器、预编译二进制文件和通过 `cargo` 自行编译安装。
 
 ## 通过包管理器安装

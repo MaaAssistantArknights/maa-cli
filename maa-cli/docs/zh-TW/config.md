@@ -1,5 +1,9 @@
 # 配置
 
+::: important Translation Required
+This page is outdated and maybe still in Simplified Chinese. Translation is needed.
+:::
+
 ## 配置目录
 
 maa-cli 配置文件位于特定的配置目录中，你可以通过 `maa dir config` 获取配置目录。配置目录也可以通过环境变量 `MAA_CONFIG_DIR` 更改。在下面的例子中，我们将用 `$MAA_CONFIG_DIR` 来表示配置目录。

@@ -17,7 +17,7 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
+  pull-requests: read
 
 jobs:
   lint:
@@ -30,6 +30,7 @@ jobs:
         uses: DavidAnson/markdownlint-cli2-action@v16
         with:
           globs: "**/*.md"
+          config: "maa-cli/docs/.markdownlint.yaml"
 
   check-links:
     name: Check Dead Links
@@ -40,8 +41,7 @@ jobs:
       - name: Check Dead Link
         uses: umbrelladocs/action-linkspector@v1
         with:
-          # Use github-pr-review when triggered by a pull request; otherwise, use github-check
-          reporter: ${{ github.event_name == 'pull_request' && 'github-pr-review' || 'github-check' }}
+          reporter: github-check
           # Check only the diff when triggered by a push or pull request; otherwise, check all files
           filter_mode: ${{ contains(fromJSON('["push", "pull_request"]'), github.event_name) && 'diff_context' || 'nofilter' }}
           fail_on_error: true

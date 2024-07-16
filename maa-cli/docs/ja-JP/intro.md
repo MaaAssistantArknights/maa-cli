@@ -1,5 +1,9 @@
 # 介绍
 
+::: important Translation Required
+This page is outdated and maybe still in Simplified Chinese. Translation is needed.
+:::
+
 一个使用 Rust 编写的简单 [MAA][maa-home] 命令行工具。
 
 ## 功能

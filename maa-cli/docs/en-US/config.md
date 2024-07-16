@@ -1,4 +1,4 @@
-# Configuring maa-cli
+# Configuration
 
 ## Configuration Directory
 
@@ -456,5 +456,3 @@ With the help of JSON schema, you can get auto-completion and validation in some
 [task-schema]: ../../schemas/task.schema.json
 [asst-schema]: ../../schemas/asst.schema.json
 [cli-schema]: ../../schemas/cli.schema.json
-
-<!-- markdownlint-disable-file MD013 -->
