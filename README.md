@@ -7,7 +7,7 @@
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blueviolet)
 
 [English](maa-cli/docs/en-US/intro.md)
-|[한국어](maa-cli/docs/ko-KR/intro.md)
+| [한국어](maa-cli/docs/ko-KR/intro.md)
 
 一个使用 Rust 编写的简单 [MAA][maa-home] 命令行工具。
 
