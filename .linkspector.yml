@@ -2,4 +2,5 @@ dirs:
   - .
 useGitIgnore: true
 ignorePatterns:
-  - pattern: "^https://github.com/dependabot\\[bot\\]$"
+  - pattern: "^https://github\\.com/dependabot\\[bot\\]$"
+  - pattern: "^https://.*\\.maa-org\\.net/.*$"
