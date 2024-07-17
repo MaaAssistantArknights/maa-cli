@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD033 MD041 -->
 <div align="center">
 
 # maa-cli
@@ -19,6 +20,8 @@
 一个使用 Rust 编写的 [MAA][maa-home] 命令行工具。
 
 </div>
+
+<!-- markdownlint-enable MD033 MD041 -->
 
 ## 功能
 
