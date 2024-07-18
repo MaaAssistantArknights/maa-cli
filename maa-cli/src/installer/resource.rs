@@ -1,3 +1,5 @@
+use std::ffi::OsString;
+
 use crate::{
     config::cli::{cli_config, resource::GitBackend},
     dirs,
@@ -88,8 +90,14 @@ pub fn update(is_auto: bool) -> Result<()> {
     Ok(())
 }
 
+fn build_ssh_command(ssh_key: &std::path::Path) -> OsString {
+    let mut cmd = OsString::from("ssh -i ");
+    cmd.push(ssh_key);
+    cmd
+}
+
 mod git {
-    use super::StatusExt;
+    use super::{build_ssh_command, StatusExt};
 
     use std::path::Path;
 
@@ -115,10 +123,7 @@ mod git {
         }
 
         if let Some(ssh_key) = ssh_key {
-            cmd.env(
-                "GIT_SSH_COMMAND",
-                format!("ssh -i {}", ssh_key.to_str().context("Invalid path")?),
-            );
+            cmd.env("GIT_SSH_COMMAND", build_ssh_command(ssh_key));
         }
 
         cmd.status()
@@ -247,6 +252,105 @@ mod git2 {
         } else {
             bail!("Failed to pull resource repository")
         }
+
+        Ok(())
+    }
+}
+
+mod gix {
+    use super::build_ssh_command;
+
+    use std::path::Path;
+
+    use anyhow::{bail, Context, Result};
+    use gix::{
+        self,
+        progress::Discard,
+        reference::{self, set_target_id},
+        remote,
+        trace::warn,
+    };
+
+    pub fn clone(
+        url: &str,
+        branch: Option<&str>,
+        dest: &Path,
+        ssh_key: Option<&Path>,
+    ) -> Result<()> {
+        // gix use ssh command for ssh transport, so we need to set GIT_SSH_COMMAND like git
+        let old_ssh_command = if let Some(ssh_key) = ssh_key {
+            let old_ssh_command = std::env::var_os("GIT_SSH_COMMAND");
+            std::env::set_var("GIT_SSH_COMMAND", build_ssh_command(ssh_key));
+            old_ssh_command
+        } else {
+            None
+        };
+
+        let create_opts = gix::create::Options {
+            destination_must_be_empty: true,
+            ..Default::default()
+        };
+
+        // A copy of gix::open_opts_with_git_binary_config
+        let open_opts = {
+            use gix::sec::trust::DefaultForLevel;
+            let mut opts = gix::open::Options::default_for_level(gix::sec::Trust::Full);
+            opts.permissions.config.git_binary = true;
+            opts
+        };
+
+        // In sync mode, the interrupt seems make no sense
+        let interrupt = std::sync::atomic::AtomicBool::new(false);
+
+        let mut prepare = gix::clone::PrepareFetch::new(
+            url,
+            dest,
+            gix::create::Kind::WithWorktree,
+            create_opts,
+            open_opts,
+        )
+        .context("Failed to prepare fetch")?
+        .with_shallow(remote::fetch::Shallow::DepthAtRemote(
+            std::num::NonZeroU32::new(1).unwrap(),
+        ));
+
+        let (mut checkout, _) = prepare.fetch_then_checkout(Discard, &interrupt)?;
+
+        checkout.main_worktree(Discard, &interrupt)?;
+
+        if let Some(cmd) = old_ssh_command {
+            std::env::set_var("GIT_SSH_COMMAND", cmd);
+        }
+
+        Ok(())
+    }
+
+    pub fn pull(repo: &Path, branch: Option<&str>, ssh_key: Option<&Path>) -> Result<()> {
+        let old_ssh_command = if let Some(ssh_key) = ssh_key {
+            let old_ssh_command = std::env::var_os("GIT_SSH_COMMAND");
+            std::env::set_var("GIT_SSH_COMMAND", build_ssh_command(ssh_key));
+            old_ssh_command
+        } else {
+            None
+        };
+
+        let repo = gix::open(repo).context("Failed to open resource repository")?;
+
+        let branch = branch.unwrap_or("main");
+
+        let remote = repo
+            .find_fetch_remote(None)
+            .context("Failed to find fetch remote")?;
+
+        remote
+            .connect(remote::Direction::Fetch)?
+            .prepare_fetch(Discard, Default::default())?
+            .with_shallow(remote::fetch::Shallow::DepthAtRemote(
+                std::num::NonZeroU32::new(1).unwrap(),
+            ))
+            .receive(Discard, &std::sync::atomic::AtomicBool::new(false))?;
+
+        let fetch_head = repo.find_reference("FETCH_HEAD")?;
 
         Ok(())
     }
