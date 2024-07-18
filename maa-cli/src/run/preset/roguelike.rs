@@ -14,6 +14,7 @@ pub enum Theme {
     Phantom,
     Mizuki,
     Sami,
+    Sarkaz,
 }
 
 impl Theme {
@@ -22,13 +23,14 @@ impl Theme {
             Self::Phantom => "Phantom",
             Self::Mizuki => "Mizuki",
             Self::Sami => "Sami",
+            Self::Sarkaz => "Sarkaz",
         }
     }
 }
 
 impl ValueEnum for Theme {
     fn value_variants<'a>() -> &'a [Self] {
-        &[Self::Phantom, Self::Mizuki, Self::Sami]
+        &[Self::Phantom, Self::Mizuki, Self::Sami, Self::Sarkaz]
     }
 
     fn to_possible_value(&self) -> Option<clap::builder::PossibleValue> {
@@ -56,7 +58,7 @@ pub fn roguelike(theme: Theme) -> Result<TaskConfig> {
         "squad" => Input::<String>::new(None, Some("squad name")),
         "roles" => Input::<String>::new(None, Some("roles")),
         "core_char" => SelectD::<String>::new(
-            ["百炼嘉维尔", "焰影苇草", "锏"],
+            ["百炼嘉维尔", "焰影苇草", "锏", "维什戴尔"],
             None,
             Some("core operator"),
             true,
@@ -84,13 +86,14 @@ mod tests {
         assert_eq!(Theme::Phantom.to_str(), "Phantom");
         assert_eq!(Theme::Mizuki.to_str(), "Mizuki");
         assert_eq!(Theme::Sami.to_str(), "Sami");
+        assert_eq!(Theme::Sarkaz.to_str(), "Sarkaz");
     }
 
     #[test]
     fn theme_value_variants() {
         assert_eq!(
             Theme::value_variants(),
-            &[Theme::Phantom, Theme::Mizuki, Theme::Sami]
+            &[Theme::Phantom, Theme::Mizuki, Theme::Sami, Theme::Sarkaz]
         );
     }
 
@@ -107,6 +110,10 @@ mod tests {
         assert_eq!(
             Theme::Sami.to_possible_value(),
             Some(clap::builder::PossibleValue::new("Sami"))
+        );
+        assert_eq!(
+            Theme::Sarkaz.to_possible_value(),
+            Some(clap::builder::PossibleValue::new("Sarkaz"))
         );
     }
 

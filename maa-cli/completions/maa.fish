@@ -81,7 +81,7 @@ complete -c maa -n "__fish_seen_subcommand_from run" -f -a "$(maa list)"
 complete -c maa -n "__fish_seen_subcommand_from startup" -f -a "$clients"
 complete -c maa -n "__fish_seen_subcommand_from startup" -f -l account -d 'Account to login' -r
 complete -c maa -n "__fish_seen_subcommand_from fight" -f -s m -l medicine -d 'Medicine to use' -r
-complete -c maa -n "__fish_seen_subcommand_from roguelike" -a "phantom mizuki sami"
+complete -c maa -n "__fish_seen_subcommand_from roguelike" -a "phantom mizuki sami sarkaz"
 
 # Misc commands
 complete -c maa -n "__fish_seen_subcommand_from complete" -f -a "bash fish zsh powershell"
