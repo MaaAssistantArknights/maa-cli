@@ -638,37 +638,161 @@ impl std::fmt::Display for RecruitDetail {
 }
 
 pub struct RoguelikeDetail {
-    times: Option<i64>,
-    invest: Option<i64>,
+    explorations: Vec<ExplorationDetail>,
 }
 
 impl RoguelikeDetail {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
-            times: None,
-            invest: None,
+            explorations: Vec::new(),
         }
     }
 
-    pub fn set_times(&mut self, times: i64) {
-        self.times = Some(times);
+    pub(super) fn start_exploration(&mut self) {
+        self.explorations.push(ExplorationDetail::new());
     }
 
-    pub fn set_invest(&mut self, invest: i64) {
-        self.invest = Some(invest);
+    fn get_current_exploration(&mut self) -> Option<&mut ExplorationDetail> {
+        self.explorations.last_mut()
+    }
+
+    pub(super) fn set_state(&mut self, state: ExplorationState) {
+        if let Some(exploration) = self.get_current_exploration() {
+            exploration.set_state(state);
+        }
+    }
+
+    pub(super) fn invest(&mut self, invest: i64) {
+        if let Some(exploration) = self.get_current_exploration() {
+            exploration.invest(invest);
+        }
+    }
+
+    pub(super) fn set_exp(&mut self, exp: i64) {
+        if let Some(exploration) = self.get_current_exploration() {
+            exploration.set_exp(exp);
+        }
     }
 }
 
 impl std::fmt::Display for RoguelikeDetail {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(times) = self.times {
-            write!(f, "Explore {} times", times)?;
-            if let Some(invest) = self.invest {
-                if invest > 0 {
-                    write!(f, " invest {} times", invest)?;
+        if !self.explorations.is_empty() {
+            let mut total_invest = 0;
+            let mut total_exp = 0;
+            let mut state_count = [0; ExplorationState::total_type()];
+            writeln!(f, "Explorations:")?;
+            for (i, exploration) in self.explorations.iter().enumerate() {
+                state_count[exploration.state.to_index()] += 1;
+                total_exp += exploration.exp.unwrap_or_default();
+                total_invest += exploration.invest.unwrap_or_default();
+                writeln!(f, "{}. {};", i + 1, exploration)?;
+            }
+            writeln!(f, "Summary:")?;
+            for (i, count) in state_count.iter().enumerate() {
+                if *count > 0 {
+                    write!(f, "{} {}", ExplorationState::from(i), count)?;
+                    if i != ExplorationState::total_type() - 1 {
+                        write!(f, ", ")?;
+                    }
                 }
             }
             writeln!(f)?;
+            writeln!(f, "Total invest {} originium ingotes", total_invest)?;
+            writeln!(f, "Total gained {} exp", total_exp)?;
+        }
+        Ok(())
+    }
+}
+
+#[repr(u8)]
+#[derive(Clone, Copy)]
+pub(super) enum ExplorationState {
+    Passed = 0,
+    Failed,
+    Abandoned,
+    Unknown,
+}
+
+impl ExplorationState {
+    fn to_str(self) -> &'static str {
+        use ExplorationState::*;
+        match self {
+            Passed => "Passed",
+            Failed => "Failed",
+            Abandoned => "Abandoned",
+            Unknown => "Unknown",
+        }
+    }
+    const fn total_type() -> usize {
+        4
+    }
+    const fn to_index(self) -> usize {
+        self as usize
+    }
+}
+
+impl From<usize> for ExplorationState {
+    fn from(index: usize) -> Self {
+        use ExplorationState::*;
+        match index {
+            0 => Passed,
+            1 => Failed,
+            2 => Abandoned,
+            3 => Unknown,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl std::fmt::Display for ExplorationState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.to_str())
+    }
+}
+
+struct ExplorationDetail {
+    /// current state of this exploration
+    state: ExplorationState,
+    /// total originium ingotes invested of this exploration
+    invest: Option<i64>,
+    /// total exp gained of this exploration
+    exp: Option<i64>,
+}
+
+impl ExplorationDetail {
+    fn new() -> Self {
+        Self {
+            state: ExplorationState::Unknown,
+            invest: None,
+            exp: None,
+        }
+    }
+
+    pub(super) fn set_state(&mut self, state: ExplorationState) {
+        self.state = state;
+    }
+
+    pub(super) fn invest(&mut self, invest: i64) {
+        match self.invest {
+            Some(ref mut total) => *total += invest,
+            None => self.invest = Some(invest),
+        }
+    }
+
+    pub(super) fn set_exp(&mut self, exp: i64) {
+        self.exp = Some(exp)
+    }
+}
+
+impl std::fmt::Display for ExplorationDetail {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.state)?;
+        if let Some(invest) = self.invest {
+            write!(f, ", invest {} originium ingotes", invest)?;
+        }
+        if let Some(exp) = self.exp {
+            write!(f, ", gained {} exp", exp)?;
         }
         Ok(())
     }
@@ -971,9 +1095,26 @@ mod tests {
         #[test]
         fn roguelike() {
             let mut detail = RoguelikeDetail::new();
-            detail.set_times(2);
-            detail.set_invest(1);
-            assert_eq!(detail.to_string(), "Explore 2 times invest 1 times\n");
+            detail.start_exploration();
+            detail.invest(10);
+            detail.set_state(ExplorationState::Failed);
+            detail.set_exp(100);
+            detail.start_exploration();
+            detail.invest(17);
+            detail.set_state(ExplorationState::Passed);
+            detail.set_exp(200);
+            detail.start_exploration();
+            assert_eq!(
+                detail.to_string(),
+                "Explorations:\n\
+                1. Failed, invest 10 originium ingotes, gained 100 exp;\n\
+                2. Passed, invest 17 originium ingotes, gained 200 exp;\n\
+                3. Unknown;\n\
+                Summary:\n\
+                Passed 1, Failed 1, Unknown 1\n\
+                Total invest 27 originium ingotes\n\
+                Total gained 300 exp\n",
+            );
         }
     }
 }
