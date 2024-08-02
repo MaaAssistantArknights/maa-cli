@@ -1093,6 +1093,26 @@ mod tests {
         }
 
         #[test]
+        fn exploration_state() {
+            use ExplorationState::*;
+
+            assert_eq!(Passed.to_string(), "Passed");
+            assert_eq!(Failed.to_string(), "Failed");
+            assert_eq!(Abandoned.to_string(), "Abandoned");
+            assert_eq!(Unknown.to_string(), "Unknown");
+
+            assert_eq!(Passed.to_index(), 0);
+            assert_eq!(Failed.to_index(), 1);
+            assert_eq!(Abandoned.to_index(), 2);
+            assert_eq!(Unknown.to_index(), 3);
+
+            assert_matches!(ExplorationState::from(0), Passed);
+            assert_matches!(ExplorationState::from(1), Failed);
+            assert_matches!(ExplorationState::from(2), Abandoned);
+            assert_matches!(ExplorationState::from(3), Unknown);
+        }
+
+        #[test]
         fn roguelike() {
             let mut detail = RoguelikeDetail::new();
             detail.start_exploration();
