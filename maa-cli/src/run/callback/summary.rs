@@ -706,7 +706,7 @@ impl std::fmt::Display for RoguelikeDetail {
 }
 
 #[repr(u8)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub(super) enum ExplorationState {
     Passed = 0,
     Failed,
@@ -928,6 +928,8 @@ mod tests {
     }
 
     mod detail {
+        use crate::assert_matches;
+
         use super::*;
 
         #[test]
@@ -1121,6 +1123,7 @@ mod tests {
             detail.set_exp(100);
             detail.start_exploration();
             detail.invest(17);
+            detail.invest(1);
             detail.set_state(ExplorationState::Passed);
             detail.set_exp(200);
             detail.start_exploration();
@@ -1128,11 +1131,11 @@ mod tests {
                 detail.to_string(),
                 "Explorations:\n\
                 1. Failed, invest 10 originium ingotes, gained 100 exp;\n\
-                2. Passed, invest 17 originium ingotes, gained 200 exp;\n\
+                2. Passed, invest 18 originium ingotes, gained 200 exp;\n\
                 3. Unknown;\n\
                 Summary:\n\
                 Passed 1, Failed 1, Unknown 1\n\
-                Total invest 27 originium ingotes\n\
+                Total invest 28 originium ingotes\n\
                 Total gained 300 exp\n",
             );
         }
