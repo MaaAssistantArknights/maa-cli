@@ -70,9 +70,7 @@ jobs:
   bump:
     name: Bump Formulae and Casks
     needs: [meta]
-    runs-on: ubuntu-22.04
-    container:
-      image: ghcr.io/homebrew/ubuntu22.04:master
+    runs-on: macos-latest
     steps:
       - name: Tap MaasistantArknights Tap
         run: brew tap MaaAssistantArknights/homebrew-tap
