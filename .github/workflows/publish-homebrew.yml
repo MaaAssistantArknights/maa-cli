@@ -76,7 +76,11 @@ jobs:
     steps:
       - name: Tap MaasistantArknights Tap
         run: brew tap MaaAssistantArknights/homebrew-tap
-      - name: Bump Formula
+      - name: Configure Git User
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Bump Formulae and Casks
         run: |
           for formula in maa-cli maa-cli-beta; do
             brew bump-formula-pr "$formula" \
