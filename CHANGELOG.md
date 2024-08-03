@@ -1,5 +1,22 @@
 # Release Notes
 
+## Release 0.4.9
+
+### Features
+
+- Support Sarkaz rogue by [@hguandl](https://github.com/hguandl) in [#293](https://github.com/MaaAssistantArknights/maa-cli/pull/293)
+- Improve roguelike log output and summary by [@wangl-cc](https://github.com/wangl-cc) in [#298](https://github.com/MaaAssistantArknights/maa-cli/pull/298)
+
+### Documentation
+
+- Update docs to sync with MAA main repository by [@wangl-cc](https://github.com/wangl-cc) in [#291](https://github.com/MaaAssistantArknights/maa-cli/pull/291)
+
+### Security
+
+- Bump openssl from 0.10.64 to 0.10.66 by [@dependabot[bot]](https://github.com/dependabot[bot]) in [#296](https://github.com/MaaAssistantArknights/maa-cli/pull/296)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.4.8...v0.4.9>
+
 ## Release 0.4.8
 
 ### Features
@@ -203,7 +220,7 @@
 - Add a new subcommand `fight` by [@wangl-cc](https://github.com/wangl-cc) in [#104](https://github.com/MaaAssistantArknights/maa-cli/pull/104)
 - Add `BoolInput` to query user for boolean input by [@wangl-cc](https://github.com/wangl-cc) in [#107](https://github.com/MaaAssistantArknights/maa-cli/pull/107)
 - Qurey `start_game_enabled` and `client_type` in startup task by [@wangl-cc](https://github.com/wangl-cc) in [#110](https://github.com/MaaAssistantArknights/maa-cli/pull/110)
-- Add subcommand `copilot` to complete the auto-battle feature  by [@hzxjy1](https://github.com/hzxjy1) in [#127](https://github.com/MaaAssistantArknights/maa-cli/pull/127)
+- Add subcommand `copilot` to complete the auto-battle feature by [@hzxjy1](https://github.com/hzxjy1) in [#127](https://github.com/MaaAssistantArknights/maa-cli/pull/127)
 - **BREAKING**:Resource update and refactor maa core binding by [@wangl-cc](https://github.com/wangl-cc) in [#126](https://github.com/MaaAssistantArknights/maa-cli/pull/126)
 - **BREAKING**:Download native binaries instead of universal binaries on macOS by [@wangl-cc](https://github.com/wangl-cc) in [#133](https://github.com/MaaAssistantArknights/maa-cli/pull/133)
 - Add stage argument to fight task by [@wangl-cc](https://github.com/wangl-cc) in [#134](https://github.com/MaaAssistantArknights/maa-cli/pull/134)
@@ -312,7 +329,7 @@
 ### Features
 
 - Allow user input in task definition by [@wangl-cc](https://github.com/wangl-cc) in [#54](https://github.com/MaaAssistantArknights/maa-cli/pull/54)
-- Add option `strategy`  for  variant by [@wangl-cc](https://github.com/wangl-cc) in [#64](https://github.com/MaaAssistantArknights/maa-cli/pull/64)
+- Add option `strategy` for variant by [@wangl-cc](https://github.com/wangl-cc) in [#64](https://github.com/MaaAssistantArknights/maa-cli/pull/64)
 
 ### Documentation
 
@@ -463,7 +480,7 @@
 - Wrong match in get_asset by [@wangl-cc](https://github.com/wangl-cc)
 - Name of `maa-cli` should be `maa` by [@wangl-cc](https://github.com/wangl-cc)
 - Download url with `MAA_CLI_DOWNLOAD` by [@wangl-cc](https://github.com/wangl-cc)
-- Remove  duplicate log for additional resource by [@wangl-cc](https://github.com/wangl-cc)
+- Remove duplicate log for additional resource by [@wangl-cc](https://github.com/wangl-cc)
 - Don't treat other error as file not found during parse asst_config by [@wangl-cc](https://github.com/wangl-cc)
 - Yaml support by [@wangl-cc](https://github.com/wangl-cc)
 
