@@ -348,10 +348,21 @@ jobs:
           git tag -f stable ${{ needs.meta.outputs.commit }}
           git push --verbose --force origin stable
 
+  sync:
+    name: Sync to MAA Main Repository
+    if: ${{ fromJson(needs.meta.outputs.publish) && !fromJson(needs.meta.outputs.prerelease) }}
+    needs: [meta, release]
+    uses: ./.github/workflows/sync-main.yml
+    with:
+      version: ${{ needs.meta.outputs.version }}
+      dryrun: false
+    secrets:
+      MAA_HOMEBREW_BUMP_PR: ${{ secrets.MAA_HOMEBREW_BUMP_PR }}
+
   publish-homebrew:
+    name: Publish Homebrew Formulae
     needs: [meta, release]
     if: ${{ fromJson(needs.meta.outputs.publish) && !fromJson(needs.meta.outputs.prerelease) }}
-    name: Publish Homebrew
     uses: ./.github/workflows/publish-homebrew.yml
     with:
       version: ${{ needs.meta.outputs.version }}
@@ -360,9 +371,9 @@ jobs:
       MAA_HOMEBREW_BUMP_PR: ${{ secrets.MAA_HOMEBREW_BUMP_PR }}
 
   publish-aur:
+    name: Publish AUR Package
     needs: [meta, release]
     if: ${{ fromJson(needs.meta.outputs.publish) && !fromJson(needs.meta.outputs.prerelease) }}
-    name: Publish AUR Package
     uses: ./.github/workflows/publish-aur.yml
     with:
       pkgver: ${{ needs.meta.outputs.version }}

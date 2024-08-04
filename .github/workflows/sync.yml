@@ -1,0 +1,70 @@
+name: Sync to MAA Main Repository
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Package version
+        required: true
+        type: string
+      dryrun:
+        description: Do not create PR
+        required: true
+        type: boolean
+    secrets:
+      MAA_HOMEBREW_BUMP_PR:
+        description: GitHub PAT for creating PR
+        required: true
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version
+        required: true
+        type: string
+      dryrun:
+        description: Do not create PR
+        default: true
+        required: true
+        type: boolean
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  bump:
+    name: Bump Submodules of Main Repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Main Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.MAA_HOMEBREW_BUMP_PR }}
+          repository: MaaAssistantArknights/MaaAssistantArknights
+          ref: dev
+      - name: Update Submodules to Current Commit
+        working-directory: src/maa-cli
+        run: |
+          git submodules init .
+          git submodules update .
+          git checkout '${{ github.ref }}'
+      - name: Sync Documentations
+        working-directory: docs
+        run: |
+          ../src/maa-cli/maa-cli/docs/gen_docs.sh
+      - name: Show Changes
+        if: ${{ inputs.dryrun }}
+        run: |
+          {
+            echo '```diff'
+            git diff --submodules
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Create Pull Request
+        if: ${{ !inputs.dryrun }}
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.MAA_HOMEBREW_BUMP_PR }}
+          commit-message: |
+            Bump maa-cli to ${{ inputs.version }}
+          branch: chore/bump/maa-cli-${{ inputs.version }}
