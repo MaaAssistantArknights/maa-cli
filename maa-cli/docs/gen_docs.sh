@@ -22,6 +22,14 @@ icons=(
   ph:question-fill
 )
 
+sed() {
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    sed -i '' "$@"
+  else
+    sed -i "$@"
+  fi
+}
+
 # language of the documentation
 for lang in en-US zh-CN zh-TW ja-JP ko-KR; do
   lang_lower=$(echo "$lang" | tr '[:upper:]' '[:lower:]')
@@ -48,8 +56,8 @@ for lang in en-US zh-CN zh-TW ja-JP ko-KR; do
       cat "$file"
     } > "$out_file"
     # remap some relative links to github links
-    sed -I '' -E 's|\.\./\.\./|https://github.com/MaaAssistantArknights/maa-cli/blob/main/maa-cli/|g' "$out_file"
+    sed -E 's|\.\./\.\./|https://github.com/MaaAssistantArknights/maa-cli/blob/main/maa-cli/|g' "$out_file"
     # remap maa docs links to the relative links
-    sed -I '' -E 's|https://maa\.plus/docs/[^/]+/(.+)\.html|../../\1.md|g' "$out_file"
+    sed -E 's|https://maa\.plus/docs/[^/]+/(.+)\.html|../../\1.md|g' "$out_file"
   done
 done
