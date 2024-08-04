@@ -66,5 +66,10 @@ jobs:
         with:
           token: ${{ secrets.MAA_HOMEBREW_BUMP_PR }}
           commit-message: |
-            Bump maa-cli to ${{ inputs.version }}
+            chore: bump maa-cli to ${{ inputs.version }}
           branch: chore/bump/maa-cli-${{ inputs.version }}
+          title: "chore: bump maa-cli to ${{ inputs.version }}"
+          body: |
+            Bump maa-cli to ${{ inputs.version }}.
+
+            See [maa-cli changelog](https://github.com/MaaAssistantArknights/maa-cli/releases/tag/v${{ inputs.version }}) for more details.
