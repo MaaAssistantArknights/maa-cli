@@ -22,7 +22,7 @@ icons=(
   ph:question-fill
 )
 
-sed() {
+sedi() {
   if [[ "$OSTYPE" == "darwin"* ]]; then
     sed -i '' "$@"
   else
@@ -56,8 +56,8 @@ for lang in en-US zh-CN zh-TW ja-JP ko-KR; do
       cat "$file"
     } > "$out_file"
     # remap some relative links to github links
-    sed -E 's|\.\./\.\./|https://github.com/MaaAssistantArknights/maa-cli/blob/main/maa-cli/|g' "$out_file"
+    sedi -E 's|\.\./\.\./|https://github.com/MaaAssistantArknights/maa-cli/blob/main/maa-cli/|g' "$out_file"
     # remap maa docs links to the relative links
-    sed -E 's|https://maa\.plus/docs/[^/]+/(.+)\.html|../../\1.md|g' "$out_file"
+    sedi -E 's|https://maa\.plus/docs/[^/]+/(.+)\.html|../../\1.md|g' "$out_file"
   done
 done
