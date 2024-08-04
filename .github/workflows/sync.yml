@@ -45,8 +45,8 @@ jobs:
       - name: Update Submodules to Current Commit
         working-directory: src/maa-cli
         run: |
-          git submodules init .
-          git submodules update .
+          git submodule init .
+          git submodule update .
           git checkout '${{ github.ref }}'
       - name: Sync Documentations
         working-directory: docs
@@ -57,7 +57,7 @@ jobs:
         run: |
           {
             echo '```diff'
-            git diff --submodules
+            git diff --submodule
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Create Pull Request
