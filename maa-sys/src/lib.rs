@@ -160,13 +160,18 @@ impl Assistant {
 
     /// Append a task to the assistant, return the task id.
     pub fn append_task(&self, task: impl ToCString, params: impl ToCString) -> Result<AsstTaskId> {
-        Ok(unsafe {
+        let task_id = unsafe {
             binding::AsstAppendTask(
                 self.handle,
                 task.to_cstring()?.as_ptr(),
                 params.to_cstring()?.as_ptr(),
             )
-        })
+        };
+        if task_id == 0 {
+            Err(Error::MAAError)
+        } else {
+            Ok(task_id)
+        }
     }
 
     /// Set the parameters of the given task.
