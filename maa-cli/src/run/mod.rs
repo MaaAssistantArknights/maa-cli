@@ -153,24 +153,22 @@ where
     let asst = Assistant::new(Some(callback::default_callback), None);
     asst_config.instance_options.apply_to(&asst)?;
 
-    // Register tasks
-    let mut summarys = (!args.no_summary).then(summary::Summary::new);
+    // Register tasks to Assistant and prepare summary
+    let mut task_summary = (!args.no_summary).then(summary::Summary::new);
     for task in task_config.tasks.iter() {
-        let name = task.name();
         let task_type = task.task_type();
-        let params = task.params();
-        debug!(
-            "Adding task [{}] with params: {}",
-            name.unwrap_or(task_type.as_ref()),
-            serde_json::to_string_pretty(params)?
-        );
-        let id = asst.append_task(task_type, serde_json::to_string(params)?)?;
+        let name = task.name().unwrap_or_else(|| task_type.as_ref());
+        let params = serde_json::to_string_pretty(task.params())?;
+        debug!("Adding task [{name}] with params: {params}");
+        let id = asst
+            .append_task(task_type, params.as_str())
+            .with_context(|| format!("Failed to add task {name} with params: {params}"))?;
 
-        if let Some(s) = summarys.as_mut() {
-            s.insert(id, name.map(|s| s.to_owned()), task_type);
+        if let Some(s) = task_summary.as_mut() {
+            s.insert(id, Some(name.to_owned()), task_type);
         }
     }
-    if let Some(s) = summarys {
+    if let Some(s) = task_summary {
         summary::init(s);
     }
 
