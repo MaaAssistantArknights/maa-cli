@@ -12,8 +12,6 @@ This crate depends on the shared library MaaCore, which can be linked at compile
 
 ### Runtime loading
 
-You can also load the shared library at runtime by enabling the `runtime` feature. In this case, you will
-
-you need to call `maa_sys::binding::load(path)` to load the shared library at runtime. The `path` can be a library name like MaaCore or an absolute path to the shared library. If the `path` is a name, the shared library will be searched in the system library paths.
+You can also load the shared library at runtime by enabling the `runtime` feature. In this case, you need to call `maa_sys::binding::load(path)` to load the shared library at runtime. The `path` can be the library name `MaaCore` or an absolute path to the shared library. If the `path` is a name, the shared library will be searched in the system library paths.
 
 <!-- markdownlint-disable-file MD013 -->
