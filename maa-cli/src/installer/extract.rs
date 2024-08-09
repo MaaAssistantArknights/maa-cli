@@ -85,7 +85,7 @@ fn extract_zip(file: &Path, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Result
         let mut file = archive.by_index(i).unwrap();
 
         let outpath = match file.enclosed_name() {
-            Some(path) => match mapper(path) {
+            Some(path) => match mapper(&path) {
                 Some(path) => path,
                 None => continue,
             },
