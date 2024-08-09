@@ -467,6 +467,7 @@ mod tests {
         #[test]
         fn state_relative() {
             env::remove_var("XDG_STATE_HOME");
+            env::remove_var("MAA_STATE_DIR");
             let project = ProjectDirs::from("com", "loong", "maa");
             if cfg!(target_os = "macos") {
                 assert_eq!(
@@ -500,6 +501,7 @@ mod tests {
         #[test]
         fn data_relative() {
             env::remove_var("XDG_DATA_HOME");
+            env::remove_var("MAA_DATA_DIR");
             let project = ProjectDirs::from("com", "loong", "maa");
             if cfg!(target_os = "macos") {
                 assert_eq!(
@@ -649,6 +651,7 @@ mod tests {
         #[test]
         fn config_relative() {
             env::remove_var("XDG_CONFIG_HOME");
+            env::remove_var("MAA_CONFIG_DIR");
             let project = ProjectDirs::from("com", "loong", "maa");
             if cfg!(target_os = "macos") {
                 assert_eq!(
@@ -691,6 +694,7 @@ mod tests {
         #[test]
         fn cache_relative() {
             env::remove_var("XDG_CACHE_HOME");
+            env::remove_var("MAA_CACHE_DIR");
             let project = ProjectDirs::from("com", "loong", "maa");
             if cfg!(target_os = "macos") {
                 assert_eq!(
