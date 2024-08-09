@@ -1,5 +1,29 @@
 # Release Notes
 
+## Release 0.4.10
+
+### Features
+
+- Improve error message when failing to add task by [@wangl-cc](https://github.com/wangl-cc)
+
+### Bug Fixes
+
+- Correctly handle the return value of `AsstAppendTask` by [@wangl-cc](https://github.com/wangl-cc) in [#300](https://github.com/MaaAssistantArknights/maa-cli/pull/300)
+
+### Refactor
+
+- Parse and convert of `TouchMode` and `TaskType` by [@wangl-cc](https://github.com/wangl-cc) in [#303](https://github.com/MaaAssistantArknights/maa-cli/pull/303)
+
+### Documentation
+
+- Update runtime loading section of maa-sys by [@wangl-cc](https://github.com/wangl-cc)
+
+### Testing
+
+- Remove `MAA_*_DIR` env vars before test by [@wangl-cc](https://github.com/wangl-cc) in [#302](https://github.com/MaaAssistantArknights/maa-cli/pull/302)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.4.9...v0.4.10>
+
 ## Release 0.4.9
 
 ### Features
