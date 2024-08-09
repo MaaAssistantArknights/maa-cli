@@ -21,9 +21,9 @@ pub enum TaskType {
 }
 
 impl TaskType {
-    const COUNT: usize = 16;
+    pub const COUNT: usize = 16;
 
-    const VARIANTS: [Self; Self::COUNT] = {
+    pub const VARIANTS: [Self; Self::COUNT] = {
         let mut i = 0;
         let mut variants = [Self::StartUp; Self::COUNT];
         while i < Self::COUNT {
@@ -54,7 +54,7 @@ impl TaskType {
         }
     }
 
-    const NAMES: [&'static str; Self::COUNT] = {
+    pub const NAMES: [&'static str; Self::COUNT] = {
         let mut i = 0;
         let mut names = [""; Self::COUNT];
         while i < Self::COUNT {

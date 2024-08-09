@@ -74,8 +74,9 @@ pub enum TouchMode {
 }
 
 impl TouchMode {
-    const COUNT: usize = 4;
-    const VARIANTS: [TouchMode; Self::COUNT] = {
+    pub const COUNT: usize = 4;
+
+    pub const VARIANTS: [TouchMode; Self::COUNT] = {
         let mut i = 0;
         let mut variants = [TouchMode::ADB; Self::COUNT];
         while i < Self::COUNT {
@@ -95,7 +96,7 @@ impl TouchMode {
         }
     }
 
-    const NAMES: [&'static str; Self::COUNT] = {
+    pub const NAMES: [&'static str; Self::COUNT] = {
         let mut i = 0;
         let mut names = [""; Self::COUNT];
         while i < Self::COUNT {
