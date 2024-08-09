@@ -79,7 +79,7 @@ impl TouchMode {
         let mut i = 0;
         let mut variants = [TouchMode::ADB; Self::COUNT];
         while i < Self::COUNT {
-            variants[i] = unsafe { std::mem::transmute(i as u8) };
+            variants[i] = unsafe { std::mem::transmute::<u8, Self>(i as u8) };
             i += 1;
         }
         variants

@@ -27,7 +27,7 @@ impl TaskType {
         let mut i = 0;
         let mut variants = [Self::StartUp; Self::COUNT];
         while i < Self::COUNT {
-            variants[i] = unsafe { std::mem::transmute(i as u8) };
+            variants[i] = unsafe { std::mem::transmute::<u8, Self>(i as u8) };
             i += 1;
         }
         variants
@@ -120,7 +120,7 @@ impl<'de> serde::Deserialize<'de> for TaskType {
                 E: serde::de::Error,
             {
                 TaskType::from_str_opt(value)
-                    .ok_or_else(|| E::unknown_variant(&value, &TaskType::NAMES))
+                    .ok_or_else(|| E::unknown_variant(value, &TaskType::NAMES))
             }
         }
 
