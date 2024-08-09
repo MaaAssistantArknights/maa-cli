@@ -144,7 +144,7 @@ impl std::error::Error for UnknownTouchModeError {}
 impl std::str::FromStr for TouchMode {
     type Err = UnknownTouchModeError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         Self::from_str_opt(s).ok_or_else(|| UnknownTouchModeError(s.to_owned()))
     }
 }
