@@ -175,10 +175,6 @@ mod tests {
             "Unknown".parse::<TaskType>(),
             Err(UnknownTaskType("Unknown".to_owned()))
         );
-    }
-
-    #[test]
-    fn unknown_task_type_error() {
         assert_eq!(
             UnknownTaskType("Unknown".to_owned()).to_string(),
             "unknown task type `Unknown`, expected one of `StartUp`, `CloseDown`, `Fight`, \

@@ -120,6 +120,34 @@ impl AsRef<str> for TouchMode {
     }
 }
 
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[derive(Debug)]
+pub struct UnknownTouchModeError(String);
+
+impl std::fmt::Display for UnknownTouchModeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "unknown touch mode `{}`, expected one of ", self.0)?;
+        let mut iter = TouchMode::NAMES.iter();
+        if let Some(name) = iter.next() {
+            write!(f, "`{}`", name)?;
+            for v in iter {
+                write!(f, ", `{}`", v)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for UnknownTouchModeError {}
+
+impl std::str::FromStr for TouchMode {
+    type Err = UnknownTouchModeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_str_opt(s).ok_or_else(|| UnknownTouchModeError(s.to_owned()))
+    }
+}
+
 #[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for TouchMode {
     fn deserialize<D>(deserializer: D) -> std::result::Result<TouchMode, D::Error>
@@ -235,6 +263,29 @@ mod tests {
         assert_eq!(MacPlayTools.to_cstring().unwrap(), csting("MacPlayTools"));
     }
 
+    #[test]
+    fn parse() {
+        assert_eq!("adb".parse(), Ok(ADB));
+        assert_eq!("Adb".parse(), Ok(ADB));
+        assert_eq!("ADB".parse(), Ok(ADB));
+        assert_eq!("minitouch".parse(), Ok(MiniTouch));
+        assert_eq!("MiniTouch".parse(), Ok(MiniTouch));
+        assert_eq!("maatouch".parse(), Ok(MaaTouch));
+        assert_eq!("MaaTouch".parse(), Ok(MaaTouch));
+        assert_eq!("MAATouch".parse(), Ok(MaaTouch));
+        assert_eq!("macplaytools".parse(), Ok(MacPlayTools));
+        assert_eq!("MacPlayTools".parse(), Ok(MacPlayTools));
+
+        assert_eq!(
+            "Unknown".parse::<TouchMode>(),
+            Err(UnknownTouchModeError("Unknown".to_owned()))
+        );
+        assert_eq!(
+            UnknownTouchModeError("Unknown".to_owned()).to_string(),
+            "unknown touch mode `Unknown`, expected one of `adb`, `minitouch`, `maatouch`, `MacPlayTools`",
+        );
+    }
+
     #[cfg(feature = "serde")]
     mod serde {
         use super::*;
@@ -246,8 +297,6 @@ mod tests {
             assert_de_tokens(&ADB, &[Token::Str("adb")]);
             assert_de_tokens(&MiniTouch, &[Token::Str("minitouch")]);
             assert_de_tokens(&MaaTouch, &[Token::Str("maatouch")]);
-            assert_de_tokens(&MaaTouch, &[Token::Str("MaaTouch")]);
-            assert_de_tokens(&MaaTouch, &[Token::Str("MAATouch")]);
             assert_de_tokens(&MacPlayTools, &[Token::Str("MacPlayTools")]);
         }
 

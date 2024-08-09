@@ -49,4 +49,4 @@ impl Error {
 }
 
 /// Similar to `anyhow::Result<T>` but the default error type is [`Error`].
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;
