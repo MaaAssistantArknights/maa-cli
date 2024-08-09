@@ -3,7 +3,7 @@
 // More details see:
 // https://github.com/MaaAssistantArknights/MaaAssistantArknights/blob/dev/src/MaaCore/Common/AsstTypes.h
 
-use crate::{impl_to_cstring_by_as_ref, Assistant, Result, ToCString};
+use crate::{Assistant, Result, ToCString};
 
 /// Available static option key
 #[repr(i32)]
@@ -62,20 +62,31 @@ impl InstanceOptionKey {
 }
 
 /// Available touch mode
-#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[repr(u8)]
 #[derive(Default, Clone, Copy, PartialEq, Debug)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum TouchMode {
     #[default]
     ADB,
     MiniTouch,
-    #[cfg_attr(feature = "serde", serde(alias = "MAATouch"))]
     MaaTouch,
     MacPlayTools,
 }
 
-impl AsRef<str> for TouchMode {
-    fn as_ref(&self) -> &str {
+impl TouchMode {
+    const COUNT: usize = 4;
+    const VARIANTS: [TouchMode; Self::COUNT] = {
+        let mut i = 0;
+        let mut variants = [TouchMode::ADB; Self::COUNT];
+        while i < Self::COUNT {
+            variants[i] = unsafe { std::mem::transmute(i as u8) };
+            i += 1;
+        }
+        variants
+    };
+
+    /// Convert TouchMode to a static string slice
+    pub const fn to_str(self) -> &'static str {
         match self {
             TouchMode::ADB => "adb",
             TouchMode::MiniTouch => "minitouch",
@@ -83,19 +94,77 @@ impl AsRef<str> for TouchMode {
             TouchMode::MacPlayTools => "MacPlayTools",
         }
     }
+
+    const NAMES: [&'static str; Self::COUNT] = {
+        let mut i = 0;
+        let mut names = [""; Self::COUNT];
+        while i < Self::COUNT {
+            names[i] = Self::VARIANTS[i].to_str();
+            i += 1;
+        }
+        names
+    };
+
+    fn from_str_opt(s: &str) -> Option<TouchMode> {
+        Self::VARIANTS
+            .iter()
+            .find(|v| v.to_str().eq_ignore_ascii_case(s))
+            .copied()
+    }
+}
+
+// DEPRECATED: use `to_str` instead, will be removed in the future.
+impl AsRef<str> for TouchMode {
+    fn as_ref(&self) -> &str {
+        self.to_str()
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for TouchMode {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<TouchMode, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct TouchModeVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for TouchModeVisitor {
+            type Value = TouchMode;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a valid touch mode")
+            }
+
+            fn visit_str<E>(self, value: &str) -> std::result::Result<TouchMode, E>
+            where
+                E: serde::de::Error,
+            {
+                TouchMode::from_str_opt(value)
+                    .ok_or_else(|| E::unknown_variant(value, &TouchMode::NAMES))
+            }
+        }
+
+        deserializer.deserialize_str(TouchModeVisitor)
+    }
 }
 
 impl std::fmt::Display for TouchMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_ref())
+        f.write_str(self.to_str())
     }
 }
 
-impl_to_cstring_by_as_ref!(str, TouchMode);
+impl ToCString for TouchMode {
+    fn to_cstring(self) -> Result<std::ffi::CString> {
+        self.to_str().to_cstring()
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use TouchMode::*;
 
     // #[cfg(not(feature = "runtime"))]
     // #[test]
@@ -128,43 +197,67 @@ mod tests {
     //     }
     // }
 
-    mod to_cstring {
-        use super::*;
-        use std::ffi::CString;
-
-        #[test]
-        fn touch_mode() {
-            assert_eq!(
-                TouchMode::ADB.to_cstring().unwrap(),
-                CString::new("adb").unwrap()
-            );
-
-            assert_eq!(
-                TouchMode::MiniTouch.to_cstring().unwrap(),
-                CString::new("minitouch").unwrap()
-            );
-
-            assert_eq!(
-                TouchMode::MaaTouch.to_cstring().unwrap(),
-                CString::new("maatouch").unwrap()
-            );
-
-            assert_eq!(
-                TouchMode::MacPlayTools.to_cstring().unwrap(),
-                CString::new("MacPlayTools").unwrap()
-            );
-        }
+    #[test]
+    fn to_str() {
+        assert_eq!(ADB.to_str(), "adb");
+        assert_eq!(MiniTouch.to_str(), "minitouch");
+        assert_eq!(MaaTouch.to_str(), "maatouch");
+        assert_eq!(MacPlayTools.to_str(), "MacPlayTools");
     }
 
-    mod display {
+    #[test]
+    fn to_string() {
+        assert_eq!(ADB.to_string(), "adb");
+        assert_eq!(MiniTouch.to_string(), "minitouch");
+        assert_eq!(MaaTouch.to_string(), "maatouch");
+        assert_eq!(MacPlayTools.to_string(), "MacPlayTools");
+    }
+
+    #[test]
+    fn as_ref() {
+        assert_eq!(ADB.as_ref(), "adb");
+        assert_eq!(MiniTouch.as_ref(), "minitouch");
+        assert_eq!(MaaTouch.as_ref(), "maatouch");
+        assert_eq!(MacPlayTools.as_ref(), "MacPlayTools");
+    }
+
+    #[test]
+    fn to_cstring() {
+        use std::ffi::CString;
+
+        fn csting(s: &str) -> CString {
+            CString::new(s).unwrap()
+        }
+
+        assert_eq!(ADB.to_cstring().unwrap(), csting("adb"));
+        assert_eq!(MiniTouch.to_cstring().unwrap(), csting("minitouch"));
+        assert_eq!(MaaTouch.to_cstring().unwrap(), csting("maatouch"));
+        assert_eq!(MacPlayTools.to_cstring().unwrap(), csting("MacPlayTools"));
+    }
+
+    #[cfg(feature = "serde")]
+    mod serde {
         use super::*;
 
+        use serde_test::{assert_de_tokens, assert_de_tokens_error, Token};
+
         #[test]
-        fn touch_mode() {
-            assert_eq!(TouchMode::ADB.to_string(), "adb");
-            assert_eq!(TouchMode::MiniTouch.to_string(), "minitouch");
-            assert_eq!(TouchMode::MaaTouch.to_string(), "maatouch");
-            assert_eq!(TouchMode::MacPlayTools.to_string(), "MacPlayTools");
+        fn deserialize() {
+            assert_de_tokens(&ADB, &[Token::Str("adb")]);
+            assert_de_tokens(&MiniTouch, &[Token::Str("minitouch")]);
+            assert_de_tokens(&MaaTouch, &[Token::Str("maatouch")]);
+            assert_de_tokens(&MaaTouch, &[Token::Str("MaaTouch")]);
+            assert_de_tokens(&MaaTouch, &[Token::Str("MAATouch")]);
+            assert_de_tokens(&MacPlayTools, &[Token::Str("MacPlayTools")]);
+        }
+
+        #[test]
+        fn deserialize_unknown() {
+            assert_de_tokens_error::<TouchMode>(
+                &[Token::Str("Unknown")],
+                "unknown variant `Unknown`, expected one of \
+                `adb`, `minitouch`, `maatouch`, `MacPlayTools`",
+            );
         }
     }
 }

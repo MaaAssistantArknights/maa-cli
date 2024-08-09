@@ -20,24 +20,57 @@ pub enum TaskType {
     VideoRecognition,
 }
 
-const TASK_TYPE_STRS: [&str; 16] = [
-    "StartUp",
-    "CloseDown",
-    "Fight",
-    "Recruit",
-    "Infrast",
-    "Mall",
-    "Award",
-    "Roguelike",
-    "Copilot",
-    "SSSCopilot",
-    "Depot",
-    "OperBox",
-    "ReclamationAlgorithm",
-    "Custom",
-    "SingleStep",
-    "VideoRecognition",
-];
+impl TaskType {
+    const COUNT: usize = 16;
+
+    const VARIANTS: [Self; Self::COUNT] = {
+        let mut i = 0;
+        let mut variants = [Self::StartUp; Self::COUNT];
+        while i < Self::COUNT {
+            variants[i] = unsafe { std::mem::transmute(i as u8) };
+            i += 1;
+        }
+        variants
+    };
+
+    pub const fn to_str(self) -> &'static str {
+        match self {
+            Self::StartUp => "StartUp",
+            Self::CloseDown => "CloseDown",
+            Self::Fight => "Fight",
+            Self::Recruit => "Recruit",
+            Self::Infrast => "Infrast",
+            Self::Mall => "Mall",
+            Self::Award => "Award",
+            Self::Roguelike => "Roguelike",
+            Self::Copilot => "Copilot",
+            Self::SSSCopilot => "SSSCopilot",
+            Self::Depot => "Depot",
+            Self::OperBox => "OperBox",
+            Self::ReclamationAlgorithm => "ReclamationAlgorithm",
+            Self::Custom => "Custom",
+            Self::SingleStep => "SingleStep",
+            Self::VideoRecognition => "VideoRecognition",
+        }
+    }
+
+    const NAMES: [&'static str; Self::COUNT] = {
+        let mut i = 0;
+        let mut names = [""; Self::COUNT];
+        while i < Self::COUNT {
+            names[i] = Self::VARIANTS[i].to_str();
+            i += 1;
+        }
+        names
+    };
+
+    fn from_str_opt(s: &str) -> Option<Self> {
+        Self::VARIANTS
+            .iter()
+            .find(|v| v.to_str().eq_ignore_ascii_case(s))
+            .copied()
+    }
+}
 
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[derive(Debug)]
@@ -45,7 +78,15 @@ pub struct UnknownTaskType(String);
 
 impl std::fmt::Display for UnknownTaskType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "unknown task type `{}`", self.0)
+        write!(f, "unknown task type `{}`, expected one of ", self.0)?;
+        let mut iter = TaskType::NAMES.iter();
+        if let Some(v) = iter.next() {
+            write!(f, "`{}`", v)?;
+            for v in iter {
+                write!(f, ", `{}`", v)?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -55,11 +96,7 @@ impl std::str::FromStr for TaskType {
     type Err = UnknownTaskType;
 
     fn from_str(s: &str) -> Result<TaskType, Self::Err> {
-        TASK_TYPE_STRS
-            .iter()
-            .position(|&x| x.eq_ignore_ascii_case(s))
-            .map(|i| unsafe { std::mem::transmute(i as u8) })
-            .ok_or_else(|| UnknownTaskType(s.to_owned()))
+        Self::from_str_opt(s).ok_or_else(|| UnknownTaskType(s.to_owned()))
     }
 }
 
@@ -75,14 +112,15 @@ impl<'de> serde::Deserialize<'de> for TaskType {
             type Value = TaskType;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a task type")
+                formatter.write_str("a valid task type")
             }
 
             fn visit_str<E>(self, value: &str) -> Result<TaskType, E>
             where
                 E: serde::de::Error,
             {
-                value.parse().map_err(E::custom)
+                TaskType::from_str_opt(value)
+                    .ok_or_else(|| E::unknown_variant(&value, &TaskType::NAMES))
             }
         }
 
@@ -90,12 +128,7 @@ impl<'de> serde::Deserialize<'de> for TaskType {
     }
 }
 
-impl TaskType {
-    fn to_str(self) -> &'static str {
-        unsafe { TASK_TYPE_STRS.get_unchecked(self as usize) }
-    }
-}
-
+// DEPRECATED: use `to_str` instead, will be removed in the future.
 impl AsRef<str> for TaskType {
     fn as_ref(&self) -> &str {
         self.to_str()
@@ -145,10 +178,12 @@ mod tests {
     }
 
     #[test]
-    fn error() {
+    fn unknown_task_type_error() {
         assert_eq!(
             UnknownTaskType("Unknown".to_owned()).to_string(),
-            "unknown task type `Unknown`",
+            "unknown task type `Unknown`, expected one of `StartUp`, `CloseDown`, `Fight`, \
+            `Recruit`, `Infrast`, `Mall`, `Award`, `Roguelike`, `Copilot`, `SSSCopilot`, \
+            `Depot`, `OperBox`, `ReclamationAlgorithm`, `Custom`, `SingleStep`, `VideoRecognition`",
         );
     }
 
@@ -156,7 +191,7 @@ mod tests {
     mod serde {
         use super::*;
 
-        use serde_test::{assert_de_tokens, Token};
+        use serde_test::{assert_de_tokens, assert_de_tokens_error, Token};
 
         #[test]
         fn deserialize() {
@@ -174,15 +209,12 @@ mod tests {
         }
 
         #[test]
-        #[should_panic]
         fn deserialize_unknown_variance() {
-            assert_de_tokens(
-                &StartUp,
-                &[
-                    Token::Seq { len: Some(1) },
-                    Token::Str("Unknown"),
-                    Token::SeqEnd,
-                ],
+            assert_de_tokens_error::<TaskType>(
+                &[Token::Str("Unknown")],
+                "unknown variant `Unknown`, expected one of `StartUp`, `CloseDown`, `Fight`, \
+                `Recruit`, `Infrast`, `Mall`, `Award`, `Roguelike`, `Copilot`, `SSSCopilot`, \
+                `Depot`, `OperBox`, `ReclamationAlgorithm`, `Custom`, `SingleStep`, `VideoRecognition`",
             );
         }
     }
