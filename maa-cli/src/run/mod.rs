@@ -129,11 +129,8 @@ where
 
     let task = f(&asst_config)?;
     let task_config = task.init()?;
-    if let Some(client_type) = task_config.client_type {
-        debug!("Detected client type: {}", client_type);
-        if let Some(resource) = client_type.resource() {
-            asst_config.resource.use_global_resource(resource);
-        }
+    if let Some(resource) = task_config.client_type.resource() {
+        asst_config.resource.use_global_resource(resource);
     }
 
     // Load and setup MaaCore
@@ -182,7 +179,7 @@ where
         crate::config::asst::Preset::PlayCover => playcover::PlayCoverApp::new(
             task_config.start_app,
             task_config.close_app,
-            task_config.client_type.unwrap_or_default(),
+            task_config.client_type,
             addr.as_ref(),
         ),
         _ => None,
