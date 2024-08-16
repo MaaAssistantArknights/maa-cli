@@ -267,11 +267,8 @@ impl TaskConfig {
             let params = &mut task.params;
 
             // Set client type in task automatically
-            match (task_type, client_type) {
-                (StartUp | Fight | CloseDown, Some(t)) => {
-                    params.insert("client_type", t.to_string());
-                }
-                _ => {}
+            if let (StartUp | Fight | CloseDown, Some(t)) = (task_type, client_type) {
+                params.insert("client_type", t.to_string());
             }
         }
 
