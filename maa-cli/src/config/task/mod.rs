@@ -1038,6 +1038,7 @@ mod tests {
             );
 
             // Filename will be converted to absolute path
+            #[cfg(unix)]
             assert_eq!(
                 TaskConfig {
                     client_type: None,
