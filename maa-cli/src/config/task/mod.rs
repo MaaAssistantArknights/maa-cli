@@ -10,7 +10,6 @@ use crate::{dirs, object, value::MAAValue};
 use std::path::PathBuf;
 
 use anyhow::Context;
-use log::warn;
 use maa_sys::TaskType;
 use serde::Deserialize;
 
@@ -240,15 +239,19 @@ impl TaskConfig {
                 }
             }
 
-            let task_client_type = params.get("client_type").and_then(|v| v.as_str());
+            let client_type_str = params.get("client_type").and_then(|v| v.as_str());
+
+            let task_client_type = if let Some(s) = client_type_str {
+                Some(s.parse()?)
+            } else {
+                None
+            };
 
             // Get client type from task params
             match (task_client_type, client_type) {
-                (Some(t), None) => {
-                    client_type = Some(t.parse()?);
-                }
-                (Some(t1), Some(t2)) if t1 != t2.to_string() => {
-                    warn!(
+                (Some(t), None) => client_type = Some(t),
+                (Some(t1), Some(t2)) if t1 != t2 => {
+                    log::warn!(
                         "Task {} has client_type {}, but the client type is set to {} in previous tasks or config",
                         task.name.as_deref().unwrap_or_else(|| task_type.to_str()),
                         t1,
@@ -683,6 +686,8 @@ mod tests {
 
         #[test]
         fn init() {
+            use ClientType::*;
+
             // Default client type is Official
             assert_eq!(
                 TaskConfig {
@@ -694,7 +699,7 @@ mod tests {
                 .init()
                 .unwrap(),
                 InitializedTaskConfig {
-                    client_type: ClientType::Official,
+                    client_type: Official,
                     start_app: false,
                     close_app: false,
                     tasks: vec![],
@@ -723,7 +728,7 @@ mod tests {
                 .init()
                 .unwrap(),
                 InitializedTaskConfig {
-                    client_type: ClientType::Official,
+                    client_type: Official,
                     start_app: false,
                     close_app: false,
                     tasks: vec![],
@@ -746,7 +751,7 @@ mod tests {
                 .init()
                 .unwrap(),
                 InitializedTaskConfig {
-                    client_type: ClientType::YoStarEN,
+                    client_type: YoStarEN,
                     start_app: true,
                     close_app: false,
                     tasks: vec![InitializedTask::new_no_name(
@@ -775,7 +780,7 @@ mod tests {
                 .init()
                 .unwrap(),
                 InitializedTaskConfig {
-                    client_type: ClientType::YoStarEN,
+                    client_type: YoStarEN,
                     start_app: false,
                     close_app: false,
                     tasks: vec![InitializedTask::new_no_name(
@@ -802,7 +807,7 @@ mod tests {
                 .init()
                 .unwrap(),
                 InitializedTaskConfig {
-                    client_type: ClientType::YoStarEN,
+                    client_type: YoStarEN,
                     start_app: false,
                     close_app: true,
                     tasks: vec![InitializedTask::new_no_name(
@@ -828,7 +833,7 @@ mod tests {
                 .init()
                 .unwrap(),
                 InitializedTaskConfig {
-                    client_type: ClientType::YoStarEN,
+                    client_type: YoStarEN,
                     start_app: false,
                     close_app: false,
                     tasks: vec![InitializedTask::new_no_name(
@@ -851,7 +856,7 @@ mod tests {
                 .init()
                 .unwrap(),
                 InitializedTaskConfig {
-                    client_type: ClientType::Official,
+                    client_type: Official,
                     start_app: false,
                     close_app: true,
                     tasks: vec![InitializedTask::new_no_name(CloseDown, object!())]
@@ -871,7 +876,7 @@ mod tests {
                 .init()
                 .unwrap(),
                 InitializedTaskConfig {
-                    client_type: ClientType::YoStarEN,
+                    client_type: YoStarEN,
                     start_app: false,
                     close_app: false,
                     tasks: vec![InitializedTask::new_no_name(
@@ -901,7 +906,7 @@ mod tests {
                 .init()
                 .unwrap(),
                 InitializedTaskConfig {
-                    client_type: ClientType::Official,
+                    client_type: Official,
                     start_app: true,
                     close_app: true,
                     tasks: vec![
@@ -929,7 +934,7 @@ mod tests {
 
             assert_eq!(
                 TaskConfig {
-                    client_type: Some(ClientType::Official),
+                    client_type: Some(Official),
                     startup: Some(true),
                     closedown: Some(true),
                     tasks: vec![
@@ -941,7 +946,7 @@ mod tests {
                 .init()
                 .unwrap(),
                 InitializedTaskConfig {
-                    client_type: ClientType::Official,
+                    client_type: Official,
                     start_app: true,
                     close_app: true,
                     tasks: vec![
@@ -981,7 +986,7 @@ mod tests {
                 .init()
                 .unwrap(),
                 InitializedTaskConfig {
-                    client_type: ClientType::Official,
+                    client_type: Official,
                     start_app: true,
                     close_app: true,
                     tasks: vec![
@@ -1003,7 +1008,7 @@ mod tests {
 
             assert_eq!(
                 TaskConfig {
-                    client_type: Some(ClientType::YoStarEN),
+                    client_type: Some(YoStarEN),
                     startup: Some(true),
                     closedown: Some(true),
                     tasks: vec![Task::new_with_default(Fight, object!("stage" => "1-7"))],
@@ -1011,7 +1016,7 @@ mod tests {
                 .init()
                 .unwrap(),
                 InitializedTaskConfig {
-                    client_type: ClientType::YoStarEN,
+                    client_type: YoStarEN,
                     start_app: true,
                     close_app: true,
                     tasks: vec![
@@ -1037,6 +1042,33 @@ mod tests {
                 }
             );
 
+            // Conflicting client type
+            assert_eq!(
+                TaskConfig {
+                    client_type: Some(Official),
+                    startup: None,
+                    closedown: None,
+                    tasks: vec![
+                        Task::new_with_default(StartUp, object!("client_type" => "YoStarEN")),
+                        Task::new_with_default(CloseDown, object!("client_type" => "YoStarJP")),
+                    ],
+                }
+                .init()
+                .unwrap(),
+                InitializedTaskConfig {
+                    client_type: Official,
+                    start_app: false,
+                    close_app: true,
+                    tasks: vec![
+                        InitializedTask::new_no_name(StartUp, object!("client_type" => "Official")),
+                        InitializedTask::new_no_name(
+                            CloseDown,
+                            object!("client_type" => "Official")
+                        ),
+                    ]
+                }
+            );
+
             // Filename will be converted to absolute path
             #[cfg(unix)]
             assert_eq!(
@@ -1052,7 +1084,7 @@ mod tests {
                 .init()
                 .unwrap(),
                 InitializedTaskConfig {
-                    client_type: ClientType::Official,
+                    client_type: Official,
                     start_app: false,
                     close_app: false,
                     tasks: vec![
