@@ -13,7 +13,7 @@ pub fn startup(client: Option<ClientType>, account: Option<String>) -> Result<Ta
     let mut params = MAAValue::new();
 
     if let Some(client) = client {
-        params.insert("client_type", client.as_ref());
+        params.insert("client_type", client.to_str());
         params.insert("start_game_enabled", true);
     };
 

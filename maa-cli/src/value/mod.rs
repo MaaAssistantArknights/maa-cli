@@ -215,12 +215,27 @@ impl MAAValue {
         }
     }
 
+    /// Get mutable inner value if the value is an object
+    pub fn as_object_mut(&mut self) -> Option<&mut Map<String, MAAValue>> {
+        match self {
+            Self::Object(v) => Some(v),
+            _ => None,
+        }
+    }
+
     /// Get value of given key
     ///
     /// If the value is an object and the key exists, the value will be returned.
     /// Otherwise, return `None`.
     pub fn get(&self, key: &str) -> Option<&Self> {
         self.as_object().and_then(|map| map.get(key))
+    }
+
+    /// Get mutable value of given key
+    ///
+    /// Same as `get`, but return mutable reference.
+    pub fn get_mut(&mut self, key: &str) -> Option<&mut Self> {
+        self.as_object_mut().and_then(|map| map.get_mut(key))
     }
 
     /// Get value of given key or return default value
@@ -252,6 +267,9 @@ impl MAAValue {
     }
 
     /// Get the value if the value is primate
+    ///
+    /// A primate value can be a bool, int, float or string.
+    /// It can not be an array, object or input value.
     fn as_primate(&self) -> Option<&MAAPrimate> {
         match self {
             Self::Primate(v) => Some(v),
@@ -259,22 +277,29 @@ impl MAAValue {
         }
     }
 
+    /// Convert the value to bool if the value is primate bool
     pub fn as_bool(&self) -> Option<bool> {
         self.as_primate().and_then(MAAPrimate::as_bool)
     }
 
+    /// Convert the value to int if the value is primate int
     pub fn as_int(&self) -> Option<i32> {
         self.as_primate().and_then(MAAPrimate::as_int)
     }
 
+    /// Convert the value to float if the value is primate float
     pub fn as_float(&self) -> Option<f32> {
         self.as_primate().and_then(MAAPrimate::as_float)
     }
 
+    /// Convert the value to string if the value is primate string
     pub fn as_str(&self) -> Option<&str> {
         self.as_primate().and_then(MAAPrimate::as_str)
     }
 
+    /// Merge other value into self
+    ///
+    /// Both self and other should be an object.
     pub fn merge_mut(&mut self, other: &Self) {
         match (self, other) {
             (Self::Object(self_map), Self::Object(other_map)) => {
@@ -292,6 +317,28 @@ impl MAAValue {
 }
 
 #[macro_export]
+/// A convenient macro to create a MAAValue::Object
+///
+/// # Examples
+/// ```
+/// use maa_cli::value::MAAValue;
+///
+/// let object = object!(
+///     "bool" => true,
+///     "int" => 1,
+///     "float" => 1.0,
+///     "string" => "string",
+///     "array" => [1, 2],
+///     "object" => object!(
+///         "key1" => "value1",
+///         "key2" => "value2",
+///     )
+///     "optional" if "bool" == true => 1,
+///     "optional_no_satisfied" if "bool" == false => 1,
+///     "optional_no_exist" if "no_exist" == true => 1,
+///     "optional_chian" if "optional" == true => 1,
+/// );
+/// ```
 macro_rules! object {
     () => {
         $crate::value::MAAValue::new()
@@ -671,6 +718,14 @@ mod tests {
         assert_eq!(value.get_or("int", 2), 1);
         assert_eq!(value.get_or("int", 2.0), 2.0);
         assert_eq!(value.get_or("float", 2.0), 2.0);
+
+        let mut value = object!("int" => 1);
+
+        assert_eq!(value.get("int").unwrap().as_int().unwrap(), 1);
+        *value.get_mut("int").unwrap() = 2.into();
+        assert_eq!(value.get("int").unwrap().as_int().unwrap(), 2);
+        assert_eq!(value.get_mut("float"), None);
+        assert_eq!(MAAValue::from(1).get_mut("int"), None);
     }
 
     #[test]
