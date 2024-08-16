@@ -1,6 +1,7 @@
 use clap::ValueEnum;
 use serde::Deserialize;
 
+#[repr(u8)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Clone, Copy, Default, ValueEnum)]
 #[clap(rename_all = "verbatim")]
@@ -12,6 +13,82 @@ pub enum ClientType {
     YoStarEN,
     YoStarJP,
     YoStarKR,
+}
+
+use ClientType::*;
+
+impl ClientType {
+    pub const COUNT: usize = 6;
+    pub const VARIANTS: [ClientType; Self::COUNT] = {
+        let mut i = 0;
+        let mut variants = [Official; Self::COUNT];
+        while i < Self::COUNT {
+            variants[i] = unsafe { std::mem::transmute::<u8, ClientType>(i as u8) };
+            i += 1;
+        }
+        variants
+    };
+
+    pub const fn to_str(self) -> &'static str {
+        match self {
+            Official => "Official",
+            Bilibili => "Bilibili",
+            Txwy => "txwy",
+            YoStarEN => "YoStarEN",
+            YoStarJP => "YoStarJP",
+            YoStarKR => "YoStarKR",
+        }
+    }
+
+    pub const NAMES: [&'static str; Self::COUNT] = {
+        let mut i = 0;
+        let mut names = ["Official"; Self::COUNT];
+        while i < Self::COUNT {
+            names[i] = Self::VARIANTS[i].to_str();
+            i += 1;
+        }
+        names
+    };
+
+    fn from_str_opt(s: &str) -> Option<Self> {
+        // Default to Official if empty
+        if s.is_empty() {
+            return Some(Official);
+        }
+
+        Self::NAMES
+            .iter()
+            .position(|&name| name.eq_ignore_ascii_case(s))
+            .map(|i| Self::VARIANTS[i])
+    }
+
+    pub const fn resource(self) -> Option<&'static str> {
+        match self {
+            Txwy => Some("txwy"),
+            YoStarEN => Some("YoStarEN"),
+            YoStarJP => Some("YoStarJP"),
+            YoStarKR => Some("YoStarKR"),
+            _ => None,
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    pub const fn app(self) -> &'static str {
+        match self {
+            Official | Bilibili | Txwy => "明日方舟",
+            YoStarEN => "Arknights",
+            YoStarJP => "アークナイツ",
+            YoStarKR => "명일방주",
+        }
+    }
+
+    pub const fn server_time_zone(self) -> i8 {
+        match self {
+            Official | Bilibili | Txwy => 4,
+            YoStarEN => -11,
+            YoStarJP | YoStarKR => 5,
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for ClientType {
@@ -26,7 +103,8 @@ impl<'de> Deserialize<'de> for ClientType {
             }
 
             fn visit_str<E: serde::de::Error>(self, value: &str) -> Result<Self::Value, E> {
-                value.parse().map_err(serde::de::Error::custom)
+                ClientType::from_str_opt(value)
+                    .ok_or_else(|| E::unknown_variant(value, &ClientType::NAMES))
             }
         }
 
@@ -34,128 +112,57 @@ impl<'de> Deserialize<'de> for ClientType {
     }
 }
 
-impl ClientType {
-    pub fn resource(self) -> Option<&'static str> {
-        match self {
-            ClientType::Txwy => Some("txwy"),
-            ClientType::YoStarEN => Some("YoStarEN"),
-            ClientType::YoStarJP => Some("YoStarJP"),
-            ClientType::YoStarKR => Some("YoStarKR"),
-            _ => None,
-        }
-    }
-
-    #[cfg(target_os = "macos")]
-    pub fn app(self) -> &'static str {
-        match self {
-            ClientType::Official | ClientType::Bilibili | ClientType::Txwy => "明日方舟",
-            ClientType::YoStarEN => "Arknights",
-            ClientType::YoStarJP => "アークナイツ",
-            ClientType::YoStarKR => "명일방주",
-        }
-    }
-
-    pub fn server_time_zone(self) -> i8 {
-        use ClientType::*;
-        match self {
-            Official | Bilibili | Txwy => 4,
-            YoStarEN => -11,
-            YoStarJP | YoStarKR => 5,
-        }
-    }
-}
-
-impl AsRef<str> for ClientType {
-    fn as_ref(&self) -> &str {
-        match self {
-            ClientType::Official => "Official",
-            ClientType::Bilibili => "Bilibili",
-            ClientType::Txwy => "txwy",
-            ClientType::YoStarEN => "YoStarEN",
-            ClientType::YoStarJP => "YoStarJP",
-            ClientType::YoStarKR => "YoStarKR",
-        }
-    }
-}
-
 impl std::fmt::Display for ClientType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_ref())
+        f.write_str(self.to_str())
     }
 }
 
 impl std::str::FromStr for ClientType {
-    type Err = Error;
+    type Err = UnknownClientTypeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "Official" | "" => Ok(ClientType::Official),
-            "Bilibili" => Ok(ClientType::Bilibili),
-            "Txwy" | "TXWY" | "txwy" => Ok(ClientType::Txwy),
-            "YoStarEN" => Ok(ClientType::YoStarEN),
-            "YoStarJP" => Ok(ClientType::YoStarJP),
-            "YoStarKR" => Ok(ClientType::YoStarKR),
-            _ => Err(Error::UnknownClientType),
-        }
+        Self::from_str_opt(s).ok_or(UnknownClientTypeError)
     }
 }
 
-impl TryFrom<&str> for ClientType {
-    type Error = Error;
-
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        s.parse()
-    }
-}
-
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug)]
-pub enum Error {
-    UnknownClientType,
-}
+pub struct UnknownClientTypeError;
 
-impl std::fmt::Display for Error {
+impl std::fmt::Display for UnknownClientTypeError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Error::UnknownClientType => f.write_str("Unknown client type"),
-        }
+        write!(f, "Unknown client type")
     }
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for UnknownClientTypeError {}
 
 #[cfg(test)]
 mod tests {
-    use crate::assert_matches;
-
     use super::*;
 
     use serde_test::{assert_de_tokens, assert_de_tokens_error, Token};
 
     impl ClientType {
-        fn to_token(self) -> Token {
-            match self {
-                ClientType::Official => Token::Str("Official"),
-                ClientType::Bilibili => Token::Str("Bilibili"),
-                ClientType::Txwy => Token::Str("txwy"),
-                ClientType::YoStarEN => Token::Str("YoStarEN"),
-                ClientType::YoStarJP => Token::Str("YoStarJP"),
-                ClientType::YoStarKR => Token::Str("YoStarKR"),
-            }
+        const fn to_token(self) -> Token {
+            Token::Str(self.to_str())
         }
     }
 
     #[test]
     fn deserialize() {
-        assert_de_tokens(&ClientType::Official, &[ClientType::Official.to_token()]);
-        assert_de_tokens(&ClientType::Bilibili, &[ClientType::Bilibili.to_token()]);
-        assert_de_tokens(&ClientType::Txwy, &[ClientType::Txwy.to_token()]);
-        assert_de_tokens(&ClientType::YoStarEN, &[ClientType::YoStarEN.to_token()]);
-        assert_de_tokens(&ClientType::YoStarJP, &[ClientType::YoStarJP.to_token()]);
-        assert_de_tokens(&ClientType::YoStarKR, &[ClientType::YoStarKR.to_token()]);
+        assert_de_tokens(&Official, &[Official.to_token()]);
+        assert_de_tokens(&Bilibili, &[Bilibili.to_token()]);
+        assert_de_tokens(&Txwy, &[Txwy.to_token()]);
+        assert_de_tokens(&YoStarEN, &[YoStarEN.to_token()]);
+        assert_de_tokens(&YoStarJP, &[YoStarJP.to_token()]);
+        assert_de_tokens(&YoStarKR, &[YoStarKR.to_token()]);
 
         assert_de_tokens_error::<ClientType>(
             &[Token::Str("UnknownClientType")],
-            "Unknown client type",
+            "unknown variant `UnknownClientType`, expected one of \
+            `Official`, `Bilibili`, `txwy`, `YoStarEN`, `YoStarJP`, `YoStarKR`",
         );
 
         assert_de_tokens_error::<ClientType>(
@@ -166,74 +173,62 @@ mod tests {
 
     #[test]
     fn parse() {
-        assert_matches!("".parse::<ClientType>().unwrap(), ClientType::Official);
-        assert_matches!(
-            "Official".parse::<ClientType>().unwrap(),
-            ClientType::Official
-        );
-        assert_matches!(
-            "Bilibili".parse::<ClientType>().unwrap(),
-            ClientType::Bilibili
-        );
-        assert_matches!("txwy".parse::<ClientType>().unwrap(), ClientType::Txwy);
-        assert_matches!("TXWY".parse::<ClientType>().unwrap(), ClientType::Txwy);
-        assert_matches!(
-            "YoStarEN".parse::<ClientType>().unwrap(),
-            ClientType::YoStarEN
-        );
-        assert_matches!(
-            "YoStarJP".parse::<ClientType>().unwrap(),
-            ClientType::YoStarJP
-        );
-        assert_matches!(
-            "YoStarKR".parse::<ClientType>().unwrap(),
-            ClientType::YoStarKR
+        assert_eq!("".parse(), Ok(Official));
+        assert_eq!("Official".parse(), Ok(Official));
+        assert_eq!("Bilibili".parse(), Ok(Bilibili));
+        assert_eq!("txwy".parse(), Ok(Txwy));
+        assert_eq!("TXWY".parse(), Ok(Txwy));
+        assert_eq!("YoStarEN".parse(), Ok(YoStarEN));
+        assert_eq!("YoStarJP".parse(), Ok(YoStarJP));
+        assert_eq!("YoStarKR".parse(), Ok(YoStarKR));
+        assert_eq!(
+            "UnknownClientType".parse::<ClientType>(),
+            Err(UnknownClientTypeError),
         );
 
-        assert_matches!(
-            "UnknownClientType".parse::<ClientType>().unwrap_err(),
-            Error::UnknownClientType,
-        );
+        assert_eq!(UnknownClientTypeError.to_string(), "Unknown client type",)
     }
 
     #[test]
-    fn client_to_resource() {
-        assert_eq!(ClientType::Official.resource(), None);
-        assert_eq!(ClientType::Bilibili.resource(), None);
-        assert_eq!(ClientType::Txwy.resource(), Some("txwy"));
-        assert_eq!(ClientType::YoStarEN.resource(), Some("YoStarEN"));
-        assert_eq!(ClientType::YoStarJP.resource(), Some("YoStarJP"));
-        assert_eq!(ClientType::YoStarKR.resource(), Some("YoStarKR"));
+    fn to_resource() {
+        assert_eq!(Official.resource(), None);
+        assert_eq!(Bilibili.resource(), None);
+        assert_eq!(Txwy.resource(), Some("txwy"));
+        assert_eq!(YoStarEN.resource(), Some("YoStarEN"));
+        assert_eq!(YoStarJP.resource(), Some("YoStarJP"));
+        assert_eq!(YoStarKR.resource(), Some("YoStarKR"));
     }
 
     #[test]
     #[cfg(target_os = "macos")]
-    fn client_to_app() {
-        assert_eq!(ClientType::Official.app(), "明日方舟");
-        assert_eq!(ClientType::Bilibili.app(), "明日方舟");
-        assert_eq!(ClientType::Txwy.app(), "明日方舟");
-        assert_eq!(ClientType::YoStarEN.app(), "Arknights");
-        assert_eq!(ClientType::YoStarJP.app(), "アークナイツ");
-        assert_eq!(ClientType::YoStarKR.app(), "명일방주");
+    fn to_app() {
+        assert_eq!(Official.app(), "明日方舟");
+        assert_eq!(Bilibili.app(), "明日方舟");
+        assert_eq!(Txwy.app(), "明日方舟");
+        assert_eq!(YoStarEN.app(), "Arknights");
+        assert_eq!(YoStarJP.app(), "アークナイツ");
+        assert_eq!(YoStarKR.app(), "명일방주");
     }
 
     #[test]
-    fn client_to_server_time_zone() {
-        assert_eq!(ClientType::Official.server_time_zone(), 4);
-        assert_eq!(ClientType::Bilibili.server_time_zone(), 4);
-        assert_eq!(ClientType::Txwy.server_time_zone(), 4);
-        assert_eq!(ClientType::YoStarEN.server_time_zone(), -11);
-        assert_eq!(ClientType::YoStarJP.server_time_zone(), 5);
-        assert_eq!(ClientType::YoStarKR.server_time_zone(), 5);
+    fn to_server_time_zone() {
+        assert_eq!(Official.server_time_zone(), 4);
+        assert_eq!(Bilibili.server_time_zone(), 4);
+        assert_eq!(Txwy.server_time_zone(), 4);
+        assert_eq!(YoStarEN.server_time_zone(), -11);
+        assert_eq!(YoStarJP.server_time_zone(), 5);
+        assert_eq!(YoStarKR.server_time_zone(), 5);
     }
 
     #[test]
-    fn client_to_string() {
-        assert_eq!(ClientType::Official.to_string(), "Official");
-        assert_eq!(ClientType::Bilibili.to_string(), "Bilibili");
-        assert_eq!(ClientType::Txwy.to_string(), "txwy");
-        assert_eq!(ClientType::YoStarEN.to_string(), "YoStarEN");
-        assert_eq!(ClientType::YoStarJP.to_string(), "YoStarJP");
-        assert_eq!(ClientType::YoStarKR.to_string(), "YoStarKR");
+    fn to_str() {
+        assert_eq!(Official.to_str(), "Official");
+        assert_eq!(Bilibili.to_str(), "Bilibili");
+        assert_eq!(Txwy.to_str(), "txwy");
+        assert_eq!(YoStarEN.to_str(), "YoStarEN");
+        assert_eq!(YoStarJP.to_str(), "YoStarJP");
+        assert_eq!(YoStarKR.to_str(), "YoStarKR");
+
+        assert_eq!(Official.to_string(), "Official");
     }
 }

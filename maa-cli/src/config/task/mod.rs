@@ -10,6 +10,7 @@ use crate::{dirs, object, value::MAAValue};
 use std::path::PathBuf;
 
 use anyhow::Context;
+use log::warn;
 use maa_sys::TaskType;
 use serde::Deserialize;
 
@@ -171,16 +172,16 @@ impl TaskConfig {
         self.tasks.push(task);
     }
 
-    /// TODO: this function is not ideal, it should be refactored
     pub fn init(&self) -> anyhow::Result<InitializedTaskConfig> {
         let mut startup = self.startup;
         let mut closedown = self.closedown;
         let mut client_type = self.client_type;
 
-        let mut prepend_startup = startup.is_some_and(|v| v);
-        let mut append_closedown = closedown.is_some_and(|v| v);
-
         let mut tasks: Vec<InitializedTask> = Vec::new();
+        let mut prepend_startup = startup.unwrap_or(false);
+        let mut append_closedown = closedown.unwrap_or(false);
+
+        use TaskType::*;
 
         for task in self.tasks.iter() {
             if !task.is_active() {
@@ -190,8 +191,9 @@ impl TaskConfig {
             let task_type = task.task_type();
             let mut params = task.params().init()?;
 
+            // If startup task is not enabled, enable it automatically
             match task_type {
-                TaskType::StartUp => {
+                StartUp => {
                     let start_game =
                         params.get_or("enable", true) && params.get_or("start_game_enabled", false);
 
@@ -206,25 +208,9 @@ impl TaskConfig {
                         _ => {}
                     }
 
-                    match (params.get("client_type"), client_type) {
-                        // If client_type in task is set, set client type in config automatically
-                        (Some(t), None) => {
-                            client_type = Some(
-                                t.as_str()
-                                    .context("client_type must be a string")?
-                                    .parse()?,
-                            );
-                        }
-                        // If client type in config is set, set client_type in task automatically
-                        (None, Some(t)) => {
-                            params.insert("client_type", t.to_string());
-                        }
-                        _ => {}
-                    }
-
                     prepend_startup = false;
                 }
-                TaskType::CloseDown => {
+                CloseDown => {
                     match (params.get_or("enable", true), closedown) {
                         // If closedown task is enabled, enable closedown automatically
                         (true, None) => {
@@ -237,20 +223,6 @@ impl TaskConfig {
                         _ => {}
                     }
 
-                    match (params.get("client_type"), client_type) {
-                        (Some(t), None) => {
-                            client_type = Some(
-                                t.as_str()
-                                    .context("client_type must be a string")?
-                                    .parse()?,
-                            );
-                        }
-                        (None, Some(t)) => {
-                            params.insert("client_type", t.to_string());
-                        }
-                        _ => {}
-                    }
-
                     append_closedown = false;
                 }
                 _ => {
@@ -258,16 +230,49 @@ impl TaskConfig {
                     // and the filename parameter is not an absolute path,
                     // it will be treated as a relative path to the config directory
                     // and will be converted to an absolute path.
-                    if let Some(v) = params.get("filename") {
-                        let file: PathBuf = v.as_str().context("filename must be a string")?.into();
+                    if let Some(v) = params.get_mut("filename") {
+                        let file = PathBuf::from(v.as_str().context("filename must be a string")?);
                         let sub_dir = task_type.as_ref().to_lowercase();
                         if let Some(path) = dirs::abs_config(file, Some(sub_dir)) {
-                            params.insert("filename", path.to_str().context("Invilid UTF-8")?)
+                            *v = path.to_str().context("Invilid UTF-8")?.into();
                         }
                     }
                 }
             }
+
+            let task_client_type = params.get("client_type").and_then(|v| v.as_str());
+
+            // Get client type from task params
+            match (task_client_type, client_type) {
+                (Some(t), None) => {
+                    client_type = Some(t.parse()?);
+                }
+                (Some(t1), Some(t2)) if t1 != t2.to_string() => {
+                    warn!(
+                        "Task {} has client_type {}, but the client type is set to {} in previous tasks or config",
+                        task.name.as_deref().unwrap_or_else(|| task_type.to_str()),
+                        t1,
+                        t2,
+                    )
+                }
+                _ => {}
+            }
+
             tasks.push(InitializedTask::new(task.name.clone(), task_type, params));
+        }
+
+        // If client type is set in any task, set client type in all tasks automatically
+        for task in tasks.iter_mut() {
+            let task_type = task.task_type();
+            let params = &mut task.params;
+
+            // Set client type in task automatically
+            match (task_type, client_type) {
+                (StartUp | Fight | CloseDown, Some(t)) => {
+                    params.insert("client_type", t.to_string());
+                }
+                _ => {}
+            }
         }
 
         let client_type = client_type.unwrap_or_default();
@@ -557,9 +562,9 @@ mod tests {
                         "client_type" if "start_game_enabled" == true =>
                             SelectD::<String>::new(
                                 vec![
-                                    Official.as_ref(),
-                                    YoStarEN.as_ref(),
-                                    YoStarJP.as_ref(),
+                                    Official.to_str(),
+                                    YoStarEN.to_str(),
+                                    YoStarJP.to_str(),
                                 ],
                                 None,
                                 Some("a client type"),
@@ -681,6 +686,204 @@ mod tests {
 
         #[test]
         fn init() {
+            // Default client type is Official
+            assert_eq!(
+                TaskConfig {
+                    client_type: None,
+                    startup: None,
+                    closedown: None,
+                    tasks: vec![],
+                }
+                .init()
+                .unwrap(),
+                InitializedTaskConfig {
+                    client_type: ClientType::Official,
+                    start_app: false,
+                    close_app: false,
+                    tasks: vec![],
+                }
+            );
+
+            // No active tasks will be skipped
+            assert_eq!(
+                TaskConfig {
+                    client_type: None,
+                    startup: None,
+                    closedown: None,
+                    tasks: vec![Task::new(
+                        None,
+                        StartUp,
+                        object!("start_game_enabled" => true),
+                        Strategy::default(),
+                        vec![TaskVariant {
+                            condition: Condition::Not {
+                                condition: Box::new(Condition::Always),
+                            },
+                            params: object!(),
+                        }],
+                    )],
+                }
+                .init()
+                .unwrap(),
+                InitializedTaskConfig {
+                    client_type: ClientType::Official,
+                    start_app: false,
+                    close_app: false,
+                    tasks: vec![],
+                }
+            );
+
+            assert_eq!(
+                TaskConfig {
+                    client_type: None,
+                    startup: None,
+                    closedown: None,
+                    tasks: vec![Task::new_with_default(
+                        StartUp,
+                        object!(
+                            "start_game_enabled" => true,
+                            "client_type" => "YoStarEN",
+                        )
+                    )],
+                }
+                .init()
+                .unwrap(),
+                InitializedTaskConfig {
+                    client_type: ClientType::YoStarEN,
+                    start_app: true,
+                    close_app: false,
+                    tasks: vec![InitializedTask::new_no_name(
+                        StartUp,
+                        object!(
+                            "start_game_enabled" => true,
+                            "client_type" => "YoStarEN",
+                        )
+                    )]
+                }
+            );
+
+            assert_eq!(
+                TaskConfig {
+                    client_type: None,
+                    startup: None,
+                    closedown: None,
+                    tasks: vec![Task::new_with_default(
+                        StartUp,
+                        object!(
+                            "start_game_enabled" => false,
+                            "client_type" => "YoStarEN",
+                        )
+                    )],
+                }
+                .init()
+                .unwrap(),
+                InitializedTaskConfig {
+                    client_type: ClientType::YoStarEN,
+                    start_app: false,
+                    close_app: false,
+                    tasks: vec![InitializedTask::new_no_name(
+                        StartUp,
+                        object!(
+                            "start_game_enabled" => false,
+                            "client_type" => "YoStarEN",
+                        )
+                    )]
+                }
+            );
+
+            // Process CloseDown task
+            assert_eq!(
+                TaskConfig {
+                    client_type: None,
+                    startup: None,
+                    closedown: None,
+                    tasks: vec![Task::new_with_default(
+                        CloseDown,
+                        object!("client_type" => "YoStarEN")
+                    )],
+                }
+                .init()
+                .unwrap(),
+                InitializedTaskConfig {
+                    client_type: ClientType::YoStarEN,
+                    start_app: false,
+                    close_app: true,
+                    tasks: vec![InitializedTask::new_no_name(
+                        CloseDown,
+                        object!("client_type" => "YoStarEN")
+                    )]
+                }
+            );
+
+            assert_eq!(
+                TaskConfig {
+                    client_type: None,
+                    startup: None,
+                    closedown: None,
+                    tasks: vec![Task::new_with_default(
+                        CloseDown,
+                        object!(
+                            "enable" => false,
+                            "client_type" => "YoStarEN",
+                        )
+                    )],
+                }
+                .init()
+                .unwrap(),
+                InitializedTaskConfig {
+                    client_type: ClientType::YoStarEN,
+                    start_app: false,
+                    close_app: false,
+                    tasks: vec![InitializedTask::new_no_name(
+                        CloseDown,
+                        object!(
+                            "enable" => false,
+                            "client_type" => "YoStarEN",
+                        )
+                    )]
+                }
+            );
+
+            assert_eq!(
+                TaskConfig {
+                    client_type: None,
+                    startup: None,
+                    closedown: None,
+                    tasks: vec![Task::new_with_default(CloseDown, object!())],
+                }
+                .init()
+                .unwrap(),
+                InitializedTaskConfig {
+                    client_type: ClientType::Official,
+                    start_app: false,
+                    close_app: true,
+                    tasks: vec![InitializedTask::new_no_name(CloseDown, object!())]
+                }
+            );
+
+            assert_eq!(
+                TaskConfig {
+                    client_type: None,
+                    startup: None,
+                    closedown: None,
+                    tasks: vec![Task::new_with_default(
+                        Fight,
+                        object!("client_type" => "YoStarEN")
+                    )],
+                }
+                .init()
+                .unwrap(),
+                InitializedTaskConfig {
+                    client_type: ClientType::YoStarEN,
+                    start_app: false,
+                    close_app: false,
+                    tasks: vec![InitializedTask::new_no_name(
+                        Fight,
+                        object!("client_type" => "YoStarEN")
+                    )]
+                }
+            );
+
             assert_eq!(
                 TaskConfig {
                     client_type: None,
@@ -690,8 +893,8 @@ mod tests {
                         Task::new_with_default(
                             StartUp,
                             object!(
-                                "client_type" => "Official",
                                 "start_game_enabled" => true,
+                                "client_type" => "Official",
                             ),
                         ),
                         Task::new_with_default(Fight, object!("stage" => "1-7")),
@@ -712,7 +915,13 @@ mod tests {
                                 "start_game_enabled" => true,
                             )
                         ),
-                        InitializedTask::new_no_name(Fight, object!("stage" => "1-7")),
+                        InitializedTask::new_no_name(
+                            Fight,
+                            object!(
+                                "stage" => "1-7",
+                                "client_type" => "Official",
+                            )
+                        ),
                         InitializedTask::new_no_name(
                             CloseDown,
                             object!("client_type" => "Official")
@@ -747,7 +956,13 @@ mod tests {
                                 "start_game_enabled" => true,
                             )
                         ),
-                        InitializedTask::new_no_name(Fight, object!("stage" => "1-7")),
+                        InitializedTask::new_no_name(
+                            Fight,
+                            object!(
+                                "stage" => "1-7",
+                                "client_type" => "Official",
+                            )
+                        ),
                         InitializedTask::new_no_name(
                             CloseDown,
                             object!(
@@ -810,7 +1025,13 @@ mod tests {
                                 "client_type" => "YoStarEN",
                             )
                         ),
-                        InitializedTask::new_no_name(Fight, object!("stage" => "1-7")),
+                        InitializedTask::new_no_name(
+                            Fight,
+                            object!(
+                                "stage" => "1-7",
+                                "client_type" => "YoStarEN",
+                            )
+                        ),
                         InitializedTask::new_no_name(
                             CloseDown,
                             object!("client_type" => "YoStarEN"),
