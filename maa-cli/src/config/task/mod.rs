@@ -1035,7 +1035,41 @@ mod tests {
                         ),
                     ]
                 }
-            )
+            );
+
+            // Filename will be converted to absolute path
+            assert_eq!(
+                TaskConfig {
+                    client_type: None,
+                    startup: None,
+                    closedown: None,
+                    tasks: vec![
+                        Task::new_with_default(Infrast, object!("filename" => "daily.json")),
+                        Task::new_with_default(Infrast, object!("filename" => "/tmp/daily.json")),
+                    ],
+                }
+                .init()
+                .unwrap(),
+                InitializedTaskConfig {
+                    client_type: ClientType::Official,
+                    start_app: false,
+                    close_app: false,
+                    tasks: vec![
+                        InitializedTask::new_no_name(
+                            Infrast,
+                            object!("filename" => dirs::abs_config("daily.json", Some("infrast"))
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .to_string())
+                        ),
+                        InitializedTask::new_no_name(
+                            Infrast,
+                            object!("filename" => "/tmp/daily.json")
+                        )
+                    ]
+                }
+            );
         }
 
         #[test]
