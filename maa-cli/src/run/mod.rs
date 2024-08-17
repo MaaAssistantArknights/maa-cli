@@ -174,9 +174,11 @@ where
     // Launch external app like PlayCover or Emulator
     // Only support PlayCover on macOS now, may support more in the future
     let app: Option<Box<dyn external::ExternalApp>> = match asst_config.connection.preset() {
-        crate::config::asst::Preset::PlayCover if task_config.start_app => Some(Box::new(
-            external::PlayCoverApp::new(task_config.client_type, address.as_ref()),
-        )),
+        #[cfg(target_os = "macos")]
+        crate::config::asst::Preset::PlayCover => Some(Box::new(external::PlayCoverApp::new(
+            task_config.client_type,
+            address.as_ref(),
+        ))),
         _ => None,
     };
 
