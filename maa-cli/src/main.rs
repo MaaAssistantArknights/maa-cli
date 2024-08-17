@@ -80,7 +80,9 @@ fn main() -> Result<()> {
             account,
             common,
         } => run::run(|_| run::preset::startup(client, account), common)?,
-        Command::CloseDown { common } => run::run(|_| run::preset::closedown(), common)?,
+        Command::CloseDown { client, common } => {
+            run::run(|_| run::preset::closedown(client), common)?
+        }
         Command::Fight {
             stage,
             medicine,
