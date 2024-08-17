@@ -25,9 +25,6 @@ use log::{debug, warn};
 use maa_sys::Assistant;
 use signal_hook::consts::TERM_SIGNALS;
 
-#[cfg(target_os = "macos")]
-use tokio::runtime::Runtime;
-
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Args, Default)]
 pub struct CommonArgs {
@@ -183,7 +180,7 @@ where
     };
 
     if !args.dry_run {
-        let rt = Runtime::new().context("Failed to create tokio runtime")?;
+        let rt = tokio::runtime::Runtime::new().context("Failed to create tokio runtime")?;
 
         // Startup external app
         if let (Some(app), true) = (app.as_deref(), task_config.start_app) {
