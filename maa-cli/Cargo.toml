@@ -76,6 +76,7 @@ tar = { version = "0.4.40", optional = true }
 
 # Logging support
 log = "0.4.20"
+async-trait = "0.1.81"
 [dependencies.env_logger]
 version = "0.11"
 default-features = false

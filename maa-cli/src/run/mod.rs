@@ -4,8 +4,7 @@
 mod callback;
 use callback::summary;
 
-#[cfg(target_os = "macos")]
-mod playcover;
+mod external;
 
 pub mod preset;
 
@@ -170,32 +169,28 @@ where
     }
 
     // Prepare connection
-    let (adb, addr, config) = asst_config.connection.connect_args();
+    let (adb_path, address, config) = asst_config.connection.connect_args();
 
     // Launch external app like PlayCover or Emulator
     // Only support PlayCover on macOS now, may support more in the future
-    #[cfg(target_os = "macos")]
-    let app = match asst_config.connection.preset() {
-        crate::config::asst::Preset::PlayCover => playcover::PlayCoverApp::new(
-            task_config.start_app,
-            task_config.close_app,
-            task_config.client_type,
-            addr.as_ref(),
-        ),
+    let app: Option<Box<dyn external::ExternalApp>> = match asst_config.connection.preset() {
+        crate::config::asst::Preset::PlayCover if task_config.start_app => Some(Box::new(
+            external::PlayCoverApp::new(task_config.client_type, address.as_ref()),
+        )),
         _ => None,
     };
 
     if !args.dry_run {
-        // Startup external app
-        #[cfg(target_os = "macos")]
         let rt = Runtime::new().context("Failed to create tokio runtime")?;
-        #[cfg(target_os = "macos")]
-        if let Some(app) = app.as_ref() {
-            rt.block_on(app.open())?;
+
+        // Startup external app
+        if let (Some(app), true) = (app.as_deref(), task_config.start_app) {
+            rt.block_on(app.open())
+                .context("Failed to open external app")?;
         }
 
         // Connect to game or emulator
-        asst.async_connect(adb, addr.as_ref(), config, true)?;
+        asst.async_connect(adb_path, address.as_ref(), config, true)?;
 
         asst.start()?;
 
@@ -209,9 +204,9 @@ where
         asst.stop()?;
 
         // Close external app
-        #[cfg(target_os = "macos")]
-        if let Some(app) = app.as_ref() {
-            rt.block_on(app.close())?;
+        if let (Some(app), true) = (app.as_deref(), task_config.close_app) {
+            rt.block_on(app.close())
+                .context("Failed to close external app")?;
         }
     }
 
