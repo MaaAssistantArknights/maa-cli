@@ -49,6 +49,7 @@ anyhow = "1"
 signal-hook = "0.3.17"
 dunce = "1.0.4"
 sys-locale = "0.3.1"
+async-trait = "0.1.81"
 prettytable = { version = "0.10.0", default-features = false }
 
 clap = { version = "4.4", features = ["derive"] }
@@ -76,7 +77,7 @@ tar = { version = "0.4.40", optional = true }
 
 # Logging support
 log = "0.4.20"
-async-trait = "0.1.81"
+
 [dependencies.env_logger]
 version = "0.11"
 default-features = false
