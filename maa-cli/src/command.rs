@@ -126,6 +126,12 @@ pub(crate) enum Command {
     /// Close game client
     #[command(name = "closedown")]
     CloseDown {
+        /// Client type of the game client
+        ///
+        /// The client type of the game client, used to close the game client.
+        /// If not specified, default to the Official client.
+        #[arg(default_value = "Official")]
+        client: config::task::ClientType,
         #[command(flatten)]
         common: run::CommonArgs,
     },
@@ -594,6 +600,15 @@ mod test {
         assert_matches!(
             parse_from(["maa", "closedown"]).command,
             Command::CloseDown {
+                client: config::task::ClientType::Official,
+                common: run::CommonArgs { .. }
+            }
+        );
+
+        assert_matches!(
+            parse_from(["maa", "closedown", "YoStarEN"]).command,
+            Command::CloseDown {
+                client: config::task::ClientType::YoStarEN,
                 common: run::CommonArgs { .. }
             }
         );
