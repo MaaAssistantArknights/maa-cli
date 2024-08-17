@@ -82,7 +82,6 @@ pub struct ConnectionConfig {
 }
 
 impl ConnectionConfig {
-    #[cfg(target_os = "macos")]
     pub fn preset(&self) -> Preset {
         self.preset
     }

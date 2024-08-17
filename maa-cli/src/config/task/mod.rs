@@ -313,9 +313,7 @@ impl super::FromFile for TaskConfig {}
 #[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct InitializedTaskConfig {
     pub client_type: ClientType,
-    #[allow(dead_code)]
     pub start_app: bool,
-    #[allow(dead_code)]
     pub close_app: bool,
     pub tasks: Vec<InitializedTask>,
 }
