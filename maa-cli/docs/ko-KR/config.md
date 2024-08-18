@@ -295,7 +295,7 @@ cpu_ocr = false
 gpu_ocr = 1
 
 [instance_options]
-touch_mode = "MAATouch"
+touch_mode = "MaaTouch"
 deployment_with_pause = false
 adb_lite_enabled = false
 kill_adb_on_exit = false
@@ -356,7 +356,7 @@ gpu_ocr = 1 # GPU OCR을 사용할 때 사용하는 GPU ID, 이 값이 비어 �
 
 ```toml
 [instance_options]
-touch_mode = "ADB" # 사용할 터치 모드, 가능한 값은 "ADB", "MiniTouch", "MAATouch", "MacPlayTools"
+touch_mode = "ADB" # 사용할 터치 모드, 가능한 값은 "ADB", "MiniTouch", "MaaTouch", "MacPlayTools"
 deployment_with_pause = false # 배포 시 게임을 일시 중지할지 여부
 adb_lite_enabled = false # adb-lite를 사용할지 여부
 kill_adb_on_exit = false # 종료 시 adb를 종료할지 여부
