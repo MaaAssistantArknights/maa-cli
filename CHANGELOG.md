@@ -1,5 +1,26 @@
 # Release Notes
 
+## Release 0.4.11
+
+### Features
+
+- Set `client_type` for `Fight` and `Closedown` automatically by [@wangl-cc](https://github.com/wangl-cc) in [#305](https://github.com/MaaAssistantArknights/maa-cli/pull/305)
+- Support client type for `Closedown` command by [@wangl-cc](https://github.com/wangl-cc) in [#309](https://github.com/MaaAssistantArknights/maa-cli/pull/309)
+
+### Bug Fixes
+
+- Remove resource mirror by [@wangl-cc](https://github.com/wangl-cc) in [#311](https://github.com/MaaAssistantArknights/maa-cli/pull/311)
+
+### Refactor
+
+- Generalize external app open/close by [@wangl-cc](https://github.com/wangl-cc) in [#308](https://github.com/MaaAssistantArknights/maa-cli/pull/308)
+
+### Documentation
+
+- Unified case of `MaaTouch` by [@wangl-cc](https://github.com/wangl-cc)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.4.10...v0.4.11>
+
 ## Release 0.4.10
 
 ### Features
