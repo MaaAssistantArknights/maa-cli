@@ -47,7 +47,6 @@ directories = "5"
 anyhow = "1"
 signal-hook = "0.3.17"
 dunce = "1.0.4"
-sys-locale = "0.3.1"
 async-trait = "0.1.81"
 prettytable = { version = "0.10.0", default-features = false }
 
