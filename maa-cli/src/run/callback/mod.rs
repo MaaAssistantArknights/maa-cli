@@ -131,6 +131,11 @@ fn process_connection_info(message: &Map<String, Value>) -> Option<()> {
             "Got UUID: {}",
             message.get("details")?.get("uuid")?.as_str()?
         ),
+        "ConnectFailed" => error!(
+            "Failed to connect to android device, {}, Please check your connect configuration: {}",
+            message.get("why")?.as_str()?,
+            serde_json::to_string_pretty(message.get("details")?).unwrap()
+        ),
         // Resolution
         "ResolutionGot" => debug!(
             "Got Resolution: {} × {}",
