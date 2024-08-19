@@ -266,7 +266,7 @@ impl TaskConfig {
 
         // If client type is set in any task, set client type in all tasks automatically
         for task in tasks.iter_mut() {
-            let task_type = task.task_type();
+            let task_type = task.task_type;
             let params = &mut task.params;
 
             // Set client type in task automatically
@@ -320,9 +320,9 @@ pub struct InitializedTaskConfig {
 
 #[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct InitializedTask {
-    name: Option<String>,
-    task_type: TaskType,
-    params: MAAValue,
+    pub name: Option<String>,
+    pub task_type: TaskType,
+    pub params: MAAValue,
 }
 
 impl InitializedTask {
@@ -338,16 +338,10 @@ impl InitializedTask {
         Self::new(None, task_type.into(), params)
     }
 
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
-    }
-
-    pub fn task_type(&self) -> TaskType {
-        self.task_type
-    }
-
-    pub fn params(&self) -> &MAAValue {
-        &self.params
+    pub fn name_or_default(&self) -> &str {
+        self.name
+            .as_deref()
+            .unwrap_or_else(|| self.task_type.to_str())
     }
 }
 
@@ -1110,9 +1104,16 @@ mod tests {
                 Fight,
                 object!("stage" => "1-7"),
             );
-            assert_eq!(task.name(), Some("Fight Daily"));
-            assert_eq!(task.task_type(), Fight);
-            assert_eq!(task.params(), &object!("stage" => "1-7"));
+            assert_eq!(task.name_or_default(), "Fight Daily");
+            assert_eq!(task.task_type, Fight);
+            assert_eq!(&task.params, &object!("stage" => "1-7"));
+            assert_eq!(task.name, Some(String::from("Fight Daily")));
+
+            let task = InitializedTask::new_no_name(Fight, object!("stage" => "1-7"));
+            assert_eq!(task.name_or_default(), "Fight");
+            assert_eq!(task.task_type, Fight);
+            assert_eq!(&task.params, &object!("stage" => "1-7"));
+            assert_eq!(task.name, None);
         }
     }
 }

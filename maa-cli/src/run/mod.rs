@@ -148,17 +148,24 @@ where
 
     // Register tasks to Assistant and prepare summary
     let mut task_summary = (!args.no_summary).then(summary::Summary::new);
-    for task in task_config.tasks.iter() {
-        let task_type = task.task_type();
-        let name = task.name().unwrap_or_else(|| task_type.as_ref());
-        let params = serde_json::to_string_pretty(task.params())?;
-        debug!("Adding task [{name}] with params: {params}");
+    for task in task_config.tasks {
+        let task_type = task.task_type;
+        let params = serde_json::to_string_pretty(&task.params)?;
+        debug!(
+            "Adding task [{}] with params: {params}",
+            task.name_or_default(),
+        );
         let id = asst
             .append_task(task_type, params.as_str())
-            .with_context(|| format!("Failed to add task {name} with params: {params}"))?;
+            .with_context(|| {
+                format!(
+                    "Failed to add task {} with params: {params}",
+                    task.name_or_default(),
+                )
+            })?;
 
         if let Some(s) = task_summary.as_mut() {
-            s.insert(id, Some(name.to_owned()), task_type);
+            s.insert(id, task.name.map(Into::into), task_type);
         }
     }
     if let Some(s) = task_summary {
