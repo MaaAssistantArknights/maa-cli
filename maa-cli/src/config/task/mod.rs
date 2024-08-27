@@ -264,18 +264,18 @@ impl TaskConfig {
             tasks.push(InitializedTask::new(task.name.clone(), task_type, params));
         }
 
+        let client_type = client_type.unwrap_or_default();
+
         // If client type is set in any task, set client type in all tasks automatically
         for task in tasks.iter_mut() {
             let task_type = task.task_type;
             let params = &mut task.params;
 
             // Set client type in task automatically
-            if let (StartUp | Fight | CloseDown, Some(t)) = (task_type, client_type) {
-                params.insert("client_type", t.to_string());
+            if matches!(task_type, StartUp | Fight | CloseDown) {
+                params.insert("client_type", client_type.to_str());
             }
         }
-
-        let client_type = client_type.unwrap_or_default();
 
         if prepend_startup {
             tasks.insert(
@@ -851,7 +851,10 @@ mod tests {
                     client_type: Official,
                     start_app: false,
                     close_app: true,
-                    tasks: vec![InitializedTask::new_no_name(CloseDown, object!())]
+                    tasks: vec![InitializedTask::new_no_name(
+                        CloseDown,
+                        object!("client_type" => "Official")
+                    )]
                 }
             );
 
@@ -989,7 +992,13 @@ mod tests {
                                 "start_game_enabled" => true,
                             )
                         ),
-                        InitializedTask::new_no_name(Fight, object!("stage" => "1-7")),
+                        InitializedTask::new_no_name(
+                            Fight,
+                            object!(
+                                "stage" => "1-7",
+                                "client_type" => "Official",
+                            )
+                        ),
                         InitializedTask::new_no_name(
                             CloseDown,
                             object!("client_type" => "Official"),
