@@ -1,13 +1,9 @@
-use crate::{
-    config::task::{Task, TaskConfig},
-    object,
-    value::userinput::{BoolInput, Input, SelectD, ValueWithDesc},
-};
+use super::MAAValue;
 
-use anyhow::Result;
+use anyhow::bail;
 use clap::ValueEnum;
-use maa_sys::TaskType::Roguelike;
 
+#[repr(i8)]
 #[cfg_attr(test, derive(PartialEq, Debug))]
 #[derive(Clone, Copy)]
 pub enum Theme {
@@ -18,7 +14,7 @@ pub enum Theme {
 }
 
 impl Theme {
-    fn to_str(self) -> &'static str {
+    const fn to_str(self) -> &'static str {
         match self {
             Self::Phantom => "Phantom",
             Self::Mizuki => "Mizuki",
@@ -38,94 +34,409 @@ impl ValueEnum for Theme {
     }
 }
 
-pub fn roguelike(theme: Theme) -> Result<TaskConfig> {
-    let mut task_config = TaskConfig::new();
+#[derive(clap::Args)]
+pub struct RoguelikeParams {
+    /// Theme of the roguelike
+    theme: Theme,
+    /// Mode of the roguelike
+    ///
+    /// 0: mode for score;
+    /// 1: mode for ingots;
+    /// 2: combination of 0 and 1, deprecated;
+    /// 3: mode for pass, not implemented yet;
+    /// 4: mode that exist after 3rd floor;
+    /// 5: mode for collapsal paradigms, only for Sami, use with `expected_collapsal_paradigms`
+    #[arg(long, default_value = "0")]
+    mode: i32,
 
-    let params = object!(
-        "theme" => theme.to_str(),
-        "mode" => SelectD::<i32>::new([
-            ValueWithDesc::new(0, Some("Clear as many stages as possible with stable strategy")),
-            ValueWithDesc::new(1, Some("Invest ingots and exits after first level")),
-            ValueWithDesc::new(3, Some("Clear as many stages as possible with agrressive strategy")),
-            ValueWithDesc::new(4, Some("Exit after entering 3rd level")),
-        ], Some(1), Some("Roguelike mode"), false).unwrap(),
-        "start_count" => Input::<i32>::new(Some(999), Some("number of times to start a new run")),
-        "investment_disabled" => BoolInput::new(Some(false), Some("disable investment")),
-        "investments_count" if "investment_disabled" == false =>
-            Input::<i32>::new(Some(999), Some("number of times to invest")),
-        "stop_when_investment_full" if "investment_disabled" == false =>
-            BoolInput::new(Some(false), Some("stop when investment is full")),
-        "squad" => Input::<String>::new(None, Some("squad name")),
-        "roles" => Input::<String>::new(None, Some("roles")),
-        "core_char" => SelectD::<String>::new(
-            ["百炼嘉维尔", "焰影苇草", "锏", "维什戴尔"],
-            None,
-            Some("core operator"),
-            true,
-        ).unwrap(),
-        "use_support" => BoolInput::new(Some(false), Some("use support operator")),
-        "use_nonfriend_support" if "use_support" == true =>
-            BoolInput::new(Some(false), Some("use non-friend support operator")),
-        "refresh_trader_with_dice" if "theme" == "Mizuki" =>
-            BoolInput::new(Some(false), Some("refresh trader with dice")),
-    );
+    // TODO: input localized names, maybe during initialization of tasks
 
-    task_config.push(Task::new_with_default(Roguelike, params));
+    // Start related parameters
+    /// Squad to start with in Chinese, e.g. "指挥分队" (default), "后勤分队"
+    #[arg(long)]
+    squad: Option<String>,
+    /// Starting core operator in Chinese, e.g. "维什戴尔"
+    #[arg(long)]
+    core_char: Option<String>,
+    /// Starting operators recruitment combination in Chinese, e.g. "取长补短", "先手必胜" (default)
+    #[arg(long)]
+    roles: Option<String>,
 
-    Ok(task_config)
+    /// Stop after given count, if not given, never stop
+    #[arg(long)]
+    start_count: Option<i32>,
+
+    // Investment related parameters
+    /// Disable investment
+    #[arg(long)]
+    disable_investment: bool,
+    /// Try to gain more score in investment mode
+    ///
+    /// By default, some actions will be skipped in investment mode to save time.
+    /// If this option is enabled, try to gain exp score in investment mode.
+    #[arg(long)]
+    investment_with_more_score: bool,
+    /// Stop exploration investment reaches given count
+    #[arg(long)]
+    investments_count: Option<i32>,
+    /// Do not stop exploration when investment is full
+    #[arg(long)]
+    no_stop_when_investment_full: bool,
+
+    // Support related parameters
+    /// Use support operator
+    #[arg(long)]
+    use_support: bool,
+    /// Use non-friend support operator
+    #[arg(long)]
+    use_nonfriend_support: bool,
+
+    // Elite related parameters
+    /// Start with elite two
+    #[arg(long)]
+    start_with_elite_two: bool,
+    /// Only start with elite two
+    #[arg(long)]
+    only_start_with_elite_two: bool,
+
+    /// Stop exploration before final boss
+    #[arg(long)]
+    stop_at_final_boss: bool,
+
+    // Mizuki specific parameters
+    /// Whether to refresh trader with dice (only available in Mizuki theme)
+    #[arg(long)]
+    refresh_trader_with_dice: bool,
+
+    // Sami specific parameters
+    // Foldartal related parameters
+    /// Whether to use Foldartal in Sami theme
+    #[arg(long)]
+    use_foldartal: bool,
+    /// A list of expected Foldartal to be started with
+    #[arg(short = 'F', long)]
+    start_foldartals: Vec<String>,
+    /// A list of expected collapsal paradigms
+    #[arg(short = 'P', long)]
+    expected_collapsal_paradigms: Vec<String>,
+}
+
+impl super::ToTaskType for RoguelikeParams {
+    fn to_task_type(&self) -> super::TaskType {
+        super::TaskType::Roguelike
+    }
+}
+
+impl TryFrom<RoguelikeParams> for MAAValue {
+    type Error = anyhow::Error;
+
+    fn try_from(params: RoguelikeParams) -> Result<Self, Self::Error> {
+        let mut value = MAAValue::new();
+
+        let theme = params.theme;
+        let mode = params.mode;
+
+        match mode {
+            5 if !matches!(theme, Theme::Sami) => {
+                bail!("Mode 5 is only available in Sami theme");
+            }
+            0..=5 => {}
+            _ => bail!("Mode must be in range between 0 and 5"),
+        }
+
+        value.insert("theme", params.theme.to_str());
+        value.insert("mode", params.mode);
+
+        value.maybe_insert("squad", params.squad);
+        value.maybe_insert("roles", params.roles);
+        value.maybe_insert("core_char", params.core_char);
+
+        value.maybe_insert("start_count", params.start_count);
+
+        if params.disable_investment {
+            value.insert("investment_enabled", false);
+        } else {
+            value.insert("investment_enabled", true);
+            value.maybe_insert("investments_count", params.investments_count);
+            value.insert(
+                "investment_with_more_score",
+                params.investment_with_more_score,
+            );
+            value.insert(
+                "stop_when_investment_full",
+                !params.no_stop_when_investment_full,
+            );
+        }
+
+        if params.use_support {
+            value.insert("use_support", true);
+            value.insert("use_nonfriend_support", params.use_nonfriend_support);
+        }
+
+        if params.start_with_elite_two {
+            value.insert("start_with_elite_two", true);
+            value.insert(
+                "only_start_with_elite_two",
+                params.only_start_with_elite_two,
+            );
+        }
+
+        value.insert("stop_at_final_boss", params.stop_at_final_boss);
+
+        // Theme specific parameters
+        match theme {
+            Theme::Mizuki => {
+                value.insert("refresh_trader_with_dice", params.refresh_trader_with_dice);
+            }
+            Theme::Sami => {
+                value.insert("use_foldartal", params.use_foldartal);
+                if !params.start_foldartals.is_empty() {
+                    value.insert(
+                        "start_foldartal_list",
+                        MAAValue::Array(
+                            params
+                                .start_foldartals
+                                .into_iter()
+                                .map(MAAValue::from)
+                                .collect(),
+                        ),
+                    );
+                }
+
+                if mode == 5 {
+                    value.insert("check_collapsal_paradigms", true);
+                    value.insert("double_check_collapsal_paradigms", true);
+                    if params.expected_collapsal_paradigms.is_empty() {
+                        bail!("At least one expected collapsal paradigm is required when mode 5 is enabled");
+                    }
+                    value.insert(
+                        "expected_collapsal_paradigms",
+                        MAAValue::Array(
+                            params
+                                .expected_collapsal_paradigms
+                                .into_iter()
+                                .map(MAAValue::from)
+                                .collect(),
+                        ),
+                    );
+                }
+            }
+            _ => {}
+        }
+
+        Ok(value)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use crate::value::MAAValue;
+    use crate::{
+        command::{parse_from, Command},
+        object,
+        value::MAAValue,
+    };
 
-    #[test]
-    fn theme_to_str() {
-        assert_eq!(Theme::Phantom.to_str(), "Phantom");
-        assert_eq!(Theme::Mizuki.to_str(), "Mizuki");
-        assert_eq!(Theme::Sami.to_str(), "Sami");
-        assert_eq!(Theme::Sarkaz.to_str(), "Sarkaz");
+    mod theme {
+        use super::*;
+
+        #[test]
+        fn to_str() {
+            assert_eq!(Theme::Phantom.to_str(), "Phantom");
+            assert_eq!(Theme::Mizuki.to_str(), "Mizuki");
+            assert_eq!(Theme::Sami.to_str(), "Sami");
+            assert_eq!(Theme::Sarkaz.to_str(), "Sarkaz");
+        }
+
+        #[test]
+        fn value_variants() {
+            assert_eq!(
+                Theme::value_variants(),
+                &[Theme::Phantom, Theme::Mizuki, Theme::Sami, Theme::Sarkaz]
+            );
+        }
+
+        #[test]
+        fn to_possible_value() {
+            assert_eq!(
+                Theme::Phantom.to_possible_value(),
+                Some(clap::builder::PossibleValue::new("Phantom"))
+            );
+            assert_eq!(
+                Theme::Mizuki.to_possible_value(),
+                Some(clap::builder::PossibleValue::new("Mizuki"))
+            );
+            assert_eq!(
+                Theme::Sami.to_possible_value(),
+                Some(clap::builder::PossibleValue::new("Sami"))
+            );
+            assert_eq!(
+                Theme::Sarkaz.to_possible_value(),
+                Some(clap::builder::PossibleValue::new("Sarkaz"))
+            );
+        }
     }
 
     #[test]
-    fn theme_value_variants() {
-        assert_eq!(
-            Theme::value_variants(),
-            &[Theme::Phantom, Theme::Mizuki, Theme::Sami, Theme::Sarkaz]
-        );
-    }
+    fn parse_roguellike_params() {
+        fn parse<I, T>(args: I) -> Result<MAAValue, anyhow::Error>
+        where
+            I: IntoIterator<Item = T>,
+            T: Into<std::ffi::OsString> + Clone,
+        {
+            let command = parse_from(args).command;
+            match command {
+                Command::Roguelike { params, .. } => params.try_into(),
+                _ => panic!("Not a Roguelike command"),
+            }
+        }
 
-    #[test]
-    fn theme_to_possible_value() {
-        assert_eq!(
-            Theme::Phantom.to_possible_value(),
-            Some(clap::builder::PossibleValue::new("Phantom"))
+        let default_params = object!(
+            "mode" => 0,
+            "investment_enabled" => true,
+            "investment_with_more_score" => false,
+            "stop_when_investment_full" => true,
+            "stop_at_final_boss" => false,
         );
-        assert_eq!(
-            Theme::Mizuki.to_possible_value(),
-            Some(clap::builder::PossibleValue::new("Mizuki"))
-        );
-        assert_eq!(
-            Theme::Sami.to_possible_value(),
-            Some(clap::builder::PossibleValue::new("Sami"))
-        );
-        assert_eq!(
-            Theme::Sarkaz.to_possible_value(),
-            Some(clap::builder::PossibleValue::new("Sarkaz"))
-        );
-    }
 
-    #[test]
-    fn roguelike_task_config() {
-        let task_config = roguelike(Theme::Phantom).unwrap();
-        let tasks = task_config.tasks();
-        assert_eq!(tasks.len(), 1);
-        assert_eq!(tasks[0].task_type(), Roguelike);
         assert_eq!(
-            tasks[0].params().get("theme").unwrap(),
-            &MAAValue::from("Phantom")
+            parse(["maa", "roguelike", "Phantom"]).unwrap(),
+            default_params.join(object!("theme" => "Phantom")),
+        );
+        assert!(parse(["maa", "roguelike", "Phantom", "--mode", "5"]).is_err());
+        assert!(parse(["maa", "roguelike", "Phantom", "--mode", "7"]).is_err());
+
+        assert_eq!(
+            parse([
+                "maa",
+                "roguelike",
+                "Sarkaz",
+                "--squad",
+                "蓝图测绘分队",
+                "--roles",
+                "取长补短",
+                "--core-char",
+                "维什戴尔",
+                "--start-count=100",
+            ])
+            .unwrap(),
+            default_params.join(object!(
+                "theme" => "Sarkaz",
+                "squad" => "蓝图测绘分队",
+                "roles" => "取长补短",
+                "core_char" => "维什戴尔",
+                "start_count" => 100,
+            )),
+        );
+
+        assert_eq!(
+            parse(["maa", "roguelike", "Sarkaz", "--disable-investment"]).unwrap(),
+            // Can't use default_params here because some fields are removed in this case
+            object!(
+                "theme" => "Sarkaz",
+                "mode" => 0,
+                "investment_enabled" => false,
+                "stop_at_final_boss" => false,
+            ),
+        );
+        assert_eq!(
+            parse([
+                "maa",
+                "roguelike",
+                "Sarkaz",
+                "--investment-with-more-score",
+                "--investments-count=100",
+                "--no-stop-when-investment-full"
+            ])
+            .unwrap(),
+            default_params.join(object!(
+                "theme" => "Sarkaz",
+                "investment_with_more_score" => true,
+                "investments_count" => 100,
+                "stop_when_investment_full" => false,
+            )),
+        );
+
+        assert_eq!(
+            parse([
+                "maa",
+                "roguelike",
+                "Sarkaz",
+                "--use-support",
+                "--use-nonfriend-support",
+                "--start-with-elite-two",
+                "--only-start-with-elite-two",
+                "--stop-at-final-boss",
+            ])
+            .unwrap(),
+            default_params.join(object!(
+                "theme" => "Sarkaz",
+                "use_support" => true,
+                "use_nonfriend_support" => true,
+                "start_with_elite_two" => true,
+                "only_start_with_elite_two" => true,
+                "stop_at_final_boss" => true,
+            )),
+        );
+
+        assert_eq!(
+            parse(["maa", "roguelike", "Mizuki"]).unwrap(),
+            default_params.join(object!(
+                "theme" => "Mizuki",
+                "refresh_trader_with_dice" => false,
+            )),
+        );
+
+        assert_eq!(
+            parse(["maa", "roguelike", "Mizuki", "--refresh-trader-with-dice"]).unwrap(),
+            default_params.join(object!(
+                "theme" => "Mizuki",
+                "refresh_trader_with_dice" => true,
+            )),
+        );
+
+        assert_eq!(
+            parse([
+                "maa",
+                "roguelike",
+                "Sami",
+                "--use-foldartal",
+                "-F英雄",
+                "-F大地"
+            ])
+            .unwrap(),
+            default_params.join(object!(
+                "theme" => "Sami",
+                "use_foldartal" => true,
+                "start_foldartal_list" => MAAValue::Array(vec![
+                    MAAValue::from("英雄"),
+                    MAAValue::from("大地"),
+                ]),
+            )),
+        );
+        assert!(parse(["maa", "roguelike", "Sami", "--mode", "5"]).is_err());
+        assert_eq!(
+            parse([
+                "maa",
+                "roguelike",
+                "Sami",
+                "--mode=5",
+                "-P目空一些",
+                "-P图像损坏",
+            ])
+            .unwrap(),
+            default_params.join(object!(
+                "theme" => "Sami",
+                "mode" => 5,
+                "use_foldartal" => false,
+                "check_collapsal_paradigms" => true,
+                "double_check_collapsal_paradigms" => true,
+                "expected_collapsal_paradigms" => MAAValue::Array(vec![
+                    MAAValue::from("目空一些"),
+                    MAAValue::from("图像损坏"),
+                ]),
+            )),
         );
     }
 }

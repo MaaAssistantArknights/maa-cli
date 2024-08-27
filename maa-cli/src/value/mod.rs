@@ -11,6 +11,7 @@ use std::io;
 
 use serde::{Deserialize, Serialize};
 
+/// TODO: Zero-copy deserialization and reduce clone in init
 #[cfg_attr(test, derive(PartialEq, Debug))]
 #[derive(Deserialize, Clone)]
 #[serde(untagged)]
@@ -263,6 +264,12 @@ impl MAAValue {
             map.insert(key.into(), value.into());
         } else {
             panic!("value is not an object");
+        }
+    }
+
+    pub fn maybe_insert(&mut self, key: impl Into<String>, value: Option<impl Into<Self>>) {
+        if let Some(value) = value {
+            self.insert(key, value);
         }
     }
 
@@ -741,6 +748,16 @@ mod tests {
     fn insert_panics() {
         let mut value = MAAValue::from(1);
         value.insert("int", 1);
+    }
+
+    #[test]
+    fn maybe_insert() {
+        let mut value = MAAValue::new();
+        assert_eq!(value.get("int"), None);
+        value.maybe_insert("int", Some(1));
+        assert_eq!(value.get("int").unwrap().as_int().unwrap(), 1);
+        value.maybe_insert("float", None::<f32>);
+        assert_eq!(value.get("float"), None);
     }
 
     #[test]

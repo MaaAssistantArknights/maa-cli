@@ -45,8 +45,6 @@ impl CLIConfig {
     }
 }
 
-impl super::FromFile for CLIConfig {}
-
 pub fn cli_config() -> &'static CLIConfig {
     static INSTALLER_CONFIG: OnceLock<CLIConfig> = OnceLock::new();
     INSTALLER_CONFIG.get_or_init(|| {

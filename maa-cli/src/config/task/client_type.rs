@@ -89,6 +89,17 @@ impl ClientType {
             YoStarJP | YoStarKR => 5,
         }
     }
+
+    /// The server type of sample used in the report.
+    pub const fn server_report(self) -> Option<&'static str> {
+        match self {
+            Official | Bilibili => Some("CN"),
+            YoStarEN => Some("US"),
+            YoStarJP => Some("JP"),
+            YoStarKR => Some("KR"),
+            _ => None,
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for ClientType {
@@ -218,6 +229,16 @@ mod tests {
         assert_eq!(YoStarEN.server_time_zone(), -11);
         assert_eq!(YoStarJP.server_time_zone(), 5);
         assert_eq!(YoStarKR.server_time_zone(), 5);
+    }
+
+    #[test]
+    fn to_server_report() {
+        assert_eq!(Official.server_report(), Some("CN"));
+        assert_eq!(Bilibili.server_report(), Some("CN"));
+        assert_eq!(Txwy.server_report(), None);
+        assert_eq!(YoStarEN.server_report(), Some("US"));
+        assert_eq!(YoStarJP.server_report(), Some("JP"));
+        assert_eq!(YoStarKR.server_report(), Some("KR"));
     }
 
     #[test]

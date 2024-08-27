@@ -112,53 +112,52 @@ pub(crate) enum Command {
     /// Startup Game and Enter Main Screen
     #[command(name = "startup")]
     StartUp {
-        /// Client type of the game client
-        ///
-        /// The client type of the game client, used to launch the game client.
-        /// If not specified, the client will not be launched.
-        client: Option<config::task::ClientType>,
-        /// Account name to switch to
-        #[arg(long)]
-        account: Option<String>,
+        #[command(flatten)]
+        params: run::preset::StartUpParams,
         #[command(flatten)]
         common: run::CommonArgs,
     },
     /// Close game client
     #[command(name = "closedown")]
     CloseDown {
-        /// Client type of the game client
-        ///
-        /// The client type of the game client, used to close the game client.
-        /// If not specified, default to the Official client.
-        #[arg(default_value = "Official")]
-        client: config::task::ClientType,
+        #[command(flatten)]
+        params: run::preset::CloseDownParams,
         #[command(flatten)]
         common: run::CommonArgs,
     },
     /// Run fight task
     Fight {
-        /// Stage to fight
-        #[arg(default_value = "")]
-        stage: String,
-        /// medicine to use
-        #[arg(short, long)]
-        medicine: Option<i32>,
+        #[command(flatten)]
+        params: run::preset::FightParams,
         #[command(flatten)]
         common: run::CommonArgs,
     },
     /// Run copilot task
     Copilot {
-        /// A code copied from <https://prts.plus> or a json file,
-        /// such as "maa://12345" or "/your/json/path.json".
-        uri: String,
+        #[command(flatten)]
+        params: run::preset::CopilotParams,
+        #[command(flatten)]
+        common: run::CommonArgs,
+    },
+    /// Run SSSCopilot task
+    #[command(name = "ssscopilot")]
+    SSSCopilot {
+        #[command(flatten)]
+        params: run::preset::SSSCopilotParams,
         #[command(flatten)]
         common: run::CommonArgs,
     },
     /// Run rouge-like task
     Roguelike {
-        /// Theme of the game
-        #[arg(ignore_case = true)]
-        theme: run::preset::RoguelikeTheme,
+        #[command(flatten)]
+        params: run::preset::RoguelikeParams,
+        #[command(flatten)]
+        common: run::CommonArgs,
+    },
+    /// Run Reclamation Algorithm task
+    Reclamation {
+        #[command(flatten)]
+        params: run::preset::ReclamationParams,
         #[command(flatten)]
         common: run::CommonArgs,
     },
@@ -564,113 +563,6 @@ mod test {
                 ..
             } if task == "task"
         ));
-    }
-
-    #[test]
-    fn startup() {
-        assert_matches!(
-            parse_from(["maa", "startup"]).command,
-            Command::StartUp {
-                client: None,
-                account: None,
-                common: run::CommonArgs { .. },
-            }
-        );
-
-        assert_matches!(
-            parse_from(["maa", "startup", "YoStarEN"]).command,
-            Command::StartUp {
-                client: Some(client),
-                ..
-            } if client == config::task::ClientType::YoStarEN
-        );
-
-        assert_matches!(
-            parse_from(["maa", "startup", "YoStarEN", "--account", "account"]).command,
-            Command::StartUp {
-                client: Some(client),
-                account: Some(account),
-                ..
-            } if client == config::task::ClientType::YoStarEN && account == "account"
-        );
-    }
-
-    #[test]
-    fn closedown() {
-        assert_matches!(
-            parse_from(["maa", "closedown"]).command,
-            Command::CloseDown {
-                client: config::task::ClientType::Official,
-                common: run::CommonArgs { .. }
-            }
-        );
-
-        assert_matches!(
-            parse_from(["maa", "closedown", "YoStarEN"]).command,
-            Command::CloseDown {
-                client: config::task::ClientType::YoStarEN,
-                common: run::CommonArgs { .. }
-            }
-        );
-    }
-
-    #[test]
-    fn fight() {
-        assert_matches!(
-            parse_from(["maa", "fight", "1-7"]).command,
-            Command::Fight {
-                stage,
-                ..
-            } if stage == "1-7"
-        );
-
-        assert_matches!(
-            parse_from(["maa", "fight", "1-7", "-m", "1"]).command,
-            Command::Fight {
-                stage,
-                medicine: Some(medicine),
-                ..
-            } if stage == "1-7" && medicine == 1
-        );
-
-        assert_matches!(
-            parse_from(["maa", "fight", "1-7", "--medicine", "1"]).command,
-            Command::Fight {
-                stage,
-                medicine: Some(medicine),
-                ..
-            } if stage == "1-7" && medicine == 1
-        );
-    }
-
-    #[test]
-    fn copilot() {
-        assert_matches!(
-            parse_from(["maa", "copilot", "maa://12345"]).command,
-            Command::Copilot {
-                uri,
-                ..
-            } if uri == "maa://12345"
-        );
-
-        assert_matches!(
-            parse_from(["maa", "copilot", "/your/json/path.json"]).command,
-            Command::Copilot {
-                uri,
-                common: run::CommonArgs { .. }
-            } if uri == "/your/json/path.json"
-        );
-    }
-
-    #[test]
-    fn rougelike() {
-        assert_matches!(
-            parse_from(["maa", "roguelike", "phantom"]).command,
-            Command::Roguelike {
-                theme,
-                ..
-            } if matches!(theme, run::preset::RoguelikeTheme::Phantom)
-        );
     }
 
     #[test]

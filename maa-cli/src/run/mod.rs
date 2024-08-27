@@ -241,6 +241,10 @@ where
     Ok(())
 }
 
+pub fn run_preset(params: impl preset::IntoTaskConfig, args: CommonArgs) -> Result<()> {
+    run(|config| params.into_task_config(config), args)
+}
+
 pub fn run_custom(path: impl AsRef<Path>, args: CommonArgs) -> Result<()> {
     run(
         |_| {
