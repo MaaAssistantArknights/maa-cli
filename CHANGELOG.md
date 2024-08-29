@@ -1,5 +1,25 @@
 # Release Notes
 
+## Release 0.4.12
+
+### Features
+
+- Use `Official` as the default value for `client_type` by [@wangl-cc](https://github.com/wangl-cc) in [#312](https://github.com/MaaAssistantArknights/maa-cli/pull/312)
+
+### Bug Fixes
+
+- Handle `ConnectFailed` message in callback by [@wangl-cc](https://github.com/wangl-cc)
+
+### Performance
+
+- Slightly decrease allocations in processing tasks by [@wangl-cc](https://github.com/wangl-cc)
+
+### Documentation
+
+- Remove outdated FAQ entries by [@wangl-cc](https://github.com/wangl-cc)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.4.11...v0.4.12>
+
 ## Release 0.4.11
 
 ### Features
