@@ -284,7 +284,7 @@
 - Search both origin and canonicalized directory of `current_exe` by [@wangl-cc](https://github.com/wangl-cc) in [#94](https://github.com/MaaAssistantArknights/maa-cli/pull/94)
 - Add a new subcommand `fight` by [@wangl-cc](https://github.com/wangl-cc) in [#104](https://github.com/MaaAssistantArknights/maa-cli/pull/104)
 - Add `BoolInput` to query user for boolean input by [@wangl-cc](https://github.com/wangl-cc) in [#107](https://github.com/MaaAssistantArknights/maa-cli/pull/107)
-- Qurey `start_game_enabled` and `client_type` in startup task by [@wangl-cc](https://github.com/wangl-cc) in [#110](https://github.com/MaaAssistantArknights/maa-cli/pull/110)
+- Query `start_game_enabled` and `client_type` in startup task by [@wangl-cc](https://github.com/wangl-cc) in [#110](https://github.com/MaaAssistantArknights/maa-cli/pull/110)
 - Add subcommand `copilot` to complete the auto-battle feature by [@hzxjy1](https://github.com/hzxjy1) in [#127](https://github.com/MaaAssistantArknights/maa-cli/pull/127)
 - **BREAKING**:Resource update and refactor maa core binding by [@wangl-cc](https://github.com/wangl-cc) in [#126](https://github.com/MaaAssistantArknights/maa-cli/pull/126)
 - **BREAKING**:Download native binaries instead of universal binaries on macOS by [@wangl-cc](https://github.com/wangl-cc) in [#133](https://github.com/MaaAssistantArknights/maa-cli/pull/133)
