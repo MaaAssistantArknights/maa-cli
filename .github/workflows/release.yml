@@ -76,7 +76,7 @@ jobs:
           fetch-depth: 0
       - name: Generate Release Notes
         id: git_cliff
-        uses: orhun/git-cliff-action@v3
+        uses: orhun/git-cliff-action@v4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.meta.outputs.version }}
