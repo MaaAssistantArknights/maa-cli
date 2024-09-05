@@ -258,7 +258,7 @@ mod tests {
         let version = super::Assistant::get_version().unwrap();
 
         if let Some(v_str) = std::env::var_os("MAA_CORE_VERSION") {
-            assert_eq!(version, &v_str.to_str().unwrap()[1..]);
+            assert_eq!(version, v_str.to_str().unwrap());
         }
     }
 }
