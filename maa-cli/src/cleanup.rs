@@ -11,7 +11,6 @@ use std::{
 };
 
 use anyhow::{bail, Result};
-use log::warn;
 
 pub trait PathProvider {
     /// Path to a directory to be cleaned up
