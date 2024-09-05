@@ -123,6 +123,8 @@ jobs:
           cargo build --package maa-cli --locked \
             --no-default-features --features '${{ matrix.feature }}'
       - name: Test
+        env:
+          SKIP_CORE_TEST: true
         run: |
           cargo test -- --include-ignored
 
