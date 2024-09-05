@@ -51,7 +51,7 @@ runs:
       working-directory: ${{ runner.temp }}
       run: |
         MAA=MaaAssistantArknights
-        ./maa install beta -t0 --api-url \
+        ./maa install beta -t0 --api-url -vv\
           https://github.com/$MAA/MaaRelease/raw/main/$MAA/api/
         core_dir=$(./maa dir lib)
         resource_dir=$(./maa dir resource)
@@ -64,8 +64,9 @@ runs:
           echo "MAA_RESOURCE_DIR=$resource_dir"
           echo "MAA_CORE_VERSION=v$version"
         } >> "$GITHUB_ENV"
-    - name: Remove Prebuilt CLI
+    - name: Cleanup
       shell: bash
       working-directory: ${{ runner.temp }}
       run: |
+        ./maa cleanup --batch
         rm -vrf maa_cli* stable.json maa*
