@@ -51,7 +51,7 @@ runs:
       working-directory: ${{ runner.temp }}
       run: |
         MAA=MaaAssistantArknights
-        ./maa install beta -t0 -vv \
+        ./maa install beta -t0 \
           --api-url "https://github.com/$MAA/MaaRelease/raw/main/$MAA/api/version/"
         core_dir=$(./maa dir lib)
         resource_dir=$(./maa dir resource)
