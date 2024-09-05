@@ -52,7 +52,7 @@ runs:
       run: |
         MAA=MaaAssistantArknights
         ./maa install beta -t0 -vv \
-          --api-url "https://github.com/$MAA/MaaRelease/raw/main/$MAA/api/"
+          --api-url "https://github.com/$MAA/MaaRelease/raw/main/$MAA/api/version/"
         core_dir=$(./maa dir lib)
         resource_dir=$(./maa dir resource)
         version=$(./maa version core)
