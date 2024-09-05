@@ -212,6 +212,8 @@ impl<T, E: std::fmt::Display> WarnError<T> for std::result::Result<T, E> {
 mod tests {
     use super::*;
 
+    use std::env::var_os;
+
     #[test]
     fn parse_time_from_activity_info() {
         use chrono::{TimeZone, Utc};
@@ -441,21 +443,26 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "need installed resource"]
     fn test_load_stage_activity() {
-        if std::env::var_os("MAA_CORE_INSTALLED").is_some() {
-            stage_activity().unwrap();
+        if var_os("SKIP_CORE_TEST").is_some() {
+            return;
         }
+        stage_activity().unwrap();
     }
 
     #[test]
+    #[ignore = "need installed resource"]
     fn test_item_index() {
-        if std::env::var_os("MAA_CORE_INSTALLED").is_some() {
-            load_item_index(ClientType::Official).unwrap();
-            load_item_index(ClientType::YoStarEN).unwrap();
-            load_item_index(ClientType::YoStarJP).unwrap();
-            load_item_index(ClientType::YoStarKR).unwrap();
-            load_item_index(ClientType::Txwy).unwrap();
+        if var_os("SKIP_CORE_TEST").is_some() {
+            return;
         }
+
+        load_item_index(ClientType::Official).unwrap();
+        load_item_index(ClientType::YoStarEN).unwrap();
+        load_item_index(ClientType::YoStarJP).unwrap();
+        load_item_index(ClientType::YoStarKR).unwrap();
+        load_item_index(ClientType::Txwy).unwrap();
     }
 
     #[test]
