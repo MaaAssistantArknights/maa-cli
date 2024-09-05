@@ -18,7 +18,7 @@ core_installer = ["__installer"]
 cli_installer = ["__installer"]
 
 # Vendored openssl
-vendored-openssl = ["git2?/vendored-openssl", "reqwest/native-tls-vendored"]
+vendored-openssl = ["git2?/vendored-openssl"]
 
 # Common features used to install and update MAA Core and maa-cli self
 __installer = [
@@ -100,7 +100,17 @@ features = ["rt", "rt-multi-thread"]
 
 [dependencies.reqwest]
 version = "0.12"
-features = ["blocking", "json"]
+default-features = false
+features = [
+  # default features without default-tls {{{
+  "charset",
+  "http2",
+  "macos-system-configuration",
+  # }}}
+  "rustls-tls",
+  "blocking",
+  "json",
+]
 
 [target.'cfg(windows)'.dependencies.windows]
 version = "0.52.0"
