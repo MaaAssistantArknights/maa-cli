@@ -307,7 +307,7 @@ mod tests {
     #[test]
     #[ignore = "need installed MaaCore"]
     fn version() {
-        if env::var_os("SKIP_VERSION_TEST").is_none() {
+        if env::var_os("SKIP_CORE_TEST").is_some() {
             return;
         }
         let version = env::var_os("MAA_CORE_VERSION").unwrap();
