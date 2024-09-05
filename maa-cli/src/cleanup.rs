@@ -197,15 +197,15 @@ mod tests {
             assert_eq!(Log.target_dir(), log());
         }
 
-        fn create_target_entry(path: &Path, name: &str) -> Result<DirEntry> {
-            let path = path.join(name);
+        fn create_target_entry(dir: &Path, name: &str) -> Result<DirEntry> {
+            let path = dir.join(name);
             if name.ends_with('/') {
                 std::fs::create_dir(&path)?;
             } else {
                 std::fs::File::create(&path)?;
             };
 
-            for entry in path.read_dir()? {
+            for entry in dir.read_dir()? {
                 let entry = entry?;
                 if entry.path() == path {
                     return Ok(entry);
