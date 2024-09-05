@@ -46,30 +46,20 @@ pub enum CleanupTarget {
     CliCache,
     /// Cache files for MaaCore
     CoreCache,
-    /// Debug files
+    /// Debug files (including log and other debug files)
     Debug,
     /// Log files (both for MaaCore and maa-cli)
     Log,
-    /// Deprecated, operator avatar cache, will be removed in the future, use core-cache instead
-    Avatars,
-    /// Deprecated, uncatagorized debug files, will be removed in the future, use debug instead
-    Misc,
 }
 
 use CleanupTarget::*;
 
 impl PathProvider for CleanupTarget {
     fn target_dir(&self) -> Cow<Path> {
-        // Show warning for deprecated targets
-        match *self {
-            Avatars => warn!("Cleanup target avatars is deprecated, use core-cache instead."),
-            Misc => warn!("Cleanup target misc is deprecated, use debug instead."),
-            _ => {}
-        }
         match *self {
             CliCache => cache().into(),
-            CoreCache | Avatars => join!(state(), "cache").into(),
-            Debug | Log | Misc => log().into(),
+            CoreCache => join!(state(), "cache").into(),
+            Debug | Log => log().into(),
         }
     }
 
@@ -87,17 +77,6 @@ impl PathProvider for CleanupTarget {
                 }
                 _ => false,
             },
-            Avatars => {
-                entry.file_type().is_ok_and(|x| x.is_dir())
-                    && entry.file_name().to_str().is_some_and(|x| x == "avatars")
-            }
-            Misc => {
-                entry.file_type().is_ok_and(|x| x.is_dir())
-                    && entry
-                        .file_name()
-                        .to_str()
-                        .is_some_and(|x| matches!(x, "drops" | "map" | "other" | "Roguelike"))
-            }
             _ => true,
         }
     }
@@ -215,10 +194,26 @@ mod tests {
         fn target_dir() {
             assert_eq!(CliCache.target_dir(), cache());
             assert_eq!(CoreCache.target_dir(), join!(state(), "cache"));
-            assert_eq!(Avatars.target_dir(), join!(state(), "cache"));
             assert_eq!(Debug.target_dir(), log());
             assert_eq!(Log.target_dir(), log());
-            assert_eq!(Misc.target_dir(), log());
+        }
+
+        fn create_target_entry(path: &Path, name: &str) -> Result<DirEntry> {
+            let path = path.join(name);
+            if name.ends_with('/') {
+                std::fs::create_dir(&path)?;
+            } else {
+                std::fs::File::create(&path)?;
+            };
+
+            for entry in path.read_dir()? {
+                let entry = entry?;
+                if entry.path() == path {
+                    return Ok(entry);
+                }
+            }
+
+            bail!("Entry not found");
         }
 
         #[test]
@@ -227,45 +222,41 @@ mod tests {
 
             test_root.ensure().unwrap();
 
-            let test_entry = |target: CleanupTarget, is_dir: bool, name: &str| -> bool {
-                let path = join!(&test_root, name);
-                if is_dir {
-                    std::fs::create_dir(&path).unwrap();
-                } else {
-                    std::fs::File::create(&path).unwrap();
-                }
-                let entry = test_root.read_dir().unwrap().next().unwrap().unwrap();
-                let ret = target.should_delete(&entry);
-                del_item(&path).unwrap();
-                ret
-            };
+            macro_rules! assert_should_delete {
+                ($target:expr, $name:expr, $expected:expr) => {
+                    let entry = create_target_entry(&test_root, $name).unwrap();
+                    assert_eq!($target.should_delete(&entry), $expected);
+                    del_item(&entry.path()).unwrap();
+                };
+            }
 
             // Create a directory with some files and subdirectories
             std::fs::create_dir_all(&test_root).unwrap();
 
-            assert!(test_entry(CliCache, false, "test"));
+            assert_should_delete!(Log, "asst.log", true);
+            assert_should_delete!(Log, "asst.bak.log", true);
 
-            assert!(test_entry(Log, false, "asst.log"));
-            assert!(test_entry(Log, false, "asst.bak.log"));
-            assert!(!test_entry(Log, false, "test"));
+            assert_should_delete!(Log, "2024", false);
+            assert_should_delete!(Log, "2024/", true);
+            assert_should_delete!(Log, "20A4", false);
+            assert_should_delete!(Log, "2024-01-01", false);
 
-            assert!(test_entry(Log, true, "2024"));
-            assert!(!test_entry(Log, true, "20A4"));
-            assert!(!test_entry(Log, true, "2024-01-01"));
+            assert_should_delete!(CliCache, "avatars/", true);
+            assert_should_delete!(CliCache, "drops/", true);
 
-            assert!(test_entry(Avatars, true, "avatars"));
-            assert!(!test_entry(Avatars, false, "avatars"));
-
-            assert!(test_entry(Misc, true, "drops"));
-            assert!(test_entry(Misc, true, "map"));
-            assert!(test_entry(Misc, true, "other"));
-            assert!(test_entry(Misc, true, "Roguelike"));
-            assert!(!test_entry(Misc, false, "test"));
+            assert_should_delete!(CliCache, "copilot", true);
+            assert_should_delete!(CliCache, "copilot/", true);
+            assert_should_delete!(
+                CliCache,
+                "MAA-v5.6.0-beta.2-macos-runtime-universal.zip",
+                true
+            );
 
             std::fs::remove_dir(&test_root).unwrap();
         }
 
         #[test]
+        #[ignore = "Need installed MaaCore"]
         fn should_keep() {
             let test_root = join!(temp_dir(), "maa-cli-test-should-keep");
 
@@ -274,30 +265,26 @@ mod tests {
             // Create a directory with some files and subdirectories
             std::fs::create_dir_all(&test_root).unwrap();
 
-            let test_entry = |target: CleanupTarget, is_dir: bool, name: &str| -> bool {
-                let path = join!(&test_root, name);
-                if is_dir {
-                    std::fs::create_dir(&path).unwrap();
-                } else {
-                    std::fs::File::create(&path).unwrap();
-                }
-                let entry = test_root.read_dir().unwrap().next().unwrap().unwrap();
-                let ret = target.should_keep(&entry);
-                del_item(&path).unwrap();
-                ret
-            };
+            macro_rules! assert_should_keep {
+                ($target:expr, $name:expr, $expected:expr) => {
+                    let entry = create_target_entry(&test_root, $name).unwrap();
+                    assert_eq!($target.should_keep(&entry), $expected);
+                    del_item(&entry.path()).unwrap();
+                };
+            }
 
-            assert!(!test_entry(CoreCache, false, "test"));
+            assert_should_keep!(CoreCache, "avatars/", false);
+
+            assert_should_keep!(CliCache, "test", false);
+            assert_should_keep!(CliCache, "copilot/", false);
 
             #[cfg(feature = "core_installer")]
             {
-                assert!(!test_entry(CliCache, false, "test"));
-                if let Some(version) = std::env::var_os("MAA_CORE_VERSION") {
-                    use crate::installer::maa_core;
-                    let name =
-                        maa_core::name(&version.to_str().unwrap()[1..].parse().unwrap()).unwrap();
-                    assert!(test_entry(CliCache, false, &name));
-                }
+                let version = std::env::var_os("MAA_CORE_VERSION")
+                    .expect("MAA_CORE_VERSION environment variable not set");
+                let version = version.to_str().unwrap()[1..].parse().unwrap();
+                let name = crate::installer::maa_core::name(&version).unwrap();
+                assert_should_keep!(CliCache, &name, true);
             }
 
             std::fs::remove_dir(&test_root).unwrap();
