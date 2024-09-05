@@ -305,10 +305,13 @@ mod tests {
     use std::env::{self, temp_dir};
 
     #[test]
+    #[ignore = "need installed MaaCore"]
     fn version() {
-        if let Some(version) = env::var_os("MAA_CORE_VERSION") {
-            assert_eq!(core_version().unwrap(), version);
+        if env::var_os("SKIP_VERSION_TEST").is_none() {
+            return;
         }
+        let version = env::var_os("MAA_CORE_VERSION").unwrap();
+        assert_eq!(core_version().unwrap(), version);
     }
 
     #[test]

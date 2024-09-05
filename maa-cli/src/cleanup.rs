@@ -184,7 +184,10 @@ mod tests {
 
     use crate::dirs::Ensure;
 
-    use std::{collections::BTreeSet, env::temp_dir};
+    use std::{
+        collections::BTreeSet,
+        env::{temp_dir, var_os},
+    };
 
     mod cleanup_target {
         use super::*;
@@ -278,8 +281,8 @@ mod tests {
             assert_should_keep!(CliCache, "copilot/", false);
 
             #[cfg(feature = "core_installer")]
-            if std::env::var_os("SKIP_CORE_TEST").is_none() {
-                let version = std::env::var_os("MAA_CORE_VERSION")
+            if var_os("SKIP_CORE_TEST").is_none() {
+                let version = var_os("MAA_CORE_VERSION")
                     .expect("MAA_CORE_VERSION environment variable not set");
                 let version = version.to_str().unwrap()[1..].parse().unwrap();
                 let name = crate::installer::maa_core::name(&version).unwrap();
@@ -395,7 +398,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "Need installed MaaCore and write to user directories"]
     fn test_cleanup_real_files() {
         // Create some files for testing
         cache().ensure().unwrap();
@@ -415,9 +418,11 @@ mod tests {
             ))
             .unwrap();
 
-            if let Some(version) = std::env::var_os("MAA_CORE_VERSION") {
-                let name =
-                    maa_core::name(&version.to_str().unwrap()[1..].parse().unwrap()).unwrap();
+            if var_os("SKIP_CORE_TEST").is_none() {
+                let version = var_os("MAA_CORE_VERSION")
+                    .expect("MAA_CORE_VERSION environment variable not set");
+                let version = version.to_str().unwrap()[1..].parse().unwrap();
+                let name = maa_core::name(&version).unwrap();
                 std::fs::File::create(join!(cache(), &name)).unwrap();
             }
         }

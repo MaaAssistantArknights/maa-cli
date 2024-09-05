@@ -255,6 +255,10 @@ mod tests {
     #[cfg(not(feature = "runtime"))]
     #[test]
     fn get_version() {
-        assert!(super::Assistant::get_version().is_ok());
+        let version = super::Assistant::get_version().unwrap();
+
+        if let Some(v_str) = std::env::var_os("MAA_CORE_VERSION") {
+            assert_eq!(version, v_str.to_str().unwrap()[1..]);
+        }
     }
 }
