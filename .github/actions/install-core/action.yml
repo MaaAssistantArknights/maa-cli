@@ -50,25 +50,20 @@ runs:
       shell: bash
       working-directory: ${{ runner.temp }}
       run: |
-        ./maa install stable -t0 \
-          --api-url https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version/
-
-        MAA_CORE_DIR="$(./maa dir lib)"
-        MAA_RESOURCE_DIR="$(./maa dir resource)"
-        ls -l "$MAA_CORE_DIR"
-        ls -l "$MAA_RESOURCE_DIR"
-        echo "MAA_CORE_DIR=$MAA_CORE_DIR" >> $GITHUB_ENV
-        echo "MAA_RESOURCE_DIR=$MAA_RESOURCE_DIR" >> $GITHUB_ENV
-
-        package_name=$(basename "$(ls "$(./maa dir cache)")")
-        echo "Downloaded MaaCore package: $package_name"
-        core_version=${package_name#MAA-v}
-        core_version=${core_version%%-*}
-        if [[ $core_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-          echo "Downloaded MaaCore version: $core_version"
-          echo "MAA_CORE_VERSION=v$core_version" >> "$GITHUB_ENV"
-        fi
-        echo "MAA_CORE_INSTALLED=true" >> "$GITHUB_ENV"
+        MAA=MaaAssistantArknights
+        ./maa install beta -t0 --api-url \
+          https://github.com/$MAA/MaaRelease/raw/main/$MAA/api/
+        core_dir=$(./maa dir lib)
+        resource_dir=$(./maa dir resource)
+        version=$(./maa version core)
+        version=${version#MaaCore v}
+        ls -l "$core_dir"
+        ls -l "$resource_dir"
+        {
+          echo "MAA_CORE_DIR=$core_dir"
+          echo "MAA_RESOURCE_DIR=$resource_dir"
+          echo "MAA_CORE_VERSION=v$version"
+        } >> "$GITHUB_ENV"
     - name: Remove Prebuilt CLI
       shell: bash
       working-directory: ${{ runner.temp }}
