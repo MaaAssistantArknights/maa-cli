@@ -254,7 +254,6 @@ mod tests {
             std::fs::remove_dir(&test_root).unwrap();
         }
 
-        #[cfg(feature = "core_installer")]
         #[test]
         #[ignore = "Need installed MaaCore"]
         fn should_keep() {
@@ -278,11 +277,14 @@ mod tests {
             assert_should_keep!(CliCache, "test", false);
             assert_should_keep!(CliCache, "copilot/", false);
 
-            let version = std::env::var_os("MAA_CORE_VERSION")
-                .expect("MAA_CORE_VERSION environment variable not set");
-            let version = version.to_str().unwrap()[1..].parse().unwrap();
-            let name = crate::installer::maa_core::name(&version).unwrap();
-            assert_should_keep!(CliCache, &name, true);
+            #[cfg(feature = "core_installer")]
+            if std::env::var_os("SKIP_CORE_TEST").is_none() {
+                let version = std::env::var_os("MAA_CORE_VERSION")
+                    .expect("MAA_CORE_VERSION environment variable not set");
+                let version = version.to_str().unwrap()[1..].parse().unwrap();
+                let name = crate::installer::maa_core::name(&version).unwrap();
+                assert_should_keep!(CliCache, &name, true);
+            }
 
             std::fs::remove_dir(&test_root).unwrap();
         }
