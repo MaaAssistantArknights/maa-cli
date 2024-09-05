@@ -1,10 +1,7 @@
 use crate::{
     config::task::{Task, TaskConfig},
     object,
-    value::{
-        userinput::{BoolInput, Input, SelectD, ValueWithDesc},
-        MAAValue, Map,
-    },
+    value::userinput::{BoolInput, Input, SelectD, ValueWithDesc},
 };
 
 use anyhow::Result;
@@ -17,6 +14,7 @@ pub enum Theme {
     Phantom,
     Mizuki,
     Sami,
+    Sarkaz,
 }
 
 impl Theme {
@@ -25,13 +23,14 @@ impl Theme {
             Self::Phantom => "Phantom",
             Self::Mizuki => "Mizuki",
             Self::Sami => "Sami",
+            Self::Sarkaz => "Sarkaz",
         }
     }
 }
 
 impl ValueEnum for Theme {
     fn value_variants<'a>() -> &'a [Self] {
-        &[Self::Phantom, Self::Mizuki, Self::Sami]
+        &[Self::Phantom, Self::Mizuki, Self::Sami, Self::Sarkaz]
     }
 
     fn to_possible_value(&self) -> Option<clap::builder::PossibleValue> {
@@ -42,7 +41,6 @@ impl ValueEnum for Theme {
 pub fn roguelike(theme: Theme) -> Result<TaskConfig> {
     let mut task_config = TaskConfig::new();
 
-    use MAAValue::OptionalInput;
     let params = object!(
         "theme" => theme.to_str(),
         "mode" => SelectD::<i32>::new([
@@ -53,31 +51,23 @@ pub fn roguelike(theme: Theme) -> Result<TaskConfig> {
         ], Some(1), Some("Roguelike mode"), false).unwrap(),
         "start_count" => Input::<i32>::new(Some(999), Some("number of times to start a new run")),
         "investment_disabled" => BoolInput::new(Some(false), Some("disable investment")),
-        "investments_count" => OptionalInput {
-            deps: Map::from([("investment_disabled".to_string(), false.into())]),
-            input: Input::<i32>::new(Some(999), Some("number of times to invest")).into(),
-        },
-        "stop_when_investment_full" => OptionalInput {
-            deps: Map::from([("investment_disabled".to_string(), false.into())]),
-            input: BoolInput::new(Some(false), Some("stop when investment is full")).into(),
-        },
+        "investments_count" if "investment_disabled" == false =>
+            Input::<i32>::new(Some(999), Some("number of times to invest")),
+        "stop_when_investment_full" if "investment_disabled" == false =>
+            BoolInput::new(Some(false), Some("stop when investment is full")),
         "squad" => Input::<String>::new(None, Some("squad name")),
         "roles" => Input::<String>::new(None, Some("roles")),
         "core_char" => SelectD::<String>::new(
-            ["百炼嘉维尔", "焰影苇草", "锏"],
+            ["百炼嘉维尔", "焰影苇草", "锏", "维什戴尔"],
             None,
             Some("core operator"),
             true,
         ).unwrap(),
         "use_support" => BoolInput::new(Some(false), Some("use support operator")),
-        "use_nonfriend_support" => OptionalInput {
-            deps: Map::from([("use_support".to_string(), true.into())]),
-            input: BoolInput::new(Some(false), Some("use non-friend support operator")).into(),
-        },
-        "refresh_trader_with_dice" => OptionalInput {
-            deps: Map::from([("theme".to_string(), "Mizuki".into())]),
-            input: BoolInput::new(Some(false), Some("refresh trader with dice")).into(),
-        },
+        "use_nonfriend_support" if "use_support" == true =>
+            BoolInput::new(Some(false), Some("use non-friend support operator")),
+        "refresh_trader_with_dice" if "theme" == "Mizuki" =>
+            BoolInput::new(Some(false), Some("refresh trader with dice")),
     );
 
     task_config.push(Task::new_with_default(Roguelike, params));
@@ -89,18 +79,21 @@ pub fn roguelike(theme: Theme) -> Result<TaskConfig> {
 mod tests {
     use super::*;
 
+    use crate::value::MAAValue;
+
     #[test]
     fn theme_to_str() {
         assert_eq!(Theme::Phantom.to_str(), "Phantom");
         assert_eq!(Theme::Mizuki.to_str(), "Mizuki");
         assert_eq!(Theme::Sami.to_str(), "Sami");
+        assert_eq!(Theme::Sarkaz.to_str(), "Sarkaz");
     }
 
     #[test]
     fn theme_value_variants() {
         assert_eq!(
             Theme::value_variants(),
-            &[Theme::Phantom, Theme::Mizuki, Theme::Sami]
+            &[Theme::Phantom, Theme::Mizuki, Theme::Sami, Theme::Sarkaz]
         );
     }
 
@@ -117,6 +110,10 @@ mod tests {
         assert_eq!(
             Theme::Sami.to_possible_value(),
             Some(clap::builder::PossibleValue::new("Sami"))
+        );
+        assert_eq!(
+            Theme::Sarkaz.to_possible_value(),
+            Some(clap::builder::PossibleValue::new("Sarkaz"))
         );
     }
 

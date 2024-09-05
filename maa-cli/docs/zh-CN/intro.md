@@ -1,4 +1,4 @@
-# maa-cli
+# 介绍
 
 一个使用 Rust 编写的简单 [MAA][maa-home] 命令行工具。
 

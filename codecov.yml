@@ -1,0 +1,14 @@
+comment:
+  # do not comment PRs if coverage is not changed
+  require_changes: true
+  # comment after receiving coverage reports from all three platforms
+  after_n_builds: 3
+
+component_management:
+  individual_components:
+    - component_id: maa-sys
+      paths:
+        - maa-sys
+    - component_id: maa-cli
+      paths:
+        - maa-cli

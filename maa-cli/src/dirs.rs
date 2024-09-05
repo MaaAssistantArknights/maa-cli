@@ -25,14 +25,19 @@ pub fn maa_lib_name() -> &'static str {
 /// This is useful to avoid unnecessary allocation when the first path is a PathBuf,
 /// and when multiple paths are joined.
 ///
+/// The expression after `;` is optional, which is used to set the extension of the final path.
+///
 /// Note: Because we reuse the first path, the first path will be consumed.
 /// Thus, if you want to reuse the first path, you should pass a Path instead of a PathBuf.
 macro_rules! join {
-    ($path:expr, $($paths:expr),+) => {{
+    ($path:expr, $($paths:expr),+ $(; $ext:expr)?) => {{
         let mut path: ::std::path::PathBuf = $path.into();
         $(
             path.push($paths);
         )+
+        $(
+            path.set_extension($ext);
+        )?
         path
     }}
 }
@@ -462,6 +467,7 @@ mod tests {
         #[test]
         fn state_relative() {
             env::remove_var("XDG_STATE_HOME");
+            env::remove_var("MAA_STATE_DIR");
             let project = ProjectDirs::from("com", "loong", "maa");
             if cfg!(target_os = "macos") {
                 assert_eq!(
@@ -495,6 +501,7 @@ mod tests {
         #[test]
         fn data_relative() {
             env::remove_var("XDG_DATA_HOME");
+            env::remove_var("MAA_DATA_DIR");
             let project = ProjectDirs::from("com", "loong", "maa");
             if cfg!(target_os = "macos") {
                 assert_eq!(
@@ -522,7 +529,7 @@ mod tests {
             assert_eq!(resource(), test_dirs().resource());
             // The value of `MAA_COER_VERSION` is set in CI,
             // where the MaaCore is installed at standard location.
-            if env::var_os("MAA_CORE_INSTALLED").is_some() {
+            if env::var_os("SKIP_CORE_TEST").is_none() {
                 // This is not used in this test, but needed.
                 let extra_dir = Path::new("/usr/local/share/maa");
                 assert_eq!(
@@ -644,6 +651,7 @@ mod tests {
         #[test]
         fn config_relative() {
             env::remove_var("XDG_CONFIG_HOME");
+            env::remove_var("MAA_CONFIG_DIR");
             let project = ProjectDirs::from("com", "loong", "maa");
             if cfg!(target_os = "macos") {
                 assert_eq!(
@@ -686,6 +694,7 @@ mod tests {
         #[test]
         fn cache_relative() {
             env::remove_var("XDG_CACHE_HOME");
+            env::remove_var("MAA_CACHE_DIR");
             let project = ProjectDirs::from("com", "loong", "maa");
             if cfg!(target_os = "macos") {
                 assert_eq!(

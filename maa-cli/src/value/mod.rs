@@ -6,6 +6,7 @@ pub use primate::MAAPrimate;
 mod input;
 pub use input::MAAInput;
 
+pub use std::collections::BTreeMap as Map;
 use std::io;
 
 use serde::{Deserialize, Serialize};
@@ -18,23 +19,47 @@ pub enum MAAValue {
     Array(Vec<MAAValue>),
     /// A value that should be queried from user input
     Input(MAAInput),
-    /// A optional value only if all the dependencies are satisfied. Must in an object.
+    /// A optional value
     ///
-    /// If keys in dependencies are not exist or the values are not equal to the expected values,
-    /// the value will be dropped during initialization.
-    OptionalInput {
+    /// A optional value will be initialized only if all the dependencies are satisfied.
+    /// If one of the dependencies is not exist or the value is not equal to the expected value,
+    /// the optional value will be dropped after initialization.
+    ///
+    /// Note: Circular dependencies will cause panic.
+    Optional {
         /// A map of dependencies
         ///
         /// Keys are the keys of the dependencies in the sam object and values are the expected
-        deps: Map<MAAPrimate>,
+        #[serde(alias = "deps")]
+        conditions: Map<String, MAAPrimate>,
         /// Input value query from user when all the dependencies are satisfied
-        #[serde(flatten)]
-        input: MAAInput,
+        #[serde(alias = "input", flatten)]
+        value: BoxedMAAValue,
     },
     /// Object is a map of key-value pair
-    Object(Map<MAAValue>),
+    Object(Map<String, MAAValue>),
     /// Primate json types: bool, int, float, string
     Primate(MAAPrimate),
+}
+
+#[cfg_attr(test, derive(PartialEq, Debug))]
+#[derive(Deserialize, Clone)]
+#[serde(transparent)]
+pub struct BoxedMAAValue(Box<MAAValue>);
+
+impl BoxedMAAValue {
+    fn init(self) -> io::Result<MAAValue> {
+        self.0.init()
+    }
+}
+
+impl<T> From<T> for BoxedMAAValue
+where
+    T: Into<MAAValue>,
+{
+    fn from(value: T) -> Self {
+        Self(Box::new(value.into()))
+    }
 }
 
 impl Serialize for MAAValue {
@@ -75,10 +100,18 @@ impl MAAValue {
     /// If the value is an primate value, do nothing.
     /// If the value is an input value, try to get the value from user input and set it to the value.
     /// If the value is an array or an object, initialize all the values in it recursively.
+    /// If the value is an optional value, initialize it only if all the dependencies are satisfied.
     ///
-    /// For optional input value, initialize it only if all the dependencies are satisfied.
+    /// # Errors
     ///
-    /// Note: circular dependencies will be set to missing.
+    /// ## InvalidData
+    ///
+    /// 1. If an optional value is not in an object, the error will be returned.
+    /// 2. If a circular dependencies are found, the error will be returned.
+    ///
+    /// ## Other
+    ///
+    /// Otherwise, if some value failed to initialize, forward the error.
     pub fn init(self) -> io::Result<Self> {
         use MAAValue::*;
         match self {
@@ -91,45 +124,73 @@ impl MAAValue {
                 Ok(Array(ret))
             }
             Object(mut map) => {
-                let mut sorted_map = map.iter().collect::<Vec<_>>();
-                sorted_map.sort_by(|(k1, v1), (k2, v2)| match (v1, v2) {
-                    (OptionalInput { deps: deps1, .. }, OptionalInput { deps: deps2, .. }) => {
-                        match (deps1.contains_key(*k2), deps2.contains_key(*k1)) {
-                            (false, false) => k1.cmp(k2),
-                            (true, false) => std::cmp::Ordering::Greater,
-                            (false, true) => std::cmp::Ordering::Less,
-                            (true, true) => panic!("circular dependencies"),
-                        }
-                    }
-                    (OptionalInput { .. }, _) => std::cmp::Ordering::Greater,
-                    (_, OptionalInput { .. }) => std::cmp::Ordering::Less,
-                    _ => k1.cmp(k2),
-                });
+                enum Mark {
+                    Visiting,
+                    Visited,
+                }
 
-                // Clone sorted keys to release the borrow of map
-                let sorted_keys = sorted_map
-                    .iter()
-                    .map(|(k, _)| (*k).clone())
-                    .collect::<Vec<_>>();
+                // Depth-first search to sort the keys
+                fn visit<'key>(
+                    sorted_keys: &mut Vec<String>,
+                    key: &'key str,
+                    map: &'key Map<String, MAAValue>,
+                    marks: &mut Map<&'key str, Mark>,
+                ) -> io::Result<()> {
+                    match marks.get(key) {
+                        Some(Mark::Visited) => return Ok(()),
+                        Some(Mark::Visiting) => {
+                            return Err(io::Error::new(
+                                io::ErrorKind::InvalidData,
+                                "circular dependencies",
+                            ));
+                        }
+                        _ => {}
+                    }
+
+                    match map.get(key) {
+                        // If the key is an optional value, visit all the dependencies first
+                        Some(Optional { conditions, .. }) => {
+                            marks.insert(key, Mark::Visiting);
+                            for cond_key in conditions.keys() {
+                                visit(sorted_keys, cond_key, map, marks)?;
+                            }
+                        }
+                        // if the key is not exist, return directly
+                        None => return Ok(()),
+                        _ => {}
+                    }
+
+                    marks.insert(key, Mark::Visited);
+                    sorted_keys.push(key.to_string());
+
+                    Ok(())
+                }
+
+                let mut sorted_keys: Vec<String> = Vec::with_capacity(map.len());
+                let mut marks = std::collections::BTreeMap::<&str, Mark>::new();
+
+                for key in map.keys() {
+                    visit(&mut sorted_keys, key, &map, &mut marks)?;
+                }
 
                 // Initialize all the values with given order and put them into a new map
-                let mut initialized: Map<MAAValue> = Map::new();
+                let mut initialized: Map<String, MAAValue> = Map::new();
                 for key in sorted_keys {
                     let value = map.remove(&key).unwrap();
-                    if let OptionalInput { deps, input } = value {
+                    if let Optional { conditions, value } = value {
                         let mut satisfied = true;
                         // Check if all the dependencies are satisfied
-                        for (dep_key, expected) in deps {
+                        for (cond_key, expected) in conditions {
                             // If the dependency is not exist or the value is not equal to the expected values
                             // break the loop and mark status as unsatisfied
-                            if !initialized.get(&dep_key).is_some_and(|v| v == &expected) {
+                            if !initialized.get(&cond_key).is_some_and(|v| v == &expected) {
                                 satisfied = false;
                                 break;
                             }
                         }
                         // if all the dependencies are satisfied, initialize the value
                         if satisfied {
-                            initialized.insert(key, input.into_primate()?.into());
+                            initialized.insert(key, value.init()?);
                         }
                     } else {
                         initialized.insert(key, value.init()?);
@@ -138,7 +199,7 @@ impl MAAValue {
 
                 Ok(Object(initialized))
             }
-            OptionalInput { .. } => Err(io::Error::new(
+            Optional { .. } => Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "optional input must be in an object",
             )),
@@ -147,7 +208,15 @@ impl MAAValue {
     }
 
     /// Get inner value if the value is an object
-    pub fn as_object(&self) -> Option<&Map<MAAValue>> {
+    pub fn as_object(&self) -> Option<&Map<String, MAAValue>> {
+        match self {
+            Self::Object(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    /// Get mutable inner value if the value is an object
+    pub fn as_object_mut(&mut self) -> Option<&mut Map<String, MAAValue>> {
         match self {
             Self::Object(v) => Some(v),
             _ => None,
@@ -160,6 +229,13 @@ impl MAAValue {
     /// Otherwise, return `None`.
     pub fn get(&self, key: &str) -> Option<&Self> {
         self.as_object().and_then(|map| map.get(key))
+    }
+
+    /// Get mutable value of given key
+    ///
+    /// Same as `get`, but return mutable reference.
+    pub fn get_mut(&mut self, key: &str) -> Option<&mut Self> {
+        self.as_object_mut().and_then(|map| map.get_mut(key))
     }
 
     /// Get value of given key or return default value
@@ -191,6 +267,9 @@ impl MAAValue {
     }
 
     /// Get the value if the value is primate
+    ///
+    /// A primate value can be a bool, int, float or string.
+    /// It can not be an array, object or input value.
     fn as_primate(&self) -> Option<&MAAPrimate> {
         match self {
             Self::Primate(v) => Some(v),
@@ -198,22 +277,29 @@ impl MAAValue {
         }
     }
 
+    /// Convert the value to bool if the value is primate bool
     pub fn as_bool(&self) -> Option<bool> {
         self.as_primate().and_then(MAAPrimate::as_bool)
     }
 
+    /// Convert the value to int if the value is primate int
     pub fn as_int(&self) -> Option<i32> {
         self.as_primate().and_then(MAAPrimate::as_int)
     }
 
+    /// Convert the value to float if the value is primate float
     pub fn as_float(&self) -> Option<f32> {
         self.as_primate().and_then(MAAPrimate::as_float)
     }
 
+    /// Convert the value to string if the value is primate string
     pub fn as_str(&self) -> Option<&str> {
         self.as_primate().and_then(MAAPrimate::as_str)
     }
 
+    /// Merge other value into self
+    ///
+    /// Both self and other should be an object.
     pub fn merge_mut(&mut self, other: &Self) {
         match (self, other) {
             (Self::Object(self_map), Self::Object(other_map)) => {
@@ -230,16 +316,47 @@ impl MAAValue {
     }
 }
 
-// TODO: shortcur for OptionalInput
 #[macro_export]
+/// A convenient macro to create a MAAValue::Object
+///
+/// # Examples
+/// ```
+/// use maa_cli::value::MAAValue;
+///
+/// let object = object!(
+///     "bool" => true,
+///     "int" => 1,
+///     "float" => 1.0,
+///     "string" => "string",
+///     "array" => [1, 2],
+///     "object" => object!(
+///         "key1" => "value1",
+///         "key2" => "value2",
+///     )
+///     "optional" if "bool" == true => 1,
+///     "optional_no_satisfied" if "bool" == false => 1,
+///     "optional_no_exist" if "no_exist" == true => 1,
+///     "optional_chian" if "optional" == true => 1,
+/// );
+/// ```
 macro_rules! object {
     () => {
-        MAAValue::new()
+        $crate::value::MAAValue::new()
     };
-    ($($key:expr => $value:expr),* $(,)?) => {{
-        let mut value = MAAValue::new();
-        $(value.insert($key, $value);)*
-        value
+    ($($key:literal $(if $($cond_key:literal == $expected:expr),*)? => $value:expr),* $(,)?) => {{
+        let mut object = $crate::value::MAAValue::new();
+        $(
+            let value = $value;
+            $(
+                let mut conditions = $crate::value::Map::new();
+                $(
+                    conditions.insert($cond_key.into(), $expected.into());
+                )*
+                let value = $crate::value::MAAValue::Optional { conditions, value: value.into() };
+            )?
+            object.insert($key, value);
+        )*
+        object
     }};
 }
 
@@ -302,10 +419,10 @@ impl<'a> TryFromMAAValue<'a> for &str {
     }
 }
 
-pub type Map<T> = std::collections::BTreeMap<String, T>;
-
 #[cfg(test)]
 mod tests {
+    use crate::assert_matches;
+
     use super::*;
 
     use userinput::{BoolInput, Input, SelectD};
@@ -331,7 +448,7 @@ mod tests {
             "bool" => true,
             "float" => 1.0,
             "int" => 1,
-            "object" => [("key", "value")],
+            "object" => object!("key" => "value"),
             "string" => "string",
             "input_bool" => BoolInput::new(Some(true), None),
             "input_float" => Input::new(Some(1.0), None),
@@ -340,20 +457,16 @@ mod tests {
             "select_int" => SelectD::new([1, 2], Some(2), None, false).unwrap(),
             "select_float" => SelectD::new([1.0, 2.0], Some(2), None, false).unwrap(),
             "select_string" => SelectD::<String>::new(["string1", "string2"], Some(2), None, false).unwrap(),
-            "optional" => MAAValue::OptionalInput {
-                deps: Map::from([("input_bool".to_string(), true.into())]),
-                input: Input::new(Some(1), None).into(),
-            },
-            "optional_no_satisfied" => MAAValue::OptionalInput {
-                deps: Map::from([("input_bool".to_string(), false.into())]),
-                input: Input::new(Some(1), None).into(),
-            },
+            "optional" if "input_bool" == true => Input::new(Some(1), None),
+            "optional_no_satisfied" if "input_bool" == false => Input::new(Some(1), None),
+            "optional_object" if "input_bool" == true =>
+                object!("key1" => "value1", "key2" => "value2"),
         );
 
         serde_test::assert_de_tokens(
             &obj,
             &[
-                Token::Map { len: Some(15) },
+                Token::Map { len: Some(16) },
                 Token::Str("array"),
                 Token::Seq { len: Some(2) },
                 Token::I32(1),
@@ -424,7 +537,7 @@ mod tests {
                 Token::MapEnd,
                 Token::Str("optional"),
                 Token::Map { len: Some(2) },
-                Token::Str("deps"),
+                Token::Str("conditions"),
                 Token::Map { len: Some(1) },
                 Token::Str("input_bool"),
                 Token::Bool(true),
@@ -434,13 +547,25 @@ mod tests {
                 Token::MapEnd,
                 Token::Str("optional_no_satisfied"),
                 Token::Map { len: Some(2) },
-                Token::Str("deps"),
+                Token::Str("conditions"),
                 Token::Map { len: Some(1) },
                 Token::Str("input_bool"),
                 Token::Bool(false),
                 Token::MapEnd,
                 Token::Str("default"),
                 Token::I32(1),
+                Token::MapEnd,
+                Token::Str("optional_object"),
+                Token::Map { len: Some(3) },
+                Token::Str("conditions"),
+                Token::Map { len: Some(1) },
+                Token::Str("input_bool"),
+                Token::Bool(true),
+                Token::MapEnd,
+                Token::Str("key1"),
+                Token::Str("value1"),
+                Token::Str("key2"),
+                Token::Str("value2"),
                 Token::MapEnd,
                 Token::MapEnd,
             ],
@@ -451,7 +576,7 @@ mod tests {
         serde_test::assert_ser_tokens(
             &obj,
             &[
-                Token::Map { len: Some(14) },
+                Token::Map { len: Some(15) },
                 Token::Str("array"),
                 Token::Seq { len: Some(2) },
                 Token::I32(1),
@@ -478,6 +603,13 @@ mod tests {
                 Token::MapEnd,
                 Token::Str("optional"),
                 Token::I32(1),
+                Token::Str("optional_object"),
+                Token::Map { len: Some(2) },
+                Token::Str("key1"),
+                Token::Str("value1"),
+                Token::Str("key2"),
+                Token::Str("value2"),
+                Token::MapEnd,
                 Token::Str("select_float"),
                 Token::F32(2.0),
                 Token::Str("select_int"),
@@ -501,35 +633,22 @@ mod tests {
 
     #[test]
     fn init() {
-        use MAAValue::OptionalInput;
-
         let input = BoolInput::new(Some(true), None);
-        let optional = OptionalInput {
-            deps: Map::from([("input".to_string(), true.into())]),
-            input: input.clone().into(),
-        };
-        let optional_no_satisfied = OptionalInput {
-            deps: Map::from([("input".to_string(), false.into())]),
-            input: input.clone().into(),
-        };
-        let optional_no_exist = OptionalInput {
-            deps: Map::from([("no_exist".to_string(), true.into())]),
-            input: input.clone().into(),
-        };
-        let optional_chianed = OptionalInput {
-            deps: Map::from([("optional".to_string(), true.into())]),
-            input: input.clone().into(),
-        };
 
         let value = object!(
             "input" => input.clone(),
             "array" => [1],
             "primate" => 1,
-            "optional" => optional.clone(),
-            "optional_no_satisfied" => optional_no_satisfied.clone(),
-            "optional_no_exist" => optional_no_exist.clone(),
-            "optional_chian" => optional_chianed.clone(),
+            "optional" if "input" == true => input.clone(),
+            "optional_no_satisfied" if "input" == false => input.clone(),
+            "optional_no_exist" if "no_exist" == true => input.clone(),
+            "optional_chian" if "optional" == true => input.clone(),
+            "optional_nested" if "optional" == true => object!(
+                "nested" if "optional" == true => input.clone(),
+            ),
         );
+
+        let optional = value.get("optional").unwrap().clone();
 
         assert_eq!(value.get("input").unwrap(), &MAAValue::from(input.clone()));
         assert_eq!(
@@ -537,13 +656,23 @@ mod tests {
             &MAAValue::Array(vec![1.into()])
         );
         assert_eq!(value.get("primate").unwrap(), &MAAValue::from(1));
-        assert_eq!(value.get("optional").unwrap(), &optional);
-        assert_eq!(
+        assert_matches!(value.get("optional").unwrap(), MAAValue::Optional { .. });
+        assert_matches!(
             value.get("optional_no_satisfied").unwrap(),
-            &optional_no_satisfied
+            MAAValue::Optional { .. }
         );
-        assert_eq!(value.get("optional_no_exist").unwrap(), &optional_no_exist);
-        assert_eq!(value.get("optional_chian").unwrap(), &optional_chianed);
+        assert_matches!(
+            value.get("optional_no_exist").unwrap(),
+            MAAValue::Optional { .. }
+        );
+        assert_matches!(
+            value.get("optional_chian").unwrap(),
+            MAAValue::Optional { .. }
+        );
+        assert_matches!(
+            value.get("optional_nested").unwrap(),
+            MAAValue::Optional { .. }
+        );
 
         let value = value.init().unwrap();
 
@@ -557,29 +686,25 @@ mod tests {
         assert_eq!(value.get("optional_no_satisfied"), None);
         assert_eq!(value.get("optional_no_exist"), None);
         assert_eq!(value.get("optional_chian").unwrap(), &MAAValue::from(true));
+        assert_eq!(value.get("optional_nested").unwrap(), &object!());
 
         assert_eq!(
             optional.init().unwrap_err().kind(),
             io::ErrorKind::InvalidData
-        )
-    }
-
-    #[test]
-    #[should_panic(expected = "circular dependencies")]
-    fn init_circular_dependencies() {
-        let input1 = BoolInput::new(Some(true), None);
-        let value = object!(
-            "optional1" => MAAValue::OptionalInput {
-                deps: Map::from([("optional2".to_string(), true.into())]),
-                input: input1.clone().into(),
-            },
-            "optional2" => MAAValue::OptionalInput {
-                deps: Map::from([("optional1".to_string(), true.into())]),
-                input: input1.clone().into(),
-            },
         );
 
-        value.init().unwrap();
+        let value = object!(
+            "optional1" if "optional2" == true => input.clone(),
+            "optional2" if "optional1" == true => input.clone(),
+        );
+        assert_eq!(value.init().unwrap_err().kind(), io::ErrorKind::InvalidData);
+
+        let value = object!(
+            "optional1" if "optional2" == true => input.clone(),
+            "optional2" if "optional3" == true => input.clone(),
+            "optional3" if "optional1" == true => input.clone(),
+        );
+        assert_eq!(value.init().unwrap_err().kind(), io::ErrorKind::InvalidData);
     }
 
     #[test]
@@ -593,6 +718,14 @@ mod tests {
         assert_eq!(value.get_or("int", 2), 1);
         assert_eq!(value.get_or("int", 2.0), 2.0);
         assert_eq!(value.get_or("float", 2.0), 2.0);
+
+        let mut value = object!("int" => 1);
+
+        assert_eq!(value.get("int").unwrap().as_int().unwrap(), 1);
+        *value.get_mut("int").unwrap() = 2.into();
+        assert_eq!(value.get("int").unwrap().as_int().unwrap(), 2);
+        assert_eq!(value.get_mut("float"), None);
+        assert_eq!(MAAValue::from(1).get_mut("int"), None);
     }
 
     #[test]
@@ -646,14 +779,20 @@ mod tests {
             "float" => 1.0,
             "string" => "string",
             "array" => [1, 2],
-            "object" => [("key1", "value1"), ("key2", "value2")],
+            "object" => object!(
+                "key1" => "value1",
+                "key2" => "value2",
+            ),
         );
 
         let value2 = object!(
             "bool" => false,
             "int" => 2,
             "array" => [3, 4],
-            "object" => [("key2", "value2_2"), ("key3", "value3")],
+            "object" => object!(
+                "key2" => "value2_2",
+                "key3" => "value3",
+            ),
         );
 
         assert_eq!(
@@ -664,7 +803,11 @@ mod tests {
                 "float" => 1.0,
                 "string" => "string",
                 "array" => [3, 4], // array will be replaced instead of merged
-                "object" => [("key1", "value1"), ("key2", "value2_2"), ("key3", "value3")],
+                "object" => object!(
+                    "key1" => "value1",
+                    "key2" => "value2_2",
+                    "key3" => "value3",
+                ),
             ),
         );
     }

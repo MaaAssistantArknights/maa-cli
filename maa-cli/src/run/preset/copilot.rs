@@ -2,10 +2,7 @@ use crate::{
     config::task::{Task, TaskConfig},
     dirs::{self, Ensure},
     object,
-    value::{
-        userinput::{BoolInput, Input},
-        MAAValue,
-    },
+    value::userinput::{BoolInput, Input},
 };
 
 use std::{

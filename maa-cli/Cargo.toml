@@ -1,7 +1,7 @@
 [package]
 name = "maa-cli"
 authors = ["Loong Wang <wangl-cc@outlook.com>"]
-version = "0.4.6"
+version = "0.5.0"
 edition = "2021"
 readme = "../README-EN.md"
 description = "A simple CLI for MAA (MaaAssistantArknights)"
@@ -18,11 +18,10 @@ core_installer = ["__installer"]
 cli_installer = ["__installer"]
 
 # Vendored openssl
-vendored-openssl = ["git2?/vendored-openssl", "reqwest/native-tls-vendored"]
+vendored-openssl = ["git2?/vendored-openssl"]
 
 # Common features used to install and update MAA Core and maa-cli self
 __installer = [
-  "tokio",
   "indicatif",
   "futures-util",
   "sha2",
@@ -48,13 +47,12 @@ directories = "5"
 anyhow = "1"
 signal-hook = "0.3.17"
 dunce = "1.0.4"
-sys-locale = "0.3.1"
+async-trait = "0.1.81"
 prettytable = { version = "0.10.0", default-features = false }
 
 clap = { version = "4.4", features = ["derive"] }
 clap_complete = { version = "4.4" }
 clap_mangen = "0.2.20"
-clap-verbosity-flag = "2.1"
 
 toml = "0.8"
 serde = { version = "1", features = ["derive"] }
@@ -62,7 +60,7 @@ serde_json = "1"
 serde_yaml = "0.9.25"
 
 # Backend used to manipulate resource repository
-git2 = { version = "0.18.1", optional = true }
+git2 = { version = "0.19", optional = true }
 
 # Dependencies used to download files
 indicatif = { version = "0.17.7", optional = true }
@@ -77,6 +75,7 @@ tar = { version = "0.4.40", optional = true }
 
 # Logging support
 log = "0.4.20"
+
 [dependencies.env_logger]
 version = "0.11"
 default-features = false
@@ -89,29 +88,33 @@ default-features = false
 features = ["std", "clock", "serde"]
 
 [dependencies.zip]
-version = "0.6.6"
+version = "2"
 optional = true
 default-features = false
 features = ["deflate"]
 
 [dependencies.tokio]
 version = "1.31"
-optional = true
 default-features = false
 features = ["rt", "rt-multi-thread"]
 
 [dependencies.reqwest]
 version = "0.12"
-features = ["blocking", "json"]
+default-features = false
+features = [
+  # default features without default-tls {{{
+  "charset",
+  "http2",
+  "macos-system-configuration",
+  # }}}
+  "rustls-tls",
+  "blocking",
+  "json",
+]
 
 [target.'cfg(windows)'.dependencies.windows]
 version = "0.52.0"
 features = ["Win32_Foundation", "Win32_System_LibraryLoader"]
-
-[target.'cfg(target_os = "macos")'.dependencies.tokio]
-version = "1.31"
-default-features = false
-features = ["rt", "rt-multi-thread"]
 
 [dev-dependencies]
 regex = "1.10.2"

@@ -35,6 +35,8 @@ __maa_add_subcommand list 'List all available tasks'
 __maa_add_subcommand complete 'Generate completion script for given shell'
 __maa_add_subcommand mangen 'Generate man page for maa-cli at given path'
 __maa_add_subcommand convert 'Convert config file to another format'
+__maa_add_subcommand import 'Import config file from file'
+__maa_add_subcommand init 'Initialize config file'
 __maa_add_subcommand cleanup 'Cleanup maa-cli and MaaCore cache'
 
 # options for subcommands
@@ -78,8 +80,9 @@ complete -c maa -n "__fish_seen_subcommand_from $run_commands" -f # prevent fish
 complete -c maa -n "__fish_seen_subcommand_from run" -f -a "$(maa list)"
 complete -c maa -n "__fish_seen_subcommand_from startup" -f -a "$clients"
 complete -c maa -n "__fish_seen_subcommand_from startup" -f -l account -d 'Account to login' -r
+complete -c maa -n "__fish_seen_subcommand_from closedown" -f -a "$clients"
 complete -c maa -n "__fish_seen_subcommand_from fight" -f -s m -l medicine -d 'Medicine to use' -r
-complete -c maa -n "__fish_seen_subcommand_from roguelike" -a "phantom mizuki sami"
+complete -c maa -n "__fish_seen_subcommand_from roguelike" -a "phantom mizuki sami sarkaz"
 
 # Misc commands
 complete -c maa -n "__fish_seen_subcommand_from complete" -f -a "bash fish zsh powershell"
@@ -88,4 +91,12 @@ complete -c maa -n "__fish_seen_subcommand_from cleanup" -f -a "cli-cache core-c
 complete -c maa -n "__fish_seen_subcommand_from convert" -f -s f -l format -a "j json y yaml t toml" -r
 complete -c maa -n "__fish_seen_subcommand_from activity" -f -a "$clients"
 complete -c maa -n "__fish_seen_subcommand_from remainder" -f -l timezone -d 'Timezone to determine the current date' -r
+
+complete -c maa -n "__fish_seen_subcommand_from import" -s f -l force -d 'Force to import even if the config already exists'
+complete -c maa -n "__fish_seen_subcommand_from import" -s t -l config-type -d "Type of config file to import, default to task"
+
+complete -c maa -n "__fish_seen_subcommand_from init" -s n -l name -d 'Name of profile to initialize' -r
+complete -c maa -n "__fish_seen_subcommand_from init" -l force -d 'Force to initialize even if the config already exists'
+complete -c maac -n "__fish_seen_subcommand_from init" -s f -l format -a "j json y yaml t toml" -r
+
 complete -c maa -n "__fish_seen_subcommand_from hot-update list" -f # prevent fish complete from path

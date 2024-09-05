@@ -4,8 +4,7 @@
 mod callback;
 use callback::summary;
 
-#[cfg(target_os = "macos")]
-mod playcover;
+mod external;
 
 pub mod preset;
 
@@ -22,12 +21,9 @@ use std::{
 
 use anyhow::{bail, Context, Result};
 use clap::Args;
-use log::debug;
+use log::{debug, warn};
 use maa_sys::Assistant;
 use signal_hook::consts::TERM_SIGNALS;
-
-#[cfg(target_os = "macos")]
-use tokio::runtime::Runtime;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Args, Default)]
@@ -104,12 +100,13 @@ fn find_profile(root: impl AsRef<Path>, profile: Option<&str>) -> Result<AsstCon
     if let Some(profile) = profile {
         AsstConfig::find_file(join!(root, "profiles", profile))
             .context("Failed to find profile file!")
+    } else if let Some(config) = AsstConfig::find_file_or_none(join!(root, "profiles", "default"))?
+    {
+        Ok(config)
+    } else if let Some(config) = AsstConfig::find_file_or_none(join!(root, "asst"))? {
+        warn!("The config file `asst.toml` is deprecated, please use `profiles/default.toml` instead!");
+        Ok(config)
     } else {
-        for file in &[join!(root, "profiles", "default"), join!(root, "asst")] {
-            if let Some(config) = AsstConfig::find_file_or_none(file)? {
-                return Ok(config);
-            }
-        }
         Ok(AsstConfig::default())
     }
 }
@@ -128,11 +125,8 @@ where
 
     let task = f(&asst_config)?;
     let task_config = task.init()?;
-    if let Some(client_type) = task_config.client_type {
-        debug!("Detected client type: {}", client_type);
-        if let Some(resource) = client_type.resource() {
-            asst_config.resource.use_global_resource(resource);
-        }
+    if let Some(resource) = task_config.client_type.resource() {
+        asst_config.resource.use_global_resource(resource);
     }
 
     // Load and setup MaaCore
@@ -152,54 +146,57 @@ where
     let asst = Assistant::new(Some(callback::default_callback), None);
     asst_config.instance_options.apply_to(&asst)?;
 
-    // Register tasks
-    let mut summarys = (!args.no_summary).then(summary::Summary::new);
-    for task in task_config.tasks.iter() {
-        let name = task.name();
-        let task_type = task.task_type();
-        let params = task.params();
+    // Register tasks to Assistant and prepare summary
+    let mut task_summary = (!args.no_summary).then(summary::Summary::new);
+    for task in task_config.tasks {
+        let task_type = task.task_type;
+        let params = serde_json::to_string_pretty(&task.params)?;
         debug!(
-            "Adding task [{}] with params: {}",
-            name.unwrap_or(task_type.as_ref()),
-            serde_json::to_string_pretty(params)?
+            "Adding task [{}] with params: {params}",
+            task.name_or_default(),
         );
-        let id = asst.append_task(task_type, serde_json::to_string(params)?)?;
+        let id = asst
+            .append_task(task_type, params.as_str())
+            .with_context(|| {
+                format!(
+                    "Failed to add task {} with params: {params}",
+                    task.name_or_default(),
+                )
+            })?;
 
-        if let Some(s) = summarys.as_mut() {
-            s.insert(id, name.map(|s| s.to_owned()), task_type);
+        if let Some(s) = task_summary.as_mut() {
+            s.insert(id, task.name.map(Into::into), task_type);
         }
     }
-    if let Some(s) = summarys {
+    if let Some(s) = task_summary {
         summary::init(s);
     }
 
     // Prepare connection
-    let (adb, addr, config) = asst_config.connection.connect_args();
+    let (adb_path, address, config) = asst_config.connection.connect_args();
 
     // Launch external app like PlayCover or Emulator
     // Only support PlayCover on macOS now, may support more in the future
-    #[cfg(target_os = "macos")]
-    let app = match asst_config.connection.preset() {
-        crate::config::asst::Preset::PlayCover => playcover::PlayCoverApp::new(
-            task_config.start_app,
-            task_config.close_app,
-            task_config.client_type.unwrap_or_default(),
-            addr,
-        ),
+    let app: Option<Box<dyn external::ExternalApp>> = match asst_config.connection.preset() {
+        #[cfg(target_os = "macos")]
+        crate::config::asst::Preset::PlayCover => Some(Box::new(external::PlayCoverApp::new(
+            task_config.client_type,
+            address.as_ref(),
+        ))),
         _ => None,
     };
 
     if !args.dry_run {
+        let rt = tokio::runtime::Runtime::new().context("Failed to create tokio runtime")?;
+
         // Startup external app
-        #[cfg(target_os = "macos")]
-        let rt = Runtime::new().context("Failed to create tokio runtime")?;
-        #[cfg(target_os = "macos")]
-        if let Some(app) = app.as_ref() {
-            rt.block_on(app.open())?;
+        if let (Some(app), true) = (app.as_deref(), task_config.start_app) {
+            rt.block_on(app.open())
+                .context("Failed to open external app")?;
         }
 
         // Connect to game or emulator
-        asst.async_connect(adb, addr, config, true)?;
+        asst.async_connect(adb_path, address.as_ref(), config, true)?;
 
         asst.start()?;
 
@@ -213,9 +210,9 @@ where
         asst.stop()?;
 
         // Close external app
-        #[cfg(target_os = "macos")]
-        if let Some(app) = app.as_ref() {
-            rt.block_on(app.close())?;
+        if let (Some(app), true) = (app.as_deref(), task_config.close_app) {
+            rt.block_on(app.close())
+                .context("Failed to close external app")?;
         }
     }
 
@@ -308,13 +305,13 @@ mod tests {
     use std::env::{self, temp_dir};
 
     #[test]
+    #[ignore = "need installed MaaCore"]
     fn version() {
-        if env::var_os("MAA_CORE_INSTALLED").is_some() {
-            let version = core_version().unwrap();
-            if let Some(expect) = env::var_os("MAA_CORE_VERSION") {
-                assert_eq!(version, expect);
-            }
+        if env::var_os("SKIP_CORE_TEST").is_some() {
+            return;
         }
+        let version = env::var_os("MAA_CORE_VERSION").unwrap();
+        assert_eq!(core_version().unwrap(), version);
     }
 
     #[test]

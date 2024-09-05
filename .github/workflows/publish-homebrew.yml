@@ -5,7 +5,7 @@ on:
     inputs:
       version:
         description: Package version
-        required: false
+        required: true
         type: string
       dryrun:
         description: Do not create PR
@@ -19,7 +19,7 @@ on:
     inputs:
       version:
         description: Package version
-        required: false
+        required: true
         type: string
       dryrun:
         description: Do not create PR
@@ -38,53 +38,27 @@ env:
   HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.MAA_HOMEBREW_BUMP_PR }}
 
 jobs:
-  meta:
-    name: Meta
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      dryrun: ${{ steps.dryrun.outputs.dryrun }}
-    steps:
-      - name: Check if Dryrun
-        id: dryrun
-        run: |
-          if [ "$GITHUB_EVENT_NAME" = "release" ]; then
-            dryrun='false'
-          else
-            dryrun='${{ inputs.dryrun }}'
-          fi
-          echo "Dryrun: $dryrun"
-          echo "dryrun=$dryrun" >> "$GITHUB_OUTPUT"
-      - name: Get version
-        id: version
-        run: |
-          if [ "$GITHUB_EVENT_NAME" = "release" ]; then
-            tag='${{ github.ref }}'
-            version=${tag#refs/tags/v}
-          else
-            version='${{ inputs.version }}'
-          fi
-          echo "Version: $version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
   bump:
     name: Bump Formulae and Casks
-    needs: [meta]
     runs-on: macos-latest
     steps:
       - name: Tap MaasistantArknights Tap
         run: brew tap MaaAssistantArknights/homebrew-tap
-      - name: Bump Formula
+      - name: Configure Git User
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Bump Formulae and Casks
         run: |
           for formula in maa-cli maa-cli-beta; do
             brew bump-formula-pr "$formula" \
-              ${{ fromJson(needs.meta.outputs.dryrun) && '--dry-run' || '' }} \
+              ${{ inputs.dryrun && '--dry-run' || '' }} \
               --no-browse \
-              --version='${{ needs.meta.outputs.version }}'
+              --version='${{ inputs.version }}'
           done
           for cask in maa-cli-bin; do
             brew bump-cask-pr "$cask" \
-              ${{ fromJson(needs.meta.outputs.dryrun) && '--dry-run' || '' }} \
+              ${{ inputs.dryrun && '--dry-run' || '' }} \
               --no-browse \
-              --version='${{ needs.meta.outputs.version }}'
+              --version='${{ inputs.version }}'
           done

@@ -13,7 +13,7 @@ pub fn startup(client: Option<ClientType>, account: Option<String>) -> Result<Ta
     let mut params = MAAValue::new();
 
     if let Some(client) = client {
-        params.insert("client_type", client.as_ref());
+        params.insert("client_type", client.to_str());
         params.insert("start_game_enabled", true);
     };
 
@@ -26,10 +26,13 @@ pub fn startup(client: Option<ClientType>, account: Option<String>) -> Result<Ta
     Ok(task_config)
 }
 
-pub fn closedown() -> Result<TaskConfig> {
+pub fn closedown(client: ClientType) -> Result<TaskConfig> {
     let mut task_config = TaskConfig::new();
 
-    task_config.push(Task::new_with_default(CloseDown, object!()));
+    task_config.push(Task::new_with_default(
+        CloseDown,
+        object!("client_type" => client.to_str()),
+    ));
 
     Ok(task_config)
 }
@@ -107,13 +110,22 @@ mod tests {
 
     #[test]
     fn test_closedown() {
-        let task_config = closedown().unwrap();
+        let task_config = closedown(ClientType::YoStarEN).unwrap();
         let tasks = task_config.tasks();
 
         assert_eq!(tasks.len(), 1);
         let closedown_task = tasks.first().unwrap();
 
         assert_eq!(closedown_task.task_type(), CloseDown);
+        assert_eq!(
+            closedown_task
+                .params()
+                .get("client_type")
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "YoStarEN"
+        );
     }
 
     #[test]

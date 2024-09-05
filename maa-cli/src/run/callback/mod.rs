@@ -27,6 +27,7 @@ enum AsstMsg {
     ConnectionInfo = 2,
     AllTasksCompleted = 3,
     AsyncCallInfo = 4,
+    Destroyed = 5,
 
     /* TaskChain Info */
     TaskChainError = 10000,
@@ -54,6 +55,7 @@ impl From<AsstMsgId> for AsstMsg {
             2 => AsstMsg::ConnectionInfo,
             3 => AsstMsg::AllTasksCompleted,
             4 => AsstMsg::AsyncCallInfo,
+            5 => AsstMsg::Destroyed,
 
             10000 => AsstMsg::TaskChainError,
             10001 => AsstMsg::TaskChainStart,
@@ -93,6 +95,10 @@ fn process_message(code: AsstMsgId, json: Value) {
             Some(())
         }
         AsyncCallInfo => Some(()),
+        Destroyed => {
+            debug!("Instance destroyed");
+            Some(())
+        }
 
         TaskChainError | TaskChainStart | TaskChainCompleted | TaskChainExtraInfo
         | TaskChainStopped => process_taskchain(code.into(), message),
@@ -121,7 +127,21 @@ fn process_connection_info(message: &Map<String, Value>) -> Option<()> {
     let what = message.get("what")?.as_str()?;
 
     match what {
+        "UuidGot" => debug!(
+            "Got UUID: {}",
+            message.get("details")?.get("uuid")?.as_str()?
+        ),
+        "ConnectFailed" => error!(
+            "Failed to connect to android device, {}, Please check your connect configuration: {}",
+            message.get("why")?.as_str()?,
+            serde_json::to_string_pretty(message.get("details")?).unwrap()
+        ),
         // Resolution
+        "ResolutionGot" => debug!(
+            "Got Resolution: {} × {}",
+            message.get("details")?.get("width")?.as_i64()?,
+            message.get("details")?.get("height")?.as_i64()?
+        ),
         "UnsupportedResolution" => error!("{}", "UnsupportedResolution"),
         "ResolutionError" => error!("{}", "ResolutionAcquisitionFailure"),
 
@@ -271,24 +291,33 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
                 let exec_times = details.get("exec_times")?.as_i64()?;
                 edit_current_task_detail(|detail| {
                     if let Some(detail) = detail.as_roguelike_mut() {
-                        detail.set_times(exec_times)
+                        detail.start_exploration()
                     }
                 });
-                info!("{} {} {}", "MissionStart", exec_times, "times");
+                info!("Start exploration {} times", exec_times)
             }
-            "StageTraderInvestConfirm" => {
-                let exec_times = details.get("exec_times")?.as_i64()?;
+            "ExitThenAbandon" => {
                 edit_current_task_detail(|detail| {
                     if let Some(detail) = detail.as_roguelike_mut() {
-                        detail.set_invest(exec_times)
+                        detail.set_state(summary::ExplorationState::Abandoned)
                     }
                 });
-                info!("{} {} {}", "Invest", exec_times, "times");
+                info!("Exploration Abandoned")
             }
-            "ExitThenAbandon" => info!("{}", "ExplorationAbandoned"),
             "ExitThenConfirm" => info!("{}", "ExplorationConfirmed"),
             "MissionCompletedFlag" => info!("{}", "MissionCompleted"),
-            "MissionFailedFlag" => info!("{}", "MissionFailed"),
+            "MissionFailedFlag" => {
+                // Deposit In some cases a failed mission doesn't mean failed exploration
+                // If a exploration was not failed, it's state would be overwritten later
+                if message.get("taskchain")?.as_str()? == "Roguelike" {
+                    edit_current_task_detail(|detail| {
+                        if let Some(detail) = detail.as_roguelike_mut() {
+                            detail.set_state(summary::ExplorationState::Failed)
+                        }
+                    });
+                }
+                info!("MissionFailed")
+            }
             "StageTraderEnter" => info!("{}", "StageTraderEnter"),
             "StageSafeHouseEnter" => info!("{}", "StageSafeHouseEnter"),
             "StageCambatDpsEnter" => info!("{}", "StageCambatDpsEnter"),
@@ -493,6 +522,29 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
         // RogueLike
         "StageInfo" => info!("{} {}", "StartCombat", details.get("name")?.as_str()?),
         "StageInfoError" => error!("{}", "StageInfoError"),
+        "RoguelikeInvestment" => {
+            let count = details.get("count")?.as_i64()?;
+            let total = details.get("total")?.as_i64()?;
+            let deposit = details.get("deposit")?.as_i64()?;
+
+            edit_current_task_detail(|detail| {
+                if let Some(detail) = detail.as_roguelike_mut() {
+                    detail.invest(count);
+                }
+            });
+
+            info!("Deposit {count} / {total} / {deposit} originium ingots")
+        }
+        "RoguelikeSettlement" => {
+            let exp = details.get("exp")?.as_i64()?;
+            edit_current_task_detail(|detail| {
+                if let Some(detail) = detail.as_roguelike_mut() {
+                    detail.set_exp(exp)
+                }
+            });
+            info!("Gain {} exp during this exploration", exp);
+        }
+
         // Copilot
         "BattleFormation" => info!(
             "{} {}",

@@ -1,4 +1,4 @@
-# Configuring maa-cli
+# Configuration
 
 ## Configuration Directory
 
@@ -272,10 +272,14 @@ params = { stage = "CE-6" }
 [tasks.variants.params.stage]
 default = "1-7" # default value of stage, optional (if not given, user can input empty value to re-prompt)
 description = "a stage to fight" # description of the input, optional
+
+# query the medicine to use only when stage is 1-7
 [tasks.variants.params.medicine]
-# dependency of parameters, the key is the name of parameter, the value is the expected value of dependency parameter
-# when set, the parameter will be required to input only if all dependency parameters are satisfied
-deps = { stage = "1-7" }
+# a parameter can be optional with `optional` field
+# if the condition is not matched, the parameter will be ignored
+# the `condition` field can be used to specify the condition of the parameter
+# where the condition can be a table, whose keys are name of other parameters and values are the expected value
+conditions = { stage = "1-7" }
 default = 1000
 description = "medicine to use"
 ```
@@ -308,7 +312,7 @@ cpu_ocr = false
 gpu_ocr = 1
 
 [instance_options]
-touch_mode = "MAATouch"
+touch_mode = "MaaTouch"
 deployment_with_pause = false
 adb_lite_enabled = false
 kill_adb_on_exit = false
@@ -325,7 +329,7 @@ address = "emulator-5554" # the address of device, such as "emulator-5554" or "1
 config = "General" # the config of maa, should not be changed most of time
 ```
 
-`adb_path` is the path of `adb` executable, you can set it to the absolute path of `adb` or or leave it empty if it is in PATH. The `address` is the address of the device used by `adb`, like `emulator-5554` or `127.0.0.1:[port]`, the port of some common emulators can be found in the [MAA FAQ][emulator-ports]. The `config` is used to specify some configurations of the host and emulator, whose default value is `CompatMac` on macOS, `CompatPOSIXShell` on Linux and `General` on other platforms. More optional configs can be found in `config.json` in the resource directory.
+`adb_path` is the path of `adb` executable, you can set it to the absolute path of `adb` or or leave it empty if it is in PATH. The `address` is the address of the device used by `adb`, like `emulator-5554` or `127.0.0.1:[port]`, the port of some common emulators can be found in the [MAA FAQ][emulator-ports]. If the `address` is absent, the cli will try to find the device automatically by `adb devices`, if there are multiple online devices, the first one will be used. If cli can not find any device, it will try to use the default address `emulator-5554`. The `config` is used to specify some configurations of the host and emulator, whose default value is `CompatMac` on macOS, `CompatPOSIXShell` on Linux and `General` on other platforms. More optional configs can be found in `config.json` in the resource directory.
 
 For some common emulators, you can use `preset` to use predefined configurations:
 
@@ -371,7 +375,7 @@ The `instance_options` section is used to configure MAA instance options:
 
 ```toml
 [instance_options]
-touch_mode = "ADB" # touch mode to use, can be "ADB", "MiniTouch", "MAATouch" or "MacPlayTools" (only for PlayCover)
+touch_mode = "ADB" # touch mode to use, can be "ADB", "MiniTouch", "MaaTouch" or "MacPlayTools" (only for PlayCover)
 deployment_with_pause = false # whether pause the game when deployment
 adb_lite_enabled = false # whether use adb-lite
 kill_adb_on_exit = false # whether kill adb when exit
@@ -443,14 +447,12 @@ The JSON schema of configuration files can be found at [`schemas` directory][sch
 
 With the help of JSON schema, you can get auto-completion and validation in some editors with plugins.
 
-[task-types]: https://maa.plus/docs/en-us/3.1-INTEGRATION.html#list-of-task-types
-[emulator-ports]: https://maa.plus/docs/en-us/1.2-FAQ.html#common-adb-ports-for-popular-android-emulators
-[playcover-doc]: https://maa.plus/docs/en-us/1.4-EMULATOR_SUPPORTS_FOR_MAC.html#✅-playcover-the-software-runs-most-fluently-for-its-nativity-🚀
+[task-types]: https://maa.plus/docs/zh-cn/protocol/integration.html#list-of-task-types
+[emulator-ports]: https://maa.plus/docs/en-us/manual/connection.html#obtain-port-number
+[playcover-doc]: https://maa.plus/docs/en-us/manual/device/macos.html#%E2%9C%85-playcover-the-software-runs-most-fluently-for-its-nativity-%F0%9F%9A%80
 [example-config]: ../../config_examples
 [wangl-cc-dotfiles]: https://github.com/wangl-cc/dotfiles/tree/master/.config/maa
 [schema-dir]: ../../schemas/
 [task-schema]: ../../schemas/task.schema.json
 [asst-schema]: ../../schemas/asst.schema.json
 [cli-schema]: ../../schemas/cli.schema.json
-
-<!-- markdownlint-disable-file MD013 -->

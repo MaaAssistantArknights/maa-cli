@@ -1,5 +1,186 @@
 # Release Notes
 
+## Release 0.4.12
+
+### Features
+
+- Use `Official` as the default value for `client_type` by [@wangl-cc](https://github.com/wangl-cc) in [#312](https://github.com/MaaAssistantArknights/maa-cli/pull/312)
+
+### Bug Fixes
+
+- Handle `ConnectFailed` message in callback by [@wangl-cc](https://github.com/wangl-cc)
+
+### Performance
+
+- Slightly decrease allocations in processing tasks by [@wangl-cc](https://github.com/wangl-cc)
+
+### Documentation
+
+- Remove outdated FAQ entries by [@wangl-cc](https://github.com/wangl-cc)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.4.11...v0.4.12>
+
+## Release 0.4.11
+
+### Features
+
+- Set `client_type` for `Fight` and `Closedown` automatically by [@wangl-cc](https://github.com/wangl-cc) in [#305](https://github.com/MaaAssistantArknights/maa-cli/pull/305)
+- Support client type for `Closedown` command by [@wangl-cc](https://github.com/wangl-cc) in [#309](https://github.com/MaaAssistantArknights/maa-cli/pull/309)
+
+### Bug Fixes
+
+- Remove resource mirror by [@wangl-cc](https://github.com/wangl-cc) in [#311](https://github.com/MaaAssistantArknights/maa-cli/pull/311)
+
+### Refactor
+
+- Generalize external app open/close by [@wangl-cc](https://github.com/wangl-cc) in [#308](https://github.com/MaaAssistantArknights/maa-cli/pull/308)
+
+### Documentation
+
+- Unified case of `MaaTouch` by [@wangl-cc](https://github.com/wangl-cc)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.4.10...v0.4.11>
+
+## Release 0.4.10
+
+### Features
+
+- Improve error message when failing to add task by [@wangl-cc](https://github.com/wangl-cc)
+
+### Bug Fixes
+
+- Correctly handle the return value of `AsstAppendTask` by [@wangl-cc](https://github.com/wangl-cc) in [#300](https://github.com/MaaAssistantArknights/maa-cli/pull/300)
+
+### Refactor
+
+- Parse and convert of `TouchMode` and `TaskType` by [@wangl-cc](https://github.com/wangl-cc) in [#303](https://github.com/MaaAssistantArknights/maa-cli/pull/303)
+
+### Documentation
+
+- Update runtime loading section of maa-sys by [@wangl-cc](https://github.com/wangl-cc)
+
+### Testing
+
+- Remove `MAA_*_DIR` env vars before test by [@wangl-cc](https://github.com/wangl-cc) in [#302](https://github.com/MaaAssistantArknights/maa-cli/pull/302)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.4.9...v0.4.10>
+
+## Release 0.4.9
+
+### Features
+
+- Support Sarkaz rogue by [@hguandl](https://github.com/hguandl) in [#293](https://github.com/MaaAssistantArknights/maa-cli/pull/293)
+- Improve roguelike log output and summary by [@wangl-cc](https://github.com/wangl-cc) in [#298](https://github.com/MaaAssistantArknights/maa-cli/pull/298)
+
+### Documentation
+
+- Update docs to sync with MAA main repository by [@wangl-cc](https://github.com/wangl-cc) in [#291](https://github.com/MaaAssistantArknights/maa-cli/pull/291)
+
+### Security
+
+- Bump openssl from 0.10.64 to 0.10.66 by [@dependabot[bot]](https://github.com/dependabot[bot]) in [#296](https://github.com/MaaAssistantArknights/maa-cli/pull/296)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.4.8...v0.4.9>
+
+## Release 0.4.8
+
+### Features
+
+- Check git and ssh key availability before hot update by [@wangl-cc](https://github.com/wangl-cc) in [#279](https://github.com/MaaAssistantArknights/maa-cli/pull/279)
+- Improve optional value by [@wangl-cc](https://github.com/wangl-cc) in [#280](https://github.com/MaaAssistantArknights/maa-cli/pull/280)
+- Subcommand `init` to init profile (asst config) by [@wangl-cc](https://github.com/wangl-cc) in [#282](https://github.com/MaaAssistantArknights/maa-cli/pull/282)
+- Support callback message `Destroyed` by [@wangl-cc](https://github.com/wangl-cc)
+
+### Bug Fixes
+
+- Ensure config file are unique after importing by [@wangl-cc](https://github.com/wangl-cc) in [#281](https://github.com/MaaAssistantArknights/maa-cli/pull/281)
+- Respect gpu ocr when cpu ocr is not specified by [@wangl-cc](https://github.com/wangl-cc) in [#287](https://github.com/MaaAssistantArknights/maa-cli/pull/287)
+
+### Documentation
+
+- Improve usage guide about running tasks by [@wangl-cc](https://github.com/wangl-cc)
+- Fix the link document in the generated docs by [@wangl-cc](https://github.com/wangl-cc)
+- Change link target of configuration document by [@wangl-cc](https://github.com/wangl-cc)
+- 采用新的文档地址 by [@Alan-Charred](https://github.com/Alan-Charred) in [#289](https://github.com/MaaAssistantArknights/maa-cli/pull/289)
+- Fix dead link by [@Cryolitia](https://github.com/Cryolitia)
+
+### Miscellaneous
+
+- Remove debug print by [@wangl-cc](https://github.com/wangl-cc)
+- Fix asset links by [@wangl-cc](https://github.com/wangl-cc)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.4.7...v0.4.8>
+
+## Release 0.4.7
+
+### Features
+
+- Mark the old config file `asst.toml` deprecated by [@wangl-cc](https://github.com/wangl-cc) in [#275](https://github.com/MaaAssistantArknights/maa-cli/pull/275)
+- New command `import` to import configuration files by [@wangl-cc](https://github.com/wangl-cc) in [#276](https://github.com/MaaAssistantArknights/maa-cli/pull/276)
+- Detect device address by `adb devices` by [@wangl-cc](https://github.com/wangl-cc) in [#277](https://github.com/MaaAssistantArknights/maa-cli/pull/277)
+
+### Documentation
+
+- Add docs for other subcommands by [@wangl-cc](https://github.com/wangl-cc)
+
+### Miscellaneous
+
+- Use new file structure for config examples by [@wangl-cc](https://github.com/wangl-cc)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.4.6...v0.4.7>
+
+## Release 0.4.6
+
+### Features
+
+- Support multiple profiles by [@wangl-cc](https://github.com/wangl-cc) in [#251](https://github.com/MaaAssistantArknights/maa-cli/pull/251)
+- Add new cleanup targets and some refactoring for `dirs` by [@wangl-cc](https://github.com/wangl-cc) in [#254](https://github.com/MaaAssistantArknights/maa-cli/pull/254)
+- Impl `FromStr` for `TaskType` by [@wangl-cc](https://github.com/wangl-cc) in [#262](https://github.com/MaaAssistantArknights/maa-cli/pull/262)
+- Read version from environment variable by [@wangl-cc](https://github.com/wangl-cc) in [#273](https://github.com/MaaAssistantArknights/maa-cli/pull/273)
+- Handle ResolutionGot and UuidGot messages by [@wangl-cc](https://github.com/wangl-cc) in [#274](https://github.com/MaaAssistantArknights/maa-cli/pull/274)
+
+### Bug Fixes
+
+- Wrong path to item_index.json for non-official clients by [@wangl-cc](https://github.com/wangl-cc) in [#256](https://github.com/MaaAssistantArknights/maa-cli/pull/256)
+- Use `$crate::ToCString` in impl_to_cstring macros by [@wangl-cc](https://github.com/wangl-cc)
+- Ensure log directory exists before creating log file by [@wangl-cc](https://github.com/wangl-cc) in [#269](https://github.com/MaaAssistantArknights/maa-cli/pull/269)
+
+### Refactor
+
+- Replace lazy_static with OnceLock or normal static by [@wangl-cc](https://github.com/wangl-cc) in [#257](https://github.com/MaaAssistantArknights/maa-cli/pull/257)
+- Remove clap_verbosity_flag by [@wangl-cc](https://github.com/wangl-cc) in [#265](https://github.com/MaaAssistantArknights/maa-cli/pull/265)
+
+### Documentation
+
+- Add Nix/Linux by [@Cryolitia](https://github.com/Cryolitia) in [#248](https://github.com/MaaAssistantArknights/maa-cli/pull/248)
+- Update README for maa-sys and add more docs by [@wangl-cc](https://github.com/wangl-cc)
+- Fix markdown link in doc comments by [@wangl-cc](https://github.com/wangl-cc)
+- Split readme and move into `maa-cli/docs` by [@wangl-cc](https://github.com/wangl-cc)
+- Fix grammar by [@wangl-cc](https://github.com/wangl-cc) in [#250](https://github.com/MaaAssistantArknights/maa-cli/pull/250)
+- Update documentation generation script and titles by [@wangl-cc](https://github.com/wangl-cc)
+
+### Testing
+
+- Compare `BTreeSet` instead of `Vec` in cleanup by [@wangl-cc](https://github.com/wangl-cc) in [#271](https://github.com/MaaAssistantArknights/maa-cli/pull/271)
+
+### Security
+
+- Bump h2 from 0.4.3 to 0.4.4 by [@dependabot[bot]](https://github.com/dependabot[bot]) in [#252](https://github.com/MaaAssistantArknights/maa-cli/pull/252)
+
+### Miscellaneous
+
+- Use AGPL-3.0-only License by [@wangl-cc](https://github.com/wangl-cc) in [#234](https://github.com/MaaAssistantArknights/maa-cli/pull/234)
+- Bump DavidAnson/markdownlint-cli2-action from 15 to 16 by [@dependabot[bot]](https://github.com/dependabot[bot]) in [#253](https://github.com/MaaAssistantArknights/maa-cli/pull/253)
+- Bump Cargo.lock by [@wangl-cc](https://github.com/wangl-cc) in [#258](https://github.com/MaaAssistantArknights/maa-cli/pull/258)
+- Remove some unnecessary comments by [@wangl-cc](https://github.com/wangl-cc)
+- Fix relative links in generated docs by [@wangl-cc](https://github.com/wangl-cc)
+- Use relative md links for generated docs by [@wangl-cc](https://github.com/wangl-cc)
+- Update documentation of some methods in cleanup.rs by [@wangl-cc](https://github.com/wangl-cc)
+- Update fish completion for cleanup target by [@wangl-cc](https://github.com/wangl-cc)
+- Split command definition by [@wangl-cc](https://github.com/wangl-cc) in [#267](https://github.com/MaaAssistantArknights/maa-cli/pull/267)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.4.5...v0.4.6>
+
 ## Release 0.4.5
 
 ### Features
@@ -103,8 +284,8 @@
 - Search both origin and canonicalized directory of `current_exe` by [@wangl-cc](https://github.com/wangl-cc) in [#94](https://github.com/MaaAssistantArknights/maa-cli/pull/94)
 - Add a new subcommand `fight` by [@wangl-cc](https://github.com/wangl-cc) in [#104](https://github.com/MaaAssistantArknights/maa-cli/pull/104)
 - Add `BoolInput` to query user for boolean input by [@wangl-cc](https://github.com/wangl-cc) in [#107](https://github.com/MaaAssistantArknights/maa-cli/pull/107)
-- Qurey `start_game_enabled` and `client_type` in startup task by [@wangl-cc](https://github.com/wangl-cc) in [#110](https://github.com/MaaAssistantArknights/maa-cli/pull/110)
-- Add subcommand `copilot` to complete the auto-battle feature  by [@hzxjy1](https://github.com/hzxjy1) in [#127](https://github.com/MaaAssistantArknights/maa-cli/pull/127)
+- Query `start_game_enabled` and `client_type` in startup task by [@wangl-cc](https://github.com/wangl-cc) in [#110](https://github.com/MaaAssistantArknights/maa-cli/pull/110)
+- Add subcommand `copilot` to complete the auto-battle feature by [@hzxjy1](https://github.com/hzxjy1) in [#127](https://github.com/MaaAssistantArknights/maa-cli/pull/127)
 - **BREAKING**:Resource update and refactor maa core binding by [@wangl-cc](https://github.com/wangl-cc) in [#126](https://github.com/MaaAssistantArknights/maa-cli/pull/126)
 - **BREAKING**:Download native binaries instead of universal binaries on macOS by [@wangl-cc](https://github.com/wangl-cc) in [#133](https://github.com/MaaAssistantArknights/maa-cli/pull/133)
 - Add stage argument to fight task by [@wangl-cc](https://github.com/wangl-cc) in [#134](https://github.com/MaaAssistantArknights/maa-cli/pull/134)
@@ -213,7 +394,7 @@
 ### Features
 
 - Allow user input in task definition by [@wangl-cc](https://github.com/wangl-cc) in [#54](https://github.com/MaaAssistantArknights/maa-cli/pull/54)
-- Add option `strategy`  for  variant by [@wangl-cc](https://github.com/wangl-cc) in [#64](https://github.com/MaaAssistantArknights/maa-cli/pull/64)
+- Add option `strategy` for variant by [@wangl-cc](https://github.com/wangl-cc) in [#64](https://github.com/MaaAssistantArknights/maa-cli/pull/64)
 
 ### Documentation
 
@@ -364,7 +545,7 @@
 - Wrong match in get_asset by [@wangl-cc](https://github.com/wangl-cc)
 - Name of `maa-cli` should be `maa` by [@wangl-cc](https://github.com/wangl-cc)
 - Download url with `MAA_CLI_DOWNLOAD` by [@wangl-cc](https://github.com/wangl-cc)
-- Remove  duplicate log for additional resource by [@wangl-cc](https://github.com/wangl-cc)
+- Remove duplicate log for additional resource by [@wangl-cc](https://github.com/wangl-cc)
 - Don't treat other error as file not found during parse asst_config by [@wangl-cc](https://github.com/wangl-cc)
 - Yaml support by [@wangl-cc](https://github.com/wangl-cc)
 
