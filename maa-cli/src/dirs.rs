@@ -390,6 +390,7 @@ impl Ensure for &Path {
                         "Failed to remove dir {} due to {err}, retry {i} times",
                         self.display()
                     );
+                    std::thread::sleep(std::time::Duration::from_secs(1));
                     ret = remove_dir_all(self);
                 } else {
                     break;
