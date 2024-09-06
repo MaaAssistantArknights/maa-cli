@@ -383,7 +383,19 @@ impl Ensure for &Path {
 
     fn ensure_clean(self) -> Result<Self, Self::Error> {
         if self.exists() {
-            remove_dir_all(self)?;
+            let mut ret = remove_dir_all(self);
+            for i in 0..3 {
+                if let Err(err) = &ret {
+                    log::warn!(
+                        "Failed to remove dir {} due to {err}, retry {i} times",
+                        self.display()
+                    );
+                    ret = remove_dir_all(self);
+                } else {
+                    break;
+                }
+            }
+            ret?;
         } else if let Some(parent) = self.parent() {
             parent.ensure()?;
         }
@@ -429,6 +441,8 @@ where
 /// # Panics
 ///
 /// Panics if the given str is a string containing path separator.
+///
+/// This function only called at compile time, so it's dead code in release build.
 #[allow(dead_code)]
 fn ensure_name(name: &str) -> &str {
     assert!(
