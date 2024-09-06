@@ -384,7 +384,7 @@ impl Ensure for &Path {
     fn ensure_clean(self) -> Result<Self, Self::Error> {
         if self.exists() {
             let mut ret = remove_dir_all(self);
-            for i in 0..3 {
+            for i in 1..=3 {
                 if let Err(err) = &ret {
                     log::warn!(
                         "Failed to remove dir {} due to {err}, retry {i} times",
