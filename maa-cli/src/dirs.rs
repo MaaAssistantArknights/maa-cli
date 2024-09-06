@@ -499,6 +499,7 @@ mod tests {
         }
 
         #[test]
+        #[ignore = "need installed MaaCore and resource"]
         fn data_relative() {
             env::remove_var("XDG_DATA_HOME");
             env::remove_var("MAA_DATA_DIR");
@@ -527,8 +528,6 @@ mod tests {
             assert_eq!(data(), test_dirs().data());
             assert_eq!(library(), test_dirs().library());
             assert_eq!(resource(), test_dirs().resource());
-            // The value of `MAA_COER_VERSION` is set in CI,
-            // where the MaaCore is installed at standard location.
             if env::var_os("SKIP_CORE_TEST").is_none() {
                 // This is not used in this test, but needed.
                 let extra_dir = Path::new("/usr/local/share/maa");
