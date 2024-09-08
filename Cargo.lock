@@ -981,6 +981,7 @@ dependencies = [
  "git2",
  "indicatif",
  "log",
+ "maa-dirs",
  "maa-sys",
  "prettytable",
  "regex",
@@ -997,6 +998,15 @@ dependencies = [
  "toml",
  "windows",
  "zip",
+]
+
+[[package]]
+name = "maa-dirs"
+version = "0.1.0"
+dependencies = [
+ "directories",
+ "dunce",
+ "log",
 ]
 
 [[package]]

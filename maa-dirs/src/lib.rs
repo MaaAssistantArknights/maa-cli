@@ -28,7 +28,8 @@ pub fn maa_lib_name() -> &'static str {
 /// The expression after `;` is optional, which is used to set the extension of the final path.
 ///
 /// Note: Because we reuse the first path, the first path will be consumed.
-/// Thus, if you want to reuse the first path, you should pass a Path instead of a PathBuf.
+/// Thus, if you want to reuse the first path, you should pass a Path instead of a PathBuf
+#[macro_export]
 macro_rules! join {
     ($path:expr, $($paths:expr),+ $(; $ext:expr)?) => {{
         let mut path: ::std::path::PathBuf = $path.into();

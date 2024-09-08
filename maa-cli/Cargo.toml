@@ -42,6 +42,7 @@ maa-sys = { path = "../maa-sys", version = "0.3.1", features = [
   "runtime",
   "serde",
 ] }
+maa-dirs = { path = "../maa-dirs", version = "0.1.0" }
 
 directories = "5"
 anyhow = "1"
