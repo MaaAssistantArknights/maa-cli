@@ -10,12 +10,20 @@ use crate::{
 use anyhow::{Context, Result};
 use maa_sys::TaskType;
 
-pub trait IntoTaskConfig {
-    fn into_task_config(self, config: &AsstConfig) -> Result<TaskConfig>;
+fn default_file(task_type: TaskType) -> std::path::PathBuf {
+    maa_dirs::join!(
+        maa_dirs::config(),
+        "overlays",
+        task_type.to_str().to_lowercase()
+    )
 }
 
 trait ToTaskType {
     fn to_task_type(&self) -> TaskType;
+}
+
+pub trait IntoTaskConfig {
+    fn into_task_config(self, config: &AsstConfig) -> Result<TaskConfig>;
 }
 
 impl<T> IntoTaskConfig for T
@@ -27,7 +35,7 @@ where
         let task_type = self.to_task_type();
         let mut params: MAAValue = self.try_into().map_err(Into::into)?;
 
-        let default = MAAValue::find_file_or_default(task_type.to_str().to_lowercase())
+        let default = MAAValue::find_file_or_default(default_file(task_type))
             .context("Failed to load default task config")?;
 
         params.merge_mut(&default);
@@ -121,21 +129,47 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "write to user directory"]
     fn into_task_config() {
-        let config = AsstConfig::default();
-        let params = StartUpParams {
-            client_type: Some(ClientType::Official),
-            account_name: Some("account".to_string()),
-        };
+        struct TestParams;
 
-        // let task_config = params.into_task_config(&config).unwrap();
-        // let task = task_config.
-        //
-        // assert_eq!(task.task_type, TaskType::StartUp);
-        // assert_eq!(
-        //     task.params,
-        //     default.join(object!("account_name" => "account"))
-        // );
+        impl ToTaskType for TestParams {
+            fn to_task_type(&self) -> TaskType {
+                TaskType::Custom
+            }
+        }
+
+        impl From<TestParams> for MAAValue {
+            fn from(_: TestParams) -> Self {
+                object!()
+            }
+        }
+
+        let config = AsstConfig::default();
+
+        let task_config = TestParams
+            .into_task_config(&config)
+            .unwrap()
+            .init()
+            .unwrap()
+            .tasks;
+        assert_eq!(task_config.len(), 1);
+        assert_eq!(task_config[0].task_type, TaskType::Custom);
+        assert_eq!(task_config[0].params, object!());
+
+        let default = default_file(TaskType::Custom).with_extension("toml");
+        let mut file = std::fs::File::create(&default).unwrap();
+        use std::io::Write;
+        writeln!(file, "foo = 42").unwrap();
+        let task_config = TestParams
+            .into_task_config(&config)
+            .unwrap()
+            .init()
+            .unwrap()
+            .tasks;
+        assert_eq!(task_config.len(), 1);
+        assert_eq!(task_config[0].task_type, TaskType::Custom);
+        assert_eq!(task_config[0].params, object!("foo" => 42));
     }
 
     #[test]

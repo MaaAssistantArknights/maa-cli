@@ -1,4 +1,4 @@
-use super::{IntoTaskConfig, ToTaskType};
+use super::{FindFileOrDefault, IntoTaskConfig, ToTaskType};
 
 use crate::{
     config::task::{Task, TaskConfig},
@@ -21,6 +21,11 @@ use serde_json::Value as JsonValue;
 #[cfg_attr(test, derive(Default))]
 #[derive(clap::Args)]
 pub struct CopilotParams {
+    /// URI of the copilot task file
+    ///
+    /// It can be a maa URI or a local file path. Multiple URIs can be provided to fight multiple stages.
+    /// For URI, it can be in the format of `maa://<code>`, `maa://<code>s`, `file://<path>`,
+    /// which represents a single copilot task, a copilot task set, and a local file respectively.
     uri_list: Vec<String>,
     /// Whether to fight stage in raid mode
     ///
@@ -41,18 +46,18 @@ pub struct CopilotParams {
     use_sanity_potion: bool,
     /// Whether to navigate to the stage
     ///
-    /// When multiple uri are provided or the uri is a copilot task set, default to true.
+    /// When multiple uri are provided or the uri is a copilot task set, force to true.
     /// Otherwise, default to false.
     #[arg(long)]
     need_navigate: bool,
     /// Whether to add operators to empty slots in the formation to earn trust
     #[arg(long)]
     add_trust: bool,
-    /// Select which formation to use [0-4]
+    /// Select which formation to use [1-4]
     ///
-    /// 0 to the current formation in the game, 1 to 4 to use the corresponding formation.
-    #[arg(long, default_value = "0")]
-    select_formation: i32, // use i32 to match MAAValue
+    /// If not provided, use the current formation
+    #[arg(long)]
+    select_formation: Option<i32>,
     /// Use given support unit name, don't use support unit if not provided
     #[arg(long)]
     support_unit_name: Option<String>,
@@ -62,6 +67,8 @@ impl IntoTaskConfig for CopilotParams {
     fn into_task_config(self, config: &super::AsstConfig) -> Result<TaskConfig> {
         let copilot_dir = dirs::copilot().ensure()?;
         let base_dirs = config.resource.base_dirs();
+        let default = MAAValue::find_file_or_default(super::default_file(TaskType::Copilot))
+            .context("Failed to load default copilot task config")?;
 
         let mut copilot_files = Vec::new();
         for uri in &self.uri_list {
@@ -71,8 +78,15 @@ impl IntoTaskConfig for CopilotParams {
         }
 
         let is_task_list = copilot_files.len() > 1;
-        let auto_formation = self.formation || is_task_list;
-        let need_navigate = self.need_navigate || is_task_list;
+        let formation = self.formation || is_task_list || default.get_or("formation", false);
+        let need_navigate =
+            self.need_navigate || is_task_list || default.get_or("need_navigate", false);
+        let use_sanity_potion =
+            self.use_sanity_potion || default.get_or("use_sanity_potion", false);
+        let add_trust = self.add_trust || default.get_or("add_trust", false);
+        let select_formation = self
+            .select_formation
+            .unwrap_or_else(|| default.get_or("select_formation", 0));
 
         let mut task_config = TaskConfig::new();
         for file in copilot_files {
@@ -97,7 +111,7 @@ impl IntoTaskConfig for CopilotParams {
                 }
             }
 
-            if !auto_formation {
+            if !formation {
                 println!("Operators:\n{}", operator_table(&copilot_info)?);
                 println!("Please set up your formation manually");
                 while !BoolInput::new(Some(true), Some("continue")).value()? {
@@ -108,11 +122,11 @@ impl IntoTaskConfig for CopilotParams {
             let mut value = object!(
                 "filename" => String::from(file.to_str().context("Invalid file path")?),
                 "need_navigate" => need_navigate,
-                "formation" => auto_formation,
+                "formation" => formation,
                 "navigate_name" => stage_code,
-                "use_sanity_potion" => self.use_sanity_potion,
-                "add_trust" => self.add_trust,
-                "select_formation" => self.select_formation,
+                "use_sanity_potion" => use_sanity_potion,
+                "add_trust" => add_trust,
+                "select_formation" => select_formation,
             );
 
             value.maybe_insert("support_unit_name", self.support_unit_name.clone());
@@ -248,12 +262,18 @@ impl<'a> CopilotFile<'a> {
     fn from_uri(uri: &'a str) -> Result<Self> {
         let trimmed = uri.trim();
         if let Some(code_str) = trimmed.strip_prefix("maa://") {
-            // just check if it's a number
-            let code_num = code_str.parse::<i64>().context("Invalid code")?;
-            Ok(CopilotFile::Remote(code_num))
-        } else if let Some(code) = trimmed.strip_prefix("maas://") {
-            let code_num = code.parse::<i64>().context("Invalid code")?;
-            Ok(CopilotFile::RemoteSet(code_num))
+            if let Some(code_str) = code_str.strip_suffix('s') {
+                Ok(CopilotFile::RemoteSet(
+                    code_str.parse::<i64>().context("Invalid code")?,
+                ))
+            } else {
+                Ok(CopilotFile::Remote(
+                    code_str.parse::<i64>().context("Invalid code")?,
+                ))
+            }
+        // } else if let Some(code) = trimmed.strip_prefix("maas://") {
+        //     let code_num = code.parse::<i64>().context("Invalid code")?;
+        //     Ok(CopilotFile::RemoteSet(code_num))
         } else if let Some(code) = trimmed.strip_prefix("file://") {
             Ok(CopilotFile::Local(Path::new(code)))
         } else {
@@ -678,7 +698,7 @@ mod tests {
             assert!(CopilotFile::from_uri("maa://xyz").is_err());
 
             assert_eq!(
-                CopilotFile::from_uri("maas://20001").unwrap(),
+                CopilotFile::from_uri("maa://20001s").unwrap(),
                 CopilotFile::RemoteSet(20001)
             );
 
@@ -734,7 +754,7 @@ mod tests {
             assert_eq!(
                 {
                     let mut paths = Vec::new();
-                    CopilotFile::from_uri("maas://23125")
+                    CopilotFile::from_uri("maa://23125s")
                         .unwrap()
                         .push_path_to(&mut paths, &test_root)
                         .unwrap();
