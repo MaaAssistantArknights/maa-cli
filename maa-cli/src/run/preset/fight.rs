@@ -141,7 +141,11 @@ mod tests {
         {
             let command = parse_from(args).command;
             match command {
-                Command::Fight { params, .. } => params.try_into(),
+                Command::Fight { params, .. } => {
+                    use super::super::{TaskType, ToTaskType};
+                    assert_eq!(params.to_task_type(), TaskType::Fight);
+                    params.try_into()
+                }
                 _ => panic!("Not a Fight command"),
             }
         }

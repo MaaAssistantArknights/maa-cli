@@ -119,7 +119,11 @@ mod tests {
         {
             let command = crate::command::parse_from(args).command;
             match command {
-                crate::Command::Reclamation { params, .. } => params.into(),
+                crate::Command::Reclamation { params, .. } => {
+                    use super::super::{TaskType, ToTaskType};
+                    assert_eq!(params.to_task_type(), TaskType::ReclamationAlgorithm);
+                    params.into()
+                }
                 _ => panic!("Not a Reclamation command"),
             }
         }

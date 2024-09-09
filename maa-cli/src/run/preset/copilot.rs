@@ -467,12 +467,9 @@ mod tests {
                 return; // Skip test if resource is not provided
             }
 
-            // We don't use dirs::find_resource() here, because it is unreliable in tests
-            // due to some tests may change return value of it.
-            let resource_dir = std::env::var_os("MAA_RESOURCE_DIR")
-                .map(PathBuf::from)
-                .expect("MAA_RESOURCE_DIR not set");
-            let resource_dirs = vec![resource_dir];
+            let resource_dir = maa_dirs::find_resource().unwrap().into_owned();
+            let hot_update_dir = maa_dirs::hot_update().to_owned();
+            let resource_dirs = vec![resource_dir, hot_update_dir];
 
             let mut config = AsstConfig::default();
             config.resource.resource_base_dirs = resource_dirs;

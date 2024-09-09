@@ -287,7 +287,11 @@ mod tests {
         {
             let command = parse_from(args).command;
             match command {
-                Command::Roguelike { params, .. } => params.try_into(),
+                Command::Roguelike { params, .. } => {
+                    use super::super::{TaskType, ToTaskType};
+                    assert_eq!(params.to_task_type(), TaskType::Roguelike);
+                    params.try_into()
+                }
                 _ => panic!("Not a Roguelike command"),
             }
         }
