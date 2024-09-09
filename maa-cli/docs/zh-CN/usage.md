@@ -39,11 +39,13 @@ maa init
 
 对于常见任务，maa-cli 提供了一些预定义的任务：
 
-- `maa startup [client]`: 启动游戏并进入主界面，`[client]` 是客户端类型，如果留空则不会启动游戏客户端；
-- `maa closedown [client]`: 关闭游戏客户端，`[client]` 是客户端类型，默认为 `Official`；
-- `maa fight [stage]`: 运行战斗任务，`[stage]` 是关卡名称，例如 `1-7`；留空选择上次或者当前关卡；
-- `maa copilot <maa_uri>`: 运行自动战斗任务，其中 `<maa_uri>` 是作业的 URI，其可以是 `maa://1234` 或者本地文件路径 `./1234.json`；
-- `maa roguelike [theme]`: 自动集成战略，`[theme]` 是集成战略的主题，可选值为 `Phantom`，`Mizuki`，`Sami` 以及 `Sarkaz`；
+- `maa startup [client]`: 启动游戏并进入主界面，`[client]` 是客户端类型，如果留空则不会启动游戏客户端。
+- `maa closedown [client]`: 关闭游戏客户端，`[client]` 是客户端类型，默认为 `Official`。
+- `maa fight [stage]`: 运行战斗任务，`[stage]` 是关卡名称，例如 `1-7`；留空选择上次或者当前关卡。
+- `maa copilot <maa_uri>...`: 自动抄作业，其中 `<maa_uri>` 是作业的 URI，多个 URI 会依次执行，`maa_uri` 可以是 `maa://1234` 或者 本地文件路径 `./1234.json`。
+- `maa sscopilot <maa_uri>`: 自动保全派驻，其中 `<maa_uri>` 是保全派驻作业的 URI。
+- `maa roguelike <theme>`: 自动集成战略，`<theme>` 是集成战略的主题，可选值为 `Phantom`，`Mizuki`，`Sami` 以及 `Sarkaz`。
+- `maa reclamation <theme>`: 自动生息演算，`<theme>` 是生息演算的主题，目前仅 `Tales` 主题可用。
 
 上述任务接受一些参数，你可以通过 `maa <task> --help` 来查看具体的参数。
 

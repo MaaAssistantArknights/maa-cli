@@ -76,26 +76,13 @@ fn main() -> Result<()> {
             }
         },
         Command::Run { task, common } => run::run_custom(task, common)?,
-        Command::StartUp {
-            client,
-            account,
-            common,
-        } => run::run(|_| run::preset::startup(client, account), common)?,
-        Command::CloseDown { client, common } => {
-            run::run(|_| run::preset::closedown(client), common)?
-        }
-        Command::Fight {
-            stage,
-            medicine,
-            common,
-        } => run::run(|_| run::preset::fight(stage, medicine), common)?,
-        Command::Copilot { uri, common } => run::run(
-            |config| run::preset::copilot(uri, config.resource.base_dirs()),
-            common,
-        )?,
-        Command::Roguelike { theme, common } => {
-            run::run(|_| run::preset::roguelike(theme), common)?
-        }
+        Command::StartUp { params, common } => run::run_preset(params, common)?,
+        Command::CloseDown { params, common } => run::run_preset(params, common)?,
+        Command::Fight { params, common } => run::run_preset(params, common)?,
+        Command::Roguelike { params, common } => run::run_preset(params, common)?,
+        Command::Copilot { params, common } => run::run_preset(params, common)?,
+        Command::SSSCopilot { params, common } => run::run_preset(params, common)?,
+        Command::Reclamation { params, common } => run::run_preset(params, common)?,
         Command::Convert {
             input,
             output,

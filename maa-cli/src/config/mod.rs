@@ -3,7 +3,6 @@ use crate::dirs::{self, Ensure};
 use std::fs::{self, File};
 use std::path::Path;
 
-use clap::ValueEnum;
 use serde_json::Value as JsonValue;
 
 #[derive(Debug)]
@@ -79,7 +78,7 @@ fn file_not_found(path: impl AsRef<Path>) -> Error {
 
 const SUPPORTED_EXTENSION: [&str; 4] = ["json", "yaml", "yml", "toml"];
 
-#[derive(Clone, Copy, ValueEnum)]
+#[derive(Clone, Copy, clap::ValueEnum)]
 pub enum Filetype {
     #[clap(alias = "j")]
     Json,
@@ -158,6 +157,8 @@ pub trait FromFile: Sized + serde::de::DeserializeOwned {
     }
 }
 
+impl<T> FromFile for T where T: serde::de::DeserializeOwned {}
+
 pub trait FindFile: FromFile {
     /// Find file with supported extension and deserialize it.
     ///
@@ -192,8 +193,6 @@ pub trait FindFileOrDefault: FromFile + Default {
 impl<T> FindFile for T where T: FromFile {}
 
 impl<T> FindFileOrDefault for T where T: FromFile + Default {}
-
-impl FromFile for JsonValue {}
 
 pub fn convert(file: &Path, out: Option<&Path>, ft: Option<Filetype>) -> Result<()> {
     let ft = ft.or_else(|| {
@@ -409,8 +408,6 @@ mod tests {
             a: i32,
             b: String,
         }
-
-        impl FromFile for TestConfig {}
 
         let test_root = temp_dir().join("find_file");
         std::fs::create_dir_all(&test_root).unwrap();

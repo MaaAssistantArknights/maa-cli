@@ -40,10 +40,6 @@ impl TaskVariant {
     }
 }
 
-fn default_variants() -> Vec<TaskVariant> {
-    vec![Default::default()]
-}
-
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Deserialize, Debug, Default)]
 #[serde(rename_all = "kebab-case")]
@@ -71,47 +67,53 @@ pub struct Task {
     params: MAAValue,
     #[serde(default)]
     strategy: Strategy,
-    #[serde(default = "default_variants")]
+    #[serde(default)]
     variants: Vec<TaskVariant>,
 }
 
+// Constructor for Task
 impl Task {
-    pub fn new<T, V, S>(
-        name: Option<String>,
-        task_type: T,
-        params: V,
-        strategy: Strategy,
-        variants: S,
-    ) -> Self
-    where
-        T: Into<TaskType>,
-        V: Into<MAAValue>,
-        S: IntoIterator<Item = TaskVariant>,
-    {
+    pub fn new(task_type: TaskType, params: MAAValue) -> Self {
         Self {
-            name,
-            task_type: task_type.into(),
-            strategy,
-            params: params.into(),
-            variants: variants.into_iter().collect(),
+            name: None,
+            task_type,
+            strategy: Strategy::default(),
+            params,
+            variants: Vec::new(),
         }
     }
 
-    pub fn new_with_default<T, V>(task_type: T, params: V) -> Self
-    where
-        T: Into<TaskType>,
-        V: Into<MAAValue>,
-    {
-        Self::new(
-            None,
-            task_type,
-            params,
-            Strategy::default(),
-            default_variants(),
-        )
+    pub fn with_name(mut self, name: String) -> Self {
+        self.name = Some(name);
+        self
+    }
+
+    #[cfg(test)]
+    pub fn with_strategy(mut self, strategy: Strategy) -> Self {
+        self.strategy = strategy;
+        self
+    }
+
+    #[cfg(test)]
+    pub fn with_variants(mut self, variants: Vec<TaskVariant>) -> Self {
+        self.variants = variants;
+        self
+    }
+
+    #[cfg(test)]
+    pub fn push_variant(&mut self, variants: TaskVariant) -> &mut Self {
+        self.variants.push(variants);
+        self
+    }
+
+    pub fn task_type(&self) -> TaskType {
+        self.task_type
     }
 
     pub fn is_active(&self) -> bool {
+        if self.variants.is_empty() {
+            return true;
+        }
         for variant in self.variants.iter() {
             if variant.is_active() {
                 return true;
@@ -120,28 +122,13 @@ impl Task {
         false
     }
 
-    pub fn task_type(&self) -> TaskType {
-        self.task_type
-    }
-
     pub fn params(&self) -> MAAValue {
         let mut params = self.params.clone();
-        match self.strategy {
-            // Merge params from the first active variant
-            Strategy::First => {
-                for variant in &self.variants {
-                    if variant.is_active() {
-                        params.merge_mut(variant.params());
-                        break;
-                    }
-                }
-            }
-            // Merge params from all active variants
-            Strategy::Merge => {
-                for variant in &self.variants {
-                    if variant.is_active() {
-                        params.merge_mut(variant.params());
-                    }
+        for variant in &self.variants {
+            if variant.is_active() {
+                params.merge_mut(variant.params());
+                if matches!(self.strategy, Strategy::First) {
+                    break;
                 }
             }
         }
@@ -261,7 +248,13 @@ impl TaskConfig {
                 _ => {}
             }
 
-            tasks.push(InitializedTask::new(task.name.clone(), task_type, params));
+            let mut inited_task = InitializedTask::new(task_type, params);
+
+            if let Some(name) = &task.name {
+                inited_task = inited_task.with_name(name.to_owned());
+            }
+
+            tasks.push(inited_task)
         }
 
         let client_type = client_type.unwrap_or_default();
@@ -280,7 +273,7 @@ impl TaskConfig {
         if prepend_startup {
             tasks.insert(
                 0,
-                InitializedTask::new_no_name(
+                InitializedTask::new(
                     TaskType::StartUp,
                     object!(
                         "start_game_enabled" => true,
@@ -291,7 +284,7 @@ impl TaskConfig {
         }
 
         if append_closedown {
-            tasks.push(InitializedTask::new_no_name(
+            tasks.push(InitializedTask::new(
                 TaskType::CloseDown,
                 object!(
                     "client_type" => client_type.to_string(),
@@ -307,8 +300,6 @@ impl TaskConfig {
         })
     }
 }
-
-impl super::FromFile for TaskConfig {}
 
 #[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct InitializedTaskConfig {
@@ -326,16 +317,17 @@ pub struct InitializedTask {
 }
 
 impl InitializedTask {
-    fn new(name: Option<String>, task_type: impl Into<TaskType>, params: MAAValue) -> Self {
+    const fn new(task_type: TaskType, params: MAAValue) -> Self {
         Self {
-            name,
-            task_type: task_type.into(),
+            name: None,
+            task_type,
             params,
         }
     }
 
-    fn new_no_name(task_type: impl Into<TaskType>, params: MAAValue) -> Self {
-        Self::new(None, task_type.into(), params)
+    fn with_name(mut self, name: String) -> Self {
+        self.name = Some(name);
+        self
     }
 
     pub fn name_or_default(&self) -> &str {
@@ -351,12 +343,6 @@ mod tests {
 
     use crate::object;
 
-    impl TaskConfig {
-        pub fn tasks(&self) -> &[Task] {
-            &self.tasks
-        }
-    }
-
     mod task {
         use super::*;
 
@@ -364,14 +350,9 @@ mod tests {
         fn is_active() {
             fn test_with_veriants(variants: Vec<TaskVariant>, expected: bool) {
                 assert_eq!(
-                    Task::new(
-                        None,
-                        TaskType::StartUp,
-                        object!(),
-                        Strategy::default(),
-                        variants
-                    )
-                    .is_active(),
+                    Task::new(TaskType::StartUp, object!())
+                        .with_variants(variants)
+                        .is_active(),
                     expected
                 );
             }
@@ -402,7 +383,7 @@ mod tests {
         #[test]
         fn get_type() {
             assert_eq!(
-                Task::new_with_default(TaskType::StartUp, object!()).task_type(),
+                Task::new(TaskType::StartUp, object!()).task_type(),
                 TaskType::StartUp,
             );
         }
@@ -415,21 +396,23 @@ mod tests {
                 variants: impl IntoIterator<Item = MAAValue>,
                 expected: MAAValue,
             ) {
-                assert_eq!(
-                    Task::new(
-                        None,
-                        TaskType::StartUp,
-                        base,
-                        strategy,
-                        variants.into_iter().map(|v| TaskVariant {
-                            condition: Condition::Always,
-                            params: v,
-                        })
-                    )
-                    .params(),
-                    expected
-                );
+                let mut task = Task::new(TaskType::StartUp, base).with_strategy(strategy);
+                for v in variants {
+                    task.push_variant(TaskVariant {
+                        condition: Condition::Always,
+                        params: v,
+                    });
+                }
+
+                assert_eq!(task.params(), expected);
             }
+
+            test_with_variants(
+                object!("a" => 1),
+                Strategy::First,
+                vec![],
+                object!("a" => 1),
+            );
 
             test_with_variants(
                 object!("a" => 1),
@@ -437,6 +420,7 @@ mod tests {
                 vec![object!()],
                 object!("a" => 1),
             );
+
             test_with_variants(
                 object!(),
                 Strategy::First,
@@ -487,25 +471,21 @@ mod tests {
             );
 
             assert_eq!(
-                Task::new(
-                    None,
-                    TaskType::StartUp,
-                    object!("a" => 1, "c" => 5),
-                    Strategy::First,
-                    vec![
-                        TaskVariant {
-                            condition: Condition::Not {
-                                condition: Box::new(Condition::Always),
-                            },
-                            params: object!("a" => 2),
+                {
+                    let mut task = Task::new(TaskType::StartUp, object!("a" => 1, "c" => 5))
+                        .with_strategy(Strategy::First);
+                    task.push_variant(TaskVariant {
+                        condition: Condition::Not {
+                            condition: Box::new(Condition::Always),
                         },
-                        TaskVariant {
-                            condition: Condition::Always,
-                            params: object!("a" => 3, "b" => 4),
-                        },
-                    ]
-                )
-                .params(),
+                        params: object!("a" => 2),
+                    });
+                    task.push_variant(TaskVariant {
+                        condition: Condition::Always,
+                        params: object!("a" => 3, "b" => 4),
+                    });
+                    task.params()
+                },
                 object!("a" => 3, "b" => 4, "c" => 5),
             );
         }
@@ -544,7 +524,7 @@ mod tests {
 
                 let mut task_list = TaskConfig::new();
 
-                task_list.push(Task::new_with_default(
+                task_list.push(Task::new(
                     StartUp,
                     object!(
                         "start_game_enabled" => BoolInput::new(
@@ -565,85 +545,84 @@ mod tests {
                     ),
                 ));
 
-                task_list.push(Task::new(
-                    Some("Fight Daily".to_string()),
-                    Fight,
-                    object!(),
-                    Strategy::Merge,
-                    vec![
-                        TaskVariant {
-                            condition: Condition::Weekday {
-                                weekdays: vec![Weekday::Sun],
-                                timezone: TimeOffset::Local,
+                task_list.push(
+                    Task::new(Fight, object!())
+                        .with_name("Fight Daily".to_string())
+                        .with_strategy(Strategy::Merge)
+                        .with_variants(vec![
+                            TaskVariant {
+                                condition: Condition::Weekday {
+                                    weekdays: vec![Weekday::Sun],
+                                    timezone: TimeOffset::Local,
+                                },
+                                params: object!("expiring_medicine" => 5),
                             },
-                            params: object!("expiring_medicine" => 5),
-                        },
-                        TaskVariant {
-                            condition: Condition::Always,
-                            params: object!(
-                                "stage" => Input::new(
-                                    Some("1-7".to_string()),
-                                    Some("a stage to fight"),
+                            TaskVariant {
+                                condition: Condition::Always,
+                                params: object!(
+                                    "stage" => Input::new(
+                                        Some("1-7".to_string()),
+                                        Some("a stage to fight"),
+                                    ),
                                 ),
-                            ),
-                        },
-                        TaskVariant {
-                            condition: Condition::Weekday {
-                                weekdays: vec![Weekday::Tue, Weekday::Thu, Weekday::Sat],
-                                timezone: TimeOffset::Client(ClientType::Official),
                             },
-                            params: object!("stage" => "CE-6"),
-                        },
-                        TaskVariant {
-                            condition: Condition::DateTime {
-                                start: Some(naive_local_datetime(2023, 8, 1, 16, 0, 0)),
-                                end: Some(naive_local_datetime(2023, 8, 21, 3, 59, 59)),
-                                timezone: TimeOffset::TimeZone(8),
+                            TaskVariant {
+                                condition: Condition::Weekday {
+                                    weekdays: vec![Weekday::Tue, Weekday::Thu, Weekday::Sat],
+                                    timezone: TimeOffset::Client(ClientType::Official),
+                                },
+                                params: object!("stage" => "CE-6"),
                             },
-                            params: object!(
-                                "stage" => SelectD::<String>::new(
-                                    [
-                                        "SL-6",
-                                        "SL-7",
-                                        "SL-8",
-                                    ],
-                                    Some(2),
-                                    Some("a stage to fight in summer event"),
-                                    true,
-                                ).unwrap(),
-                            ),
-                        },
-                    ],
-                ));
+                            TaskVariant {
+                                condition: Condition::DateTime {
+                                    start: Some(naive_local_datetime(2023, 8, 1, 16, 0, 0)),
+                                    end: Some(naive_local_datetime(2023, 8, 21, 3, 59, 59)),
+                                    timezone: TimeOffset::TimeZone(8),
+                                },
+                                params: object!(
+                                    "stage" => SelectD::<String>::new(
+                                        [
+                                            "SL-6",
+                                            "SL-7",
+                                            "SL-8",
+                                        ],
+                                        Some(2),
+                                        Some("a stage to fight in summer event"),
+                                        true,
+                                    ).unwrap(),
+                                ),
+                            },
+                        ]),
+                );
 
-                task_list.push(Task::new(
-                    None,
-                    Mall,
-                    object!(
-                        "shopping" => true,
-                        "credit_fight" => true,
-                        "buy_first" => [
-                            "招聘许可",
-                            "龙门币",
-                        ],
-                        "blacklist" => [
-                            "碳",
-                            "家具",
-                            "加急许可",
-                        ],
-                    ),
-                    Strategy::default(),
-                    vec![TaskVariant {
+                task_list.push(
+                    Task::new(
+                        Mall,
+                        object!(
+                            "shopping" => true,
+                            "credit_fight" => true,
+                            "buy_first" => [
+                                "招聘许可",
+                                "龙门币",
+                            ],
+                            "blacklist" => [
+                                "碳",
+                                "家具",
+                                "加急许可",
+                            ],
+                        ),
+                    )
+                    .with_variants(vec![TaskVariant {
                         condition: Condition::Time {
                             start: Some(NaiveTime::from_hms_opt(16, 0, 0).unwrap()),
                             end: None,
                             timezone: TimeOffset::Local,
                         },
                         params: object!(),
-                    }],
-                ));
+                    }]),
+                );
 
-                task_list.push(Task::new_with_default(CloseDown, object!()));
+                task_list.push(Task::new(CloseDown, object!()));
 
                 task_list
             }
@@ -704,18 +683,13 @@ mod tests {
                     client_type: None,
                     startup: None,
                     closedown: None,
-                    tasks: vec![Task::new(
-                        None,
-                        StartUp,
-                        object!("start_game_enabled" => true),
-                        Strategy::default(),
-                        vec![TaskVariant {
+                    tasks: vec![Task::new(StartUp, object!("start_game_enabled" => true))
+                        .with_variants(vec![TaskVariant {
                             condition: Condition::Not {
                                 condition: Box::new(Condition::Always),
                             },
                             params: object!(),
-                        }],
-                    )],
+                        }]),],
                 }
                 .init()
                 .unwrap(),
@@ -732,13 +706,14 @@ mod tests {
                     client_type: None,
                     startup: None,
                     closedown: None,
-                    tasks: vec![Task::new_with_default(
+                    tasks: vec![Task::new(
                         StartUp,
                         object!(
                             "start_game_enabled" => true,
                             "client_type" => "YoStarEN",
                         )
-                    )],
+                    )
+                    .with_name(String::from("StartUp"))],
                 }
                 .init()
                 .unwrap(),
@@ -746,13 +721,14 @@ mod tests {
                     client_type: YoStarEN,
                     start_app: true,
                     close_app: false,
-                    tasks: vec![InitializedTask::new_no_name(
+                    tasks: vec![InitializedTask::new(
                         StartUp,
                         object!(
                             "start_game_enabled" => true,
                             "client_type" => "YoStarEN",
                         )
-                    )]
+                    )
+                    .with_name(String::from("StartUp"))]
                 }
             );
 
@@ -761,7 +737,7 @@ mod tests {
                     client_type: None,
                     startup: None,
                     closedown: None,
-                    tasks: vec![Task::new_with_default(
+                    tasks: vec![Task::new(
                         StartUp,
                         object!(
                             "start_game_enabled" => false,
@@ -775,7 +751,7 @@ mod tests {
                     client_type: YoStarEN,
                     start_app: false,
                     close_app: false,
-                    tasks: vec![InitializedTask::new_no_name(
+                    tasks: vec![InitializedTask::new(
                         StartUp,
                         object!(
                             "start_game_enabled" => false,
@@ -791,10 +767,7 @@ mod tests {
                     client_type: None,
                     startup: None,
                     closedown: None,
-                    tasks: vec![Task::new_with_default(
-                        CloseDown,
-                        object!("client_type" => "YoStarEN")
-                    )],
+                    tasks: vec![Task::new(CloseDown, object!("client_type" => "YoStarEN"))],
                 }
                 .init()
                 .unwrap(),
@@ -802,7 +775,7 @@ mod tests {
                     client_type: YoStarEN,
                     start_app: false,
                     close_app: true,
-                    tasks: vec![InitializedTask::new_no_name(
+                    tasks: vec![InitializedTask::new(
                         CloseDown,
                         object!("client_type" => "YoStarEN")
                     )]
@@ -814,7 +787,7 @@ mod tests {
                     client_type: None,
                     startup: None,
                     closedown: None,
-                    tasks: vec![Task::new_with_default(
+                    tasks: vec![Task::new(
                         CloseDown,
                         object!(
                             "enable" => false,
@@ -828,7 +801,7 @@ mod tests {
                     client_type: YoStarEN,
                     start_app: false,
                     close_app: false,
-                    tasks: vec![InitializedTask::new_no_name(
+                    tasks: vec![InitializedTask::new(
                         CloseDown,
                         object!(
                             "enable" => false,
@@ -843,7 +816,7 @@ mod tests {
                     client_type: None,
                     startup: None,
                     closedown: None,
-                    tasks: vec![Task::new_with_default(CloseDown, object!())],
+                    tasks: vec![Task::new(CloseDown, object!())],
                 }
                 .init()
                 .unwrap(),
@@ -851,7 +824,7 @@ mod tests {
                     client_type: Official,
                     start_app: false,
                     close_app: true,
-                    tasks: vec![InitializedTask::new_no_name(
+                    tasks: vec![InitializedTask::new(
                         CloseDown,
                         object!("client_type" => "Official")
                     )]
@@ -863,10 +836,7 @@ mod tests {
                     client_type: None,
                     startup: None,
                     closedown: None,
-                    tasks: vec![Task::new_with_default(
-                        Fight,
-                        object!("client_type" => "YoStarEN")
-                    )],
+                    tasks: vec![Task::new(Fight, object!("client_type" => "YoStarEN"))],
                 }
                 .init()
                 .unwrap(),
@@ -874,7 +844,7 @@ mod tests {
                     client_type: YoStarEN,
                     start_app: false,
                     close_app: false,
-                    tasks: vec![InitializedTask::new_no_name(
+                    tasks: vec![InitializedTask::new(
                         Fight,
                         object!("client_type" => "YoStarEN")
                     )]
@@ -887,15 +857,15 @@ mod tests {
                     startup: None,
                     closedown: None,
                     tasks: vec![
-                        Task::new_with_default(
+                        Task::new(
                             StartUp,
                             object!(
                                 "start_game_enabled" => true,
                                 "client_type" => "Official",
                             ),
                         ),
-                        Task::new_with_default(Fight, object!("stage" => "1-7")),
-                        Task::new_with_default(CloseDown, object!()),
+                        Task::new(Fight, object!("stage" => "1-7")),
+                        Task::new(CloseDown, object!()),
                     ],
                 }
                 .init()
@@ -905,24 +875,21 @@ mod tests {
                     start_app: true,
                     close_app: true,
                     tasks: vec![
-                        InitializedTask::new_no_name(
+                        InitializedTask::new(
                             StartUp,
                             object!(
                                 "client_type" => "Official",
                                 "start_game_enabled" => true,
                             )
                         ),
-                        InitializedTask::new_no_name(
+                        InitializedTask::new(
                             Fight,
                             object!(
                                 "stage" => "1-7",
                                 "client_type" => "Official",
                             )
                         ),
-                        InitializedTask::new_no_name(
-                            CloseDown,
-                            object!("client_type" => "Official")
-                        ),
+                        InitializedTask::new(CloseDown, object!("client_type" => "Official")),
                     ]
                 }
             );
@@ -933,9 +900,9 @@ mod tests {
                     startup: Some(true),
                     closedown: Some(true),
                     tasks: vec![
-                        Task::new_with_default(StartUp, object!( "start_game_enabled" => false)),
-                        Task::new_with_default(Fight, object!("stage" => "1-7")),
-                        Task::new_with_default(CloseDown, object!("enable" => false)),
+                        Task::new(StartUp, object!( "start_game_enabled" => false)),
+                        Task::new(Fight, object!("stage" => "1-7")),
+                        Task::new(CloseDown, object!("enable" => false)),
                     ],
                 }
                 .init()
@@ -945,7 +912,7 @@ mod tests {
                     start_app: true,
                     close_app: true,
                     tasks: vec![
-                        InitializedTask::new_no_name(
+                        InitializedTask::new(
                             StartUp,
                             object!(
                                 "enable" => true,
@@ -953,14 +920,14 @@ mod tests {
                                 "start_game_enabled" => true,
                             )
                         ),
-                        InitializedTask::new_no_name(
+                        InitializedTask::new(
                             Fight,
                             object!(
                                 "stage" => "1-7",
                                 "client_type" => "Official",
                             )
                         ),
-                        InitializedTask::new_no_name(
+                        InitializedTask::new(
                             CloseDown,
                             object!(
                                 "enable" => true,
@@ -976,7 +943,7 @@ mod tests {
                     client_type: None,
                     startup: Some(true),
                     closedown: Some(true),
-                    tasks: vec![Task::new_with_default(Fight, object!("stage" => "1-7"))],
+                    tasks: vec![Task::new(Fight, object!("stage" => "1-7"))],
                 }
                 .init()
                 .unwrap(),
@@ -985,24 +952,21 @@ mod tests {
                     start_app: true,
                     close_app: true,
                     tasks: vec![
-                        InitializedTask::new_no_name(
+                        InitializedTask::new(
                             StartUp,
                             object!(
                                 "client_type" => "Official",
                                 "start_game_enabled" => true,
                             )
                         ),
-                        InitializedTask::new_no_name(
+                        InitializedTask::new(
                             Fight,
                             object!(
                                 "stage" => "1-7",
                                 "client_type" => "Official",
                             )
                         ),
-                        InitializedTask::new_no_name(
-                            CloseDown,
-                            object!("client_type" => "Official"),
-                        ),
+                        InitializedTask::new(CloseDown, object!("client_type" => "Official"),),
                     ]
                 },
             );
@@ -1012,7 +976,7 @@ mod tests {
                     client_type: Some(YoStarEN),
                     startup: Some(true),
                     closedown: Some(true),
-                    tasks: vec![Task::new_with_default(Fight, object!("stage" => "1-7"))],
+                    tasks: vec![Task::new(Fight, object!("stage" => "1-7"))],
                 }
                 .init()
                 .unwrap(),
@@ -1021,24 +985,21 @@ mod tests {
                     start_app: true,
                     close_app: true,
                     tasks: vec![
-                        InitializedTask::new_no_name(
+                        InitializedTask::new(
                             StartUp,
                             object!(
                                 "start_game_enabled" => true,
                                 "client_type" => "YoStarEN",
                             )
                         ),
-                        InitializedTask::new_no_name(
+                        InitializedTask::new(
                             Fight,
                             object!(
                                 "stage" => "1-7",
                                 "client_type" => "YoStarEN",
                             )
                         ),
-                        InitializedTask::new_no_name(
-                            CloseDown,
-                            object!("client_type" => "YoStarEN"),
-                        ),
+                        InitializedTask::new(CloseDown, object!("client_type" => "YoStarEN"),),
                     ]
                 }
             );
@@ -1050,8 +1011,8 @@ mod tests {
                     startup: None,
                     closedown: None,
                     tasks: vec![
-                        Task::new_with_default(StartUp, object!("client_type" => "YoStarEN")),
-                        Task::new_with_default(CloseDown, object!("client_type" => "YoStarJP")),
+                        Task::new(StartUp, object!("client_type" => "YoStarEN")),
+                        Task::new(CloseDown, object!("client_type" => "YoStarJP")),
                     ],
                 }
                 .init()
@@ -1061,11 +1022,8 @@ mod tests {
                     start_app: false,
                     close_app: true,
                     tasks: vec![
-                        InitializedTask::new_no_name(StartUp, object!("client_type" => "Official")),
-                        InitializedTask::new_no_name(
-                            CloseDown,
-                            object!("client_type" => "Official")
-                        ),
+                        InitializedTask::new(StartUp, object!("client_type" => "Official")),
+                        InitializedTask::new(CloseDown, object!("client_type" => "Official")),
                     ]
                 }
             );
@@ -1078,8 +1036,8 @@ mod tests {
                     startup: None,
                     closedown: None,
                     tasks: vec![
-                        Task::new_with_default(Infrast, object!("filename" => "daily.json")),
-                        Task::new_with_default(Infrast, object!("filename" => "/tmp/daily.json")),
+                        Task::new(Infrast, object!("filename" => "daily.json")),
+                        Task::new(Infrast, object!("filename" => "/tmp/daily.json")),
                     ],
                 }
                 .init()
@@ -1089,7 +1047,7 @@ mod tests {
                     start_app: false,
                     close_app: false,
                     tasks: vec![
-                        InitializedTask::new_no_name(
+                        InitializedTask::new(
                             Infrast,
                             object!("filename" => dirs::abs_config("daily.json", Some("infrast"))
                         .unwrap()
@@ -1097,10 +1055,7 @@ mod tests {
                         .unwrap()
                         .to_string())
                         ),
-                        InitializedTask::new_no_name(
-                            Infrast,
-                            object!("filename" => "/tmp/daily.json")
-                        )
+                        InitializedTask::new(Infrast, object!("filename" => "/tmp/daily.json"))
                     ]
                 }
             );
@@ -1108,17 +1063,14 @@ mod tests {
 
         #[test]
         fn initialized_task() {
-            let task = InitializedTask::new(
-                Some("Fight Daily".to_string()),
-                Fight,
-                object!("stage" => "1-7"),
-            );
+            let task = InitializedTask::new(Fight, object!("stage" => "1-7"))
+                .with_name("Fight Daily".to_string());
             assert_eq!(task.name_or_default(), "Fight Daily");
             assert_eq!(task.task_type, Fight);
             assert_eq!(&task.params, &object!("stage" => "1-7"));
             assert_eq!(task.name, Some(String::from("Fight Daily")));
 
-            let task = InitializedTask::new_no_name(Fight, object!("stage" => "1-7"));
+            let task = InitializedTask::new(Fight, object!("stage" => "1-7"));
             assert_eq!(task.name_or_default(), "Fight");
             assert_eq!(task.task_type, Fight);
             assert_eq!(&task.params, &object!("stage" => "1-7"));

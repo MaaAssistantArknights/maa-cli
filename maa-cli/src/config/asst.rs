@@ -66,8 +66,6 @@ impl<'de> Deserialize<'de> for AsstConfig {
     }
 }
 
-impl super::FromFile for AsstConfig {}
-
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Clone, Default)]
 pub struct ConnectionConfig {
@@ -232,7 +230,7 @@ pub struct ResourceConfig {
     user_resource: bool,
     /// Resource base directories, a list of directories containing resource directories
     /// Not deserialized from config file
-    resource_base_dirs: Vec<PathBuf>,
+    pub(crate) resource_base_dirs: Vec<PathBuf>,
 }
 
 impl<'de> Deserialize<'de> for ResourceConfig {
