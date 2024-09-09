@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["maa-cli", "maa-sys"]
+members = ["maa-cli", "maa-dirs", "maa-sys"]
 
 [workspace.package]
 license = "AGPL-3.0-only"

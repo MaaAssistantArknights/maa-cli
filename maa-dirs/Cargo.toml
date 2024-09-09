@@ -1,0 +1,12 @@
+[package]
+name = "maa-dirs"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+directories = "5"
+dunce = "1.0.4"
+log = "0.4.20"

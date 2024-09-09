@@ -10,7 +10,6 @@ pub mod preset;
 
 use crate::{
     config::{asst::AsstConfig, task::TaskConfig, FindFile},
-    dirs::{self, maa_lib_name, Ensure},
     installer::resource,
 };
 
@@ -22,6 +21,7 @@ use std::{
 use anyhow::{bail, Context, Result};
 use clap::Args;
 use log::{debug, warn};
+use maa_dirs::{self as dirs, Ensure, MAA_CORE_LIB};
 use maa_sys::Assistant;
 use signal_hook::consts::TERM_SIGNALS;
 
@@ -278,10 +278,10 @@ fn load_core() -> Result<()> {
 
             unsafe { SetDllDirectoryW(&HSTRING::from(lib_dir.as_ref()))? };
         }
-        maa_sys::binding::load(lib_dir.join(maa_lib_name()))
+        maa_sys::binding::load(lib_dir.join(MAA_CORE_LIB))
     } else {
         debug!("MaaCore not found, trying to load from system library path");
-        maa_sys::binding::load(maa_lib_name())
+        maa_sys::binding::load(MAA_CORE_LIB)
     }
     .context("Failed to load MaaCore!")?;
 
