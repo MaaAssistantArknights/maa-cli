@@ -162,6 +162,14 @@ pub(crate) enum Command {
         #[command(flatten)]
         common: run::CommonArgs,
     },
+    Depot {
+        #[command(flatten)]
+        common: run::CommonArgs,
+    },
+    Operbox {
+        #[command(flatten)]
+        common: run::CommonArgs,
+    },
     /// Convert file format between TOML, YAML and JSON
     ///
     /// This command will convert a file from TOML, YAML or JSON format to another format.
@@ -670,6 +678,26 @@ mod test {
                 theme,
                 ..
             } if matches!(theme, run::preset::RoguelikeTheme::Phantom)
+        );
+    }
+
+    #[test]
+    fn depot() {
+        assert_matches!(
+            parse_from(["maa", "depot"]).command,
+            Command::Depot {
+                common: run::CommonArgs { .. }
+            }
+        );
+    }
+
+    #[test]
+    fn operbox() {
+        assert_matches!(
+            parse_from(["maa", "operbox"]).command,
+            Command::Operbox {
+                common: run::CommonArgs { .. }
+            }
         );
     }
 
