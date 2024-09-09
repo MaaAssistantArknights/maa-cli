@@ -117,6 +117,8 @@ mod tests {
         object,
     };
 
+    use maa_dirs::Ensure;
+
     impl MAAValue {
         /// Merge another value into this default value.
         ///
@@ -158,6 +160,7 @@ mod tests {
         assert_eq!(task_config[0].params, object!());
 
         let default = default_file(TaskType::Custom).with_extension("toml");
+        default.parent().unwrap().ensure().unwrap();
         let mut file = std::fs::File::create(&default).unwrap();
         use std::io::Write;
         writeln!(file, "foo = 42").unwrap();
