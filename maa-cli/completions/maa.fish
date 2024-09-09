@@ -69,7 +69,7 @@ complete -c maa -n "__fish_seen_subcommand_from dir" -f -a "$maa_dirs"
 # Maa run related options
 set -l clients Official Bilibili Txwy YoStarEN YoStarJP YoStarKR
 ## Common options
-set -l run_commands run startup closedown fight copilot roguelike
+set -l run_commands run startup closedown fight copilot sscopilot roguelike reclamation
 complete -c maa -n "__fish_seen_subcommand_from $run_commands" -s a -l addr -d 'ADB serial number of device or MaaTools address set in PlayCover' -r
 complete -c maa -n "__fish_seen_subcommand_from $run_commands" -s p -l profile -d 'Profile to use' -r
 complete -c maa -n "__fish_seen_subcommand_from $run_commands" -l user-resource -d 'Load resources from the config directory'
@@ -81,8 +81,53 @@ complete -c maa -n "__fish_seen_subcommand_from run" -f -a "$(maa list)"
 complete -c maa -n "__fish_seen_subcommand_from startup" -f -a "$clients"
 complete -c maa -n "__fish_seen_subcommand_from startup" -f -l account -d 'Account to login' -r
 complete -c maa -n "__fish_seen_subcommand_from closedown" -f -a "$clients"
+
 complete -c maa -n "__fish_seen_subcommand_from fight" -f -s m -l medicine -d 'Medicine to use' -r
-complete -c maa -n "__fish_seen_subcommand_from roguelike" -a "phantom mizuki sami sarkaz"
+complete -c maa -n "__fish_seen_subcommand_from fight" -f -l expiring-medicine -d 'Expiring medicine to use' -r
+complete -c maa -n "__fish_seen_subcommand_from fight" -f -l stone -d 'Stone to use' -r
+complete -c maa -n "__fish_seen_subcommand_from fight" -f -l times -d 'Times to fight' -r
+complete -c maa -n "__fish_seen_subcommand_from fight" -f -s D -l drops -d 'Exit after collecting given number of drops' -r
+complete -c maa -n "__fish_seen_subcommand_from fight" -f -l series -d 'Series of proxy combat' -r
+complete -c maa -n "__fish_seen_subcommand_from fight" -f -l report-to-penguin -d 'Report drops to the Penguin Statistics'
+complete -c maa -n "__fish_seen_subcommand_from fight" -f -l penguin-id -d 'Penguin Statistics ID to report drops' -r
+complete -c maa -n "__fish_seen_subcommand_from fight" -f -l report-to-yituliu -d 'Report drops to the yituliu'
+complete -c maa -n "__fish_seen_subcommand_from fight" -f -l yituliu-id -d 'Yituliu ID to report drops' -r
+complete -c maa -n "__fish_seen_subcommand_from fight" -f -l client-type -d 'Client type to restart' -r
+complete -c maa -n "__fish_seen_subcommand_from fight" -f -l dr-grandet -d 'Use Dr. Grandet'
+
+complete -c maa -n "__fish_seen_subcommand_from copilot" -f -s f -l formation -d 'Use formation'
+complete -c maa -n "__fish_seen_subcommand_from copilot" -f -l use-sanity-potion -d 'Use sanity potion'
+complete -c maa -n "__fish_seen_subcommand_from copilot" -f -l need-navigate -d 'Need navigate'
+complete -c maa -n "__fish_seen_subcommand_from copilot" -f -l add-trust -d 'Add trust'
+complete -c maa -n "__fish_seen_subcommand_from copilot" -f -l select-formation -d 'Select formation' -r
+complete -c maa -n "__fish_seen_subcommand_from copilot" -f -l support-unit-name -d 'Support unit name' -r
+complete -c maa -n "__fish_seen_subcommand_from sscopilot" -f -s l -l loop-times -d 'Loop times' -r
+
+complete -c maa -n "__fish_seen_subcommand_from roguelike" -a "Phantom Mizuki Sami Sarkaz"
+complete -c maa -n "__fish_seen_subcommand_from roguelike" -l mode -d 'Mode of roguelike' -a "0 1 2 3 4"
+complete -c maa -n "__fish_seen_subcommand_from roguelike" -l squad -d 'Squad to use' -r
+complete -c maa -n "__fish_seen_subcommand_from roguelike" -l roles -d 'Roles to use' -r
+complete -c maa -n "__fish_seen_subcommand_from roguelike" -l core-char -d 'Core character to use' -r
+complete -c maa -n "__fish_seen_subcommand_from roguelike" -l start-count -d 'Count of start' -r
+complete -c maa -n "__fish_seen_subcommand_from roguelike" -l disable-investment -d 'Disable investment'
+complete -c maa -n "__fish_seen_subcommand_from roguelike" -l investment-with-more-score -d 'Try to gain more score in investment mode'
+complete -c maa -n "__fish_seen_subcommand_from roguelike" -l investments-count -d 'Count of investments' -r
+complete -c maa -n "__fish_seen_subcommand_from roguelike" -l no-stop-when-investment-full -d 'Do not stop when investment is full'
+complete -c maa -n "__fish_seen_subcommand_from roguelike" -l use-support -d 'Use support'
+complete -c maa -n "__fish_seen_subcommand_from roguelike" -l use-nonfriend-support -d 'Use non-friend support'
+complete -c maa -n "__fish_seen_subcommand_from roguelike" -l start-with-elite-two -d 'Start with elite two'
+complete -c maa -n "__fish_seen_subcommand_from roguelike" -l only-start-with-elite-two -d 'Only start with elite two'
+complete -c maa -n "__fish_seen_subcommand_from roguelike" -l stop-at-final-boss -d 'Stop exploration before final boss'
+complete -c maa -n "__fish_seen_subcommand_from roguelike" -l refresh-trader-with-dice -d 'Refresh trader with dice'
+complete -c maa -n "__fish_seen_subcommand_from roguelike" -l use-foldartal -d 'Use foldartal'
+complete -c maa -n "__fish_seen_subcommand_from roguelike" -l start-foldartals -d 'Start foldartals' -r
+complete -c maa -n "__fish_seen_subcommand_from roguelike" -l expected-collapsal-paradigms -d 'Expected collapsal paradigms' -r
+
+complete -c maa -n "__fish_seen_subcommand_from reclamation" -a "Tales"
+complete -c maa -n "__fish_seen_subcommand_from reclamation" -f -s m -l mode -d 'Mode of reclamation' -r -a "0 1"
+complete -c maa -n "__fish_seen_subcommand_from reclamation" -f -s C -l tool-to-craft -d 'Tool to craft' -r
+complete -c maa -n "__fish_seen_subcommand_from reclamation" -f -s m -l increase-mode -d 'Method to increase the number of tools' -r
+complete -c maa -n "__fish_seen_subcommand_from reclamation" -f -s n -l num-craft-batches -d 'Number of batches in each game run' -r
 
 # Misc commands
 complete -c maa -n "__fish_seen_subcommand_from complete" -f -a "bash fish zsh powershell"
