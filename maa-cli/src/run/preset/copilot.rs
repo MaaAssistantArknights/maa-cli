@@ -133,19 +133,31 @@ impl IntoTaskConfig for CopilotParams {
 
             match self.raid {
                 0 => {
-                    task_config.push(Task::new(TaskType::Copilot, value));
+                    task_config.push(
+                        Task::new(TaskType::Copilot, value)
+                            .with_name(format!("{stage_code} {stage_name} Normal")),
+                    );
                 }
                 1 => {
                     value.insert("is_raid", true);
-                    task_config.push(Task::new(TaskType::Copilot, value));
+                    task_config.push(
+                        Task::new(TaskType::Copilot, value)
+                            .with_name(format!("{stage_code} {stage_name} Raid")),
+                    );
                 }
                 2 => {
-                    task_config.push(Task::new(TaskType::Copilot, value.clone()));
+                    task_config.push(
+                        Task::new(TaskType::Copilot, value.clone())
+                            .with_name(format!("{stage_code} {stage_name} Normal")),
+                    );
 
                     value.insert("is_raid", true);
                     value.insert("need_navigate", true);
                     value.insert("formation", false); // use the same formation as normal mode
-                    task_config.push(Task::new(TaskType::Copilot, value));
+                    task_config.push(
+                        Task::new(TaskType::Copilot, value)
+                            .with_name(format!("{stage_code} {stage_name} Raid",)),
+                    );
                 }
                 n => bail!("Invalid raid mode {n}, should be 0, 1 or 2"),
             }
@@ -507,6 +519,10 @@ mod tests {
 
             let tasks = parse_to_taskes(["maa", "copilot", "maa://40051"], &config);
             assert_eq!(tasks.len(), 1);
+            assert_eq!(
+                tasks[0].name.as_deref(),
+                Some("AS-EX-1 小偷与收款人 Normal")
+            );
             assert_eq!(tasks[0].task_type, TaskType::Copilot);
             assert_params!(
                 tasks[0].params,
@@ -540,6 +556,10 @@ mod tests {
                 &config,
             );
             assert_eq!(tasks_no_default.len(), 1);
+            assert_eq!(
+                tasks_no_default[0].name.as_deref(),
+                Some("AS-EX-1 小偷与收款人 Raid")
+            );
             assert_eq!(tasks_no_default[0].task_type, TaskType::Copilot);
             assert_params!(
                 tasks_no_default[0].params,
@@ -568,6 +588,14 @@ mod tests {
                 &config,
             );
             assert_eq!(tasks_raid_2.len(), 2);
+            assert_eq!(
+                tasks_raid_2[0].name.as_deref(),
+                Some("AS-EX-1 小偷与收款人 Normal")
+            );
+            assert_eq!(
+                tasks_raid_2[1].name.as_deref(),
+                Some("AS-EX-1 小偷与收款人 Raid")
+            );
             assert_eq!(tasks_raid_2[0].task_type, TaskType::Copilot);
             assert_eq!(tasks_raid_2[1].task_type, TaskType::Copilot);
             assert_params!(
@@ -600,6 +628,14 @@ mod tests {
                 parse_to_taskes(["maa", "copilot", "maa://40051", "maa://40052"], &config);
 
             assert_eq!(tasks_multiple.len(), 2);
+            assert_eq!(
+                tasks_multiple[0].name.as_deref(),
+                Some("AS-EX-1 小偷与收款人 Normal")
+            );
+            assert_eq!(
+                tasks_multiple[1].name.as_deref(),
+                Some("AS-EX-2 被吹碎的镜子 Normal")
+            );
             assert_eq!(tasks_multiple[0].task_type, TaskType::Copilot);
             assert_eq!(tasks_multiple[1].task_type, TaskType::Copilot);
             assert_params!(

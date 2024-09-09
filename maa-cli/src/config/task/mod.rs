@@ -83,7 +83,6 @@ impl Task {
         }
     }
 
-    #[cfg(test)]
     pub fn with_name(mut self, name: String) -> Self {
         self.name = Some(name);
         self
@@ -713,7 +712,8 @@ mod tests {
                             "start_game_enabled" => true,
                             "client_type" => "YoStarEN",
                         )
-                    )],
+                    )
+                    .with_name(String::from("StartUp"))],
                 }
                 .init()
                 .unwrap(),
@@ -727,7 +727,8 @@ mod tests {
                             "start_game_enabled" => true,
                             "client_type" => "YoStarEN",
                         )
-                    )]
+                    )
+                    .with_name(String::from("StartUp"))]
                 }
             );
 
