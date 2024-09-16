@@ -27,7 +27,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Lint Markdown
-        uses: DavidAnson/markdownlint-cli2-action@v16
+        uses: DavidAnson/markdownlint-cli2-action@v17
         with:
           globs: "**/*.md"
           config: "maa-cli/docs/.markdownlint.yaml"
