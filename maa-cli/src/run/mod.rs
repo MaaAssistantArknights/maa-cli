@@ -22,7 +22,7 @@ use anyhow::{bail, Context, Result};
 use clap::Args;
 use log::{debug, warn};
 use maa_dirs::{self as dirs, Ensure, MAA_CORE_LIB};
-use maa_sys::Assistant;
+use maa_sys::{binding::unload, Assistant};
 use signal_hook::consts::TERM_SIGNALS;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -263,7 +263,11 @@ pub fn run_custom(path: impl AsRef<Path>, args: CommonArgs) -> Result<()> {
 pub fn core_version<'a>() -> Result<&'a str> {
     load_core()?;
 
-    Assistant::get_version().context("Failed to get MaaCore version!")
+    let s = Assistant::get_version().context("Failed to get MaaCore version!");
+
+    unload();
+
+    s
 }
 
 fn load_core() -> Result<()> {
