@@ -149,7 +149,7 @@ impl std::fmt::Display for TaskSummary {
         write!(
             f,
             "[{}]",
-            self.name.as_deref().unwrap_or(self.task.as_ref())
+            self.name.as_deref().unwrap_or(self.task.to_str())
         )?;
 
         match (self.start_time, self.end_time) {

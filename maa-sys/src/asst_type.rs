@@ -63,7 +63,7 @@ impl InstanceOptionKey {
 
 /// Available touch mode
 #[repr(u8)]
-#[derive(Default, Clone, Copy, PartialEq, Debug)]
+#[derive(Default, Clone, Copy, PartialEq)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum TouchMode {
     #[default]
@@ -111,13 +111,6 @@ impl TouchMode {
             .iter()
             .find(|v| v.to_str().eq_ignore_ascii_case(s))
             .copied()
-    }
-}
-
-// DEPRECATED: use `to_str` instead, will be removed in the future.
-impl AsRef<str> for TouchMode {
-    fn as_ref(&self) -> &str {
-        self.to_str()
     }
 }
 
@@ -174,6 +167,12 @@ impl<'de> serde::Deserialize<'de> for TouchMode {
         }
 
         deserializer.deserialize_str(TouchModeVisitor)
+    }
+}
+
+impl std::fmt::Debug for TouchMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.to_str())
     }
 }
 
@@ -235,19 +234,9 @@ mod tests {
     }
 
     #[test]
-    fn to_string() {
-        assert_eq!(ADB.to_string(), "adb");
-        assert_eq!(MiniTouch.to_string(), "minitouch");
-        assert_eq!(MaaTouch.to_string(), "maatouch");
-        assert_eq!(MacPlayTools.to_string(), "MacPlayTools");
-    }
-
-    #[test]
-    fn as_ref() {
-        assert_eq!(ADB.as_ref(), "adb");
-        assert_eq!(MiniTouch.as_ref(), "minitouch");
-        assert_eq!(MaaTouch.as_ref(), "maatouch");
-        assert_eq!(MacPlayTools.as_ref(), "MacPlayTools");
+    fn fmt() {
+        assert_eq!(format!("{}", ADB), "adb");
+        assert_eq!(format!("{:?}", MiniTouch), "minitouch");
     }
 
     #[test]
