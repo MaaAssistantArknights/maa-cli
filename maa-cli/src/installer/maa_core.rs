@@ -68,11 +68,12 @@ fn extract_mapper(
 
 /// Get installed MaaCore version
 pub fn version() -> Result<Version> {
-    let ver_str = run::core_version()?.trim();
+    let v_str = run::core_version()?;
+    let v_str = v_str.trim();
 
-    ver_str
+    v_str
         .strip_prefix('v')
-        .unwrap_or(ver_str)
+        .unwrap_or(v_str)
         .parse()
         .context("Failed to get version")
 }

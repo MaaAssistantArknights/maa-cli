@@ -113,11 +113,11 @@ impl Assistant {
     /// # Errors
     ///
     /// This function will raise an error if the version is not a valid UTF-8 string.
-    pub fn get_version<'a>() -> Result<&'a str> {
+    pub fn get_version() -> Result<String> {
         unsafe {
             let c_str = binding::AsstGetVersion();
             let version = CStr::from_ptr(c_str).to_str()?;
-            Ok(version)
+            Ok(String::from(version))
         }
     }
 
