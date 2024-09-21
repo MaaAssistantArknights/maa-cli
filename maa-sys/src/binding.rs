@@ -135,7 +135,10 @@ mod tests {
             use windows::core::HSTRING;
             use windows::Win32::System::LibraryLoader::SetDllDirectoryW;
 
-            unsafe { SetDllDirectoryW(&HSTRING::from(lib_dir.as_ref()))? };
+            unsafe {
+                SetDllDirectoryW(&HSTRING::from(lib_dir.as_ref()))
+                    .expect("Failed to set DLL directory")
+            };
         }
 
         let lib = SharedLibrary::new(lib_path).expect("Failed to load shared library");
