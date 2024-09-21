@@ -260,10 +260,14 @@ pub fn run_custom(path: impl AsRef<Path>, args: CommonArgs) -> Result<()> {
     )
 }
 
-pub fn core_version<'a>() -> Result<&'a str> {
+pub fn core_version() -> Result<String> {
     load_core()?;
 
-    Assistant::get_version().context("Failed to get MaaCore version!")
+    let v_str = Assistant::get_version().context("Failed to get MaaCore version!")?;
+
+    maa_sys::binding::unload();
+
+    Ok(v_str)
 }
 
 fn load_core() -> Result<()> {
@@ -315,7 +319,7 @@ mod tests {
             return;
         }
         let version = env::var_os("MAA_CORE_VERSION").unwrap();
-        assert_eq!(core_version().unwrap(), version);
+        assert_eq!(core_version().unwrap().as_str(), version);
     }
 
     #[test]
