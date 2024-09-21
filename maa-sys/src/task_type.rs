@@ -1,6 +1,6 @@
 /// Available task type for MAA
 #[repr(u8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum TaskType {
     StartUp,
     CloseDown,
@@ -128,10 +128,9 @@ impl<'de> serde::Deserialize<'de> for TaskType {
     }
 }
 
-// DEPRECATED: use `to_str` instead, will be removed in the future.
-impl AsRef<str> for TaskType {
-    fn as_ref(&self) -> &str {
-        self.to_str()
+impl std::fmt::Debug for TaskType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.to_str())
     }
 }
 
@@ -239,8 +238,9 @@ mod tests {
     }
 
     #[test]
-    fn to_string() {
-        assert_eq!(StartUp.to_string(), "StartUp");
+    fn fmt() {
+        assert_eq!(format!("{}", StartUp), "StartUp");
+        assert_eq!(format!("{:?}", StartUp), "StartUp");
     }
 
     #[test]

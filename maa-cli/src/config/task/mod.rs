@@ -218,7 +218,7 @@ impl TaskConfig {
                     // and will be converted to an absolute path.
                     if let Some(v) = params.get_mut("filename") {
                         let file = PathBuf::from(v.as_str().context("filename must be a string")?);
-                        let sub_dir = task_type.as_ref().to_lowercase();
+                        let sub_dir = task_type.to_str().to_lowercase();
                         if let Some(path) = dirs::abs_config(file, Some(sub_dir)) {
                             *v = path.to_str().context("Invilid UTF-8")?.into();
                         }
