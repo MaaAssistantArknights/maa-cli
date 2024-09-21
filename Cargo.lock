@@ -1038,6 +1038,7 @@ dependencies = [
  "libloading",
  "serde",
  "serde_test",
+ "windows",
 ]
 
 [[package]]

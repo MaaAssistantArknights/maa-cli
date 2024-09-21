@@ -129,6 +129,14 @@ mod tests {
         );
         let lib_path = std::path::PathBuf::from(dir).join(lib_name);
 
+        #[cfg(target_os = "windows")]
+        {
+            use windows::core::HSTRING;
+            use windows::Win32::System::LibraryLoader::SetDllDirectoryW;
+
+            unsafe { SetDllDirectoryW(&HSTRING::from(lib_dir.as_ref()))? };
+        }
+
         let lib = SharedLibrary::new(lib_path).expect("Failed to load shared library");
 
         let f = *unsafe {
