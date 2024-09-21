@@ -136,8 +136,7 @@ mod tests {
             use windows::Win32::System::LibraryLoader::SetDllDirectoryW;
 
             unsafe {
-                SetDllDirectoryW(&HSTRING::from(lib_dir.as_ref()))
-                    .expect("Failed to set DLL directory")
+                SetDllDirectoryW(&HSTRING::from(&lib_dir)).expect("Failed to set DLL directory")
             };
         }
 
