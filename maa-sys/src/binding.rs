@@ -111,3 +111,45 @@ link! {
     pub fn AsstGetVersion() -> *const ::std::os::raw::c_char;
     pub fn AsstLog(level: *const ::std::os::raw::c_char, message: *const ::std::os::raw::c_char);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(not(feature = "runtime"))]
+    #[test]
+    fn test_link() {
+        assert_eq!(unsafe { AsstGetVersion() }, "0.0.1");
+    }
+
+    #[cfg(feature = "runtime")]
+    #[test]
+    #[ignore = "Need to set MAA_CORE_DIR"]
+    fn test_link() {
+        let dir = std::env::var_os("MAA_CORE_DIR")
+            .expect("Please set MAA_CORE_DIR to the path of the shared library");
+        let lib_name = format!(
+            "{}MaaCore{}",
+            std::env::consts::DLL_PREFIX,
+            std::env::consts::DLL_SUFFIX,
+        );
+        let lib_path = std::path::PathBuf::from(dir).join(lib_name);
+
+        let lib = SharedLibrary::new(lib_path).expect("Failed to load shared library");
+
+        let f = *unsafe {
+            lib.handle
+                .get::<extern "C" fn() -> *const ::std::os::raw::c_char>(b"AsstGetVersion\0")
+        }
+        .expect("Failed to get function");
+
+        let ver = f();
+
+        if let Some(v_str) = std::env::var_os("MAA_CORE_VERSION") {
+            assert_eq!(
+                unsafe { std::ffi::CStr::from_ptr(ver).to_str().unwrap() },
+                v_str.to_str().unwrap()
+            );
+        }
+    }
+}
