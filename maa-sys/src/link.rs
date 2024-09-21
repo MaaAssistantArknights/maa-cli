@@ -40,36 +40,27 @@ macro_rules! link {
             )+
         }
 
-        use std::cell::RefCell;
-        use std::sync::Arc;
+        use ::std::sync::RwLock;
 
-        thread_local! {
-            static SHARED_LIBRARY: RefCell<Option<Arc<SharedLibrary>>> = RefCell::new(None);
-        }
+        static SHARED_LIBRARY: RwLock<Option<SharedLibrary>> = RwLock::new(None);
 
         /// Load the shared library of MaaCore from the given path in this thread.
         pub fn load(path: impl AsRef<std::ffi::OsStr>) -> Result<(), libloading::Error> {
-                let lib = SharedLibrary::new(path)?;
+            let lib = SharedLibrary::new(path)?;
 
-                SHARED_LIBRARY.with(|share_lib| {
-                    *share_lib.borrow_mut() = Some(Arc::new(lib));
-                });
+            SHARED_LIBRARY.write().expect("Failed to lock shared library").replace(lib);
 
-                Ok(())
+            Ok(())
         }
 
         /// Unload the shared library of MaaCore in this thread.
         pub fn unload() {
-            SHARED_LIBRARY.with(|lib| {
-                *lib.borrow_mut() = None;
-            });
+            SHARED_LIBRARY.write().expect("Failed to lock shared library").take();
         }
 
         /// Check if the shared library of MaaCore is loaded in this thread.
         pub fn loaded() -> bool {
-            SHARED_LIBRARY.with(|lib| {
-                lib.borrow().is_some()
-            })
+            SHARED_LIBRARY.read().expect("Failed to lock shared library").is_some()
         }
 
         $(
@@ -84,10 +75,10 @@ macro_rules! link {
             /// This function will panic if the shared library is not loaded in this thread.
             #[allow(non_snake_case)]
             pub unsafe fn $name($($pname: $pty), *) $(-> $ret)* {
-                SHARED_LIBRARY.with(|lib| match lib.borrow().as_ref() {
+                match SHARED_LIBRARY.read().expect("Failed to lock shared library").as_ref() {
                     Some(lib) => lib.$name($($pname), *),
-                    None => panic!("MaaCore is not loaded in this thread."),
-                })
+                    None => panic!("MaaCore in not loaded"),
+                }
             }
         )+
     )
