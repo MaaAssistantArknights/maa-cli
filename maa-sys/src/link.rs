@@ -9,35 +9,19 @@ macro_rules! link {
 
         #[allow(non_snake_case)]
         struct SharedLibrary {
-            _handle: Library,
-            $(
-                $name: extern "C" fn($($pname: $pty), *) $(-> $ret)*,
-            )+
+            handle: Library,
         }
 
 
         impl SharedLibrary {
-            pub fn new(path: impl AsRef<std::ffi::OsStr>) -> Result<Self, libloading::Error> {
+            fn new(path: impl AsRef<std::ffi::OsStr>) -> Result<Self, libloading::Error> {
                 let handle = unsafe { libloading::Library::new(path)? };
                 let lib = Self {
-                    $(
-                        $name: unsafe {
-                            let symbol: Symbol<extern "C" fn($($pname: $pty), *) $(-> $ret)*> = handle.get(stringify!($name).as_bytes())?;
-                            *symbol
-                        },
-                    )+
-                    // We need to keep the handle alive, even though we don't use it.
-                    _handle: handle,
+                    // We need to keep the handle alive, even though we don't use it
+                    handle,
                 };
                 Ok(lib)
             }
-
-            $(
-                #[allow(non_snake_case)]
-                pub fn $name(&self, $($pname: $pty), *) $(-> $ret)* {
-                    (self.$name)($($pname), *)
-                }
-            )+
         }
 
         use std::sync::RwLock;
@@ -74,7 +58,11 @@ macro_rules! link {
             #[allow(non_snake_case)]
             pub unsafe fn $name($($pname: $pty), *) $(-> $ret)* {
                 match SHARED_LIBRARY.read().expect("Failed to lock shared library").as_ref() {
-                    Some(lib) => lib.$name($($pname), *),
+                    Some(lib) => {
+                        let sym: Symbol<extern "C" fn($($pname: $pty), *) $(-> $ret)*>
+                            = lib.handle.get(stringify!($name).as_bytes()).expect("Failed to get symbol");
+                        sym($($pname), *)
+                    },
                     None => panic!("MaaCore is not loaded"),
                 }
             }
