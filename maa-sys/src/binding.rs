@@ -120,14 +120,15 @@ mod tests {
     #[test]
     #[ignore = "Need to set MAA_CORE_DIR"]
     fn test_link() {
-        let dir = std::env::var_os("MAA_CORE_DIR")
+        let lib_dir = std::env::var_os("MAA_CORE_DIR")
+            .map(std::path::PathBuf::from)
             .expect("Please set MAA_CORE_DIR to the path of the shared library");
         let lib_name = format!(
             "{}MaaCore{}",
             std::env::consts::DLL_PREFIX,
             std::env::consts::DLL_SUFFIX,
         );
-        let lib_path = std::path::PathBuf::from(dir).join(lib_name);
+        let lib_path = lib_dir.join(lib_name);
 
         #[cfg(target_os = "windows")]
         {
