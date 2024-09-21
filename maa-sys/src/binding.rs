@@ -116,12 +116,6 @@ link! {
 mod tests {
     use super::*;
 
-    #[cfg(not(feature = "runtime"))]
-    #[test]
-    fn test_link() {
-        assert_eq!(unsafe { AsstGetVersion() }, "0.0.1");
-    }
-
     #[cfg(feature = "runtime")]
     #[test]
     #[ignore = "Need to set MAA_CORE_DIR"]

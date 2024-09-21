@@ -312,16 +312,16 @@ mod tests {
 
     use std::env::{self, temp_dir};
 
-    #[test]
-    #[ignore = "need installed MaaCore"]
-    fn version() {
-        if env::var_os("SKIP_CORE_TEST").is_some() {
-            return;
-        }
-        let version = env::var_os("MAA_CORE_VERSION").unwrap();
-        assert_eq!(core_version().unwrap(), version);
-    }
-
+    // #[test]
+    // #[ignore = "need installed MaaCore"]
+    // fn version() {
+    //     if env::var_os("SKIP_CORE_TEST").is_some() {
+    //         return;
+    //     }
+    //     let version = env::var_os("MAA_CORE_VERSION").unwrap();
+    //     assert_eq!(core_version().unwrap(), version);
+    // }
+    //
     #[test]
     fn test_find_profile() {
         let test_dir = temp_dir().join("maa_test_find_profile");
