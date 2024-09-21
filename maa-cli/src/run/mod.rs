@@ -22,7 +22,7 @@ use anyhow::{bail, Context, Result};
 use clap::Args;
 use log::{debug, warn};
 use maa_dirs::{self as dirs, Ensure, MAA_CORE_LIB};
-use maa_sys::{binding::unload, Assistant};
+use maa_sys::Assistant;
 use signal_hook::consts::TERM_SIGNALS;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -263,11 +263,11 @@ pub fn run_custom(path: impl AsRef<Path>, args: CommonArgs) -> Result<()> {
 pub fn core_version<'a>() -> Result<&'a str> {
     load_core()?;
 
-    let s = Assistant::get_version().context("Failed to get MaaCore version!");
+    let s = Assistant::get_version().context("Failed to get MaaCore version!")?;
 
-    unload();
+    // unload();
 
-    s
+    Ok(s)
 }
 
 fn load_core() -> Result<()> {
@@ -312,16 +312,16 @@ mod tests {
 
     use std::env::{self, temp_dir};
 
-    // #[test]
-    // #[ignore = "need installed MaaCore"]
-    // fn version() {
-    //     if env::var_os("SKIP_CORE_TEST").is_some() {
-    //         return;
-    //     }
-    //     let version = env::var_os("MAA_CORE_VERSION").unwrap();
-    //     assert_eq!(core_version().unwrap(), version);
-    // }
-    //
+    #[test]
+    #[ignore = "need installed MaaCore"]
+    fn version() {
+        if env::var_os("SKIP_CORE_TEST").is_some() {
+            return;
+        }
+        let version = env::var_os("MAA_CORE_VERSION").unwrap();
+        assert_eq!(core_version().unwrap(), version);
+    }
+
     #[test]
     fn test_find_profile() {
         let test_dir = temp_dir().join("maa_test_find_profile");

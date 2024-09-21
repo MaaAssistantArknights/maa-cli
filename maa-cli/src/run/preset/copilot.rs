@@ -481,7 +481,7 @@ mod tests {
             {
                 let command = crate::command::parse_from(args).command;
                 match command {
-                    crate::Command::Copilot { params, .. } => params.into_task_config(&config),
+                    crate::Command::Copilot { params, .. } => params.into_task_config(config),
                     _ => panic!("Not a Copilot command"),
                 }
             }
