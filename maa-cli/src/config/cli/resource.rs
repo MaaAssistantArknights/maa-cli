@@ -101,23 +101,21 @@ pub mod tests {
     #[test]
     fn default() {
         let config = Config::default();
-        assert_eq!(
-            config,
-            Config {
-                auto_update: false,
-                backend: GitBackend::Git,
-                remote: Remote {
-                    url: default_url(),
-                    branch: None,
-                    ssh_key: None,
-                }
+        assert_eq!(config, Config {
+            auto_update: false,
+            backend: GitBackend::Git,
+            remote: Remote {
+                url: default_url(),
+                branch: None,
+                ssh_key: None,
             }
-        );
+        });
     }
 
     mod serde {
-        use super::*;
         use serde_test::{assert_de_tokens, Token};
+
+        use super::*;
 
         impl GitBackend {
             pub fn to_token(self) -> Token {
@@ -142,10 +140,10 @@ pub mod tests {
 
         #[test]
         fn remote() {
-            assert_de_tokens(
-                &Remote::default(),
-                &[Token::Map { len: Some(0) }, Token::MapEnd],
-            );
+            assert_de_tokens(&Remote::default(), &[
+                Token::Map { len: Some(0) },
+                Token::MapEnd,
+            ]);
 
             assert_de_tokens(
                 &Remote {
@@ -170,10 +168,10 @@ pub mod tests {
 
         #[test]
         fn config() {
-            assert_de_tokens(
-                &Config::default(),
-                &[Token::Map { len: Some(0) }, Token::MapEnd],
-            );
+            assert_de_tokens(&Config::default(), &[
+                Token::Map { len: Some(0) },
+                Token::MapEnd,
+            ]);
 
             assert_de_tokens(
                 &Config {

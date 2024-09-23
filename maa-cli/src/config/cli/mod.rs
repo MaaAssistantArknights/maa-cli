@@ -5,14 +5,13 @@ pub mod maa_core;
 
 pub mod resource;
 
-use super::FindFileOrDefault;
-
-use crate::dirs;
-
 use std::sync::OnceLock;
 
 use clap::ValueEnum;
 use serde::Deserialize;
+
+use super::FindFileOrDefault;
+use crate::dirs;
 
 /// Configuration for the CLI (cli.toml)
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -89,11 +88,11 @@ fn normalize_url(url: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{resource::GitBackend, *};
-
     use serde_json;
     use serde_test::{assert_de_tokens, Token};
     use toml;
+
+    use super::{resource::GitBackend, *};
 
     // The serde_de_token cannot deserialize "beta" to Channel::Beta
     // But it works in real implementation (serde_json::from_str)
@@ -124,10 +123,10 @@ mod tests {
 
     #[test]
     fn deserialize_installer_config() {
-        assert_de_tokens(
-            &CLIConfig::default(),
-            &[Token::Map { len: Some(0) }, Token::MapEnd],
-        );
+        assert_de_tokens(&CLIConfig::default(), &[
+            Token::Map { len: Some(0) },
+            Token::MapEnd,
+        ]);
 
         #[cfg(feature = "core_installer")]
         assert_de_tokens(

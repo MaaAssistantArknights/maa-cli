@@ -97,7 +97,8 @@ pub trait UserInput: Sized {
     /// The caller will flush it when necessary.
     fn prompt(&self, writer: &mut impl Write) -> io::Result<()>;
 
-    /// Prompt user to re-input a value for this parameter when the input is empty and default value is not set.
+    /// Prompt user to re-input a value for this parameter when the input is empty and default value
+    /// is not set.
     ///
     /// Don't flush the writer after writing to it.
     /// The caller will flush it when necessary.

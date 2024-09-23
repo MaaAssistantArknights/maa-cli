@@ -1,10 +1,12 @@
 #[cfg(not(feature = "runtime"))]
 fn static_link() {
-    use std::env::{
-        consts::{DLL_PREFIX, DLL_SUFFIX},
-        var_os,
+    use std::{
+        env::{
+            consts::{DLL_PREFIX, DLL_SUFFIX},
+            var_os,
+        },
+        path::PathBuf,
     };
-    use std::path::PathBuf;
 
     let core_dir = var_os("MAA_CORE_DIR")
         .map(PathBuf::from)

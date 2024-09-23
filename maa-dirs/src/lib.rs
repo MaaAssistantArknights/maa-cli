@@ -163,8 +163,9 @@ impl Dirs {
     /// Try to find it in the directory relative to the executable file.
     /// First, try to find the MaaCore in the same directory as the executable file.
     /// Then, assume the executable file is in the `bin` directory,
-    /// try to find the MaaCore in the `lib` directory in the parent directory of the executable file.
-    /// If the executable is a symbolic link, will try to find the MaaCore both in the symbolic link and the link target.
+    /// try to find the MaaCore in the `lib` directory in the parent directory of the executable
+    /// file. If the executable is a symbolic link, will try to find the MaaCore both in the
+    /// symbolic link and the link target.
     pub fn find_library<'a>(&'a self, exe_path: &'a Path) -> Option<Cow<'a, Path>> {
         if self.library().join(MAA_CORE_LIB).exists() {
             return Some(self.library().into());
@@ -238,8 +239,9 @@ impl Dirs {
     /// Try to find it in the directory relative to the executable file.
     /// First, try to find the resource directory in the same directory as the executable file.
     /// Then, assume the executable file is in the `bin` directory,
-    /// try to find the resource directory in the `share/maa` directory in the parent directory of the executable file.
-    /// If the executable is a symbolic link, will try to find the resource directory both in the symbolic link and the link target.
+    /// try to find the resource directory in the `share/maa` directory in the parent directory of
+    /// the executable file. If the executable is a symbolic link, will try to find the resource
+    /// directory both in the symbolic link and the link target.
     ///
     /// Additionally, if maa is compiled with `MAA_EXTRA_SHARE_NAME` environment variable,
     /// try to find the resource directory in the `share/$MAA_EXTRA_SHARE_NAME` directory.
@@ -478,8 +480,9 @@ fn ensure_name(name: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::env::{self, temp_dir};
+
+    use super::*;
 
     #[test]
     fn maa_lib_name() {
@@ -494,8 +497,9 @@ mod tests {
     }
 
     mod get_dir {
-        use super::*;
         use std::fs::{create_dir_all, remove_dir_all};
+
+        use super::*;
 
         fn project() -> Option<ProjectDirs> {
             ProjectDirs::from("com", "loong", "maa")
@@ -641,8 +645,9 @@ mod tests {
             env::remove_var("MAA_DATA_DIR");
 
             // Test find_library and find_resource at non-standard location (in a test directory)
-            // We need to use the provius dirs since the data directory is not at its standard location,
-            // to avoid find_library and find_resource returning the standard location.
+            // We need to use the provius dirs since the data directory is not at its standard
+            // location, to avoid find_library and find_resource returning the standard
+            // location.
             let test_root = temp_dir().join("maa-dirs-test-data-relative");
             test_root.ensure_clean().unwrap();
             let test_root = canonicalize(test_root).unwrap();
@@ -822,10 +827,9 @@ mod tests {
 
         std::fs::File::create(&test_file).unwrap();
 
-        assert_eq!(
-            global_path([&test_dir1, &test_dir2], "test"),
-            vec![test_file.clone()]
-        );
+        assert_eq!(global_path([&test_dir1, &test_dir2], "test"), vec![
+            test_file.clone()
+        ]);
         assert_eq!(
             global_path([&test_dir1, &test_dir2], "not_exist"),
             Vec::<PathBuf>::new()

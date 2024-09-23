@@ -1,6 +1,6 @@
-use super::MAAValue;
-
 use color_print::cstr;
+
+use super::MAAValue;
 
 #[repr(u8)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -87,9 +87,9 @@ mod tests {
     use super::*;
 
     mod theme {
-        use super::*;
-
         use clap::ValueEnum;
+
+        use super::*;
 
         #[test]
         fn to_str() {

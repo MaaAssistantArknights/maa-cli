@@ -1,9 +1,11 @@
-use crate::dirs::{self, Ensure};
-
-use std::fs::{self, File};
-use std::path::Path;
+use std::{
+    fs::{self, File},
+    path::Path,
+};
 
 use serde_json::Value as JsonValue;
+
+use crate::dirs::{self, Ensure};
 
 #[derive(Debug)]
 pub enum Error {
@@ -351,13 +353,13 @@ pub mod init;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::env::temp_dir;
-
-    use crate::assert_matches;
 
     use serde::Deserialize;
     use serde_json::{json, Value as JsonValue};
+
+    use super::*;
+    use crate::assert_matches;
 
     #[test]
     fn filetype() {
@@ -435,13 +437,10 @@ mod tests {
             }
         );
 
-        assert_eq!(
-            TestConfig::find_file(&test_file).unwrap(),
-            TestConfig {
-                a: 1,
-                b: "test".to_string()
-            }
-        );
+        assert_eq!(TestConfig::find_file(&test_file).unwrap(), TestConfig {
+            a: 1,
+            b: "test".to_string()
+        });
 
         assert_matches!(
             TestConfig::find_file(&non_exist_file).unwrap_err(),

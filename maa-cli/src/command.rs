@@ -1,9 +1,9 @@
-use crate::{cleanup, config, log, run};
-
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use clap_complete::Shell;
+
+use crate::{cleanup, config, log, run};
 
 #[derive(Parser)]
 #[command(name = "maa", author, version = env!("MAA_VERSION"), about = "A tool for Arknights.")]
@@ -176,8 +176,8 @@ pub(crate) enum Command {
         output: Option<PathBuf>,
         /// Format of the output file, can be one of "toml", "yaml" and "json"
         ///
-        /// If not specified, the format will be guessed from the file extension of the output file.
-        /// If output file is not specified, the output will be default to "json".
+        /// If not specified, the format will be guessed from the file extension of the output
+        /// file. If output file is not specified, the output will be default to "json".
         #[arg(short, long)]
         format: Option<config::Filetype>,
     },
@@ -223,8 +223,8 @@ pub(crate) enum Command {
         /// - `resource`: user resource files.
         ///
         /// Other values are supported, but not recommended.
-        /// It will be treated as a subdirectory of the config directory and show a warning message.
-        /// If you think it is correct, please open an issue to let us know.
+        /// It will be treated as a subdirectory of the config directory and show a warning
+        /// message. If you think it is correct, please open an issue to let us know.
         #[arg(short = 't', long, default_value = "task", verbatim_doc_comment)]
         config_type: String,
     },
@@ -311,7 +311,6 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-
     use crate::config::cli::Channel;
 
     #[macro_export]
@@ -330,13 +329,10 @@ mod test {
     #[cfg(feature = "core_installer")]
     #[test]
     fn install() {
-        assert_matches!(
-            parse_from(["maa", "install"]).command,
-            Command::Install {
-                common: config::cli::maa_core::CommonArgs { .. },
-                force: false,
-            }
-        );
+        assert_matches!(parse_from(["maa", "install"]).command, Command::Install {
+            common: config::cli::maa_core::CommonArgs { .. },
+            force: false,
+        });
 
         assert_matches!(
             parse_from(["maa", "install", "beta"]).command,
@@ -402,12 +398,9 @@ mod test {
     #[cfg(feature = "core_installer")]
     #[test]
     fn update() {
-        assert_matches!(
-            parse_from(["maa", "update"]).command,
-            Command::Update {
-                common: config::cli::maa_core::CommonArgs { .. },
-            }
-        );
+        assert_matches!(parse_from(["maa", "update"]).command, Command::Update {
+            common: config::cli::maa_core::CommonArgs { .. },
+        });
     }
 
     #[cfg(feature = "cli_installer")]
@@ -443,26 +436,22 @@ mod test {
 
     #[test]
     fn dir() {
-        assert_matches!(
-            parse_from(["maa", "dir", "data"]).command,
-            Command::Dir { dir: Dir::Data }
-        );
+        assert_matches!(parse_from(["maa", "dir", "data"]).command, Command::Dir {
+            dir: Dir::Data
+        });
         assert_matches!(
             parse_from(["maa", "dir", "library"]).command,
             Command::Dir { dir: Dir::Library }
         );
-        assert_matches!(
-            parse_from(["maa", "dir", "lib"]).command,
-            Command::Dir { dir: Dir::Library }
-        );
-        assert_matches!(
-            parse_from(["maa", "dir", "config"]).command,
-            Command::Dir { dir: Dir::Config }
-        );
-        assert_matches!(
-            parse_from(["maa", "dir", "cache"]).command,
-            Command::Dir { dir: Dir::Cache }
-        );
+        assert_matches!(parse_from(["maa", "dir", "lib"]).command, Command::Dir {
+            dir: Dir::Library
+        });
+        assert_matches!(parse_from(["maa", "dir", "config"]).command, Command::Dir {
+            dir: Dir::Config
+        });
+        assert_matches!(parse_from(["maa", "dir", "cache"]).command, Command::Dir {
+            dir: Dir::Cache
+        });
         assert_matches!(
             parse_from(["maa", "dir", "resource"]).command,
             Command::Dir { dir: Dir::Resource }
@@ -473,20 +462,16 @@ mod test {
                 dir: Dir::HotUpdate
             }
         );
-        assert_matches!(
-            parse_from(["maa", "dir", "log"]).command,
-            Command::Dir { dir: Dir::Log }
-        );
+        assert_matches!(parse_from(["maa", "dir", "log"]).command, Command::Dir {
+            dir: Dir::Log
+        });
     }
 
     #[test]
     fn version() {
-        assert_matches!(
-            parse_from(["maa", "version"]).command,
-            Command::Version {
-                component: Component::All
-            }
-        );
+        assert_matches!(parse_from(["maa", "version"]).command, Command::Version {
+            component: Component::All
+        });
         assert_matches!(
             parse_from(["maa", "version", "all"]).command,
             Command::Version {
@@ -604,12 +589,9 @@ mod test {
 
     #[test]
     fn activity() {
-        assert_matches!(
-            parse_from(["maa", "activity"]).command,
-            Command::Activity {
-                client: config::task::ClientType::Official,
-            }
-        );
+        assert_matches!(parse_from(["maa", "activity"]).command, Command::Activity {
+            client: config::task::ClientType::Official,
+        });
 
         assert_matches!(
             parse_from(["maa", "activity", "YoStarEN"]).command,
@@ -689,14 +671,11 @@ mod test {
 
     #[test]
     fn init() {
-        assert_matches!(
-            parse_from(["maa", "init"]).command,
-            Command::Init {
-                name: None,
-                format: None,
-                force: false,
-            }
-        );
+        assert_matches!(parse_from(["maa", "init"]).command, Command::Init {
+            name: None,
+            format: None,
+            force: false,
+        });
 
         assert_matches!(
             parse_from(["maa", "init", "--name", "name"]).command,
@@ -714,13 +693,10 @@ mod test {
             }
         );
 
-        assert_matches!(
-            parse_from(["maa", "init", "-ft"]).command,
-            Command::Init {
-                format: Some(config::Filetype::Toml),
-                ..
-            }
-        );
+        assert_matches!(parse_from(["maa", "init", "-ft"]).command, Command::Init {
+            format: Some(config::Filetype::Toml),
+            ..
+        });
 
         assert_matches!(
             parse_from(["maa", "init", "--force"]).command,

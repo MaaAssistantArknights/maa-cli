@@ -1,5 +1,3 @@
-use crate::{config::task::ClientType, dirs};
-
 use std::{io::Write, path::Path, sync::OnceLock};
 
 use anyhow::{bail, Context, Result};
@@ -7,6 +5,8 @@ use chrono::{DateTime, FixedOffset, NaiveDateTime};
 use log::warn;
 use serde::Deserialize;
 use serde_json::Value as JsonValue;
+
+use crate::{config::task::ClientType, dirs};
 
 fn stage_activity() -> Option<&'static StageActivityJson> {
     static STAGE_ACTIVITY: OnceLock<Option<StageActivityJson>> = OnceLock::new();
@@ -210,9 +210,9 @@ impl<T, E: std::fmt::Display> WarnError<T> for std::result::Result<T, E> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use std::env::var_os;
+
+    use super::*;
 
     #[test]
     fn parse_time_from_activity_info() {

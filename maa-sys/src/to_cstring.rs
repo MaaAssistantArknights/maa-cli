@@ -1,9 +1,9 @@
-use crate::{Error, Result};
-
 use std::{
     ffi::CString,
     path::{Path, PathBuf},
 };
+
+use crate::{Error, Result};
 
 /// A trait to convert a value to a UTF-8 encoded C string passed to MAA.
 pub trait ToCString {
@@ -50,7 +50,8 @@ impl ToCString for &Path {
 
 /// Implement `ToCString` by `as_ref` method.
 ///
-/// `impl_to_cstring_by_as_ref!(ref_t, t1, t2, ...)` will implement `ToCString` for `t1`, `t2`, ... by `as_ref::<ref_t>` method.
+/// `impl_to_cstring_by_as_ref!(ref_t, t1, t2, ...)` will implement `ToCString` for `t1`, `t2`, ...
+/// by `as_ref::<ref_t>` method.
 #[macro_export]
 macro_rules! impl_to_cstring_by_as_ref {
     ($ref_t:ty, $($t:ty),*) => {
@@ -77,7 +78,8 @@ impl ToCString for bool {
 
 /// Implement `ToCString` by `to_string` method.
 ///
-/// `impl_to_cstring_by_to_string!(t1, t2, ...)` will implement `ToCString` for `t1`, `t2`, ... by `to_string` method.
+/// `impl_to_cstring_by_to_string!(t1, t2, ...)` will implement `ToCString` for `t1`, `t2`, ... by
+/// `to_string` method.
 #[macro_export]
 macro_rules! impl_to_cstring_by_to_string {
     ($($t:ty),*) => {

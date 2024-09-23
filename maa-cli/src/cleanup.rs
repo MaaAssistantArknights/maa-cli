@@ -1,8 +1,3 @@
-use crate::{
-    dirs::{cache, log, state},
-    value::userinput::{BoolInput, UserInput},
-};
-
 use std::{
     borrow::Cow,
     fs::{read_dir, DirEntry},
@@ -12,14 +7,19 @@ use std::{
 
 use anyhow::{bail, Result};
 
+use crate::{
+    dirs::{cache, log, state},
+    value::userinput::{BoolInput, UserInput},
+};
+
 pub trait PathProvider {
     /// Path to a directory to be cleaned up
     fn target_dir(&self) -> Cow<Path>;
 
     /// Determine whether an entry in the directory should be deleted
     ///
-    /// Default implementation always returns true, meaning all files and directories will be deleted.
-    /// This method and `should_keep` determine whether an entry should be deleted.
+    /// Default implementation always returns true, meaning all files and directories will be
+    /// deleted. This method and `should_keep` determine whether an entry should be deleted.
     /// If this method returns true and `should_keep` returns false, the entry will be deleted.
     /// Otherwise, the entry will not be deleted.
     #[allow(unused_variables)]
@@ -180,14 +180,13 @@ fn del_item(path: &Path) -> Result<(), std::io::Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use crate::dirs::Ensure;
-
     use std::{
         collections::BTreeSet,
         env::{temp_dir, var_os},
     };
+
+    use super::*;
+    use crate::dirs::Ensure;
 
     mod cleanup_target {
         use super::*;
@@ -409,8 +408,9 @@ mod tests {
 
         #[cfg(feature = "core_installer")]
         {
-            use crate::installer::maa_core;
             use semver::Version;
+
+            use crate::installer::maa_core;
 
             std::fs::File::create(join!(
                 cache(),

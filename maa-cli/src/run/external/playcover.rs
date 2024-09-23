@@ -1,8 +1,8 @@
-use crate::config::task::ClientType;
-
 use anyhow::{Context, Result};
 use log::{info, trace};
 use tokio::net::TcpStream;
+
+use crate::config::task::ClientType;
 
 #[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct PlayCoverApp<'a> {

@@ -19,6 +19,15 @@ use ClientType::*;
 
 impl ClientType {
     pub const COUNT: usize = 6;
+    pub const NAMES: [&'static str; Self::COUNT] = {
+        let mut i = 0;
+        let mut names = ["Official"; Self::COUNT];
+        while i < Self::COUNT {
+            names[i] = Self::VARIANTS[i].to_str();
+            i += 1;
+        }
+        names
+    };
     pub const VARIANTS: [ClientType; Self::COUNT] = {
         let mut i = 0;
         let mut variants = [Official; Self::COUNT];
@@ -39,16 +48,6 @@ impl ClientType {
             YoStarKR => "YoStarKR",
         }
     }
-
-    pub const NAMES: [&'static str; Self::COUNT] = {
-        let mut i = 0;
-        let mut names = ["Official"; Self::COUNT];
-        while i < Self::COUNT {
-            names[i] = Self::VARIANTS[i].to_str();
-            i += 1;
-        }
-        names
-    };
 
     fn from_str_opt(s: &str) -> Option<Self> {
         // Default to Official if empty
@@ -151,9 +150,9 @@ impl std::error::Error for UnknownClientTypeError {}
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use serde_test::{assert_de_tokens, assert_de_tokens_error, Token};
+
+    use super::*;
 
     impl ClientType {
         const fn to_token(self) -> Token {

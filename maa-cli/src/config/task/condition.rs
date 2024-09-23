@@ -1,9 +1,8 @@
-use super::client_type::ClientType;
-
-use crate::activity::has_side_story_open;
-
 use chrono::{DateTime, Datelike, NaiveDateTime, NaiveTime, TimeZone, Utc, Weekday};
 use serde::Deserialize;
+
+use super::client_type::ClientType;
+use crate::activity::has_side_story_open;
 
 #[cfg_attr(test, derive(PartialEq, Debug))]
 #[derive(Deserialize)]
@@ -16,8 +15,9 @@ pub enum Condition {
     /// The task is active on the specified weekdays
     ///
     /// By default, use the weekday in user local time zone.
-    /// If client is specified, use the weekday in the server time zone and start of the day will be
-    /// 04:00:00 instead of 00:00:00 in server time zone, and the end of the day will be 03:59:59.
+    /// If client is specified, use the weekday in the server time zone and start of the day will
+    /// be 04:00:00 instead of 00:00:00 in server time zone, and the end of the day will be
+    /// 03:59:59.
     Weekday {
         weekdays: Vec<Weekday>,
         #[serde(default, alias = "client")]
@@ -182,8 +182,9 @@ pub fn remainder_of_day_mod(tz: TimeOffset, divisor: u32) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::{Local, TimeZone};
+
+    use super::*;
 
     fn naive_local_datetime(y: i32, m: u32, d: u32, h: u32, mi: u32, s: u32) -> NaiveDateTime {
         Local
@@ -193,8 +194,9 @@ mod tests {
     }
 
     mod active {
-        use super::*;
         use chrono::{Duration, FixedOffset, NaiveDate};
+
+        use super::*;
 
         #[test]
         fn always() {
@@ -315,9 +317,10 @@ mod tests {
                 naive_date(2024, 2, 14),
             );
 
-            // This is a very unusual case that the local time zone is UTC+14 and server time zone is UTC-7
-            // For local time 2024-02-15 00:00:00, the server time is 2024-02-14 03:00:00
-            // Thus the game date is 2024-02-13 even though the local date is 2024-02-15
+            // This is a very unusual case that the local time zone is UTC+14 and server time zone
+            // is UTC-7 For local time 2024-02-15 00:00:00, the server time is
+            // 2024-02-14 03:00:00 Thus the game date is 2024-02-13 even though the
+            // local date is 2024-02-15
             assert_eq!(
                 game_date(datetime(14, 2024, 2, 15, 0, 0), ClientType::YoStarEN),
                 naive_date(2024, 2, 13),
@@ -523,22 +526,16 @@ mod tests {
             }
             .is_active());
             assert!(!Condition::And {
-                conditions: vec![
-                    Condition::Always,
-                    Condition::Not {
-                        condition: Box::new(Condition::Always)
-                    },
-                ]
+                conditions: vec![Condition::Always, Condition::Not {
+                    condition: Box::new(Condition::Always)
+                },]
             }
             .is_active());
 
             assert!(Condition::Or {
-                conditions: vec![
-                    Condition::Always,
-                    Condition::Not {
-                        condition: Box::new(Condition::Always)
-                    }
-                ]
+                conditions: vec![Condition::Always, Condition::Not {
+                    condition: Box::new(Condition::Always)
+                }]
             }
             .is_active());
 
@@ -562,8 +559,9 @@ mod tests {
     }
 
     mod serde {
-        use super::*;
         use serde_test::{assert_de_tokens, Token};
+
+        use super::*;
 
         #[test]
         fn weekday() {
@@ -637,31 +635,25 @@ mod tests {
                 timezone: TimeOffset::Local,
             };
 
-            assert_de_tokens(
-                &cond,
-                &[
-                    Token::Map { len: Some(3) },
-                    Token::Str("type"),
-                    Token::Str("DayMod"),
-                    Token::Str("divisor"),
-                    Token::U32(7),
-                    Token::Str("remainder"),
-                    Token::U32(0),
-                    Token::MapEnd,
-                ],
-            );
+            assert_de_tokens(&cond, &[
+                Token::Map { len: Some(3) },
+                Token::Str("type"),
+                Token::Str("DayMod"),
+                Token::Str("divisor"),
+                Token::U32(7),
+                Token::Str("remainder"),
+                Token::U32(0),
+                Token::MapEnd,
+            ]);
 
-            assert_de_tokens(
-                &cond,
-                &[
-                    Token::Map { len: Some(2) },
-                    Token::Str("type"),
-                    Token::Str("DayMod"),
-                    Token::Str("divisor"),
-                    Token::U32(7),
-                    Token::MapEnd,
-                ],
-            );
+            assert_de_tokens(&cond, &[
+                Token::Map { len: Some(2) },
+                Token::Str("type"),
+                Token::Str("DayMod"),
+                Token::Str("divisor"),
+                Token::U32(7),
+                Token::MapEnd,
+            ]);
         }
 
         #[test]

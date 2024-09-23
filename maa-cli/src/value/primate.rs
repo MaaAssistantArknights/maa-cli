@@ -1,6 +1,6 @@
-use super::MAAValue;
-
 use serde::{Deserialize, Serialize};
+
+use super::MAAValue;
 
 #[cfg_attr(test, derive(Debug))]
 #[derive(Deserialize, Clone, PartialEq)]
@@ -19,6 +19,7 @@ impl MAAPrimate {
             _ => None,
         }
     }
+
     pub(super) fn as_int(&self) -> Option<i32> {
         match self {
             Self::Int(v) => Some(*v),
@@ -126,17 +127,14 @@ mod tests {
             MAAPrimate::String("".to_string()),
         ];
 
-        assert_de_tokens(
-            &values,
-            &[
-                Token::Seq { len: Some(4) },
-                Token::Bool(true),
-                Token::I32(1),
-                Token::F32(1.0),
-                Token::Str(""),
-                Token::SeqEnd,
-            ],
-        );
+        assert_de_tokens(&values, &[
+            Token::Seq { len: Some(4) },
+            Token::Bool(true),
+            Token::I32(1),
+            Token::F32(1.0),
+            Token::Str(""),
+            Token::SeqEnd,
+        ]);
     }
 
     #[test]

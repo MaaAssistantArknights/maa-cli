@@ -1,5 +1,3 @@
-use super::UserInput;
-
 use std::{
     convert::Infallible,
     fmt::Display,
@@ -9,6 +7,8 @@ use std::{
 
 use anyhow::bail;
 use serde::Deserialize;
+
+use super::UserInput;
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
@@ -61,7 +61,8 @@ impl<A> Select<A> {
     /// * `alternatives` - A list of alternatives for this parameter;
     /// * `default_index` - The 1-based index of the default value;
     /// * `description` - Description of this parameter, default to "one of the alternatives";
-    /// * `allow_custom` - Allow custom input, if set to true and input is not a number, try to parse it;
+    /// * `allow_custom` - Allow custom input, if set to true and input is not a number, try to
+    ///   parse it;
     ///
     /// # Examples
     ///
@@ -69,10 +70,10 @@ impl<A> Select<A> {
     /// use crate::config::task::value::input::Select;
     ///
     /// let select = Select::<String>::new(
-    ///    vec!["CE-5", "CE-6"],
-    ///    Some(2),
-    ///    Some("a stage to fight"),
-    ///    true,
+    ///     vec!["CE-5", "CE-6"],
+    ///     Some(2),
+    ///     Some("a stage to fight"),
+    ///     true,
     /// );
     /// ```
     ///
@@ -298,8 +299,8 @@ impl From<&str> for ValueWithDesc<String> {
 }
 
 impl Selectable for ValueWithDesc<i32> {
-    type Value = i32;
     type Error = <i32 as FromStr>::Err;
+    type Value = i32;
 
     fn value(self) -> i32 {
         self.value()
@@ -320,8 +321,8 @@ impl<T: Display> Display for ValueWithDesc<T> {
 }
 
 impl Selectable for ValueWithDesc<f32> {
-    type Value = f32;
     type Error = <f32 as FromStr>::Err;
+    type Value = f32;
 
     fn value(self) -> f32 {
         self.value()
@@ -333,8 +334,8 @@ impl Selectable for ValueWithDesc<f32> {
 }
 
 impl Selectable for ValueWithDesc<String> {
-    type Value = String;
     type Error = Infallible;
+    type Value = String;
 
     fn value(self) -> String {
         self.value()
@@ -353,11 +354,10 @@ pub type SelectD<T> = Select<ValueWithDesc<T>>;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use crate::assert_matches;
-
     use serde_test::{assert_de_tokens, Token};
+
+    use super::*;
+    use crate::assert_matches;
 
     // Use this function to get a Select with most fields set to Some.
     fn test_full() -> SelectD<String> {
@@ -382,45 +382,42 @@ mod tests {
     fn serde() {
         let values = [test_full(), test_none()];
 
-        assert_de_tokens(
-            &values,
-            &[
-                Token::Seq { len: Some(2) },
-                Token::Map { len: Some(4) },
-                Token::Str("alternatives"),
-                Token::Seq { len: Some(2) },
-                Token::Map { len: Some(2) },
-                Token::Str("value"),
-                Token::Str("CE-5"),
-                Token::Str("desc"),
-                Token::Str("LMB stage 5"),
-                Token::MapEnd,
-                Token::Map { len: Some(2) },
-                Token::Str("value"),
-                Token::Str("CE-6"),
-                Token::Str("desc"),
-                Token::Str("LMB stage 6"),
-                Token::MapEnd,
-                Token::SeqEnd,
-                Token::Str("default_index"),
-                Token::Some,
-                Token::U64(2),
-                Token::Str("description"),
-                Token::Some,
-                Token::Str("a stage to fight"),
-                Token::Str("allow_custom"),
-                Token::Bool(true),
-                Token::MapEnd,
-                Token::Map { len: Some(1) },
-                Token::Str("alternatives"),
-                Token::Seq { len: Some(2) },
-                Token::Str("CE-5"),
-                Token::Str("CE-6"),
-                Token::SeqEnd,
-                Token::MapEnd,
-                Token::SeqEnd,
-            ],
-        );
+        assert_de_tokens(&values, &[
+            Token::Seq { len: Some(2) },
+            Token::Map { len: Some(4) },
+            Token::Str("alternatives"),
+            Token::Seq { len: Some(2) },
+            Token::Map { len: Some(2) },
+            Token::Str("value"),
+            Token::Str("CE-5"),
+            Token::Str("desc"),
+            Token::Str("LMB stage 5"),
+            Token::MapEnd,
+            Token::Map { len: Some(2) },
+            Token::Str("value"),
+            Token::Str("CE-6"),
+            Token::Str("desc"),
+            Token::Str("LMB stage 6"),
+            Token::MapEnd,
+            Token::SeqEnd,
+            Token::Str("default_index"),
+            Token::Some,
+            Token::U64(2),
+            Token::Str("description"),
+            Token::Some,
+            Token::Str("a stage to fight"),
+            Token::Str("allow_custom"),
+            Token::Bool(true),
+            Token::MapEnd,
+            Token::Map { len: Some(1) },
+            Token::Str("alternatives"),
+            Token::Seq { len: Some(2) },
+            Token::Str("CE-5"),
+            Token::Str("CE-6"),
+            Token::SeqEnd,
+            Token::MapEnd,
+            Token::SeqEnd,
+        ]);
     }
 
     #[test]
