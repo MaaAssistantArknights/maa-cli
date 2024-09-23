@@ -281,10 +281,14 @@ fn load_core() -> Result<()> {
         // Set DLL directory on Windows
         #[cfg(target_os = "windows")]
         {
-            use windows::core::HSTRING;
-            use windows::Win32::System::LibraryLoader::SetDllDirectoryW;
+            use windows_strings::HSTRING;
+            use windows_sys::Win32::System::LibraryLoader::SetDllDirectoryW;
 
-            unsafe { SetDllDirectoryW(&HSTRING::from(lib_dir.as_ref()))? };
+            let code = unsafe { SetDllDirectoryW(HSTRING::from(lib_dir.as_ref()).as_ref()) };
+            if code.is_zero() {
+                return Err(anyhow::Error::new(windows_result::Error::from_win32().ex)
+                    .context("Failed to set DLL directory!"));
+            }
         }
         maa_sys::binding::load(lib_dir.join(MAA_CORE_LIB))
     } else {
