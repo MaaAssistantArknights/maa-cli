@@ -115,7 +115,7 @@ jobs:
           - x86_64
           - aarch64
         include:
-          - os: macos-12 # x86_64 runner
+          - os: macos-13 # x86_64 runner
             arch: x86_64
           - os: macos-14 # aaarch64 runner
             arch: aarch64
