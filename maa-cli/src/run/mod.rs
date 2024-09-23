@@ -284,9 +284,9 @@ fn load_core() -> Result<()> {
             use windows_strings::HSTRING;
             use windows_sys::Win32::System::LibraryLoader::SetDllDirectoryW;
 
-            let code = unsafe { SetDllDirectoryW(HSTRING::from(lib_dir.as_ref()).as_ref()) };
-            if code.is_zero() {
-                return Err(anyhow::Error::new(windows_result::Error::from_win32().ex)
+            let code = unsafe { SetDllDirectoryW(HSTRING::from(lib_dir.as_ref()).as_ptr()) };
+            if code == 0 {
+                return Err(anyhow::Error::new(windows_result::Error::from_win32())
                     .context("Failed to set DLL directory!"));
             }
         }
