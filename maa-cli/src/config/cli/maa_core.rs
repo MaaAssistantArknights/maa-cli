@@ -1,7 +1,7 @@
-use super::{normalize_url, return_true, Channel};
-
 use clap::Args;
 use serde::Deserialize;
+
+use super::{normalize_url, return_true, Channel};
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Clone)]
@@ -157,9 +157,9 @@ pub struct CommonArgs {
 
 #[cfg(test)]
 pub mod tests {
-    use super::*;
-
     use std::sync::OnceLock;
+
+    use super::*;
 
     pub fn example_config() -> Config {
         Config {
@@ -179,9 +179,9 @@ pub mod tests {
     }
 
     mod serde {
-        use super::*;
-
         use serde_test::{assert_de_tokens, Token};
+
+        use super::*;
 
         #[test]
         fn deserialize_components() {
@@ -223,10 +223,10 @@ pub mod tests {
                 &[Token::Map { len: Some(0) }, Token::MapEnd],
             );
 
-            assert_de_tokens(
-                &default_config(),
-                &[Token::Map { len: Some(0) }, Token::MapEnd],
-            );
+            assert_de_tokens(&default_config(), &[
+                Token::Map { len: Some(0) },
+                Token::MapEnd,
+            ]);
 
             assert_de_tokens(
                 &Config {

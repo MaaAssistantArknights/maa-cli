@@ -1,8 +1,7 @@
-use super::MAAValue;
-
-use crate::config::task::ClientType;
-
 use anyhow::{bail, Context};
+
+use super::MAAValue;
+use crate::config::task::ClientType;
 
 #[derive(clap::Args)]
 pub struct FightParams {
@@ -126,7 +125,6 @@ impl TryFrom<FightParams> for MAAValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use crate::{
         command::{parse_from, Command},
         object,

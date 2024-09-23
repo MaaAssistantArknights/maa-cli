@@ -1,10 +1,10 @@
-use super::IterJoin;
-
 pub use std::collections::BTreeMap as Map;
 use std::sync::Mutex;
 
 use chrono;
 use maa_sys::{binding::AsstTaskId, TaskType};
+
+use super::IterJoin;
 
 static SUMMARY: Mutex<Option<Summary>> = Mutex::new(None);
 
@@ -454,7 +454,8 @@ impl std::fmt::Display for InfrastRoomInfo {
             write!(
                 f,
                 ", [{}]",
-                self.candidates.iter().join(", ").unwrap() // safe to unwrap, because it's not empty
+                self.candidates.iter().join(", ").unwrap() /* safe to unwrap, because it's not
+                                                            * empty */
             )?;
         }
         Ok(())
@@ -724,9 +725,11 @@ impl ExplorationState {
             Unknown => "Unknown",
         }
     }
+
     const fn total_type() -> usize {
         4
     }
+
     const fn to_index(self) -> usize {
         self as usize
     }
@@ -842,7 +845,6 @@ mod tests {
         use regex::Regex;
 
         use super::*;
-
         use crate::assert_matches;
 
         #[test]
@@ -928,9 +930,8 @@ mod tests {
     }
 
     mod detail {
-        use crate::assert_matches;
-
         use super::*;
+        use crate::assert_matches;
 
         #[test]
         fn detail() {

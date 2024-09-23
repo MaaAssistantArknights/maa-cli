@@ -59,7 +59,8 @@ jobs:
           cargo clippy --package maa-cli -- -D warnings
       - name: Lint (rustfmt)
         run: |
-          cargo fmt --package maa-cli -- --check
+          rustup toolchain install nightly -c rustfmt
+          cargo +nightly fmt --package maa-cli -- --check
       - name: Install MaaCore
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/maa-cli/config_examples
@@ -154,7 +155,9 @@ jobs:
       - name: Lint (clippy)
         run: cargo clippy --package maa-sys -- -D warnings
       - name: Lint (fmt)
-        run: cargo fmt --package maa-sys -- --check
+        run: |
+          rustup toolchain install nightly -c rustfmt
+          cargo +nightly fmt --package maa-sys -- --check
       - name: Test
         # It seems rust needs a static library to check the linking.
         # Without this, we can not link maa-sys to MaaCore on Windows.

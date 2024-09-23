@@ -2,16 +2,15 @@ mod client_type;
 pub use client_type::ClientType;
 
 mod condition;
-use condition::Condition;
-pub use condition::{remainder_of_day_mod, TimeOffset};
-
-use crate::{dirs, object, value::MAAValue};
-
 use std::path::PathBuf;
 
 use anyhow::Context;
+use condition::Condition;
+pub use condition::{remainder_of_day_mod, TimeOffset};
 use maa_sys::TaskType;
 use serde::Deserialize;
+
+use crate::{dirs, object, value::MAAValue};
 
 #[cfg_attr(test, derive(PartialEq, Debug))]
 #[derive(Deserialize, Default)]
@@ -340,7 +339,6 @@ impl InitializedTask {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use crate::object;
 
     mod task {
@@ -492,18 +490,16 @@ mod tests {
     }
 
     mod task_config {
-        use super::*;
-
         use TaskType::*;
 
-        mod serde {
-            use super::*;
+        use super::*;
 
+        mod serde {
+            use chrono::{NaiveDateTime, NaiveTime, TimeZone, Weekday};
             use condition::TimeOffset;
 
+            use super::*;
             use crate::value::userinput::{BoolInput, Input, SelectD};
-
-            use chrono::{NaiveDateTime, NaiveTime, TimeZone, Weekday};
 
             fn naive_local_datetime(
                 y: i32,

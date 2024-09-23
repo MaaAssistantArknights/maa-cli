@@ -164,9 +164,9 @@ mod tests {
     use super::*;
 
     mod cmd_args {
-        use crate::command::parse_from;
-
         use std::env;
+
+        use crate::command::parse_from;
 
         #[test]
         fn to_filter() {

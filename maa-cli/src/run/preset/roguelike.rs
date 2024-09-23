@@ -1,7 +1,7 @@
-use super::MAAValue;
-
 use anyhow::bail;
 use clap::ValueEnum;
+
+use super::MAAValue;
 
 #[repr(i8)]
 #[cfg_attr(test, derive(PartialEq, Debug))]
@@ -58,7 +58,8 @@ pub struct RoguelikeParams {
     /// Starting core operator in Chinese, e.g. "维什戴尔"
     #[arg(long)]
     core_char: Option<String>,
-    /// Starting operators recruitment combination in Chinese, e.g. "取长补短", "先手必胜" (default)
+    /// Starting operators recruitment combination in Chinese, e.g. "取长补短", "先手必胜"
+    /// (default)
     #[arg(long)]
     roles: Option<String>,
 
@@ -231,7 +232,6 @@ impl TryFrom<RoguelikeParams> for MAAValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use crate::{
         command::{parse_from, Command},
         object,
@@ -251,10 +251,12 @@ mod tests {
 
         #[test]
         fn value_variants() {
-            assert_eq!(
-                Theme::value_variants(),
-                &[Theme::Phantom, Theme::Mizuki, Theme::Sami, Theme::Sarkaz]
-            );
+            assert_eq!(Theme::value_variants(), &[
+                Theme::Phantom,
+                Theme::Mizuki,
+                Theme::Sami,
+                Theme::Sarkaz
+            ]);
         }
 
         #[test]

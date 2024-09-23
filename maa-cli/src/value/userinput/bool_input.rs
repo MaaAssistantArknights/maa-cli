@@ -1,8 +1,8 @@
-use super::UserInput;
-
 use std::io::{self, Write};
 
 use serde::Deserialize;
+
+use super::UserInput;
 
 /// A struct that represents a user input that queries the user for boolean input.
 #[cfg_attr(test, derive(PartialEq))]
@@ -75,11 +75,10 @@ impl UserInput for BoolInput {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use crate::assert_matches;
-
     use serde_test::{assert_de_tokens, Token};
+
+    use super::*;
+    use crate::assert_matches;
 
     #[test]
     fn serde() {
@@ -90,33 +89,30 @@ mod tests {
             BoolInput::new(None, None),
         ];
 
-        assert_de_tokens(
-            &values,
-            &[
-                Token::Seq { len: Some(4) },
-                Token::Map { len: Some(2) },
-                Token::Str("default"),
-                Token::Some,
-                Token::Bool(true),
-                Token::Str("description"),
-                Token::Some,
-                Token::Str("do something"),
-                Token::MapEnd,
-                Token::Map { len: Some(1) },
-                Token::Str("default"),
-                Token::Some,
-                Token::Bool(false),
-                Token::MapEnd,
-                Token::Map { len: Some(1) },
-                Token::Str("description"),
-                Token::Some,
-                Token::Str("do something"),
-                Token::MapEnd,
-                Token::Map { len: Some(0) },
-                Token::MapEnd,
-                Token::SeqEnd,
-            ],
-        );
+        assert_de_tokens(&values, &[
+            Token::Seq { len: Some(4) },
+            Token::Map { len: Some(2) },
+            Token::Str("default"),
+            Token::Some,
+            Token::Bool(true),
+            Token::Str("description"),
+            Token::Some,
+            Token::Str("do something"),
+            Token::MapEnd,
+            Token::Map { len: Some(1) },
+            Token::Str("default"),
+            Token::Some,
+            Token::Bool(false),
+            Token::MapEnd,
+            Token::Map { len: Some(1) },
+            Token::Str("description"),
+            Token::Some,
+            Token::Str("do something"),
+            Token::MapEnd,
+            Token::Map { len: Some(0) },
+            Token::MapEnd,
+            Token::SeqEnd,
+        ]);
     }
 
     #[test]
@@ -129,13 +125,10 @@ mod tests {
             } if description == "do something"
         );
 
-        assert_matches!(
-            BoolInput::new(Some(true), None),
-            BoolInput {
-                default: Some(true),
-                description: None,
-            }
-        );
+        assert_matches!(BoolInput::new(Some(true), None), BoolInput {
+            default: Some(true),
+            description: None,
+        });
 
         assert_matches!(
             BoolInput::new(None, Some("do something")),
@@ -145,13 +138,10 @@ mod tests {
             } if description == "do something"
         );
 
-        assert_matches!(
-            BoolInput::new(None, None),
-            BoolInput {
-                default: None,
-                description: None,
-            }
-        );
+        assert_matches!(BoolInput::new(None, None), BoolInput {
+            default: None,
+            description: None,
+        });
     }
 
     #[test]

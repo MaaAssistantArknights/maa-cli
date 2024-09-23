@@ -8,11 +8,6 @@ mod external;
 
 pub mod preset;
 
-use crate::{
-    config::{asst::AsstConfig, task::TaskConfig, FindFile},
-    installer::resource,
-};
-
 use std::{
     path::Path,
     sync::{atomic, Arc},
@@ -24,6 +19,11 @@ use log::{debug, warn};
 use maa_dirs::{self as dirs, Ensure, MAA_CORE_LIB};
 use maa_sys::Assistant;
 use signal_hook::consts::TERM_SIGNALS;
+
+use crate::{
+    config::{asst::AsstConfig, task::TaskConfig, FindFile},
+    installer::resource,
+};
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Args, Default)]
@@ -312,9 +312,9 @@ fn setup_core(config: &AsstConfig) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use std::env::{self, temp_dir};
+
+    use super::*;
 
     #[test]
     #[ignore = "need installed MaaCore"]

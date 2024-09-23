@@ -1,3 +1,7 @@
+use std::path::PathBuf;
+
+use anyhow::{bail, Result};
+
 use crate::{
     object,
     value::{
@@ -5,10 +9,6 @@ use crate::{
         MAAValue,
     },
 };
-
-use std::path::PathBuf;
-
-use anyhow::{bail, Result};
 
 fn asst_config_template() -> MAAValue {
     object!(
@@ -236,9 +236,7 @@ pub fn init(name: Option<PathBuf>, filetype: Option<super::Filetype>, force: boo
 
 #[cfg(test)]
 mod test {
-    use super::*;
-
-    use super::super::Filetype;
+    use super::{super::Filetype, *};
 
     #[test]
     #[ignore = "write to user's config directory"]

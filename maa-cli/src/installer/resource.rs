@@ -1,10 +1,10 @@
+use anyhow::{bail, Result};
+use log::{debug, warn};
+
 use crate::{
     config::cli::{cli_config, resource::GitBackend},
     dirs,
 };
-
-use anyhow::{bail, Result};
-use log::{debug, warn};
 
 trait StatusExt {
     /// If error, return the error, otherwise return an error if the status is not successful
@@ -89,11 +89,11 @@ pub fn update(is_auto: bool) -> Result<()> {
 }
 
 mod git {
-    use super::StatusExt;
-
     use std::path::Path;
 
     use anyhow::{Context, Result};
+
+    use super::StatusExt;
 
     pub fn clone(
         url: &str,

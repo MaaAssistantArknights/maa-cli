@@ -1,5 +1,12 @@
-use super::{FindFileOrDefault, IntoTaskConfig, ToTaskType};
+use std::{borrow::Cow, fs, io::Write, path::Path};
 
+use anyhow::{bail, Context, Result};
+use log::{debug, trace};
+use maa_sys::TaskType;
+use prettytable::{format, row, Table};
+use serde_json::Value as JsonValue;
+
+use super::{FindFileOrDefault, IntoTaskConfig, ToTaskType};
 use crate::{
     config::task::{Task, TaskConfig},
     dirs::{self, Ensure},
@@ -10,21 +17,13 @@ use crate::{
     },
 };
 
-use std::{borrow::Cow, fs, io::Write, path::Path};
-
-use anyhow::{bail, Context, Result};
-use log::{debug, trace};
-use maa_sys::TaskType;
-use prettytable::{format, row, Table};
-use serde_json::Value as JsonValue;
-
 #[cfg_attr(test, derive(Default))]
 #[derive(clap::Args)]
 pub struct CopilotParams {
     /// URI of the copilot task file
     ///
-    /// It can be a maa URI or a local file path. Multiple URIs can be provided to fight multiple stages.
-    /// For URI, it can be in the format of `maa://<code>`, `maa://<code>s`, `file://<path>`,
+    /// It can be a maa URI or a local file path. Multiple URIs can be provided to fight multiple
+    /// stages. For URI, it can be in the format of `maa://<code>`, `maa://<code>s`, `file://<path>`,
     /// which represents a single copilot task, a copilot task set, and a local file respectively.
     uri_list: Vec<String>,
     /// Whether to fight stage in raid mode
@@ -34,8 +33,8 @@ pub struct CopilotParams {
     raid: u8,
     /// Whether to auto formation
     ///
-    /// When multiple uri are provided or a copilot task set contains multiple stages, force to true.
-    /// Otherwise, default to false.
+    /// When multiple uri are provided or a copilot task set contains multiple stages, force to
+    /// true. Otherwise, default to false.
     #[arg(long)]
     formation: bool,
     /// Whether to use sanity potion to restore sanity when it's not enough
@@ -431,12 +430,10 @@ fn get_str_key(value: &JsonValue, key: impl AsRef<str>) -> Result<&str> {
 
 #[cfg(test)]
 mod tests {
+    use std::{env::temp_dir, path::PathBuf};
+
     use super::*;
-
     use crate::config::asst::AsstConfig;
-
-    use std::env::temp_dir;
-    use std::path::PathBuf;
 
     macro_rules! assert_params {
         ($params:expr, $expected:expr $(,)?) => {

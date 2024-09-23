@@ -1,14 +1,15 @@
-use log::debug;
-
-use std::cmp::min;
-use std::fs::{remove_file, File};
-use std::io::Write;
-use std::path::Path;
-use std::time::{Duration, Instant};
+use std::{
+    cmp::min,
+    fs::{remove_file, File},
+    io::Write,
+    path::Path,
+    time::{Duration, Instant},
+};
 
 use digest::Digest;
 use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
+use log::debug;
 use reqwest::Client;
 use sha2::Sha256;
 

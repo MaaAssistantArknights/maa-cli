@@ -1,20 +1,5 @@
 // This file is used to download and extract prebuilt packages of maa-core.
 
-use super::{
-    download::{check_file_exists, download_mirrors},
-    extract::Archive,
-    version_json::VersionJSON,
-};
-
-use crate::{
-    config::cli::{
-        cli_config,
-        maa_core::{CommonArgs, Components, Config},
-    },
-    dirs::{self, Ensure},
-    run,
-};
-
 use std::{
     borrow::Cow,
     env::consts::{ARCH, DLL_PREFIX, DLL_SUFFIX, OS},
@@ -27,6 +12,20 @@ use log::debug;
 use semver::Version;
 use serde::Deserialize;
 use tokio::runtime::Runtime;
+
+use super::{
+    download::{check_file_exists, download_mirrors},
+    extract::Archive,
+    version_json::VersionJSON,
+};
+use crate::{
+    config::cli::{
+        cli_config,
+        maa_core::{CommonArgs, Components, Config},
+    },
+    dirs::{self, Ensure},
+    run,
+};
 
 fn extract_mapper(
     src: &Path,
@@ -284,9 +283,9 @@ pub fn download<'p>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use serde_json;
+
+    use super::*;
 
     #[test]
     fn deserialize_version_json() {

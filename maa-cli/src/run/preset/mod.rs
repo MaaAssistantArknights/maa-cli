@@ -1,3 +1,6 @@
+use anyhow::{Context, Result};
+use maa_sys::TaskType;
+
 use crate::{
     config::{
         asst::AsstConfig,
@@ -6,9 +9,6 @@ use crate::{
     },
     value::MAAValue,
 };
-
-use anyhow::{Context, Result};
-use maa_sys::TaskType;
 
 fn default_file(task_type: TaskType) -> std::path::PathBuf {
     maa_dirs::join!(
@@ -110,14 +110,13 @@ pub use reclamation::ReclamationParams;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use maa_dirs::Ensure;
 
+    use super::*;
     use crate::{
         command::{parse_from, Command},
         object,
     };
-
-    use maa_dirs::Ensure;
 
     impl MAAValue {
         /// Merge another value into this default value.

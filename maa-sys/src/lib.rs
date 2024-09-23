@@ -56,7 +56,7 @@ impl Assistant {
         }
     }
 
-    /*------------------------- Static Methods -------------------------*/
+    /* ------------------------- Static Methods ------------------------- */
 
     /// Set the user directory of the assistant.
     ///
@@ -127,7 +127,7 @@ impl Assistant {
         Ok(())
     }
 
-    /*------------------------ Instance Methods ------------------------*/
+    /* ------------------------ Instance Methods ------------------------ */
     //// Set the instance option of the assistant.
     pub fn set_instance_option(
         &self,
@@ -185,14 +185,17 @@ impl Assistant {
     pub fn start(&self) -> Result<()> {
         handle_asst(unsafe { binding::AsstStart(self.handle) })
     }
+
     /// Stop the assistant.
     pub fn stop(&self) -> Result<()> {
         handle_asst(unsafe { binding::AsstStop(self.handle) })
     }
+
     /// Check if the assistant is running.
     pub fn running(&self) -> bool {
         unsafe { binding::AsstRunning(self.handle) != 0 }
     }
+
     /// Check if the assistant is connected.
     pub fn connected(&self) -> bool {
         unsafe { binding::AsstConnected(self.handle) != 0 }

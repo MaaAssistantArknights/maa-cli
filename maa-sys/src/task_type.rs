@@ -22,7 +22,15 @@ pub enum TaskType {
 
 impl TaskType {
     pub const COUNT: usize = 16;
-
+    pub const NAMES: [&'static str; Self::COUNT] = {
+        let mut i = 0;
+        let mut names = [""; Self::COUNT];
+        while i < Self::COUNT {
+            names[i] = Self::VARIANTS[i].to_str();
+            i += 1;
+        }
+        names
+    };
     pub const VARIANTS: [Self; Self::COUNT] = {
         let mut i = 0;
         let mut variants = [Self::StartUp; Self::COUNT];
@@ -53,16 +61,6 @@ impl TaskType {
             Self::VideoRecognition => "VideoRecognition",
         }
     }
-
-    pub const NAMES: [&'static str; Self::COUNT] = {
-        let mut i = 0;
-        let mut names = [""; Self::COUNT];
-        while i < Self::COUNT {
-            names[i] = Self::VARIANTS[i].to_str();
-            i += 1;
-        }
-        names
-    };
 
     fn from_str_opt(s: &str) -> Option<Self> {
         Self::VARIANTS
@@ -148,9 +146,9 @@ impl crate::ToCString for TaskType {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use TaskType::*;
+
+    use super::*;
 
     #[test]
     fn parse() {
@@ -184,23 +182,20 @@ mod tests {
 
     #[cfg(feature = "serde")]
     mod serde {
-        use super::*;
-
         use serde_test::{assert_de_tokens, assert_de_tokens_error, Token};
+
+        use super::*;
 
         #[test]
         fn deserialize() {
             let types: [TaskType; 2] = [StartUp, CloseDown];
 
-            assert_de_tokens(
-                &types,
-                &[
-                    Token::Seq { len: Some(2) },
-                    Token::Str("StartUp"),
-                    Token::Str("CloseDown"),
-                    Token::SeqEnd,
-                ],
-            );
+            assert_de_tokens(&types, &[
+                Token::Seq { len: Some(2) },
+                Token::Str("StartUp"),
+                Token::Str("CloseDown"),
+                Token::SeqEnd,
+            ]);
         }
 
         #[test]
@@ -245,9 +240,9 @@ mod tests {
 
     #[test]
     fn to_cstring() {
-        use crate::ToCString;
-
         use std::ffi::CString;
+
+        use crate::ToCString;
 
         assert_eq!(
             StartUp.to_cstring().unwrap(),

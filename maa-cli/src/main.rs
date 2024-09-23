@@ -12,10 +12,10 @@ mod installer;
 mod run;
 mod value;
 
-use crate::command::{Command, Component, Dir, CLI};
-
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser};
+
+use crate::command::{Command, Component, Dir, CLI};
 
 fn main() -> Result<()> {
     let cli = command::CLI::parse();

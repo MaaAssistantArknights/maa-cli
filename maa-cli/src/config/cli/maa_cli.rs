@@ -1,7 +1,7 @@
-use super::{normalize_url, return_true, Channel};
-
 use clap::Args;
 use serde::Deserialize;
+
+use super::{normalize_url, return_true, Channel};
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Clone)]
@@ -132,25 +132,22 @@ pub mod tests {
     }
 
     mod serde {
-        use super::*;
-
         use serde_test::{assert_de_tokens, Token};
+
+        use super::*;
 
         #[test]
         fn deserialize_cli_components() {
-            assert_de_tokens(
-                &CLIComponents { binary: true },
-                &[Token::Map { len: Some(0) }, Token::MapEnd],
-            );
-            assert_de_tokens(
-                &CLIComponents { binary: false },
-                &[
-                    Token::Map { len: Some(1) },
-                    Token::Str("binary"),
-                    Token::Bool(false),
-                    Token::MapEnd,
-                ],
-            );
+            assert_de_tokens(&CLIComponents { binary: true }, &[
+                Token::Map { len: Some(0) },
+                Token::MapEnd,
+            ]);
+            assert_de_tokens(&CLIComponents { binary: false }, &[
+                Token::Map { len: Some(1) },
+                Token::Str("binary"),
+                Token::Bool(false),
+                Token::MapEnd,
+            ]);
         }
 
         #[test]
@@ -179,10 +176,10 @@ pub mod tests {
                 ],
             );
 
-            assert_de_tokens(
-                &Config::default(),
-                &[Token::Map { len: Some(0) }, Token::MapEnd],
-            );
+            assert_de_tokens(&Config::default(), &[
+                Token::Map { len: Some(0) },
+                Token::MapEnd,
+            ]);
         }
     }
 
@@ -240,10 +237,9 @@ pub mod tests {
 
         #[test]
         fn components() {
-            assert_eq!(
-                Config::default().components(),
-                &CLIComponents { binary: true },
-            );
+            assert_eq!(Config::default().components(), &CLIComponents {
+                binary: true
+            },);
 
             assert_eq!(
                 Config {

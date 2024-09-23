@@ -1,14 +1,3 @@
-use super::{
-    download::{download, Checker},
-    extract::Archive,
-    version_json::VersionJSON,
-};
-
-use crate::{
-    config::cli::{cli_config, maa_cli::CommonArgs},
-    dirs::{self, Ensure},
-};
-
 use std::{
     env::{consts, current_exe},
     time::Duration,
@@ -19,6 +8,16 @@ use dunce::canonicalize;
 use semver::Version;
 use serde::Deserialize;
 use tokio::runtime::Runtime;
+
+use super::{
+    download::{download, Checker},
+    extract::Archive,
+    version_json::VersionJSON,
+};
+use crate::{
+    config::cli::{cli_config, maa_cli::CommonArgs},
+    dirs::{self, Ensure},
+};
 
 pub fn update(args: &CommonArgs) -> Result<()> {
     let config = cli_config().cli_config().with_args(args);
@@ -146,9 +145,9 @@ impl Asset {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use serde_json;
+
+    use super::*;
 
     #[test]
     fn deserialize_version_json() {

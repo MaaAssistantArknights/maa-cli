@@ -1,11 +1,11 @@
-use crate::dirs;
-
 use std::{borrow::Cow, path::PathBuf};
 
 use anyhow::{Context, Result};
 use log::{debug, info, warn};
 use maa_sys::{Assistant, InstanceOptionKey, StaticOptionKey, TouchMode};
 use serde::Deserialize;
+
+use crate::dirs;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Default, Clone)]
@@ -223,10 +223,11 @@ fn config_based_on_os() -> &'static str {
 pub struct ResourceConfig {
     /// Resources used by global arknights client, e.g. `YostarEN`
     global_resource: Option<PathBuf>,
-    /// Resources used by platform diff, subdirectories of `resource_base_dirs`, e.g. `platform_diff/iOS`
+    /// Resources used by platform diff, subdirectories of `resource_base_dirs`, e.g.
+    /// `platform_diff/iOS`
     platform_diff_resource: Option<PathBuf>,
-    /// Whether to load resources from user config directory, when enabled, the `MAA_CONFIG_DIR/resource`
-    /// will be appended to `resource_base_dirs` as the last element
+    /// Whether to load resources from user config directory, when enabled, the
+    /// `MAA_CONFIG_DIR/resource` will be appended to `resource_base_dirs` as the last element
     user_resource: bool,
     /// Resource base directories, a list of directories containing resource directories
     /// Not deserialized from config file
@@ -435,7 +436,7 @@ impl StaticOptions {
                     .apply(true)
                     .context("Failed to enable CPU OCR")?;
             }
-            (_, _) => {}
+            (..) => {}
         };
 
         Ok(())
@@ -500,11 +501,10 @@ impl InstanceOptions {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use crate::assert_matches;
-
     use std::sync::OnceLock;
+
+    use super::*;
+    use crate::assert_matches;
 
     fn user_resource_dir() -> PathBuf {
         static USER_RESOURCE_DIR: OnceLock<PathBuf> = OnceLock::new();
@@ -520,9 +520,9 @@ mod tests {
     }
 
     mod serde {
-        use super::*;
-
         use serde_test::{assert_de_tokens, Token};
+
+        use super::*;
 
         #[test]
         #[ignore = "attempt to create a directory in user space"]
@@ -534,45 +534,42 @@ mod tests {
             )
             .unwrap();
 
-            assert_eq!(
-                config,
-                AsstConfig {
-                    connection: ConnectionConfig {
-                        preset: Preset::ADB,
-                        adb_path: Some(String::from("adb")),
-                        address: Some(String::from("emulator-5554")),
-                        config: Some(String::from("CompatMac")),
+            assert_eq!(config, AsstConfig {
+                connection: ConnectionConfig {
+                    preset: Preset::ADB,
+                    adb_path: Some(String::from("adb")),
+                    address: Some(String::from("emulator-5554")),
+                    config: Some(String::from("CompatMac")),
+                },
+                resource: ResourceConfig {
+                    resource_base_dirs: {
+                        let mut base_dirs = default_resource_base_dirs();
+                        base_dirs.push(user_resource_dir);
+                        base_dirs
                     },
-                    resource: ResourceConfig {
-                        resource_base_dirs: {
-                            let mut base_dirs = default_resource_base_dirs();
-                            base_dirs.push(user_resource_dir);
-                            base_dirs
-                        },
-                        global_resource: Some(PathBuf::from("YoStarEN")),
-                        platform_diff_resource: Some(PathBuf::from("iOS")),
-                        user_resource: true,
-                    },
-                    static_options: StaticOptions {
-                        cpu_ocr: Some(false),
-                        gpu_ocr: Some(1),
-                    },
-                    instance_options: InstanceOptions {
-                        touch_mode: Some(TouchMode::MaaTouch),
-                        deployment_with_pause: Some(false),
-                        adb_lite_enabled: Some(false),
-                        kill_adb_on_exit: Some(false),
-                    },
-                }
-            );
+                    global_resource: Some(PathBuf::from("YoStarEN")),
+                    platform_diff_resource: Some(PathBuf::from("iOS")),
+                    user_resource: true,
+                },
+                static_options: StaticOptions {
+                    cpu_ocr: Some(false),
+                    gpu_ocr: Some(1),
+                },
+                instance_options: InstanceOptions {
+                    touch_mode: Some(TouchMode::MaaTouch),
+                    deployment_with_pause: Some(false),
+                    adb_lite_enabled: Some(false),
+                    kill_adb_on_exit: Some(false),
+                },
+            });
         }
 
         #[test]
         fn connection_config() {
-            assert_de_tokens(
-                &ConnectionConfig::default(),
-                &[Token::Map { len: Some(0) }, Token::MapEnd],
-            );
+            assert_de_tokens(&ConnectionConfig::default(), &[
+                Token::Map { len: Some(0) },
+                Token::MapEnd,
+            ]);
 
             assert_de_tokens(
                 &ConnectionConfig {
@@ -808,15 +805,12 @@ mod tests {
 
         #[test]
         fn default() {
-            assert_matches!(
-                ConnectionConfig::default(),
-                ConnectionConfig {
-                    preset: Preset::ADB,
-                    adb_path: None,
-                    address: None,
-                    config: None,
-                }
-            );
+            assert_matches!(ConnectionConfig::default(), ConnectionConfig {
+                preset: Preset::ADB,
+                adb_path: None,
+                address: None,
+                config: None,
+            });
         }
 
         #[cfg(target_os = "macos")]
@@ -936,23 +930,19 @@ mod tests {
     }
 
     mod resource_config {
-        use super::*;
-
-        use crate::dirs::Ensure;
-
         use std::{env::temp_dir, fs};
+
+        use super::*;
+        use crate::dirs::Ensure;
 
         #[test]
         fn default() {
-            assert_eq!(
-                ResourceConfig::default(),
-                ResourceConfig {
-                    resource_base_dirs: default_resource_base_dirs(),
-                    global_resource: None,
-                    platform_diff_resource: None,
-                    user_resource: false,
-                }
-            );
+            assert_eq!(ResourceConfig::default(), ResourceConfig {
+                resource_base_dirs: default_resource_base_dirs(),
+                global_resource: None,
+                platform_diff_resource: None,
+                user_resource: false,
+            });
         }
 
         #[test]
@@ -1043,10 +1033,9 @@ mod tests {
 
             resource_dir.ensure().unwrap();
 
-            assert_eq!(
-                push_resource(&mut Vec::new(), resource_dir.clone()),
-                &[resource_dir.clone()]
-            );
+            assert_eq!(push_resource(&mut Vec::new(), resource_dir.clone()), &[
+                resource_dir.clone()
+            ]);
 
             assert_eq!(
                 push_resource(&mut Vec::new(), unexists_resource_dir.clone()),

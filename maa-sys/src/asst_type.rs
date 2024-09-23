@@ -75,7 +75,15 @@ pub enum TouchMode {
 
 impl TouchMode {
     pub const COUNT: usize = 4;
-
+    pub const NAMES: [&'static str; Self::COUNT] = {
+        let mut i = 0;
+        let mut names = [""; Self::COUNT];
+        while i < Self::COUNT {
+            names[i] = Self::VARIANTS[i].to_str();
+            i += 1;
+        }
+        names
+    };
     pub const VARIANTS: [TouchMode; Self::COUNT] = {
         let mut i = 0;
         let mut variants = [TouchMode::ADB; Self::COUNT];
@@ -95,16 +103,6 @@ impl TouchMode {
             TouchMode::MacPlayTools => "MacPlayTools",
         }
     }
-
-    pub const NAMES: [&'static str; Self::COUNT] = {
-        let mut i = 0;
-        let mut names = [""; Self::COUNT];
-        while i < Self::COUNT {
-            names[i] = Self::VARIANTS[i].to_str();
-            i += 1;
-        }
-        names
-    };
 
     fn from_str_opt(s: &str) -> Option<TouchMode> {
         Self::VARIANTS
@@ -190,16 +188,16 @@ impl ToCString for TouchMode {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use TouchMode::*;
+
+    use super::*;
 
     // #[cfg(not(feature = "runtime"))]
     // #[test]
     // fn apply_to() {
     //     // Apply static options
-    //     // We can't apply_to GPU OCR option because it requires a GPU which is not available in CI.
-    //     StaticOptionKey::CpuOCR.apply_to(true).unwrap();
+    //     // We can't apply_to GPU OCR option because it requires a GPU which is not available in
+    // CI.     StaticOptionKey::CpuOCR.apply_to(true).unwrap();
     //     // StaticOptionKey::GpuOCR.apply_to(1).unwrap();
     //
     //     use std::{env, path::Path};
@@ -278,9 +276,9 @@ mod tests {
 
     #[cfg(feature = "serde")]
     mod serde {
-        use super::*;
-
         use serde_test::{assert_de_tokens, assert_de_tokens_error, Token};
+
+        use super::*;
 
         #[test]
         fn deserialize() {

@@ -1,5 +1,3 @@
-use crate::dirs::Ensure;
-
 use std::{
     borrow::Cow,
     fs::File,
@@ -8,6 +6,8 @@ use std::{
 };
 
 use anyhow::{anyhow, bail, Context, Result};
+
+use crate::dirs::Ensure;
 
 /// Supported archive types.
 ///
@@ -135,8 +135,10 @@ fn extract_zip(file: &Path, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Result
 
         #[cfg(unix)]
         {
-            use std::fs::{set_permissions, Permissions};
-            use std::os::unix::fs::PermissionsExt;
+            use std::{
+                fs::{set_permissions, Permissions},
+                os::unix::fs::PermissionsExt,
+            };
 
             if let Some(mode) = file.unix_mode() {
                 set_permissions(&outpath, Permissions::from_mode(mode))
