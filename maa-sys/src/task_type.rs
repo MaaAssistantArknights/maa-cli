@@ -14,7 +14,7 @@ pub enum TaskType {
     SSSCopilot,
     Depot,
     OperBox,
-    ReclamationAlgorithm,
+    Reclamation,
     Custom,
     SingleStep,
     VideoRecognition,
@@ -55,7 +55,7 @@ impl TaskType {
             Self::SSSCopilot => "SSSCopilot",
             Self::Depot => "Depot",
             Self::OperBox => "OperBox",
-            Self::ReclamationAlgorithm => "ReclamationAlgorithm",
+            Self::Reclamation => "Reclamation",
             Self::Custom => "Custom",
             Self::SingleStep => "SingleStep",
             Self::VideoRecognition => "VideoRecognition",
@@ -164,7 +164,7 @@ mod tests {
         assert_eq!("SSSCopilot".parse(), Ok(SSSCopilot));
         assert_eq!("Depot".parse(), Ok(Depot));
         assert_eq!("OperBox".parse(), Ok(OperBox));
-        assert_eq!("ReclamationAlgorithm".parse(), Ok(ReclamationAlgorithm));
+        assert_eq!("Reclamation".parse(), Ok(Reclamation));
         assert_eq!("Custom".parse(), Ok(Custom));
         assert_eq!("SingleStep".parse(), Ok(SingleStep));
         assert_eq!("VideoRecognition".parse(), Ok(VideoRecognition));
@@ -176,7 +176,7 @@ mod tests {
             UnknownTaskType("Unknown".to_owned()).to_string(),
             "unknown task type `Unknown`, expected one of `StartUp`, `CloseDown`, `Fight`, \
             `Recruit`, `Infrast`, `Mall`, `Award`, `Roguelike`, `Copilot`, `SSSCopilot`, \
-            `Depot`, `OperBox`, `ReclamationAlgorithm`, `Custom`, `SingleStep`, `VideoRecognition`",
+            `Depot`, `OperBox`, `Reclamation`, `Custom`, `SingleStep`, `VideoRecognition`",
         );
     }
 
@@ -204,7 +204,7 @@ mod tests {
                 &[Token::Str("Unknown")],
                 "unknown variant `Unknown`, expected one of `StartUp`, `CloseDown`, `Fight`, \
                 `Recruit`, `Infrast`, `Mall`, `Award`, `Roguelike`, `Copilot`, `SSSCopilot`, \
-                `Depot`, `OperBox`, `ReclamationAlgorithm`, `Custom`, `SingleStep`, `VideoRecognition`",
+                `Depot`, `OperBox`, `Reclamation`, `Custom`, `SingleStep`, `VideoRecognition`",
             );
         }
     }
@@ -223,10 +223,7 @@ mod tests {
         assert_eq!(SSSCopilot.to_str(), "SSSCopilot");
         assert_eq!(Depot.to_str(), "Depot");
         assert_eq!(OperBox.to_str(), "OperBox");
-        assert_eq!(
-            TaskType::ReclamationAlgorithm.to_str(),
-            "ReclamationAlgorithm",
-        );
+        assert_eq!(Reclamation.to_str(), "Reclamation",);
         assert_eq!(Custom.to_str(), "Custom");
         assert_eq!(SingleStep.to_str(), "SingleStep");
         assert_eq!(VideoRecognition.to_str(), "VideoRecognition");

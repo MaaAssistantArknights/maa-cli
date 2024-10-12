@@ -63,7 +63,7 @@ pub struct ReclamationParams {
 
 impl super::ToTaskType for ReclamationParams {
     fn to_task_type(&self) -> super::TaskType {
-        super::TaskType::ReclamationAlgorithm
+        super::TaskType::Reclamation
     }
 }
 
@@ -121,7 +121,7 @@ mod tests {
             match command {
                 crate::Command::Reclamation { params, .. } => {
                     use super::super::{TaskType, ToTaskType};
-                    assert_eq!(params.to_task_type(), TaskType::ReclamationAlgorithm);
+                    assert_eq!(params.to_task_type(), TaskType::Reclamation);
                     params.into()
                 }
                 _ => panic!("Not a Reclamation command"),
