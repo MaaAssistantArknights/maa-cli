@@ -327,7 +327,7 @@ pub mod tests {
             auto_update: true,
             backend: GitBackend::Libgit2,
             remote: Remote {
-                url: String::from("git@github.com:MaaAssistantArknights/MaaResource.git"),
+                url: String::from("https://github.com/MaaAssistantArknights/MaaResource.git"),
                 branch: Some(String::from("main")),
                 certificate: Some(Certificate::SshKey {
                     path: PathBuf::from("~/.ssh/id_ed25519"),

@@ -41,7 +41,9 @@ backend = "libgit2" # Backend to manipulate repository, can be `git` or `libgit2
 [resource.remote]
 branch = "main" # Branch of remote resource repository
 # URL of remote resource repository, leave it empty to use the default URL
-url = "git@github.com:MaaAssistantArknights/MaaResource.git"
+uril = "https://github.com/MaaAssistantArknights/MaaResource.git"
+# Or you can use ssh to clone the repository
+# url = "git@github.com:MaaAssistantArknights/MaaResource.git"
 # If you want to use ssh, a certificate is needed which can be "ssh-agent" or "ssh-key"
 # To use ssh-agent, set `use_ssh_agent` to true, and leave `ssh_key` and `passphrase` empty
 # use_ssh_agent = true # Use ssh-agent to authenticate

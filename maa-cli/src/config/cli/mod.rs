@@ -201,7 +201,7 @@ mod tests {
                 Token::Some,
                 Token::Str("main"),
                 Token::Str("url"),
-                Token::Str("git@github.com:MaaAssistantArknights/MaaResource.git"),
+                Token::Str("https://github.com/MaaAssistantArknights/MaaResource.git"),
                 Token::Str("ssh_key"),
                 Token::Some,
                 Token::Str("~/.ssh/id_ed25519"),
