@@ -291,10 +291,9 @@ impl Passphrase {
                     .args(&cmd[1..])
                     .output()?;
                 if output.status.success() {
-                    String::from_utf8(output.stdout)
-                        .map(Cow::Owned)
-                        .map(Some)
-                        .map_err(std::io::Error::other)
+                    let passphrase = std::str::from_utf8(&output.stdout)
+                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+                    Ok(Some(Cow::Owned(passphrase.trim().to_owned())))
                 } else {
                     Err(std::io::Error::other(
                         String::from_utf8(output.stderr).unwrap_or_default(),
@@ -621,17 +620,46 @@ pub mod tests {
 
         assert_eq!(
             Remote {
-                certificate: Some(Certificate::SshKey {
-                    path: PathBuf::from("~/.ssh/id_ed25519"),
-                    passphrase: Passphrase::None,
-                }),
+                certificate: Some(Certificate::SshAgent),
                 ..Default::default()
             }
             .certificate(),
-            Some(&Certificate::SshKey {
-                path: PathBuf::from("~/.ssh/id_ed25519"),
-                passphrase: Passphrase::None,
-            })
+            Some(&Certificate::SshAgent)
+        );
+    }
+
+    #[test]
+    fn passphrase() {
+        assert!(!Passphrase::Plain(String::from("password")).compatible_with_git());
+        assert!(Passphrase::Prompt.compatible_with_git());
+
+        assert_eq!(Passphrase::None.get().unwrap(), None);
+
+        assert_eq!(
+            Passphrase::Plain(String::from("password")).get().unwrap(),
+            Some(Cow::Borrowed("password"))
+        );
+
+        assert!(Passphrase::Env(String::from("MMA_TEST_SSH_PASSPHRASE"))
+            .get()
+            .is_err());
+
+        std::env::set_var("MMA_TEST_SSH_PASSPHRASE", "password");
+        assert_eq!(
+            Passphrase::Env(String::from("MMA_TEST_SSH_PASSPHRASE"))
+                .get()
+                .unwrap()
+                .unwrap(),
+            "password"
+        );
+        std::env::remove_var("MMA_TEST_SSH_PASSPHRASE");
+
+        assert_eq!(
+            Passphrase::Command(vec![String::from("echo"), String::from("password")])
+                .get()
+                .unwrap()
+                .unwrap(),
+            "password"
         );
     }
 }
