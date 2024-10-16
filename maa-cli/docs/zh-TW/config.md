@@ -407,11 +407,23 @@ backend = "libgit2" # 资源热更新后端，可选值为 "git" 或者 "libgit2
 
 # 资源热更新远程仓库相关配置
 [resource.remote]
-branch = "main" # 远程仓库的分支，默认为 "main"
-# 远程仓库的 url，如果你想要使用 ssh，你必须配置 ssh_key 的路径
-url = "https://github.com/MaaAssistantArknights/MaaResource.git"
-# url = "git@github.com:MaaAssistantArknights/MaaResource.git"
-# ssh_key = "~/.ssh/id_ed25519" # path to ssh key
+# 远程资源仓库的 URL，留空以使用默认 URL
+url = "git@github.com:MaaAssistantArknights/MaaResource.git"
+# 如果你想使用 ssh，那么你需要配置认证方式, 可以是 "ssh-agent" 或 "ssh-key"
+# 要使用 ssh-agent，请将 `use_ssh_agent` 设置为 true，并将 `ssh_key` 和 `passphrase` 留空
+# use_ssh_agent = true # 使用 ssh-agent 进行身份验证
+# 要使用 ssh-key，请将 `ssh_key` 设置为 ssh 密钥的路径
+ssh_key = "~/.ssh/id_ed25519" # ssh 密钥的路径
+# 如果 ssh 密钥已加密，你需要提供密码
+passphrase = "password"       # ssh 密钥的密码
+# 在配置文件中存储明文密码是不安全的，因此有一些方法可以避免这种情况
+# 1. 将 `passphrase` 设置为 true，然后 maa-cli 将每次提示你输入密码
+# passphrase = true
+# 2. 将 `passphrase` 设置为环境变量名，然后 maa-cli 将使用环境变量作为密码
+# passphrase = { env = "MAA_SSH_PASSPHRASE" }
+# 3. 将 `passphrase` 设置为命令，然后 maa-cli 将执行该命令以获取密码
+# 这在你使用密码管理器管理密码时非常有用
+# passphrase = { cmd = ["pass", "show", "ssh/id_ed25519"] }
 ```
 
 **注意事项**：

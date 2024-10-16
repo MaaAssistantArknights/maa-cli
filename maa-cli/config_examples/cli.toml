@@ -45,10 +45,10 @@ url = "git@github.com:MaaAssistantArknights/MaaResource.git"
 # If you want to use ssh, a certificate is needed which can be "ssh-agent" or "ssh-key"
 # To use ssh-agent, set `use_ssh_agent` to true, and leave `ssh_key` and `passphrase` empty
 # use_ssh_agent = true # Use ssh-agent to authenticate
-# To use ssh-key, set `ssh_key` to path of ssh key, and set `passphrase` to
-# passphrase of ssh key if the ssh key is encrypted
+# To use ssh-key, set `ssh_key` to path of ssh key,
 ssh_key = "~/.ssh/id_ed25519" # Path of ssh key
-passphrase = "password"       # Passphrase of ssh key
+# A Passphrase is needed if the ssh key is encrypted
+passphrase = "password" # Passphrase of ssh key
 # Store plain text password in configuration file is unsafe, so there are some ways to avoid it
 # 1. set `passphrase` to true, then maa-cli will prompt you to input passphrase each time
 # passphrase = true
