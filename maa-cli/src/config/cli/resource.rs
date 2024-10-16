@@ -123,6 +123,7 @@ pub enum Certificate {
     },
 }
 
+#[cfg(feature = "git2")]
 impl Certificate {
     pub fn fetch(&self, username: &str) -> Result<git2::Cred, git2::Error> {
         match self {
