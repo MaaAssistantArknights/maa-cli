@@ -37,7 +37,7 @@ pub fn update(is_auto: bool) -> Result<()> {
     let backend = config.backend();
     let url = config.remote().url();
     let branch = config.remote().branch();
-    let ssh_key = config.remote().ssh_key().map(dirs::expand_tilde);
+    let cert = config.remote().certificate();
     let dest = dirs::hot_update();
 
     // check if git is available when using git backend
@@ -65,23 +65,23 @@ pub fn update(is_auto: bool) -> Result<()> {
     };
 
     // check if ssh key is available
-    if url.starts_with("git@") && ssh_key.is_none() {
-        bail!("SSH key is required for git repository with ssh url");
+    if url.starts_with("git@") && cert.is_none() {
+        bail!("A Certificate is required to clone a repository using SSH");
     }
 
     if dest.exists() {
         debug!("Fetching resource repository...");
         match backend {
-            GitBackend::Git => git::pull(dest, branch, ssh_key.as_deref())?,
+            GitBackend::Git => git::pull(dest, branch, cert)?,
             #[cfg(feature = "git2")]
-            GitBackend::Libgit2 => git2::pull(dest, branch, ssh_key.as_deref())?,
+            GitBackend::Libgit2 => git2::pull(dest, branch, cert)?,
         }
     } else {
         debug!("Cloning resource repository...");
         match backend {
-            GitBackend::Git => git::clone(url, branch, dest, ssh_key.as_deref())?,
+            GitBackend::Git => git::clone(url, branch, dest, cert)?,
             #[cfg(feature = "git2")]
-            GitBackend::Libgit2 => git2::clone(url, branch, dest, ssh_key.as_deref())?,
+            GitBackend::Libgit2 => git2::clone(url, branch, dest, cert)?,
         }
     }
 
@@ -89,17 +89,40 @@ pub fn update(is_auto: bool) -> Result<()> {
 }
 
 mod git {
-    use std::path::Path;
+    use std::{path::Path, process::Command};
 
-    use anyhow::{Context, Result};
+    use anyhow::{bail, Context, Result};
 
     use super::StatusExt;
+    use crate::config::cli::resource::Certificate;
+
+    fn setup_cert(cmd: &mut Command, cert: Option<&Certificate>) -> Result<()> {
+        match cert {
+            Some(Certificate::SshKey { path, passphrase }) => {
+                if !passphrase.compatible_with_git() {
+                    bail!(
+                        "Pass passphrase to git is not supported,
+                        you will also need to provide the passphrase to the terminal.
+                        please use git2 backend or use ssh-agent to authenticate"
+                    );
+                }
+
+                cmd.env(
+                    "GIT_SSH_COMMAND",
+                    format!("ssh -i {}", path.to_str().context("Invalid path")?),
+                );
+            }
+            Some(Certificate::SshAgent) | None => {} // git uses ssh-agent by default
+        }
+
+        Ok(())
+    }
 
     pub fn clone(
         url: &str,
         branch: Option<&str>,
         dest: &Path,
-        ssh_key: Option<&Path>,
+        cert: Option<&Certificate>,
     ) -> Result<()> {
         let mut cmd = std::process::Command::new("git");
 
@@ -114,12 +137,7 @@ mod git {
             cmd.args(["--branch", branch]);
         }
 
-        if let Some(ssh_key) = ssh_key {
-            cmd.env(
-                "GIT_SSH_COMMAND",
-                format!("ssh -i {}", ssh_key.to_str().context("Invalid path")?),
-            );
-        }
+        setup_cert(&mut cmd, cert)?;
 
         cmd.status()
             .check()
@@ -128,7 +146,7 @@ mod git {
         Ok(())
     }
 
-    pub fn pull(repo: &Path, branch: Option<&str>, ssh_key: Option<&Path>) -> Result<()> {
+    pub fn pull(repo: &Path, branch: Option<&str>, cert: Option<&Certificate>) -> Result<()> {
         let mut cmd = std::process::Command::new("git");
 
         cmd.args(["pull", "origin"]);
@@ -139,12 +157,7 @@ mod git {
 
         cmd.arg("--ff-only");
 
-        if let Some(ssh_key) = ssh_key {
-            cmd.env(
-                "GIT_SSH_COMMAND",
-                format!("ssh -i {}", ssh_key.to_str().context("Invalid path")?),
-            );
-        }
+        setup_cert(&mut cmd, cert)?;
 
         cmd.current_dir(repo)
             .status()
@@ -163,11 +176,25 @@ mod git2 {
     use git2::{build::RepoBuilder, Repository};
     use log::debug;
 
+    use crate::config::cli::resource::Certificate;
+
+    fn create_fetch_options(cert: &Certificate) -> git2::FetchOptions {
+        let mut callbacks = git2::RemoteCallbacks::new();
+        callbacks.credentials(|_, username, _| {
+            username
+                .map(|username| cert.fetch(username))
+                .unwrap_or(Err(git2::Error::from_str("No username provided")))
+        });
+        let mut fetch_options = git2::FetchOptions::new();
+        fetch_options.remote_callbacks(callbacks);
+        fetch_options
+    }
+
     pub fn clone(
         url: &str,
         branch: Option<&str>,
         dest: &Path,
-        ssh_key: Option<&Path>,
+        cert: Option<&Certificate>,
     ) -> Result<()> {
         let mut builder = RepoBuilder::new();
 
@@ -175,15 +202,8 @@ mod git2 {
             builder.branch(branch);
         }
 
-        if let Some(ssh_key) = ssh_key {
-            let mut callbacks = git2::RemoteCallbacks::new();
-            callbacks.credentials(|_, username_from_url, _| {
-                git2::Cred::ssh_key(username_from_url.unwrap(), None, ssh_key, None)
-            });
-
-            let mut fetch_options = git2::FetchOptions::new();
-            fetch_options.remote_callbacks(callbacks);
-
+        if let Some(cert) = cert {
+            let fetch_options = create_fetch_options(cert);
             builder.fetch_options(fetch_options);
         }
 
@@ -194,22 +214,12 @@ mod git2 {
         Ok(())
     }
 
-    pub fn pull(repo: &Path, branch: Option<&str>, ssh_key: Option<&Path>) -> Result<()> {
+    pub fn pull(repo: &Path, branch: Option<&str>, cert: Option<&Certificate>) -> Result<()> {
         let repo = Repository::open(repo).context("Failed to open resource repository")?;
 
         let branch = branch.unwrap_or("main");
 
-        let mut fetch_options = ssh_key.map(|ssh_key| {
-            let mut callbacks = git2::RemoteCallbacks::new();
-            callbacks.credentials(|_, username_from_url, _| {
-                git2::Cred::ssh_key(username_from_url.unwrap(), None, ssh_key, None)
-            });
-
-            let mut fetch_options = git2::FetchOptions::new();
-            fetch_options.remote_callbacks(callbacks);
-
-            fetch_options
-        });
+        let mut fetch_options = cert.map(create_fetch_options);
 
         repo.find_remote("origin")
             .context("Failed to find remote 'origin'")?
