@@ -1,44 +1,61 @@
 "$schema" = "../schemas/cli.schema.json"
 
-# Configurations for MaaCore
+# Configurations for MaaCore installation and update
 [core]
-channel = "Beta" # update channel of MaaCore, can be "Alpha", "Beta" or "Stable"
-test_time = 0    # time to test the speed of mirrors, 0 to disable
-# url of the MaaCore version api, used to get the latest version of MaaCore,
-# leave it empty to use the default url
+# Update channel of MaaCore, can be "Alpha", "Beta" or "Stable"
+channel = "Beta"
+# Time to test the speed of mirrors, in seconds, set to 0 to disable the test
+# Default value is 3, smaller value if you have a fast network
+test_time = 0
+# URL of the MaaCore version API, used to get the latest version of MaaCore,
+# leave it empty to use the default URL
 api_url = "https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version/"
 
 # Configurations for whether to install given components of MaaCore
 [core.components]
-library = true  # whether to install libraries of MaaCore
-resource = true # whether to install resources of MaaCore
+library = true  # Whether to install libraries of MaaCore
+resource = true # Whether to install resources of MaaCore
 
-# Configurations for maa-cli
+# Configurations for maa-cli self update
 [cli]
-channel = "Alpha" # update channel of maa-cli, can be "Alpha", "Beta" or "Stable"
-# url of the maa-cli version api, used to get the latest version of maa-cli,
-# if you want to use jsdelivr, the double v in @vversion is necessary instead of a typo
+# Update channel of maa-cli, can be "Alpha", "Beta" or "Stable".
+channel = "Alpha"
+# URL of the maa-cli version API, used to get the latest version of maa-cli.
 api_url = "https://cdn.jsdelivr.net/gh/MaaAssistantArknights/maa-cli@vversion/"
-# url to download latest version of maa-cli, leave it empty to use the default url
+# URL to download latest version of maa-cli, leave it empty to use the default URL.
 download_url = "https://github.com/MaaAssistantArknights/maa-cli/releases/download/"
 
 # Configurations for whether to install given components of maa-cli
 [cli.components]
-binary = false # whether to install binary of maa-cli
+binary = false # Whether to install binary of maa-cli
 
 # Configurations for hot update of resource
 # Note: this is different from `core.components.resource`, this is for hot update of resource
 # while this is hot update resource of MaaCore
-# You can not use this to hot update without any base resource
+# You cannot use this to hot update without any base resource
 [resource]
-auto_update = true  # whether to auto update resource each time run maa task
-backend = "libgit2" # backend to manipulate repository, can be "git" or "libgit2"
+auto_update = true  # Whether to auto update resource each time run maa task
+backend = "libgit2" # Backend to manipulate repository, can be `git` or `libgit2`
 
 # Configurations for remote git repository of resource
 [resource.remote]
-branch = "main" # branch of remote resource repository
-# url of remote resource repository, leave it empty to use the default url
-url = "https://github.com/MaaAssistantArknights/MaaResource.git"
-# if you want to use ssh, set url to ssh url and set ssh_key to the path of ssh key
+branch = "main" # Branch of remote resource repository
+# URL of remote resource repository, leave it empty to use the default URL
+uril = "https://github.com/MaaAssistantArknights/MaaResource.git"
+# Or you can use ssh to clone the repository
 # url = "git@github.com:MaaAssistantArknights/MaaResource.git"
-# ssh_key = "~/.ssh/id_ed25519" # path to ssh key
+# If you want to use ssh, a certificate is needed which can be "ssh-agent" or "ssh-key"
+# To use ssh-agent, set `use_ssh_agent` to true, and leave `ssh_key` and `passphrase` empty
+# use_ssh_agent = true # Use ssh-agent to authenticate
+# To use ssh-key, set `ssh_key` to path of ssh key,
+ssh_key = "~/.ssh/id_ed25519" # Path of ssh key
+# A Passphrase is needed if the ssh key is encrypted
+passphrase = "password" # Passphrase of ssh key
+# Store plain text password in configuration file is unsafe, so there are some ways to avoid it
+# 1. set `passphrase` to true, then maa-cli will prompt you to input passphrase each time
+# passphrase = true
+# 2. set `passphrase` to a environment variable, then maa-cli will use the environment variable as passphrase
+# passphrase = { env = "MAA_SSH_PASSPHRASE" }
+# 3. set `passphrase` to a command, then maa-cli will execute the command to get passphrase
+# which is useful when you use a password manager to manage your passphrase
+# passphrase = { cmd = ["pass", "show", "ssh/id_ed25519"] }

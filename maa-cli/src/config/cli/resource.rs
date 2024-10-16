@@ -1,6 +1,9 @@
-use std::path::{Path, PathBuf};
+use std::{borrow::Cow, path::PathBuf};
 
+use maa_dirs::expand_tilde;
 use serde::Deserialize;
+
+use crate::value::userinput::{Input, UserInput};
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Default, Clone)]
@@ -41,17 +44,53 @@ pub enum GitBackend {
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Deserialize, Clone)]
+#[derive(Clone)]
 pub struct Remote {
     /// URL to resource repository
-    #[serde(default = "default_url")]
     url: String,
     /// Branch of resource repository
-    #[serde(default)]
     branch: Option<String>,
-    /// SSH key to access resource repository when fetch from SSH
-    #[serde(default)]
-    ssh_key: Option<PathBuf>,
+    /// Certificate to access resource repository
+    certificate: Option<Certificate>,
+}
+
+impl<'de> Deserialize<'de> for Remote {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct RemoteHelper {
+            #[serde(default = "default_url")]
+            url: String,
+            #[serde(default)]
+            branch: Option<String>,
+            #[serde(default)]
+            use_ssh_agent: bool,
+            #[serde(default)]
+            ssh_key: Option<PathBuf>,
+            #[serde(default)]
+            passphrase: Passphrase,
+        }
+
+        let helper = RemoteHelper::deserialize(deserializer)?;
+
+        let certificate = match (helper.use_ssh_agent, helper.ssh_key, helper.passphrase) {
+            (true, None, _) => Some(Certificate::SshAgent),
+            (true, Some(_), _) => {
+                log::warn!("Using ssh-agent to fetch certificate, no need to specify ssh_key");
+                Some(Certificate::SshAgent)
+            }
+            (false, Some(path), passphrase) => Some(Certificate::SshKey { path, passphrase }),
+            (false, None, _) => None,
+        };
+
+        Ok(Remote {
+            url: helper.url,
+            branch: helper.branch,
+            certificate,
+        })
+    }
 }
 
 impl Default for Remote {
@@ -59,13 +98,210 @@ impl Default for Remote {
         Self {
             url: default_url(),
             branch: None,
-            ssh_key: None,
+            certificate: None,
         }
     }
 }
 
 fn default_url() -> String {
     String::from("https://github.com/MaaAssistantArknights/MaaResource.git")
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone)]
+pub enum Certificate {
+    /// Use certificate from ssh-agent
+    SshAgent,
+    /// Use given private key as certificate
+    ///
+    /// Note: when using git backend, the encrypted key will not work in batch mode
+    /// because we can not pass the passphrase to git command and it will prompt for passphrase.
+    /// Use ssh-agent in this case.
+    SshKey {
+        path: PathBuf,
+        passphrase: Passphrase,
+    },
+}
+
+#[cfg(feature = "git2")]
+impl Certificate {
+    pub fn fetch(&self, username: &str) -> Result<git2::Cred, git2::Error> {
+        match self {
+            Certificate::SshAgent => git2::Cred::ssh_key_from_agent(username),
+            Certificate::SshKey { path, passphrase } => git2::Cred::ssh_key(
+                username,
+                None,
+                expand_tilde(path).as_ref(),
+                passphrase
+                    .get()
+                    .map_err(|e| git2::Error::from_str(&format!("Failed to get passphrase {e}")))?
+                    .as_deref(),
+            ),
+        }
+    }
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone, Default)]
+pub enum Passphrase<Str = String> {
+    /// No passphrase
+    #[default]
+    None,
+    /// Prompt for passphrase
+    ///
+    /// This will not work in batch mode
+    Prompt,
+    /// Plain text passphrase
+    ///
+    /// This is not recommended for security reasons
+    Plain(Str),
+    /// From  Environment variable
+    ///
+    /// This is not recommended for security reasons
+    Env(Str),
+    /// Use a command to get passphrase
+    ///
+    /// A command that outputs the passphrase to stdout
+    /// This is useful to fetch passphrase from password manager
+    Command(Vec<Str>),
+}
+
+impl<'de> Deserialize<'de> for Passphrase {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        enum PassphraseField {
+            Cmd,
+            Env,
+        }
+
+        impl<'de> serde::Deserialize<'de> for PassphraseField {
+            fn deserialize<D>(deserializer: D) -> Result<PassphraseField, D::Error>
+            where
+                D: serde::de::Deserializer<'de>,
+            {
+                struct PassphraseFieldVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for PassphraseFieldVisitor {
+                    type Value = PassphraseField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        formatter.write_str("`cmd` or `env`")
+                    }
+
+                    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match v {
+                            "cmd" => Ok(PassphraseField::Cmd),
+                            "env" => Ok(PassphraseField::Env),
+                            _ => Err(serde::de::Error::unknown_field(v, &["cmd", "env"])),
+                        }
+                    }
+                }
+
+                deserializer.deserialize_identifier(PassphraseFieldVisitor)
+            }
+        }
+
+        struct PassphraseVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for PassphraseVisitor {
+            type Value = Passphrase;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a valid passphrase, which must be a bool, string, or map")
+            }
+
+            fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                if v {
+                    Ok(Passphrase::Prompt)
+                } else {
+                    Ok(Passphrase::None)
+                }
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Passphrase::Plain(v.to_owned()))
+            }
+
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Passphrase::Plain(v))
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                let v = match map.next_key()? {
+                    Some(PassphraseField::Cmd) => {
+                        let cmd = map.next_value()?;
+                        Passphrase::Command(cmd)
+                    }
+                    Some(PassphraseField::Env) => {
+                        let name = map.next_value()?;
+                        Passphrase::Env(name)
+                    }
+                    None => return Err(serde::de::Error::custom("`cmd` or `env` is required")),
+                };
+
+                if map.next_key::<PassphraseField>()?.is_some() {
+                    println!("here");
+                    return Err(serde::de::Error::custom("only one field is allowed"));
+                }
+
+                Ok(v)
+            }
+        }
+
+        deserializer.deserialize_any(PassphraseVisitor)
+    }
+}
+
+impl Passphrase {
+    pub fn compatible_with_git(&self) -> bool {
+        matches!(self, Passphrase::None | Passphrase::Prompt)
+    }
+
+    pub fn get(&self) -> std::io::Result<Option<Cow<str>>> {
+        match self {
+            Passphrase::None => Ok(None),
+            Passphrase::Prompt => Input::<String>::new(None, Some("passphrase"))
+                .value()
+                .map(Cow::Owned)
+                .map(Some),
+            Passphrase::Plain(password) => Ok(Some(Cow::Borrowed(password))),
+            Passphrase::Env(name) => std::env::var(name)
+                .map(Cow::Owned)
+                .map(Some)
+                .map_err(std::io::Error::other),
+            Passphrase::Command(cmd) => {
+                let output = std::process::Command::new(&cmd[0])
+                    .args(&cmd[1..])
+                    .output()?;
+                if output.status.success() {
+                    let passphrase = std::str::from_utf8(&output.stdout)
+                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+                    Ok(Some(Cow::Owned(passphrase.trim().to_owned())))
+                } else {
+                    Err(std::io::Error::other(
+                        String::from_utf8(output.stderr).unwrap_or_default(),
+                    ))
+                }
+            }
+        }
+    }
 }
 
 impl Remote {
@@ -77,8 +313,8 @@ impl Remote {
         self.branch.as_deref()
     }
 
-    pub fn ssh_key(&self) -> Option<&Path> {
-        self.ssh_key.as_deref()
+    pub fn certificate(&self) -> Option<&Certificate> {
+        self.certificate.as_ref()
     }
 }
 
@@ -93,7 +329,10 @@ pub mod tests {
             remote: Remote {
                 url: String::from("https://github.com/MaaAssistantArknights/MaaResource.git"),
                 branch: Some(String::from("main")),
-                ssh_key: None,
+                certificate: Some(Certificate::SshKey {
+                    path: PathBuf::from("~/.ssh/id_ed25519"),
+                    passphrase: Passphrase::Plain(String::from("password")),
+                }),
             },
         }
     }
@@ -107,13 +346,13 @@ pub mod tests {
             remote: Remote {
                 url: default_url(),
                 branch: None,
-                ssh_key: None,
+                certificate: None,
             }
         });
     }
 
     mod serde {
-        use serde_test::{assert_de_tokens, Token};
+        use serde_test::{assert_de_tokens, assert_de_tokens_error, Token};
 
         use super::*;
 
@@ -147,22 +386,157 @@ pub mod tests {
 
             assert_de_tokens(
                 &Remote {
-                    url: String::from("http://gitee.com/MaaMirror/Resource.git"),
+                    url: String::from("http://git.com/MaaMirror/Resource.git"),
                     branch: Some(String::from("main")),
-                    ssh_key: Some(PathBuf::from("~/.ssh/id_ed25519")),
+                    certificate: None,
                 },
                 &[
                     Token::Map { len: Some(3) },
                     Token::Str("url"),
-                    Token::Str("http://gitee.com/MaaMirror/Resource.git"),
+                    Token::Str("http://git.com/MaaMirror/Resource.git"),
                     Token::Str("branch"),
                     Token::Some,
                     Token::Str("main"),
+                    Token::MapEnd,
+                ],
+            );
+
+            assert_de_tokens(
+                &Remote {
+                    certificate: Some(Certificate::SshAgent),
+                    ..Default::default()
+                },
+                &[
+                    Token::Map { len: Some(1) },
+                    Token::Str("use_ssh_agent"),
+                    Token::Bool(true),
+                    Token::MapEnd,
+                ],
+            );
+
+            assert_de_tokens(
+                &Remote {
+                    certificate: None,
+                    ..Default::default()
+                },
+                &[
+                    Token::Map { len: Some(1) },
+                    Token::Str("use_ssh_agent"),
+                    Token::Bool(false),
+                    Token::MapEnd,
+                ],
+            );
+
+            assert_de_tokens(
+                &Remote {
+                    certificate: Some(Certificate::SshKey {
+                        path: PathBuf::from("~/.ssh/id_ed25519"),
+                        passphrase: Passphrase::None,
+                    }),
+                    ..Default::default()
+                },
+                &[
+                    Token::Map { len: Some(1) },
                     Token::Str("ssh_key"),
                     Token::Some,
                     Token::Str("~/.ssh/id_ed25519"),
                     Token::MapEnd,
                 ],
+            );
+
+            assert_de_tokens(
+                &Remote {
+                    certificate: Some(Certificate::SshKey {
+                        path: PathBuf::from("~/.ssh/id_ed25519"),
+                        passphrase: Passphrase::Plain(String::from("password")),
+                    }),
+                    ..Default::default()
+                },
+                &[
+                    Token::Map { len: Some(2) },
+                    Token::Str("ssh_key"),
+                    Token::Some,
+                    Token::Str("~/.ssh/id_ed25519"),
+                    Token::Str("passphrase"),
+                    Token::Str("password"),
+                    Token::MapEnd,
+                ],
+            );
+
+            assert_de_tokens(
+                &Remote {
+                    certificate: Some(Certificate::SshAgent),
+                    ..Default::default()
+                },
+                &[
+                    Token::Map { len: Some(2) },
+                    Token::Str("use_ssh_agent"),
+                    Token::Bool(true),
+                    Token::Str("ssh_key"),
+                    Token::Some,
+                    Token::Str("~/.ssh/id_ed25519"),
+                    Token::MapEnd,
+                ],
+            );
+        }
+
+        #[test]
+        fn passphrase() {
+            assert_de_tokens(&Passphrase::Prompt, &[Token::Bool(true)]);
+
+            assert_de_tokens(&Passphrase::None, &[Token::Bool(false)]);
+
+            assert_de_tokens(&Passphrase::Plain(String::from("password")), &[Token::Str(
+                "password",
+            )]);
+
+            assert_de_tokens(&Passphrase::Env(String::from("SSH_PASSPHRASE")), &[
+                Token::Map { len: Some(1) },
+                Token::Str("env"),
+                Token::Str("SSH_PASSPHRASE"),
+                Token::MapEnd,
+            ]);
+
+            assert_de_tokens(
+                &Passphrase::Command(vec![String::from("get"), String::from("passphrase")]),
+                &[
+                    Token::Map { len: Some(1) },
+                    Token::Str("cmd"),
+                    Token::Seq { len: Some(2) },
+                    Token::Str("get"),
+                    Token::Str("passphrase"),
+                    Token::SeqEnd,
+                    Token::MapEnd,
+                ],
+            );
+
+            assert_de_tokens_error::<Passphrase>(
+                &[Token::Map { len: Some(1) }, Token::Str("foo")],
+                "unknown field `foo`, expected `cmd` or `env`",
+            );
+
+            assert_de_tokens_error::<Passphrase>(
+                &[
+                    Token::Map { len: Some(2) },
+                    Token::Str("cmd"),
+                    Token::Seq { len: Some(2) },
+                    Token::Str("get"),
+                    Token::Str("passphrase"),
+                    Token::SeqEnd,
+                    Token::Str("env"),
+                ],
+                "only one field is allowed",
+            );
+
+            assert_de_tokens_error::<Passphrase>(
+                &[Token::Map { len: Some(0) }, Token::MapEnd],
+                "`cmd` or `env` is required",
+            );
+
+            assert_de_tokens_error::<Passphrase>(
+                &[Token::I64(0)],
+                "invalid type: integer `0`, \
+                expected a valid passphrase, which must be a bool, string, or map",
             );
         }
 
@@ -180,7 +554,10 @@ pub mod tests {
                     remote: Remote {
                         url: String::from("git@github.com:MaaAssistantArknights/MaaResource.git"),
                         branch: Some(String::from("main")),
-                        ssh_key: Some(PathBuf::from("~/.ssh/id_ed25519")),
+                        certificate: Some(Certificate::SshKey {
+                            path: PathBuf::from("~/.ssh/id_ed25519"),
+                            passphrase: Passphrase::Plain(String::from("password")),
+                        }),
                     },
                 },
                 &[
@@ -199,6 +576,8 @@ pub mod tests {
                     Token::Str("ssh_key"),
                     Token::Some,
                     Token::Str("~/.ssh/id_ed25519"),
+                    Token::Str("passphrase"),
+                    Token::Str("password"),
                     Token::MapEnd,
                     Token::MapEnd,
                 ],
@@ -212,11 +591,11 @@ pub mod tests {
 
         assert_eq!(
             Remote {
-                url: String::from("http://gitee.com/MaaMirror/Resource.git"),
+                url: String::from("http://git.com/MaaMirror/Resource.git"),
                 ..Default::default()
             }
             .url(),
-            "http://gitee.com/MaaMirror/Resource.git"
+            "http://git.com/MaaMirror/Resource.git"
         );
     }
 
@@ -236,17 +615,51 @@ pub mod tests {
     }
 
     #[test]
-    fn ssh_key() {
-        assert_eq!(Remote::default().ssh_key(), None);
+    fn certificate() {
+        assert_eq!(Remote::default().certificate(), None);
 
         assert_eq!(
             Remote {
-                ssh_key: Some(PathBuf::from("~/.ssh/id_ed25519")),
+                certificate: Some(Certificate::SshAgent),
                 ..Default::default()
             }
-            .ssh_key()
-            .unwrap(),
-            Path::new("~/.ssh/id_ed25519")
+            .certificate(),
+            Some(&Certificate::SshAgent)
+        );
+    }
+
+    #[test]
+    fn passphrase() {
+        assert!(!Passphrase::Plain(String::from("password")).compatible_with_git());
+        assert!(Passphrase::Prompt.compatible_with_git());
+
+        assert_eq!(Passphrase::None.get().unwrap(), None);
+
+        assert_eq!(
+            Passphrase::Plain(String::from("password")).get().unwrap(),
+            Some(Cow::Borrowed("password"))
+        );
+
+        assert!(Passphrase::Env(String::from("MMA_TEST_SSH_PASSPHRASE"))
+            .get()
+            .is_err());
+
+        std::env::set_var("MMA_TEST_SSH_PASSPHRASE", "password");
+        assert_eq!(
+            Passphrase::Env(String::from("MMA_TEST_SSH_PASSPHRASE"))
+                .get()
+                .unwrap()
+                .unwrap(),
+            "password"
+        );
+        std::env::remove_var("MMA_TEST_SSH_PASSPHRASE");
+
+        assert_eq!(
+            Passphrase::Command(vec![String::from("echo"), String::from("password")])
+                .get()
+                .unwrap()
+                .unwrap(),
+            "password"
         );
     }
 }
