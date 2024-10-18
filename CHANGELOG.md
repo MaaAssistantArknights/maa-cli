@@ -78,7 +78,7 @@
 
 ### Security
 
-- Bump openssl from 0.10.64 to 0.10.66 by [@dependabot[bot]](https://github.com/dependabot[bot]) in [#296](https://github.com/MaaAssistantArknights/maa-cli/pull/296)
+- Bump openssl from 0.10.64 to 0.10.66 by [@dependabot](https://github.com/dependabot) in [#296](https://github.com/MaaAssistantArknights/maa-cli/pull/296)
 
 **Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.4.8...v0.4.9>
 
@@ -165,12 +165,12 @@
 
 ### Security
 
-- Bump h2 from 0.4.3 to 0.4.4 by [@dependabot[bot]](https://github.com/dependabot[bot]) in [#252](https://github.com/MaaAssistantArknights/maa-cli/pull/252)
+- Bump h2 from 0.4.3 to 0.4.4 by [@dependabot](https://github.com/dependabot) in [#252](https://github.com/MaaAssistantArknights/maa-cli/pull/252)
 
 ### Miscellaneous
 
 - Use AGPL-3.0-only License by [@wangl-cc](https://github.com/wangl-cc) in [#234](https://github.com/MaaAssistantArknights/maa-cli/pull/234)
-- Bump DavidAnson/markdownlint-cli2-action from 15 to 16 by [@dependabot[bot]](https://github.com/dependabot[bot]) in [#253](https://github.com/MaaAssistantArknights/maa-cli/pull/253)
+- Bump DavidAnson/markdownlint-cli2-action from 15 to 16 by [@dependabot](https://github.com/dependabot) in [#253](https://github.com/MaaAssistantArknights/maa-cli/pull/253)
 - Bump Cargo.lock by [@wangl-cc](https://github.com/wangl-cc) in [#258](https://github.com/MaaAssistantArknights/maa-cli/pull/258)
 - Remove some unnecessary comments by [@wangl-cc](https://github.com/wangl-cc)
 - Fix relative links in generated docs by [@wangl-cc](https://github.com/wangl-cc)

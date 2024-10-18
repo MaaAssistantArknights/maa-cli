@@ -24,6 +24,7 @@ body = """
 {%- endmacro -%}
 
 {%- macro user_link(username) -%}
+  {%- set username = username | trim_end_matches(pat="[bot]") -%}
   {%- if get_env(name="CI", default="false") == "true" -%}
     @{{ username }}
   {%- else -%}
@@ -38,11 +39,11 @@ body = """
 {%- macro format_commit(commit) -%}
   {%- if commit.breaking -%} **BREAKING**: {%- endif -%}
   {{ commit.message | upper_first }}
-  {%- if commit.github.username %} \
-    by {{ self::user_link(username=commit.github.username) }}
+  {%- if commit.remote.username %} \
+    by {{ self::user_link(username=commit.remote.username) }}
   {%- endif -%}
-  {%- if commit.github.pr_number %} \
-    in {{ self::pr_link(pr=commit.github.pr_number) }}
+  {%- if commit.remote.pr_number %} \
+    in {{ self::pr_link(pr=commit.remote.pr_number) }}
   {%- endif -%}
 {%- endmacro -%}
 
