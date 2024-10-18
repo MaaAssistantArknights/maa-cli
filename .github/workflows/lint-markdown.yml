@@ -17,7 +17,7 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   lint:
@@ -38,10 +38,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Check Dead Link
-        uses: umbrelladocs/action-linkspector@v1
+      - name: Setup Lychee Cache
+        uses: actions/cache@v4
         with:
-          reporter: github-check
-          # Check only the diff when triggered by a push or pull request; otherwise, check all files
-          filter_mode: ${{ contains(fromJSON('["push", "pull_request"]'), github.event_name) && 'diff_context' || 'nofilter' }}
-          fail_on_error: true
+          path: .lycheecache
+          key: cache-lychee-${{ github.sha }}
+          restore-keys: cache-lychee-
+      - name: Check Dead Links
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: >
+            --verbose --no-progress --cache --max-cache-age 1d
+            -- .
+      - name: Comment on Pull Request if Dead Links Found
+        if: failure() && github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          message: |
+            Dead links found in the documentation. Please fix them.
+            Details: https://github.com/MaaAssistantArknights/maa-cli/actions/runs/${{ github.run_id }}
