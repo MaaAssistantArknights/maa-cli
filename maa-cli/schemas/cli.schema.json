@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/MaaAssistantArknights/maa-cli/raw/v0.4.0/maa-cli/schemas/cli.schema.json",
+  "$id": "https://github.com/MaaAssistantArknights/maa-cli/raw/v0.5.0/maa-cli/schemas/cli.schema.json",
   "type": "object",
   "properties": {
     "core": {
@@ -42,7 +42,9 @@
           "properties": {
             "branch": { "type": "string", "default": "main" },
             "url": { "type": "string" },
-            "ssh_key": { "type": "string" }
+            "use_ssh_agent": { "type": "boolean" },
+            "ssh_key": { "type": "string" },
+            "passphrase": { "$ref": "#/definitions/passphrase" }
           }
         }
       }
@@ -51,7 +53,28 @@
   "definitions": {
     "channel": {
       "type": "string",
-      "enum": ["stable", "Beta", "Alpha"]
+      "enum": ["Stable", "Beta", "Alpha"]
+    },
+    "passphrase": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "boolean" },
+        {
+          "type": "object",
+          "properties": {
+            "env": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cmd": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        }
+      ]
     }
   }
 }
