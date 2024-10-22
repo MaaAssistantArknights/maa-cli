@@ -1,5 +1,50 @@
 # Release Notes
 
+## Release 0.5.0
+
+### Features
+
+- **BREAKING**: Remove deprecated cleanup targets and improve tests by [@wangl-cc](https://github.com/wangl-cc) in [#315](https://github.com/MaaAssistantArknights/maa-cli/pull/315)
+- **BREAKING**: Add `reclamation` and improve `fight`, `roguelike`, `copilot` commands by [@wangl-cc](https://github.com/wangl-cc) in [#313](https://github.com/MaaAssistantArknights/maa-cli/pull/313)
+- Add support for encrypted ssh key and ssh-agent by [@wangl-cc](https://github.com/wangl-cc) in [#337](https://github.com/MaaAssistantArknights/maa-cli/pull/337)
+
+### Bug Fixes
+
+- Retry `remove_dir_all` 3 times in `ensure_clean` by [@wangl-cc](https://github.com/wangl-cc) in [#320](https://github.com/MaaAssistantArknights/maa-cli/pull/320)
+- Unload core after getting version by [@wangl-cc](https://github.com/wangl-cc) in [#327](https://github.com/MaaAssistantArknights/maa-cli/pull/327)
+- Task name of reclamation algorithm by [@wangl-cc](https://github.com/wangl-cc) in [#336](https://github.com/MaaAssistantArknights/maa-cli/pull/336)
+
+### Performance
+
+- Use manual Debug implementation and remove deprecated AsRef by [@wangl-cc](https://github.com/wangl-cc) in [#330](https://github.com/MaaAssistantArknights/maa-cli/pull/330)
+
+### Refactor
+
+- **BREAKING**: Switch from `native-tls` to `rustls` by [@wangl-cc](https://github.com/wangl-cc) in [#317](https://github.com/MaaAssistantArknights/maa-cli/pull/317)
+- Split `dirs` module into a separate crate by [@wangl-cc](https://github.com/wangl-cc) in [#321](https://github.com/MaaAssistantArknights/maa-cli/pull/321)
+- Use RwLock instead of TLS to store shared library by [@wangl-cc](https://github.com/wangl-cc) in [#328](https://github.com/MaaAssistantArknights/maa-cli/pull/328)
+- Use windows-sys to replace windows crate by [@wangl-cc](https://github.com/wangl-cc) in [#331](https://github.com/MaaAssistantArknights/maa-cli/pull/331)
+
+### Documentation
+
+- Fix typo by [@wangl-cc](https://github.com/wangl-cc)
+- Imporve docs about fetching via SSH by [@wangl-cc](https://github.com/wangl-cc)
+
+### Testing
+
+- **BREAKING**: Run tests even some environment variables are not set by [@wangl-cc](https://github.com/wangl-cc) in [#316](https://github.com/MaaAssistantArknights/maa-cli/pull/316)
+- Fix env var name and logic in version test by [@wangl-cc](https://github.com/wangl-cc)
+- Ignore data_relative test by [@wangl-cc](https://github.com/wangl-cc)
+
+### Miscellaneous
+
+- Sort dependencies by name by [@wangl-cc](https://github.com/wangl-cc)
+- Remove unnecessary reference by [@wangl-cc](https://github.com/wangl-cc)
+- Update schema ssh configuration by [@wangl-cc](https://github.com/wangl-cc)
+- Remove [bot] suffix from username in changelog by [@wangl-cc](https://github.com/wangl-cc)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.4.12...v0.5.0>
+
 ## Release 0.4.12
 
 ### Features
