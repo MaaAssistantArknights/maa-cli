@@ -28,7 +28,7 @@
 ### Documentation
 
 - Fix typo by [@wangl-cc](https://github.com/wangl-cc)
-- Imporve docs about fetching via SSH by [@wangl-cc](https://github.com/wangl-cc)
+- Improve docs about fetching via SSH by [@wangl-cc](https://github.com/wangl-cc)
 
 ### Testing
 
