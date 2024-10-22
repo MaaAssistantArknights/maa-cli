@@ -199,3 +199,35 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
+
+  musl:
+    name: Build and Test (musl)
+    runs-on: ubuntu-latest
+    container:
+      image: rust:1-alpine
+    env:
+      CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Toolchain
+        shell: sh
+        run: |
+          apk add perl make musl-dev bash
+      - name: Build
+        run: |
+          cargo build --package maa-cli --locked \
+            --features vendored-openssl
+      - name: Install MaaCore
+        env:
+          MAA_CONFIG_DIR: ${{ github.workspace }}/maa-cli/config_examples
+        run: |
+          cargo run \
+            --features vendored-openssl \
+            -- install stable
+          echo "MAA_CORE_INSTALLED=true" >> "$GITHUB_ENV"
+      - name: Test
+        run: |
+          cargo test --package maa-cli --locked \
+            --features vendored-openssl \
+            -- --include-ignored
