@@ -11,7 +11,7 @@
 ### Bug Fixes
 
 - Retry `remove_dir_all` 3 times in `ensure_clean` by [@wangl-cc](https://github.com/wangl-cc) in [#320](https://github.com/MaaAssistantArknights/maa-cli/pull/320)
-- Unload core after getting version by [@wangl-cc](https://github.com/wangl-cc) in [#327](https://github.com/MaaAssistantArknights/maa-cli/pull/327)
+- Create a owned copy of version string of MaaCore instead of a reference by [@wangl-cc](https://github.com/wangl-cc) in [#327](https://github.com/MaaAssistantArknights/maa-cli/pull/327)
 - Task name of reclamation algorithm by [@wangl-cc](https://github.com/wangl-cc) in [#336](https://github.com/MaaAssistantArknights/maa-cli/pull/336)
 
 ### Performance
