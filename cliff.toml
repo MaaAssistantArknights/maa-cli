@@ -37,7 +37,7 @@ body = """
 {%- endmacro -%}
 
 {%- macro format_commit(commit) -%}
-  {%- if commit.breaking -%} **BREAKING**: {%- endif -%}
+  {%- if commit.breaking -%} **BREAKING**: {% endif -%}
   {{ commit.message | upper_first }}
   {%- if commit.remote.username %} \
     by {{ self::user_link(username=commit.remote.username) }}
