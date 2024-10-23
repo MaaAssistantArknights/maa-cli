@@ -9,6 +9,9 @@ component_management:
     - component_id: maa-sys
       paths:
         - maa-sys
+    - component_id: maa-dirs
+      paths:
+        - maa-dirs
     - component_id: maa-cli
       paths:
         - maa-cli
