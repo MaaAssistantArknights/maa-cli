@@ -51,9 +51,11 @@ impl ToCString for &std::ffi::OsStr {
 #[cfg(not(unix))]
 impl ToCString for &std::ffi::OsStr {
     fn to_cstring(self) -> Result<CString> {
-        /// OsStr on non-Unix platforms can not use `as_bytes` method. So, we use the `to_str`
-        /// method directly, which lacks the detailed error information.
-        self.to_str().ok_or(Error::InvalidUtf8NoInfo)?.to_cstring()
+        // OsStr on non-Unix platforms can not use `as_bytes` method. So, we use the `to_str`
+        // method directly, which lacks the detailed error information.
+        self.to_str()
+            .ok_or(crate::Error::InvalidUtf8NoInfo)?
+            .to_cstring()
     }
 }
 
