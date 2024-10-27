@@ -148,26 +148,6 @@ impl Assistant {
         .to_err()
     }
 
-    /// Connect to device with the given adb path, address and config.
-    #[deprecated(note = "use async_connect instead")]
-    pub fn connect(
-        &self,
-        adb_path: impl ToCString,
-        address: impl ToCString,
-        config: impl ToCString,
-    ) -> Result<()> {
-        unsafe {
-            #[allow(deprecated)]
-            binding::AsstConnect(
-                self.handle,
-                adb_path.to_cstring()?.as_ptr(),
-                address.to_cstring()?.as_ptr(),
-                config.to_cstring()?.as_ptr(),
-            )
-        }
-        .to_err()
-    }
-
     /// Append a task to the assistant, return the task id.
     pub fn append_task(&self, task: impl ToCString, params: impl ToCString) -> Result<AsstTaskId> {
         let task_id = unsafe {
@@ -278,13 +258,21 @@ impl AsstBoolExt for maa_types::primitive::AsstBool {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[cfg(not(feature = "runtime"))]
     #[test]
     fn get_version() {
-        let version = super::Assistant::get_version().unwrap();
+        let version = Assistant::get_version().unwrap();
 
         if let Some(v_str) = std::env::var_os("MAA_CORE_VERSION") {
             assert_eq!(version, v_str.to_str().unwrap());
         }
+    }
+
+    #[test]
+    fn asst_bool_ext() {
+        assert!(matches!(0.to_err(), Err(super::Error::MAAError)));
+        assert!(matches!(1.to_err(), Ok(())));
     }
 }

@@ -312,7 +312,7 @@ mod tests {
         fn parse() {
             assert_eq!("adb".parse(), Ok(Adb));
             assert_eq!("Adb".parse(), Ok(Adb));
-            assert_eq!("Adb".parse(), Ok(Adb));
+            assert_eq!("ADB".parse(), Ok(Adb));
             assert_eq!("minitouch".parse(), Ok(MiniTouch));
             assert_eq!("MiniTouch".parse(), Ok(MiniTouch));
             assert_eq!("maatouch".parse(), Ok(MaaTouch));
