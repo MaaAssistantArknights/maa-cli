@@ -38,11 +38,9 @@ name = "maa"
 path = "src/main.rs"
 
 [dependencies]
-maa-sys = { path = "../maa-sys", version = "0.4.0", features = [
-  "runtime",
-  "serde",
-] }
+maa-sys = { path = "../maa-sys", version = "0.5.0", features = ["runtime"] }
 maa-dirs = { path = "../maa-dirs", version = "0.1.1" }
+maa-types = { path = "../maa-types", version = "0.1.0", features = ["serde"] }
 
 anyhow = "1"
 async-trait = "0.1.81"
@@ -51,7 +49,6 @@ clap_complete = { version = "4.4" }
 clap_mangen = "0.2.20"
 color-print = "0.3.6"
 digest = { version = "0.10.7", optional = true }
-directories = "5"
 dunce = "1.0.4"
 flate2 = { version = "1", optional = true }
 futures-util = { version = "0.3.28", optional = true }
@@ -60,8 +57,8 @@ indicatif = { version = "0.17.7", optional = true }
 log = "0.4.20"
 prettytable = { version = "0.10.0", default-features = false }
 semver = { version = "1.0.19", features = ["serde"], optional = true }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 serde_yaml = "0.9.25"
 sha2 = { version = "0.10.7", optional = true }
 signal-hook = "0.3.17"
@@ -79,7 +76,7 @@ default-features = false
 features = ["auto-color"]
 
 [dependencies.reqwest]
-version = "0.12"
+workspace = true
 default-features = false
 features = [
   # Default features without default-tls {{{
@@ -93,7 +90,7 @@ features = [
 ]
 
 [dependencies.tokio]
-version = "1.31"
+workspace = true
 default-features = false
 features = ["rt", "rt-multi-thread"]
 
@@ -111,4 +108,4 @@ windows-sys = { version = "0.59.0", features = ["Win32_System_LibraryLoader"] }
 
 [dev-dependencies]
 regex = "1.10.2"
-serde_test = "1"
+serde_test = { workspace = true }

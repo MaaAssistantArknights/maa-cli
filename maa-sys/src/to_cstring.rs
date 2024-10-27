@@ -1,16 +1,14 @@
-use std::{
-    ffi::CString,
-    path::{Path, PathBuf},
-};
+use std::ffi::CString;
 
-use crate::{Error, Result};
+use crate::Result;
 
-/// A trait to convert a value to a UTF-8 encoded C string passed to MAA.
+/// A trait to convert a reference to a UTF-8 encoded C string passed to MAA.
 pub trait ToCString {
     /// Convert the value of `self` to a UTF-8 encoded C string.
     ///
     /// # Examples
-    /// ```
+    ///
+    /// ```rust
     /// use maa_sys::ToCString;
     ///
     /// let c_str = "Hello, world!".to_cstring().unwrap();
@@ -42,33 +40,28 @@ impl ToCString for &str {
     }
 }
 
-impl ToCString for &Path {
+#[cfg(unix)]
+impl ToCString for &std::ffi::OsStr {
     fn to_cstring(self) -> Result<CString> {
-        self.to_str().ok_or(Error::Utf8Error(None))?.to_cstring()
+        use std::os::unix::ffi::OsStrExt;
+        std::str::from_utf8(self.as_bytes())?.to_cstring()
     }
 }
 
-/// Implement `ToCString` by `as_ref` method.
-///
-/// `impl_to_cstring_by_as_ref!(ref_t, t1, t2, ...)` will implement `ToCString` for `t1`, `t2`, ...
-/// by `as_ref::<ref_t>` method.
-#[macro_export]
-macro_rules! impl_to_cstring_by_as_ref {
-    ($ref_t:ty, $($t:ty),*) => {
-        $(
-            impl $crate::ToCString for $t {
-                fn to_cstring(self) -> Result<std::ffi::CString> {
-                    let r: &$ref_t = self.as_ref();
-                    r.to_cstring()
-                }
-            }
-        )*
-    };
+#[cfg(not(unix))]
+impl ToCString for &std::ffi::OsStr {
+    fn to_cstring(self) -> Result<CString> {
+        /// OsStr on non-Unix platforms can not use `as_bytes` method. So, we use the `to_str`
+        /// method directly, which lacks the detailed error information.
+        self.to_str().ok_or(Error::InvalidUtf8NoInfo)?.to_cstring()
+    }
 }
 
-impl_to_cstring_by_as_ref!(str, String, &String);
-
-impl_to_cstring_by_as_ref!(Path, PathBuf, &PathBuf);
+impl ToCString for &std::path::Path {
+    fn to_cstring(self) -> Result<CString> {
+        self.as_os_str().to_cstring()
+    }
+}
 
 impl ToCString for bool {
     fn to_cstring(self) -> Result<CString> {
@@ -80,7 +73,6 @@ impl ToCString for bool {
 ///
 /// `impl_to_cstring_by_to_string!(t1, t2, ...)` will implement `ToCString` for `t1`, `t2`, ... by
 /// `to_string` method.
-#[macro_export]
 macro_rules! impl_to_cstring_by_to_string {
     ($($t:ty),*) => {
         $(
@@ -95,28 +87,75 @@ macro_rules! impl_to_cstring_by_to_string {
 
 impl_to_cstring_by_to_string!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
 
+impl ToCString for maa_types::TouchMode {
+    fn to_cstring(self) -> Result<CString> {
+        self.to_str().to_cstring()
+    }
+}
+
+impl ToCString for maa_types::TaskType {
+    fn to_cstring(self) -> Result<std::ffi::CString> {
+        self.to_str().to_cstring()
+    }
+}
+
+/// A trait to convert a reference to a value to a UTF-8 encoded C string passed to MAA.
+pub trait IntoCString {
+    fn into_cstring(self) -> Result<CString>;
+}
+
+impl IntoCString for CString {
+    fn into_cstring(self) -> Result<CString> {
+        Ok(self)
+    }
+}
+
+impl IntoCString for String {
+    fn into_cstring(self) -> Result<CString> {
+        self.as_str().to_cstring()
+    }
+}
+
+impl IntoCString for std::ffi::OsString {
+    fn into_cstring(self) -> Result<CString> {
+        self.as_os_str().to_cstring()
+    }
+}
+
+impl IntoCString for std::path::PathBuf {
+    fn into_cstring(self) -> Result<CString> {
+        self.as_path().to_cstring()
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::{
+        ffi::{OsStr, OsString},
+        path::{Path, PathBuf},
+    };
+
     use super::*;
 
     #[test]
     fn to_cstring() {
         assert_eq!("foo".to_cstring().unwrap(), CString::new("foo").unwrap());
         assert_eq!(
-            String::from("foo").to_cstring().unwrap(),
-            CString::new("foo").unwrap()
-        );
-        assert_eq!(
             (&String::from("foo")).to_cstring().unwrap(),
             CString::new("foo").unwrap()
         );
 
         assert_eq!(
-            Path::new("/tmp").to_cstring().unwrap(),
+            OsStr::new("/tmp").to_cstring().unwrap(),
             CString::new("/tmp").unwrap()
         );
         assert_eq!(
-            PathBuf::from("/tmp").to_cstring().unwrap(),
+            (&OsString::from("/tmp")).to_cstring().unwrap(),
+            CString::new("/tmp").unwrap()
+        );
+
+        assert_eq!(
+            Path::new("/tmp").to_cstring().unwrap(),
             CString::new("/tmp").unwrap()
         );
         assert_eq!(
@@ -129,5 +168,36 @@ mod tests {
 
         assert_eq!(1.to_cstring().unwrap(), CString::new("1").unwrap());
         assert_eq!(1i8.to_cstring().unwrap(), CString::new("1").unwrap());
+
+        assert_eq!(
+            maa_types::TouchMode::MaaTouch.to_cstring().unwrap(),
+            CString::new("maatouch").unwrap()
+        );
+
+        assert_eq!(
+            maa_types::TaskType::StartUp.to_cstring().unwrap(),
+            CString::new("StartUp").unwrap()
+        );
+    }
+
+    #[test]
+    fn into_cstring() {
+        assert_eq!(
+            String::from("foo").into_cstring().unwrap(),
+            CString::new("foo").unwrap()
+        );
+        assert_eq!(
+            String::from("foo").into_cstring().unwrap(),
+            CString::new("foo").unwrap()
+        );
+
+        assert_eq!(
+            PathBuf::from("/tmp").into_cstring().unwrap(),
+            CString::new("/tmp").unwrap()
+        );
+        assert_eq!(
+            PathBuf::from("/tmp").into_cstring().unwrap(),
+            CString::new("/tmp").unwrap()
+        );
     }
 }

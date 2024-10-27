@@ -2,7 +2,8 @@ use std::{borrow::Cow, path::PathBuf};
 
 use anyhow::{Context, Result};
 use log::{debug, info, warn};
-use maa_sys::{Assistant, InstanceOptionKey, StaticOptionKey, TouchMode};
+use maa_sys::Assistant;
+use maa_types::{InstanceOptionKey, StaticOptionKey, TouchMode};
 use serde::Deserialize;
 
 use crate::dirs;
@@ -426,14 +427,12 @@ impl StaticOptions {
                     warn!("Both CPU OCR and GPU OCR are enabled, CPU OCR will be ignored");
                 }
                 debug!("Using GPU OCR with GPU ID {}", gpu_id);
-                StaticOptionKey::GpuOCR
-                    .apply(gpu_id)
+                Assistant::set_static_option(StaticOptionKey::GpuOCR, gpu_id)
                     .with_context(|| format!("Failed to enable GPU OCR with GPU ID {}", gpu_id))?;
             }
             (Some(cpu_ocr), None) if cpu_ocr => {
                 debug!("Using CPU OCR");
-                StaticOptionKey::CpuOCR
-                    .apply(true)
+                Assistant::set_static_option(StaticOptionKey::CpuOCR, true)
                     .context("Failed to enable CPU OCR")?;
             }
             (..) => {}
@@ -473,26 +472,25 @@ impl InstanceOptions {
     pub fn apply_to(&self, asst: &Assistant) -> Result<()> {
         if let Some(touch_mode) = self.touch_mode {
             debug!("Setting touch mode to {}", touch_mode);
-            InstanceOptionKey::TouchMode
-                .apply_to(asst, touch_mode)
+            asst.set_instance_option(InstanceOptionKey::TouchMode, touch_mode)
                 .with_context(|| format!("Failed to set touch mode to {}", touch_mode))?;
         }
         if let Some(deployment_with_pause) = self.deployment_with_pause {
             debug!("Setting deployment with pause to {}", deployment_with_pause);
-            InstanceOptionKey::DeploymentWithPause
-                .apply_to(asst, deployment_with_pause)
-                .context("Failed to set deployment with pause")?;
+            asst.set_instance_option(
+                InstanceOptionKey::DeploymentWithPause,
+                deployment_with_pause,
+            )
+            .context("Failed to set deployment with pause")?;
         }
         if let Some(adb_lite_enabled) = self.adb_lite_enabled {
             debug!("Setting adb lite enabled to {}", adb_lite_enabled);
-            InstanceOptionKey::AdbLiteEnabled
-                .apply_to(asst, adb_lite_enabled)
+            asst.set_instance_option(InstanceOptionKey::AdbLiteEnabled, adb_lite_enabled)
                 .context("Failed to set adb lite enabled")?;
         }
         if let Some(kill_adb_on_exit) = self.kill_adb_on_exit {
             debug!("Setting kill adb on exit to {}", kill_adb_on_exit);
-            InstanceOptionKey::KillAdbOnExit
-                .apply_to(asst, kill_adb_on_exit)
+            asst.set_instance_option(InstanceOptionKey::KillAdbOnExit, kill_adb_on_exit)
                 .context("Failed to set kill adb on exit")?;
         }
         Ok(())
@@ -718,7 +716,7 @@ mod tests {
 
             assert_de_tokens(
                 &InstanceOptions {
-                    touch_mode: Some(TouchMode::ADB),
+                    touch_mode: Some(TouchMode::Adb),
                     deployment_with_pause: Some(false),
                     adb_lite_enabled: Some(false),
                     kill_adb_on_exit: Some(false),
@@ -1130,7 +1128,7 @@ mod tests {
 
         assert_matches!(
             InstanceOptions {
-                touch_mode: Some(TouchMode::ADB),
+                touch_mode: Some(TouchMode::Adb),
                 ..Default::default()
             }
             .force_playtools(),

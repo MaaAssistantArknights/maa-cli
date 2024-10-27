@@ -1,34 +1,42 @@
-mod error;
-pub use error::{Error, Result};
+use std::ffi::CStr;
 
-mod asst_type;
-pub use asst_type::{InstanceOptionKey, StaticOptionKey, TouchMode};
+use maa_types::primitive::*;
+pub use maa_types::{InstanceOptionKey, StaticOptionKey, TaskType, TouchMode};
 
 mod to_cstring;
-pub use to_cstring::ToCString;
-
-mod task_type;
-pub use task_type::TaskType;
+pub use to_cstring::{IntoCString, ToCString};
 
 #[macro_use]
 mod link;
 
-/// Raw binding
+/// Raw binding of MaaCore API
 pub mod binding;
 
-use std::ffi::CStr;
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("MaaCore returned an error, check its log for details")]
+    MAAError,
+    #[error("Buffer Too Small")]
+    BufferTooSmall,
+    #[error("Interior null byte")]
+    Nul(#[from] std::ffi::NulError),
+    #[error("Invalid UTF-8")]
+    InvalidUtf8(#[from] std::str::Utf8Error),
+    #[error("Invalid UTF-8")]
+    InvalidUtf8NoInfo,
+    #[error("{0}")]
+    Custom(String),
+}
 
-use binding::{AsstAsyncCallId, AsstSize, AsstTaskId};
-
-fn handle_asst(code: binding::AsstBool) -> Result<()> {
-    if code == 1 {
-        Ok(())
-    } else {
-        Err(Error::MAAError)
+impl Error {
+    pub fn custom(msg: impl Into<String>) -> Self {
+        Error::Custom(msg.into())
     }
 }
 
-/// A wrapper of the assistant instance.
+pub type Result<T> = std::result::Result<T, Error>;
+
+/// A safe and convenient wrapper of MaaCore Assistant API.
 pub struct Assistant {
     handle: binding::AsstHandle,
 }
@@ -70,7 +78,7 @@ impl Assistant {
     /// This function will raise an error if the path is not a valid UTF-8 string,
     /// or raise an error if set the user directory failed.
     pub fn set_user_dir(path: impl ToCString) -> Result<()> {
-        handle_asst(unsafe { binding::AsstSetUserDir(path.to_cstring()?.as_ptr()) })
+        unsafe { binding::AsstSetUserDir(path.to_cstring()?.as_ptr()) }.to_err()
     }
 
     /// Set the static option of the assistant.
@@ -84,11 +92,11 @@ impl Assistant {
     ///
     /// This function will raise an error if the value is not a valid UTF-8 string,
     /// or raise an error if set the static option failed.
-    pub fn set_static_option(
-        key: binding::AsstStaticOptionKey,
-        value: impl ToCString,
-    ) -> Result<()> {
-        handle_asst(unsafe { binding::AsstSetStaticOption(key, value.to_cstring()?.as_ptr()) })
+    pub fn set_static_option(key: StaticOptionKey, value: impl ToCString) -> Result<()> {
+        unsafe {
+            binding::AsstSetStaticOption(key as AsstStaticOptionKey, value.to_cstring()?.as_ptr())
+        }
+        .to_err()
     }
 
     /// Load resource from the given directory.
@@ -100,11 +108,11 @@ impl Assistant {
     /// This function will raise an error if the path is not a valid UTF-8 string,
     /// or raise an error if load resource failed.
     pub fn load_resource(path: impl ToCString) -> Result<()> {
-        handle_asst(unsafe { binding::AsstLoadResource(path.to_cstring()?.as_ptr()) })
+        unsafe { binding::AsstLoadResource(path.to_cstring()?.as_ptr()) }.to_err()
     }
 
     /// Get the null size of the assistant.
-    pub fn get_null_size() -> AsstSize {
+    pub fn get_null_size() -> maa_types::primitive::AsstSize {
         unsafe { binding::AsstGetNullSize() }
     }
 
@@ -129,14 +137,15 @@ impl Assistant {
 
     /* ------------------------ Instance Methods ------------------------ */
     //// Set the instance option of the assistant.
-    pub fn set_instance_option(
-        &self,
-        key: binding::AsstInstanceOptionKey,
-        value: impl ToCString,
-    ) -> Result<()> {
-        handle_asst(unsafe {
-            binding::AsstSetInstanceOption(self.handle, key, value.to_cstring()?.as_ptr())
-        })
+    pub fn set_instance_option(&self, key: InstanceOptionKey, value: impl ToCString) -> Result<()> {
+        unsafe {
+            binding::AsstSetInstanceOption(
+                self.handle,
+                key as AsstInstanceOptionKey,
+                value.to_cstring()?.as_ptr(),
+            )
+        }
+        .to_err()
     }
 
     /// Connect to device with the given adb path, address and config.
@@ -147,7 +156,7 @@ impl Assistant {
         address: impl ToCString,
         config: impl ToCString,
     ) -> Result<()> {
-        handle_asst(unsafe {
+        unsafe {
             #[allow(deprecated)]
             binding::AsstConnect(
                 self.handle,
@@ -155,7 +164,8 @@ impl Assistant {
                 address.to_cstring()?.as_ptr(),
                 config.to_cstring()?.as_ptr(),
             )
-        })
+        }
+        .to_err()
     }
 
     /// Append a task to the assistant, return the task id.
@@ -176,19 +186,18 @@ impl Assistant {
 
     /// Set the parameters of the given task.
     pub fn set_task_params(&self, task_id: AsstTaskId, params: impl ToCString) -> Result<()> {
-        handle_asst(unsafe {
-            binding::AsstSetTaskParams(self.handle, task_id, params.to_cstring()?.as_ptr())
-        })
+        unsafe { binding::AsstSetTaskParams(self.handle, task_id, params.to_cstring()?.as_ptr()) }
+            .to_err()
     }
 
     /// Start the assistant.
     pub fn start(&self) -> Result<()> {
-        handle_asst(unsafe { binding::AsstStart(self.handle) })
+        unsafe { binding::AsstStart(self.handle) }.to_err()
     }
 
     /// Stop the assistant.
     pub fn stop(&self) -> Result<()> {
-        handle_asst(unsafe { binding::AsstStop(self.handle) })
+        unsafe { binding::AsstStop(self.handle) }.to_err()
     }
 
     /// Check if the assistant is running.
@@ -250,6 +259,20 @@ impl Assistant {
                 buff_size,
             )
         })
+    }
+}
+
+trait AsstBoolExt {
+    fn to_err(self) -> Result<()>;
+}
+
+impl AsstBoolExt for maa_types::primitive::AsstBool {
+    fn to_err(self) -> Result<()> {
+        if self == 1 {
+            Ok(())
+        } else {
+            Err(Error::MAAError)
+        }
     }
 }
 

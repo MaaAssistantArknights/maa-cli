@@ -2,14 +2,14 @@ pub mod summary;
 use std::{fmt::Write, sync::atomic::AtomicBool};
 
 use log::{debug, error, info, trace, warn};
-use maa_sys::binding::{AsstMsgId, AsstTaskId};
+use maa_types::primitive::{AsstMsgId, AsstTaskId};
 use serde_json::{Map, Value};
 use summary::{edit_current_task_detail, end_current_task, start_task};
 
 pub static MAA_CORE_ERRORED: AtomicBool = AtomicBool::new(false);
 
 pub unsafe extern "C" fn default_callback(
-    code: maa_sys::binding::AsstMsgId,
+    code: AsstMsgId,
     json_raw: *const ::std::os::raw::c_char,
     _: *mut ::std::os::raw::c_void,
 ) {
