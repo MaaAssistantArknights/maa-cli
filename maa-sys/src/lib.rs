@@ -4,7 +4,7 @@ use maa_types::primitive::*;
 pub use maa_types::{InstanceOptionKey, StaticOptionKey, TaskType, TouchMode};
 
 mod to_cstring;
-pub use to_cstring::{IntoCString, ToCString};
+pub use to_cstring::ToCString;
 
 #[macro_use]
 mod link;

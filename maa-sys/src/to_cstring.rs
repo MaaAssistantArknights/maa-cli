@@ -101,35 +101,6 @@ impl ToCString for maa_types::TaskType {
     }
 }
 
-/// A trait to convert a reference to a value to a UTF-8 encoded C string passed to MAA.
-pub trait IntoCString {
-    fn into_cstring(self) -> Result<CString>;
-}
-
-impl IntoCString for CString {
-    fn into_cstring(self) -> Result<CString> {
-        Ok(self)
-    }
-}
-
-impl IntoCString for String {
-    fn into_cstring(self) -> Result<CString> {
-        self.as_str().to_cstring()
-    }
-}
-
-impl IntoCString for std::ffi::OsString {
-    fn into_cstring(self) -> Result<CString> {
-        self.as_os_str().to_cstring()
-    }
-}
-
-impl IntoCString for std::path::PathBuf {
-    fn into_cstring(self) -> Result<CString> {
-        self.as_path().to_cstring()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::{
@@ -179,27 +150,6 @@ mod tests {
         assert_eq!(
             maa_types::TaskType::StartUp.to_cstring().unwrap(),
             CString::new("StartUp").unwrap()
-        );
-    }
-
-    #[test]
-    fn into_cstring() {
-        assert_eq!(
-            String::from("foo").into_cstring().unwrap(),
-            CString::new("foo").unwrap()
-        );
-        assert_eq!(
-            String::from("foo").into_cstring().unwrap(),
-            CString::new("foo").unwrap()
-        );
-
-        assert_eq!(
-            PathBuf::from("/tmp").into_cstring().unwrap(),
-            CString::new("/tmp").unwrap()
-        );
-        assert_eq!(
-            PathBuf::from("/tmp").into_cstring().unwrap(),
-            CString::new("/tmp").unwrap()
         );
     }
 }
