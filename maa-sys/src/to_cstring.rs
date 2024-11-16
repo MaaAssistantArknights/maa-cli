@@ -112,44 +112,28 @@ mod tests {
 
     #[test]
     fn to_cstring() {
-        assert_eq!("foo".to_cstring().unwrap(), CString::new("foo").unwrap());
-        assert_eq!(
-            (&String::from("foo")).to_cstring().unwrap(),
-            CString::new("foo").unwrap()
-        );
+        macro_rules! compare_cstring {
+            ($value:expr, $expected:expr) => {
+                assert_eq!($value.to_cstring().unwrap().as_c_str(), $expected);
+            };
+        }
 
-        assert_eq!(
-            OsStr::new("/tmp").to_cstring().unwrap(),
-            CString::new("/tmp").unwrap()
-        );
-        assert_eq!(
-            (&OsString::from("/tmp")).to_cstring().unwrap(),
-            CString::new("/tmp").unwrap()
-        );
+        compare_cstring!("foo", c"foo");
+        compare_cstring!(String::from("foo"), c"foo");
 
-        assert_eq!(
-            Path::new("/tmp").to_cstring().unwrap(),
-            CString::new("/tmp").unwrap()
-        );
-        assert_eq!(
-            (&PathBuf::from("/tmp")).to_cstring().unwrap(),
-            CString::new("/tmp").unwrap()
-        );
+        compare_cstring!(OsStr::new("/tmp"), c"/tmp");
+        compare_cstring!(OsString::from("/tmp"), c"/tmp");
 
-        assert_eq!(true.to_cstring().unwrap(), CString::new("1").unwrap());
-        assert_eq!(false.to_cstring().unwrap(), CString::new("0").unwrap());
+        compare_cstring!(Path::new("/tmp"), c"/tmp");
+        compare_cstring!(PathBuf::from("/tmp"), c"/tmp");
 
-        assert_eq!(1.to_cstring().unwrap(), CString::new("1").unwrap());
-        assert_eq!(1i8.to_cstring().unwrap(), CString::new("1").unwrap());
+        compare_cstring!(true, c"1");
+        compare_cstring!(false, c"0");
 
-        assert_eq!(
-            maa_types::TouchMode::MaaTouch.to_cstring().unwrap(),
-            CString::new("maatouch").unwrap()
-        );
+        compare_cstring!(1, c"1");
+        compare_cstring!(1i8, c"1");
 
-        assert_eq!(
-            maa_types::TaskType::StartUp.to_cstring().unwrap(),
-            CString::new("StartUp").unwrap()
-        );
+        compare_cstring!(maa_types::TouchMode::MaaTouch, c"maatouch");
+        compare_cstring!(maa_types::TaskType::StartUp, c"StartUp");
     }
 }
