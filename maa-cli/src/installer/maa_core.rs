@@ -20,8 +20,8 @@ use super::{
 };
 use crate::{
     config::cli::{
-        cli_config,
         maa_core::{CommonArgs, Components, Config},
+        CLI_CONFIG,
     },
     dirs::{self, Ensure},
     run,
@@ -78,7 +78,7 @@ pub fn version() -> Result<Version> {
 }
 
 pub fn install(force: bool, args: &CommonArgs) -> Result<()> {
-    let config = cli_config().core_config().apply_args(args);
+    let config = CLI_CONFIG.core_config().apply_args(args);
 
     let lib_dir = dirs::library();
     let lib_name = format!("{}MaaCore{}", DLL_PREFIX, DLL_SUFFIX);
@@ -122,7 +122,7 @@ pub fn install(force: bool, args: &CommonArgs) -> Result<()> {
 }
 
 pub fn update(args: &CommonArgs) -> Result<()> {
-    let config = cli_config().core_config().apply_args(args);
+    let config = CLI_CONFIG.core_config().apply_args(args);
 
     let components = config.components();
     // Check if any component is specified

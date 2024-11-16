@@ -157,7 +157,7 @@ pub struct CommonArgs {
 
 #[cfg(test)]
 pub mod tests {
-    use std::sync::OnceLock;
+    use std::sync::LazyLock;
 
     use super::*;
 
@@ -173,9 +173,9 @@ pub mod tests {
         }
     }
 
+    static DEFAULT_CONFIG: LazyLock<Config> = LazyLock::new(Config::default);
     fn default_config() -> Config {
-        static DEFAULT_CONFIG: OnceLock<Config> = OnceLock::new();
-        DEFAULT_CONFIG.get_or_init(Config::default).clone()
+        DEFAULT_CONFIG.clone()
     }
 
     mod serde {
@@ -223,7 +223,7 @@ pub mod tests {
                 &[Token::Map { len: Some(0) }, Token::MapEnd],
             );
 
-            assert_de_tokens(&default_config(), &[
+            assert_de_tokens(&*DEFAULT_CONFIG, &[
                 Token::Map { len: Some(0) },
                 Token::MapEnd,
             ]);
@@ -264,7 +264,7 @@ pub mod tests {
 
         #[test]
         fn channel() {
-            assert_eq!(default_config().channel(), Channel::Stable);
+            assert_eq!(DEFAULT_CONFIG.channel(), Channel::Stable);
             assert_eq!(
                 default_config().set_channel(Channel::Beta).channel(),
                 Channel::Beta
@@ -277,7 +277,7 @@ pub mod tests {
 
         #[test]
         fn test_time() {
-            assert_eq!(default_config().test_time(), 3);
+            assert_eq!(DEFAULT_CONFIG.test_time(), 3);
             assert_eq!(default_config().set_test_time(5).test_time(), 5);
         }
 

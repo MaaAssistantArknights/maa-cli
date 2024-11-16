@@ -498,23 +498,18 @@ impl InstanceOptions {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::OnceLock;
+    use std::sync::LazyLock;
 
     use super::*;
     use crate::assert_matches;
 
-    fn user_resource_dir() -> PathBuf {
-        static USER_RESOURCE_DIR: OnceLock<PathBuf> = OnceLock::new();
-        USER_RESOURCE_DIR
-            .get_or_init(|| {
-                let user_resource_dir = dirs::config().join("resource");
-                if !user_resource_dir.exists() {
-                    std::fs::create_dir_all(&user_resource_dir).unwrap();
-                }
-                user_resource_dir
-            })
-            .clone()
-    }
+    static USER_RESOURCE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
+        let user_resource_dir = dirs::config().join("resource");
+        if !user_resource_dir.exists() {
+            std::fs::create_dir_all(&user_resource_dir).unwrap();
+        }
+        user_resource_dir
+    });
 
     mod serde {
         use serde_test::{assert_de_tokens, Token};
@@ -524,7 +519,7 @@ mod tests {
         #[test]
         #[ignore = "attempt to create a directory in user space"]
         fn deserialize_example() {
-            let user_resource_dir = user_resource_dir();
+            let user_resource_dir = USER_RESOURCE_DIR.clone();
 
             let config: AsstConfig = toml::from_str(
                 &std::fs::read_to_string("./config_examples/profiles/default.toml").unwrap(),
@@ -645,7 +640,7 @@ mod tests {
                 &[Token::Map { len: Some(0) }, Token::MapEnd],
             );
 
-            let user_resource_dir = user_resource_dir();
+            let user_resource_dir = USER_RESOURCE_DIR.clone();
 
             assert_de_tokens(
                 &ResourceConfig {
@@ -954,7 +949,7 @@ mod tests {
         #[test]
         #[ignore = "attempt to create a directory in user space"]
         fn use_user_resource() {
-            let user_resource_dir = user_resource_dir();
+            let user_resource_dir = USER_RESOURCE_DIR.clone();
 
             assert_eq!(
                 *ResourceConfig::default().use_user_resource(),

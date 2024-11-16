@@ -5,7 +5,7 @@ pub mod maa_core;
 
 pub mod resource;
 
-use std::sync::OnceLock;
+use std::sync::LazyLock;
 
 use clap::ValueEnum;
 use serde::Deserialize;
@@ -44,13 +44,10 @@ impl CLIConfig {
     }
 }
 
-pub fn cli_config() -> &'static CLIConfig {
-    static INSTALLER_CONFIG: OnceLock<CLIConfig> = OnceLock::new();
-    INSTALLER_CONFIG.get_or_init(|| {
-        CLIConfig::find_file_or_default(dirs::config().join("cli"))
-            .expect("Failed to load installer config")
-    })
-}
+pub(crate) static CLI_CONFIG: LazyLock<CLIConfig> = LazyLock::new(|| {
+    CLIConfig::find_file_or_default(dirs::config().join("cli"))
+        .expect("Failed to load installer config")
+});
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(ValueEnum, Clone, Copy, Default, Deserialize)]

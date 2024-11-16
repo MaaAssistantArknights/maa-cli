@@ -15,12 +15,12 @@ use super::{
     version_json::VersionJSON,
 };
 use crate::{
-    config::cli::{cli_config, maa_cli::CommonArgs},
+    config::cli::{maa_cli::CommonArgs, CLI_CONFIG},
     dirs::{self, Ensure},
 };
 
 pub fn update(args: &CommonArgs) -> Result<()> {
-    let config = cli_config().cli_config().with_args(args);
+    let config = CLI_CONFIG.cli_config().with_args(args);
 
     println!("Fetching maa-cli version info...");
     let version_json: VersionJSON<Details> = reqwest::blocking::get(config.api_url())

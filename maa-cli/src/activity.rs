@@ -1,4 +1,4 @@
-use std::{io::Write, path::Path, sync::OnceLock};
+use std::{io::Write, path::Path, sync::LazyLock};
 
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, FixedOffset, NaiveDateTime};
@@ -8,24 +8,18 @@ use serde_json::Value as JsonValue;
 
 use crate::{config::task::ClientType, dirs};
 
-fn stage_activity() -> Option<&'static StageActivityJson> {
-    static STAGE_ACTIVITY: OnceLock<Option<StageActivityJson>> = OnceLock::new();
-
-    STAGE_ACTIVITY
-        .get_or_init(|| {
-            load_stage_activity(
-                dirs::hot_update()
-                    .join("cache")
-                    .join("gui")
-                    .join("StageActivity.json"),
-            )
-            .warn_err()
-        })
-        .as_ref()
-}
+static STAGE_ACTIVITY: LazyLock<Option<StageActivityJson>> = LazyLock::new(|| {
+    load_stage_activity(
+        dirs::hot_update()
+            .join("cache")
+            .join("gui")
+            .join("StageActivity.json"),
+    )
+    .warn_err()
+});
 
 pub fn has_side_story_open(client: ClientType) -> bool {
-    stage_activity()
+    STAGE_ACTIVITY
         .as_ref()
         .map(|stage_activity| {
             stage_activity
@@ -36,7 +30,7 @@ pub fn has_side_story_open(client: ClientType) -> bool {
 }
 
 pub fn display_stage_activity(client: ClientType) -> std::io::Result<()> {
-    if let Some(stage_activity) = stage_activity().as_ref() {
+    if let Some(stage_activity) = STAGE_ACTIVITY.as_ref() {
         stage_activity.display(std::io::stdout(), client)?;
         std::io::stdout().flush()?;
     }
@@ -448,7 +442,7 @@ mod tests {
         if var_os("SKIP_CORE_TEST").is_some() {
             return;
         }
-        stage_activity().unwrap();
+        let _ = STAGE_ACTIVITY.as_ref();
     }
 
     #[test]

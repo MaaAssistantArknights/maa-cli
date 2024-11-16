@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use log::{debug, warn};
 
 use crate::{
-    config::cli::{cli_config, resource::GitBackend},
+    config::cli::{resource::GitBackend, CLI_CONFIG},
     dirs,
 };
 
@@ -27,7 +27,7 @@ impl StatusExt for std::io::Result<std::process::ExitStatus> {
 }
 
 pub fn update(is_auto: bool) -> Result<()> {
-    let config = cli_config().resource_config();
+    let config = CLI_CONFIG.resource_config();
 
     // Skip auto update if auto update is disabled
     if is_auto && !config.auto_update() {

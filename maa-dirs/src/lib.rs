@@ -2,12 +2,12 @@ use std::{
     borrow::Cow,
     env::{
         consts::{DLL_PREFIX, DLL_SUFFIX},
-        current_exe, var_os,
+        var_os,
     },
     ffi::OsStr,
     fs::{create_dir, create_dir_all, remove_dir_all},
     path::{Path, PathBuf},
-    sync::OnceLock,
+    sync::LazyLock,
 };
 
 use directories::ProjectDirs;
@@ -292,72 +292,70 @@ impl Dirs {
     }
 }
 
-fn dirs() -> &'static Dirs {
-    static DIRS: OnceLock<Dirs> = OnceLock::new();
-    DIRS.get_or_init(|| Dirs::new(ProjectDirs::from("com", "loong", "maa")))
-}
+static DIRS: LazyLock<Dirs> = LazyLock::new(|| Dirs::new(ProjectDirs::from("com", "loong", "maa")));
 
-fn exe() -> Option<&'static Path> {
-    static CURRENT_EXE: OnceLock<Option<PathBuf>> = OnceLock::new();
-    CURRENT_EXE.get_or_init(|| current_exe().ok()).as_deref()
+fn current_exe() -> Option<&'static Path> {
+    static CURRENT_EXE: LazyLock<Option<PathBuf>> = LazyLock::new(|| std::env::current_exe().ok());
+    CURRENT_EXE.as_deref()
 }
 
 pub fn data() -> &'static Path {
-    dirs().data()
+    DIRS.data()
 }
 
 pub fn library() -> &'static Path {
-    dirs().library()
+    DIRS.library()
 }
 
 pub fn find_library() -> Option<Cow<'static, Path>> {
-    dirs().find_library(exe()?)
+    DIRS.find_library(current_exe()?)
 }
 
 pub fn config() -> &'static Path {
-    dirs().config()
+    DIRS.config()
 }
 
 pub fn abs_config<P: AsRef<Path>, D: AsRef<Path>>(path: P, sub_dir: Option<D>) -> Option<PathBuf> {
-    dirs().abs_config(path, sub_dir)
+    DIRS.abs_config(path, sub_dir)
 }
 
 pub fn cache() -> &'static Path {
-    dirs().cache()
+    DIRS.cache()
 }
 
 pub fn copilot() -> &'static Path {
-    dirs().copilot()
+    DIRS.copilot()
 }
 
 pub fn resource() -> &'static Path {
-    dirs().resource()
+    DIRS.resource()
 }
 
 pub fn find_resource() -> Option<Cow<'static, Path>> {
-    dirs().find_resource(exe()?)
+    DIRS.find_resource(current_exe()?)
 }
 
 pub fn hot_update() -> &'static Path {
-    dirs().hot_update()
+    DIRS.hot_update()
 }
 
 pub fn state() -> &'static Path {
-    dirs().state()
+    DIRS.state()
 }
 
 pub fn log() -> &'static Path {
-    dirs().log()
+    DIRS.log()
 }
 
 fn home() -> &'static Path {
-    static HOME: OnceLock<PathBuf> = OnceLock::new();
-    HOME.get_or_init(|| {
+    static HOME: LazyLock<PathBuf> = LazyLock::new(|| {
         directories::BaseDirs::new()
             .expect("Failed to get home directory")
             .home_dir()
             .to_path_buf()
-    })
+    });
+
+    HOME.as_ref()
 }
 
 pub fn expand_tilde(path: &Path) -> Cow<Path> {
@@ -509,8 +507,7 @@ mod tests {
         /// A dirs instance created in a clean environment (no environment variables set).
         /// And the static DIRS should also be initialized in this clean environment.
         fn clean_dirs() -> &'static Dirs {
-            static TEST_DIRS: OnceLock<Dirs> = OnceLock::new();
-            TEST_DIRS.get_or_init(|| {
+            static TEST_DIRS: LazyLock<Dirs> = LazyLock::new(|| {
                 env::remove_var("XDG_DATA_HOME");
                 env::remove_var("XDG_STATE_HOME");
                 env::remove_var("XDG_CACHE_HOME");
@@ -522,7 +519,9 @@ mod tests {
                 home();
                 log();
                 Dirs::new(project())
-            })
+            });
+
+            &TEST_DIRS
         }
 
         /// Test for path the depends on *_STATE_* environment variables.

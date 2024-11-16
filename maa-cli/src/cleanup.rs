@@ -2,7 +2,7 @@ use std::{
     borrow::Cow,
     fs::{read_dir, DirEntry},
     path::{Path, PathBuf},
-    sync::OnceLock,
+    sync::LazyLock,
 };
 
 use anyhow::{bail, Result};
@@ -93,14 +93,13 @@ impl PathProvider for CleanupTarget {
                 use crate::installer::maa_core;
 
                 // Cache the name of the core package to avoid repeated calls
-                static CORE_CACHE_NAME: OnceLock<Option<String>> = OnceLock::new();
-                let name = CORE_CACHE_NAME.get_or_init(|| {
+                static CORE_CACHE_NAME: LazyLock<Option<String>> = LazyLock::new(|| {
                     maa_core::version()
                         .and_then(|version| maa_core::name(&version))
                         .ok()
                 });
 
-                name.as_deref().is_some_and(|name| {
+                CORE_CACHE_NAME.as_deref().is_some_and(|name| {
                     entry.file_type().is_ok_and(|x| x.is_file())
                         && entry.file_name().to_str().is_some_and(|x| x == name)
                 })
