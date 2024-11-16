@@ -8,20 +8,47 @@ homepage = "https://github.com/MaaAssistantArknights/maa-cli"
 repository = "https://github.com/MaaAssistantArknights/maa-cli"
 
 [workspace.dependencies]
+maa-dirs = { path = "maa-dirs", version = "0.1.1" }
+maa-sys = { path = "maa-sys", version = "0.5.0" }
+maa-types = { path = "maa-types", version = "0.1" }
+
 anyhow = "1"
-thiserror = "1"
 async-trait = "0.1.81"
+chrono = { version = "0.4.31", default-features = false }
+clap = "4.4"
+clap_complete = "4.4"
+clap_mangen = "0.2.20"
+color-print = "0.3.6"
+digest = "0.10.7"
+directories = "5"
+dunce = "1.0.4"
+env_logger = { version = "0.11", default-features = false }
+flate2 = "1"
+futures-util = "0.3.28"
+git2 = "0.19"
+indicatif = "0.17.7"
+libloading = "0.8"
+log = "0.4.20"
+prettytable = { version = "0.10.0", default-features = false }
+regex = "1.10.2"
+semver = "1.0.19"
 serde = "1"
 serde_json = "1"
 serde_test = "1"
-jsonrpsee = "0.24.7"
+serde_yaml = "0.9.25"
+sha2 = "0.10.7"
+signal-hook = "0.3.17"
+tar = "0.4.40"
+thiserror = "2"
+tokio = "1.31"
+toml = "0.8"
+tracing = "0.1.40"
+windows-result = "0.2.0"
+windows-strings = "0.2.0"
+windows-sys = "0.59.0"
+zip = { version = "2", default-features = false }
 
 [workspace.dependencies.reqwest]
 version = "0.12"
 default-features = false
 features = ["charset", "http2", "macos-system-configuration", "rustls-tls"]
-
-[workspace.dependencies.tokio]
-version = "1.31"
-default-features = false
-features = ["rt", "rt-multi-thread"]

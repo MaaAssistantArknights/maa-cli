@@ -38,74 +38,44 @@ name = "maa"
 path = "src/main.rs"
 
 [dependencies]
-maa-sys = { path = "../maa-sys", version = "0.5.0", features = ["runtime"] }
-maa-dirs = { path = "../maa-dirs", version = "0.1.1" }
-maa-types = { path = "../maa-types", version = "0.1.0", features = ["serde"] }
+maa-dirs = { workspace = true }
+maa-sys = { workspace = true, features = ["runtime"] }
+maa-types = { workspace = true, features = ["serde"] }
 
-anyhow = "1"
-async-trait = "0.1.81"
-clap = { version = "4.4", features = ["derive"] }
-clap_complete = { version = "4.4" }
-clap_mangen = "0.2.20"
-color-print = "0.3.6"
-digest = { version = "0.10.7", optional = true }
-dunce = "1.0.4"
-flate2 = { version = "1", optional = true }
-futures-util = { version = "0.3.28", optional = true }
-git2 = { version = "0.19", optional = true }
-indicatif = { version = "0.17.7", optional = true }
-log = "0.4.20"
-prettytable = { version = "0.10.0", default-features = false }
-semver = { version = "1.0.19", features = ["serde"], optional = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true, features = ["std", "clock", "serde"] }
+clap = { workspace = true, features = ["derive"] }
+clap_complete = { workspace = true }
+clap_mangen = { workspace = true }
+color-print = { workspace = true }
+digest = { workspace = true, optional = true }
+dunce = { workspace = true }
+env_logger = { workspace = true, features = ["auto-color"] }
+flate2 = { workspace = true, optional = true }
+futures-util = { workspace = true, optional = true }
+git2 = { workspace = true, optional = true }
+indicatif = { workspace = true, optional = true }
+log = { workspace = true }
+prettytable = { workspace = true }
+reqwest = { workspace = true, features = ["blocking", "json"] }
+semver = { workspace = true, optional = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-serde_yaml = "0.9.25"
-sha2 = { version = "0.10.7", optional = true }
-signal-hook = "0.3.17"
-tar = { version = "0.4.40", optional = true }
-toml = "0.8"
-
-[dependencies.chrono]
-version = "0.4.31"
-default-features = false
-features = ["std", "clock", "serde"]
-
-[dependencies.env_logger]
-version = "0.11"
-default-features = false
-features = ["auto-color"]
-
-[dependencies.reqwest]
-workspace = true
-default-features = false
-features = [
-  # Default features without default-tls {{{
-  "charset",
-  "http2",
-  "macos-system-configuration",
-  # }}}
-  "rustls-tls",
-  "blocking",
-  "json",
-]
-
-[dependencies.tokio]
-workspace = true
-default-features = false
-features = ["rt", "rt-multi-thread"]
-
-[dependencies.zip]
-version = "2"
-optional = true
-default-features = false
-features = ["deflate"]
+serde_yaml = { workspace = true }
+sha2 = { workspace = true, optional = true }
+signal-hook = { workspace = true }
+tar = { workspace = true, optional = true }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread"] }
+toml = { workspace = true }
+zip = { workspace = true, optional = true, features = ["deflate"] }
 
 # Windows specific dependencies
 [target.'cfg(windows)'.dependencies]
-windows-result = "0.2.0"
-windows-strings = "0.1.0"
-windows-sys = { version = "0.59.0", features = ["Win32_System_LibraryLoader"] }
+windows-result = { workspace = true }
+windows-strings = { workspace = true }
+windows-sys = { workspace = true, features = ["Win32_System_LibraryLoader"] }
 
 [dev-dependencies]
-regex = "1.10.2"
+regex = { workspace = true }
 serde_test = { workspace = true }

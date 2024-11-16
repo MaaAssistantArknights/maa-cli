@@ -7,6 +7,6 @@ homepage.workspace = true
 repository.workspace = true
 
 [dependencies]
-directories = "5"
-dunce = "1.0.4"
-log = "0.4.20"
+directories = { workspace = true }
+dunce = { workspace = true }
+log = { workspace = true }

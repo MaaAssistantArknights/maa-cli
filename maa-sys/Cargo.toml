@@ -12,6 +12,6 @@ homepage.workspace = true
 runtime = ["libloading"]
 
 [dependencies]
-maa-types = { version = "0.1", path = "../maa-types" }
-libloading = { version = "0.8", optional = true }
+maa-types = { workspace = true }
+libloading = { workspace = true, optional = true }
 thiserror = { workspace = true }
