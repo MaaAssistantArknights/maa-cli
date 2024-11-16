@@ -15,10 +15,10 @@ mod value;
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser};
 
-use crate::command::{Command, Component, Dir, CLI};
+use crate::command::{Cli, Command, Component, Dir};
 
 fn main() -> Result<()> {
-    let cli = command::CLI::parse();
+    let cli = command::Cli::parse();
 
     cli.log.init_logger()?;
 
@@ -120,7 +120,7 @@ fn main() -> Result<()> {
             config_type,
         } => config::import(&path, force, &config_type)?,
         Command::Complete { shell } => {
-            clap_complete::generate(shell, &mut CLI::command(), "maa", &mut std::io::stdout());
+            clap_complete::generate(shell, &mut Cli::command(), "maa", &mut std::io::stdout());
         }
         Command::Init {
             name,
@@ -128,7 +128,7 @@ fn main() -> Result<()> {
             force,
         } => config::init::init(name, format, force)?,
         Command::Mangen { path } => {
-            clap_mangen::generate_to(CLI::command(), path)?;
+            clap_mangen::generate_to(Cli::command(), path)?;
         }
     }
 

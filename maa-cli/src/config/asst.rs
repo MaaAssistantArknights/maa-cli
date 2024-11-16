@@ -119,12 +119,11 @@ impl ConnectionConfig {
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Default, Clone, Copy)]
-#[allow(clippy::upper_case_acronyms)]
 pub enum Preset {
     MuMuPro,
     PlayCover,
     #[default]
-    ADB,
+    Adb,
 }
 
 impl<'de> Deserialize<'de> for Preset {
@@ -148,10 +147,10 @@ impl<'de> Deserialize<'de> for Preset {
                 match value {
                     "MuMuPro" => Ok(Preset::MuMuPro),
                     "PlayCover" | "PlayTools" => Ok(Preset::PlayCover),
-                    "ADB" => Ok(Preset::ADB),
+                    "ADB" | "Adb" | "adb" => Ok(Preset::Adb),
                     _ => {
                         warn!("Unknown connection preset: {}, ignoring", value);
-                        Ok(Preset::ADB)
+                        Ok(Preset::Adb)
                     }
                 }
             }
@@ -166,7 +165,7 @@ impl Preset {
         match self {
             Preset::MuMuPro => "/Applications/MuMuPlayer.app/Contents/MacOS/MuMuEmulator.app/Contents/MacOS/tools/adb",
             Preset::PlayCover => "",
-            Preset::ADB => "adb",
+            Preset::Adb => "adb",
         }
     }
 
@@ -174,7 +173,7 @@ impl Preset {
         match self {
             Preset::MuMuPro => "127.0.0.1:16384".into(),
             Preset::PlayCover => "127.0.0.1:1717".into(),
-            Preset::ADB => std::process::Command::new(adb_path)
+            Preset::Adb => std::process::Command::new(adb_path)
                 .arg("devices")
                 .output()
                 .ok()
@@ -534,7 +533,7 @@ mod tests {
 
             assert_eq!(config, AsstConfig {
                 connection: ConnectionConfig {
-                    preset: Preset::ADB,
+                    preset: Preset::Adb,
                     adb_path: Some(String::from("adb")),
                     address: Some(String::from("emulator-5554")),
                     config: Some(String::from("CompatMac")),
@@ -571,7 +570,7 @@ mod tests {
 
             assert_de_tokens(
                 &ConnectionConfig {
-                    preset: Preset::ADB,
+                    preset: Preset::Adb,
                     ..Default::default()
                 },
                 &[
@@ -584,7 +583,7 @@ mod tests {
 
             assert_de_tokens(
                 &ConnectionConfig {
-                    preset: Preset::ADB,
+                    preset: Preset::Adb,
                     ..Default::default()
                 },
                 &[
@@ -610,7 +609,7 @@ mod tests {
 
             assert_de_tokens(
                 &ConnectionConfig {
-                    preset: Preset::ADB,
+                    preset: Preset::Adb,
                     adb_path: Some(String::from("/path/to/adb")),
                     address: Some(String::from("127.0.0.1:5555")),
                     config: Some(String::from("SomeConfig")),
@@ -744,6 +743,15 @@ mod tests {
         }
 
         #[test]
+        fn preset() {
+            assert_de_tokens(&Preset::Adb, &[Token::Str("ADB")]);
+            assert_de_tokens(&Preset::Adb, &[Token::Str("Adb")]);
+            assert_de_tokens(&Preset::Adb, &[Token::Str("adb")]);
+
+            assert_de_tokens(&Preset::MuMuPro, &[Token::Str("MuMuPro")]);
+        }
+
+        #[test]
         fn asst_config() {
             assert_de_tokens(
                 &AsstConfig {
@@ -804,7 +812,7 @@ mod tests {
         #[test]
         fn default() {
             assert_matches!(ConnectionConfig::default(), ConnectionConfig {
-                preset: Preset::ADB,
+                preset: Preset::Adb,
                 adb_path: None,
                 address: None,
                 config: None,
@@ -814,7 +822,7 @@ mod tests {
         #[cfg(target_os = "macos")]
         #[test]
         fn preset() {
-            assert_eq!(ConnectionConfig::default().preset(), Preset::ADB);
+            assert_eq!(ConnectionConfig::default().preset(), Preset::Adb);
 
             assert_eq!(
                 ConnectionConfig {
@@ -889,7 +897,7 @@ mod tests {
 
             args_eq(
                 ConnectionConfig {
-                    preset: Preset::ADB,
+                    preset: Preset::Adb,
                     adb_path: Some("/path/to/adb".to_owned()),
                     address: Some("127.0.0.1:11111".to_owned()),
                     config: Some("SomeConfig".to_owned()),

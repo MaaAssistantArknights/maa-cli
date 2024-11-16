@@ -16,7 +16,10 @@ use dunce::canonicalize;
 macro_rules! str_join {
     ($($e:expr),*) => {{
         const LEN: usize = 0 $(+ $e.len())*;
-        #[allow(unused_assignments)]
+        #[expect(
+            unused_assignments,
+            reason = "The last assignment will not be used, but in macro, we can't avoid it."
+        )]
         const BYTES: [u8; LEN] = {
             let mut dest: [u8; LEN] = [0; LEN];
             let mut offset = 0;
@@ -467,9 +470,7 @@ where
 /// # Panics
 ///
 /// Panics if the given str is a string containing path separator.
-///
-/// This function only called at compile time, so it's dead code in release build.
-#[allow(dead_code)]
+#[allow(dead_code, reason = "This function is only called at compile time")]
 fn ensure_name(name: &str) -> &str {
     assert!(
         !name.contains(std::path::is_separator),
@@ -828,10 +829,9 @@ mod tests {
 
         std::fs::File::create(&test_file).unwrap();
 
-        assert_eq!(
-            global_path([&test_dir1, &test_dir2], "test"),
-            vec![test_file.clone()]
-        );
+        assert_eq!(global_path([&test_dir1, &test_dir2], "test"), vec![
+            test_file.clone()
+        ]);
         assert_eq!(
             global_path([&test_dir1, &test_dir2], "not_exist"),
             Vec::<PathBuf>::new()

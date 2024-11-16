@@ -7,7 +7,7 @@ macro_rules! link {
     ) => (
         use libloading::{Library, Symbol};
 
-        #[allow(non_snake_case)]
+        #[expect(non_snake_case, reason = "FFI functions are named in PascalCase")]
         struct SharedLibrary {
             _handle: Library,
             $(
@@ -33,7 +33,7 @@ macro_rules! link {
             }
 
             $(
-                #[allow(non_snake_case)]
+                #[allow(non_snake_case, reason = "FFI functions are named in PascalCase")]
                 pub fn $name(&self, $($pname: $pty), *) $(-> $ret)* {
                     (self.$name)($($pname), *)
                 }
@@ -73,7 +73,7 @@ macro_rules! link {
             /// # Panics
             ///
             /// This function will panic if the shared library is not loaded in this thread.
-            #[allow(non_snake_case)]
+            #[allow(non_snake_case, reason = "FFI functions are named in PascalCase")]
             pub unsafe fn $name($($pname: $pty), *) $(-> $ret)* {
                 match SHARED_LIBRARY.read().expect("Failed to lock shared library").as_ref() {
                     Some(lib) => lib.$name($($pname), *),

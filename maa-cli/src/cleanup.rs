@@ -22,7 +22,10 @@ pub trait PathProvider {
     /// deleted. This method and `should_keep` determine whether an entry should be deleted.
     /// If this method returns true and `should_keep` returns false, the entry will be deleted.
     /// Otherwise, the entry will not be deleted.
-    #[allow(unused_variables)]
+    #[expect(
+        unused_variables,
+        reason = "This is default implementation, the variable may used by other implementations"
+    )]
     fn should_delete(&self, entry: &DirEntry) -> bool {
         true
     }
@@ -33,7 +36,10 @@ pub trait PathProvider {
     /// This method and `should_delete` determine whether an entry should be deleted.
     /// If `should_delete` returns true and this method returns false, the entry will be deleted.
     /// Otherwise, the entry will not be deleted.
-    #[allow(unused_variables)]
+    #[expect(
+        unused_variables,
+        reason = "This is default implementation, the variable may used by other implementations"
+    )]
     fn should_keep(&self, entry: &DirEntry) -> bool {
         false
     }

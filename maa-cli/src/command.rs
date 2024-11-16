@@ -7,8 +7,7 @@ use crate::{cleanup, config, log, run};
 
 #[derive(Parser)]
 #[command(name = "maa", author, version = env!("MAA_VERSION"), about = "A tool for Arknights.")]
-#[allow(clippy::upper_case_acronyms)]
-pub(crate) struct CLI {
+pub(crate) struct Cli {
     #[command(subcommand)]
     pub(crate) command: Command,
     /// Enable batch mode
@@ -300,12 +299,12 @@ pub(crate) enum Dir {
 }
 
 #[cfg(test)]
-pub(crate) fn parse_from<I, T>(args: I) -> CLI
+pub(crate) fn parse_from<I, T>(args: I) -> Cli
 where
     I: IntoIterator<Item = T>,
     T: Into<std::ffi::OsString> + Clone,
 {
-    CLI::parse_from(args)
+    Cli::parse_from(args)
 }
 
 #[cfg(test)]
