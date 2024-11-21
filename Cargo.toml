@@ -52,3 +52,6 @@ zip = { version = "2", default-features = false }
 version = "0.12"
 default-features = false
 features = ["charset", "http2", "macos-system-configuration", "rustls-tls"]
+
+[workspace.metadata.typos.files]
+extend-exclude = ["licenses.html"]
