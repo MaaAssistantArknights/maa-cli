@@ -1,0 +1,11 @@
+accepted = ["Apache-2.0", "MIT", "ISC", "BSD-3-Clause", "AGPL-3.0"]
+
+targets = [
+  "x86_64-unknown-linux-gnu",
+  "aarch64-unknown-linux-gnu",
+  "x86_64-apple-darwin",
+  "aarch64-apple-darwin",
+  "x86_64-pc-windows-msvc",
+]
+
+ignore-transitive-dependencies = true
