@@ -21,13 +21,11 @@ jobs:
           tool: cargo-about
       - name: Generate Third-Party Licenses Information
         run: cargo about generate about.hbs > licenses.html
-      - name: Setup Git User
+      - name: Commit Changes if needed
         run: |
+          git diff --exit-code && exit 0
+          git add licenses.html
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-      - name: Commit Changes
-        run: |
-          git add licenses.html
           git commit -m "chore(deps): update third-party licenses information"
-      - name: Push Changes
-        run: git push
+          git push
