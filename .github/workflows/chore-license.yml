@@ -7,11 +7,14 @@ on:
       - "Cargo.lock"
       - "about.toml"
       - "about.hbs"
+      - ".github/workflows/chore-license.yml"
 
 jobs:
   update-license:
     name: Update Third-Party Licenses Information
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
