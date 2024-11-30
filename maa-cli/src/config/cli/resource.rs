@@ -183,7 +183,7 @@ impl<'de> Deserialize<'de> for Passphrase {
             {
                 struct PassphraseFieldVisitor;
 
-                impl<'de> serde::de::Visitor<'de> for PassphraseFieldVisitor {
+                impl serde::de::Visitor<'_> for PassphraseFieldVisitor {
                     type Value = PassphraseField;
 
                     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -257,7 +257,6 @@ impl<'de> Deserialize<'de> for Passphrase {
                 };
 
                 if map.next_key::<PassphraseField>()?.is_some() {
-                    println!("here");
                     return Err(serde::de::Error::custom("only one field is allowed"));
                 }
 

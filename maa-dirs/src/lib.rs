@@ -54,7 +54,24 @@ pub const MAA_CORE_LIB: &str = str_join!(DLL_PREFIX, MAA_CORE_NAME, DLL_SUFFIX);
 /// The expression after `;` is optional, which is used to set the extension of the final path.
 ///
 /// Note: Because we reuse the first path, the first path will be consumed.
-/// Thus, if you want to reuse the first path, you should pass a Path instead of a PathBuf
+/// Thus, if you want to keep the ownership of the first path, you should pass a reference.
+///
+/// # Examples
+///
+/// ```rust
+/// use std::path::PathBuf;
+///
+/// use maa_dirs::join;
+///
+/// let path = PathBuf::from("foo");
+/// // The path will not be consumed.
+/// let p1 = join!(&path, "bar", "baz");
+/// assert_eq!(p1, PathBuf::from("foo/bar/baz"));
+///
+/// // The path will be consumed.
+/// let p2 = join!(path, "bar", "baz");
+/// assert_eq!(p2, PathBuf::from("foo/bar/baz"));
+/// ```
 #[macro_export]
 macro_rules! join {
     ($path:expr, $($paths:expr),+ $(; $ext:expr)?) => {{

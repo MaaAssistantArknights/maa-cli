@@ -54,7 +54,7 @@ pub enum Checker<'a> {
     Sha256(&'a str),
 }
 
-impl<'a> Checker<'a> {
+impl Checker<'_> {
     fn hasher(&self) -> Hasher {
         match self {
             Self::Sha256(_) => Hasher::Sha256(Sha256::new()),

@@ -25,7 +25,7 @@ impl<'a> PlayCoverApp<'a> {
 }
 
 #[async_trait::async_trait]
-impl<'a> super::ExternalApp for PlayCoverApp<'a> {
+impl super::ExternalApp for PlayCoverApp<'_> {
     async fn open(&self) -> Result<()> {
         if self.connect().await.is_ok() {
             info!("Game is already running!");

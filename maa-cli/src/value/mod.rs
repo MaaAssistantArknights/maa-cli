@@ -395,7 +395,7 @@ pub trait TryFromMAAValue<'a>: Sized {
     fn try_from_value(value: &'a MAAValue) -> Option<Self::Value>;
 }
 
-impl<'a> TryFromMAAValue<'a> for bool {
+impl TryFromMAAValue<'_> for bool {
     type Value = bool;
 
     fn try_from_value(value: &MAAValue) -> Option<Self::Value> {
@@ -403,7 +403,7 @@ impl<'a> TryFromMAAValue<'a> for bool {
     }
 }
 
-impl<'a> TryFromMAAValue<'a> for i32 {
+impl TryFromMAAValue<'_> for i32 {
     type Value = Self;
 
     fn try_from_value(value: &MAAValue) -> Option<Self::Value> {
@@ -411,7 +411,7 @@ impl<'a> TryFromMAAValue<'a> for i32 {
     }
 }
 
-impl<'a> TryFromMAAValue<'a> for f32 {
+impl TryFromMAAValue<'_> for f32 {
     type Value = Self;
 
     fn try_from_value(value: &MAAValue) -> Option<Self::Value> {

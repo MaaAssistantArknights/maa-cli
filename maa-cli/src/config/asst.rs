@@ -133,7 +133,7 @@ impl<'de> Deserialize<'de> for Preset {
     {
         struct PresetVisitor;
 
-        impl<'de> serde::de::Visitor<'de> for PresetVisitor {
+        impl serde::de::Visitor<'_> for PresetVisitor {
             type Value = Preset;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

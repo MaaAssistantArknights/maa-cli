@@ -1,5 +1,5 @@
 #[cfg(not(feature = "runtime"))]
-fn static_link() {
+fn dynamic_link() {
     use std::{
         env::{
             consts::{DLL_PREFIX, DLL_SUFFIX},
@@ -21,5 +21,5 @@ fn static_link() {
 
 fn main() {
     #[cfg(not(feature = "runtime"))]
-    static_link();
+    dynamic_link();
 }

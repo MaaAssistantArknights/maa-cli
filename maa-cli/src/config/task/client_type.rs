@@ -105,7 +105,7 @@ impl<'de> Deserialize<'de> for ClientType {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         struct ClientTypeVisitor;
 
-        impl<'de> serde::de::Visitor<'de> for ClientTypeVisitor {
+        impl serde::de::Visitor<'_> for ClientTypeVisitor {
             type Value = ClientType;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
