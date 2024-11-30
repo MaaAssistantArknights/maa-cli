@@ -22,6 +22,7 @@ pub mod primitive {
 }
 
 /// Available static option key
+#[repr(u8)]
 #[derive(Clone, Copy)]
 pub enum StaticOptionKey {
     /// set to true to enable CPU OCR
@@ -31,6 +32,7 @@ pub enum StaticOptionKey {
 }
 
 /// Available instance option key
+#[repr(u8)]
 #[derive(Clone, Copy)]
 pub enum InstanceOptionKey {
     /// set touch mode of instance
@@ -44,6 +46,7 @@ pub enum InstanceOptionKey {
 }
 
 /// Available touch mode
+#[repr(u8)]
 #[derive(Default, Clone, Copy, PartialEq)]
 pub enum TouchMode {
     #[default]
@@ -128,11 +131,22 @@ impl<'de> serde::Deserialize<'de> for TouchMode {
     {
         struct TouchModeVisitor;
 
-        impl<'de> serde::de::Visitor<'de> for TouchModeVisitor {
+        impl serde::de::Visitor<'_> for TouchModeVisitor {
             type Value = TouchMode;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 formatter.write_str("a valid touch mode")
+            }
+
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                if v < TouchMode::COUNT as u64 {
+                    Ok(unsafe { std::mem::transmute::<u8, TouchMode>(v as u8) })
+                } else {
+                    Err(E::invalid_value(serde::de::Unexpected::Unsigned(v), &self))
+                }
             }
 
             fn visit_str<E>(self, value: &str) -> std::result::Result<TouchMode, E>
@@ -145,6 +159,16 @@ impl<'de> serde::Deserialize<'de> for TouchMode {
         }
 
         deserializer.deserialize_str(TouchModeVisitor)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for TouchMode {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_u64(*self as u64)
     }
 }
 
@@ -161,6 +185,7 @@ impl std::fmt::Display for TouchMode {
 }
 
 /// Available task type for MAA
+#[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum TaskType {
     StartUp,
@@ -267,11 +292,22 @@ impl<'de> serde::Deserialize<'de> for TaskType {
     {
         struct TaskTypeVisitor;
 
-        impl<'de> serde::de::Visitor<'de> for TaskTypeVisitor {
+        impl serde::de::Visitor<'_> for TaskTypeVisitor {
             type Value = TaskType;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 formatter.write_str("a valid task type")
+            }
+
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                if v < TaskType::COUNT as u64 {
+                    Ok(unsafe { std::mem::transmute::<u8, TaskType>(v as u8) })
+                } else {
+                    Err(E::invalid_value(serde::de::Unexpected::Unsigned(v), &self))
+                }
             }
 
             fn visit_str<E>(self, value: &str) -> Result<TaskType, E>
@@ -284,6 +320,16 @@ impl<'de> serde::Deserialize<'de> for TaskType {
         }
 
         deserializer.deserialize_str(TaskTypeVisitor)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for TaskType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_u64(*self as u64)
     }
 }
 
@@ -339,18 +385,40 @@ mod tests {
 
             #[test]
             fn deserialize() {
-                assert_de_tokens(&Adb, &[Token::Str("adb")]);
-                assert_de_tokens(&MiniTouch, &[Token::Str("minitouch")]);
-                assert_de_tokens(&MaaTouch, &[Token::Str("maatouch")]);
-                assert_de_tokens(&MacPlayTools, &[Token::Str("MacPlayTools")]);
+                let modes = [Adb, MiniTouch, MaaTouch, MacPlayTools];
+
+                // Test deserializing from string
+                assert_de_tokens(&modes, &[
+                    Token::Seq { len: Some(4) },
+                    Token::Str("adb"),
+                    Token::Str("minitouch"),
+                    Token::Str("maatouch"),
+                    Token::Str("MacPlayTools"),
+                    Token::SeqEnd,
+                ]);
+
+                // Test deserializing from u64
+                assert_de_tokens(&modes, &[
+                    Token::Seq { len: Some(4) },
+                    Token::U64(0),
+                    Token::U64(1),
+                    Token::U64(2),
+                    Token::U64(3),
+                    Token::SeqEnd,
+                ]);
             }
 
             #[test]
-            fn deserialize_unknown() {
+            fn deserialize_error() {
                 assert_de_tokens_error::<TouchMode>(
                     &[Token::Str("Unknown")],
                     "unknown variant `Unknown`, expected one of \
                 `adb`, `minitouch`, `maatouch`, `MacPlayTools`",
+                );
+
+                assert_de_tokens_error::<TouchMode>(
+                    &[Token::U64(4)],
+                    "invalid value: integer `4`, expected a valid touch mode",
                 );
             }
         }
@@ -421,15 +489,27 @@ mod tests {
                     Token::Str("CloseDown"),
                     Token::SeqEnd,
                 ]);
+
+                assert_de_tokens(&types, &[
+                    Token::Seq { len: Some(2) },
+                    Token::U64(0),
+                    Token::U64(1),
+                    Token::SeqEnd,
+                ]);
             }
 
             #[test]
-            fn deserialize_unknown_variance() {
+            fn deserialize_error() {
                 assert_de_tokens_error::<TaskType>(
                     &[Token::Str("Unknown")],
                     "unknown variant `Unknown`, expected one of `StartUp`, `CloseDown`, `Fight`, \
                     `Recruit`, `Infrast`, `Mall`, `Award`, `Roguelike`, `Copilot`, `SSSCopilot`, \
                     `Depot`, `OperBox`, `Reclamation`, `Custom`, `SingleStep`, `VideoRecognition`",
+                );
+
+                assert_de_tokens_error::<TaskType>(
+                    &[Token::U64(16)],
+                    "invalid value: integer `16`, expected a valid task type",
                 );
             }
         }
