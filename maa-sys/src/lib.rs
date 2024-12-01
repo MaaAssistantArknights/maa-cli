@@ -12,6 +12,7 @@ mod link;
 /// Raw binding of MaaCore API
 pub mod binding;
 
+#[cfg_attr(test, derive(PartialEq, Eq))]
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("MaaCore returned an error, check its log for details")]
@@ -311,13 +312,21 @@ mod tests {
 
     #[test]
     fn asst_bool() {
-        assert!(matches!(0u8.to_result(), Err(super::Error::MAAError)));
-        assert!(matches!(1u8.to_result(), Ok(())));
+        assert_eq!(0u8.to_result(), Err(super::Error::MAAError));
+        assert_eq!(1u8.to_result(), Ok(()));
     }
 
     #[test]
     fn asst_size() {
-        assert!(matches!(NULL_SIZE.to_result(), Err(super::Error::MAAError)));
-        assert!(matches!(1u64.to_result(), Ok(1u64)));
+        assert_eq!(NULL_SIZE.to_result(), Err(super::Error::MAAError));
+        assert_eq!(1u64.to_result(), Ok(1u64));
+        #[cfg(not(feature = "runtime"))]
+        assert_eq!(unsafe { binding::AsstGetNullSize() }, NULL_SIZE);
+    }
+
+    #[test]
+    fn asst_id() {
+        assert_eq!(INVALID_ID.to_result(), Err(super::Error::MAAError));
+        assert_eq!(1u64.to_result(), Ok(1u64));
     }
 }
