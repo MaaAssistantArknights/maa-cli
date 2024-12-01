@@ -454,6 +454,19 @@ mod tests {
         };
     }
 
+    fn retry<T>(times: usize, f: impl Fn() -> Result<T>) -> T {
+        for i in 0..times {
+            match f() {
+                Ok(x) => return x,
+                Err(e) => {
+                    eprintln!("Failed to run test: {e}, retry {i}");
+                }
+            }
+        }
+
+        panic!("Failed to run test after {times} retries");
+    }
+
     mod copilot_params {
         use super::*;
 
@@ -486,10 +499,13 @@ mod tests {
             use crate::config::task::InitializedTask;
             fn parse_to_taskes<I, T>(args: I, config: &AsstConfig) -> Vec<InitializedTask>
             where
-                I: IntoIterator<Item = T>,
+                I: AsRef<[T]>,
                 T: Into<std::ffi::OsString> + Clone,
             {
-                parse(args, config).unwrap().init().unwrap().tasks
+                retry(3, || parse(args.as_ref().iter().cloned(), config))
+                    .init()
+                    .unwrap()
+                    .tasks
             }
 
             macro_rules! assert_params {
@@ -769,27 +785,25 @@ mod tests {
 
             // Remote
             assert_eq!(
-                {
+                retry(3, || {
                     let mut paths = Vec::new();
                     CopilotFile::from_uri("maa://40051")
                         .unwrap()
-                        .push_path_to(&mut paths, &test_root)
-                        .unwrap();
-                    paths
-                },
+                        .push_path_to(&mut paths, &test_root)?;
+                    Ok(paths)
+                }),
                 &[test_root.join("40051.json")],
             );
 
             // RemoteSet
             assert_eq!(
-                {
+                retry(3, || {
                     let mut paths = Vec::new();
                     CopilotFile::from_uri("maa://23125s")
                         .unwrap()
-                        .push_path_to(&mut paths, &test_root)
-                        .unwrap();
-                    paths
-                },
+                        .push_path_to(&mut paths, &test_root)?;
+                    Ok(paths)
+                }),
                 {
                     let ids = [40051, 40052, 40053, 40055, 40056, 40057, 40058, 40059];
 
