@@ -207,6 +207,21 @@ impl Assistant {
         .to_result()
     }
 
+    /// Set the connection extras of the assistant
+    pub fn set_connection_extras(
+        &self,
+        name: impl ToCString,
+        extras: impl ToCString,
+    ) -> Result<()> {
+        handle_asst(unsafe {
+            binding::AsstSetConnectionExtras(
+                self.handle,
+                name.to_cstring()?.as_ptr(),
+                extras.to_cstring()?.as_ptr(),
+            )
+        })
+    }
+
     /// Click the screen at the given position
     pub fn async_click(&self, x: i32, y: i32, block: bool) -> Result<AsstAsyncCallId> {
         unsafe { binding::AsstAsyncClick(self.handle, x, y, block.into()) }.to_result()
