@@ -78,7 +78,7 @@ impl Assistant {
     /// This function will raise an error if the path is not a valid UTF-8 string,
     /// or raise an error if set the user directory failed.
     pub fn set_user_dir(path: impl ToCString) -> Result<()> {
-        unsafe { binding::AsstSetUserDir(path.to_cstring()?.as_ptr()) }.to_err()
+        unsafe { binding::AsstSetUserDir(path.to_cstring()?.as_ptr()) }.to_result()
     }
 
     /// Set the static option of the assistant.
@@ -96,7 +96,7 @@ impl Assistant {
         unsafe {
             binding::AsstSetStaticOption(key as AsstStaticOptionKey, value.to_cstring()?.as_ptr())
         }
-        .to_err()
+        .to_result()
     }
 
     /// Load resource from the given directory.
@@ -108,7 +108,7 @@ impl Assistant {
     /// This function will raise an error if the path is not a valid UTF-8 string,
     /// or raise an error if load resource failed.
     pub fn load_resource(path: impl ToCString) -> Result<()> {
-        unsafe { binding::AsstLoadResource(path.to_cstring()?.as_ptr()) }.to_err()
+        unsafe { binding::AsstLoadResource(path.to_cstring()?.as_ptr()) }.to_result()
     }
 
     /// Get the null size of the assistant.
@@ -145,39 +145,35 @@ impl Assistant {
                 value.to_cstring()?.as_ptr(),
             )
         }
-        .to_err()
+        .to_result()
     }
 
     /// Append a task to the assistant, return the task id.
     pub fn append_task(&self, task: impl ToCString, params: impl ToCString) -> Result<AsstTaskId> {
-        let task_id = unsafe {
+        unsafe {
             binding::AsstAppendTask(
                 self.handle,
                 task.to_cstring()?.as_ptr(),
                 params.to_cstring()?.as_ptr(),
             )
-        };
-        if task_id == 0 {
-            Err(Error::MAAError)
-        } else {
-            Ok(task_id)
         }
+        .to_result()
     }
 
     /// Set the parameters of the given task.
     pub fn set_task_params(&self, task_id: AsstTaskId, params: impl ToCString) -> Result<()> {
         unsafe { binding::AsstSetTaskParams(self.handle, task_id, params.to_cstring()?.as_ptr()) }
-            .to_err()
+            .to_result()
     }
 
     /// Start the assistant.
     pub fn start(&self) -> Result<()> {
-        unsafe { binding::AsstStart(self.handle) }.to_err()
+        unsafe { binding::AsstStart(self.handle) }.to_result()
     }
 
     /// Stop the assistant.
     pub fn stop(&self) -> Result<()> {
-        unsafe { binding::AsstStop(self.handle) }.to_err()
+        unsafe { binding::AsstStop(self.handle) }.to_result()
     }
 
     /// Check if the assistant is running.
@@ -198,7 +194,7 @@ impl Assistant {
         config: impl ToCString,
         block: bool,
     ) -> Result<AsstAsyncCallId> {
-        Ok(unsafe {
+        unsafe {
             binding::AsstAsyncConnect(
                 self.handle,
                 adb_path.to_cstring()?.as_ptr(),
@@ -206,52 +202,95 @@ impl Assistant {
                 config.to_cstring()?.as_ptr(),
                 block.into(),
             )
-        })
+        }
+        .to_result()
     }
 
     /// Click the screen at the given position
     pub fn async_click(&self, x: i32, y: i32, block: bool) -> Result<AsstAsyncCallId> {
-        Ok(unsafe { binding::AsstAsyncClick(self.handle, x, y, block.into()) })
+        unsafe { binding::AsstAsyncClick(self.handle, x, y, block.into()) }.to_result()
     }
 
     /// Take a screenshot
     pub fn async_screncap(&self, block: bool) -> Result<AsstAsyncCallId> {
-        Ok(unsafe { binding::AsstAsyncScreencap(self.handle, block.into()) })
+        unsafe { binding::AsstAsyncScreencap(self.handle, block.into()) }.to_result()
     }
 
     /// Take a screenshot and save it to the given buffer
     pub fn get_image(&self, buff: &mut [u8], buff_size: AsstSize) -> Result<AsstSize> {
-        Ok(unsafe {
+        unsafe {
             binding::AsstGetImage(
                 self.handle,
                 buff.as_mut_ptr() as *mut std::os::raw::c_void,
                 buff_size,
             )
-        })
+        }
+        .to_result()
     }
 
     /// Get the UUID of the device
     pub fn get_uuid(&self, buff: &mut [u8], buff_size: AsstSize) -> Result<AsstSize> {
-        Ok(unsafe {
+        unsafe {
             binding::AsstGetUUID(
                 self.handle,
                 buff.as_mut_ptr() as *mut std::os::raw::c_char,
                 buff_size,
             )
-        })
+        }
+        .to_result()
     }
 }
 
-trait AsstBoolExt {
-    fn to_err(self) -> Result<()>;
+trait AsstResult {
+    /// The return type of the function
+    type Return;
+
+    fn to_result(self) -> Result<Self::Return>;
 }
 
-impl AsstBoolExt for maa_types::primitive::AsstBool {
-    fn to_err(self) -> Result<()> {
+impl AsstResult for maa_types::primitive::AsstBool {
+    type Return = ();
+
+    fn to_result(self) -> Result<()> {
         if self == 1 {
             Ok(())
         } else {
             Err(Error::MAAError)
+        }
+    }
+}
+
+/// The null size is used to indicate a failure in the API which returns a AsstSize.
+///
+/// Ideally we should use a binding::GetNullSize() function to get the null size,
+/// but it's okay to use a constant here since the null size is defined as u64::MAX in MaaCore.
+pub const NULL_SIZE: AsstSize = AsstSize::MAX;
+
+impl AsstResult for maa_types::primitive::AsstSize {
+    type Return = Self;
+
+    fn to_result(self) -> Result<Self> {
+        if self == NULL_SIZE {
+            Err(Error::MAAError)
+        } else {
+            Ok(self)
+        }
+    }
+}
+
+/// The invalid id is used to indicate a failure in the API which returns a AsstId.
+///
+/// The invalid id is defined as 0 in MaaCore, so we can use a constant here.
+pub const INVALID_ID: AsstId = 0;
+
+impl AsstResult for maa_types::primitive::AsstId {
+    type Return = Self;
+
+    fn to_result(self) -> Result<Self> {
+        if self == INVALID_ID {
+            Err(Error::MAAError)
+        } else {
+            Ok(self)
         }
     }
 }
@@ -271,8 +310,14 @@ mod tests {
     }
 
     #[test]
-    fn asst_bool_ext() {
-        assert!(matches!(0.to_err(), Err(super::Error::MAAError)));
-        assert!(matches!(1.to_err(), Ok(())));
+    fn asst_bool() {
+        assert!(matches!(0u8.to_result(), Err(super::Error::MAAError)));
+        assert!(matches!(1u8.to_result(), Ok(())));
+    }
+
+    #[test]
+    fn asst_size() {
+        assert!(matches!(NULL_SIZE.to_result(), Err(super::Error::MAAError)));
+        assert!(matches!(1u64.to_result(), Ok(1u64)));
     }
 }
