@@ -1,0 +1,19 @@
+[package]
+name = "maa-rpc-api"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[features]
+server = ["jsonrpsee/server-core"]
+client = ["jsonrpsee/client-core"]
+
+[dependencies]
+chrono = { workspace = true, default-features = false, features = ["serde"] }
+jsonrpsee = { workspace = true, features = ["macros"] }
+log = { workspace = true, features = ["serde"] }
+maa-types = { workspace = true, features = ["serde"] }
+serde = { workspace = true }
+serde_json = { workspace = true }

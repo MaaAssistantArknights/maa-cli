@@ -9,6 +9,7 @@ repository = "https://github.com/MaaAssistantArknights/maa-cli"
 
 [workspace.dependencies]
 maa-dirs = { path = "maa-dirs", version = "0.1.1" }
+maa-rpc-api = { path = "maa-rpc-api", version = "0.1" }
 maa-sys = { path = "maa-sys", version = "0.5.0" }
 maa-types = { path = "maa-types", version = "0.1" }
 
@@ -27,6 +28,7 @@ flate2 = "1"
 futures-util = "0.3.28"
 git2 = "0.19"
 indicatif = "0.17.7"
+jsonrpsee = "0.24.7"
 libloading = "0.8"
 log = "0.4.20"
 prettytable = { version = "0.10.0", default-features = false }

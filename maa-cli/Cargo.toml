@@ -39,6 +39,7 @@ path = "src/main.rs"
 
 [dependencies]
 maa-dirs = { workspace = true }
+maa-rpc-api = { workspace = true, features = ["client", "server"] }
 maa-sys = { workspace = true, features = ["runtime"] }
 maa-types = { workspace = true, features = ["serde"] }
 
@@ -56,6 +57,7 @@ flate2 = { workspace = true, optional = true }
 futures-util = { workspace = true, optional = true }
 git2 = { workspace = true, optional = true }
 indicatif = { workspace = true, optional = true }
+jsonrpsee = { workspace = true }
 log = { workspace = true }
 prettytable = { workspace = true }
 reqwest = { workspace = true, features = ["blocking", "json"] }
