@@ -117,7 +117,7 @@ jobs:
         include:
           - os: macos-13 # x86_64 runner
             arch: x86_64
-          - os: macos-14 # aaarch64 runner
+          - os: macos-latest # aarch64 runner
             arch: aarch64
         exclude:
           # Failed to cross compile ring on Windows
@@ -130,7 +130,7 @@ jobs:
         uses: ./.github/actions/setup
         with:
           os: ${{ matrix.os }}
-          host_arch: ${{ matrix.os == 'macos-14' && 'aarch64' || 'x86_64' }}
+          host_arch: ${{ matrix.os != 'macos-13' && 'aarch64' || 'x86_64' }}
           target_arch: ${{ matrix.arch }}
       - name: Build
         env:
@@ -153,7 +153,7 @@ jobs:
           fi
           file "$target_dir/$exe" # check file status
           # dry run if not cross compiling
-          if [[ "$TARGET_ARCH" == "x86_64" || "$TARGET_OS" == "macos-14" ]]; then
+          if [[ "$TARGET_ARCH" == "x86_64" || "$TARGET_OS" != "macos-13" ]]; then
             "$target_dir/$exe" --version
           fi
           tar -cvf "$CARGO_BUILD_TARGET.tar" -C "$target_dir" "$exe"
@@ -168,7 +168,7 @@ jobs:
   build-universal:
     name: Build Universal Binary
     if: ${{ !fromJson(needs.meta.outputs.skip) }}
-    runs-on: macos-14
+    runs-on: macos-latest
     needs: [meta, build]
     steps:
       # download all artifacts, even if not all are used,
