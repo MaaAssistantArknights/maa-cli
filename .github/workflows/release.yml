@@ -111,18 +111,19 @@ jobs:
         os:
           - ubuntu-latest
           - windows-latest
-        arch:
+        host-arch:
+          - x86_64
+        target-arch:
           - x86_64
           - aarch64
+        # macOS can be natively built on both x86_64 and aarch64
         include:
-          - os: macos-13 # x86_64 runner
-            arch: x86_64
-          - os: macos-14 # aaarch64 runner
-            arch: aarch64
-        exclude:
-          # Failed to cross compile ring on Windows
-          - os: windows-latest
-            arch: aarch64
+          - os: macos-13
+            host-arch: x86_64
+            target-arch: x86_64
+          - os: macos-latest
+            host-arch: aarch64
+            target-arch: aarch64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -130,8 +131,8 @@ jobs:
         uses: ./.github/actions/setup
         with:
           os: ${{ matrix.os }}
-          host_arch: ${{ matrix.os == 'macos-14' && 'aarch64' || 'x86_64' }}
-          target_arch: ${{ matrix.arch }}
+          host_arch: ${{ matrix.host-arch }}
+          target_arch: ${{ matrix.target-arch }}
       - name: Build
         env:
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 1
@@ -142,18 +143,18 @@ jobs:
           cargo build --release --package maa-cli --locked --features vendored-openssl
       - name: Tar Artifact
         env:
-          TARGET_OS: ${{ matrix.os }}
-          TARGET_ARCH: ${{ matrix.arch }}
+          OS: ${{ matrix.os }}
+          IS_CROSS: ${{ matrix.host-arch != matrix.target-arch }}
         run: |
           target_dir="target/$CARGO_BUILD_TARGET/release"
-          if [[ "$TARGET_OS" == "windows"* ]]; then
+          if [[ "$OS" == "windows"* ]]; then
             exe="maa.exe"
           else
             exe="maa"
           fi
           file "$target_dir/$exe" # check file status
           # dry run if not cross compiling
-          if [[ "$TARGET_ARCH" == "x86_64" || "$TARGET_OS" == "macos-14" ]]; then
+          if [[ "$IS_CROSS" == "false" ]]; then
             "$target_dir/$exe" --version
           fi
           tar -cvf "$CARGO_BUILD_TARGET.tar" -C "$target_dir" "$exe"
@@ -168,7 +169,7 @@ jobs:
   build-universal:
     name: Build Universal Binary
     if: ${{ !fromJson(needs.meta.outputs.skip) }}
-    runs-on: macos-14
+    runs-on: macos-latest
     needs: [meta, build]
     steps:
       # download all artifacts, even if not all are used,
@@ -230,17 +231,8 @@ jobs:
             yq -i -oj ".details.commit = \"$COMMIT\"" "$version_file"
           done
 
-          targets=(
-            x86_64-unknown-linux-gnu
-            aarch64-unknown-linux-gnu
-            universal-apple-darwin
-            x86_64-apple-darwin
-            aarch64-apple-darwin
-            x86_64-pc-windows-msvc
-          )
-
-          for target in "${targets[@]}"; do
-            dir="maa_cli-$target"
+          for dir in maa_cli-*; do
+            target=${dir#maa_cli-}
             tar -xvf "$dir/$target.tar" -C "$dir"
             # use tar on linux and zip on other platforms
             case "$target" in
@@ -272,17 +264,6 @@ jobs:
             size=$(stat -c%s "$archive_name")
             echo "$checksum" > "$archive_name.sha256"
             sha256sum "$archive_name_unversioned" > "$archive_name_unversioned.sha256"
-
-            # old version info (deprecated)
-            # only update when a stable release is published
-            if [ "$CHANNEL" == "stable" ]; then
-              version_file="version/version.json"
-              yq -i -oj ".maa-cli.$target.version = \"$VERSION\"" "$version_file"
-              yq -i -oj ".maa-cli.$target.tag = \"$TAG\"" "$version_file"
-              yq -i -oj ".maa-cli.$target.name = \"$archive_name\"" "$version_file"
-              yq -i -oj ".maa-cli.$target.size = $size" $version_file
-              yq -i -oj ".maa-cli.$target.sha256sum = \"$checksum_hash\"" "$version_file"
-            fi
 
             # target dependent version info
             for version_file in "${version_files[@]}"; do

@@ -42,7 +42,7 @@ jobs:
         os:
           - ubuntu-latest
           - macos-13 # x86_64 runner
-          - macos-14 # aarch64 runner
+          - macos-latest # aarch64 runner
           - windows-latest
     env:
       MAA_EXTRA_SHARE_NAME: maa-test
@@ -65,7 +65,7 @@ jobs:
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/maa-cli/config_examples
         run: |
-          cargo run -- install beta 
+          cargo run -- install beta
           core_dir=$(cargo run -- dir library)
           resource_dir=$(cargo run -- dir resource)
           cache_dir=$(cargo run -- dir cache)
@@ -95,6 +95,7 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
+          - windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -116,7 +117,7 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - macos-14
+          - macos-latest
           - windows-latest
         feature:
           - core_installer # disabled cli_installer and git2, used by package manager
@@ -143,7 +144,7 @@ jobs:
         os:
           - ubuntu-latest
           - macos-13 # x86_64 runner
-          - macos-14 # aarch64 runner
+          - macos-latest # aarch64 runner
           - windows-latest
     steps:
       - name: Checkout
@@ -174,7 +175,7 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - macos-14 # aarch64 runner
+          - macos-latest # aarch64 runner
           - windows-latest
     env:
       MAA_EXTRA_SHARE_NAME: maa-test
