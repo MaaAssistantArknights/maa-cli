@@ -111,18 +111,19 @@ jobs:
         os:
           - ubuntu-latest
           - windows-latest
-        arch:
+        host-arch:
+          - x86_64
+        target-arch:
           - x86_64
           - aarch64
+        # macOS can be natively built on both x86_64 and aarch64
         include:
-          - os: macos-13 # x86_64 runner
-            arch: x86_64
-          - os: macos-latest # aarch64 runner
-            arch: aarch64
-        exclude:
-          # Failed to cross compile ring on Windows
-          - os: windows-latest
-            arch: aarch64
+          - os: macos-13
+            host-arch: x86_64
+            target-arch: x86_64
+          - os: macos-latest
+            host-arch: aarch64
+            target-arch: aarch64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -130,8 +131,8 @@ jobs:
         uses: ./.github/actions/setup
         with:
           os: ${{ matrix.os }}
-          host_arch: ${{ matrix.os != 'macos-13' && 'aarch64' || 'x86_64' }}
-          target_arch: ${{ matrix.arch }}
+          host_arch: ${{ matrix.host-arch }}
+          target_arch: ${{ matrix.target-arch }}
       - name: Build
         env:
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 1
@@ -142,18 +143,18 @@ jobs:
           cargo build --release --package maa-cli --locked --features vendored-openssl
       - name: Tar Artifact
         env:
-          TARGET_OS: ${{ matrix.os }}
-          TARGET_ARCH: ${{ matrix.arch }}
+          OS: ${{ matrix.os }}
+          IS_CROSS: ${{ matrix.host-arch != matrix.target-arch }}
         run: |
           target_dir="target/$CARGO_BUILD_TARGET/release"
-          if [[ "$TARGET_OS" == "windows"* ]]; then
+          if [[ "$OS" == "windows"* ]]; then
             exe="maa.exe"
           else
             exe="maa"
           fi
           file "$target_dir/$exe" # check file status
           # dry run if not cross compiling
-          if [[ "$TARGET_ARCH" == "x86_64" || "$TARGET_OS" != "macos-13" ]]; then
+          if [[ "$IS_CROSS" == "false" ]]; then
             "$target_dir/$exe" --version
           fi
           tar -cvf "$CARGO_BUILD_TARGET.tar" -C "$target_dir" "$exe"
