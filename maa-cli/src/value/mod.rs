@@ -386,6 +386,12 @@ impl<const N: usize, T: Into<MAAValue>> From<[T; N]> for MAAValue {
     }
 }
 
+impl<T: Into<MAAValue>> From<Vec<T>> for MAAValue {
+    fn from(value: Vec<T>) -> Self {
+        Self::Array(value.into_iter().map(Into::into).collect())
+    }
+}
+
 /// Try to convert the value to given type
 ///
 /// If the value is not convertible to the type, None will be returned.
@@ -755,7 +761,20 @@ mod tests {
     }
 
     #[test]
-    fn try_from() {
+    fn value_from_others() {
+        // Array
+        assert_eq!(
+            MAAValue::from([1, 2]),
+            MAAValue::Array(vec![1.into(), 2.into()])
+        );
+        assert_eq!(
+            MAAValue::from(vec![1, 2]),
+            MAAValue::Array(vec![1.into(), 2.into()])
+        );
+    }
+
+    #[test]
+    fn try_from_value() {
         // Bool
         assert_eq!(bool::try_from_value(&true.into()), Some(true));
         assert_eq!(i32::try_from_value(&true.into()), None);

@@ -49,7 +49,7 @@ pub struct ReclamationParams {
     mode: i32,
     /// Name of tool to craft in mode 1
     #[arg(short = 'C', long, default_value = "荧光棒")]
-    tool_to_craft: String,
+    tools_to_craft: Vec<String>,
     /// Method to interactive with the add button when increasing the crafting quantity
     ///
     /// 0: increase the number by clicking the button.
@@ -74,7 +74,7 @@ impl From<ReclamationParams> for MAAValue {
         value.insert("mode", params.mode);
 
         if params.mode == 1 {
-            value.insert("tool_to_craft", params.tool_to_craft);
+            value.insert("tools_to_craft", params.tools_to_craft);
             value.insert("increase_mode", params.increase_mode);
             value.insert("num_craft_batches", params.num_craft_batches);
         }
@@ -135,7 +135,7 @@ mod tests {
         assert_eq!(
             parse(["maa", "reclamation", "Tales"]),
             base_params.join(object!(
-                "tool_to_craft" => "荧光棒",
+                "tools_to_craft" => ["荧光棒"],
                 "increase_mode" => 0,
                 "num_craft_batches" => 16,
             )),
@@ -150,13 +150,14 @@ mod tests {
                 "reclamation",
                 "Tales",
                 "-m1",
-                "-CSomething",
+                "-CFoo",
+                "-CBar",
                 "--increase-mode=1",
                 "--num-craft-batches=32"
             ]),
             base_params.join(object!(
                 "mode" => 1,
-                "tool_to_craft" => "Something",
+                "tools_to_craft" => ["Foo", "Bar"],
                 "increase_mode" => 1,
                 "num_craft_batches" => 32,
             )),
