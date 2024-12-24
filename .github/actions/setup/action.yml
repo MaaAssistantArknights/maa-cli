@@ -57,7 +57,7 @@ runs:
         echo "AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar" >> $GITHUB_ENV
         echo "CFLAGS_aarch64_unknown_linux_gnu=--sysroot=/usr/aarch64-linux-gnu" >> $GITHUB_ENV
         echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-    - name: Setup Cross Compiling Toolchain (msvc for aarch64 on x86_64 Windows)
+    - name: Setup Cross Compiling Toolchain (LLVM for aarch64 on x86_64 Windows)
       if: >
         inputs.target_arch == 'aarch64' &&
           inputs.host_arch == 'x86_64' &&
