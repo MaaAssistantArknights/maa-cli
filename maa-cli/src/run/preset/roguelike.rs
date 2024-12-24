@@ -67,6 +67,13 @@ pub struct RoguelikeParams {
     #[arg(long)]
     start_count: Option<i32>,
 
+    /// Difficulty, not valid for Phantom theme (no numerical difficulty)
+    ///
+    /// If the given difficulty is larger than the maximum difficulty of the theme, it will be
+    /// capped to the maximum difficulty. If not given, 0 will be used.
+    #[arg(long)]
+    difficulty: Option<i32>,
+
     // Investment related parameters
     /// Disable investment
     #[arg(long)]
@@ -153,6 +160,14 @@ impl TryFrom<RoguelikeParams> for MAAValue {
         value.maybe_insert("core_char", params.core_char);
 
         value.maybe_insert("start_count", params.start_count);
+
+        if matches!(theme, Theme::Phantom) {
+            if params.difficulty.is_some() {
+                log::warn!("Difficulty is not valid for Phantom theme, ignored");
+            }
+        } else {
+            value.maybe_insert("difficulty", params.difficulty);
+        }
 
         if params.disable_investment {
             value.insert("investment_enabled", false);
@@ -313,6 +328,12 @@ mod tests {
         assert!(parse(["maa", "roguelike", "Phantom", "--mode", "5"]).is_err());
         assert!(parse(["maa", "roguelike", "Phantom", "--mode", "7"]).is_err());
 
+        // Difficulty is ignored for Phantom theme
+        assert_eq!(
+            parse(["maa", "roguelike", "Phantom", "--difficulty", "15"]).unwrap(),
+            default_params.join(object!("theme" => "Phantom")),
+        );
+
         assert_eq!(
             parse([
                 "maa",
@@ -325,6 +346,7 @@ mod tests {
                 "--core-char",
                 "维什戴尔",
                 "--start-count=100",
+                "--difficulty=15",
             ])
             .unwrap(),
             default_params.join(object!(
@@ -333,6 +355,7 @@ mod tests {
                 "roles" => "取长补短",
                 "core_char" => "维什戴尔",
                 "start_count" => 100,
+                "difficulty" => 15,
             )),
         );
 
