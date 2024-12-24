@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeMap,
     env::{consts, current_exe},
     time::Duration,
 };
@@ -89,36 +90,15 @@ impl Details {
 }
 
 #[derive(Deserialize)]
-struct Assets {
-    #[serde(rename = "x86_64-apple-darwin")]
-    x86_64_apple_darwin: Asset,
-    #[serde(rename = "aarch64-apple-darwin")]
-    aarch64_apple_darwin: Asset,
-    #[serde(rename = "x86_64-unknown-linux-gnu")]
-    x86_64_unknown_linux_gnu: Asset,
-    #[serde(rename = "aarch64-unknown-linux-gnu")]
-    aarch64_unknown_linux_gnu: Asset,
-    #[serde(rename = "x86_64-pc-windows-msvc")]
-    x86_64_pc_windows_msvc: Asset,
-}
+struct Assets(BTreeMap<String, Asset>);
+
+const PLATFORM: &str = env!("TARGET");
 
 impl Assets {
     fn asset(&self) -> Result<&Asset> {
-        use consts::{ARCH, OS};
-        match OS {
-            "macos" => match ARCH {
-                "x86_64" => Ok(&self.x86_64_apple_darwin),
-                "aarch64" => Ok(&self.aarch64_apple_darwin),
-                _ => Err(anyhow!("Unsupported architecture: {ARCH}")),
-            },
-            "linux" => match consts::ARCH {
-                "x86_64" => Ok(&self.x86_64_unknown_linux_gnu),
-                "aarch64" => Ok(&self.aarch64_unknown_linux_gnu),
-                _ => Err(anyhow!("Unsupported architecture: {ARCH}")),
-            },
-            "windows" if consts::ARCH == "x86_64" => Ok(&self.x86_64_pc_windows_msvc),
-            _ => Err(anyhow!("Unsupported platform: {OS} {ARCH}")),
-        }
+        self.0
+            .get(PLATFORM)
+            .ok_or_else(|| anyhow!("No asset for platform: {}", PLATFORM))
     }
 }
 
@@ -158,27 +138,32 @@ mod tests {
         "tag": "v0.1.0",
         "assets": {
             "x86_64-apple-darwin": {
-                "name": "maa-cli.zip",
+                "name": "maa_cli-0.1.0-x86_64-apple-darwin.zip",
                 "size": 123456,
                 "sha256sum": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
             },
             "aarch64-apple-darwin": {
-                "name": "maa-cli.zip",
+                "name": "maa_cli-0.1.0-aarch64-apple-darwin.zip",
                 "size": 123456,
                 "sha256sum": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
             },
             "x86_64-unknown-linux-gnu": {
-                "name": "maa-cli.zip",
+                "name": "maa_cli-0.1.0-x86_64-unknown-linux-gnu.zip",
                 "size": 123456,
                 "sha256sum": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
             },
             "aarch64-unknown-linux-gnu": {
-                "name": "maa-cli.zip",
+                "name": "maa_cli-0.1.0-aarch64-unknown-linux-gnu.zip",
                 "size": 123456,
                 "sha256sum": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
             },
             "x86_64-pc-windows-msvc": {
-                "name": "maa-cli.zip",
+                "name": "maa_cli-0.1.0-x86_64-pc-windows-msvc.zip",
+                "size": 123456,
+                "sha256sum": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+            },
+            "aarch64-pc-windows-msvc": {
+                "name": "maa_cli-0.1.0-aarch64-pc-windows-msvc.zip",
                 "size": 123456,
                 "sha256sum": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
             }
@@ -190,7 +175,7 @@ mod tests {
         let version_json: VersionJSON<Details> = serde_json::from_str(json).unwrap();
         let asset = version_json.details().asset().unwrap();
 
-        assert_eq!(asset.name(), "maa-cli.zip");
+        assert_eq!(asset.name(), format!("maa_cli-0.1.0-{}.zip", PLATFORM));
         assert_eq!(asset.size(), 123456);
         assert_eq!(
             asset.checksum(),

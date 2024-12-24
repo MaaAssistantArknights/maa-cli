@@ -5,4 +5,9 @@ fn main() {
     } else {
         println!("cargo:rustc-env=MAA_VERSION={}", env!("CARGO_PKG_VERSION"));
     }
+
+    println!(
+        "cargo:rustc-env=TARGET={}",
+        std::env::var("TARGET").unwrap()
+    );
 }
