@@ -1,5 +1,37 @@
 # Release Notes
 
+## Release 0.5.2
+
+### Features
+
+- Add serialize for TouchMode and TaskType enum by [@wangl-cc](https://github.com/wangl-cc)
+- Improve the error handling of assistant API by [@wangl-cc](https://github.com/wangl-cc) in [#346](https://github.com/MaaAssistantArknights/maa-cli/pull/346)
+- Add difficulty parameter to roguelike preset by [@wangl-cc](https://github.com/wangl-cc) in [#351](https://github.com/MaaAssistantArknights/maa-cli/pull/351)
+- Support multiple tools to craft in reclamation by [@wangl-cc](https://github.com/wangl-cc) in [#353](https://github.com/MaaAssistantArknights/maa-cli/pull/353)
+- Add support for Windows aarch64 by [@wangl-cc](https://github.com/wangl-cc) in [#354](https://github.com/MaaAssistantArknights/maa-cli/pull/354)
+
+### Refactor
+
+- Split shared types into maa-types crate by [@wangl-cc](https://github.com/wangl-cc) in [#341](https://github.com/MaaAssistantArknights/maa-cli/pull/341)
+- Replace OnceLock with LazyLock by [@wangl-cc](https://github.com/wangl-cc)
+
+### Testing
+
+- Simplify to_cstring test by [@wangl-cc](https://github.com/wangl-cc)
+- Improve test about maa-sys::Error by [@wangl-cc](https://github.com/wangl-cc) in [#347](https://github.com/MaaAssistantArknights/maa-cli/pull/347)
+- Retry 3 times for test that downloads files from internet by [@wangl-cc](https://github.com/wangl-cc) in [#348](https://github.com/MaaAssistantArknights/maa-cli/pull/348)
+
+### Miscellaneous
+
+- Centralize and update dependencies by [@wangl-cc](https://github.com/wangl-cc) in [#342](https://github.com/MaaAssistantArknights/maa-cli/pull/342)
+- Replace some allow with expect and add reason by [@wangl-cc](https://github.com/wangl-cc)
+- Display licenses of third party projects by [@wangl-cc](https://github.com/wangl-cc)
+- Ignore licenses.html in typos check by [@wangl-cc](https://github.com/wangl-cc)
+- Add editorconfig by [@wangl-cc](https://github.com/wangl-cc)
+- Remove unnecessary lifetime annotations by [@wangl-cc](https://github.com/wangl-cc)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.5.1...v0.5.2>
+
 ## Release 0.5.0
 
 ### Features
@@ -628,4 +660,11 @@
 - Change package name to maa-cli by [@wangl-cc](https://github.com/wangl-cc)
 - Update comment by [@wangl-cc](https://github.com/wangl-cc)
 
-<!-- markdownlint-disable-file MD013 MD024 -->
+<!-- markdownlint-configure-file
+{
+  "line-length": false,
+  "no-duplicate-heading": {
+    "siblings_only": true
+  }
+}
+-->
