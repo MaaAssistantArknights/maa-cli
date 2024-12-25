@@ -1,4 +1,4 @@
-name: Update Third-Party Licenses Information
+name: Update Third-Party Licenses
 
 on:
   push:
@@ -23,11 +23,11 @@ jobs:
         with:
           tool: cargo-about
       - name: Generate Third-Party Licenses Information
-        run: cargo about generate about.hbs > licenses.html
+        run: cargo about generate about.hbs > licenses.md
       - name: Commit Changes if needed
         run: |
           git diff --exit-code && exit 0
-          git add licenses.html
+          git add licenses.md
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "chore(deps): update third-party licenses information"
