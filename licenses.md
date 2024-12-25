@@ -25,7 +25,7 @@ GNU Affero General Public License v3.0
 
 #### Full text
 
-```
+```text
 GNU AFFERO GENERAL PUBLIC LICENSE
 Version 3, 19 November 2007
 
@@ -263,6 +263,7 @@ If your software can interact with users remotely through a computer network, yo
 You should also get your employer (if you work as a programmer) or school, if any, to sign a "copyright disclaimer" for the program, if necessary. For more information on this, and how to apply and follow the GNU AGPL, see <http://www.gnu.org/licenses/>.
 
 ```
+
 ### Apache-2.0
 
 Apache License 2.0
@@ -275,7 +276,7 @@ Apache License 2.0
 
 #### Full text
 
-```
+```text
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
@@ -479,6 +480,7 @@ Apache License 2.0
    limitations under the License.
 
 ```
+
 ### Apache-2.0
 
 Apache License 2.0
@@ -490,7 +492,7 @@ Apache License 2.0
 
 #### Full text
 
-```
+```text
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
@@ -694,6 +696,7 @@ Apache License 2.0
    limitations under the License.
 
 ```
+
 ### Apache-2.0
 
 Apache License 2.0
@@ -706,7 +709,7 @@ Apache License 2.0
 
 #### Full text
 
-```
+```text
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
@@ -911,6 +914,7 @@ Apache License 2.0
 
 
 ```
+
 ### Apache-2.0
 
 Apache License 2.0
@@ -921,7 +925,7 @@ Apache License 2.0
 
 #### Full text
 
-```
+```text
                               Apache License
                         Version 2.0, January 2004
                      http://www.apache.org/licenses/
@@ -1098,6 +1102,7 @@ TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
    of your accepting any such warranty or additional liability.
 
 ```
+
 ### Apache-2.0
 
 Apache License 2.0
@@ -1115,7 +1120,7 @@ Apache License 2.0
 
 #### Full text
 
-```
+```text
                               Apache License
                         Version 2.0, January 2004
                      http://www.apache.org/licenses/
@@ -1294,6 +1299,7 @@ TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
 END OF TERMS AND CONDITIONS
 
 ```
+
 ### Apache-2.0
 
 Apache License 2.0
@@ -1304,7 +1310,7 @@ Apache License 2.0
 
 #### Full text
 
-```
+```text
                               Apache License
                         Version 2.0, January 2004
                      http://www.apache.org/licenses/
@@ -1509,6 +1515,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ```
+
 ### Apache-2.0
 
 Apache License 2.0
@@ -1519,7 +1526,7 @@ Apache License 2.0
 
 #### Full text
 
-```
+```text
                               Apache License
                         Version 2.0, January 2004
                      http://www.apache.org/licenses/
@@ -1723,6 +1730,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ```
+
 ### Apache-2.0
 
 Apache License 2.0
@@ -1738,7 +1746,7 @@ Apache License 2.0
 
 #### Full text
 
-```
+```text
                               Apache License
                         Version 2.0, January 2004
                      http://www.apache.org/licenses/
@@ -1942,6 +1950,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ```
+
 ### Apache-2.0
 
 Apache License 2.0
@@ -1953,7 +1962,7 @@ Apache License 2.0
 
 #### Full text
 
-```
+```text
                               Apache License
                         Version 2.0, January 2004
                      http://www.apache.org/licenses/
@@ -2157,6 +2166,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ```
+
 ### Apache-2.0
 
 Apache License 2.0
@@ -2169,7 +2179,7 @@ Apache License 2.0
 
 #### Full text
 
-```
+```text
 Apache License
 Version 2.0, January 2004
 http://www.apache.org/licenses/
@@ -2245,6 +2255,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ```
+
 ### BSD-3-Clause
 
 BSD 3-Clause "New" or "Revised" License
@@ -2255,7 +2266,7 @@ BSD 3-Clause "New" or "Revised" License
 
 #### Full text
 
-```
+```text
 Copyright (c) 2022, Pierre-Henri Symoneaux
 All rights reserved.
 
@@ -2284,6 +2295,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
+
 ### ISC
 
 ISC License
@@ -2294,7 +2306,7 @@ ISC License
 
 #### Full text
 
-```
+```text
 Copyright © 2015, Simonas Kazlauskas
 
 Permission to use, copy, modify, and/or distribute this software for any purpose with or without
@@ -2309,6 +2321,7 @@ NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE US
 THIS SOFTWARE.
 
 ```
+
 ### MIT
 
 MIT License
@@ -2319,7 +2332,7 @@ MIT License
 
 #### Full text
 
-```
+```text
 MIT License
 
 Copyright (c) Tokio Contributors
@@ -2343,6 +2356,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ```
+
 ### MIT
 
 MIT License
@@ -2353,7 +2367,7 @@ MIT License
 
 #### Full text
 
-```
+```text
 The MIT License (MIT)
 
 Copyright (c) 2014 Mathijs van de Nes
@@ -2379,6 +2393,7 @@ SOFTWARE.
 Some files in the "tests/data" subdirectory of this repository are under other
 licences; see files named LICENSE.*.txt for details.
 ```
+
 ### MIT
 
 MIT License
@@ -2389,7 +2404,7 @@ MIT License
 
 #### Full text
 
-```
+```text
 The MIT License (MIT)
 
 Copyright (c) 2017 Armin Ronacher <armin.ronacher@active-4.com>
@@ -2414,6 +2429,4 @@ SOFTWARE.
 
 
 ```
-
-<!-- markdownlint-disable-file MD013 MD024 -->
-
+<!-- markdownlint-disable-file MD010 MD013 MD024 -->

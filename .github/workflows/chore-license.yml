@@ -23,7 +23,7 @@ jobs:
         with:
           tool: cargo-about
       - name: Generate Third-Party Licenses Information
-        run: cargo about generate about.hbs > licenses.md
+        run: cargo about generate about.hbs -o licenses.md
       - name: Commit Changes if needed
         run: |
           git diff --exit-code && exit 0
