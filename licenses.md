@@ -4,11 +4,11 @@ This page lists the licenses of the projects used in cargo-about.
 
 ## Overview of licenses
 
-- [Apache License 2.0](#Apache-2.0) (30)
-- [GNU Affero General Public License v3.0](#AGPL-3.0) (4)
-- [MIT License](#MIT) (3)
-- [BSD 3-Clause "New" or "Revised" License](#BSD-3-Clause) (1)
-- [ISC License](#ISC) (1)
+- Apache License 2.0 (30)
+- GNU Affero General Public License v3.0 (4)
+- MIT License (3)
+- BSD 3-Clause "New" or "Revised" License (1)
+- ISC License (1)
 
 ## All license text
 
@@ -2414,4 +2414,6 @@ SOFTWARE.
 
 
 ```
+
+<!-- markdownlint-disable-file MD013 MD024 -->
 
