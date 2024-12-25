@@ -40,4 +40,4 @@
 
 ## 许可证
 
-本项目使用 [AGPL-3.0-only](LICENSE) 许可证。相关第三方项目的许可证请参阅 [licenses](licenses.html) 文件。
+本项目使用 [AGPL-3.0-only](LICENSE) 许可证。相关第三方项目的许可证请参阅 [licenses](licenses.md)。
