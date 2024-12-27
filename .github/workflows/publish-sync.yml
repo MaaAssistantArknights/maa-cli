@@ -1,6 +1,11 @@
 name: Sync to MAA Main Repository
 
 on:
+  # Dry run on pull request
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "crates/maa-cli/docs/**"
   workflow_call:
     inputs:
       version:
@@ -15,17 +20,6 @@ on:
       MAA_HOMEBREW_BUMP_PR:
         description: GitHub PAT for creating PR
         required: true
-  workflow_dispatch:
-    inputs:
-      version:
-        description: Package version
-        required: true
-        type: string
-      dryrun:
-        description: Do not create PR
-        default: true
-        required: true
-        type: boolean
 
 defaults:
   run:
@@ -53,7 +47,8 @@ jobs:
         run: |
           ../src/maa-cli/crates/maa-cli/docs/gen_docs.sh
       - name: Show Changes
-        if: ${{ inputs.dryrun }}
+        # Show changes in diff format if it's a pull request or dry run
+        if: github.event_name == 'pull_request' || inputs.dryrun
         run: |
           {
             echo '```diff'
@@ -61,7 +56,7 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Create Pull Request
-        if: ${{ !inputs.dryrun }}
+        if: github.event_name != 'pull_request' && !inputs.dryrun
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.MAA_HOMEBREW_BUMP_PR }}
