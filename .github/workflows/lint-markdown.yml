@@ -30,7 +30,7 @@ jobs:
         uses: DavidAnson/markdownlint-cli2-action@v18
         with:
           globs: "**/*.md"
-          config: "maa-cli/docs/.markdownlint.yaml"
+          config: "crates/maa-cli/docs/.markdownlint.yaml"
 
   check-links:
     name: Check Dead Links
