@@ -58,7 +58,7 @@ jobs:
         run: |
           {
             echo '```diff'
-            git diff --submodule
+            git diff
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Create Pull Request
