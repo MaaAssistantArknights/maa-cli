@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["maa-*"]
+members = ["crates/*"]
 
 [workspace.package]
 license = "AGPL-3.0-only"
@@ -8,9 +8,9 @@ homepage = "https://github.com/MaaAssistantArknights/maa-cli"
 repository = "https://github.com/MaaAssistantArknights/maa-cli"
 
 [workspace.dependencies]
-maa-dirs = { path = "maa-dirs", version = "0.1.1" }
-maa-sys = { path = "maa-sys", version = "0.5.0" }
-maa-types = { path = "maa-types", version = "0.1" }
+maa-dirs = { path = "crates/maa-dirs", version = "0.1.1" }
+maa-sys = { path = "crates/maa-sys", version = "0.5.0" }
+maa-types = { path = "crates/maa-types", version = "0.1" }
 
 anyhow = "1"
 async-trait = "0.1.81"
