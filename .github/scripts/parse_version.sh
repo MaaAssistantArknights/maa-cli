@@ -2,7 +2,7 @@
 
 set -e
 
-CARGO_PKG_VERSION=$(yq -oy '.package.version' maa-cli/Cargo.toml)
+CARGO_PKG_VERSION=$(yq -oy '.package.version' crates/maa-cli/Cargo.toml)
 COMMIT_SHA=$(git rev-parse HEAD)
 COMMIT_SHORT_SHA=$(git rev-parse --short HEAD)
 
