@@ -1,6 +1,11 @@
 name: Sync to MAA Main Repository
 
 on:
+  # Dry run on pull request
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "crates/maa-cli/docs/**"
   workflow_call:
     inputs:
       version:
@@ -15,17 +20,6 @@ on:
       MAA_HOMEBREW_BUMP_PR:
         description: GitHub PAT for creating PR
         required: true
-  workflow_dispatch:
-    inputs:
-      version:
-        description: Package version
-        required: true
-        type: string
-      dryrun:
-        description: Do not create PR
-        default: true
-        required: true
-        type: boolean
 
 defaults:
   run:
@@ -42,26 +36,33 @@ jobs:
           token: ${{ secrets.MAA_HOMEBREW_BUMP_PR }}
           repository: MaaAssistantArknights/MaaAssistantArknights
           ref: dev
-      - name: Update Submodules to Current Commit
+      - name: Update Submodule (Workflow Call)
+        if: github.event_name == 'workflow_call'
         working-directory: src/maa-cli
         run: |
           git submodule init .
           git submodule update .
           git checkout '${{ github.ref }}'
+      - name: Checkout Submodule (Pull Request)
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          path: src/maa-cli
       - name: Sync Documentations
         working-directory: docs
         run: |
-          ../src/maa-cli/maa-cli/docs/gen_docs.sh
+          ../src/maa-cli/crates/maa-cli/docs/gen_docs.sh
       - name: Show Changes
-        if: ${{ inputs.dryrun }}
+        # Show changes in diff format if it's a pull request or dry run
+        if: github.event_name == 'pull_request' || inputs.dryrun
         run: |
           {
             echo '```diff'
-            git diff --submodule
+            git diff
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Create Pull Request
-        if: ${{ !inputs.dryrun }}
+        if: github.event_name != 'pull_request' && !inputs.dryrun
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.MAA_HOMEBREW_BUMP_PR }}

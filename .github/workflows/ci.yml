@@ -4,9 +4,9 @@ on:
   push:
     branches: ["main"]
     paths:
-      - "*/src/**"
-      - "*/Cargo.toml"
-      - "*/build.rs"
+      - "crates/*/src/**"
+      - "crates/*/Cargo.toml"
+      - "crates/*/build.rs"
       - "Cargo.lock"
       - "codecov.yml"
       - ".github/workflows/ci.yml"
@@ -15,9 +15,9 @@ on:
   pull_request:
     branches: ["main"]
     paths:
-      - "*/src/**"
-      - "*/Cargo.toml"
-      - "*/build.rs"
+      - "crates/*/src/**"
+      - "crates/*/Cargo.toml"
+      - "crates/*/build.rs"
       - "Cargo.lock"
       - "codecov.yml"
       - ".github/workflows/ci.yml"
@@ -65,7 +65,7 @@ jobs:
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/maa-cli/config_examples
         run: |
-          cargo run -- install beta
+          cargo run --package maa-cli -- install beta
           core_dir=$(cargo run -- dir library)
           resource_dir=$(cargo run -- dir resource)
           cache_dir=$(cargo run -- dir cache)

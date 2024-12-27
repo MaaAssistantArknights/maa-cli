@@ -34,7 +34,7 @@ sedi() {
 for lang in en-US zh-CN zh-TW ja-JP ko-KR; do
   lang_lower=$(echo "$lang" | tr '[:upper:]' '[:lower:]')
   # output to the specified directory, default is the same as the language
-  output_dir=$(resolve_dir "${2:-"$lang_lower/manual/cli"}")
+  output_dir=$(resolve_dir "$lang_lower/manual/cli")
   # the original directory of docs is at the same directory as this script
   original_dir=$(resolve_dir "$(dirname "${BASH_SOURCE[0]}")")
 

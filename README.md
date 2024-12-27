@@ -13,9 +13,9 @@
 ![Beta Release Version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fgithub.com%2FMaaAssistantArknights%2Fmaa-cli%2Fraw%2Fversion%2Fbeta.json&query=%24.version&prefix=v&label=beta)
 ![Nightly Release Version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fgithub.com%2FMaaAssistantArknights%2Fmaa-cli%2Fraw%2Fversion%2Falpha.json&query=%24.version&prefix=v&label=nightly)
 
-[简体中文](maa-cli/docs/zh-CN/intro.md)
-| [English](maa-cli/docs/en-US/intro.md)
-| [한국어](maa-cli/docs/ko-KR/intro.md)
+[简体中文](crates/maa-cli/docs/zh-CN/intro.md)
+| [English](crates/maa-cli/docs/en-US/intro.md)
+| [한국어](crates/maa-cli/docs/ko-KR/intro.md)
 
 一个使用 Rust 编写的 [MAA][maa-home] 命令行工具。
 
@@ -31,10 +31,10 @@
 
 ## 文档
 
-- [安装及编译](maa-cli/docs/zh-CN/install.md)
-- [使用](maa-cli/docs/zh-CN/usage.md)
-- [配置](maa-cli/docs/zh-CN/config.md)
-- [常见问题](maa-cli/docs/zh-CN/faq.md)
+- [安装及编译](crates/maa-cli/docs/zh-CN/install.md)
+- [使用](crates/maa-cli/docs/zh-CN/usage.md)
+- [配置](crates/maa-cli/docs/zh-CN/config.md)
+- [常见问题](crates/maa-cli/docs/zh-CN/faq.md)
 
 [maa-home]: https://github.com/MaaAssistantArknights/MaaAssistantArknights/
 
