@@ -333,7 +333,7 @@ jobs:
     name: Sync to MAA Main Repository
     if: ${{ fromJson(needs.meta.outputs.publish) && !fromJson(needs.meta.outputs.prerelease) }}
     needs: [meta, release]
-    uses: ./.github/workflows/sync.yml
+    uses: ./.github/workflows/publish-sync.yml
     with:
       version: ${{ needs.meta.outputs.version }}
       dryrun: false
