@@ -36,12 +36,18 @@ jobs:
           token: ${{ secrets.MAA_HOMEBREW_BUMP_PR }}
           repository: MaaAssistantArknights/MaaAssistantArknights
           ref: dev
-      - name: Update Submodules to Current Commit
+      - name: Update Submodule (Workflow Call)
+        if: github.event_name == 'workflow_call'
         working-directory: src/maa-cli
         run: |
           git submodule init .
           git submodule update .
           git checkout '${{ github.ref }}'
+      - name: Checkout Submodule (Pull Request)
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          path: src/maa-cli
       - name: Sync Documentations
         working-directory: docs
         run: |
