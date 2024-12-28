@@ -40,7 +40,7 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-latest
+          - ubuntu-22.04
           - macos-13 # x86_64 runner
           - macos-latest # aarch64 runner
           - windows-latest
@@ -94,7 +94,7 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-latest
+          - ubuntu-22.04
           - windows-latest
     steps:
       - name: Checkout
@@ -116,7 +116,7 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-latest
+          - ubuntu-22.04
           - macos-latest
           - windows-latest
         feature:
@@ -142,7 +142,7 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-latest
+          - ubuntu-22.04
           - macos-13 # x86_64 runner
           - macos-latest # aarch64 runner
           - windows-latest
@@ -174,7 +174,7 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-latest
+          - ubuntu-22.04
           - macos-latest # aarch64 runner
           - windows-latest
     env:
