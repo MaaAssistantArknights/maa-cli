@@ -726,14 +726,14 @@ mod tests {
 
             assert!(parse(["maa", "ssscopilot", "maa://40051"]).is_err());
             assert_params!(
-                retry(3, || parse(["maa", "ssscopilot", "maa://40051"])),
+                retry(3, || parse(["maa", "ssscopilot", "maa://40451"])),
                 object!("filename" => "40451.json", "loop_times" => 1)
             );
             assert_params!(
                 retry(3, || parse([
                     "maa",
                     "ssscopilot",
-                    "maa://40051",
+                    "maa://40451",
                     "--loop-times",
                     "2"
                 ])),
