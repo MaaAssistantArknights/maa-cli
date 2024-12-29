@@ -291,6 +291,7 @@ jobs:
         with:
           name: v${{ needs.meta.outputs.version }}
           tag_name: ${{ needs.meta.outputs.tag }}
+          target_commitish: ${{ needs.meta.outputs.commit }}
           prerelease: ${{ fromJson(needs.meta.outputs.prerelease) }}
           body: ${{ needs.release-note.outputs.content }}
           fail_on_unmatched_files: true
