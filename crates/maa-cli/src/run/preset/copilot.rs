@@ -711,7 +711,7 @@ mod tests {
 
         #[test]
         #[ignore = "need downloaded from internet"]
-        fn try_from() {
+        fn try_into_maa_value() {
             fn parse<I, T>(args: I) -> Result<MAAValue>
             where
                 I: IntoIterator<Item = T>,
@@ -726,11 +726,17 @@ mod tests {
 
             assert!(parse(["maa", "ssscopilot", "maa://40051"]).is_err());
             assert_params!(
-                parse(["maa", "ssscopilot", "maa://40451"]).unwrap(),
+                retry(3, || parse(["maa", "ssscopilot", "maa://40051"])),
                 object!("filename" => "40451.json", "loop_times" => 1)
             );
             assert_params!(
-                parse(["maa", "ssscopilot", "maa://40451", "--loop-times", "2"]).unwrap(),
+                retry(3, || parse([
+                    "maa",
+                    "ssscopilot",
+                    "maa://40051",
+                    "--loop-times",
+                    "2"
+                ])),
                 object!("filename" => "40451.json", "loop_times" => 2)
             );
         }
