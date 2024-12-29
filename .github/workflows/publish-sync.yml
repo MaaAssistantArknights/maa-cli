@@ -36,8 +36,8 @@ jobs:
           token: ${{ secrets.MAA_HOMEBREW_BUMP_PR }}
           repository: MaaAssistantArknights/MaaAssistantArknights
           ref: dev
-      - name: Update Submodule (Workflow Call)
-        if: github.event_name == 'workflow_call'
+      - name: Update Submodule
+        if: github.event_name != 'pull_request'
         working-directory: src/maa-cli
         run: |
           git submodule init .
