@@ -1,11 +1,6 @@
-use std::{
-    collections::BTreeMap,
-    env::{consts, current_exe},
-    time::Duration,
-};
+use std::{collections::BTreeMap, time::Duration};
 
 use anyhow::{anyhow, Context, Result};
-use dunce::canonicalize;
 use semver::Version;
 use serde::Deserialize;
 use tokio::runtime::Runtime;
@@ -20,6 +15,9 @@ use crate::{
     dirs::{self, Ensure},
 };
 
+const MAA_CLI_NAME: &str = "maa";
+const MAA_CLI_EXE: &str = constcat::concat!(MAA_CLI_NAME, std::env::consts::EXE_SUFFIX);
+
 pub fn update(args: &CommonArgs) -> Result<()> {
     let config = CLI_CONFIG.cli_config().with_args(args);
 
@@ -33,7 +31,6 @@ pub fn update(args: &CommonArgs) -> Result<()> {
         return Ok(());
     }
 
-    let bin_path = canonicalize(current_exe()?)?;
     let details = version_json.details();
     let asset = details.asset()?;
     let asset_name = asset.name();
@@ -61,14 +58,18 @@ pub fn update(args: &CommonArgs) -> Result<()> {
             .context("Failed to download maa-cli")?;
     };
 
-    let cli_exe = format!("maa{}", consts::EXE_SUFFIX);
+    let tmp_dir = tempfile::tempdir()?;
+    let tmp_exe = tmp_dir.path().join(MAA_CLI_EXE);
+
     Archive::new(cache_path.into())?.extract(|path| {
-        if config.components().binary && path.ends_with(&cli_exe) {
-            Some(bin_path.clone())
+        if config.components().binary && path.ends_with(MAA_CLI_EXE) {
+            Some(tmp_exe.clone())
         } else {
             None
         }
     })?;
+
+    self_replace::self_replace(tmp_exe)?;
 
     Ok(())
 }

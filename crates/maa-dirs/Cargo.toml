@@ -7,6 +7,7 @@ homepage.workspace = true
 repository.workspace = true
 
 [dependencies]
+constcat = { workspace = true }
 directories = { workspace = true }
 dunce = { workspace = true }
 log = { workspace = true }

@@ -1,9 +1,6 @@
 use std::{
     borrow::Cow,
-    env::{
-        consts::{DLL_PREFIX, DLL_SUFFIX},
-        var_os,
-    },
+    env::{consts, var_os},
     ffi::OsStr,
     fs::{create_dir, create_dir_all, remove_dir_all},
     path::{Path, PathBuf},
@@ -13,36 +10,11 @@ use std::{
 use directories::ProjectDirs;
 use dunce::canonicalize;
 
-macro_rules! str_join {
-    ($($e:expr),*) => {{
-        const LEN: usize = 0 $(+ $e.len())*;
-        #[expect(
-            unused_assignments,
-            reason = "The last assignment will not be used, but in macro, we can't avoid it."
-        )]
-        const BYTES: [u8; LEN] = {
-            let mut dest: [u8; LEN] = [0; LEN];
-            let mut offset = 0;
-            $(
-                let src = $e.as_bytes();
-                let len = src.len();
-                let mut i = 0;
-                while i < len {
-                    dest[offset + i] = src[i];
-                    i += 1;
-                }
-                offset += len;
-            )*
-            dest
-        };
-        unsafe { std::str::from_utf8_unchecked(&BYTES) }
-    }};
-}
-
 /// The name of the MaaCore library.
 pub const MAA_CORE_NAME: &str = "MaaCore";
 /// The name of the MaaCore library with the platform-specific prefix and suffix.
-pub const MAA_CORE_LIB: &str = str_join!(DLL_PREFIX, MAA_CORE_NAME, DLL_SUFFIX);
+pub const MAA_CORE_LIB: &str =
+    constcat::concat!(consts::DLL_PREFIX, MAA_CORE_NAME, consts::DLL_SUFFIX);
 
 /// A convenient macro to join paths, avoiding intermediate `PathBuf` allocation.
 ///
