@@ -428,32 +428,32 @@ mod tests {
             #[cfg(target_os = "linux")]
             assert_eq!(
                 extract_mapper(
-                    Cow::Borrowed(Path::new("libM.so")),
+                    Cow::Borrowed(Path::new("libMaaCore.so")),
                     lib_dir,
                     resource_dir,
                     &config
                 ),
-                Some(lib_dir.join("libM.so"))
+                Some(lib_dir.join("libMaaCore.so"))
             );
             #[cfg(target_os = "macos")]
             assert_eq!(
                 extract_mapper(
-                    Cow::Borrowed(Path::new("libM.dylib")),
+                    Cow::Borrowed(Path::new("libMaaCore.dylib")),
                     lib_dir,
                     resource_dir,
                     &config
                 ),
-                Some(lib_dir.join("libM.dylib"))
+                Some(lib_dir.join("libMaaCore.dylib"))
             );
             #[cfg(target_os = "windows")]
             assert_eq!(
                 extract_mapper(
-                    Cow::Borrowed(Path::new("libM.dll")),
+                    Cow::Borrowed(Path::new("MaaCore.dll")),
                     lib_dir,
                     resource_dir,
                     &config
                 ),
-                Some(lib_dir.join("libM.dll"))
+                Some(lib_dir.join("MaaCore.dll"))
             );
             assert_eq!(
                 extract_mapper(
