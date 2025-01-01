@@ -69,7 +69,10 @@ impl<'f> Archive<'f> {
     /// If the output path exists, the file will be skipped if the file size matches.
     /// Otherwise, the file will be overwritten.
     /// The file permissions will be preserved.
-    pub fn extract(&self, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Result<()> {
+    pub fn extract<F>(&self, mapper: F) -> Result<()>
+    where
+        F: FnMut(Cow<Path>) -> Option<PathBuf>,
+    {
         println!("Extracting archive file...");
         match self.archive_type {
             ArchiveType::Zip => extract_zip(&self.file, mapper),
@@ -78,24 +81,29 @@ impl<'f> Archive<'f> {
     }
 }
 
-fn extract_zip(file: &Path, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Result<()> {
+fn extract_zip<F>(file: &Path, mut mapper: F) -> Result<()>
+where
+    F: FnMut(Cow<Path>) -> Option<PathBuf>,
+{
     let mut archive = zip::ZipArchive::new(File::open(file)?)?;
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i).unwrap();
 
-        let outpath = match file.enclosed_name() {
-            Some(path) => match mapper(&path) {
-                Some(path) => path,
-                None => continue,
-            },
+        let src_path = file
+            .enclosed_name()
+            .context("Bad file path in zip archive")?
+            .into();
+        let dst = match mapper(src_path) {
+            Some(path) => path,
             None => continue,
         };
+        let dst = dst.as_path();
 
         if file.is_dir() {
             continue;
         } else {
-            if let Some(p) = outpath.parent() {
+            if let Some(p) = dst.parent() {
                 p.ensure()?;
             }
 
@@ -114,23 +122,23 @@ fn extract_zip(file: &Path, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Result
                         let mut contents = Vec::new();
                         file.read_to_end(&mut contents)?;
                         let link_target = std::ffi::OsString::from_vec(contents);
-                        if outpath.exists() {
-                            remove_file(&outpath).with_context(|| {
-                                format!("Failed to remove existing file: {}", outpath.display())
+                        if dst.exists() {
+                            remove_file(dst).with_context(|| {
+                                format!("Failed to remove existing file: {}", dst.display())
                             })?;
                         }
-                        symlink(link_target, &outpath).with_context(|| {
-                            format!("Failed to extract file: {}", outpath.display())
+                        symlink(link_target, dst).with_context(|| {
+                            format!("Failed to extract file: {}", dst.display())
                         })?;
                         continue;
                     }
                 }
             }
 
-            let mut outfile = File::create(&outpath)
-                .with_context(|| format!("Failed to create file: {}", outpath.display()))?;
+            let mut outfile = File::create(dst)
+                .with_context(|| format!("Failed to create file: {}", dst.display()))?;
             copy(&mut file, &mut outfile)
-                .with_context(|| format!("Failed to extract file: {}", outpath.display()))?;
+                .with_context(|| format!("Failed to extract file: {}", dst.display()))?;
         }
 
         #[cfg(unix)]
@@ -141,8 +149,8 @@ fn extract_zip(file: &Path, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Result
             };
 
             if let Some(mode) = file.unix_mode() {
-                set_permissions(&outpath, Permissions::from_mode(mode))
-                    .with_context(|| format!("Failed to set permissions: {}", outpath.display()))?;
+                set_permissions(dst, Permissions::from_mode(mode))
+                    .with_context(|| format!("Failed to set permissions: {}", dst.display()))?;
             }
         }
     }
@@ -150,26 +158,26 @@ fn extract_zip(file: &Path, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Result
     Ok(())
 }
 
-fn extract_tar_gz(file: &Path, mapper: impl Fn(&Path) -> Option<PathBuf>) -> Result<()> {
+fn extract_tar_gz<F>(file: &Path, mut mapper: F) -> Result<()>
+where
+    F: FnMut(Cow<Path>) -> Option<PathBuf>,
+{
     let gz_decoder = flate2::read::GzDecoder::new(File::open(file)?);
     let mut archive = tar::Archive::new(gz_decoder);
 
     for entry in archive.entries()? {
-        let mut file = entry?;
-
-        let outpath = match &file.path() {
-            Ok(path) => match mapper(path) {
-                Some(path) => path,
-                None => continue,
-            },
-            Err(e) => return Err(anyhow!("Error while reading tar entry: {}", e)),
+        let mut entry = entry?;
+        let entry_path = entry.path().context("Bad file path in tar.gz archive")?;
+        let dst = match mapper(entry_path) {
+            Some(path) => path,
+            None => continue,
         };
 
-        if let Some(p) = outpath.parent() {
+        if let Some(p) = dst.parent() {
             p.ensure()?;
         }
 
-        file.unpack(&outpath)?;
+        entry.unpack(&dst)?;
     }
 
     println!("Done!");

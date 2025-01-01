@@ -3,7 +3,7 @@
 use std::{
     borrow::Cow,
     env::consts::{ARCH, DLL_PREFIX, DLL_SUFFIX, OS},
-    path::{self, Path, PathBuf},
+    path::{self, Path},
     time::Duration,
 };
 
@@ -28,11 +28,11 @@ use crate::{
 };
 
 fn extract_mapper(
-    src: &Path,
+    src: Cow<Path>,
     lib_dir: &Path,
     resource_dir: &Path,
     config: &Components,
-) -> Option<PathBuf> {
+) -> Option<std::path::PathBuf> {
     debug!("Extracting file: {}", src.display());
     let mut path_components = src.components();
     for c in path_components.by_ref() {
@@ -54,7 +54,7 @@ fn extract_mapper(
                     .is_some_and(|s| s.starts_with(DLL_PREFIX) && s.contains(DLL_SUFFIX))
                 {
                     let dest = lib_dir.join(src.file_name()?);
-                    debug!( "Extracting {} => {}", src.display(), dest.display());
+                    debug!("Extracting {} => {}", src.display(), dest.display());
                     return Some(dest);
                 }
             }
@@ -116,7 +116,7 @@ pub fn install(force: bool, args: &CommonArgs) -> Result<()> {
         debug!("Cleaning resource directory");
         resource_dir.ensure_clean()?;
     }
-    archive.extract(|path: &Path| extract_mapper(path, lib_dir, resource_dir, components))?;
+    archive.extract(|path| extract_mapper(path, lib_dir, resource_dir, components))?;
 
     Ok(())
 }
@@ -420,27 +420,57 @@ mod tests {
     #[test]
     fn test_extract_mapper() {
         let config = Components::default();
-        let lib_dir = PathBuf::from("/home/user/.local/share/maa/lib");
-        let resource_dir = PathBuf::from("/home/user/.local/share/maa/resource");
+        let lib_dir = Path::new("/home/user/.local/share/maa/lib");
+        let resource_dir = Path::new("/home/user/.local/share/maa/resource");
 
         #[cfg(unix)]
         {
             #[cfg(target_os = "linux")]
             assert_eq!(
-                extract_mapper(Path::new("libM.so"), &lib_dir, &resource_dir, &config),
-                Some(lib_dir.join("libM.so"))
+                extract_mapper(
+                    Cow::Borrowed(Path::new("libMaaCore.so")),
+                    lib_dir,
+                    resource_dir,
+                    &config
+                ),
+                Some(lib_dir.join("libMaaCore.so"))
+            );
+            #[cfg(target_os = "macos")]
+            assert_eq!(
+                extract_mapper(
+                    Cow::Borrowed(Path::new("libMaaCore.dylib")),
+                    lib_dir,
+                    resource_dir,
+                    &config
+                ),
+                Some(lib_dir.join("libMaaCore.dylib"))
+            );
+            #[cfg(target_os = "windows")]
+            assert_eq!(
+                extract_mapper(
+                    Cow::Borrowed(Path::new("MaaCore.dll")),
+                    lib_dir,
+                    resource_dir,
+                    &config
+                ),
+                Some(lib_dir.join("MaaCore.dll"))
             );
             assert_eq!(
                 extract_mapper(
-                    Path::new("resource/config.json"),
-                    &lib_dir,
-                    &resource_dir,
+                    Cow::Borrowed(Path::new("resource/config.json")),
+                    lib_dir,
+                    resource_dir,
                     &config
                 ),
                 Some(resource_dir.join("config.json"))
             );
             assert_eq!(
-                extract_mapper(Path::new("misc"), &lib_dir, &resource_dir, &config),
+                extract_mapper(
+                    Cow::Borrowed(Path::new("misc")),
+                    lib_dir,
+                    resource_dir,
+                    &config
+                ),
                 None
             );
         }

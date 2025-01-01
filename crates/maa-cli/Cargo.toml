@@ -49,6 +49,7 @@ clap = { workspace = true, features = ["derive"] }
 clap_complete = { workspace = true }
 clap_mangen = { workspace = true }
 color-print = { workspace = true }
+constcat = { workspace = true }
 digest = { workspace = true, optional = true }
 dunce = { workspace = true }
 env_logger = { workspace = true, features = ["auto-color"] }
@@ -69,6 +70,8 @@ tar = { workspace = true, optional = true }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread"] }
 toml = { workspace = true }
 zip = { workspace = true, optional = true, features = ["deflate"] }
+self-replace = { workspace = true }
+tempfile = { workspace = true }
 
 # Windows specific dependencies
 [target.'cfg(windows)'.dependencies]
