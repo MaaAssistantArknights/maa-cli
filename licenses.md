@@ -4,7 +4,7 @@ This page lists the licenses of the projects used in cargo-about.
 
 ## Overview of licenses
 
-- Apache License 2.0 (30)
+- Apache License 2.0 (33)
 - GNU Affero General Public License v3.0 (4)
 - MIT License (3)
 - BSD 3-Clause "New" or "Revised" License (1)
@@ -489,6 +489,7 @@ Apache License 2.0
 
 - [clap_complete](https://github.com/clap-rs/clap)
 - [clap_mangen](https://github.com/clap-rs/clap)
+- [constcat](https://github.com/rossmacarthur/constcat)
 
 #### Full text
 
@@ -1741,8 +1742,10 @@ Apache License 2.0
 - [git2](https://github.com/rust-lang/git2-rs)
 - [log](https://github.com/rust-lang/log)
 - [regex](https://github.com/rust-lang/regex)
+- [self-replace](https://github.com/mitsuhiko/self-replace)
 - [signal-hook](https://github.com/vorner/signal-hook)
 - [tar](https://github.com/alexcrichton/tar-rs)
+- [tempfile](https://github.com/Stebalien/tempfile)
 
 #### Full text
 
