@@ -85,7 +85,7 @@ fn asst_config_template() -> MAAValue {
                     ),
                     ValueWithDesc::new(
                         "YostarJP",
-                        Some("resource fror Japenese client"),
+                        Some("resource fror Japanese client"),
                     ),
                     ValueWithDesc::new(
                         "YostarKR",
