@@ -429,11 +429,31 @@ mod tests {
             assert_eq!(
                 extract_mapper(
                     Cow::Borrowed(Path::new("libM.so")),
-                    &lib_dir,
-                    &resource_dir,
+                    lib_dir,
+                    resource_dir,
                     &config
                 ),
                 Some(lib_dir.join("libM.so"))
+            );
+            #[cfg(target_os = "macos")]
+            assert_eq!(
+                extract_mapper(
+                    Cow::Borrowed(Path::new("libM.dylib")),
+                    lib_dir,
+                    resource_dir,
+                    &config
+                ),
+                Some(lib_dir.join("libM.dylib"))
+            );
+            #[cfg(target_os = "windows")]
+            assert_eq!(
+                extract_mapper(
+                    Cow::Borrowed(Path::new("libM.dll")),
+                    lib_dir,
+                    resource_dir,
+                    &config
+                ),
+                Some(lib_dir.join("libM.dll"))
             );
             assert_eq!(
                 extract_mapper(
