@@ -427,7 +427,12 @@ mod tests {
         {
             #[cfg(target_os = "linux")]
             assert_eq!(
-                extract_mapper(Path::new("libM.so"), &lib_dir, &resource_dir, &config),
+                extract_mapper(
+                    Cow::Borrowed(Path::new("libM.so")),
+                    &lib_dir,
+                    &resource_dir,
+                    &config
+                ),
                 Some(lib_dir.join("libM.so"))
             );
             assert_eq!(
