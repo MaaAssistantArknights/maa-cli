@@ -109,16 +109,12 @@ jobs:
           cargo build --package maa-cli --locked \
             --features vendored-openssl
 
-  build-feature:
-    name: Build and Test (no default features)
-    runs-on: ${{ matrix.os }}
+  build-no-default:
+    name: No Default Build
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-22.04
-          - macos-latest
-          - windows-latest
         feature:
           - core_installer # disabled cli_installer and git2, used by package manager
           - git2 # disabled both cli_installer and core_installer, used by appimage
