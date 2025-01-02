@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, time::Duration};
 
 use anyhow::{anyhow, Context, Result};
+use maa_dirs::MAA_CLI_EXE;
 use semver::Version;
 use serde::Deserialize;
 use tokio::runtime::Runtime;
@@ -14,9 +15,6 @@ use crate::{
     config::cli::{maa_cli::CommonArgs, CLI_CONFIG},
     dirs::{self, Ensure},
 };
-
-const MAA_CLI_NAME: &str = "maa";
-const MAA_CLI_EXE: &str = constcat::concat!(MAA_CLI_NAME, std::env::consts::EXE_SUFFIX);
 
 pub fn update(args: &CommonArgs) -> Result<()> {
     let config = CLI_CONFIG.cli_config().with_args(args);
