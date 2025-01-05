@@ -107,8 +107,6 @@ maa install
 
 - Nix：
 
-  ```bash
-  nix-env -iA nixpkgs.maa-assistant-arknights
-  ```
+  Nix의 maa-cli는 MaaCore에 대한 필수 종속성이 있습니다. 따라서 Nix 사용자는 MaaCore를 수동으로 설치할 필요가 없으며, 설치해서도 안 됩니다.
 
 **注意**：只有使用包管理器安装 maa-cli 的用户才能使用包管理器安装 MaaCore，否则请使用 `maa install` 命令安装。此外，`maa install` 通过下载官方预编译的 MaaCore，而包管理器安装的 MaaCore 可能使用的编译选项和依赖版本与官方预编译的版本不同，这可能导致性能和功能上存在略微差异。

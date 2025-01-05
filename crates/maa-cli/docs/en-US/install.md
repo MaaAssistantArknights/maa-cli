@@ -107,8 +107,6 @@ For users who installed via package managers, MaaCore can also be installed via 
 
 - Nix：
 
-  ```bash
-  nix-env -iA nixpkgs.maa-assistant-arknights
-  ```
+  maa-cli on Nix depends on the MaaCore package, so no additional installation is required.
 
 **NOTE**: Only users who installed maa-cli via package managers can install MaaCore via package managers. Otherwise, please use the `maa install` command to install. In addition, the `maa install` downloads the official precompiled MaaCore, while the MaaCore installed by package managers has different compilation options and dependency versions from the official precompiled version, potentially causing variations in behavior and performance.
