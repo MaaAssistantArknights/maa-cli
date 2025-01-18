@@ -98,12 +98,12 @@ impl Hasher {
 // * `path` - The path to save the downloaded file.
 // * `size` - The size of the file.
 // * `checker` - The optional checksum checker.
-pub async fn download<'a>(
+pub async fn download(
     client: &Client,
     url: &str,
     path: &Path,
     size: u64,
-    checker: Option<Checker<'a>>,
+    checker: Option<Checker<'_>>,
 ) -> Result<()> {
     let resp = client.get(url).send().await?;
 
@@ -190,13 +190,13 @@ async fn try_download(client: &Client, url: &str, timeout: Duration) -> Result<u
 /// * `size` - The size of the file.
 /// * `t` - The test duration for each mirror, in seconds, 0 to skip the test.
 /// * `checker` - The optional checksum checker.
-pub async fn download_mirrors<'a>(
+pub async fn download_mirrors(
     client: &Client,
     mirrors: Vec<String>,
     path: &Path,
     size: u64,
     t: u64,
-    checker: Option<Checker<'a>>,
+    checker: Option<Checker<'_>>,
 ) -> Result<()> {
     // The first mirror is the default download link.
     let mut download_link = &mirrors[0];

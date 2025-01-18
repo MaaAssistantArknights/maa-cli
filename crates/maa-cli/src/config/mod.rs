@@ -240,7 +240,7 @@ pub fn import(src: &Path, force: bool, config_type: &str) -> std::io::Result<()>
         // check if the file name is cli with supported extension for cli configuration
         if file
             .file_stem()
-            .is_some_and(|stem| stem.to_str().map_or(false, |stem| stem == "cli"))
+            .is_some_and(|stem| stem.to_str().is_some_and(|stem| stem == "cli"))
             && Filetype::is_valid_file(file)
         {
             let cli_path = dirs::config().join("cli");

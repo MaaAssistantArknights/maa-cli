@@ -181,7 +181,7 @@ where
                     file_path
                         .file_name()
                         .and_then(|file_name| file_name.to_str())
-                        .map_or(false, |file_name| {
+                        .is_some_and(|file_name| {
                             file_name.starts_with(stage_id) && file_name.ends_with("json")
                         })
                 })
