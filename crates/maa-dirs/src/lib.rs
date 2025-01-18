@@ -697,7 +697,7 @@ mod tests {
             // resource in the ./share/maa/resource
             {
                 let root = tempfile::tempdir().expect("Failed to create temp dir");
-                let root = std::fs::canonicalize(root.path()).unwrap();
+                let root = canonicalize(root.path()).unwrap();
                 let bin_dir = join!(&root, "bin");
                 let lib_dir = join!(&root, "lib");
                 let resource_dir = join!(&root, "share", "maa", "resource");
