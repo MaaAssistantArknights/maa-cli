@@ -179,6 +179,7 @@ mod tests {
             ],
         );
 
+        #[cfg(feature = "git2")]
         assert_de_tokens(
             &CLIConfig {
                 resource: resource::tests::example_config(),
@@ -212,6 +213,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "git2")]
     fn deserialize_example() {
         let config: CLIConfig =
             toml::from_str(&std::fs::read_to_string("./config_examples/cli.toml").unwrap())
