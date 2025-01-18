@@ -608,7 +608,7 @@ mod tests {
             {
                 assert_eq!(data(), home.join("AppData\\Roaming\\loong\\maa\\data"));
                 assert_eq!(state(), home.join("AppData\\Roaming\\loong\\maa\\data"));
-                assert_eq!(cache(), home.join("AppData\\Roaming\\loong\\maa\\cache"));
+                assert_eq!(cache(), home.join("AppData\\Local\\loong\\maa\\cache"));
                 assert_eq!(config(), home.join("AppData\\Roaming\\loong\\maa\\config"));
             }
 
