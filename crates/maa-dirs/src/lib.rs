@@ -606,9 +606,9 @@ mod tests {
 
             #[cfg(target_os = "windows")]
             {
-                assert_eq!(data(), home.join("AppData\\Local\\loong\\maa"));
-                assert_eq!(state(), home.join("AppData\\Local\\loong\\maa"));
-                assert_eq!(cache(), home.join("AppData\\Local\\loong\\maa\\cache"));
+                assert_eq!(data(), home.join("AppData\\Roaming\\loong\\maa"));
+                assert_eq!(state(), home.join("AppData\\Roaming\\loong\\maa"));
+                assert_eq!(cache(), home.join("AppData\\Roaming\\loong\\maa\\cache"));
                 assert_eq!(config(), home.join("AppData\\Roaming\\loong\\maa"));
             }
 
