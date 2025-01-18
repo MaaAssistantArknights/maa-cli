@@ -88,7 +88,7 @@ jobs:
           cargo test -- --include-ignored
 
   build-cross:
-    name: Cross Build to aarch64
+    name: Cross Build
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -110,7 +110,7 @@ jobs:
             --features vendored-openssl
 
   build-no-default-features:
-    name: Build and Test (features=${{ matrix.feature }})
+    name: Build and Test (${{ matrix.feature }})
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
@@ -130,7 +130,7 @@ jobs:
             -- --include-ignored
 
   build-sys:
-    name: Build and Test (maa-sys, static)
+    name: Build and Test (maa-sys, static, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
