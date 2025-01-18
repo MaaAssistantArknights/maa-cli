@@ -606,10 +606,10 @@ mod tests {
 
             #[cfg(target_os = "windows")]
             {
-                assert_eq!(data(), home.join("AppData\\Roaming\\loong\\maa"));
-                assert_eq!(state(), home.join("AppData\\Roaming\\loong\\maa"));
+                assert_eq!(data(), home.join("AppData\\Roaming\\loong\\maa\\data"));
+                assert_eq!(state(), home.join("AppData\\Roaming\\loong\\maa\\data"));
                 assert_eq!(cache(), home.join("AppData\\Roaming\\loong\\maa\\cache"));
-                assert_eq!(config(), home.join("AppData\\Roaming\\loong\\maa"));
+                assert_eq!(config(), home.join("AppData\\Roaming\\loong\\maa\\config"));
             }
 
             assert_eq!(library(), data().join("lib"));
