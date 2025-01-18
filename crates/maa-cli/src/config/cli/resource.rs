@@ -321,6 +321,7 @@ impl Remote {
 pub mod tests {
     use super::*;
 
+    #[cfg(feature = "git2")]
     pub fn example_config() -> Config {
         Config {
             auto_update: true,
