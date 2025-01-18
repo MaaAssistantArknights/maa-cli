@@ -165,7 +165,7 @@ where
             })?;
 
         if let Some(s) = task_summary.as_mut() {
-            s.insert(id, task.name.map(Into::into), task_type);
+            s.insert(id, task.name, task_type);
         }
     }
     if let Some(s) = task_summary {
