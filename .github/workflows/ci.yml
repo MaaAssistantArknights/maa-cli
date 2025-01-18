@@ -53,14 +53,14 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: Build (maa-cli)
         run: |
-          cargo build --package maa-cli --locked
+          cargo build --locked
       - name: Lint (clippy)
         run: |
-          cargo clippy --package maa-cli -- -D warnings
+          cargo clippy -- -D warnings
       - name: Lint (rustfmt)
         run: |
-          rustup toolchain install nightly -c rustfmt
-          cargo +nightly fmt --package maa-cli -- --check
+          rustup toolchain install nightly --profile minimal --component rustfmt
+          cargo +nightly fmt -- --check
       - name: Install MaaCore
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/crates/maa-cli/config_examples
@@ -109,8 +109,8 @@ jobs:
           cargo build --package maa-cli --locked \
             --features vendored-openssl
 
-  build-no-default:
-    name: No Default Build
+  build-no-default-features:
+    name: Build and Test (features=${{ matrix.feature }})
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
@@ -121,15 +121,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Build
-        run: |
-          cargo build --package maa-cli --locked \
-            --no-default-features --features '${{ matrix.feature }}'
-      - name: Test
+      - name: Build and Test
         env:
           SKIP_CORE_TEST: true
         run: |
-          cargo test -- --include-ignored
+          cargo test --package maa-cli --locked
+            --no-default-features --features '${{ matrix.feature }}' \
+            -- --include-ignored
 
   build-sys:
     name: Build and Test (maa-sys, static)
@@ -153,7 +151,7 @@ jobs:
         run: cargo clippy --package maa-sys -- -D warnings
       - name: Lint (fmt)
         run: |
-          rustup toolchain install nightly -c rustfmt
+          rustup toolchain install nightly --profile minimal --component rustfmt
           cargo +nightly fmt --package maa-sys -- --check
       - name: Test
         # It seems rust needs a static library to check the linking.
