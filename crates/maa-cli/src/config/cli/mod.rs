@@ -179,6 +179,7 @@ mod tests {
             ],
         );
 
+        #[cfg(feature = "git2")]
         assert_de_tokens(
             &CLIConfig {
                 resource: resource::tests::example_config(),
