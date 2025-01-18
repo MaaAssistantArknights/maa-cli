@@ -127,6 +127,11 @@ pub struct RoguelikeParams {
     /// A list of expected collapsal paradigms
     #[arg(short = 'P', long)]
     expected_collapsal_paradigms: Vec<String>,
+
+    // Sarkaz specific parameters
+    /// Whether to start with seed, only available in Sarkaz theme and mode 1
+    #[arg(long)]
+    start_with_seed: bool,
 }
 
 impl super::ToTaskType for RoguelikeParams {
@@ -236,6 +241,9 @@ impl TryFrom<RoguelikeParams> for MAAValue {
                         ),
                     );
                 }
+            }
+            Theme::Sarkaz if mode == 1 => {
+                value.insert("start_with_seed", params.start_with_seed);
             }
             _ => {}
         }
@@ -465,6 +473,22 @@ mod tests {
                     MAAValue::from("目空一些"),
                     MAAValue::from("图像损坏"),
                 ]),
+            )),
+        );
+
+        assert_eq!(
+            parse([
+                "maa",
+                "roguelike",
+                "Sarkaz",
+                "--mode=1",
+                "--start-with-seed",
+            ])
+            .unwrap(),
+            default_params.join(object!(
+                "theme" => "Sarkaz",
+                "mode" => 1,
+                "start_with_seed" => true,
             )),
         );
     }
