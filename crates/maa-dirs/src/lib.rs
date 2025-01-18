@@ -1,7 +1,7 @@
 use std::{
     borrow::Cow,
-    env::{consts, var_os},
-    ffi::OsStr,
+    env::consts,
+    ffi::{OsStr, OsString},
     fs::{create_dir, create_dir_all, remove_dir_all},
     path::{Path, PathBuf},
     sync::LazyLock,
@@ -9,6 +9,9 @@ use std::{
 
 use directories::ProjectDirs;
 use dunce::canonicalize;
+
+pub const MAA_CLI_NAME: &str = "maa";
+pub const MAA_CLI_EXE: &str = constcat::concat!(MAA_CLI_NAME, consts::EXE_SUFFIX);
 
 /// The name of the MaaCore library.
 pub const MAA_CORE_NAME: &str = "MaaCore";
@@ -58,42 +61,58 @@ macro_rules! join {
     }}
 }
 
+// Use this trait to make tests more easily.
+trait VarOs {
+    /// Get the value of the variable `key` as an `OsString`.
+    fn var_os(self, key: impl AsRef<OsStr>) -> Option<OsString>;
+}
+
+/// A `VarOs` implementation that gets the value from system environment variables.
+#[derive(Clone, Copy)]
+struct EnvVarOs;
+
+impl VarOs for EnvVarOs {
+    fn var_os(self, key: impl AsRef<OsStr>) -> Option<OsString> {
+        std::env::var_os(key)
+    }
+}
+
 /// Get the directory from environment variables.
 ///
 /// The `maa_env` usually is `MAA_XXX_DIR`, and the `xdg_env` usually is `XDG_XXX_HOME`.
 /// If the `maa_env` is set, return the directory `maa_env`.
 /// If the `xdg_env` is set, return the directory `xdg_env/maa`.
 /// Otherwise, return `None`.
-fn dir_from_env(maa_env: impl AsRef<OsStr>, xdg_env: impl AsRef<OsStr>) -> Option<PathBuf> {
-    var_os(maa_env)
+fn dir_from_env(v: impl VarOs + Copy, maa_env: &str, xdg_env: &str) -> Option<PathBuf> {
+    v.var_os(maa_env)
         .map(PathBuf::from)
-        .or_else(|| var_os(xdg_env).map(|xdg| join!(xdg, "maa")))
+        .or_else(|| v.var_os(xdg_env).map(|xdg| join!(xdg, "maa")))
 }
 
 /// Get the data directory.
-fn get_data_dir(proj: Option<&ProjectDirs>) -> PathBuf {
-    dir_from_env("MAA_DATA_DIR", "XDG_DATA_HOME")
+fn get_data_dir(v: impl VarOs + Copy, proj: Option<&ProjectDirs>) -> PathBuf {
+    dir_from_env(v, "MAA_DATA_DIR", "XDG_DATA_HOME")
         .or_else(|| proj.map(|dirs| dirs.data_dir().into()))
         .expect("Failed to get data directory!")
 }
 
 /// Get the state directory.
-fn get_state_dir(proj: Option<&ProjectDirs>) -> PathBuf {
-    dir_from_env("MAA_STATE_DIR", "XDG_STATE_HOME")
+fn get_state_dir(v: impl VarOs + Copy, proj: Option<&ProjectDirs>) -> PathBuf {
+    dir_from_env(v, "MAA_STATE_DIR", "XDG_STATE_HOME")
         .or_else(|| proj.map(|dirs| dirs.state_dir().unwrap_or_else(|| dirs.data_dir()).into()))
         .expect("Failed to get state directory!")
 }
 
 /// Get the cache directory.
-fn get_cache_dir(proj: Option<&ProjectDirs>) -> PathBuf {
-    dir_from_env("MAA_CACHE_DIR", "XDG_CACHE_HOME")
+fn get_cache_dir(v: impl VarOs + Copy, proj: Option<&ProjectDirs>) -> PathBuf {
+    dir_from_env(v, "MAA_CACHE_DIR", "XDG_CACHE_HOME")
         .or_else(|| proj.map(|dirs| dirs.cache_dir().into()))
         .expect("Failed to get cache directory!")
 }
 
 /// Get the config directory.
-fn get_config_dir(proj: Option<&ProjectDirs>) -> PathBuf {
-    dir_from_env("MAA_CONFIG_DIR", "XDG_CONFIG_HOME")
+fn get_config_dir(v: impl VarOs + Copy, proj: Option<&ProjectDirs>) -> PathBuf {
+    dir_from_env(v, "MAA_CONFIG_DIR", "XDG_CONFIG_HOME")
         .or_else(|| {
             proj.map(|dirs| {
                 if cfg!(target_os = "macos") {
@@ -119,16 +138,19 @@ pub struct Dirs {
 }
 
 impl Dirs {
-    pub fn new(proj: Option<ProjectDirs>) -> Self {
-        let proj = proj.as_ref();
-        let data_dir = get_data_dir(proj);
-        let state_dir = get_state_dir(proj);
-        let cache_dir = get_cache_dir(proj);
+    fn new(proj: Option<&ProjectDirs>) -> Self {
+        Self::new_inner(proj, EnvVarOs)
+    }
+
+    fn new_inner(proj: Option<&ProjectDirs>, v: impl VarOs + Copy) -> Self {
+        let data_dir = get_data_dir(v, proj);
+        let state_dir = get_state_dir(v, proj);
+        let cache_dir = get_cache_dir(v, proj);
 
         Self {
             copilot: cache_dir.join("copilot"),
             cache: cache_dir,
-            config: get_config_dir(proj),
+            config: get_config_dir(v, proj),
             library: data_dir.join("lib"),
             resource: data_dir.join("resource"),
             hot_update: data_dir.join("MaaResource"),
@@ -281,7 +303,12 @@ impl Dirs {
     }
 }
 
-static DIRS: LazyLock<Dirs> = LazyLock::new(|| Dirs::new(ProjectDirs::from("com", "loong", "maa")));
+const QUALIFIER: &str = "com";
+const ORGANIZATION: &str = "loong";
+const APPLICATION: &str = "maa";
+
+static DIRS: LazyLock<Dirs> =
+    LazyLock::new(|| Dirs::new(ProjectDirs::from(QUALIFIER, ORGANIZATION, APPLICATION).as_ref()));
 
 fn current_exe() -> Option<&'static Path> {
     static CURRENT_EXE: LazyLock<Option<PathBuf>> = LazyLock::new(|| std::env::current_exe().ok());
@@ -468,7 +495,7 @@ fn ensure_name(name: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use std::env::{self, temp_dir};
+    use std::env;
 
     use super::*;
 
@@ -484,19 +511,63 @@ mod tests {
         assert_eq!(MAA_CORE_LIB, "MaaCore.dll");
     }
 
+    #[test]
+    fn env_var_os() {
+        use std::env;
+
+        // A random environment variable name to avoid conflict
+        const VAR: &str = "DEAWPMONUBYASDCOPBH";
+
+        env::set_var(VAR, "foo");
+        assert_eq!(EnvVarOs.var_os(VAR), Some(OsString::from("foo")));
+
+        env::remove_var(VAR);
+        assert_eq!(EnvVarOs.var_os(VAR), None);
+    }
+
     mod get_dir {
-        use std::fs::{create_dir_all, remove_dir_all};
+        use std::{fs::create_dir_all, sync::Once};
 
         use super::*;
 
-        fn project() -> Option<ProjectDirs> {
-            ProjectDirs::from("com", "loong", "maa")
+        struct MockVarOs {
+            vars: std::collections::BTreeMap<OsString, OsString>,
         }
 
-        /// A dirs instance created in a clean environment (no environment variables set).
-        /// And the static DIRS should also be initialized in this clean environment.
-        fn clean_dirs() -> &'static Dirs {
-            static TEST_DIRS: LazyLock<Dirs> = LazyLock::new(|| {
+        impl VarOs for &MockVarOs {
+            fn var_os(self, key: impl AsRef<OsStr>) -> Option<OsString> {
+                self.vars.get(key.as_ref()).cloned()
+            }
+        }
+
+        impl MockVarOs {
+            fn new() -> Self {
+                Self {
+                    vars: std::collections::BTreeMap::new(),
+                }
+            }
+
+            fn with_var(mut self, key: &str, value: &str) -> Self {
+                self.vars.insert(OsString::from(key), OsString::from(value));
+                self
+            }
+        }
+
+        impl From<Vec<(&str, &str)>> for MockVarOs {
+            fn from(vars: Vec<(&str, &str)>) -> Self {
+                let vars = vars
+                    .into_iter()
+                    .map(|(k, v)| (OsString::from(k), OsString::from(v)))
+                    .collect();
+                Self { vars }
+            }
+        }
+
+        /// Clear all related environment variables to avoid pollution from parent process
+        fn clear_env() {
+            static CLRER: Once = Once::new();
+            // env_remove_var is not thread-safe and will be marked as unsafe in rust edition 2024
+            CLRER.call_once(|| unsafe {
                 env::remove_var("XDG_DATA_HOME");
                 env::remove_var("XDG_STATE_HOME");
                 env::remove_var("XDG_CACHE_HOME");
@@ -505,282 +576,280 @@ mod tests {
                 env::remove_var("MAA_STATE_DIR");
                 env::remove_var("MAA_CACHE_DIR");
                 env::remove_var("MAA_CONFIG_DIR");
-                home();
-                log();
-                Dirs::new(project())
             });
-
-            &TEST_DIRS
         }
 
-        /// Test for path the depends on *_STATE_* environment variables.
         #[test]
-        fn state_relative() {
-            let dirs = clean_dirs();
+        fn test_std_dirs() {
+            clear_env();
+
+            let home = home();
+
             #[cfg(target_os = "macos")]
             {
                 assert_eq!(
-                    dirs.state(),
-                    home().join("Library/Application Support/com.loong.maa")
+                    data(),
+                    home.join("Library/Application Support/com.loong.maa")
                 );
-                assert_eq!(
-                    dirs.log(),
-                    home().join("Library/Application Support/com.loong.maa/debug")
-                );
+                assert_eq!(state(), data());
+                assert_eq!(cache(), home.join("Library/Caches/com.loong.maa"));
+                assert_eq!(config(), data().join("config"));
             }
+
             #[cfg(target_os = "linux")]
             {
-                assert_eq!(dirs.state(), home().join(".local/state/maa"));
-                assert_eq!(dirs.log(), home().join(".local/state/maa/debug"));
+                assert_eq!(data(), home.join(".local/share/maa"));
+                assert_eq!(state(), home.join(".local/state/maa"));
+                assert_eq!(cache(), home.join(".cache/maa"));
+                assert_eq!(config(), home.join(".config/maa"));
             }
-            assert_eq!(state(), clean_dirs().state());
-            assert_eq!(log(), clean_dirs().log());
 
-            env::set_var("XDG_STATE_HOME", "/xdg");
-            let dirs = Dirs::new(project());
-            assert_eq!(dirs.state(), PathBuf::from("/xdg/maa"));
-            assert_eq!(dirs.log(), PathBuf::from("/xdg/maa/debug"));
-            env::remove_var("XDG_STATE_HOME");
+            #[cfg(target_os = "windows")]
+            {
+                assert_eq!(data(), home.join("AppData\\Roaming\\loong\\maa\\data"));
+                assert_eq!(state(), home.join("AppData\\Roaming\\loong\\maa\\data"));
+                assert_eq!(cache(), home.join("AppData\\Local\\loong\\maa\\cache"));
+                assert_eq!(config(), home.join("AppData\\Roaming\\loong\\maa\\config"));
+            }
 
-            env::set_var("MAA_STATE_DIR", "/maa");
-            let dirs = Dirs::new(project());
-            assert_eq!(dirs.state(), PathBuf::from("/maa"));
-            assert_eq!(dirs.log(), PathBuf::from("/maa/debug"));
-            env::remove_var("MAA_STATE_DIR");
+            assert_eq!(library(), data().join("lib"));
+            assert_eq!(resource(), data().join("resource"));
+            assert_eq!(hot_update(), data().join("MaaResource"));
+            assert_eq!(copilot(), cache().join("copilot"));
+            assert_eq!(log(), state().join("debug"));
         }
 
         #[test]
         #[ignore = "need installed MaaCore and resource"]
-        fn data_relative() {
-            let dirs = clean_dirs();
-
-            #[cfg(target_os = "macos")]
-            {
-                assert_eq!(
-                    dirs.data(),
-                    home().join("Library/Application Support/com.loong.maa")
-                );
-                assert_eq!(
-                    dirs.library(),
-                    home().join("Library/Application Support/com.loong.maa/lib")
-                );
-                assert_eq!(
-                    dirs.resource(),
-                    home().join("Library/Application Support/com.loong.maa/resource")
-                );
-                assert_eq!(
-                    dirs.hot_update(),
-                    home().join("Library/Application Support/com.loong.maa/MaaResource")
-                );
+        fn find_std_dirs() {
+            if env::var_os("SKIP_CORE_TEST").is_some() {
+                return;
             }
 
-            #[cfg(target_os = "linux")]
-            {
-                assert_eq!(dirs.data(), home().join(".local/share/maa"));
-                assert_eq!(dirs.library(), home().join(".local/share/maa/lib"));
-                assert_eq!(dirs.resource(), home().join(".local/share/maa/resource"));
-                assert_eq!(
-                    dirs.hot_update(),
-                    home().join(".local/share/maa/MaaResource")
-                );
-            }
+            clear_env();
 
-            assert_eq!(data(), dirs.data());
-            assert_eq!(library(), dirs.library());
-            assert_eq!(resource(), dirs.resource());
-            assert_eq!(hot_update(), dirs.hot_update());
+            assert_eq!(find_library().unwrap(), library());
 
-            // Test find_library and find_resource at standard location.
-            // So we need MaaCore installed at standard location.
-            if env::var_os("SKIP_CORE_TEST").is_none() {
-                let exe_path = Path::new("/path/to/maa");
-                assert_eq!(
-                    clean_dirs().find_library(exe_path).unwrap(),
-                    clean_dirs().library()
-                );
-                assert_eq!(
-                    clean_dirs().find_resource(exe_path).unwrap(),
-                    clean_dirs().resource()
-                );
-                assert_eq!(find_library().unwrap(), library());
-                assert_eq!(find_resource().unwrap(), resource());
-            }
+            assert_eq!(find_resource().unwrap(), resource());
+        }
 
-            env::set_var("XDG_DATA_HOME", "/xdg");
-            let dirs = Dirs::new(project());
+        static PROJECT: LazyLock<Option<ProjectDirs>> =
+            LazyLock::new(|| ProjectDirs::from(QUALIFIER, ORGANIZATION, APPLICATION));
+
+        #[test]
+        fn data_dir() {
+            // Test with XDG_DATA_HOME set
+            let mock = MockVarOs::new().with_var("XDG_DATA_HOME", "/xdg");
+            let dirs = Dirs::new_inner(PROJECT.as_ref(), &mock);
             assert_eq!(dirs.data(), PathBuf::from("/xdg/maa"));
             assert_eq!(dirs.library(), PathBuf::from("/xdg/maa/lib"));
             assert_eq!(dirs.resource(), PathBuf::from("/xdg/maa/resource"));
-            env::remove_var("XDG_DATA_HOME");
+            assert_eq!(dirs.hot_update(), PathBuf::from("/xdg/maa/MaaResource"));
 
-            env::set_var("MAA_DATA_DIR", "/maa");
-            let dirs = Dirs::new(project());
+            // Test with MAA_DATA_DIR set
+            let mock = MockVarOs::new().with_var("MAA_DATA_DIR", "/maa");
+            let dirs = Dirs::new_inner(PROJECT.as_ref(), &mock);
             assert_eq!(dirs.data(), PathBuf::from("/maa"));
             assert_eq!(dirs.library(), PathBuf::from("/maa/lib"));
             assert_eq!(dirs.resource(), PathBuf::from("/maa/resource"));
-            env::remove_var("MAA_DATA_DIR");
+            assert_eq!(dirs.hot_update(), PathBuf::from("/maa/MaaResource"));
+        }
 
-            env::set_var("XDG_DATA_HOME", "/xdg");
-            let dirs = Dirs::new(project());
-            assert_eq!(dirs.data(), PathBuf::from("/xdg/maa"));
-            assert_eq!(dirs.library(), PathBuf::from("/xdg/maa/lib"));
-            assert_eq!(dirs.resource(), PathBuf::from("/xdg/maa/resource"));
-            env::remove_var("XDG_DATA_HOME");
+        #[test]
+        fn find_dirs() {
+            use std::fs::File;
 
-            env::set_var("MAA_DATA_DIR", "/maa");
-            let dirs = Dirs::new(project());
-            assert_eq!(dirs.data(), PathBuf::from("/maa"));
-            assert_eq!(dirs.library(), PathBuf::from("/maa/lib"));
-            assert_eq!(dirs.resource(), PathBuf::from("/maa/resource"));
-            env::remove_var("MAA_DATA_DIR");
+            // Make sure library and resource are not found
+            let dirs = Dirs::new_inner(
+                PROJECT.as_ref(),
+                &MockVarOs::new()
+                    .with_var("XDG_DATA_HOME", "/xdg")
+                    .with_var("XDG_CACHE_HOME", "/xdg")
+                    .with_var("XDG_STATE_HOME", "/xdg")
+                    .with_var("XDG_CONFIG_HOME", "/xdg"),
+            );
 
-            // Test find_library and find_resource at non-standard location (in a test directory)
-            // We need to use the provius dirs since the data directory is not at its standard
-            // location, to avoid find_library and find_resource returning the standard
-            // location.
-            let test_root = temp_dir().join("maa-dirs-test-data-relative");
-            test_root.ensure_clean().unwrap();
-            let test_root = canonicalize(test_root).unwrap();
+            // Test flat directory structure, common in Windows
+            // maa in the root
+            // lib in the root
+            // resource in the root
+            {
+                let root = tempfile::tempdir().expect("Failed to create temp dir");
+                let root = canonicalize(root.path()).unwrap();
+                let exe = join!(&root, MAA_CLI_EXE);
+                let lib = join!(&root, MAA_CORE_LIB);
+                let resource = join!(&root, "resource");
 
-            fn prepare_files(bin: &Path, lib: &Path, resource: &Path) {
-                let bin_dir = bin.parent().expect("Failed to get bin directory");
-                let lib_dir = lib.parent().expect("Failed to get lib directory");
-                bin_dir.ensure().expect("Failed to create bin directory");
-                lib_dir.ensure().expect("Failed to create lib directory");
-                std::fs::File::create(bin).expect("Failed to create bin file");
-                std::fs::File::create(lib).expect("Failed to create lib file");
-                create_dir_all(resource).expect("Failed to create resource directory");
+                File::create(&exe).expect("Failed to create exe file");
+                File::create(&lib).expect("Failed to create lib file");
+                create_dir_all(&resource).expect("Failed to create resource dir");
+
+                assert_eq!(dirs.find_library(&exe).as_deref(), Some(root.as_path()));
+                assert_eq!(
+                    dirs.find_resource(&exe).as_deref(),
+                    Some(resource.as_path())
+                );
             }
 
-            // Test flat directory structure.
-            let bin = join!(&test_root, "maa");
-            let lib = join!(&test_root, MAA_CORE_LIB);
-            let resource = join!(&test_root, "resource");
-            test_root.ensure_clean().unwrap();
-            prepare_files(&bin, &lib, &resource);
-            assert_eq!(dirs.find_library(&bin).unwrap(), lib.parent().unwrap());
-            assert_eq!(dirs.find_resource(&bin).unwrap(), resource);
+            // Test unix-like layout
+            // maa in the ./bin
+            // MaaCore in the ./lib
+            // resource in the ./share/maa/resource
+            {
+                let root = tempfile::tempdir().expect("Failed to create temp dir");
+                let root = canonicalize(root.path()).unwrap();
+                let bin_dir = join!(&root, "bin");
+                let lib_dir = join!(&root, "lib");
+                let resource_dir = join!(&root, "share", "maa", "resource");
+                bin_dir.ensure().expect("Failed to create bin dir");
+                lib_dir.ensure().expect("Failed to create lib dir");
+                resource_dir
+                    .ensure()
+                    .expect("Failed to create resource dir");
 
-            // Test unix-like directory structure.
-            let bin = join!(&test_root, "bin", "maa");
-            let lib = join!(&test_root, "lib", MAA_CORE_LIB);
-            let resource = join!(&test_root, "share", "maa", "resource");
-            test_root.ensure_clean().unwrap();
-            prepare_files(&bin, &lib, &resource);
-            assert_eq!(dirs.find_library(&bin).unwrap(), lib.parent().unwrap());
-            assert_eq!(dirs.find_resource(&bin).unwrap(), resource);
+                let exe = bin_dir.join(MAA_CLI_EXE);
+                let lib = lib_dir.join(MAA_CORE_LIB);
 
-            // Test unix-like directory structure but resource has a different name.
-            if let Some(name) = option_env!("MAA_EXTRA_SHARE_NAME") {
-                let bin = join!(&test_root, "bin", "maa");
-                let lib = join!(&test_root, "lib", MAA_CORE_LIB);
-                let resource = join!(&test_root, "share", name, "resource");
-                test_root.ensure_clean().unwrap();
-                prepare_files(&bin, &lib, &resource);
-                assert_eq!(dirs.find_library(&bin).unwrap(), lib.parent().unwrap());
-                assert_eq!(dirs.find_resource(&bin).unwrap(), resource);
+                File::create(&exe).expect("Failed to create exe file");
+                File::create(&lib).expect("Failed to create lib file");
+
+                assert_eq!(dirs.find_library(&exe).as_deref(), Some(lib_dir.as_path()));
+                assert_eq!(
+                    dirs.find_resource(&exe).as_deref(),
+                    Some(resource_dir.as_path())
+                );
             }
 
+            // Test with maa extra share name
+            // maa in the ./bin
+            // MaaCore in the ./lib
+            // resource in the ./share/{MAA_EXTRA_SHARE_NAME}/resource
+            if let Some(extra_share) = option_env!("MAA_EXTRA_SHARE_NAME") {
+                let root = tempfile::tempdir().expect("Failed to create temp dir");
+                let root = canonicalize(root.path()).unwrap();
+                let bin_dir = join!(&root, "bin");
+                let lib_dir = join!(&root, "lib");
+                let resource_dir = join!(&root, "share", extra_share, "resource");
+                bin_dir.ensure().expect("Failed to create bin dir");
+                lib_dir.ensure().expect("Failed to create lib dir");
+                resource_dir
+                    .ensure()
+                    .expect("Failed to create resource dir");
+
+                let exe = bin_dir.join(MAA_CLI_EXE);
+                let lib = lib_dir.join(MAA_CORE_LIB);
+
+                File::create(&exe).expect("Failed to create exe file");
+                File::create(&lib).expect("Failed to create lib file");
+
+                assert_eq!(dirs.find_library(&exe).as_deref(), Some(lib_dir.as_path()));
+                assert_eq!(
+                    dirs.find_resource(&exe).as_deref(),
+                    Some(resource_dir.as_path())
+                );
+            }
+
+            // Test homebrew-like layout
+            // maa in a isolated cellar directory ./cellar/maa-cli/bin
+            // MaaCore in a isolated cellar directory ./cellar/maa-core/lib
+            // resource in a isolated cellar directory ./cellar/maa-core/share/maa/resource
             #[cfg(unix)]
             {
+                let root = tempfile::tempdir().expect("Failed to create temp dir");
+                let root = canonicalize(root.path()).unwrap();
+                let bin_dir = join!(&root, "bin");
+                let lib_dir = join!(&root, "lib");
+                let resource_dir = join!(&root, "share", "maa", "resource");
+
+                bin_dir.ensure().expect("Failed to create bin dir");
+                lib_dir.ensure().expect("Failed to create lib dir");
+                resource_dir
+                    .parent()
+                    .unwrap()
+                    .ensure()
+                    .expect("Failed to create resource dir");
+
+                let cellar_dir = join!(&root, "Cellar");
+                let maa_cli_cellar = join!(&cellar_dir, "maa-cli");
+                let maa_core_cellar = join!(&cellar_dir, "maa-core");
+                let maa_cli_bin_dir = join!(&maa_cli_cellar, "bin");
+                let maa_core_lib_dir = join!(&maa_core_cellar, "lib");
+                let maa_core_resource_dir = join!(&maa_core_cellar, "share", "maa", "resource");
+
+                maa_cli_bin_dir
+                    .ensure()
+                    .expect("Failed to create maa-cli bin dir");
+                maa_core_lib_dir
+                    .ensure()
+                    .expect("Failed to create maa-core lib dir");
+                maa_core_resource_dir
+                    .ensure()
+                    .expect("Failed to create maa-core resource dir");
+
+                let maa_cli_exe = maa_cli_bin_dir.join(MAA_CLI_EXE);
+                let maa_core_lib = maa_core_lib_dir.join(MAA_CORE_LIB);
+
+                File::create(&maa_cli_exe).expect("Failed to create maa-cli exe file");
+                File::create(&maa_core_lib).expect("Failed to create maa-core lib file");
+
+                // create symbolic link
                 use std::os::unix::fs::symlink;
-                // Test homebrew-like directory structure.
-                let bin = join!(&test_root, "Cellar", "bin", "maa");
-                let lib = join!(&test_root, "lib", MAA_CORE_LIB);
-                let resource = join!(&test_root, "share", "maa", "resource");
-                test_root.ensure_clean().unwrap();
-                prepare_files(&bin, &lib, &resource);
-                let exe = join!(&test_root, "bin", "maa");
-                let exe_dir = exe.parent().expect("Failed to get exe directory");
-                exe_dir.ensure().expect("Failed to create exe directory");
-                symlink(&bin, &exe).expect("Failed to create symbolic link");
-                assert_eq!(dirs.find_library(&exe).unwrap(), lib.parent().unwrap());
-                assert_eq!(dirs.find_resource(&exe).unwrap(), resource);
+                let exe = bin_dir.join(MAA_CLI_EXE);
+                let lib = lib_dir.join(MAA_CORE_LIB);
+                symlink(&maa_cli_exe, &exe).expect("Failed to create symbolic link");
+                symlink(&maa_core_lib, &lib).expect("Failed to create symbolic link");
+                symlink(&maa_core_resource_dir, &resource_dir)
+                    .expect("Failed to create symbolic link");
 
-                // Test maa is linked to a different directory.
-                let bin = join!(&test_root, "bin", "maa");
-                let lib = join!(&test_root, "lib", MAA_CORE_LIB);
-                let resource = join!(&test_root, "share", "maa", "resource");
-                test_root.ensure_clean().unwrap();
-                prepare_files(&bin, &lib, &resource);
-                let exe = join!(&test_root, "other", "bin", "maa");
-                let exe_dir = exe.parent().expect("Failed to get exe directory");
-                exe_dir.ensure().expect("Failed to create exe directory");
-                symlink(&bin, &exe).expect("Failed to create symbolic link");
-                assert_eq!(dirs.find_library(&exe).unwrap(), lib.parent().unwrap());
-                assert_eq!(dirs.find_resource(&exe).unwrap(), resource);
+                assert_eq!(dirs.find_library(&exe).as_deref(), Some(lib_dir.as_path()));
+                assert_eq!(
+                    dirs.find_resource(&exe).as_deref(),
+                    Some(resource_dir.as_path())
+                );
             }
-
-            remove_dir_all(&test_root).unwrap();
         }
 
         #[test]
-        fn config_relative() {
-            let dirs = clean_dirs();
-            #[cfg(target_os = "macos")]
-            {
-                assert_eq!(
-                    dirs.config(),
-                    home().join("Library/Application Support/com.loong.maa/config")
-                );
-            }
-            #[cfg(target_os = "linux")]
-            {
-                assert_eq!(dirs.config(), home().join(".config/maa"));
-            }
-            assert_eq!(config(), clean_dirs().config());
+        fn state_dir() {
+            // Test with XDG_STATE_HOME set
+            let mock = MockVarOs::new().with_var("XDG_STATE_HOME", "/xdg");
+            let dirs = Dirs::new_inner(PROJECT.as_ref(), &mock);
+            assert_eq!(dirs.state(), PathBuf::from("/xdg/maa"));
+            assert_eq!(dirs.log(), PathBuf::from("/xdg/maa/debug"));
 
-            assert_eq!(
-                clean_dirs().abs_config::<&str, &str>("foo", None).unwrap(),
-                clean_dirs().config().join("foo")
-            );
-            assert_eq!(
-                clean_dirs().abs_config("foo", Some("bar")).unwrap(),
-                join!(clean_dirs().config(), "bar", "foo")
-            );
-            #[cfg(unix)]
-            {
-                assert_eq!(clean_dirs().abs_config::<&str, &str>("/tmp", None), None);
-                assert_eq!(clean_dirs().abs_config("/tmp", Some("bar")), None);
-            }
-
-            env::set_var("XDG_CONFIG_HOME", "/xdg");
-            let dirs = Dirs::new(project());
-            assert_eq!(dirs.config(), PathBuf::from("/xdg/maa"));
-
-            env::set_var("MAA_CONFIG_DIR", "/maa");
-            let dirs = Dirs::new(project());
-            assert_eq!(dirs.config(), PathBuf::from("/maa"));
+            // Test with MAA_STATE_DIR set
+            let mock = MockVarOs::new().with_var("MAA_STATE_DIR", "/maa");
+            let dirs = Dirs::new_inner(PROJECT.as_ref(), &mock);
+            assert_eq!(dirs.state(), PathBuf::from("/maa"));
+            assert_eq!(dirs.log(), PathBuf::from("/maa/debug"));
         }
 
         #[test]
-        fn cache_relative() {
-            let dirs = clean_dirs();
-            #[cfg(target_os = "macos")]
-            {
-                assert_eq!(dirs.cache(), home().join("Library/Caches/com.loong.maa"));
-                assert_eq!(
-                    dirs.copilot(),
-                    home().join("Library/Caches/com.loong.maa/copilot")
-                );
-            }
-            #[cfg(target_os = "linux")]
-            {
-                assert_eq!(dirs.cache(), home().join(".cache/maa"));
-                assert_eq!(dirs.copilot(), home().join(".cache/maa/copilot"));
-            }
-            assert_eq!(cache(), clean_dirs().cache());
-            assert_eq!(copilot(), clean_dirs().copilot());
-
-            env::set_var("XDG_CACHE_HOME", "/xdg");
-            let dirs = Dirs::new(project());
+        fn cache_dir() {
+            // Test with XDG_CACHE_HOME set
+            let mock = MockVarOs::new().with_var("XDG_CACHE_HOME", "/xdg");
+            let dirs = Dirs::new_inner(PROJECT.as_ref(), &mock);
             assert_eq!(dirs.cache(), PathBuf::from("/xdg/maa"));
             assert_eq!(dirs.copilot(), PathBuf::from("/xdg/maa/copilot"));
 
-            env::set_var("MAA_CACHE_DIR", "/maa");
-            let dirs = Dirs::new(project());
+            // Test with MAA_CACHE_DIR set
+            let mock = MockVarOs::new().with_var("MAA_CACHE_DIR", "/maa");
+            let dirs = Dirs::new_inner(PROJECT.as_ref(), &mock);
             assert_eq!(dirs.cache(), PathBuf::from("/maa"));
             assert_eq!(dirs.copilot(), PathBuf::from("/maa/copilot"));
+        }
+
+        #[test]
+        fn config_dir() {
+            // Test with XDG_CONFIG_HOME set
+            let mock = MockVarOs::new().with_var("XDG_CONFIG_HOME", "/xdg");
+            let dirs = Dirs::new_inner(PROJECT.as_ref(), &mock);
+            assert_eq!(dirs.config(), PathBuf::from("/xdg/maa"));
+
+            // Test with MAA_CONFIG_DIR set
+            let mock = MockVarOs::new().with_var("MAA_CONFIG_DIR", "/maa");
+            let dirs = Dirs::new_inner(PROJECT.as_ref(), &mock);
+            assert_eq!(dirs.config(), PathBuf::from("/maa"));
         }
     }
 
@@ -796,18 +865,20 @@ mod tests {
 
     #[test]
     fn ensure() {
-        let test_root = temp_dir().join("maa-test-ensure");
+        let test_root = tempfile::tempdir().expect("Failed to create temp dir");
+
+        let test_root = test_root.path();
         let test_dir = test_root.join("test");
         assert_eq!(test_root.ensure_clean().unwrap(), test_root);
         assert!(!test_dir.exists());
         assert_eq!(test_dir.ensure().unwrap(), test_dir);
         assert!(test_dir.exists());
-        remove_dir_all(&test_root).unwrap();
     }
 
     #[test]
     fn global_path_and_find() {
-        let test_root = temp_dir().join("maa-test-global-path");
+        let test_root = tempfile::tempdir().expect("Failed to create temp dir");
+        let test_root = test_root.path();
         let test_dir1 = test_root.join("test1");
         let test_dir2 = test_root.join("test2");
         let test_file = test_dir1.join("test");
@@ -846,8 +917,6 @@ mod tests {
             }),
             Vec::<PathBuf>::new()
         );
-
-        remove_dir_all(&test_root).unwrap();
     }
 
     #[test]

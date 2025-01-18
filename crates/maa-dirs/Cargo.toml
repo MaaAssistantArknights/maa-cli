@@ -1,6 +1,6 @@
 [package]
 name = "maa-dirs"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 license.workspace = true
 homepage.workspace = true
@@ -11,3 +11,6 @@ constcat = { workspace = true }
 directories = { workspace = true }
 dunce = { workspace = true }
 log = { workspace = true }
+
+[dev-dependencies]
+tempfile.workspace = true
