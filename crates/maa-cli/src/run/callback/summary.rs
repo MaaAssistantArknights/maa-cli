@@ -1,8 +1,10 @@
 //! **ALWYAS** call [`init_pipe`] before using other functions,
 //! otherwise program will panic
 pub use std::collections::BTreeMap as Map;
-use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
-use std::sync::OnceLock;
+use std::sync::{
+    mpsc::{channel, Receiver, Sender, TryRecvError},
+    OnceLock,
+};
 
 use chrono;
 use maa_sys::TaskType;
@@ -31,6 +33,7 @@ impl SummarySubscriber {
     fn new(rx: Receiver<TaskState>) -> Self {
         Self { rx, summary: None }
     }
+
     /// collect all cached content in pipe, and show the delta
     pub fn try_update(&mut self) -> Option<String> {
         if self.summary.is_none() {
@@ -77,6 +80,7 @@ impl SummarySubscriber {
                 .fold("".to_owned(), |acc, new| format!("{acc}{LINE_SEP}\n{new}")),
         )
     }
+
     /// get [`Summary`] as String
     pub fn sync(&self) -> String {
         self.summary.as_ref().unwrap_or(&Summary::new()).to_string()
@@ -144,6 +148,7 @@ impl Summary {
         self.current_task
             .and_then(|id| self.task_summarys.get_mut(&id))
     }
+    
     fn current(&self) -> Option<&TaskSummary> {
         self.current_task.and_then(|id| self.task_summarys.get(&id))
     }
