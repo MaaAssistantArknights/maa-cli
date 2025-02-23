@@ -1,5 +1,8 @@
+//! **ALWYAS** call [`init_pipe`] before using other functions,
+//! otherwise program will panic
 pub use std::collections::BTreeMap as Map;
-use std::sync::Mutex;
+use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
+use std::sync::OnceLock;
 
 use chrono;
 use maa_sys::TaskType;
@@ -7,42 +10,120 @@ use maa_types::primitive::AsstTaskId;
 
 use super::IterJoin;
 
-static SUMMARY: Mutex<Option<Summary>> = Mutex::new(None);
+static PIPE: OnceLock<Sender<TaskState>> = OnceLock::new();
 
-// It's safe to unwarp the mutex all there, because lock() returns a error only when
-// another thread failed inside the lock, which is impossible in this case, because
-// there is no function that can panic inside the lock, unless the print!, which is
-// not a problem.
-
-pub(crate) fn init(summary: Summary) {
-    *SUMMARY.lock().unwrap() = Some(summary);
+enum TaskState {
+    Start(AsstTaskId),
+    End(Reason),
+    Detail(Box<dyn FnOnce(&mut Detail) + Send>),
+    Insert {
+        id: AsstTaskId,
+        name: Option<String>,
+        task: TaskType,
+    },
+}
+/// provider real-time log from MaaCore
+pub struct SummarySubscriber {
+    rx: Receiver<TaskState>,
+    summary: Option<Summary>,
+}
+impl SummarySubscriber {
+    fn new(rx: Receiver<TaskState>) -> Self {
+        Self { rx, summary: None }
+    }
+    /// collect all cached content in pipe, and show the delta
+    pub fn try_update(&mut self) -> Option<String> {
+        if self.summary.is_none() {
+            self.summary = Some(Summary::new())
+        }
+        let summary = self.summary.as_mut().unwrap();
+        let mut delta = vec![];
+        loop {
+            match self.rx.try_recv() {
+                Ok(TaskState::Insert { id, name, task }) => {
+                    let task = TaskSummary::new(name, task);
+                    delta.push(format!("Task Add:\n{}", task));
+                    summary.insert(id, task);
+                }
+                Ok(TaskState::Start(id)) => {
+                    summary.start_task(id);
+                    if let Some(task) = summary.current() {
+                        // NOTE: if id is not in the map, then current task won't change
+                        // which can cause a mistake
+                        //
+                        // But this couldn't happen?
+                        delta.push(format!("Task Start:\n{}", task));
+                    };
+                }
+                Ok(TaskState::End(reason)) => {
+                    if let Some(task) = summary.current() {
+                        delta.push(format!("Task End:\n{}", task));
+                    };
+                    summary.end_current_task(reason);
+                }
+                Ok(TaskState::Detail(detial)) => {
+                    summary.edit_current_task_detail(detial);
+                    if let Some(task) = summary.current() {
+                        delta.push(format!("Task State Change:\n{}", task));
+                    };
+                }
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => unreachable!(),
+            }
+        }
+        (!delta.is_empty()).then_some(
+            delta
+                .into_iter()
+                .fold("".to_owned(), |acc, new| format!("{acc}{LINE_SEP}\n{new}")),
+        )
+    }
+    /// get [`Summary`] as String
+    pub fn sync(&self) -> String {
+        self.summary.as_ref().unwrap_or(&Summary::new()).to_string()
+    }
 }
 
-fn with_summary<T>(f: impl FnOnce(&Summary) -> T) -> Option<T> {
-    SUMMARY.lock().unwrap().as_ref().map(f)
+pub fn init_pipe() -> SummarySubscriber {
+    let (tx, rx) = channel();
+    PIPE.set(tx).unwrap();
+    SummarySubscriber::new(rx)
 }
 
-fn with_summary_mut<T>(f: impl FnOnce(&mut Summary) -> T) -> Option<T> {
-    SUMMARY.lock().unwrap().as_mut().map(f)
+pub fn insert(id: AsstTaskId, name: Option<String>, task: impl Into<TaskType>) {
+    PIPE.get()
+        .unwrap()
+        .send(TaskState::Insert {
+            id,
+            name,
+            task: task.into(),
+        })
+        .unwrap();
 }
 
-pub(crate) fn display() -> Option<()> {
-    with_summary(|summary| print!("{}", summary))
+pub(crate) fn display(mut rx: SummarySubscriber) {
+    rx.try_update();
+    println!("{}", rx.sync());
 }
 
 pub(super) fn start_task(id: AsstTaskId) -> Option<()> {
-    with_summary_mut(|summary| summary.start_task(id)).flatten()
+    PIPE.get().unwrap().send(TaskState::Start(id)).unwrap();
+    Some(())
 }
 
 pub(super) fn end_current_task(reason: Reason) -> Option<()> {
-    with_summary_mut(|summary| summary.end_current_task(reason)).flatten()
+    PIPE.get().unwrap().send(TaskState::End(reason)).unwrap();
+    Some(())
 }
 
-pub(super) fn edit_current_task_detail(f: impl FnOnce(&mut Detail)) -> Option<()> {
-    with_summary_mut(|summary| summary.edit_current_task_detail(f)).flatten()
+pub(super) fn edit_current_task_detail(f: impl FnOnce(&mut Detail) + Send + 'static) -> Option<()> {
+    PIPE.get()
+        .unwrap()
+        .send(TaskState::Detail(Box::new(f)))
+        .unwrap();
+    Some(())
 }
 
-pub struct Summary {
+struct Summary {
     task_summarys: Map<AsstTaskId, TaskSummary>,
     current_task: Option<AsstTaskId>,
 }
@@ -55,14 +136,16 @@ impl Summary {
         }
     }
 
-    pub fn insert(&mut self, id: AsstTaskId, name: Option<String>, task: impl Into<TaskType>) {
-        self.task_summarys
-            .insert(id, TaskSummary::new(name, task.into()));
+    pub fn insert(&mut self, id: AsstTaskId, task: TaskSummary) {
+        self.task_summarys.insert(id, task);
     }
 
     fn current_mut(&mut self) -> Option<&mut TaskSummary> {
         self.current_task
             .and_then(|id| self.task_summarys.get_mut(&id))
+    }
+    fn current(&self) -> Option<&TaskSummary> {
+        self.current_task.and_then(|id| self.task_summarys.get(&id))
     }
 
     fn start_task(&mut self, id: AsstTaskId) -> Option<()> {
@@ -853,11 +936,11 @@ mod tests {
             use TaskType::*;
 
             let mut summary = Summary::new();
-            summary.insert(1, Some("Fight TS".to_owned()), Fight);
-            summary.insert(2, None, Infrast);
-            summary.insert(3, None, Recruit);
-            summary.insert(4, None, Roguelike);
-            summary.insert(5, None, CloseDown);
+            summary.insert(1, TaskSummary::new(Some("Fight TS".to_owned()), Fight));
+            summary.insert(2, TaskSummary::new(None, Infrast));
+            summary.insert(3, TaskSummary::new(None, Recruit));
+            summary.insert(4, TaskSummary::new(None, Roguelike));
+            summary.insert(5, TaskSummary::new(None, CloseDown));
 
             summary.start_task(1);
             summary.edit_current_task_detail(|detail| {

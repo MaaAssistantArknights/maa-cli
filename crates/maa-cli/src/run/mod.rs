@@ -2,7 +2,7 @@
 // use message::callback;
 //
 mod callback;
-use callback::summary;
+use callback::summary::{self, SummarySubscriber};
 
 mod external;
 
@@ -111,7 +111,7 @@ fn find_profile(root: impl AsRef<Path>, profile: Option<&str>) -> Result<AsstCon
     }
 }
 
-fn run_core<F>(f: F, args: CommonArgs) -> Result<()>
+fn run_core<F>(f: F, args: CommonArgs, rx: &mut SummarySubscriber) -> Result<()>
 where
     F: FnOnce(&AsstConfig) -> Result<TaskConfig>,
 {
@@ -147,7 +147,7 @@ where
     asst_config.instance_options.apply_to(&asst)?;
 
     // Register tasks to Assistant and prepare summary
-    let mut task_summary = (!args.no_summary).then(summary::Summary::new);
+    let task_summary = !args.no_summary;
     for task in task_config.tasks {
         let task_type = task.task_type;
         let params = serde_json::to_string_pretty(&task.params)?;
@@ -164,12 +164,9 @@ where
                 )
             })?;
 
-        if let Some(s) = task_summary.as_mut() {
-            s.insert(id, task.name, task_type);
+        if task_summary {
+            summary::insert(id, task.name, task_type);
         }
-    }
-    if let Some(s) = task_summary {
-        summary::init(s);
     }
 
     if !args.dry_run {
@@ -213,6 +210,9 @@ where
             if stop_bool.load(atomic::Ordering::Relaxed) {
                 bail!("Interrupted by user!");
             }
+            if let Some(updated) = rx.try_update() {
+                println!("{}", updated)
+            }
             std::thread::sleep(std::time::Duration::from_millis(500));
         }
 
@@ -236,9 +236,11 @@ pub fn run<F>(f: F, args: CommonArgs) -> Result<()>
 where
     F: FnOnce(&AsstConfig) -> Result<TaskConfig>,
 {
-    let ret = run_core(f, args);
+    let mut rx = summary::init_pipe();
 
-    summary::display();
+    let ret = run_core(f, args, &mut rx);
+
+    summary::display(rx);
 
     ret?;
 
