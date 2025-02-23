@@ -1,4 +1,4 @@
-//! **ALWYAS** call [`init_pipe`] before using other functions,
+//! **ALWAYS** call [`init_pipe`] before using other functions,
 //! otherwise program will panic
 pub use std::collections::BTreeMap as Map;
 use std::sync::{
@@ -64,8 +64,8 @@ impl SummarySubscriber {
                     };
                     summary.end_current_task(reason);
                 }
-                Ok(TaskState::Detail(detial)) => {
-                    summary.edit_current_task_detail(detial);
+                Ok(TaskState::Detail(detail)) => {
+                    summary.edit_current_task_detail(detail);
                     if let Some(task) = summary.current() {
                         delta.push(format!("Task State Change:\n{}", task));
                     };
@@ -148,7 +148,7 @@ impl Summary {
         self.current_task
             .and_then(|id| self.task_summarys.get_mut(&id))
     }
-    
+
     fn current(&self) -> Option<&TaskSummary> {
         self.current_task.and_then(|id| self.task_summarys.get(&id))
     }
