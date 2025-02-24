@@ -49,8 +49,7 @@ impl SummarySubscriber {
                     summary.insert(id, task);
                 }
                 Ok(TaskState::Start(id)) => {
-                    summary.start_task(id);
-                    if let Some(task) = summary.current() {
+                    if let Some(task) = summary.start_task(id) {
                         // NOTE: if id is not in the map, then current task won't change
                         // which can cause a mistake
                         //
@@ -59,14 +58,12 @@ impl SummarySubscriber {
                     };
                 }
                 Ok(TaskState::End(reason)) => {
-                    if let Some(task) = summary.current() {
+                    if let Some(task) = summary.end_current_task(reason) {
                         delta.push(format!("Task End:\n{}", task));
                     };
-                    summary.end_current_task(reason);
                 }
                 Ok(TaskState::Detail(detail)) => {
-                    summary.edit_current_task_detail(detail);
-                    if let Some(task) = summary.current() {
+                    if let Some(task) = summary.edit_current_task_detail(detail) {
                         delta.push(format!("Task State Change:\n{}", task));
                     };
                 }
@@ -110,21 +107,18 @@ pub(crate) fn display(mut rx: SummarySubscriber) {
 }
 
 pub(super) fn start_task(id: AsstTaskId) -> Option<()> {
-    PIPE.get().unwrap().send(TaskState::Start(id)).unwrap();
-    Some(())
+    PIPE.get().unwrap().send(TaskState::Start(id)).ok()
 }
 
 pub(super) fn end_current_task(reason: Reason) -> Option<()> {
-    PIPE.get().unwrap().send(TaskState::End(reason)).unwrap();
-    Some(())
+    PIPE.get().unwrap().send(TaskState::End(reason)).ok()
 }
 
 pub(super) fn edit_current_task_detail(f: impl FnOnce(&mut Detail) + Send + 'static) -> Option<()> {
     PIPE.get()
         .unwrap()
         .send(TaskState::Detail(Box::new(f)))
-        .unwrap();
-    Some(())
+        .ok()
 }
 
 struct Summary {
@@ -153,21 +147,28 @@ impl Summary {
         self.current_task.and_then(|id| self.task_summarys.get(&id))
     }
 
-    fn start_task(&mut self, id: AsstTaskId) -> Option<()> {
-        self.task_summarys.get_mut(&id).map(|summary| {
-            self.current_task = Some(id);
-            summary.start();
-        })
+    fn start_task(&mut self, id: AsstTaskId) -> Option<&TaskSummary> {
+        self.task_summarys
+            .get_mut(&id)
+            .map(|summary| {
+                self.current_task = Some(id);
+                summary.start();
+            })
+            .and(self.current())
     }
 
-    fn end_current_task(&mut self, reason: Reason) -> Option<()> {
+    fn end_current_task(&mut self, reason: Reason) -> Option<&TaskSummary> {
+        self.current_mut().map(|summary| summary.end(reason)).and(
+            self.current_task
+                .take()
+                .and_then(|id| self.task_summarys.get(&id)),
+        )
+    }
+
+    fn edit_current_task_detail(&mut self, f: impl FnOnce(&mut Detail)) -> Option<&TaskSummary> {
         self.current_mut()
-            .map(|summary| summary.end(reason))
-            .map(|_| self.current_task = None)
-    }
-
-    fn edit_current_task_detail(&mut self, f: impl FnOnce(&mut Detail)) -> Option<()> {
-        self.current_mut().map(|summary| summary.edit_detail(f))
+            .map(|summary| summary.edit_detail(f))
+            .and(self.current())
     }
 }
 
