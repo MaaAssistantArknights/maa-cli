@@ -211,7 +211,7 @@ where
                 bail!("Interrupted by user!");
             }
             if let Some(updated) = rx.try_update() {
-                println!("{}", updated)
+                print!("{}", updated)
             }
             std::thread::sleep(std::time::Duration::from_millis(500));
         }
