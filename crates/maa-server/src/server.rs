@@ -1,25 +1,23 @@
-/// # Safety
-/// only `custom_arg` should consider lifetime,
-/// the super struct [`Assistant`] own it
-/// and they should be droped at the same time
-///
-/// If we can make sure "C" will just copy the pointer to this callback
-/// maybe we can use `*const` for using just a ref rather ref mut
 pub unsafe extern "C" fn default_callback(
     code: maa_types::primitive::AsstMsgId,
     json_raw: *const ::std::os::raw::c_char,
     _: *mut ::std::os::raw::c_void,
 ) {
     let _ = code;
-    std::panic::catch_unwind(|| {
-        let json_str = unsafe { std::ffi::CStr::from_ptr(json_raw).to_str().unwrap() };
+    let json_str = unsafe { std::ffi::CStr::from_ptr(json_raw).to_str().unwrap() };
+    if let Some(tx) = task::TX_HANDLERS.read().unwrap().get("62e47172a08776c8") {
+        // ignore this here, because client might exit without call close_connection
+        // which will cause panic here due to the dropped Receiver
+        let _ = tx.send(json_str.to_string());
+    } else {
+        // some content -- or let's be clear, adb connection info will not be able to transfer
+        // to client, because the tx is not created until task_state_update, which is always 
+        // after new_connection since the session_id is required!
+        
+        // This might cannot be fixed -- the uuid is known only after connected to the device
+        // However, a new channel that send info to new_connection might help
         println!("{}", json_str);
-        // let tx = task::TX_HANDLERS.blocking_read().get("key");
-        // let tx: &mut tokio::sync::mpsc::UnboundedSender<String> =
-        //     unsafe { &mut *(custom_arg as *mut tokio::sync::mpsc::UnboundedSender<String>) };
-        // tx.send(format!("{code}: {json_str}")).unwrap();
-    })
-    .unwrap();
+    }
 }
 
 mod task {
@@ -91,8 +89,16 @@ mod task {
         }
     }
 
-    pub static TX_HANDLERS: RwLock<BTreeMap<String, tokio::sync::mpsc::UnboundedSender<String>>> =
-        RwLock::const_new(BTreeMap::new());
+    /// Cannot use async version
+    /// since callback is not in the runtime
+    ///
+    /// Given that we `write` this only when [task_server::Task::task_state_update] is called,
+    /// a sync version shouldn't block too long
+    ///
+    /// not tested under `current_thread` mode
+    pub static TX_HANDLERS: std::sync::RwLock<
+        BTreeMap<String, tokio::sync::mpsc::UnboundedSender<String>>,
+    > = std::sync::RwLock::new(BTreeMap::new());
     static TASK_HANDLERS: RwLock<BTreeMap<String, Assistant>> = RwLock::const_new(BTreeMap::new());
 
     fn get_session_id<'a>(meta: &'a MetadataMap) -> tonic::Result<&'a str> {
@@ -166,7 +172,8 @@ mod task {
             let session_id = get_session_id(&meta)?;
 
             Ok(Response::new(
-                TASK_HANDLERS.write().await.remove(session_id).is_some(),
+                TASK_HANDLERS.write().await.remove(session_id).is_some()
+                    && TX_HANDLERS.write().unwrap().remove(session_id).is_some(),
             ))
         }
 
@@ -291,7 +298,10 @@ mod task {
 
             let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
-            TX_HANDLERS.write().await.insert(session_id.to_owned(), tx);
+            TX_HANDLERS
+                .write()
+                .unwrap()
+                .insert(session_id.to_owned(), tx);
 
             use tokio_stream::StreamExt as _;
             let streaming = tokio_stream::wrappers::UnboundedReceiverStream::new(rx).map(|msg| {
