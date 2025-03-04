@@ -1,0 +1,99 @@
+syntax = "proto3";
+
+// add/modify/active/deactive task
+// and subscribe task state update
+package task;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/wrappers.proto";
+
+service Task {
+    rpc NewConnection(NewConnectionRequst) returns (google.protobuf.StringValue);
+    rpc CloseConnection(google.protobuf.Empty) returns (google.protobuf.BoolValue);
+
+    // Append a task to task list.
+    rpc AppendTask(NewTaskRequest) returns (TaskId);
+    // Set task parameters for task with given `task_id`.
+    rpc ModifyTask(ModifyTaskRequest) returns (google.protobuf.BoolValue);
+
+    rpc ActiveTask(TaskId) returns (google.protobuf.BoolValue);
+    rpc DeactiveTask(TaskId) returns (google.protobuf.BoolValue);
+
+    rpc StartTasks(google.protobuf.Empty) returns (google.protobuf.BoolValue);
+    rpc StopTasks(google.protobuf.Empty) returns (google.protobuf.BoolValue);
+
+    rpc TaskStateUpdate(google.protobuf.Empty) returns (stream TaskState);
+}
+
+message NewConnectionRequst {
+    ConnectionConfig conncfg = 1;
+    InstanceOptions instcfg = 2;
+
+    message ConnectionConfig {
+        string adb_path = 1;
+        // alias `device`
+        string address = 2;
+        string config = 3;
+        }
+
+    message InstanceOptions {
+        TouchMode touch_mode = 1;
+        bool deployment_with_pause = 2;
+        bool adb_lite_enabled = 3;
+        bool kill_adb_on_exit = 4;
+
+        enum TouchMode {
+            Adb = 0;
+            MiniTouch = 1;
+            MaaTouch = 2;
+            MacPlayTools = 3;
+        }
+    }
+}
+
+message NewTaskRequest {
+    TaskType task_type = 1;
+    string task_params = 2;
+}
+
+message ModifyTaskRequest {
+    TaskId task_id = 1;
+    string task_params = 2;
+}
+
+enum TaskType {
+    StartUp = 0;
+    CloseDown = 1;
+    Fight = 2;
+    Recruit = 3;
+    Infrast = 4;
+    Mall = 5;
+    Award = 6;
+    Roguelike = 7;
+    Copilot = 8;
+    SSSCopilot = 9;
+    Depot = 10;
+    OperBox = 11;
+    Reclamation = 12;
+    Custom = 13;
+    SingleStep = 14;
+    VideoRecognition = 15;
+}
+
+message TaskId { int32 id = 1; }
+
+message TaskState {
+    string content = 1;
+    State state = 2;
+
+    enum State{
+        // MaaCore is not loaded.
+        Unloaded = 0;
+        // MaaCore is initialized but not connected to the device.
+        Unconnected = 2 ;
+        // MaaCore is available to run tasks.
+        Idle = 3;
+        // MaaCore is actively running tasks.
+        Running = 4;
+    }
+}
