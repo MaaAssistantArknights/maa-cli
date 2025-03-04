@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package core;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/wrappers.proto";
+
+service Core {
+  rpc LoadCore(CoreConfig) returns (google.protobuf.BoolValue);
+  rpc UnloadCore(google.protobuf.Empty) returns (google.protobuf.BoolValue);
+
+  rpc SetLog(LogRequest) returns (google.protobuf.BoolValue);
+}
+
+message CoreConfig{
+  StaticOptions static_ops = 1;
+
+  message StaticOptions{
+    bool cpu_ocr = 1;
+    optional uint32 gpu_ocr = 2;
+  }
+}
+
+message LogRequest{
+    LogLevel level = 1;
+    string file_name = 2;
+
+    enum LogLevel{
+        Silent = 0;
+        Error = 1;
+        Warn = 2;
+        Info = 3;
+        Debug = 4;
+        Trace = 5;
+    }
+}

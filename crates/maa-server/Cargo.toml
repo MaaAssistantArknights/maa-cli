@@ -1,0 +1,30 @@
+[package]
+name = "maa-server"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "server"
+path = "src/server.rs"
+
+[[bin]]
+name = "client"
+path = "src/client.rs"
+
+[dependencies]
+tonic = { version = "0.12" }
+maa-types = { workspace = true, features = ["serde"] }
+prost = "*"
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+maa-sys = { workspace = true, features = ["runtime"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+serde_json.workspace = true
+maa-dirs.workspace = true
+tracing = "0.1.41"
+tracing-subscriber = "0.3.19"
+
+[build-dependencies]
+tonic-build = { version = "0.12" }
