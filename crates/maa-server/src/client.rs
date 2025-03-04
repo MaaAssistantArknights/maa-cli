@@ -1,9 +1,7 @@
-use std::time::Duration;
-
 use maa_types::TaskType;
 
 use maa_server::task::NewTaskRequest;
-use tokio::time::sleep;
+use tokio_stream::StreamExt;
 
 fn make_request<T>(payload: T, session_id: &str) -> tonic::Request<T> {
     let mut req = tonic::Request::new(payload);
@@ -53,6 +51,12 @@ async fn main() {
         .unwrap()
         .into_inner();
 
+    let mut channel = taskclient
+        .task_state_update(make_request((), &session_id))
+        .await
+        .unwrap()
+        .into_inner();
+
     println!("session_id: {}", session_id);
 
     let mut payload = NewTaskRequest::default();
@@ -83,9 +87,17 @@ async fn main() {
         .await
         .unwrap();
 
-    println!("Sleep now");
-    // Todo: subscribe to task_state_update to exit
-    sleep(Duration::from_secs(60)).await;
+    println!("Starting show callback");
+    loop {
+        if let Some(msg) = channel.next().await {
+            let msg = msg.unwrap();
+            println!("{}: {}", msg.state, msg.content);
+            if msg.content.contains("finished_tasks") {
+                break;
+            }
+        }
+    }
+    println!("Clean up");
 
     taskclient
         .close_connection(make_request((), &session_id))
