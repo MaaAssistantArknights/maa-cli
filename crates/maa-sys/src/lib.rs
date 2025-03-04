@@ -40,9 +40,14 @@ impl Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// A safe and convenient wrapper of MaaCore Assistant API.
+/// 
+/// Note:
+/// This **CANNOT** be [`Clone`] due to [`Drop`]
 pub struct Assistant {
     handle: binding::AsstHandle,
 }
+
+unsafe impl Send for Assistant {}
 
 impl Drop for Assistant {
     fn drop(&mut self) {
