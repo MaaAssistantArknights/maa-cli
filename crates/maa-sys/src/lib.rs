@@ -322,7 +322,7 @@ impl AsstResult for maa_types::primitive::AsstBool {
         if self == 1 {
             Ok(())
         } else {
-            Err(Error::BufferTooSmall)
+            Err(Error::MAAError)
         }
     }
 }
@@ -338,7 +338,7 @@ impl AsstResult for maa_types::primitive::AsstSize {
 
     fn to_result(self) -> Result<Self> {
         if self == NULL_SIZE {
-            Err(Error::MAAError)
+            Err(Error::BufferTooSmall)
         } else {
             Ok(self)
         }
