@@ -3,71 +3,86 @@ pub unsafe extern "C" fn default_callback(
     json_raw: *const ::std::os::raw::c_char,
     _: *mut ::std::os::raw::c_void,
 ) {
+    use log::Logger;
     let _ = code;
     let json_str = unsafe { std::ffi::CStr::from_ptr(json_raw).to_str().unwrap() };
 
     let uuid = Logger::uuid(json_str);
-    if let Some(tx) = task::TX_HANDLERS.read().get(&uuid) {
+    if let Some(tx) = log::TX_HANDLERS.read().get(&uuid) {
         if tx.log(json_str.to_string()) {
-            task::TX_HANDLERS.write().remove(&uuid);
+            log::TX_HANDLERS.write().remove(&uuid);
         }
     } else {
         Logger::log_to_pool(json_str);
     }
 }
 
-static LOG_POOL: RwLock<BTreeMap<String, Vec<String>>> = RwLock::new(BTreeMap::new());
+type UUID = String;
 
-struct Logger<T> {
-    tx: UnboundedSender<T>,
-    rx: Option<UnboundedReceiver<T>>,
-}
-impl Logger<String> {
-    pub fn new() -> Self {
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-        Self { tx, rx: Some(rx) }
+mod log {
+    use crate::UUID;
+    use parking_lot::RwLock;
+    use std::collections::BTreeMap;
+    use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+
+    static LOG_POOL: RwLock<BTreeMap<String, Vec<String>>> = RwLock::new(BTreeMap::new());
+
+    /// will be used in callback,
+    /// which is out of tokio runtime
+    pub static TX_HANDLERS: RwLock<BTreeMap<UUID, crate::log::Logger<String>>> =
+        RwLock::new(BTreeMap::new());
+
+    pub struct Logger<T> {
+        tx: UnboundedSender<T>,
+        rx: Option<UnboundedReceiver<T>>,
     }
-    pub fn take_rx(&mut self) -> Option<UnboundedReceiver<String>> {
-        self.rx.take()
-    }
-    /// if true, the channel is closed, so drop this
-    pub fn log(&self, message: String) -> bool {
-        Self::log_to_pool(&message);
-        // log to global log pool
-        self.tx.send(message).is_err()
-    }
-    pub fn uuid(message: &str) -> String {
-        #[derive(serde::Deserialize)]
-        struct DeSer {
-            uuid: String,
-            #[serde(flatten)]
-            __extra: BTreeMap<String, serde_json::Value>,
+    impl Logger<String> {
+        pub fn new() -> Self {
+            let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+            Self { tx, rx: Some(rx) }
         }
-        let value: DeSer = serde_json::from_str(&message).unwrap_or(DeSer {
-            uuid: "()".to_owned(),
-            __extra: Default::default(),
-        });
-        value.uuid
-    }
-    pub fn log_to_pool(message: &str) {
-        let uuid = Self::uuid(message);
-        LOG_POOL
-            .write()
-            .entry(uuid)
-            .or_default()
-            .push(message.to_owned());
+        pub fn take_rx(&mut self) -> Option<UnboundedReceiver<String>> {
+            self.rx.take()
+        }
+        /// if true, the channel is closed, so drop this
+        pub fn log(&self, message: String) -> bool {
+            Self::log_to_pool(&message);
+            // log to global log pool
+            self.tx.send(message).is_err()
+        }
+        pub fn uuid(message: &str) -> UUID {
+            #[derive(serde::Deserialize)]
+            struct DeSer {
+                uuid: UUID,
+                #[serde(flatten)]
+                __extra: BTreeMap<String, serde_json::Value>,
+            }
+            let value: DeSer = serde_json::from_str(&message).unwrap_or(DeSer {
+                uuid: "()".to_owned(),
+                __extra: Default::default(),
+            });
+            value.uuid
+        }
+        pub fn log_to_pool(message: &str) {
+            let uuid = Self::uuid(message);
+            LOG_POOL
+                .write()
+                .entry(uuid)
+                .or_default()
+                .push(message.to_owned());
+        }
     }
 }
 
 mod task {
     use maa_server::{
         task::{task_server::TaskServer, task_state::State, *},
-        tonic::{self, metadata::MetadataMap, Request, Response},
+        tonic::{self, Request, Response},
     };
-    use parking_lot::RwLock;
     use std::collections::BTreeMap;
-    use tokio::sync::Notify;
-    use tokio_stream::Stream;
+    use tokio::sync::RwLock;
+
+    use crate::{log::TX_HANDLERS, UUID};
 
     /// build service under package task
     ///
@@ -97,64 +112,94 @@ mod task {
         TaskServer::new(TaskImpl)
     }
 
-    /// A wrapper for [`maa_sys::Assistant`]
-    ///
-    /// The inner can be [Send] but not [Sync],
-    /// because every fn related is actually a `ref mut` rather `ref`,
-    /// which may cause data race
-    ///
-    /// By using [Notify], only one request can reach handler at a time
-    /// and there should be no data racing
-    struct Assistant {
-        inner: maa_sys::Assistant,
-        lock: Notify,
-    }
+    mod wrapper {
+        use tokio::sync::Notify;
 
-    unsafe impl Sync for Assistant {}
-
-    impl Assistant {
-        pub fn new() -> Self {
-            let instance = Self {
-                inner: maa_sys::Assistant::new(Some(super::default_callback), None),
-                lock: Notify::new(),
-            };
-            instance.lock.notify_one();
-            instance
+        /// A wrapper for [`maa_sys::Assistant`]
+        ///
+        /// The inner can be [Send] but not [Sync],
+        /// because every fn related is actually a `ref mut` rather `ref`,
+        /// which may cause data race
+        ///
+        /// By using [Notify], only one request can reach handler at a time
+        /// and there should be no data racing
+        pub struct Assistant {
+            inner: maa_sys::Assistant,
+            lock: Notify,
         }
 
-        pub async fn wait(&self) -> &maa_sys::Assistant {
-            self.lock.notified().await;
-            self.lock.notify_one();
-            &self.inner
+        unsafe impl Sync for Assistant {}
+
+        impl Assistant {
+            pub fn new() -> Self {
+                let instance = Self {
+                    inner: maa_sys::Assistant::new(Some(crate::default_callback), None),
+                    lock: Notify::new(),
+                };
+                instance.lock.notify_one();
+                instance
+            }
+
+            pub async fn wait(&self) -> &maa_sys::Assistant {
+                self.lock.notified().await;
+                self.lock.notify_one();
+                self.inner_unchecked()
+            }
+
+            pub fn inner_unchecked(&self) -> &maa_sys::Assistant {
+                &self.inner
+            }
+        }
+
+        pub trait SessionExt {
+            fn get_session_id(&self) -> tonic::Result<UUIDWrapper>;
+        }
+
+        impl<T> SessionExt for tonic::Request<T> {
+            fn get_session_id(&self) -> tonic::Result<UUIDWrapper> {
+                self.metadata()
+                    .get("x-session-key")
+                    .ok_or(tonic::Status::not_found("session_id is not found"))?
+                    .to_str()
+                    .map_err(|_| tonic::Status::invalid_argument("session_id should be ascii"))
+                    .map(UUIDWrapper)
+            }
+        }
+
+        impl SessionExt for tonic::metadata::MetadataMap {
+            fn get_session_id(&self) -> tonic::Result<UUIDWrapper> {
+                self.get("x-session-key")
+                    .ok_or(tonic::Status::not_found("session_id is not found"))?
+                    .to_str()
+                    .map_err(|_| tonic::Status::invalid_argument("session_id should be ascii"))
+                    .map(UUIDWrapper)
+            }
+        }
+
+        pub struct UUIDWrapper<'a>(&'a str);
+
+        impl<'a> UUIDWrapper<'a> {
+            pub async fn func_with<T>(
+                self,
+                f: impl FnOnce(&maa_sys::Assistant) -> T,
+            ) -> tonic::Result<T> {
+                let read_lock = super::TASK_HANDLERS.read().await;
+
+                let handler = read_lock
+                    .get(self.0)
+                    .ok_or(tonic::Status::not_found("session_id is not found"))?;
+
+                Ok(f(handler.wait().await))
+            }
+            pub fn into_inner(self) -> &'a str {
+                self.0
+            }
         }
     }
 
-    /// will be used in callback,
-    /// which is out of tokio runtime
-    pub static TX_HANDLERS: RwLock<BTreeMap<String, crate::Logger<String>>> =
-        RwLock::new(BTreeMap::new());
-    static TASK_HANDLERS: tokio::sync::RwLock<BTreeMap<String, Assistant>> =
-        tokio::sync::RwLock::const_new(BTreeMap::new());
+    use wrapper::{Assistant, SessionExt};
 
-    fn get_session_id<'a>(meta: &'a MetadataMap) -> tonic::Result<&'a str> {
-        meta.get("x-session-key")
-            .ok_or(tonic::Status::not_found("session_id is not found"))?
-            .to_str()
-            .map_err(|_| tonic::Status::invalid_argument("session_id should be ascii"))
-    }
-
-    async fn fun_task_handler<T>(
-        session_id: &str,
-        f: impl FnOnce(&maa_sys::Assistant) -> T,
-    ) -> tonic::Result<T> {
-        let read_lock = TASK_HANDLERS.read().await;
-
-        let handler = read_lock
-            .get(session_id)
-            .ok_or(tonic::Status::not_found("session_id is not found"))?;
-
-        Ok(f(handler.wait().await))
-    }
+    static TASK_HANDLERS: RwLock<BTreeMap<UUID, Assistant>> = RwLock::const_new(BTreeMap::new());
 
     pub struct TaskImpl;
 
@@ -167,48 +212,29 @@ mod task {
 
             let asst = Assistant::new();
 
-            if let Some(message) = instcfg.and_then(|cfg| cfg.apply_to(&asst.inner).err()) {
+            if let Some(message) =
+                instcfg.and_then(|cfg| cfg.apply_to(asst.inner_unchecked()).err())
+            {
                 return Err(tonic::Status::internal(message));
             }
+
             let (adb_path, address, config) = conncfg.unwrap().connect_args();
-            asst.inner
+            asst.inner_unchecked()
                 .async_connect(adb_path.as_str(), address.as_str(), config.as_str(), true)
                 .unwrap();
 
-            let uuid = {
-                let mut buff_size = 1024;
-                loop {
-                    if buff_size > 1024 * 1024 {
-                        unreachable!();
-                    }
-                    let mut buff: Vec<u8> = Vec::with_capacity(buff_size);
-                    let data_size = asst
-                        .inner
-                        .get_uuid(buff.as_mut_slice(), buff_size as u64)
-                        .unwrap();
-                    if data_size == maa_sys::Assistant::get_null_size() {
-                        buff_size = 2 * buff_size;
-                        continue;
-                    }
-                    unsafe { buff.set_len(data_size as usize) };
-                    break String::from_utf8_lossy(&buff).to_string();
-                }
-            };
-
-            let session_id = uuid;
+            let session_id = asst.inner_unchecked().get_uuid_ext();
 
             TX_HANDLERS
                 .write()
-                .insert(session_id.clone(), crate::Logger::new());
+                .insert(session_id.clone(), crate::log::Logger::new());
             TASK_HANDLERS.write().await.insert(session_id.clone(), asst);
 
             Ok(Response::new(session_id))
         }
 
         async fn close_connection(&self, req: Request<()>) -> Ret<bool> {
-            let (meta, _, ()) = req.into_parts();
-
-            let session_id = get_session_id(&meta)?;
+            let session_id = req.get_session_id()?.into_inner();
 
             Ok(Response::new(
                 TASK_HANDLERS.write().await.remove(session_id).is_some()
@@ -226,15 +252,14 @@ mod task {
                 },
             ) = new_task.into_parts();
 
-            let session_id = get_session_id(&meta)?;
+            let session_id = meta.get_session_id()?;
 
             let task_type: TaskType = task_type.try_into().unwrap();
             let task_type: maa_types::TaskType = task_type.into();
 
-            let ret = fun_task_handler(session_id, |handler| {
-                handler.append_task(task_type, task_params.as_str())
-            })
-            .await?;
+            let ret = session_id
+                .func_with(|handler| handler.append_task(task_type, task_params.as_str()))
+                .await?;
 
             match ret {
                 Ok(id) => Ok(Response::new(id.into())),
@@ -256,12 +281,11 @@ mod task {
                 .ok_or(tonic::Status::invalid_argument("no task_id is given"))?
                 .into();
 
-            let session_id = get_session_id(&meta)?;
+            let session_id = meta.get_session_id()?;
 
-            let ret = fun_task_handler(session_id, |handler| {
-                handler.set_task_params(task_id, task_params.as_str())
-            })
-            .await?;
+            let ret = session_id
+                .func_with(|handler| handler.set_task_params(task_id, task_params.as_str()))
+                .await?;
 
             match ret {
                 Ok(()) => Ok(Response::new(true)),
@@ -272,12 +296,13 @@ mod task {
         async fn active_task(&self, task_id: Request<TaskId>) -> Ret<bool> {
             let (meta, _, task_id) = task_id.into_parts();
 
-            let session_id = get_session_id(&meta)?;
+            let session_id = meta.get_session_id()?;
 
-            let ret = fun_task_handler(session_id, |handler| {
-                handler.set_task_params(task_id.into(), r#"{ "enable": true }"#)
-            })
-            .await?;
+            let ret = session_id
+                .func_with(|handler| {
+                    handler.set_task_params(task_id.into(), r#"{ "enable": true }"#)
+                })
+                .await?;
 
             match ret {
                 Ok(()) => Ok(Response::new(true)),
@@ -288,12 +313,13 @@ mod task {
         async fn deactive_task(&self, task_id: Request<TaskId>) -> Ret<bool> {
             let (meta, _, task_id) = task_id.into_parts();
 
-            let session_id = get_session_id(&meta)?;
+            let session_id = meta.get_session_id()?;
 
-            let ret = fun_task_handler(session_id, |handler| {
-                handler.set_task_params(task_id.into(), r#"{ "enable": false }"#)
-            })
-            .await?;
+            let ret = session_id
+                .func_with(|handler| {
+                    handler.set_task_params(task_id.into(), r#"{ "enable": false }"#)
+                })
+                .await?;
 
             match ret {
                 Ok(()) => Ok(Response::new(true)),
@@ -302,11 +328,9 @@ mod task {
         }
 
         async fn start_tasks(&self, req: Request<()>) -> Ret<bool> {
-            let (meta, _, ()) = req.into_parts();
+            let session_id = req.get_session_id()?;
 
-            let session_id = get_session_id(&meta)?;
-
-            let ret = fun_task_handler(session_id, |handler| handler.start()).await?;
+            let ret = session_id.func_with(|handler| handler.start()).await?;
 
             match ret {
                 Ok(()) => Ok(Response::new(true)),
@@ -315,11 +339,9 @@ mod task {
         }
 
         async fn stop_tasks(&self, req: Request<()>) -> Ret<bool> {
-            let (meta, _, ()) = req.into_parts();
+            let session_id = req.get_session_id()?;
 
-            let session_id = get_session_id(&meta)?;
-
-            let ret = fun_task_handler(session_id, |handler| handler.stop()).await?;
+            let ret = session_id.func_with(|handler| handler.stop()).await?;
 
             match ret {
                 Ok(()) => Ok(Response::new(true)),
@@ -327,13 +349,12 @@ mod task {
             }
         }
 
-        type TaskStateUpdateStream =
-            std::pin::Pin<Box<dyn Stream<Item = tonic::Result<TaskState>> + Send + 'static>>;
+        type TaskStateUpdateStream = std::pin::Pin<
+            Box<dyn tokio_stream::Stream<Item = tonic::Result<TaskState>> + Send + 'static>,
+        >;
 
         async fn task_state_update(&self, req: Request<()>) -> Ret<Self::TaskStateUpdateStream> {
-            let (meta, _, ()) = req.into_parts();
-
-            let session_id = get_session_id(&meta)?;
+            let session_id = req.get_session_id()?.into_inner();
 
             let Some(rx) = TX_HANDLERS
                 .write()
@@ -461,10 +482,6 @@ mod core {
     }
 }
 
-use parking_lot::RwLock;
-use std::collections::BTreeMap;
-
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tonic::transport::Server;
 use tracing_subscriber::util::SubscriberInitExt;
 
