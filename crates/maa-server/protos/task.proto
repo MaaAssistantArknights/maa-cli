@@ -23,6 +23,7 @@ service Task {
     rpc StopTasks(google.protobuf.Empty) returns (google.protobuf.BoolValue);
 
     rpc TaskStateUpdate(google.protobuf.Empty) returns (stream TaskState);
+    rpc FetchLogs(google.protobuf.Int32Value) returns (LogArray);
 }
 
 message NewConnectionRequst {
@@ -96,4 +97,8 @@ message TaskState {
         // MaaCore is actively running tasks.
         Running = 4;
     }
+}
+
+message LogArray {
+    repeated TaskState items = 1;
 }
