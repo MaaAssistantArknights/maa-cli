@@ -1311,6 +1311,7 @@ dependencies = [
 name = "maa-server"
 version = "0.1.0"
 dependencies = [
+ "hyper-util",
  "maa-dirs",
  "maa-sys",
  "maa-types",
@@ -1322,6 +1323,7 @@ dependencies = [
  "tokio-stream",
  "tonic",
  "tonic-build",
+ "tower 0.5.2",
  "tracing",
  "tracing-subscriber",
 ]

@@ -1,7 +1,9 @@
 use maa_types::TaskType;
 
 use maa_server::task::NewTaskRequest;
+use tokio::net::UnixStream;
 use tokio_stream::StreamExt;
+use tonic::transport::Endpoint;
 
 fn make_request<T>(payload: T, session_id: &str) -> tonic::Request<T> {
     let mut req = tonic::Request::new(payload);
@@ -12,10 +14,28 @@ fn make_request<T>(payload: T, session_id: &str) -> tonic::Request<T> {
 
 #[tokio::main]
 async fn main() {
-    let mut coreclient =
-        maa_server::core::core_client::CoreClient::connect("http://127.0.0.1:50051")
+    let using_socket = true;
+
+    let channel = if using_socket {
+        Endpoint::from_static("http://127.0.0.1:50051")
+            .connect_with_connector(tower::service_fn(|_: tonic::transport::Uri| async {
+                let path = "/tmp/tonic/testing.sock";
+                // Connect to a Uds socket
+                Ok::<_, std::io::Error>(hyper_util::rt::TokioIo::new(
+                    UnixStream::connect(path).await?,
+                ))
+            }))
             .await
-            .unwrap();
+            .unwrap()
+    } else {
+        Endpoint::try_from("http://127.0.0.1:50051")
+            .unwrap()
+            .connect()
+            .await
+            .unwrap()
+    };
+
+    let mut coreclient = maa_server::core::core_client::CoreClient::new(channel.clone());
     coreclient
         .load_core(maa_server::core::CoreConfig {
             static_ops: Some(maa_server::core::core_config::StaticOptions {
@@ -30,10 +50,7 @@ async fn main() {
         .await
         .unwrap();
 
-    let mut taskclient =
-        maa_server::task::task_client::TaskClient::connect("http://127.0.0.1:50051")
-            .await
-            .unwrap();
+    let mut taskclient = maa_server::task::task_client::TaskClient::new(channel);
 
     println!("Connected to server");
 
@@ -103,8 +120,16 @@ async fn main() {
             }
         }
     }
-    println!("Clean up");
 
+    println!("Grab remote log");
+    // skip first 10 log
+    let logs = taskclient
+        .fetch_logs(make_request(10, &session_id))
+        .await
+        .unwrap();
+    println!("{:?}", logs.into_inner());
+
+    println!("Clean up");
     taskclient
         .close_connection(make_request((), &session_id))
         .await
