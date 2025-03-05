@@ -27,6 +27,17 @@ mod log {
 
     static LOG_POOL: RwLock<BTreeMap<String, Vec<String>>> = RwLock::new(BTreeMap::new());
 
+    pub fn get_skip_len(uuid: &str, len: i32) -> Vec<String> {
+        LOG_POOL
+            .read()
+            .get(uuid)
+            .iter()
+            .flat_map(|vec| vec.iter())
+            .skip(len as usize)
+            .cloned()
+            .collect()
+    }
+
     /// will be used in callback,
     /// which is out of tokio runtime
     pub static TX_HANDLERS: RwLock<BTreeMap<UUID, crate::log::Logger<String>>> =
@@ -36,6 +47,7 @@ mod log {
         tx: UnboundedSender<T>,
         rx: Option<UnboundedReceiver<T>>,
     }
+
     impl Logger<String> {
         pub fn new() -> Self {
             let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
@@ -379,6 +391,24 @@ mod task {
 
             Ok(Response::new(Box::pin(streaming)))
         }
+
+        async fn fetch_logs(&self, req: Request<i32>) -> Ret<LogArray> {
+            let (meta, _, skip) = req.into_parts();
+
+            let session_id = meta.get_session_id()?.into_inner();
+
+            let logs = crate::log::get_skip_len(session_id, skip);
+
+            Ok(Response::new(LogArray {
+                items: logs
+                    .into_iter()
+                    .map(|log| TaskState {
+                        content: log,
+                        state: 0,
+                    })
+                    .collect(),
+            }))
+        }
     }
 }
 
@@ -483,16 +513,33 @@ mod core {
 }
 
 use tonic::transport::Server;
-use tracing_subscriber::util::SubscriberInitExt;
 
 // #[tokio::main(flavor = "current_thread")]
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::registry().init();
-    Server::builder()
-        .add_service(task::gen_service())
-        .add_service(core::gen_service())
-        .serve("127.0.0.1:50051".parse().unwrap())
-        .await
-        .unwrap();
+    let using_socket = true;
+
+    tracing_subscriber::fmt::init();
+
+    if using_socket {
+        use tokio::net::UnixListener;
+        use tokio_stream::wrappers::UnixListenerStream;
+        let path = "/tmp/tonic/testing.sock";
+        std::fs::create_dir_all(std::path::Path::new(path).parent().unwrap()).unwrap();
+        let socket = UnixListener::bind(path).unwrap();
+        let stream = UnixListenerStream::new(socket);
+        Server::builder()
+            .add_service(task::gen_service())
+            .add_service(core::gen_service())
+            .serve_with_incoming(stream)
+            .await
+            .unwrap();
+    } else {
+        Server::builder()
+            .add_service(task::gen_service())
+            .add_service(core::gen_service())
+            .serve("127.0.0.1:50051".parse().unwrap())
+            .await
+            .unwrap();
+    }
 }
