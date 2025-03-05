@@ -25,6 +25,8 @@ serde_json.workspace = true
 maa-dirs.workspace = true
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
+serde = { workspace = true, features = ["derive"] }
+parking_lot = "0.12.3"
 
 [build-dependencies]
 tonic-build = { version = "0.12" }
