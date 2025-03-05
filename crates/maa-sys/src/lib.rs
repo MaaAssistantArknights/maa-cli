@@ -17,8 +17,10 @@ pub mod binding;
 pub enum Error {
     #[error("MaaCore returned an error, check its log for details")]
     MAAError,
-    #[error("Buffer Too Small")]
+    #[error("Buffer too small")]
     BufferTooSmall,
+    #[error("The content returned by MaaCore is too large (length > {0})")]
+    ContentTooLarge(usize),
     #[error("Interior null byte")]
     Nul(#[from] std::ffi::NulError),
     #[error("Invalid UTF-8")]
@@ -213,39 +215,103 @@ impl Assistant {
     }
 
     /// Take a screenshot
-    pub fn async_screncap(&self, block: bool) -> Result<AsstAsyncCallId> {
+    pub fn async_screencap(&self, block: bool) -> Result<AsstAsyncCallId> {
         unsafe { binding::AsstAsyncScreencap(self.handle, block.into()) }.to_result()
     }
 
-    /// Take a screenshot and save it to the given buffer
-    pub fn get_image(&self, buff: &mut [u8], buff_size: AsstSize) -> Result<AsstSize> {
+    /// Get the image of the most recent screenshot with a buffer
+    ///
+    /// Returns the size of the image data in bytes
+    ///
+    /// # Safety
+    ///
+    /// The buffer pointer should be larger or equal to the given `size`.
+    pub unsafe fn get_image_with_buf(&self, buf: *mut u8, size: usize) -> Result<AsstSize> {
         unsafe {
             binding::AsstGetImage(
                 self.handle,
-                buff.as_mut_ptr() as *mut std::os::raw::c_void,
-                buff_size,
+                buf as *mut std::os::raw::c_void,
+                size as AsstSize,
             )
         }
         .to_result()
     }
 
-    /// Get the UUID of the device
-    pub fn get_uuid(&self, buff: &mut [u8], buff_size: AsstSize) -> Result<AsstSize> {
-        unsafe {
+    /// Get the image of the most recent screenshot
+    ///
+    /// The returned value is a Vec<u8> containing the image data, encoded as PNG.
+    pub fn get_image(&self) -> Result<Vec<u8>> {
+        // A 720p image with 24bit color depth, the raw size is 1280 * 720 * 3 (2.7 MB)
+        // Compressed image data should be smaller than the raw size.
+        // 4MB should be enough in most cases
+        const INIT_SIZE: usize = 1024 * 1024 * 4;
+        // 32MB should be enough for 4K raw images
+        const MAX_SIZE: usize = 1024 * 1024 * 32;
+
+        let mut buf_size = INIT_SIZE;
+        let mut buf = Vec::with_capacity(buf_size);
+
+        loop {
+            match unsafe { self.get_image_with_buf(buf.as_mut_ptr(), buf_size) } {
+                Ok(size) => {
+                    // Safety: the buffer is initialized by FFI, the size is the actual size
+                    unsafe { buf.set_len(size as usize) };
+                    return Ok(buf);
+                }
+                Err(_) => {
+                    if buf_size > MAX_SIZE {
+                        return Err(Error::ContentTooLarge(MAX_SIZE));
+                    }
+                    // Double the buffer size if it's not enough
+                    buf_size *= 2;
+                    buf.reserve(buf_size);
+                }
+            }
+        }
+    }
+
+    /// Take a screenshot and get the image
+    pub fn get_fresh_image(&self) -> Result<Vec<u8>> {
+        self.async_screencap(true)?;
+        self.get_image()
+    }
+
+    /// Get the UUID of the device as a string
+    ///
+    /// The return value is a string containing the device's UUID,
+    /// which looks like `12345678-1234-1234-1234-1234567890ab`.
+    /// However, it may not be a valid UUID, especially on macOS.
+    /// Don't rely on it for anything important.
+    pub fn get_uuid(&self) -> Result<String> {
+        // A standard UUID representation is a 36 character hexadecimal string.
+        // Even in some cases, the UUID may not be a valid UUID, but 128 bytes is enough to hold it.
+        const UUID_BUFF_SIZE: usize = 128;
+        let mut buff = Vec::with_capacity(UUID_BUFF_SIZE);
+        match unsafe {
             binding::AsstGetUUID(
                 self.handle,
                 buff.as_mut_ptr() as *mut std::os::raw::c_char,
-                buff_size,
+                UUID_BUFF_SIZE as AsstSize,
             )
         }
         .to_result()
+        {
+            Ok(size) => {
+                // Safety: the buffer is initialized by FFI, the len is the actual length
+                unsafe { buff.set_len(size as usize) };
+                String::from_utf8(buff).map_err(|e| Error::InvalidUtf8(e.utf8_error()))
+            }
+            Err(_) => Err(Error::ContentTooLarge(UUID_BUFF_SIZE)),
+        }
     }
 }
 
+/// Trait to convert the return value of asst FFI to a Result
 trait AsstResult {
     /// The return type of the function
     type Return;
 
+    /// Convert the return value to a Result
     fn to_result(self) -> Result<Self::Return>;
 }
 
@@ -272,7 +338,7 @@ impl AsstResult for maa_types::primitive::AsstSize {
 
     fn to_result(self) -> Result<Self> {
         if self == NULL_SIZE {
-            Err(Error::MAAError)
+            Err(Error::BufferTooSmall)
         } else {
             Ok(self)
         }
@@ -318,7 +384,7 @@ mod tests {
 
     #[test]
     fn asst_size() {
-        assert_eq!(NULL_SIZE.to_result(), Err(super::Error::MAAError));
+        assert_eq!(NULL_SIZE.to_result(), Err(super::Error::BufferTooSmall));
         assert_eq!(1u64.to_result(), Ok(1u64));
         #[cfg(not(feature = "runtime"))]
         assert_eq!(unsafe { binding::AsstGetNullSize() }, NULL_SIZE);

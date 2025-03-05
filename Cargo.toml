@@ -9,7 +9,7 @@ repository = "https://github.com/MaaAssistantArknights/maa-cli"
 
 [workspace.dependencies]
 maa-dirs = { path = "crates/maa-dirs", version = "0.1.1" }
-maa-sys = { path = "crates/maa-sys", version = "0.5.0" }
+maa-sys = { path = "crates/maa-sys", version = "0.6.0" }
 maa-types = { path = "crates/maa-types", version = "0.1" }
 
 anyhow = "1"
