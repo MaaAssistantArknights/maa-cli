@@ -91,6 +91,7 @@ jobs:
 
   build-cross:
     name: Cross Build
+    needs: [build]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -113,6 +114,7 @@ jobs:
 
   build-no-default-features:
     name: Build and Test (${{ matrix.feature }})
+    needs: [build]
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
