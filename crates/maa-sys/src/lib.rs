@@ -384,7 +384,7 @@ mod tests {
 
     #[test]
     fn asst_size() {
-        assert_eq!(NULL_SIZE.to_result(), Err(super::Error::MAAError));
+        assert_eq!(NULL_SIZE.to_result(), Err(super::Error::BufferTooSmall));
         assert_eq!(1u64.to_result(), Ok(1u64));
         #[cfg(not(feature = "runtime"))]
         assert_eq!(unsafe { binding::AsstGetNullSize() }, NULL_SIZE);
