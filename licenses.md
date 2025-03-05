@@ -926,6 +926,7 @@ Apache License 2.0
 - [async-trait](https://github.com/dtolnay/async-trait)
 - [semver](https://github.com/dtolnay/semver)
 - [serde](https://github.com/serde-rs/serde)
+- [serde_json](https://github.com/serde-rs/json)
 - [serde_test](https://github.com/serde-rs/test)
 - [serde_yaml](https://github.com/dtolnay/serde-yaml)
 - [thiserror](https://github.com/dtolnay/thiserror)
@@ -1991,7 +1992,6 @@ Apache License 2.0
 - [color-print](https://gitlab.com/dajoha/color-print)
 - [directories](https://github.com/soc/directories-rs)
 - [dunce](https://gitlab.com/kornelski/dunce)
-- [serde_json](https://github.com/serde-rs/json)
 
 #### Full text
 
