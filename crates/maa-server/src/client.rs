@@ -10,7 +10,7 @@ fn make_request<T>(payload: T, session_id: &str) -> tonic::Request<T> {
     req
 }
 
-#[tokio::main(flavor = "current_thread")]
+#[tokio::main]
 async fn main() {
     let mut coreclient =
         maa_server::core::core_client::CoreClient::connect("http://127.0.0.1:50051")
@@ -22,6 +22,10 @@ async fn main() {
                 cpu_ocr: true,
                 gpu_ocr: None,
             }),
+            log_ops: Some(maa_server::core::core_config::LogOptions {
+                name: "test".to_owned(),
+                level: maa_server::core::core_config::LogLevel::Debug.into(),
+            }),
         })
         .await
         .unwrap();
@@ -30,6 +34,8 @@ async fn main() {
         maa_server::task::task_client::TaskClient::connect("http://127.0.0.1:50051")
             .await
             .unwrap();
+
+    println!("Connected to server");
 
     let session_id = taskclient
         .new_connection(maa_server::task::NewConnectionRequst {
@@ -51,13 +57,13 @@ async fn main() {
         .unwrap()
         .into_inner();
 
+    println!("session_id: {}", session_id);
+
     let mut channel = taskclient
         .task_state_update(make_request((), &session_id))
         .await
         .unwrap()
         .into_inner();
-
-    println!("session_id: {}", session_id);
 
     let mut payload = NewTaskRequest::default();
     payload.set_task_type(TaskType::StartUp.into());
