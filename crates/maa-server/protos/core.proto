@@ -8,29 +8,29 @@ import "google/protobuf/wrappers.proto";
 service Core {
   rpc LoadCore(CoreConfig) returns (google.protobuf.BoolValue);
   rpc UnloadCore(google.protobuf.Empty) returns (google.protobuf.BoolValue);
-
-  rpc SetLog(LogRequest) returns (google.protobuf.BoolValue);
 }
 
 message CoreConfig{
   StaticOptions static_ops = 1;
+  LogOptions log_ops = 2;
 
   message StaticOptions{
     bool cpu_ocr = 1;
     optional uint32 gpu_ocr = 2;
   }
-}
 
-message LogRequest{
+  message LogOptions{
     LogLevel level = 1;
-    string file_name = 2;
+    string name = 2;
+  }
 
-    enum LogLevel{
-        Silent = 0;
-        Error = 1;
-        Warn = 2;
-        Info = 3;
-        Debug = 4;
-        Trace = 5;
-    }
+  enum LogLevel{
+    Silent = 0;
+    Error = 1;
+    Warn = 2;
+    Info = 3;
+    Debug = 4;
+    Trace = 5;
+  }
 }
+

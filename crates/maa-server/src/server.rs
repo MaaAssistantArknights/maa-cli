@@ -5,18 +5,57 @@ pub unsafe extern "C" fn default_callback(
 ) {
     let _ = code;
     let json_str = unsafe { std::ffi::CStr::from_ptr(json_raw).to_str().unwrap() };
-    if let Some(tx) = task::TX_HANDLERS.read().unwrap().get("62e47172a08776c8") {
-        // ignore this here, because client might exit without call close_connection
-        // which will cause panic here due to the dropped Receiver
-        let _ = tx.send(json_str.to_string());
+
+    let uuid = Logger::uuid(json_str);
+    if let Some(tx) = task::TX_HANDLERS.read().get(&uuid) {
+        if tx.log(json_str.to_string()) {
+            task::TX_HANDLERS.write().remove(&uuid);
+        }
     } else {
-        // some content -- or let's be clear, adb connection info will not be able to transfer
-        // to client, because the tx is not created until task_state_update, which is always 
-        // after new_connection since the session_id is required!
-        
-        // This might cannot be fixed -- the uuid is known only after connected to the device
-        // However, a new channel that send info to new_connection might help
-        println!("{}", json_str);
+        Logger::log_to_pool(json_str);
+    }
+}
+
+static LOG_POOL: RwLock<BTreeMap<String, Vec<String>>> = RwLock::new(BTreeMap::new());
+
+struct Logger<T> {
+    tx: UnboundedSender<T>,
+    rx: Option<UnboundedReceiver<T>>,
+}
+impl Logger<String> {
+    pub fn new() -> Self {
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        Self { tx, rx: Some(rx) }
+    }
+    pub fn take_rx(&mut self) -> Option<UnboundedReceiver<String>> {
+        self.rx.take()
+    }
+    /// if true, the channel is closed, so drop this
+    pub fn log(&self, message: String) -> bool {
+        Self::log_to_pool(&message);
+        // log to global log pool
+        self.tx.send(message).is_err()
+    }
+    pub fn uuid(message: &str) -> String {
+        #[derive(serde::Deserialize)]
+        struct DeSer {
+            uuid: String,
+            #[serde(flatten)]
+            __extra: BTreeMap<String, serde_json::Value>,
+        }
+        let value: DeSer = serde_json::from_str(&message).unwrap_or(DeSer {
+            uuid: "()".to_owned(),
+            __extra: Default::default(),
+        });
+        value.uuid
+    }
+    pub fn log_to_pool(message: &str) {
+        let uuid = Self::uuid(message);
+        LOG_POOL
+            .write()
+            .entry(uuid)
+            .or_default()
+            .push(message.to_owned());
     }
 }
 
@@ -25,8 +64,9 @@ mod task {
         task::{task_server::TaskServer, task_state::State, *},
         tonic::{self, metadata::MetadataMap, Request, Response},
     };
+    use parking_lot::RwLock;
     use std::collections::BTreeMap;
-    use tokio::sync::{Notify, RwLock};
+    use tokio::sync::Notify;
     use tokio_stream::Stream;
 
     /// build service under package task
@@ -89,17 +129,12 @@ mod task {
         }
     }
 
-    /// Cannot use async version
-    /// since callback is not in the runtime
-    ///
-    /// Given that we `write` this only when [task_server::Task::task_state_update] is called,
-    /// a sync version shouldn't block too long
-    ///
-    /// not tested under `current_thread` mode
-    pub static TX_HANDLERS: std::sync::RwLock<
-        BTreeMap<String, tokio::sync::mpsc::UnboundedSender<String>>,
-    > = std::sync::RwLock::new(BTreeMap::new());
-    static TASK_HANDLERS: RwLock<BTreeMap<String, Assistant>> = RwLock::const_new(BTreeMap::new());
+    /// will be used in callback,
+    /// which is out of tokio runtime
+    pub static TX_HANDLERS: RwLock<BTreeMap<String, crate::Logger<String>>> =
+        RwLock::new(BTreeMap::new());
+    static TASK_HANDLERS: tokio::sync::RwLock<BTreeMap<String, Assistant>> =
+        tokio::sync::RwLock::const_new(BTreeMap::new());
 
     fn get_session_id<'a>(meta: &'a MetadataMap) -> tonic::Result<&'a str> {
         meta.get("x-session-key")
@@ -140,7 +175,7 @@ mod task {
                 .async_connect(adb_path.as_str(), address.as_str(), config.as_str(), true)
                 .unwrap();
 
-            let uuid = unsafe {
+            let uuid = {
                 let mut buff_size = 1024;
                 loop {
                     if buff_size > 1024 * 1024 {
@@ -151,18 +186,22 @@ mod task {
                         .inner
                         .get_uuid(buff.as_mut_slice(), buff_size as u64)
                         .unwrap();
-                    if data_size == maa_sys::binding::AsstGetNullSize() {
+                    if data_size == maa_sys::Assistant::get_null_size() {
                         buff_size = 2 * buff_size;
                         continue;
                     }
-                    buff.set_len(data_size as usize);
+                    unsafe { buff.set_len(data_size as usize) };
                     break String::from_utf8_lossy(&buff).to_string();
                 }
             };
-            println!(">> {}", uuid);
+
             let session_id = uuid;
-            let mut lock = TASK_HANDLERS.write().await;
-            lock.insert(session_id.clone(), asst);
+
+            TX_HANDLERS
+                .write()
+                .insert(session_id.clone(), crate::Logger::new());
+            TASK_HANDLERS.write().await.insert(session_id.clone(), asst);
+
             Ok(Response::new(session_id))
         }
 
@@ -173,7 +212,7 @@ mod task {
 
             Ok(Response::new(
                 TASK_HANDLERS.write().await.remove(session_id).is_some()
-                    && TX_HANDLERS.write().unwrap().remove(session_id).is_some(),
+                    && TX_HANDLERS.write().remove(session_id).is_some(),
             ))
         }
 
@@ -296,12 +335,13 @@ mod task {
 
             let session_id = get_session_id(&meta)?;
 
-            let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-
-            TX_HANDLERS
+            let Some(rx) = TX_HANDLERS
                 .write()
-                .unwrap()
-                .insert(session_id.to_owned(), tx);
+                .get_mut(session_id)
+                .and_then(|logger| logger.take_rx())
+            else {
+                return Err(tonic::Status::resource_exhausted("rx has been taken"));
+            };
 
             use tokio_stream::StreamExt as _;
             let streaming = tokio_stream::wrappers::UnboundedReceiverStream::new(rx).map(|msg| {
@@ -353,12 +393,29 @@ mod core {
     #[tonic::async_trait]
     impl core_server::Core for CoreImpl {
         async fn load_core(&self, req: Request<CoreConfig>) -> Ret<bool> {
-            let CoreConfig { static_ops } = req.into_inner();
+            let CoreConfig {
+                static_ops,
+                log_ops,
+            } = req.into_inner();
 
             let tmp = tracing::span!(tracing::Level::DEBUG, "");
             let _enter = tmp.enter();
 
             let ret = maa_server::utils::load_core();
+
+            if let Some(core_config::LogOptions { level, name }) = log_ops {
+                use maa_dirs::Ensure;
+                // Todo: set log level for tracing
+                let _ = level;
+                maa_sys::Assistant::set_user_dir(
+                    maa_dirs::state()
+                        .join(name)
+                        .as_path()
+                        .ensure()
+                        .map_err(|e| tonic::Status::from_error(Box::new(e)))?,
+                )
+                .unwrap();
+            }
 
             if let Some(core_config::StaticOptions { cpu_ocr, gpu_ocr }) = static_ops {
                 use maa_sys::{Assistant, StaticOptionKey};
@@ -387,11 +444,6 @@ mod core {
                 }
             }
 
-            unsafe {
-                use maa_sys::ToCString;
-                maa_sys::binding::AsstSetUserDir(maa_dirs::state().to_cstring().unwrap().as_ptr())
-            };
-
             if maa_server::utils::ResourceConfig::default().load().is_err() {
                 return Err(tonic::Status::internal("Failed to load resources"));
             }
@@ -406,13 +458,13 @@ mod core {
 
             Ok(Response::new(true))
         }
-        async fn set_log(&self, request: Request<LogRequest>) -> Ret<bool> {
-            let _ = request;
-            todo!()
-        }
     }
 }
 
+use parking_lot::RwLock;
+use std::collections::BTreeMap;
+
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tonic::transport::Server;
 use tracing_subscriber::util::SubscriberInitExt;
 
