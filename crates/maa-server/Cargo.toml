@@ -29,6 +29,7 @@ serde = { workspace = true, features = ["derive"] }
 parking_lot = "0.12.3"
 hyper-util = "0.1.10"
 tower = "0.5.2"
+uuid = { version = "1.15.1", features = ["v7"] }
 
 [build-dependencies]
 tonic-build = { version = "0.12" }

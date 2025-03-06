@@ -309,25 +309,6 @@ impl Assistant {
             Err(_) => Err(Error::ContentTooLarge(UUID_BUFF_SIZE)),
         }
     }
-
-    pub fn get_uuid_ext(&self) -> String {
-        let mut buff_size = 1024;
-        loop {
-            if buff_size > 1024 * 1024 {
-                unreachable!();
-            }
-            let mut buff: Vec<u8> = Vec::with_capacity(buff_size);
-            let data_size = self
-                .get_uuid(buff.as_mut_slice(), buff_size as u64)
-                .unwrap();
-            if data_size == Self::get_null_size() {
-                buff_size = 2 * buff_size;
-                continue;
-            }
-            unsafe { buff.set_len(data_size as usize) };
-            break String::from_utf8_lossy(&buff).to_string();
-        }
-    }
 }
 
 /// Trait to convert the return value of asst FFI to a Result
