@@ -1,9 +1,8 @@
 use maa_types::TaskType;
 
 use maa_server::task::NewTaskRequest;
-use tokio::net::UnixStream;
 use tokio_stream::StreamExt;
-use tonic::transport::Endpoint;
+use tonic::transport::{Channel, Endpoint};
 
 fn make_request<T>(payload: T, session_id: &str) -> tonic::Request<T> {
     let mut req = tonic::Request::new(payload);
@@ -12,28 +11,33 @@ fn make_request<T>(payload: T, session_id: &str) -> tonic::Request<T> {
     req
 }
 
+#[cfg(feature = "unix-socket")]
+async fn connect() -> Channel {
+    use tokio::net::UnixStream;
+
+    Endpoint::from_static("http://127.0.0.1:50051")
+        .connect_with_connector(tower::service_fn(|_: tonic::transport::Uri| async {
+            let path = "/tmp/tonic/testing.sock";
+            Ok::<_, std::io::Error>(hyper_util::rt::TokioIo::new(
+                UnixStream::connect(path).await?,
+            ))
+        }))
+        .await
+        .unwrap()
+}
+
+#[cfg(not(feature = "unix-socket"))]
+async fn connect() -> Channel {
+    Endpoint::try_from("http://127.0.0.1:50051")
+        .unwrap()
+        .connect()
+        .await
+        .unwrap()
+}
+
 #[tokio::main]
 async fn main() {
-    let using_socket = true;
-
-    let channel = if using_socket {
-        Endpoint::from_static("http://127.0.0.1:50051")
-            .connect_with_connector(tower::service_fn(|_: tonic::transport::Uri| async {
-                let path = "/tmp/tonic/testing.sock";
-                // Connect to a Uds socket
-                Ok::<_, std::io::Error>(hyper_util::rt::TokioIo::new(
-                    UnixStream::connect(path).await?,
-                ))
-            }))
-            .await
-            .unwrap()
-    } else {
-        Endpoint::try_from("http://127.0.0.1:50051")
-            .unwrap()
-            .connect()
-            .await
-            .unwrap()
-    };
+    let channel = connect().await;
 
     let mut coreclient = maa_server::core::core_client::CoreClient::new(channel.clone());
     coreclient
@@ -43,7 +47,7 @@ async fn main() {
                 gpu_ocr: None,
             }),
             log_ops: Some(maa_server::core::core_config::LogOptions {
-                name: "test".to_owned(),
+                path: "test".to_owned(),
                 level: maa_server::core::core_config::LogLevel::Debug.into(),
             }),
         })
