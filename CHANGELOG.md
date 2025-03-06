@@ -1,5 +1,52 @@
 # Release Notes
 
+## Release 0.5.4
+
+### Features
+
+- Add support for starting with seed in Sarkaz theme and mode 1 by [@wangl-cc](https://github.com/wangl-cc) in [#368](https://github.com/MaaAssistantArknights/maa-cli/pull/368)
+- Add `warn_on_update_failure` option for hot update by [@wangl-cc](https://github.com/wangl-cc) in [#378](https://github.com/MaaAssistantArknights/maa-cli/pull/378)
+
+### Bug Fixes
+
+- Use self-replace to update maa-cli self by [@wangl-cc](https://github.com/wangl-cc) in [#363](https://github.com/MaaAssistantArknights/maa-cli/pull/363)
+
+### Documentation
+
+- Remove outdated information about `fastdeploy` by [@wangl-cc](https://github.com/wangl-cc)
+- Fix nix MaaCore installation by [@wangl-cc](https://github.com/wangl-cc)
+
+### Testing
+
+- Retry for more tests by [@wangl-cc](https://github.com/wangl-cc) in [#360](https://github.com/MaaAssistantArknights/maa-cli/pull/360)
+- Use mock environment variables in maa-dirs tests by [@wangl-cc](https://github.com/wangl-cc) in [#366](https://github.com/MaaAssistantArknights/maa-cli/pull/366)
+
+### Miscellaneous
+
+- Fix moved url in schemas by [@wangl-cc](https://github.com/wangl-cc)
+- Fix typo by [@wangl-cc](https://github.com/wangl-cc)
+- Fix new lint errors by [@wangl-cc](https://github.com/wangl-cc)
+- Simplify some code by [@wangl-cc](https://github.com/wangl-cc)
+- Use lld as default linker on windows by [@wangl-cc](https://github.com/wangl-cc)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.5.3...v0.5.4>
+
+## Release 0.5.3
+
+### Bug Fixes
+
+- Use ubuntu-22.04 instead of ubuntu-latest for build jobs by [@wangl-cc](https://github.com/wangl-cc) in [#359](https://github.com/MaaAssistantArknights/maa-cli/pull/359)
+
+### Refactor
+
+- Move all packages to `crates` subdir by [@wangl-cc](https://github.com/wangl-cc) in [#356](https://github.com/MaaAssistantArknights/maa-cli/pull/356)
+
+### Miscellaneous
+
+- Fix generated links by [@wangl-cc](https://github.com/wangl-cc)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.5.2...v0.5.3>
+
 ## Release 0.5.2
 
 ### Features
