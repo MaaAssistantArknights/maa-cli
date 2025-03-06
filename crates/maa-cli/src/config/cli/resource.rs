@@ -10,6 +10,9 @@ use crate::value::userinput::{Input, UserInput};
 pub struct Config {
     #[serde(default)]
     auto_update: bool,
+    /// Warn on auto update failure instead of exiting
+    #[serde(default)]
+    warn_on_update_failure: bool,
     #[serde(default)]
     backend: GitBackend,
     #[serde(default)]
@@ -19,6 +22,10 @@ pub struct Config {
 impl Config {
     pub fn auto_update(&self) -> bool {
         self.auto_update
+    }
+
+    pub fn warn_on_update_failure(&self) -> bool {
+        self.warn_on_update_failure
     }
 
     pub fn backend(&self) -> GitBackend {
@@ -325,6 +332,7 @@ pub mod tests {
     pub fn example_config() -> Config {
         Config {
             auto_update: true,
+            warn_on_update_failure: true,
             backend: GitBackend::Libgit2,
             remote: Remote {
                 url: String::from("https://github.com/MaaAssistantArknights/MaaResource.git"),
@@ -342,6 +350,7 @@ pub mod tests {
         let config = Config::default();
         assert_eq!(config, Config {
             auto_update: false,
+            warn_on_update_failure: false,
             backend: GitBackend::Git,
             remote: Remote {
                 url: default_url(),
@@ -550,6 +559,7 @@ pub mod tests {
             assert_de_tokens(
                 &Config {
                     auto_update: true,
+                    warn_on_update_failure: true,
                     backend: GitBackend::Git,
                     remote: Remote {
                         url: String::from("git@github.com:MaaAssistantArknights/MaaResource.git"),
@@ -561,8 +571,10 @@ pub mod tests {
                     },
                 },
                 &[
-                    Token::Map { len: Some(3) },
+                    Token::Map { len: Some(4) },
                     Token::Str("auto_update"),
+                    Token::Bool(true),
+                    Token::Str("warn_on_update_failure"),
                     Token::Bool(true),
                     Token::Str("backend"),
                     GitBackend::Git.to_token(),

@@ -36,6 +36,7 @@
       "type": "object",
       "properties": {
         "auto_update": { "type": "boolean" },
+        "warn_on_update_failure": { "type": "boolean" },
         "backend": { "type": "string", "enum": ["git", "libgit2"] },
         "remote": {
           "type": "object",

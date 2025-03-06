@@ -2,7 +2,10 @@ use anyhow::{bail, Result};
 use log::{debug, warn};
 
 use crate::{
-    config::cli::{resource::GitBackend, CLI_CONFIG},
+    config::cli::{
+        resource::{Certificate, GitBackend},
+        CLI_CONFIG,
+    },
     dirs,
 };
 
@@ -69,6 +72,26 @@ pub fn update(is_auto: bool) -> Result<()> {
         bail!("A Certificate is required to clone a repository using SSH");
     }
 
+    let result = update_core(backend, url, dest, branch, cert);
+
+    if config.warn_on_update_failure() {
+        if let Err(err) = result {
+            warn!("Failed to update resource repository: {}", err);
+        }
+    } else {
+        result?
+    }
+
+    Ok(())
+}
+
+fn update_core(
+    backend: GitBackend,
+    url: &str,
+    dest: &std::path::Path,
+    branch: Option<&str>,
+    cert: Option<&Certificate>,
+) -> Result<()> {
     if dest.exists() {
         debug!("Fetching resource repository...");
         match backend {

@@ -34,14 +34,15 @@ binary = false # Whether to install binary of maa-cli
 # while this is hot update resource of MaaCore
 # You cannot use this to hot update without any base resource
 [resource]
-auto_update = true  # Whether to auto update resource each time run maa task
-backend = "libgit2" # Backend to manipulate repository, can be `git` or `libgit2`
+auto_update = true            # Whether to auto update resource each time run maa task
+warn_on_update_failure = true # Whether to warn on update failure instead of panic
+backend = "libgit2"           # Backend to manipulate repository, can be `git` or `libgit2`
 
 # Configurations for remote git repository of resource
 [resource.remote]
 branch = "main" # Branch of remote resource repository
 # URL of remote resource repository, leave it empty to use the default URL
-uril = "https://github.com/MaaAssistantArknights/MaaResource.git"
+url = "https://github.com/MaaAssistantArknights/MaaResource.git"
 # Or you can use ssh to clone the repository
 # url = "git@github.com:MaaAssistantArknights/MaaResource.git"
 # If you want to use ssh, a certificate is needed which can be "ssh-agent" or "ssh-key"
