@@ -8,13 +8,16 @@ use crate::value::userinput::{Input, UserInput};
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Default, Clone)]
 pub struct Config {
+    /// Automatically update resource every time
     #[serde(default)]
     auto_update: bool,
-    /// Warn on auto update failure instead of exiting
+    /// Warn on update failure instead of exiting
     #[serde(default)]
     warn_on_update_failure: bool,
+    /// Backend to use for resource update
     #[serde(default)]
     backend: GitBackend,
+    /// Remote configuration for resource update
     #[serde(default)]
     remote: Remote,
 }
@@ -358,6 +361,17 @@ pub mod tests {
                 certificate: None,
             }
         });
+    }
+
+    #[test]
+    fn getter() {
+        let config = Config::default();
+        assert!(!config.auto_update());
+        assert!(!config.warn_on_update_failure());
+        assert_eq!(config.backend(), GitBackend::Git);
+        assert_eq!(config.remote().url(), default_url());
+        assert_eq!(config.remote().branch(), None);
+        assert_eq!(config.remote().certificate(), None);
     }
 
     mod serde {
