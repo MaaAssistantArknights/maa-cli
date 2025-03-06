@@ -86,7 +86,7 @@ pub mod task {
         impl new_connection_request::InstanceOptions {
             pub fn apply_to(self, asst: &maa_sys::Assistant) -> Result<(), String> {
                 use maa_sys::InstanceOptionKey;
-                if let Some(touch_mode) = TryInto::<TouchMode>::try_into(self.touch_mode).ok() {
+                if let Ok(touch_mode) = TryInto::<TouchMode>::try_into(self.touch_mode) {
                     tracing::debug!("Setting touch mode to {}", touch_mode.to_str());
                     asst.set_instance_option(InstanceOptionKey::TouchMode, touch_mode.to_str())
                         .map_err(|_| {
