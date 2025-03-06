@@ -191,6 +191,8 @@ mod tests {
                 Token::Map { len: Some(3) },
                 Token::Str("auto_update"),
                 Token::Bool(true),
+                Token::Str("warn_on_update_failure"),
+                Token::Bool(true),
                 Token::Str("backend"),
                 GitBackend::Libgit2.to_token(),
                 Token::Str("remote"),
