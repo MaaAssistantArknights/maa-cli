@@ -59,15 +59,15 @@ async fn main() {
     println!("Connected to server");
 
     let session_id = taskclient
-        .new_connection(maa_server::task::NewConnectionRequst {
-            conncfg: Some(maa_server::task::new_connection_requst::ConnectionConfig {
+        .new_connection(maa_server::task::NewConnectionRequest {
+            conncfg: Some(maa_server::task::new_connection_request::ConnectionConfig {
                 adb_path: "adb".to_owned(),
                 address: "192.168.240.112:5555".to_owned(),
                 config: "Waydroid".to_owned(),
             }),
-            instcfg: Some(maa_server::task::new_connection_requst::InstanceOptions {
+            instcfg: Some(maa_server::task::new_connection_request::InstanceOptions {
                 touch_mode:
-                    maa_server::task::new_connection_requst::instance_options::TouchMode::MaaTouch
+                    maa_server::task::new_connection_request::instance_options::TouchMode::MaaTouch
                         .into(),
                 deployment_with_pause: false,
                 adb_lite_enabled: false,
@@ -105,10 +105,10 @@ async fn main() {
         .into_inner();
     println!("Add task Fight");
     taskclient
-        .deactive_task(make_request(id, &session_id))
+        .deactivate_task(make_request(id, &session_id))
         .await
         .unwrap();
-    println!("Deactive task Fight");
+    println!("Deactivate task Fight");
     let mut payload = NewTaskRequest::default();
     payload.set_task_type(TaskType::Fight.into());
     payload.task_params = r#" { "stage": "1-7" } "#.to_owned();
