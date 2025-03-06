@@ -69,7 +69,7 @@ pub mod task {
 
     mod utils {
         use super::*;
-        use new_connection_requst::instance_options::TouchMode;
+        use new_connection_request::instance_options::TouchMode;
 
         impl TouchMode {
             /// Convert TouchMode to a static string slice
@@ -83,7 +83,7 @@ pub mod task {
             }
         }
 
-        impl new_connection_requst::InstanceOptions {
+        impl new_connection_request::InstanceOptions {
             pub fn apply_to(self, asst: &maa_sys::Assistant) -> Result<(), String> {
                 use maa_sys::InstanceOptionKey;
                 if let Some(touch_mode) = TryInto::<TouchMode>::try_into(self.touch_mode).ok() {
@@ -124,7 +124,7 @@ pub mod task {
             }
         }
 
-        impl new_connection_requst::ConnectionConfig {
+        impl new_connection_request::ConnectionConfig {
             pub fn connect_args(self) -> (String, String, String) {
                 let adb_path = self.adb_path;
                 let address = self.address;
@@ -139,7 +139,7 @@ pub mod task {
         }
     }
 
-    impl NewConnectionRequst {
+    impl NewConnectionRequest {
         #[tracing::instrument("Apply Instance Config", skip_all)]
         pub fn apply_to(self, asst: &maa_sys::Assistant) -> tonic::Result<()> {
             let Self { conncfg, instcfg } = self;

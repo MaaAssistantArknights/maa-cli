@@ -153,7 +153,7 @@ mod callback {
 
             "TouchModeNotAvailable" => error!("Touch Mode Not Available"),
             _ => debug!(
-                "{}: what:{} why:{} detials:{}",
+                "{}: what:{} why:{} details:{}",
                 "Unknown Connection Info",
                 what,
                 why.as_deref().unwrap_or("No why"),
@@ -417,7 +417,7 @@ mod task {
     ///
     /// In order to trace and sync client, an additional header `SESSION_KEY` is needed.
     ///
-    /// Client get one by calling [`Task::new_connection`], and destory by calling [`Task::close_connection`]
+    /// Client get one by calling [`Task::new_connection`], and destroy by calling [`Task::close_connection`]
     ///
     /// ### Usage:
     /// ```no_run
@@ -546,7 +546,7 @@ mod task {
     #[tonic::async_trait]
     impl task_server::Task for TaskImpl {
         #[tracing::instrument(skip_all)]
-        async fn new_connection(&self, req: Request<NewConnectionRequst>) -> Ret<String> {
+        async fn new_connection(&self, req: Request<NewConnectionRequest>) -> Ret<String> {
             let req = req.into_inner();
 
             let session_id = uuid::Uuid::now_v7().to_string();
@@ -638,7 +638,7 @@ mod task {
         }
 
         #[tracing::instrument(skip_all)]
-        async fn active_task(&self, req: Request<TaskId>) -> Ret<bool> {
+        async fn activate_task(&self, req: Request<TaskId>) -> Ret<bool> {
             let (meta, _, task_id) = req.into_parts();
 
             let session_id = meta.get_session_id()?;
@@ -656,7 +656,7 @@ mod task {
         }
 
         #[tracing::instrument(skip_all)]
-        async fn deactive_task(&self, req: Request<TaskId>) -> Ret<bool> {
+        async fn deactivate_task(&self, req: Request<TaskId>) -> Ret<bool> {
             let (meta, _, task_id) = req.into_parts();
 
             let session_id = meta.get_session_id()?;
@@ -786,7 +786,7 @@ mod core {
             let core_cfg = req.into_inner();
 
             if maa_sys::binding::loaded() {
-                tracing::debug!("MaaCore already loaded, skiping Core load");
+                tracing::debug!("MaaCore already loaded, skipping Core load");
                 // using false here to info the client that core is already loaded
                 return Ok(Response::new(false));
             }
