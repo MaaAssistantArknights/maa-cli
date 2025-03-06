@@ -14,21 +14,33 @@ path = "src/server.rs"
 name = "client"
 path = "src/client.rs"
 
+[features]
+default = ["client"]
+
+client = []
+
+unix-socket = ["dep:tower", "dep:hyper-util"]
+
 [dependencies]
-tonic = { version = "0.12" }
 maa-types = { workspace = true, features = ["serde"] }
-prost = "*"
-tokio = { workspace = true, features = ["rt-multi-thread"] }
 maa-sys = { workspace = true, features = ["runtime"] }
-tokio-stream = { version = "0.1", features = ["sync"] }
-serde_json.workspace = true
 maa-dirs.workspace = true
+
+tonic = { version = "0.12" }
+prost = "*"
+hyper-util = { version = "0.1.10", default-features = false, optional = true }
+tower = { version = "0.5.2", optional = true }
+
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
+
 serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+
 parking_lot = "0.12.3"
-hyper-util = "0.1.10"
-tower = "0.5.2"
 uuid = { version = "1.15.1", features = ["v7"] }
 
 [build-dependencies]
