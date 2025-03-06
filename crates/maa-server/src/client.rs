@@ -93,7 +93,7 @@ async fn main() {
     println!("Add task StartUp");
     let mut payload = NewTaskRequest::default();
     payload.set_task_type(TaskType::Fight.into());
-    payload.task_params = r#""#.to_owned();
+    payload.task_params = r#" { "stage": "1-7" } "#.to_owned();
     let id = taskclient
         .append_task(make_request(payload, &session_id))
         .await
@@ -105,6 +105,15 @@ async fn main() {
         .await
         .unwrap();
     println!("Deactive task Fight");
+    let mut payload = NewTaskRequest::default();
+    payload.set_task_type(TaskType::Fight.into());
+    payload.task_params = r#" { "stage": "1-7" } "#.to_owned();
+    taskclient
+        .append_task(make_request(payload, &session_id))
+        .await
+        .unwrap()
+        .into_inner();
+    println!("Add task Fight 1-7");
     taskclient
         .start_tasks(make_request((), &session_id))
         .await
