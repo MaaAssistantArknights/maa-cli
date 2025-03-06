@@ -8,7 +8,7 @@ use tonic::transport::Endpoint;
 fn make_request<T>(payload: T, session_id: &str) -> tonic::Request<T> {
     let mut req = tonic::Request::new(payload);
     req.metadata_mut()
-        .insert("x-session-key", session_id.parse().unwrap());
+        .insert("x-session-id", session_id.parse().unwrap());
     req
 }
 

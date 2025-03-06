@@ -1,46 +1,46 @@
 pub unsafe extern "C" fn default_callback(
     code: maa_types::primitive::AsstMsgId,
-    json_raw: *const std::ffi::c_char,
+    json_str: *const std::ffi::c_char,
     session_id: *mut std::ffi::c_void,
 ) {
     use log::Logger;
     let code: maa_server::callback::AsstMsg = code.into();
-    let json_str = unsafe { std::ffi::CStr::from_ptr(json_raw).to_str().unwrap() };
+    let json_str = unsafe { std::ffi::CStr::from_ptr(json_str).to_str().unwrap() };
     let session_id: SessionIDRef = unsafe {
         std::ffi::CStr::from_ptr(session_id as *mut _ as *mut std::ffi::c_char)
             .to_str()
             .unwrap()
     };
+    tracing::trace_span!("C callback").in_scope(|| {
+        tracing::trace!("Session ID: {}", session_id);
 
-    tracing::trace!("Session ID: {}", session_id);
-
-    if let Some(tx) = log::TX_HANDLERS.read().get(session_id) {
-        if tx.log(json_str.to_string()) {
-            log::TX_HANDLERS.write().remove(session_id);
+        if let Some(tx) = log::TX_HANDLERS.read().get(session_id) {
+            if tx.log(json_str.to_string(), session_id.to_owned()) {
+                log::TX_HANDLERS.write().remove(session_id);
+            }
+        } else {
+            Logger::log_to_pool(json_str, session_id.to_owned());
         }
-    } else {
-        Logger::log_to_pool(json_str);
-    }
 
-    let map: callback::Map = serde_json::from_str(json_str).unwrap();
+        let map: callback::Map = serde_json::from_str(json_str).unwrap();
 
-    // if ret is None, which means the message is not processed well
-    // we should print the message to trace the error
-    if callback::process_message(code, map).is_none() {
-        tracing::debug!(
-            "FailedToProcessMessage, code: {:?}, message: {}",
-            code,
-            json_str
-        )
-    }
+        // if ret is None, which means the message is not processed well
+        // we should print the message to trace the error
+        if callback::process_message(code, map, session_id).is_none() {
+            tracing::debug!(
+                "FailedToProcessMessage, code: {:?}, message: {}",
+                code,
+                json_str
+            )
+        }
+    })
 }
 
 type SessionID = String;
 /// an ugly way to make up
 type SessionIDRef<'a> = &'a str;
 
-type Uuid = String;
-type UuidRef<'a> = &'a str;
+type MaaUuid = String;
 
 use maa_types::primitive::AsstTaskId as TaskId;
 
@@ -48,10 +48,10 @@ mod callback {
     use maa_server::callback::AsstMsg;
     use tracing::{debug, error, info, trace, warn};
 
-    use crate::{SessionID, TaskId};
+    use crate::{SessionIDRef, TaskId};
 
     pub type Map = serde_json::Map<String, serde_json::Value>;
-    pub fn process_message(code: AsstMsg, message: Map) -> Option<()> {
+    pub fn process_message(code: AsstMsg, message: Map, session_id: SessionIDRef) -> Option<()> {
         use AsstMsg::*;
 
         match code {
@@ -72,10 +72,10 @@ mod callback {
             }
 
             TaskChainError | TaskChainStart | TaskChainCompleted | TaskChainExtraInfo
-            | TaskChainStopped => process_taskchain(code, message),
+            | TaskChainStopped => process_taskchain(code, message, session_id),
 
             SubTaskError | SubTaskStart | SubTaskCompleted | SubTaskExtraInfo | SubTaskStopped => {
-                subtask::process_subtask(code, message)
+                subtask::process_subtask(code, message, session_id)
             }
 
             Unknown => None,
@@ -87,16 +87,10 @@ mod callback {
         struct ConnectionInfo {
             what: String,
             why: Option<String>,
-            #[serde(rename = "uuid")]
-            _uuid: SessionID,
             details: Map,
         }
-        let ConnectionInfo {
-            what,
-            why,
-            _uuid,
-            details,
-        } = serde_json::from_value(serde_json::Value::Object(message)).unwrap();
+        let ConnectionInfo { what, why, details } =
+            serde_json::from_value(serde_json::Value::Object(message)).unwrap();
 
         match what.as_str() {
             "UuidGot" => debug!("Got UUID: {}", details.get("uuid")?.as_str()?),
@@ -152,18 +146,14 @@ mod callback {
         Some(())
     }
 
-    fn process_taskchain(code: AsstMsg, message: Map) -> Option<()> {
+    fn process_taskchain(code: AsstMsg, message: Map, session_id: SessionIDRef) -> Option<()> {
         #[derive(serde::Deserialize)]
         struct TaskChain {
             taskchain: maa_types::TaskType,
             taskid: TaskId,
-            uuid: SessionID,
         }
-        let TaskChain {
-            taskchain,
-            taskid,
-            uuid,
-        } = serde_json::from_value(serde_json::Value::Object(message)).unwrap();
+        let TaskChain { taskchain, taskid } =
+            serde_json::from_value(serde_json::Value::Object(message)).unwrap();
 
         use crate::state::{Reason, StatePool};
         use AsstMsg::*;
@@ -171,19 +161,19 @@ mod callback {
         match code {
             TaskChainStart => {
                 info!("{} {}", taskchain, "Start");
-                StatePool::reason_task(&uuid, taskid, Reason::Start);
+                StatePool::reason_task(session_id, taskid, Reason::Start);
             }
             TaskChainCompleted => {
                 info!("{} {}", taskchain, "Completed");
-                StatePool::reason_task(&uuid, taskid, Reason::Complete);
+                StatePool::reason_task(session_id, taskid, Reason::Complete);
             }
             TaskChainStopped => {
                 warn!("{} {}", taskchain, "Stopped");
-                StatePool::reason_task(&uuid, taskid, Reason::Cancel);
+                StatePool::reason_task(session_id, taskid, Reason::Cancel);
             }
             TaskChainError => {
                 error!("{} {}", taskchain, "Error");
-                StatePool::reason_task(&uuid, taskid, Reason::Error);
+                StatePool::reason_task(session_id, taskid, Reason::Error);
             }
             TaskChainExtraInfo => {}
 
@@ -193,414 +183,17 @@ mod callback {
         Some(())
     }
 
-    #[cfg(any())]
     mod subtask {
         use super::*;
 
-        pub fn process_subtask(code: AsstMsg, message: Map) -> Option<()> {
-            match code {
-                AsstMsg::SubTaskError => process_subtask_error(message),
-                AsstMsg::SubTaskStart => process_subtask_start(message),
-                AsstMsg::SubTaskCompleted => process_subtask_completed(message),
-                AsstMsg::SubTaskExtraInfo => process_subtask_extra_info(message),
-                AsstMsg::SubTaskStopped => Some(()),
-                _ => unreachable!(),
-            }
-        }
-
-        fn process_subtask_start(message: Map) -> Option<()> {
-            let subtask = message.get("subtask")?.as_str()?;
-
-            if subtask == "ProcessTask" {
-                let details = message.get("details")?.as_object()?;
-                let task = details.get("task")?.as_str()?;
-
-                match task {
-                    // Fight
-                    "StartButton2" | "AnnihilationConfirm" => {
-                        // Maybe need to update if MAA fight a stage multiple times in one run
-                        let exec_times = details.get("exec_times")?.as_i64()?;
-                        edit_current_task_detail(move |detail| {
-                            if let Some(detail) = detail.as_fight_mut() {
-                                detail.set_times(exec_times);
-                            }
-                        });
-                        info!("{} {} {}", "MissionStart", exec_times, "times");
-                    }
-                    "StoneConfirm" => {
-                        let exec_times = details.get("exec_times")?.as_i64()?;
-                        edit_current_task_detail(move |detail| {
-                            if let Some(detail) = detail.as_fight_mut() {
-                                detail.set_stone(exec_times)
-                            }
-                        });
-                        info!("Use {} stones", exec_times);
-                    }
-                    "AbandonAction" => warn!("{}", "PRTS error"),
-                    // Recruit
-                    "RecruitRefreshConfirm" => {
-                        edit_current_task_detail(move |detail| {
-                            if let Some(detail) = detail.as_recruit_mut() {
-                                detail.refresh()
-                            }
-                        });
-                        info!("{}", "Refresh Tags")
-                    }
-                    "RecruitConfirm" => {
-                        edit_current_task_detail(move |detail| {
-                            if let Some(detail) = detail.as_recruit_mut() {
-                                detail.recruit()
-                            }
-                        });
-                        info!("{}", "Recruit")
-                    }
-                    // Infrast
-                    "InfrastDormDoubleConfirmButton" => warn!("{}", "InfrastDormDoubleConfirmed"),
-                    // RogueLike
-                    "StartExplore" => {
-                        let exec_times = details.get("exec_times")?.as_i64()?;
-                        edit_current_task_detail(move |detail| {
-                            if let Some(detail) = detail.as_roguelike_mut() {
-                                detail.start_exploration()
-                            }
-                        });
-                        info!("Start exploration {} times", exec_times)
-                    }
-                    "ExitThenAbandon" => {
-                        edit_current_task_detail(move |detail| {
-                            if let Some(detail) = detail.as_roguelike_mut() {
-                                detail.set_state(summary::ExplorationState::Abandoned)
-                            }
-                        });
-                        info!("Exploration Abandoned")
-                    }
-                    "ExitThenConfirm" => info!("{}", "ExplorationConfirmed"),
-                    "MissionCompletedFlag" => info!("{}", "MissionCompleted"),
-                    "MissionFailedFlag" => {
-                        // Deposit In some cases a failed mission doesn't mean failed exploration
-                        // If a exploration was not failed, it's state would be overwritten later
-                        if message.get("taskchain")?.as_str()? == "Roguelike" {
-                            edit_current_task_detail(move |detail| {
-                                if let Some(detail) = detail.as_roguelike_mut() {
-                                    detail.set_state(summary::ExplorationState::Failed)
-                                }
-                            });
-                        }
-                        info!("MissionFailed")
-                    }
-                    "StageTraderEnter" => info!("{}", "StageTraderEnter"),
-                    "StageSafeHouseEnter" => info!("{}", "StageSafeHouseEnter"),
-                    "StageCambatDpsEnter" => info!("{}", "StageCambatDpsEnter"),
-                    "StageEmergencyDps" => info!("{}", "EmergencyDpsEnter"),
-                    "StageDreadfulFoe" | "StageDreadfulFoe-5Enter" => info!("{}", "DreadfulFoe"),
-                    "StageTraderInvestSystemFull" => warn!("{}", "TraderInvestSystemFull"),
-                    "GamePass" => info!("{}", "RoguelikeGamePass"),
-
-                    "OfflineConfirm" => warn!("{}", "GameOffline"),
-                    "BattleStartAll" => info!("{}", "MissionStart"),
-                    "StageTraderSpecialShoppingAfterRefresh" => {
-                        info!("{}", "RoguelikeSpecialItemBought")
-                    }
-                    _ => trace!(
-                        "{}: {}",
-                        "UnknownSubTaskStart",
-                        serde_json::to_string_pretty(message).unwrap()
-                    ),
-                }
-            }
-
-            Some(())
-        }
-
-        fn process_subtask_completed(_: Map) -> Option<()> {
-            Some(())
-        }
-
-        fn process_subtask_error(message: Map) -> Option<()> {
-            let subtask = message.get("subtask")?.as_str()?;
-
-            match subtask {
-                "StartGameTask" => error!("Failed To Start Game"),
-                "AutoRecruitTask" => error!("{} {}", message.get("why")?.as_str()?, "Has Returned"),
-                "RecognizeDrops" => error!("Failed To Recognize Drops"),
-                "ReportToPenguinStats" => error!(
-                    "{}, {}",
-                    "Failed To Report To Penguin Stats",
-                    message.get("why")?.as_str()?,
-                ),
-                "CheckStageValid" => error!("TheEX"),
-                _ => debug!(
-                    "{}: {}",
-                    "Unknown SubTask Error",
-                    serde_json::to_string_pretty(&message).unwrap()
-                ),
-            };
-
-            Some(())
-        }
-
-        fn process_subtask_extra_info(message: Map) -> Option<()> {
-            let taskchain = message.get("taskchain")?.as_str()?;
-
-            match taskchain {
-                "Depot" => info!(
-                    "{}: {}",
-                    "Depot",
-                    serde_json::to_string_pretty(message).unwrap()
-                ),
-                "OperBox" => info!(
-                    "{}: {}",
-                    "OperBox",
-                    serde_json::to_string_pretty(message).unwrap()
-                ),
-                _ => {}
-            }
-
-            let what = message.get("what")?.as_str()?;
-            let details = message.get("details")?;
-
-            match what {
-                "StageDrops" => {
-                    let drops = details.get("drops")?.as_array()?;
-                    let mut all_drops = summary::Map::new();
-                    for drop in drops {
-                        let drop = drop.as_object()?;
-                        let item = drop.get("itemName")?.as_str()?;
-                        let count = drop.get("quantity")?.as_i64()?;
-                        all_drops.insert(item.to_owned(), count);
-                    }
-
-                    info!(
-                        "{}: {}",
-                        "Drops",
-                        all_drops
-                            .iter()
-                            .map(|(item, count)| format!("{} × {}", item, count))
-                            .join(", ")
-                            .unwrap_or_else(|| "none".to_owned())
-                    );
-
-                    edit_current_task_detail(move |detail| {
-                        if let Some(detail) = detail.as_fight_mut() {
-                            detail.push_drop(all_drops);
-                        }
-                    });
-
-                    let stage = details.get("stage")?.get("stageCode")?.as_str()?.to_owned();
-                    edit_current_task_detail(move |detail| {
-                        if let Some(detail) = detail.as_fight_mut() {
-                            detail.set_stage(stage.as_str());
-                        }
-                    });
-                }
-
-                // Sanity and Medicines
-                "SanityBeforeStage" => info!(
-                    "Current sanity: {}/{}",
-                    details.get("current_sanity")?.as_i64()?,
-                    details.get("max_sanity")?.as_i64()?
-                ),
-                "UseMedicine" => {
-                    let count = details.get("count")?.as_i64()?;
-                    let is_expiring = details.get("is_expiring")?.as_bool()?;
-                    edit_current_task_detail(move |detail| {
-                        if let Some(detail) = detail.as_fight_mut() {
-                            detail.use_medicine(count, is_expiring);
-                        }
-                    });
-
-                    if is_expiring {
-                        info!("Use {} expiring medicine", count);
-                    } else {
-                        info!("Use {} medicine", count);
-                    }
-                }
-
-                // Infrast
-                "EnterFacility" => info!(
-                    "{} {} #{}",
-                    "EnterFacility",
-                    details.get("facility")?.as_str()?,
-                    details.get("index")?.as_i64()?,
-                ),
-                "ProductIncorrect" => warn!("{}", "ProductIncorrect"),
-                "ProductUnknown" => error!("{}", "ProductUnknown"),
-                "ProductChanged" => info!("{}", "ProductChanged"),
-                "NotEnoughStaff" => error!("{}", "NotEnoughStaff"),
-                "ProductOfFacility" => {
-                    let facility = details.get("facility")?.as_str()?.to_owned();
-                    let index = details.get("index")?.as_i64()?;
-                    let product = details.get("product")?.as_str()?.to_owned();
-
-                    info!("{}: {}", "ProductOfFacility", product);
-
-                    edit_current_task_detail(move |detail| {
-                        if let Some(detail) = detail.as_infrast_mut() {
-                            detail.set_product(facility.parse().unwrap(), index, product.as_str());
-                        }
-                    });
-                }
-                "CustomInfrastRoomOperators" => {
-                    let facility = details.get("facility")?.as_str()?.to_owned();
-                    let index = details.get("index")?.as_i64()?;
-                    let operators = details.get("names")?.as_array()?.to_owned();
-                    let candidates = details.get("candidates")?.as_array()?.to_owned();
-
-                    edit_current_task_detail(move |detail| {
-                        if let Some(detail) = detail.as_infrast_mut() {
-                            detail.set_operators(
-                                facility.parse().unwrap(),
-                                index,
-                                operators
-                                    .iter()
-                                    .filter_map(|x| x.as_str().map(|x| x.to_owned()))
-                                    .collect(),
-                                candidates
-                                    .iter()
-                                    .filter_map(|x| x.as_str().map(|x| x.to_owned()))
-                                    .collect(),
-                            );
-                        }
-                    });
-
-                    info!(
-                        "{}: {}",
-                        "CustomInfrastRoomOperators",
-                        details
-                            .get("names")?
-                            .as_array()?
-                            .iter()
-                            .filter_map(|x| x.as_str())
-                            .join(", ")
-                            .unwrap_or_else(|| "none".to_owned())
-                    )
-                }
-
-                // Recruit
-                "RecruitTagsDetected" => (), // this info is contained in RecruitResult, so ignore it
-                "RecruitSpecialTag" => {
-                    info!("{}: {}", "RecruitingTips", details.get("tag")?.as_str()?)
-                }
-                "RecruitRobotTag" => {
-                    info!("{}: {}", "RecruitingTips", details.get("tag")?.as_str()?)
-                }
-                "RecruitResult" => {
-                    let level = details.get("level")?.as_u64()?;
-                    let tags = details.get("tags")?.as_array()?.to_owned();
-
-                    info!(
-                        "{}: {} {}",
-                        "RecruitResult",
-                        "★".repeat(level as usize),
-                        tags.iter()
-                            .filter_map(|x| x.as_str())
-                            .join(", ")
-                            .unwrap_or_else(|| "none".to_owned())
-                    );
-
-                    edit_current_task_detail(move |detail| {
-                        if let Some(detail) = detail.as_recruit_mut() {
-                            detail.push_recruit(
-                                level,
-                                tags.iter().filter_map(|x| x.as_str().map(|x| x.to_owned())),
-                            );
-                        }
-                    });
-                }
-                "RecruitTagsSelected" => info!("{}: {}", "RecruitTagsSelected", {
-                    details
-                        .get("tags")?
-                        .as_array()?
-                        .iter()
-                        .filter_map(|x| x.as_str())
-                        .join(", ")
-                        .unwrap_or_else(|| "none".to_owned())
-                }),
-                "RecruitTagsRefreshed" => info!("{}: {}", "RecruitTagsRefreshed", {
-                    let count = details.get("count")?.as_i64()?;
-                    format!("{} times", count)
-                }),
-                // RogueLike
-                "StageInfo" => info!("{} {}", "StartCombat", details.get("name")?.as_str()?),
-                "StageInfoError" => error!("{}", "StageInfoError"),
-                "RoguelikeInvestment" => {
-                    let count = details.get("count")?.as_i64()?;
-                    let total = details.get("total")?.as_i64()?;
-                    let deposit = details.get("deposit")?.as_i64()?;
-
-                    edit_current_task_detail(move |detail| {
-                        if let Some(detail) = detail.as_roguelike_mut() {
-                            detail.invest(count);
-                        }
-                    });
-
-                    info!("Deposit {count} / {total} / {deposit} originium ingots")
-                }
-                "RoguelikeSettlement" => {
-                    let exp = details.get("exp")?.as_i64()?;
-                    edit_current_task_detail(move |detail| {
-                        if let Some(detail) = detail.as_roguelike_mut() {
-                            detail.set_exp(exp)
-                        }
-                    });
-                    info!("Gain {} exp during this exploration", exp);
-                }
-
-                // Copilot
-                "BattleFormation" => info!(
-                    "{} {}",
-                    "BattleFormation",
-                    details
-                        .get("formation")?
-                        .as_array()?
-                        .iter()
-                        .filter_map(|x| x.as_str())
-                        .join(", ")
-                        .unwrap_or_else(|| "none".to_owned())
-                ),
-                "BattleFormationSelected" => info!(
-                    "{} {}",
-                    "BattleFormationSelected",
-                    details.get("selected")?.as_str()?
-                ),
-                "CopilotAction" => info!(
-                    "{} {} {}",
-                    "CurrentSteps",
-                    details.get("action")?.as_str()?,
-                    details.get("target")?.as_str()?,
-                ),
-                // SSS
-                "SSSStage" => info!("{} {}", "CurrentStage", details.get("stage")?.as_str()?),
-                "SSSSettlement" => info!("{} {}", "SSSSettlement", details.get("why")?.as_str()?),
-                "SSSGamePass" => info!("{}", "SSSGamePass"),
-                "UnsupportedLevel" => error!("{}", "UnsupportedLevel"),
-                _ => {
-                    trace!(
-                        "{}: {}",
-                        "UnknownSubTaskExtraInfo",
-                        serde_json::to_string_pretty(message).unwrap()
-                    )
-                }
-            }
-
-            Some(())
-        }
-    }
-
-    #[cfg(all())]
-    mod subtask {
-        use super::*;
-
-        pub fn process_subtask(_code: AsstMsg, message: Map) -> Option<()> {
-            #[derive(serde::Deserialize)]
-            struct SubTask {
-                uuid: String,
-                taskid: TaskId,
-            }
+        pub fn process_subtask(
+            _code: AsstMsg,
+            message: Map,
+            session_id: SessionIDRef,
+        ) -> Option<()> {
             let msg = serde_json::to_string_pretty(&message).unwrap();
-            let SubTask { uuid, taskid } =
-                serde_json::from_value(serde_json::Value::Object(message)).unwrap();
-            crate::state::StatePool::update_task(&uuid, taskid, msg);
+            let taskid = message.get("taskid")?.as_i64()? as TaskId;
+            crate::state::StatePool::update_task(session_id, taskid, msg);
             Some(())
         }
     }
@@ -758,29 +351,15 @@ mod log {
             self.rx.take()
         }
         /// if true, the channel is closed, so drop this
-        pub fn log(&self, message: String) -> bool {
-            Self::log_to_pool(&message);
+        pub fn log(&self, message: String, session_id: SessionID) -> bool {
+            Self::log_to_pool(&message, session_id);
             // log to global log pool
             self.tx.send(message).is_err()
         }
-        pub fn uuid(message: &str) -> SessionID {
-            #[derive(serde::Deserialize)]
-            struct DeSer {
-                uuid: SessionID,
-                #[serde(flatten)]
-                __extra: BTreeMap<String, serde_json::Value>,
-            }
-            let value: DeSer = serde_json::from_str(&message).unwrap_or(DeSer {
-                uuid: "()".to_owned(),
-                __extra: Default::default(),
-            });
-            value.uuid
-        }
-        pub fn log_to_pool(message: &str) {
-            let uuid = Self::uuid(message);
+        pub fn log_to_pool(message: &str, session_id: SessionID) {
             LOG_POOL
                 .write()
-                .entry(uuid)
+                .entry(session_id)
                 .or_default()
                 .push(message.to_owned());
         }
@@ -873,34 +452,35 @@ mod task {
         }
 
         pub trait SessionExt {
-            fn get_session_id(&self) -> tonic::Result<UUIDWrapper>;
+            fn get_session_id(&self) -> tonic::Result<SessionIDWrapper>;
         }
 
         impl<T> SessionExt for tonic::Request<T> {
-            fn get_session_id(&self) -> tonic::Result<UUIDWrapper> {
+            fn get_session_id(&self) -> tonic::Result<SessionIDWrapper> {
                 self.metadata()
-                    .get("x-session-key")
+                    .get("x-session-id")
                     .ok_or(tonic::Status::not_found("session_id is not found"))?
                     .to_str()
                     .map_err(|_| tonic::Status::invalid_argument("session_id should be ascii"))
-                    .inspect(|uuid| tracing::trace!("tracking uuid: {uuid}"))
-                    .map(UUIDWrapper)
+                    .inspect(|session_id| tracing::trace!("Session ID: {session_id}"))
+                    .map(SessionIDWrapper)
             }
         }
 
         impl SessionExt for tonic::metadata::MetadataMap {
-            fn get_session_id(&self) -> tonic::Result<UUIDWrapper> {
-                self.get("x-session-key")
+            fn get_session_id(&self) -> tonic::Result<SessionIDWrapper> {
+                self.get("x-session-id")
                     .ok_or(tonic::Status::not_found("session_id is not found"))?
                     .to_str()
                     .map_err(|_| tonic::Status::invalid_argument("session_id should be ascii"))
-                    .map(UUIDWrapper)
+                    .inspect(|session_id| tracing::trace!("Session ID: {session_id}"))
+                    .map(SessionIDWrapper)
             }
         }
 
-        pub struct UUIDWrapper<'a>(SessionIDRef<'a>);
+        pub struct SessionIDWrapper<'a>(SessionIDRef<'a>);
 
-        impl<'a> UUIDWrapper<'a> {
+        impl<'a> SessionIDWrapper<'a> {
             pub async fn func_with<T>(
                 &self,
                 f: impl FnOnce(&maa_sys::Assistant) -> T,
