@@ -15,7 +15,7 @@ name = "client"
 path = "src/client.rs"
 
 [features]
-default = ["client"]
+default = ["client","unix-socket"]
 
 client = []
 
