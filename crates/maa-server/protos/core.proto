@@ -21,7 +21,7 @@ message CoreConfig{
 
   message LogOptions{
     LogLevel level = 1;
-    string name = 2;
+    string path = 2;
   }
 
   enum LogLevel{

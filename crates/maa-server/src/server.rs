@@ -3,7 +3,6 @@ pub unsafe extern "C" fn default_callback(
     json_str: *const std::ffi::c_char,
     session_id: *mut std::ffi::c_void,
 ) {
-    use log::Logger;
     let code: maa_server::callback::AsstMsg = code.into();
     let json_str = unsafe { std::ffi::CStr::from_ptr(json_str).to_str().unwrap() };
     let session_id: SessionIDRef = unsafe {
@@ -11,46 +10,49 @@ pub unsafe extern "C" fn default_callback(
             .to_str()
             .unwrap()
     };
-    tracing::trace_span!("C callback").in_scope(|| {
+    callback::main(code, json_str, session_id);
+}
+
+type SessionID = String;
+/// an ugly way to make up
+type SessionIDRef<'a> = &'a str;
+use maa_types::primitive::AsstTaskId as TaskId;
+
+type MaaUuid = String;
+
+mod callback {
+    use crate::{SessionIDRef, TaskId};
+    use maa_server::callback::AsstMsg;
+    use tracing::{debug, error, info, trace, warn};
+
+    pub type Map = serde_json::Map<String, serde_json::Value>;
+
+    #[tracing::instrument("C CallBack", skip_all)]
+    pub fn main(code: maa_server::callback::AsstMsg, json_str: &str, session_id: SessionIDRef) {
+        use crate::log::{Logger, TX_HANDLERS};
         tracing::trace!("Session ID: {}", session_id);
 
-        if let Some(tx) = log::TX_HANDLERS.read().get(session_id) {
+        if let Some(tx) = TX_HANDLERS.read().get(session_id) {
             if tx.log(json_str.to_string(), session_id.to_owned()) {
-                log::TX_HANDLERS.write().remove(session_id);
+                TX_HANDLERS.write().remove(session_id);
             }
         } else {
             Logger::log_to_pool(json_str, session_id.to_owned());
         }
 
-        let map: callback::Map = serde_json::from_str(json_str).unwrap();
+        let map: Map = serde_json::from_str(json_str).unwrap();
 
         // if ret is None, which means the message is not processed well
         // we should print the message to trace the error
-        if callback::process_message(code, map, session_id).is_none() {
+        if process_message(code, map, session_id).is_none() {
             tracing::debug!(
                 "FailedToProcessMessage, code: {:?}, message: {}",
                 code,
                 json_str
             )
         }
-    })
-}
+    }
 
-type SessionID = String;
-/// an ugly way to make up
-type SessionIDRef<'a> = &'a str;
-
-type MaaUuid = String;
-
-use maa_types::primitive::AsstTaskId as TaskId;
-
-mod callback {
-    use maa_server::callback::AsstMsg;
-    use tracing::{debug, error, info, trace, warn};
-
-    use crate::{SessionIDRef, TaskId};
-
-    pub type Map = serde_json::Map<String, serde_json::Value>;
     pub fn process_message(code: AsstMsg, message: Map, session_id: SessionIDRef) -> Option<()> {
         use AsstMsg::*;
 
@@ -60,7 +62,7 @@ mod callback {
                 error!("InitializationError");
                 Some(())
             }
-            ConnectionInfo => process_connection_info(message),
+            ConnectionInfo => process_connection_info(message, session_id),
             AllTasksCompleted => {
                 info!("AllTasksCompleted");
                 Some(())
@@ -82,7 +84,7 @@ mod callback {
         }
     }
 
-    fn process_connection_info(message: Map) -> Option<()> {
+    fn process_connection_info(message: Map, session_id: SessionIDRef) -> Option<()> {
         #[derive(serde::Deserialize)]
         struct ConnectionInfo {
             what: String,
@@ -93,11 +95,26 @@ mod callback {
             serde_json::from_value(serde_json::Value::Object(message)).unwrap();
 
         match what.as_str() {
-            "UuidGot" => debug!("Got UUID: {}", details.get("uuid")?.as_str()?),
-            "ConnectFailed" => error!(
-                "Failed to connect to android device, {}, Please check your connect configuration: {}",
-                why.unwrap(),serde_json::to_string_pretty(&details).unwrap()
-            ),
+            "UuidGot" => {
+                debug!("Got UUID: {}", details.get("uuid")?.as_str()?);
+                // safety: this should be called only during Task::new_connection
+                crate::log::TX_HANDLERS
+                    .write()
+                    .get_mut(session_id)
+                    .unwrap()
+                    .connect_success();
+            }
+            "ConnectFailed" => {
+                let err = format!("Failed to connect to android device, {}, Please check your connect configuration: {}",
+                    why.unwrap(),serde_json::to_string_pretty(&details).unwrap());
+                error!(err);
+                // safety: this should be called only during Task::new_connection
+                crate::log::TX_HANDLERS
+                    .write()
+                    .remove(session_id)
+                    .unwrap()
+                    .connect_failed(err);
+            }
             // Resolution
             "ResolutionGot" => trace!(
                 "Got Resolution: {} X {}",
@@ -136,11 +153,12 @@ mod callback {
 
             "TouchModeNotAvailable" => error!("Touch Mode Not Available"),
             _ => debug!(
-                    "{}: what:{} why:{} detials:{}",
-                    "Unknown Connection Info",
-                    what, why.as_deref().unwrap_or("No why"),
-                    serde_json::to_string_pretty(&details).unwrap()
-                ),
+                "{}: what:{} why:{} detials:{}",
+                "Unknown Connection Info",
+                what,
+                why.as_deref().unwrap_or("No why"),
+                serde_json::to_string_pretty(&details).unwrap()
+            ),
         }
 
         Some(())
@@ -302,14 +320,6 @@ mod state {
                 .flatten()
                 .map(|state| state.update(new));
         }
-
-        pub fn get_uuid(uuid: SessionIDRef) -> BTreeMap<TaskId, String> {
-            STATE_POOL
-                .read()
-                .get(uuid)
-                .map(|taskstate| taskstate.iter().map(|(&k, v)| (k, v.to_string())).collect())
-                .unwrap_or_default()
-        }
     }
 }
 
@@ -317,7 +327,10 @@ mod log {
     use crate::{SessionID, SessionIDRef};
     use parking_lot::RwLock;
     use std::collections::BTreeMap;
-    use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+    use tokio::sync::{
+        mpsc::{UnboundedReceiver, UnboundedSender},
+        oneshot,
+    };
 
     static LOG_POOL: RwLock<BTreeMap<String, Vec<String>>> = RwLock::new(BTreeMap::new());
 
@@ -334,19 +347,41 @@ mod log {
 
     /// will be used in callback,
     /// which is out of tokio runtime
-    pub static TX_HANDLERS: RwLock<BTreeMap<SessionID, crate::log::Logger<String>>> =
-        RwLock::new(BTreeMap::new());
+    pub static TX_HANDLERS: RwLock<
+        BTreeMap<SessionID, crate::log::Logger<String, Result<(), String>>>,
+    > = RwLock::new(BTreeMap::new());
 
-    pub struct Logger<T> {
+    pub struct Logger<T, R> {
         tx: UnboundedSender<T>,
         rx: Option<UnboundedReceiver<T>>,
+        oneshot: Option<oneshot::Sender<R>>,
     }
 
-    impl Logger<String> {
-        pub fn new() -> Self {
+    impl Logger<String, Result<(), String>> {
+        pub fn new() -> (Self, oneshot::Receiver<Result<(), String>>) {
             let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-            Self { tx, rx: Some(rx) }
+            let (oneshot_tx, oneshot_rx) = oneshot::channel();
+            (
+                Self {
+                    tx,
+                    rx: Some(rx),
+                    oneshot: Some(oneshot_tx),
+                },
+                oneshot_rx,
+            )
         }
+
+        pub fn connect_failed(mut self, err: String) {
+            if let Some(shot) = self.oneshot.take() {
+                let _ = shot.send(Err(err));
+            }
+        }
+        pub fn connect_success(&mut self) {
+            if let Some(shot) = self.oneshot.take() {
+                let _ = shot.send(Ok(()));
+            }
+        }
+
         pub fn take_rx(&mut self) -> Option<UnboundedReceiver<String>> {
             self.rx.take()
         }
@@ -512,27 +547,25 @@ mod task {
     impl task_server::Task for TaskImpl {
         #[tracing::instrument(skip_all)]
         async fn new_connection(&self, req: Request<NewConnectionRequst>) -> Ret<String> {
-            let NewConnectionRequst { conncfg, instcfg } = req.into_inner();
+            let req = req.into_inner();
 
             let session_id = uuid::Uuid::now_v7().to_string();
 
             let asst = Assistant::new(&session_id);
             tracing::debug!("Instance Created");
 
-            if let Some(message) =
-                instcfg.and_then(|cfg| cfg.apply_to(asst.inner_unchecked()).err())
-            {
-                return Err(tonic::Status::internal(message));
-            }
+            let (logger, oneshot) = crate::log::Logger::new();
+            tracing::debug!("Register C CallBack");
+            // ensure we can get callback
+            TX_HANDLERS.write().insert(session_id.clone(), logger);
 
-            let (adb_path, address, config) = conncfg.unwrap().connect_args();
-            asst.inner_unchecked()
-                .async_connect(adb_path.as_str(), address.as_str(), config.as_str(), true)
-                .unwrap();
-
-            TX_HANDLERS
-                .write()
-                .insert(session_id.clone(), crate::log::Logger::new());
+            req.apply_to(&asst.inner_unchecked())?;
+            tracing::debug!("Check Connection");
+            oneshot
+                .await
+                .unwrap()
+                .map_err(|e| tonic::Status::unavailable(e.to_string()))?;
+            tracing::debug!("Register Task State CallBack");
             TASK_HANDLERS.write().await.insert(session_id.clone(), asst);
 
             Ok(Response::new(session_id))
@@ -748,15 +781,9 @@ mod core {
 
     #[tonic::async_trait]
     impl core_server::Core for CoreImpl {
+        #[tracing::instrument(skip_all)]
         async fn load_core(&self, req: Request<CoreConfig>) -> Ret<bool> {
-            // no await, span here won't cause out of bound
-            let _span = tracing::trace_span!("Load Core");
-            let _entered = _span.enter();
-
-            let CoreConfig {
-                static_ops,
-                log_ops,
-            } = req.into_inner();
+            let core_cfg = req.into_inner();
 
             if maa_sys::binding::loaded() {
                 tracing::debug!("MaaCore already loaded, skiping Core load");
@@ -764,64 +791,19 @@ mod core {
                 return Ok(Response::new(false));
             }
 
-            let ret = maa_server::utils::load_core();
+            maa_server::utils::load_core().map_err(|e| tonic::Status::unknown(e))?;
 
-            if let Some(core_config::LogOptions { level, name }) = log_ops {
-                use maa_dirs::Ensure;
-                // Todo: set log level for tracing
-                let _ = level;
-                maa_sys::Assistant::set_user_dir(
-                    maa_dirs::state()
-                        .join(name)
-                        .as_path()
-                        .ensure()
-                        .map_err(|e| tonic::Status::from_error(Box::new(e)))?,
-                )
-                .unwrap();
-            }
-
-            if let Some(core_config::StaticOptions { cpu_ocr, gpu_ocr }) = static_ops {
-                use maa_sys::{Assistant, StaticOptionKey};
-                match (cpu_ocr, gpu_ocr) {
-                    (cpu_ocr, Some(gpu_id)) => {
-                        if cpu_ocr {
-                            tracing::warn!(
-                                "Both CPU OCR and GPU OCR are enabled, CPU OCR will be ignored"
-                            );
-                        }
-                        tracing::debug!("Using GPU OCR with GPU ID {}", gpu_id);
-                        if Assistant::set_static_option(StaticOptionKey::GpuOCR, gpu_id).is_err() {
-                            return Err(tonic::Status::internal(format!(
-                                "Failed to enable GPU OCR with GPU ID {}",
-                                gpu_id
-                            )));
-                        }
-                    }
-                    (true, None) => {
-                        tracing::debug!("Using CPU OCR");
-                        if Assistant::set_static_option(StaticOptionKey::CpuOCR, true).is_err() {
-                            return Err(tonic::Status::internal("Failed to enable CPU OCR"));
-                        }
-                    }
-                    (false, None) => {}
-                }
-            }
+            core_cfg.apply()?;
 
             if maa_server::utils::ResourceConfig::default().load().is_err() {
                 return Err(tonic::Status::internal("Failed to load resources"));
             }
 
-            match ret {
-                Ok(()) => Ok(Response::new(true)),
-                Err(e) => Err(tonic::Status::unknown(e)),
-            }
+            Ok(Response::new(true))
         }
 
+        #[tracing::instrument(skip_all)]
         async fn unload_core(&self, _: Request<()>) -> Ret<bool> {
-            // no await, span here won't cause out of bound
-            let _span = tracing::trace_span!("Unload Core");
-            let _entered = _span.enter();
-
             maa_sys::binding::unload();
 
             Ok(Response::new(true))
@@ -829,12 +811,13 @@ mod core {
     }
 }
 
+use tonic::transport::Server;
+use tracing_subscriber::{filter, fmt, layer::SubscriberExt, util::SubscriberInitExt, Layer};
+
 // #[tokio::main(flavor = "current_thread")]
+#[cfg(feature = "unix-socket")]
 #[tokio::main]
 async fn main() {
-    use tonic::transport::Server;
-    use tracing_subscriber::{filter, fmt, layer::SubscriberExt, util::SubscriberInitExt, Layer};
-
     tracing_subscriber::Registry::default()
         .with(
             fmt::layer()
@@ -844,28 +827,38 @@ async fn main() {
         )
         .init();
 
-    let using_socket = true;
+    use tokio::net::UnixListener;
+    use tokio_stream::wrappers::UnixListenerStream;
 
-    if using_socket {
-        use tokio::net::UnixListener;
-        use tokio_stream::wrappers::UnixListenerStream;
+    let path = "/tmp/tonic/testing.sock";
+    std::fs::create_dir_all(std::path::Path::new(path).parent().unwrap()).unwrap();
 
-        let path = "/tmp/tonic/testing.sock";
-        std::fs::create_dir_all(std::path::Path::new(path).parent().unwrap()).unwrap();
+    let socket = UnixListener::bind(path).unwrap();
+    let stream = UnixListenerStream::new(socket);
+    Server::builder()
+        .add_service(task::gen_service())
+        .add_service(core::gen_service())
+        .serve_with_incoming(stream)
+        .await
+        .unwrap();
+}
 
-        let socket = UnixListener::bind(path).unwrap();
-        let stream = UnixListenerStream::new(socket);
-        Server::builder()
-            .add_service(task::gen_service())
-            .add_service(core::gen_service())
-            .serve_with_incoming(stream)
-            .await
-    } else {
-        Server::builder()
-            .add_service(task::gen_service())
-            .add_service(core::gen_service())
-            .serve("127.0.0.1:50051".parse().unwrap())
-            .await
-    }
-    .unwrap();
+#[cfg(not(feature = "unix-socket"))]
+#[tokio::main]
+async fn main() {
+    tracing_subscriber::Registry::default()
+        .with(
+            fmt::layer()
+                .compact()
+                .with_ansi(true)
+                .with_filter(filter::LevelFilter::DEBUG),
+        )
+        .init();
+
+    Server::builder()
+        .add_service(task::gen_service())
+        .add_service(core::gen_service())
+        .serve("127.0.0.1:50051".parse().unwrap())
+        .await
+        .unwrap();
 }

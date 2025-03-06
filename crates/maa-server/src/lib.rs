@@ -3,129 +3,229 @@ pub use tonic;
 pub mod task {
     tonic::include_proto!("task");
 
-    use maa_types::{primitive::AsstTaskId, TaskType as MaaTaskType};
+    mod convert {
+        use super::*;
+        use maa_types::{primitive::AsstTaskId, TaskType as MaaTaskType};
 
-    impl From<TaskId> for AsstTaskId {
-        fn from(value: TaskId) -> Self {
-            let TaskId { id } = value;
-            id
+        impl From<TaskId> for AsstTaskId {
+            fn from(value: TaskId) -> Self {
+                let TaskId { id } = value;
+                id
+            }
         }
-    }
 
-    impl From<AsstTaskId> for TaskId {
-        fn from(id: AsstTaskId) -> Self {
-            Self { id }
+        impl From<AsstTaskId> for TaskId {
+            fn from(id: AsstTaskId) -> Self {
+                Self { id }
+            }
         }
-    }
 
-    impl From<TaskType> for MaaTaskType {
-        fn from(value: TaskType) -> Self {
-            match value {
-                TaskType::StartUp => MaaTaskType::StartUp,
-                TaskType::CloseDown => MaaTaskType::CloseDown,
-                TaskType::Fight => MaaTaskType::Fight,
-                TaskType::Recruit => MaaTaskType::Recruit,
-                TaskType::Infrast => MaaTaskType::Infrast,
-                TaskType::Mall => MaaTaskType::Mall,
-                TaskType::Award => MaaTaskType::Award,
-                TaskType::Roguelike => MaaTaskType::Roguelike,
-                TaskType::Copilot => MaaTaskType::Copilot,
-                TaskType::SssCopilot => MaaTaskType::SSSCopilot,
-                TaskType::Depot => MaaTaskType::Depot,
-                TaskType::OperBox => MaaTaskType::OperBox,
-                TaskType::Reclamation => MaaTaskType::Reclamation,
-                TaskType::Custom => MaaTaskType::Custom,
-                TaskType::SingleStep => MaaTaskType::SingleStep,
-                TaskType::VideoRecognition => MaaTaskType::VideoRecognition,
+        impl From<TaskType> for MaaTaskType {
+            fn from(value: TaskType) -> Self {
+                match value {
+                    TaskType::StartUp => MaaTaskType::StartUp,
+                    TaskType::CloseDown => MaaTaskType::CloseDown,
+                    TaskType::Fight => MaaTaskType::Fight,
+                    TaskType::Recruit => MaaTaskType::Recruit,
+                    TaskType::Infrast => MaaTaskType::Infrast,
+                    TaskType::Mall => MaaTaskType::Mall,
+                    TaskType::Award => MaaTaskType::Award,
+                    TaskType::Roguelike => MaaTaskType::Roguelike,
+                    TaskType::Copilot => MaaTaskType::Copilot,
+                    TaskType::SssCopilot => MaaTaskType::SSSCopilot,
+                    TaskType::Depot => MaaTaskType::Depot,
+                    TaskType::OperBox => MaaTaskType::OperBox,
+                    TaskType::Reclamation => MaaTaskType::Reclamation,
+                    TaskType::Custom => MaaTaskType::Custom,
+                    TaskType::SingleStep => MaaTaskType::SingleStep,
+                    TaskType::VideoRecognition => MaaTaskType::VideoRecognition,
+                }
+            }
+        }
+
+        impl From<MaaTaskType> for TaskType {
+            fn from(value: MaaTaskType) -> Self {
+                match value {
+                    MaaTaskType::StartUp => TaskType::StartUp,
+                    MaaTaskType::CloseDown => TaskType::CloseDown,
+                    MaaTaskType::Fight => TaskType::Fight,
+                    MaaTaskType::Recruit => TaskType::Recruit,
+                    MaaTaskType::Infrast => TaskType::Infrast,
+                    MaaTaskType::Mall => TaskType::Mall,
+                    MaaTaskType::Award => TaskType::Award,
+                    MaaTaskType::Roguelike => TaskType::Roguelike,
+                    MaaTaskType::Copilot => TaskType::Copilot,
+                    MaaTaskType::SSSCopilot => TaskType::SssCopilot,
+                    MaaTaskType::Depot => TaskType::Depot,
+                    MaaTaskType::OperBox => TaskType::OperBox,
+                    MaaTaskType::Reclamation => TaskType::Reclamation,
+                    MaaTaskType::Custom => TaskType::Custom,
+                    MaaTaskType::SingleStep => TaskType::SingleStep,
+                    MaaTaskType::VideoRecognition => TaskType::VideoRecognition,
+                }
             }
         }
     }
 
-    impl From<MaaTaskType> for TaskType {
-        fn from(value: MaaTaskType) -> Self {
-            match value {
-                MaaTaskType::StartUp => TaskType::StartUp,
-                MaaTaskType::CloseDown => TaskType::CloseDown,
-                MaaTaskType::Fight => TaskType::Fight,
-                MaaTaskType::Recruit => TaskType::Recruit,
-                MaaTaskType::Infrast => TaskType::Infrast,
-                MaaTaskType::Mall => TaskType::Mall,
-                MaaTaskType::Award => TaskType::Award,
-                MaaTaskType::Roguelike => TaskType::Roguelike,
-                MaaTaskType::Copilot => TaskType::Copilot,
-                MaaTaskType::SSSCopilot => TaskType::SssCopilot,
-                MaaTaskType::Depot => TaskType::Depot,
-                MaaTaskType::OperBox => TaskType::OperBox,
-                MaaTaskType::Reclamation => TaskType::Reclamation,
-                MaaTaskType::Custom => TaskType::Custom,
-                MaaTaskType::SingleStep => TaskType::SingleStep,
-                MaaTaskType::VideoRecognition => TaskType::VideoRecognition,
-            }
-        }
-    }
+    mod utils {
+        use super::*;
+        use new_connection_requst::instance_options::TouchMode;
 
-    use new_connection_requst::instance_options::TouchMode;
-    impl TouchMode {
-        /// Convert TouchMode to a static string slice
-        pub const fn to_str(self) -> &'static str {
-            match self {
-                TouchMode::Adb => "adb",
-                TouchMode::MiniTouch => "minitouch",
-                TouchMode::MaaTouch => "maatouch",
-                TouchMode::MacPlayTools => "MacPlayTools",
+        impl TouchMode {
+            /// Convert TouchMode to a static string slice
+            pub const fn to_str(self) -> &'static str {
+                match self {
+                    TouchMode::Adb => "adb",
+                    TouchMode::MiniTouch => "minitouch",
+                    TouchMode::MaaTouch => "maatouch",
+                    TouchMode::MacPlayTools => "MacPlayTools",
+                }
             }
         }
-    }
-    impl new_connection_requst::InstanceOptions {
-        pub fn apply_to(self, asst: &maa_sys::Assistant) -> Result<(), String> {
-            use maa_sys::InstanceOptionKey;
-            if let Some(touch_mode) = TryInto::<TouchMode>::try_into(self.touch_mode).ok() {
-                tracing::debug!("Setting touch mode to {}", touch_mode.to_str());
-                asst.set_instance_option(InstanceOptionKey::TouchMode, touch_mode.to_str())
-                    .map_err(|_| format!("Failed to set touch mode to {}", touch_mode.to_str()))?;
-            }
-            if self.deployment_with_pause {
-                tracing::debug!(
-                    "Setting deployment with pause to {}",
-                    self.deployment_with_pause
-                );
-                asst.set_instance_option(
-                    InstanceOptionKey::DeploymentWithPause,
-                    self.deployment_with_pause,
-                )
-                .map_err(|_| "Failed to set deployment with pause")?;
-            }
-            if self.adb_lite_enabled {
-                tracing::debug!("Setting adb lite enabled to {}", self.adb_lite_enabled);
-                asst.set_instance_option(InstanceOptionKey::AdbLiteEnabled, self.adb_lite_enabled)
+
+        impl new_connection_requst::InstanceOptions {
+            pub fn apply_to(self, asst: &maa_sys::Assistant) -> Result<(), String> {
+                use maa_sys::InstanceOptionKey;
+                if let Some(touch_mode) = TryInto::<TouchMode>::try_into(self.touch_mode).ok() {
+                    tracing::debug!("Setting touch mode to {}", touch_mode.to_str());
+                    asst.set_instance_option(InstanceOptionKey::TouchMode, touch_mode.to_str())
+                        .map_err(|_| {
+                            format!("Failed to set touch mode to {}", touch_mode.to_str())
+                        })?;
+                }
+                if self.deployment_with_pause {
+                    tracing::debug!(
+                        "Setting deployment with pause to {}",
+                        self.deployment_with_pause
+                    );
+                    asst.set_instance_option(
+                        InstanceOptionKey::DeploymentWithPause,
+                        self.deployment_with_pause,
+                    )
+                    .map_err(|_| "Failed to set deployment with pause")?;
+                }
+                if self.adb_lite_enabled {
+                    tracing::debug!("Setting adb lite enabled to {}", self.adb_lite_enabled);
+                    asst.set_instance_option(
+                        InstanceOptionKey::AdbLiteEnabled,
+                        self.adb_lite_enabled,
+                    )
                     .map_err(|_| "Failed to set adb lite enabled")?;
-            }
-            if self.kill_adb_on_exit {
-                tracing::debug!("Setting kill adb on exit to {}", self.kill_adb_on_exit);
-                asst.set_instance_option(InstanceOptionKey::KillAdbOnExit, self.kill_adb_on_exit)
+                }
+                if self.kill_adb_on_exit {
+                    tracing::debug!("Setting kill adb on exit to {}", self.kill_adb_on_exit);
+                    asst.set_instance_option(
+                        InstanceOptionKey::KillAdbOnExit,
+                        self.kill_adb_on_exit,
+                    )
                     .map_err(|_| "Failed to set kill adb on exit")?;
+                }
+                Ok(())
             }
-            Ok(())
+        }
+
+        impl new_connection_requst::ConnectionConfig {
+            pub fn connect_args(self) -> (String, String, String) {
+                let adb_path = self.adb_path;
+                let address = self.address;
+                let config = self.config;
+                tracing::debug!(
+                    "Connecting to {address} with config {config} via {}",
+                    &adb_path
+                );
+
+                (adb_path, address, config)
+            }
         }
     }
 
-    impl new_connection_requst::ConnectionConfig {
-        pub fn connect_args(self) -> (String, String, String) {
-            let adb_path = self.adb_path;
-            let address = self.address;
-            let config = self.config;
-            tracing::debug!(
-                "Connecting to {address} with config {config} via {}",
-                &adb_path
-            );
+    impl NewConnectionRequst {
+        #[tracing::instrument("Apply Instance Config", skip_all)]
+        pub fn apply_to(self, asst: &maa_sys::Assistant) -> tonic::Result<()> {
+            let Self { conncfg, instcfg } = self;
 
-            (adb_path, address, config)
+            if let Some(message) = instcfg.and_then(|cfg| cfg.apply_to(asst).err()) {
+                return Err(tonic::Status::internal(message));
+            }
+
+            let (adb_path, address, config) = conncfg.unwrap().connect_args();
+            asst.async_connect(adb_path.as_str(), address.as_str(), config.as_str(), true)
+                .unwrap();
+
+            Ok(())
         }
     }
 }
 
 pub mod core {
     tonic::include_proto!("core");
+
+    impl core_config::StaticOptions {
+        pub fn apply(self) -> tonic::Result<()> {
+            use maa_sys::{Assistant, StaticOptionKey};
+
+            match (self.cpu_ocr, self.gpu_ocr) {
+                (cpu_ocr, Some(gpu_id)) => {
+                    if cpu_ocr {
+                        tracing::warn!(
+                            "Both CPU OCR and GPU OCR are enabled, CPU OCR will be ignored"
+                        );
+                    }
+                    tracing::debug!("Using GPU OCR with GPU ID {}", gpu_id);
+                    if Assistant::set_static_option(StaticOptionKey::GpuOCR, gpu_id).is_err() {
+                        return Err(tonic::Status::internal(format!(
+                            "Failed to enable GPU OCR with GPU ID {}",
+                            gpu_id
+                        )));
+                    }
+                }
+                (true, None) => {
+                    tracing::debug!("Using CPU OCR");
+                    if Assistant::set_static_option(StaticOptionKey::CpuOCR, true).is_err() {
+                        return Err(tonic::Status::internal("Failed to enable CPU OCR"));
+                    }
+                }
+                (false, None) => {}
+            };
+            Ok(())
+        }
+    }
+
+    impl core_config::LogOptions {
+        pub fn apply(self) -> tonic::Result<()> {
+            let Self { level, path } = self;
+            // Todo: set log level for tracing
+            let _ = level;
+            let path = std::path::PathBuf::from(path);
+            if !path.exists() {
+                std::fs::create_dir_all(&path).map_err(|e| {
+                    tonic::Status::internal(format!("Unable to create dir due to {}", e))
+                })?
+            }
+            if !path.is_dir() {
+                Err(tonic::Status::invalid_argument("Not a valid dir"))?
+            }
+            maa_sys::Assistant::set_user_dir(path.as_path())
+                .map_err(|e| tonic::Status::from_error(Box::new(e)))
+        }
+    }
+
+    impl CoreConfig {
+        pub fn apply(self) -> tonic::Result<()> {
+            let Self {
+                static_ops,
+                log_ops,
+            } = self;
+
+            if let Some(ops) = log_ops {
+                ops.apply()?;
+            }
+            if let Some(ops) = static_ops {
+                ops.apply()?;
+            }
+            Ok(())
+        }
+    }
 }
 
 pub mod utils {
