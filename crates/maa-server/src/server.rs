@@ -1,16 +1,22 @@
 pub unsafe extern "C" fn default_callback(
     code: maa_types::primitive::AsstMsgId,
-    json_raw: *const ::std::os::raw::c_char,
-    _: *mut ::std::os::raw::c_void,
+    json_raw: *const std::ffi::c_char,
+    session_id: *mut std::ffi::c_void,
 ) {
     use log::Logger;
     let code: maa_server::callback::AsstMsg = code.into();
     let json_str = unsafe { std::ffi::CStr::from_ptr(json_raw).to_str().unwrap() };
+    let session_id: SessionIDRef = unsafe {
+        std::ffi::CStr::from_ptr(session_id as *mut _ as *mut std::ffi::c_char)
+            .to_str()
+            .unwrap()
+    };
 
-    let uuid = Logger::uuid(json_str);
-    if let Some(tx) = log::TX_HANDLERS.read().get(&uuid) {
+    tracing::trace!("Session ID: {}", session_id);
+
+    if let Some(tx) = log::TX_HANDLERS.read().get(session_id) {
         if tx.log(json_str.to_string()) {
-            log::TX_HANDLERS.write().remove(&uuid);
+            log::TX_HANDLERS.write().remove(session_id);
         }
     } else {
         Logger::log_to_pool(json_str);
@@ -840,9 +846,15 @@ mod task {
         unsafe impl Sync for Assistant {}
 
         impl Assistant {
-            pub fn new() -> Self {
+            pub fn new(session_id: SessionIDRef) -> Self {
                 let instance = Self {
-                    inner: maa_sys::Assistant::new(Some(crate::default_callback), None),
+                    inner: maa_sys::Assistant::new(
+                        Some(crate::default_callback),
+                        Some(
+                            std::ffi::CString::new(session_id).unwrap().into_raw() as *mut _
+                                as *mut std::ffi::c_void,
+                        ),
+                    ),
                     lock: Notify::new(),
                 };
                 instance.lock.notify_one();
@@ -918,11 +930,13 @@ mod task {
 
     #[tonic::async_trait]
     impl task_server::Task for TaskImpl {
-        #[tracing::instrument(skip_all, fields(req.metadata = ?req.metadata()))]
+        #[tracing::instrument(skip_all)]
         async fn new_connection(&self, req: Request<NewConnectionRequst>) -> Ret<String> {
             let NewConnectionRequst { conncfg, instcfg } = req.into_inner();
 
-            let asst = Assistant::new();
+            let session_id = uuid::Uuid::now_v7().to_string();
+
+            let asst = Assistant::new(&session_id);
             tracing::debug!("Instance Created");
 
             if let Some(message) =
@@ -936,8 +950,6 @@ mod task {
                 .async_connect(adb_path.as_str(), address.as_str(), config.as_str(), true)
                 .unwrap();
 
-            let session_id = asst.inner_unchecked().get_uuid_ext();
-
             TX_HANDLERS
                 .write()
                 .insert(session_id.clone(), crate::log::Logger::new());
@@ -946,11 +958,9 @@ mod task {
             Ok(Response::new(session_id))
         }
 
-        #[tracing::instrument(skip_all, fields(req.metadata = ?req.metadata()))]
+        #[tracing::instrument(skip_all)]
         async fn close_connection(&self, req: Request<()>) -> Ret<bool> {
             let session_id = req.get_session_id()?.into_inner();
-
-            println!("{:?}", crate::state::StatePool::get_uuid(session_id));
 
             Ok(Response::new(
                 TASK_HANDLERS.write().await.remove(session_id).is_some()
@@ -958,7 +968,7 @@ mod task {
             ))
         }
 
-        #[tracing::instrument(skip_all, fields(req.metadata = ?req.metadata()))]
+        #[tracing::instrument(skip_all)]
         async fn append_task(&self, req: Request<NewTaskRequest>) -> Ret<TaskId> {
             let (
                 meta,
@@ -987,7 +997,7 @@ mod task {
             }
         }
 
-        #[tracing::instrument(skip_all, fields(req.metadata = ?req.metadata()))]
+        #[tracing::instrument(skip_all)]
         async fn modify_task(&self, req: Request<ModifyTaskRequest>) -> Ret<bool> {
             let (
                 meta,
@@ -1014,7 +1024,7 @@ mod task {
             }
         }
 
-        #[tracing::instrument(skip_all, fields(req.metadata = ?req.metadata()))]
+        #[tracing::instrument(skip_all)]
         async fn active_task(&self, req: Request<TaskId>) -> Ret<bool> {
             let (meta, _, task_id) = req.into_parts();
 
@@ -1032,7 +1042,7 @@ mod task {
             }
         }
 
-        #[tracing::instrument(skip_all, fields(req.metadata = ?req.metadata()))]
+        #[tracing::instrument(skip_all)]
         async fn deactive_task(&self, req: Request<TaskId>) -> Ret<bool> {
             let (meta, _, task_id) = req.into_parts();
 
@@ -1050,7 +1060,7 @@ mod task {
             }
         }
 
-        #[tracing::instrument(skip_all, fields(req.metadata = ?req.metadata()))]
+        #[tracing::instrument(skip_all)]
         async fn start_tasks(&self, req: Request<()>) -> Ret<bool> {
             let session_id = req.get_session_id()?;
 
@@ -1062,7 +1072,7 @@ mod task {
             }
         }
 
-        #[tracing::instrument(skip_all, fields(req.metadata = ?req.metadata()))]
+        #[tracing::instrument(skip_all)]
         async fn stop_tasks(&self, req: Request<()>) -> Ret<bool> {
             let session_id = req.get_session_id()?;
 
@@ -1078,7 +1088,7 @@ mod task {
             Box<dyn tokio_stream::Stream<Item = tonic::Result<TaskState>> + Send + 'static>,
         >;
 
-        #[tracing::instrument(skip_all, fields(req.metadata = ?req.metadata()))]
+        #[tracing::instrument(skip_all)]
         async fn task_state_update(&self, req: Request<()>) -> Ret<Self::TaskStateUpdateStream> {
             let session_id = req.get_session_id()?.into_inner();
 
@@ -1106,7 +1116,7 @@ mod task {
             Ok(Response::new(Box::pin(streaming)))
         }
 
-        #[tracing::instrument(skip_all, fields(req.metadata = ?req.metadata()))]
+        #[tracing::instrument(skip_all)]
         async fn fetch_logs(&self, req: Request<i32>) -> Ret<LogArray> {
             let (meta, _, skip) = req.into_parts();
 
