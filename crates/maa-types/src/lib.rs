@@ -373,6 +373,37 @@ impl std::fmt::Display for TaskType {
     }
 }
 
+/// CallBack: Todo
+#[repr(i32)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "prost", derive(prost::Enumeration))]
+pub enum TaskStateType {
+    /* Global Info */
+    InternalError = 0,
+    InitFailed = 1,
+    ConnectionInfo = 2,
+    AllTasksCompleted = 3,
+    AsyncCallInfo = 4,
+    Destroyed = 5,
+
+    /* TaskChain Info */
+    TaskChainError = 10000,
+    TaskChainStart = 10001,
+    TaskChainCompleted = 10002,
+    TaskChainExtraInfo = 10003,
+    TaskChainStopped = 10004,
+
+    /* SubTask Info */
+    SubTaskError = 20000,
+    SubTaskStart = 20001,
+    SubTaskCompleted = 20002,
+    SubTaskExtraInfo = 20003,
+    SubTaskStopped = 20004,
+
+    /* Unknown */
+    Unknown = -1,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

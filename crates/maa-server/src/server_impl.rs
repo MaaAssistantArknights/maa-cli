@@ -6,11 +6,10 @@ unsafe extern "C" fn default_callback(
     json_str: *const std::ffi::c_char,
     session_id: *mut std::ffi::c_void,
 ) {
-    use crate::{
-        callback::{main, AsstMsg},
-        types::SessionID,
-    };
-    let code: AsstMsg = code.into();
+    use crate::{callback::main, types::SessionID};
+    use maa_types::TaskStateType;
+
+    let code: TaskStateType = code.try_into().unwrap();
     let json_str = unsafe { std::ffi::CStr::from_ptr(json_str).to_str().unwrap() };
     let session_id: SessionID = unsafe {
         let mut raw = [0u8; 16];

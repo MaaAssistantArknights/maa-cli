@@ -21,69 +21,11 @@ pub mod task {
                 Self { id }
             }
         }
-
-        // impl From<TaskType> for MaaTaskType {
-        //     fn from(value: TaskType) -> Self {
-        //         match value {
-        //             TaskType::StartUp => MaaTaskType::StartUp,
-        //             TaskType::CloseDown => MaaTaskType::CloseDown,
-        //             TaskType::Fight => MaaTaskType::Fight,
-        //             TaskType::Recruit => MaaTaskType::Recruit,
-        //             TaskType::Infrast => MaaTaskType::Infrast,
-        //             TaskType::Mall => MaaTaskType::Mall,
-        //             TaskType::Award => MaaTaskType::Award,
-        //             TaskType::Roguelike => MaaTaskType::Roguelike,
-        //             TaskType::Copilot => MaaTaskType::Copilot,
-        //             TaskType::SssCopilot => MaaTaskType::SSSCopilot,
-        //             TaskType::Depot => MaaTaskType::Depot,
-        //             TaskType::OperBox => MaaTaskType::OperBox,
-        //             TaskType::Reclamation => MaaTaskType::Reclamation,
-        //             TaskType::Custom => MaaTaskType::Custom,
-        //             TaskType::SingleStep => MaaTaskType::SingleStep,
-        //             TaskType::VideoRecognition => MaaTaskType::VideoRecognition,
-        //         }
-        //     }
-        // }
-
-        // impl From<MaaTaskType> for TaskType {
-        //     fn from(value: MaaTaskType) -> Self {
-        //         match value {
-        //             MaaTaskType::StartUp => TaskType::StartUp,
-        //             MaaTaskType::CloseDown => TaskType::CloseDown,
-        //             MaaTaskType::Fight => TaskType::Fight,
-        //             MaaTaskType::Recruit => TaskType::Recruit,
-        //             MaaTaskType::Infrast => TaskType::Infrast,
-        //             MaaTaskType::Mall => TaskType::Mall,
-        //             MaaTaskType::Award => TaskType::Award,
-        //             MaaTaskType::Roguelike => TaskType::Roguelike,
-        //             MaaTaskType::Copilot => TaskType::Copilot,
-        //             MaaTaskType::SSSCopilot => TaskType::SssCopilot,
-        //             MaaTaskType::Depot => TaskType::Depot,
-        //             MaaTaskType::OperBox => TaskType::OperBox,
-        //             MaaTaskType::Reclamation => TaskType::Reclamation,
-        //             MaaTaskType::Custom => TaskType::Custom,
-        //             MaaTaskType::SingleStep => TaskType::SingleStep,
-        //             MaaTaskType::VideoRecognition => TaskType::VideoRecognition,
-        //         }
-        //     }
-        // }
     }
 
     mod utils {
         use super::*;
         use maa_types::TouchMode;
-
-        // impl TouchMode {
-        //     /// Convert TouchMode to a static string slice
-        //     pub const fn to_str(self) -> &'static str {
-        //         match self {
-        //             TouchMode::Adb => "adb",
-        //             TouchMode::MiniTouch => "minitouch",
-        //             TouchMode::MaaTouch => "maatouch",
-        //             TouchMode::MacPlayTools => "MacPlayTools",
-        //         }
-        //     }
-        // }
 
         impl new_connection_request::InstanceOptions {
             pub fn apply_to(self, asst: &maa_sys::Assistant) -> Result<(), String> {

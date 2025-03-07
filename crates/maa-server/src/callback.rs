@@ -1,85 +1,4 @@
-use maa_types::primitive::{AsstMsgId, AsstTaskId as TaskId};
-
-#[repr(i32)]
-#[derive(Debug, Clone, Copy)]
-pub enum AsstMsg {
-    /* Global Info */
-    InternalError = 0,
-    InitFailed = 1,
-    ConnectionInfo = 2,
-    AllTasksCompleted = 3,
-    AsyncCallInfo = 4,
-    Destroyed = 5,
-
-    /* TaskChain Info */
-    TaskChainError = 10000,
-    TaskChainStart = 10001,
-    TaskChainCompleted = 10002,
-    TaskChainExtraInfo = 10003,
-    TaskChainStopped = 10004,
-
-    /* SubTask Info */
-    SubTaskError = 20000,
-    SubTaskStart = 20001,
-    SubTaskCompleted = 20002,
-    SubTaskExtraInfo = 20003,
-    SubTaskStopped = 20004,
-
-    /* Unknown */
-    Unknown = -1,
-}
-
-impl From<AsstMsgId> for AsstMsg {
-    fn from(msg: AsstMsgId) -> Self {
-        match msg {
-            0 => AsstMsg::InternalError,
-            1 => AsstMsg::InitFailed,
-            2 => AsstMsg::ConnectionInfo,
-            3 => AsstMsg::AllTasksCompleted,
-            4 => AsstMsg::AsyncCallInfo,
-            5 => AsstMsg::Destroyed,
-
-            10000 => AsstMsg::TaskChainError,
-            10001 => AsstMsg::TaskChainStart,
-            10002 => AsstMsg::TaskChainCompleted,
-            10003 => AsstMsg::TaskChainExtraInfo,
-            10004 => AsstMsg::TaskChainStopped,
-
-            20000 => AsstMsg::SubTaskError,
-            20001 => AsstMsg::SubTaskStart,
-            20002 => AsstMsg::SubTaskCompleted,
-            20003 => AsstMsg::SubTaskExtraInfo,
-            20004 => AsstMsg::SubTaskStopped,
-
-            _ => AsstMsg::Unknown,
-        }
-    }
-}
-
-impl From<AsstMsg> for crate::task::task_state::State {
-    fn from(value: AsstMsg) -> Self {
-        use crate::task::task_state::State::*;
-        match value {
-            AsstMsg::InternalError => InternalError,
-            AsstMsg::InitFailed => InitFailed,
-            AsstMsg::ConnectionInfo => ConnectionInfo,
-            AsstMsg::AllTasksCompleted => AllTasksCompleted,
-            AsstMsg::AsyncCallInfo => AsyncCallInfo,
-            AsstMsg::Destroyed => Destroyed,
-            AsstMsg::TaskChainError => TaskChainError,
-            AsstMsg::TaskChainStart => TaskChainStart,
-            AsstMsg::TaskChainCompleted => TaskChainCompleted,
-            AsstMsg::TaskChainExtraInfo => TaskChainExtraInfo,
-            AsstMsg::TaskChainStopped => TaskChainStopped,
-            AsstMsg::SubTaskError => SubTaskError,
-            AsstMsg::SubTaskStart => SubTaskStart,
-            AsstMsg::SubTaskCompleted => SubTaskCompleted,
-            AsstMsg::SubTaskExtraInfo => SubTaskExtraInfo,
-            AsstMsg::SubTaskStopped => SubTaskStopped,
-            AsstMsg::Unknown => Unknown,
-        }
-    }
-}
+use maa_types::{primitive::AsstTaskId as TaskId, TaskStateType};
 
 use tracing::{debug, error, info, trace, warn};
 
@@ -91,7 +10,7 @@ use crate::{
 type Map = serde_json::Map<String, serde_json::Value>;
 
 #[tracing::instrument("C CallBack", skip_all)]
-pub fn main(code: AsstMsg, json_str: &str, session_id: SessionID) {
+pub fn main(code: TaskStateType, json_str: &str, session_id: SessionID) {
     trace!("Session ID: {:?}", session_id);
 
     Session::log(session_id).log((code, json_str.to_string()));
@@ -108,8 +27,8 @@ pub fn main(code: AsstMsg, json_str: &str, session_id: SessionID) {
     }
 }
 
-fn process_message(code: AsstMsg, message: Map, session_id: SessionID) -> Option<()> {
-    use AsstMsg::*;
+fn process_message(code: TaskStateType, message: Map, session_id: SessionID) -> Option<()> {
+    use TaskStateType::*;
 
     match code {
         InternalError => Some(()),
@@ -211,7 +130,7 @@ fn process_connection_info(message: Map, session_id: SessionID) -> Option<()> {
     Some(())
 }
 
-fn process_taskchain(code: AsstMsg, message: Map, session_id: SessionID) -> Option<()> {
+fn process_taskchain(code: TaskStateType, message: Map, session_id: SessionID) -> Option<()> {
     #[derive(serde::Deserialize)]
     struct TaskChain {
         taskchain: maa_types::TaskType,
@@ -222,7 +141,7 @@ fn process_taskchain(code: AsstMsg, message: Map, session_id: SessionID) -> Opti
         serde_json::from_value(serde_json::Value::Object(message)).unwrap();
     Session::tasks(session_id).update(taskid, (code, msg));
 
-    use AsstMsg::*;
+    use TaskStateType::*;
     match code {
         TaskChainStart => {
             info!("{} {}", taskchain, "Start");
@@ -251,7 +170,7 @@ fn process_taskchain(code: AsstMsg, message: Map, session_id: SessionID) -> Opti
 mod subtask {
     use super::*;
 
-    pub fn process_subtask(code: AsstMsg, message: Map, session_id: SessionID) -> Option<()> {
+    pub fn process_subtask(code: TaskStateType, message: Map, session_id: SessionID) -> Option<()> {
         let msg = serde_json::to_string_pretty(&message).unwrap();
         let taskid = message.get("taskid")?.as_i64()? as TaskId;
         Session::tasks(session_id).update(taskid, (code, msg));
