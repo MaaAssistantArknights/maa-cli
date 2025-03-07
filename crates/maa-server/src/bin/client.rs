@@ -1,6 +1,6 @@
 use maa_types::TaskType;
 
-use maa_server::task::NewTaskRequest;
+use maa_server::task::{task_state::State, NewTaskRequest};
 use tokio_stream::StreamExt;
 use tonic::transport::{Channel, Endpoint};
 
@@ -113,15 +113,16 @@ async fn main() {
         .await
         .unwrap();
     println!("Deactivate task Fight");
-    // let mut payload = NewTaskRequest::default();
-    // payload.set_task_type(TaskType::Fight.into());
-    // payload.task_params = r#" { "stage": "1-7" } "#.to_owned();
-    // taskclient
-    //     .append_task(make_request(payload, &session_id))
-    //     .await
-    //     .unwrap()
-    //     .into_inner();
-    // println!("Add task Fight 1-7");
+    let mut payload = NewTaskRequest::default();
+    payload.set_task_type(TaskType::Fight.into());
+    // payload.task_params = r#" { "stage": "EA-6" } "#.to_owned();
+    payload.task_params = r#" { } "#.to_owned();
+    taskclient
+        .append_task(make_request(payload, &session_id))
+        .await
+        .unwrap()
+        .into_inner();
+    println!("Add task Fight EA-6");
     taskclient
         .start_tasks(make_request((), &session_id))
         .await
@@ -132,7 +133,7 @@ async fn main() {
         if let Some(msg) = channel.next().await {
             let msg = msg.unwrap();
             println!("{}: {}", msg.state, msg.content);
-            if msg.content.contains("finished_tasks") {
+            if msg.state == State::AllTasksCompleted as i32 {
                 break;
             }
         }
