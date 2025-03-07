@@ -50,6 +50,8 @@ runs:
       run: rustup target add $CARGO_BUILD_TARGET
     - name: Setup Protobuf Compiler
       uses: arduino/setup-protoc@v3
+      with:
+        repo-token: ${{ github.token }}
     - name: Setup Cross Compiling Toolchain (gcc and libc for aarch64 on x86_64 Linux)
       if: >
         startsWith(env.CARGO_BUILD_TARGET, 'aarch64-unknown-linux') &&
