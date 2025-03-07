@@ -1,11 +1,13 @@
+use std::collections::BTreeMap;
+
+use tokio::sync::RwLock;
+
 use crate::{
     session::Session,
     task::{task_server::TaskServer, task_state::State, *},
     tonic::{self, Request, Response},
     types::SessionID,
 };
-use std::collections::BTreeMap;
-use tokio::sync::RwLock;
 
 /// build service under package task
 ///
@@ -291,10 +293,6 @@ impl task_server::Task for TaskImpl {
             Err(e) => Err(tonic::Status::from_error(Box::new(e))),
         }
     }
-
-    type TaskStateUpdateStream = std::pin::Pin<
-        Box<dyn tokio_stream::Stream<Item = tonic::Result<TaskState>> + Send + 'static>,
-    >;
 
     #[tracing::instrument(skip_all)]
     async fn task_state_update(&self, req: Request<()>) -> Ret<Self::TaskStateUpdateStream> {
