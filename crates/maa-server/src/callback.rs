@@ -1,4 +1,4 @@
-use maa_types::{primitive::AsstTaskId as TaskId, TaskStateType};
+use crate::types::{TaskId, TaskStateType};
 
 use tracing::{debug, error, info, trace, warn};
 

@@ -21,11 +21,11 @@ use crate::{
 /// }
 /// ```
 pub fn gen_service(cancel_token: CancellationToken) -> CoreServer<CoreImpl> {
-    CoreServer::new(CoreImpl{cancel_token})
+    CoreServer::new(CoreImpl { cancel_token })
 }
 
-pub struct CoreImpl{
-    cancel_token: CancellationToken
+pub struct CoreImpl {
+    cancel_token: CancellationToken,
 }
 
 type Ret<T> = tonic::Result<Response<T>>;

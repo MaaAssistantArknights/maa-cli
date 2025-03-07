@@ -64,6 +64,8 @@ mod wrapper {
             // and callback will get an different SessionID
             // which is dangerous
             let mut session_id = session_id.to_vec();
+            assert_eq!(session_id.capacity(), 16);
+            assert_eq!(session_id.len(), 16);
             let ptr = session_id.as_mut_ptr();
             std::mem::forget(session_id);
             let instance = Self {

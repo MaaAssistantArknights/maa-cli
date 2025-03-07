@@ -351,16 +351,19 @@ pub mod tests {
     #[test]
     fn default() {
         let config = Config::default();
-        assert_eq!(config, Config {
-            auto_update: false,
-            warn_on_update_failure: false,
-            backend: GitBackend::Git,
-            remote: Remote {
-                url: default_url(),
-                branch: None,
-                certificate: None,
+        assert_eq!(
+            config,
+            Config {
+                auto_update: false,
+                warn_on_update_failure: false,
+                backend: GitBackend::Git,
+                remote: Remote {
+                    url: default_url(),
+                    branch: None,
+                    certificate: None,
+                }
             }
-        });
+        );
     }
 
     #[test]
@@ -402,10 +405,10 @@ pub mod tests {
 
         #[test]
         fn remote() {
-            assert_de_tokens(&Remote::default(), &[
-                Token::Map { len: Some(0) },
-                Token::MapEnd,
-            ]);
+            assert_de_tokens(
+                &Remote::default(),
+                &[Token::Map { len: Some(0) }, Token::MapEnd],
+            );
 
             assert_de_tokens(
                 &Remote {
@@ -509,16 +512,20 @@ pub mod tests {
 
             assert_de_tokens(&Passphrase::None, &[Token::Bool(false)]);
 
-            assert_de_tokens(&Passphrase::Plain(String::from("password")), &[Token::Str(
-                "password",
-            )]);
+            assert_de_tokens(
+                &Passphrase::Plain(String::from("password")),
+                &[Token::Str("password")],
+            );
 
-            assert_de_tokens(&Passphrase::Env(String::from("SSH_PASSPHRASE")), &[
-                Token::Map { len: Some(1) },
-                Token::Str("env"),
-                Token::Str("SSH_PASSPHRASE"),
-                Token::MapEnd,
-            ]);
+            assert_de_tokens(
+                &Passphrase::Env(String::from("SSH_PASSPHRASE")),
+                &[
+                    Token::Map { len: Some(1) },
+                    Token::Str("env"),
+                    Token::Str("SSH_PASSPHRASE"),
+                    Token::MapEnd,
+                ],
+            );
 
             assert_de_tokens(
                 &Passphrase::Command(vec![String::from("get"), String::from("passphrase")]),
@@ -565,10 +572,10 @@ pub mod tests {
 
         #[test]
         fn config() {
-            assert_de_tokens(&Config::default(), &[
-                Token::Map { len: Some(0) },
-                Token::MapEnd,
-            ]);
+            assert_de_tokens(
+                &Config::default(),
+                &[Token::Map { len: Some(0) }, Token::MapEnd],
+            );
 
             assert_de_tokens(
                 &Config {
