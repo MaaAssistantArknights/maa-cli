@@ -128,8 +128,6 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Toolchains
         uses: ./.github/actions/setup
-        with:
-          target_arch: aarch64
       - name: Build and Test
         env:
           SKIP_CORE_TEST: true
