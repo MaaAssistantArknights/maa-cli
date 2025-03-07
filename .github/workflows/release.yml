@@ -111,18 +111,14 @@ jobs:
         os:
           - ubuntu-22.04
           - windows-latest
-        host-arch:
-          - x86_64
         target-arch:
           - x86_64
           - aarch64
         # macOS can be natively built on both x86_64 and aarch64
         include:
           - os: macos-13
-            host-arch: x86_64
             target-arch: x86_64
           - os: macos-latest
-            host-arch: aarch64
             target-arch: aarch64
     steps:
       - name: Checkout
@@ -130,8 +126,6 @@ jobs:
       - name: Setup Cross Compilation Toolchains
         uses: ./.github/actions/setup
         with:
-          os: ${{ matrix.os }}
-          host_arch: ${{ matrix.host-arch }}
           target_arch: ${{ matrix.target-arch }}
       - name: Build
         env:

@@ -51,6 +51,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Setup Toolchains
+        uses: ./.github/actions/setup
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
       - name: Build (maa-cli)
@@ -102,10 +104,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Cross Compilation Toolchains
+      - name: Setup Toolchains
         uses: ./.github/actions/setup
         with:
-          os: ${{ matrix.os }}
           target_arch: aarch64
       - name: Build
         run: |
@@ -125,6 +126,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Setup Toolchains
+        uses: ./.github/actions/setup
+        with:
+          target_arch: aarch64
       - name: Build and Test
         env:
           SKIP_CORE_TEST: true
@@ -180,6 +185,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Setup Toolchains
+        uses: ./.github/actions/setup
       - name: Install Cargo tarpaulin
         uses: taiki-e/install-action@v2
         with:
