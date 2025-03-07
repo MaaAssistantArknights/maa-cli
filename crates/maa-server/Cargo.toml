@@ -18,14 +18,14 @@ required-features = ["tokio/rt-multi-thread", "tonic/transport", "client"]
 client = []
 
 [dependencies]
-maa-types = { workspace = true, features = ["serde"] }
+maa-types = { workspace = true, features = ["serde", "prost"] }
 maa-sys = { workspace = true, features = ["runtime"] }
 
 tonic = { version = "0.12", default-features = false, features = [
     "codegen",
     "prost",
 ] }
-prost = { version = "*", default-features = false, features = ["derive"] }
+prost.workspace = true
 
 tokio = { workspace = true }
 tokio-stream = { version = "0.1", default-features = false, features = [

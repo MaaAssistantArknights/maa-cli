@@ -104,9 +104,7 @@ async fn main() {
                 config: "Waydroid".to_owned(),
             }),
             instcfg: Some(maa_server::task::new_connection_request::InstanceOptions {
-                touch_mode:
-                    maa_server::task::new_connection_request::instance_options::TouchMode::MaaTouch
-                        .into(),
+                touch_mode: maa_types::TouchMode::MaaTouch.into(),
                 deployment_with_pause: false,
                 adb_lite_enabled: false,
                 kill_adb_on_exit: true,

@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package types;
+
+enum TouchMode {
+  Adb = 0;
+  MiniTouch = 1;
+  MaaTouch = 2;
+  MacPlayTools = 3;
+}
+
+enum TaskType {
+  StartUp = 0;
+  CloseDown = 1;
+  Fight = 2;
+  Recruit = 3;
+  Infrast = 4;
+  Mall = 5;
+  Award = 6;
+  Roguelike = 7;
+  Copilot = 8;
+  SSSCopilot = 9;
+  Depot = 10;
+  OperBox = 11;
+  Reclamation = 12;
+  Custom = 13;
+  SingleStep = 14;
+  VideoRecognition = 15;
+}

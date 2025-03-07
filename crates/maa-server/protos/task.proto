@@ -4,6 +4,7 @@ syntax = "proto3";
 // and subscribe task state update
 package task;
 
+import "types.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -38,47 +39,21 @@ message NewConnectionRequest {
         }
 
     message InstanceOptions {
-        TouchMode touch_mode = 1;
+        types.TouchMode touch_mode = 1;
         bool deployment_with_pause = 2;
         bool adb_lite_enabled = 3;
         bool kill_adb_on_exit = 4;
-
-        enum TouchMode {
-            Adb = 0;
-            MiniTouch = 1;
-            MaaTouch = 2;
-            MacPlayTools = 3;
-        }
     }
 }
 
 message NewTaskRequest {
-    TaskType task_type = 1;
+    types.TaskType task_type = 1;
     string task_params = 2;
 }
 
 message ModifyTaskRequest {
     TaskId task_id = 1;
     string task_params = 2;
-}
-
-enum TaskType {
-    StartUp = 0;
-    CloseDown = 1;
-    Fight = 2;
-    Recruit = 3;
-    Infrast = 4;
-    Mall = 5;
-    Award = 6;
-    Roguelike = 7;
-    Copilot = 8;
-    SSSCopilot = 9;
-    Depot = 10;
-    OperBox = 11;
-    Reclamation = 12;
-    Custom = 13;
-    SingleStep = 14;
-    VideoRecognition = 15;
 }
 
 message TaskId { int32 id = 1; }
