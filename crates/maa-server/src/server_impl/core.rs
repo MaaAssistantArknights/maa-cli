@@ -1,3 +1,5 @@
+use tokio_util::sync::CancellationToken;
+
 use crate::{
     core::{core_server::CoreServer, *},
     tonic::{self, Request, Response},
@@ -18,11 +20,13 @@ use crate::{
 ///     Ok(())
 /// }
 /// ```
-pub fn gen_service() -> CoreServer<CoreImpl> {
-    CoreServer::new(CoreImpl)
+pub fn gen_service(cancel_token: CancellationToken) -> CoreServer<CoreImpl> {
+    CoreServer::new(CoreImpl{cancel_token})
 }
 
-pub struct CoreImpl;
+pub struct CoreImpl{
+    cancel_token: CancellationToken
+}
 
 type Ret<T> = tonic::Result<Response<T>>;
 
@@ -46,6 +50,9 @@ impl core_server::Core for CoreImpl {
     #[tracing::instrument(skip_all)]
     async fn unload_core(&self, _: Request<()>) -> Ret<bool> {
         maa_sys::binding::unload();
+
+        tracing::info!("Unload Core");
+        self.cancel_token.cancel();
 
         Ok(Response::new(true))
     }
