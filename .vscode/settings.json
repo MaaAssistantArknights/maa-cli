@@ -1,0 +1,5 @@
+{
+    "protoc": {
+        "options": ["-I","crates/maa-types"]
+    }
+}

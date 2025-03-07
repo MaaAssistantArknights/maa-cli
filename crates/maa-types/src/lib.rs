@@ -46,14 +46,14 @@ pub enum InstanceOptionKey {
 }
 
 /// Available touch mode
-#[repr(u8)]
-#[derive(Default, Clone, Copy, PartialEq)]
+#[repr(i32)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "prost", derive(prost::Enumeration))]
 pub enum TouchMode {
-    #[default]
-    Adb,
-    MiniTouch,
-    MaaTouch,
-    MacPlayTools,
+    Adb = 0,
+    MiniTouch = 1,
+    MaaTouch = 2,
+    MacPlayTools = 3,
 }
 
 impl TouchMode {
@@ -71,11 +71,15 @@ impl TouchMode {
         let mut i = 0;
         let mut variants = [TouchMode::Adb; Self::COUNT];
         while i < Self::COUNT {
-            variants[i] = unsafe { std::mem::transmute::<u8, Self>(i as u8) };
+            variants[i] = unsafe { Self::from_i32_unchecked(i as i32) };
             i += 1;
         }
         variants
     };
+
+    const unsafe fn from_i32_unchecked(value: i32) -> Self {
+        unsafe { std::mem::transmute::<i32, Self>(value) }
+    }
 
     /// Convert TouchMode to a static string slice
     pub const fn to_str(self) -> &'static str {
@@ -143,7 +147,7 @@ impl<'de> serde::Deserialize<'de> for TouchMode {
                 E: serde::de::Error,
             {
                 if v < TouchMode::COUNT as u64 {
-                    Ok(unsafe { std::mem::transmute::<u8, TouchMode>(v as u8) })
+                    Ok(unsafe { TouchMode::from_i32_unchecked(v as i32) })
                 } else {
                     Err(E::invalid_value(serde::de::Unexpected::Unsigned(v), &self))
                 }
@@ -185,25 +189,27 @@ impl std::fmt::Display for TouchMode {
 }
 
 /// Available task type for MAA
-#[repr(u8)]
+#[repr(i32)]
 #[derive(Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "prost", derive(prost::Enumeration))]
 pub enum TaskType {
-    StartUp,
-    CloseDown,
-    Fight,
-    Recruit,
-    Infrast,
-    Mall,
-    Award,
-    Roguelike,
-    Copilot,
-    SSSCopilot,
-    Depot,
-    OperBox,
-    Reclamation,
-    Custom,
-    SingleStep,
-    VideoRecognition,
+    Unknown = -1,
+    StartUp = 0,
+    CloseDown = 1,
+    Fight = 2,
+    Recruit = 3,
+    Infrast = 4,
+    Mall = 5,
+    Award = 6,
+    Roguelike = 7,
+    Copilot = 8,
+    SSSCopilot = 9,
+    Depot = 10,
+    OperBox = 11,
+    Reclamation = 12,
+    Custom = 13,
+    SingleStep = 14,
+    VideoRecognition = 15,
 }
 
 impl TaskType {
@@ -221,14 +227,24 @@ impl TaskType {
         let mut i = 0;
         let mut variants = [Self::StartUp; Self::COUNT];
         while i < Self::COUNT {
-            variants[i] = unsafe { std::mem::transmute::<u8, Self>(i as u8) };
+            variants[i] = unsafe { Self::from_i32_unchecked(i as i32) };
             i += 1;
         }
         variants
     };
 
+    /// Create a TaskType from an i32 value
+    ///
+    /// # Safety
+    ///
+    /// The value must be in the range of [0, Self::COUNT)
+    const unsafe fn from_i32_unchecked(v: i32) -> Self {
+        unsafe { std::mem::transmute::<i32, Self>(v) }
+    }
+
     pub const fn to_str(self) -> &'static str {
         match self {
+            Self::Unknown => "Unknown",
             Self::StartUp => "StartUp",
             Self::CloseDown => "CloseDown",
             Self::Fight => "Fight",
@@ -258,17 +274,29 @@ impl TaskType {
 
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[derive(Debug)]
-pub struct UnknownTaskType(String);
+pub enum UnknownTaskType {
+    Str(String),
+    I32(i32),
+}
 
 impl std::fmt::Display for UnknownTaskType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "unknown task type `{}`, expected one of ", self.0)?;
-        let mut iter = TaskType::NAMES.iter();
-        if let Some(v) = iter.next() {
-            write!(f, "`{}`", v)?;
-            for v in iter {
-                write!(f, ", `{}`", v)?;
+        match self {
+            Self::Str(s) => {
+                write!(f, "unknown task type `{}`, expected one of ", s)?;
+                let mut iter = TaskType::NAMES.iter();
+                if let Some(v) = iter.next() {
+                    write!(f, "`{}`", v)?;
+                    for v in iter {
+                        write!(f, ", `{}`", v)?;
+                    }
+                }
             }
+            Self::I32(i) => write!(
+                f,
+                "unknown task type `{i}`, must be between 0 and {}",
+                TaskType::COUNT - 1
+            )?,
         }
         Ok(())
     }
@@ -280,7 +308,7 @@ impl std::str::FromStr for TaskType {
     type Err = UnknownTaskType;
 
     fn from_str(s: &str) -> Result<TaskType, Self::Err> {
-        Self::from_str_opt(s).ok_or_else(|| UnknownTaskType(s.to_owned()))
+        Self::from_str_opt(s).ok_or_else(|| UnknownTaskType::Str(s.to_owned()))
     }
 }
 
@@ -304,7 +332,7 @@ impl<'de> serde::Deserialize<'de> for TaskType {
                 E: serde::de::Error,
             {
                 if v < TaskType::COUNT as u64 {
-                    Ok(unsafe { std::mem::transmute::<u8, TaskType>(v as u8) })
+                    Ok(unsafe { TaskType::from_i32_unchecked(v as i32) })
                 } else {
                     Err(E::invalid_value(serde::de::Unexpected::Unsigned(v), &self))
                 }
@@ -388,24 +416,30 @@ mod tests {
                 let modes = [Adb, MiniTouch, MaaTouch, MacPlayTools];
 
                 // Test deserializing from string
-                assert_de_tokens(&modes, &[
-                    Token::Seq { len: Some(4) },
-                    Token::Str("adb"),
-                    Token::Str("minitouch"),
-                    Token::Str("maatouch"),
-                    Token::Str("MacPlayTools"),
-                    Token::SeqEnd,
-                ]);
+                assert_de_tokens(
+                    &modes,
+                    &[
+                        Token::Seq { len: Some(4) },
+                        Token::Str("adb"),
+                        Token::Str("minitouch"),
+                        Token::Str("maatouch"),
+                        Token::Str("MacPlayTools"),
+                        Token::SeqEnd,
+                    ],
+                );
 
                 // Test deserializing from u64
-                assert_de_tokens(&modes, &[
-                    Token::Seq { len: Some(4) },
-                    Token::U64(0),
-                    Token::U64(1),
-                    Token::U64(2),
-                    Token::U64(3),
-                    Token::SeqEnd,
-                ]);
+                assert_de_tokens(
+                    &modes,
+                    &[
+                        Token::Seq { len: Some(4) },
+                        Token::U64(0),
+                        Token::U64(1),
+                        Token::U64(2),
+                        Token::U64(3),
+                        Token::SeqEnd,
+                    ],
+                );
             }
 
             #[test]
@@ -463,14 +497,16 @@ mod tests {
             assert_eq!("VideoRecognition".parse(), Ok(VideoRecognition));
             assert_eq!(
                 "Unknown".parse::<TaskType>(),
-                Err(UnknownTaskType("Unknown".to_owned()))
+                Err(UnknownTaskType::Str("Unknown".to_owned()))
             );
             assert_eq!(
-                UnknownTaskType("Unknown".to_owned()).to_string(),
+                UnknownTaskType::Str("Unknown".to_owned()).to_string(),
                 "unknown task type `Unknown`, expected one of `StartUp`, `CloseDown`, `Fight`, \
                 `Recruit`, `Infrast`, `Mall`, `Award`, `Roguelike`, `Copilot`, `SSSCopilot`, \
                 `Depot`, `OperBox`, `Reclamation`, `Custom`, `SingleStep`, `VideoRecognition`",
             );
+
+            todo!("TryFrom Tests")
         }
 
         #[cfg(feature = "serde")]
@@ -483,19 +519,25 @@ mod tests {
             fn deserialize() {
                 let types: [TaskType; 2] = [StartUp, CloseDown];
 
-                assert_de_tokens(&types, &[
-                    Token::Seq { len: Some(2) },
-                    Token::Str("StartUp"),
-                    Token::Str("CloseDown"),
-                    Token::SeqEnd,
-                ]);
+                assert_de_tokens(
+                    &types,
+                    &[
+                        Token::Seq { len: Some(2) },
+                        Token::Str("StartUp"),
+                        Token::Str("CloseDown"),
+                        Token::SeqEnd,
+                    ],
+                );
 
-                assert_de_tokens(&types, &[
-                    Token::Seq { len: Some(2) },
-                    Token::U64(0),
-                    Token::U64(1),
-                    Token::SeqEnd,
-                ]);
+                assert_de_tokens(
+                    &types,
+                    &[
+                        Token::Seq { len: Some(2) },
+                        Token::U64(0),
+                        Token::U64(1),
+                        Token::SeqEnd,
+                    ],
+                );
             }
 
             #[test]
