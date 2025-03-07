@@ -186,4 +186,5 @@ async fn main() {
         .close_connection(make_request((), &session_id))
         .await
         .unwrap();
+    coreclient.unload_core(()).await.unwrap();
 }

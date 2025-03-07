@@ -1,3 +1,4 @@
+use tokio_util::sync::CancellationToken;
 use tonic::transport::Server;
 use tracing_subscriber::{filter, fmt, layer::SubscriberExt, util::SubscriberInitExt, Layer};
 
@@ -14,9 +15,13 @@ async fn main() {
         )
         .init();
 
+    let cancel_token = CancellationToken::new();
+    let child_cancel_token = cancel_token.child_token();
+
     let server = Server::builder()
         .add_service(maa_server::server_impl::task::gen_service())
-        .add_service(maa_server::server_impl::core::gen_service());
+        // need to be the parent node
+        .add_service(maa_server::server_impl::core::gen_service(cancel_token));
 
     if USING_UDS {
         println!("Using Unix Socket");
@@ -30,7 +35,19 @@ async fn main() {
         let stream = tokio_stream::wrappers::UnixListenerStream::new(
             tokio::net::UnixListener::bind(path).unwrap(),
         );
-        server.serve_with_incoming(stream).await.unwrap();
+        tokio::select!(
+            _ = server.serve_with_incoming_shutdown(stream, async{
+                // used to cancel running connections
+                let token = child_cancel_token.child_token();
+                token.cancelled().await
+            }) => {}
+            _ = child_cancel_token.cancelled() => {}
+        );
+
+        if maa_sys::binding::loaded() {
+            println!("Clean Up");
+            maa_sys::binding::unload();
+        }
     } else {
         println!("Using Http Port");
         let stream = tokio_stream::wrappers::TcpListenerStream::new(
@@ -38,6 +55,17 @@ async fn main() {
                 .await
                 .unwrap(),
         );
-        server.serve_with_incoming(stream).await.unwrap();
+        tokio::select!(
+            _ = server.serve_with_incoming_shutdown(stream, async{
+                let token = child_cancel_token.child_token();
+                token.cancelled().await
+            }) => {}
+            _ = child_cancel_token.cancelled() => {}
+        );
+
+        if maa_sys::binding::loaded() {
+            println!("Clean Up");
+            maa_sys::binding::unload();
+        }
     }
 }

@@ -8,7 +8,7 @@ repository.workspace = true
 
 [[example]]
 name = "server"
-required-features = ["tokio/rt-multi-thread", "tonic/transport"]
+required-features = ["tokio/rt-multi-thread", "tonic/transport", "tokio/macros"]
 
 [[example]]
 name = "client"
@@ -39,6 +39,7 @@ serde_json.workspace = true
 
 parking_lot = "0.12.3"
 uuid = { version = "1.15.1", features = ["v7"] }
+tokio-util = "0.7.13"
 
 [build-dependencies]
 tonic-build = { version = "0.12", default-features = false, features = [
