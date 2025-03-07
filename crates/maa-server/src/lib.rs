@@ -4,8 +4,9 @@ pub mod task {
     tonic::include_proto!("task");
 
     mod convert {
+        use maa_types::primitive::AsstTaskId;
+
         use super::*;
-        use maa_types::{primitive::AsstTaskId, TaskType as MaaTaskType};
 
         impl From<TaskId> for AsstTaskId {
             fn from(value: TaskId) -> Self {
@@ -19,80 +20,20 @@ pub mod task {
                 Self { id }
             }
         }
-
-        impl From<TaskType> for MaaTaskType {
-            fn from(value: TaskType) -> Self {
-                match value {
-                    TaskType::StartUp => MaaTaskType::StartUp,
-                    TaskType::CloseDown => MaaTaskType::CloseDown,
-                    TaskType::Fight => MaaTaskType::Fight,
-                    TaskType::Recruit => MaaTaskType::Recruit,
-                    TaskType::Infrast => MaaTaskType::Infrast,
-                    TaskType::Mall => MaaTaskType::Mall,
-                    TaskType::Award => MaaTaskType::Award,
-                    TaskType::Roguelike => MaaTaskType::Roguelike,
-                    TaskType::Copilot => MaaTaskType::Copilot,
-                    TaskType::SssCopilot => MaaTaskType::SSSCopilot,
-                    TaskType::Depot => MaaTaskType::Depot,
-                    TaskType::OperBox => MaaTaskType::OperBox,
-                    TaskType::Reclamation => MaaTaskType::Reclamation,
-                    TaskType::Custom => MaaTaskType::Custom,
-                    TaskType::SingleStep => MaaTaskType::SingleStep,
-                    TaskType::VideoRecognition => MaaTaskType::VideoRecognition,
-                }
-            }
-        }
-
-        impl From<MaaTaskType> for TaskType {
-            fn from(value: MaaTaskType) -> Self {
-                match value {
-                    MaaTaskType::StartUp => TaskType::StartUp,
-                    MaaTaskType::CloseDown => TaskType::CloseDown,
-                    MaaTaskType::Fight => TaskType::Fight,
-                    MaaTaskType::Recruit => TaskType::Recruit,
-                    MaaTaskType::Infrast => TaskType::Infrast,
-                    MaaTaskType::Mall => TaskType::Mall,
-                    MaaTaskType::Award => TaskType::Award,
-                    MaaTaskType::Roguelike => TaskType::Roguelike,
-                    MaaTaskType::Copilot => TaskType::Copilot,
-                    MaaTaskType::SSSCopilot => TaskType::SssCopilot,
-                    MaaTaskType::Depot => TaskType::Depot,
-                    MaaTaskType::OperBox => TaskType::OperBox,
-                    MaaTaskType::Reclamation => TaskType::Reclamation,
-                    MaaTaskType::Custom => TaskType::Custom,
-                    MaaTaskType::SingleStep => TaskType::SingleStep,
-                    MaaTaskType::VideoRecognition => TaskType::VideoRecognition,
-                }
-            }
-        }
     }
 
     mod utils {
-        use super::*;
-        use new_connection_request::instance_options::TouchMode;
+        // use new_connection_request::instance_options::TouchMode;
 
-        impl TouchMode {
-            /// Convert TouchMode to a static string slice
-            pub const fn to_str(self) -> &'static str {
-                match self {
-                    TouchMode::Adb => "adb",
-                    TouchMode::MiniTouch => "minitouch",
-                    TouchMode::MaaTouch => "maatouch",
-                    TouchMode::MacPlayTools => "MacPlayTools",
-                }
-            }
-        }
+        use super::*;
 
         impl new_connection_request::InstanceOptions {
             pub fn apply_to(self, asst: &maa_sys::Assistant) -> Result<(), String> {
                 use maa_sys::InstanceOptionKey;
-                if let Ok(touch_mode) = TryInto::<TouchMode>::try_into(self.touch_mode) {
-                    tracing::debug!("Setting touch mode to {}", touch_mode.to_str());
-                    asst.set_instance_option(InstanceOptionKey::TouchMode, touch_mode.to_str())
-                        .map_err(|_| {
-                            format!("Failed to set touch mode to {}", touch_mode.to_str())
-                        })?;
-                }
+                let touch_mode = self.touch_mode;
+                tracing::debug!("Setting touch mode to {}", touch_mode);
+                asst.set_instance_option(InstanceOptionKey::TouchMode, touch_mode)
+                    .map_err(|_| format!("Failed to set touch mode to {}", touch_mode))?;
                 if self.deployment_with_pause {
                     tracing::debug!(
                         "Setting deployment with pause to {}",
@@ -253,8 +194,9 @@ pub mod utils {
         .map_err(|e| e.to_string())
     }
 
-    use maa_dirs::{self as dirs, join};
     use std::path::PathBuf;
+
+    use maa_dirs::{self as dirs, join};
 
     #[cfg_attr(test, derive(Debug, PartialEq))]
     #[derive(Clone)]
@@ -345,7 +287,8 @@ pub mod utils {
                     );
                 }
                 None => {
-                    // should not push to resource_base_dirs as this is not a base resource directory
+                    // should not push to resource_base_dirs as this is not a base resource
+                    // directory
                     let resource = resource.into();
                     tracing::info!("Using platform diff resource: {}", resource.display());
                     self.platform_diff_resource = Some(resource);

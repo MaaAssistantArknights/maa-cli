@@ -1,6 +1,5 @@
-use maa_types::TaskType;
-
 use maa_server::task::NewTaskRequest;
+use maa_types::TaskType;
 use tokio_stream::StreamExt;
 use tonic::transport::{Channel, Endpoint};
 
@@ -70,9 +69,7 @@ async fn main() {
                 config: "Waydroid".to_owned(),
             }),
             instcfg: Some(maa_server::task::new_connection_request::InstanceOptions {
-                touch_mode:
-                    maa_server::task::new_connection_request::instance_options::TouchMode::MaaTouch
-                        .into(),
+                touch_mode: maa_types::TouchMode::MaaTouch as i32,
                 deployment_with_pause: false,
                 adb_lite_enabled: false,
                 kill_adb_on_exit: true,
@@ -91,7 +88,7 @@ async fn main() {
         .into_inner();
 
     let mut payload = NewTaskRequest::default();
-    payload.set_task_type(TaskType::StartUp.into());
+    payload.set_task_type(TaskType::StartUp);
     payload.task_params =
         r#"{ "enable": true, "client_type": "Official", "start_game_enabled": true, "account_name": "" }"#.to_owned();
     taskclient
@@ -100,7 +97,7 @@ async fn main() {
         .unwrap();
     println!("Add task StartUp");
     let mut payload = NewTaskRequest::default();
-    payload.set_task_type(TaskType::Fight.into());
+    payload.set_task_type(TaskType::Fight);
     payload.task_params = r#" { "stage": "1-7" } "#.to_owned();
     let id = taskclient
         .append_task(make_request(payload, &session_id))

@@ -5,6 +5,10 @@ fn main() -> Result<()> {
         .build_server(true)
         .build_client(cfg!(feature = "client"))
         .build_transport(false)
-        .compile_protos(&["protos/task.proto", "protos/core.proto"], &["protos"])?;
+        .extern_path(".types", "::maa_types")
+        .compile_protos(&["protos/task.proto", "protos/core.proto"], &[
+            "protos",
+            "../maa-types",
+        ])?;
     Ok(())
 }

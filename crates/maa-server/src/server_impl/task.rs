@@ -13,7 +13,8 @@ use tokio::sync::RwLock;
 ///
 /// In order to trace and sync client, an additional header `SESSION_KEY` is needed.
 ///
-/// Client get one by calling [`Task::new_connection`], and destroy by calling [`Task::close_connection`]
+/// Client get one by calling [`Task::new_connection`], and destroy by calling
+/// [`Task::close_connection`]
 ///
 /// ### Usage:
 /// ```no_run
@@ -136,6 +137,10 @@ type Ret<T> = tonic::Result<Response<T>>;
 
 #[tonic::async_trait]
 impl task_server::Task for TaskImpl {
+    type TaskStateUpdateStream = std::pin::Pin<
+        Box<dyn tokio_stream::Stream<Item = tonic::Result<TaskState>> + Send + 'static>,
+    >;
+
     #[tracing::instrument(skip_all)]
     async fn new_connection(&self, req: Request<NewConnectionRequest>) -> Ret<String> {
         let req = req.into_inner();
@@ -185,8 +190,7 @@ impl task_server::Task for TaskImpl {
 
         let session_id = meta.get_session_id()?;
 
-        let task_type: TaskType = task_type.try_into().unwrap();
-        let task_type: maa_types::TaskType = task_type.into();
+        let task_type: maa_types::TaskType = task_type.try_into().unwrap();
 
         let ret = func_with(session_id, |handler| {
             handler.append_task(task_type, task_params.as_str())

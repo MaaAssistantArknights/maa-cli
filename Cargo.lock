@@ -1357,6 +1357,7 @@ dependencies = [
 name = "maa-types"
 version = "0.1.0"
 dependencies = [
+ "prost",
  "serde",
  "serde_test",
 ]

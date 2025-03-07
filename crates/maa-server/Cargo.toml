@@ -13,7 +13,7 @@ name = "server"
 name = "client"
 
 [features]
-default = ["client","unix-socket"]
+default = ["client", "unix-socket"]
 
 client = []
 
@@ -25,7 +25,7 @@ maa-sys = { workspace = true, features = ["runtime"] }
 maa-dirs.workspace = true
 
 tonic = { version = "0.12" }
-prost = "*"
+prost = { workspace = true }
 hyper-util = { version = "0.1.10", default-features = false, optional = true }
 tower = { version = "0.5.2", optional = true }
 
