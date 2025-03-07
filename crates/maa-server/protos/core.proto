@@ -13,6 +13,8 @@ service Core {
 message CoreConfig{
   StaticOptions static_ops = 1;
   LogOptions log_ops = 2;
+  string lib_path = 3;
+  repeated string resource_dirs = 4;
 
   message StaticOptions{
     bool cpu_ocr = 1;

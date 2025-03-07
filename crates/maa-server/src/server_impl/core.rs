@@ -1,7 +1,6 @@
 use crate::{
     core::{core_server::CoreServer, *},
     tonic::{self, Request, Response},
-    utils,
 };
 
 /// build service under package core
@@ -39,13 +38,7 @@ impl core_server::Core for CoreImpl {
             return Ok(Response::new(false));
         }
 
-        utils::load_core().map_err(tonic::Status::unknown)?;
-
         core_cfg.apply()?;
-
-        if utils::ResourceConfig::default().load().is_err() {
-            return Err(tonic::Status::internal("Failed to load resources"));
-        }
 
         Ok(Response::new(true))
     }
