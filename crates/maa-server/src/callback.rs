@@ -119,6 +119,8 @@ fn process_message(code: AsstMsg, message: Map, session_id: SessionID) -> Option
         }
         ConnectionInfo => process_connection_info(message, session_id),
         AllTasksCompleted => {
+            let msg = serde_json::to_string_pretty(&message).unwrap();
+            Session::info_to_channel(session_id, (code, msg));
             info!("AllTasksCompleted");
             Some(())
         }

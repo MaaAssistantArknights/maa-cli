@@ -60,6 +60,15 @@ impl Session {
         }
     }
 
+    pub fn info_to_channel(session_id: SessionID, msg: LogContent) {
+        SESSION_POOL
+            .read()
+            .get(&session_id)
+            .unwrap()
+            .channel
+            .log_to_channel(msg);
+    }
+
     pub fn tasks(session_id: SessionID) -> Tasks {
         Tasks(session_id)
     }

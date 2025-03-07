@@ -11,6 +11,92 @@ fn make_request<T>(payload: T, session_id: &str) -> tonic::Request<T> {
     req
 }
 
+fn get_resource_dirs() -> Vec<std::path::PathBuf> {
+    use maa_dirs::{self as dirs, join};
+    use std::path::PathBuf;
+
+    #[cfg_attr(test, derive(Debug, PartialEq))]
+    #[derive(Clone)]
+    pub struct ResourceConfig {
+        /// Resources used by global arknights client, e.g. `YostarEN`
+        global_resource: Option<PathBuf>,
+        /// Resources used by platform diff, subdirectories of `resource_base_dirs`, e.g.
+        /// `platform_diff/iOS`
+        platform_diff_resource: Option<PathBuf>,
+        /// Resource base directories, a list of directories containing resource directories
+        /// Not deserialized from config file
+        pub(crate) resource_base_dirs: Vec<PathBuf>,
+    }
+
+    impl Default for ResourceConfig {
+        fn default() -> Self {
+            Self {
+                resource_base_dirs: default_resource_base_dirs(),
+                global_resource: None,
+                platform_diff_resource: None,
+            }
+        }
+    }
+
+    fn default_resource_base_dirs() -> Vec<PathBuf> {
+        let mut resource_dirs = Vec::new();
+
+        if let Some(resource_dir) = dirs::find_resource() {
+            tracing::debug!("Found resource directory: {}", resource_dir.display());
+            resource_dirs.push(resource_dir.into_owned());
+        } else {
+            tracing::warn!("Resource directory not found!")
+        }
+
+        let hot_update_dir = dirs::hot_update();
+        if hot_update_dir.exists() {
+            tracing::debug!(
+                "Found hot update resource directory: {}",
+                hot_update_dir.display()
+            );
+            resource_dirs.push(join!(hot_update_dir, "resource"));
+            resource_dirs.push(join!(hot_update_dir, "cache", "resource"));
+        } else {
+            tracing::warn!("Hot update resource directory not found!");
+        }
+
+        resource_dirs
+    }
+
+    impl ResourceConfig {
+        /// Get all resource directories, including global and platform diff resources
+        pub fn resource_dirs(&self) -> Vec<PathBuf> {
+            let base_dirs = &self.resource_base_dirs;
+            let mut resource_dirs = base_dirs.clone();
+            if let Some(global_resource) = self.global_resource.as_ref() {
+                let global_resource_dir = join!("global", global_resource, "resource");
+                let full_paths = dirs::global_path(base_dirs, global_resource_dir);
+                if full_paths.is_empty() {
+                    tracing::warn!("Global resource {} not found", global_resource.display(),);
+                } else {
+                    resource_dirs.extend(full_paths);
+                }
+            }
+            if let Some(platform_diff_resource) = self.platform_diff_resource.as_ref() {
+                let platform_diff_resource_dir =
+                    join!("platform_diff", platform_diff_resource, "resource");
+                let full_paths = dirs::global_path(base_dirs, platform_diff_resource_dir);
+                if full_paths.is_empty() {
+                    tracing::warn!(
+                        "Platform diff resource {} not found",
+                        platform_diff_resource.display(),
+                    );
+                } else {
+                    resource_dirs.extend(full_paths);
+                }
+            }
+
+            resource_dirs
+        }
+    }
+    ResourceConfig::default().resource_dirs()
+}
+
 #[cfg(feature = "unix-socket")]
 async fn connect() -> Channel {
     use tokio::net::UnixStream;
@@ -51,6 +137,18 @@ async fn main() {
                 path: "/home/maa/".to_owned(),
                 level: maa_server::core::core_config::LogLevel::Debug.into(),
             }),
+            lib_path: maa_dirs::find_library()
+                .map(|path| {
+                    path.join(maa_dirs::MAA_CORE_LIB)
+                        .to_str()
+                        .unwrap()
+                        .to_owned()
+                })
+                .unwrap_or(maa_dirs::MAA_CORE_LIB.to_owned()),
+            resource_dirs: get_resource_dirs()
+                .into_iter()
+                .map(|p| p.to_str().unwrap().to_owned())
+                .collect(),
         })
         .await
         .unwrap()
