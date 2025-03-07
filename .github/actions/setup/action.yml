@@ -32,7 +32,7 @@ runs:
         esac
 
         case "$TARGET_ARCH" in
-          Arm64|aarch64)
+          ARM64|aarch64)
             target="aarch64-$suffix"
             ;;
           X64|x86_64)
