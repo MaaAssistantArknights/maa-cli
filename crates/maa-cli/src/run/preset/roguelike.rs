@@ -274,12 +274,10 @@ mod tests {
 
         #[test]
         fn value_variants() {
-            assert_eq!(Theme::value_variants(), &[
-                Theme::Phantom,
-                Theme::Mizuki,
-                Theme::Sami,
-                Theme::Sarkaz
-            ]);
+            assert_eq!(
+                Theme::value_variants(),
+                &[Theme::Phantom, Theme::Mizuki, Theme::Sami, Theme::Sarkaz]
+            );
         }
 
         #[test]

@@ -89,30 +89,33 @@ mod tests {
             BoolInput::new(None, None),
         ];
 
-        assert_de_tokens(&values, &[
-            Token::Seq { len: Some(4) },
-            Token::Map { len: Some(2) },
-            Token::Str("default"),
-            Token::Some,
-            Token::Bool(true),
-            Token::Str("description"),
-            Token::Some,
-            Token::Str("do something"),
-            Token::MapEnd,
-            Token::Map { len: Some(1) },
-            Token::Str("default"),
-            Token::Some,
-            Token::Bool(false),
-            Token::MapEnd,
-            Token::Map { len: Some(1) },
-            Token::Str("description"),
-            Token::Some,
-            Token::Str("do something"),
-            Token::MapEnd,
-            Token::Map { len: Some(0) },
-            Token::MapEnd,
-            Token::SeqEnd,
-        ]);
+        assert_de_tokens(
+            &values,
+            &[
+                Token::Seq { len: Some(4) },
+                Token::Map { len: Some(2) },
+                Token::Str("default"),
+                Token::Some,
+                Token::Bool(true),
+                Token::Str("description"),
+                Token::Some,
+                Token::Str("do something"),
+                Token::MapEnd,
+                Token::Map { len: Some(1) },
+                Token::Str("default"),
+                Token::Some,
+                Token::Bool(false),
+                Token::MapEnd,
+                Token::Map { len: Some(1) },
+                Token::Str("description"),
+                Token::Some,
+                Token::Str("do something"),
+                Token::MapEnd,
+                Token::Map { len: Some(0) },
+                Token::MapEnd,
+                Token::SeqEnd,
+            ],
+        );
     }
 
     #[test]
@@ -125,10 +128,13 @@ mod tests {
             } if description == "do something"
         );
 
-        assert_matches!(BoolInput::new(Some(true), None), BoolInput {
-            default: Some(true),
-            description: None,
-        });
+        assert_matches!(
+            BoolInput::new(Some(true), None),
+            BoolInput {
+                default: Some(true),
+                description: None,
+            }
+        );
 
         assert_matches!(
             BoolInput::new(None, Some("do something")),
@@ -138,10 +144,13 @@ mod tests {
             } if description == "do something"
         );
 
-        assert_matches!(BoolInput::new(None, None), BoolInput {
-            default: None,
-            description: None,
-        });
+        assert_matches!(
+            BoolInput::new(None, None),
+            BoolInput {
+                default: None,
+                description: None,
+            }
+        );
     }
 
     #[test]

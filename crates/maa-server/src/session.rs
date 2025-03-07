@@ -1,5 +1,4 @@
-use crate::types::{SessionID, TaskId};
-use maa_types::TaskStateType;
+use crate::types::{SessionID, TaskId, TaskStateType};
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use tokio::sync::oneshot::Sender;

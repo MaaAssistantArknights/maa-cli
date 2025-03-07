@@ -214,6 +214,7 @@ pub mod callback;
 pub mod types {
     pub type SessionID = [u8; 16];
     pub use maa_types::primitive::AsstTaskId as TaskId;
+    pub use maa_types::TaskStateType;
 
     #[cfg(test)]
     mod tests {
