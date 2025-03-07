@@ -1,6 +1,6 @@
 use crate::{
     session::Session,
-    task::{task_server::TaskServer, task_state::State, *},
+    task::{task_server::TaskServer, *},
     tonic::{self, Request, Response},
     types::SessionID,
 };
@@ -301,17 +301,13 @@ impl task_server::Task for TaskImpl {
         };
 
         use tokio_stream::StreamExt as _;
-        let streaming = tokio_stream::wrappers::UnboundedReceiverStream::new(rx).map(|msg| {
-            let state = if !maa_sys::binding::loaded() {
-                State::Unloaded
-            } else {
-                State::Idle
-            };
-            let mut st = TaskState::default();
-            st.set_state(state);
-            st.content = msg;
-            Ok(st)
-        });
+        let streaming =
+            tokio_stream::wrappers::UnboundedReceiverStream::new(rx).map(|(state, log)| {
+                Ok(TaskState {
+                    content: log,
+                    state: task_state::State::from(state).into(),
+                })
+            });
 
         Ok(Response::new(Box::pin(streaming)))
     }
@@ -327,9 +323,9 @@ impl task_server::Task for TaskImpl {
         Ok(Response::new(LogArray {
             items: logs
                 .into_iter()
-                .map(|log| TaskState {
+                .map(|(state, log)| TaskState {
                     content: log,
-                    state: 0,
+                    state: task_state::State::from(state).into(),
                 })
                 .collect(),
         }))

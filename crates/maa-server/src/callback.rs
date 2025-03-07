@@ -56,9 +56,37 @@ impl From<AsstMsgId> for AsstMsg {
     }
 }
 
+impl From<AsstMsg> for crate::task::task_state::State {
+    fn from(value: AsstMsg) -> Self {
+        use crate::task::task_state::State::*;
+        match value {
+            AsstMsg::InternalError => InternalError,
+            AsstMsg::InitFailed => InitFailed,
+            AsstMsg::ConnectionInfo => ConnectionInfo,
+            AsstMsg::AllTasksCompleted => AllTasksCompleted,
+            AsstMsg::AsyncCallInfo => AsyncCallInfo,
+            AsstMsg::Destroyed => Destroyed,
+            AsstMsg::TaskChainError => TaskChainError,
+            AsstMsg::TaskChainStart => TaskChainStart,
+            AsstMsg::TaskChainCompleted => TaskChainCompleted,
+            AsstMsg::TaskChainExtraInfo => TaskChainExtraInfo,
+            AsstMsg::TaskChainStopped => TaskChainStopped,
+            AsstMsg::SubTaskError => SubTaskError,
+            AsstMsg::SubTaskStart => SubTaskStart,
+            AsstMsg::SubTaskCompleted => SubTaskCompleted,
+            AsstMsg::SubTaskExtraInfo => SubTaskExtraInfo,
+            AsstMsg::SubTaskStopped => SubTaskStopped,
+            AsstMsg::Unknown => Unknown,
+        }
+    }
+}
+
 use tracing::{debug, error, info, trace, warn};
 
-use crate::{session::{Session, State}, types::SessionID};
+use crate::{
+    session::{Session, State},
+    types::SessionID,
+};
 
 type Map = serde_json::Map<String, serde_json::Value>;
 
@@ -66,7 +94,7 @@ type Map = serde_json::Map<String, serde_json::Value>;
 pub fn main(code: AsstMsg, json_str: &str, session_id: SessionID) {
     trace!("Session ID: {:?}", session_id);
 
-    Session::log(session_id).log(json_str.to_string());
+    Session::log(session_id).log((code, json_str.to_string()));
 
     let map: Map = serde_json::from_str(json_str).unwrap();
 
@@ -187,11 +215,12 @@ fn process_taskchain(code: AsstMsg, message: Map, session_id: SessionID) -> Opti
         taskchain: maa_types::TaskType,
         taskid: TaskId,
     }
+    let msg = serde_json::to_string_pretty(&message).unwrap();
     let TaskChain { taskchain, taskid } =
         serde_json::from_value(serde_json::Value::Object(message)).unwrap();
+    Session::tasks(session_id).update(taskid, (code, msg));
 
     use AsstMsg::*;
-
     match code {
         TaskChainStart => {
             info!("{} {}", taskchain, "Start");
@@ -211,7 +240,7 @@ fn process_taskchain(code: AsstMsg, message: Map, session_id: SessionID) -> Opti
         }
         TaskChainExtraInfo => {}
 
-        _ => {} // unreachable
+        _ => unreachable!(),
     };
 
     Some(())
@@ -220,10 +249,10 @@ fn process_taskchain(code: AsstMsg, message: Map, session_id: SessionID) -> Opti
 mod subtask {
     use super::*;
 
-    pub fn process_subtask(_code: AsstMsg, message: Map, session_id: SessionID) -> Option<()> {
+    pub fn process_subtask(code: AsstMsg, message: Map, session_id: SessionID) -> Option<()> {
         let msg = serde_json::to_string_pretty(&message).unwrap();
         let taskid = message.get("taskid")?.as_i64()? as TaskId;
-        Session::tasks(session_id).update(taskid, msg);
+        Session::tasks(session_id).update(taskid, (code, msg));
         Some(())
     }
 }

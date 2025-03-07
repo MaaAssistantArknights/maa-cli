@@ -87,15 +87,31 @@ message TaskState {
     string content = 1;
     State state = 2;
 
-    enum State{
-        // MaaCore is not loaded.
-        Unloaded = 0;
-        // MaaCore is initialized but not connected to the device.
-        Unconnected = 2 ;
-        // MaaCore is available to run tasks.
-        Idle = 3;
-        // MaaCore is actively running tasks.
-        Running = 4;
+    enum State {
+        /* Global Info */
+        InternalError = 0;
+        InitFailed = 1;
+        ConnectionInfo = 2;
+        AllTasksCompleted = 3;
+        AsyncCallInfo = 4;
+        Destroyed = 5;
+    
+        /* TaskChain Info */
+        TaskChainError = 6;
+        TaskChainStart = 7;
+        TaskChainCompleted = 8;
+        TaskChainExtraInfo = 9;
+        TaskChainStopped = 10;
+    
+        /* SubTask Info */
+        SubTaskError = 11;
+        SubTaskStart = 12;
+        SubTaskCompleted = 13;
+        SubTaskExtraInfo = 14;
+        SubTaskStopped = 15;
+    
+        /* Unknown */
+        Unknown = 16;
     }
 }
 

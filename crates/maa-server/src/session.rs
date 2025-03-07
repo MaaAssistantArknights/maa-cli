@@ -1,11 +1,14 @@
-use crate::types::{SessionID, TaskId};
+use crate::{
+    callback::AsstMsg,
+    types::{SessionID, TaskId},
+};
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use tokio::sync::oneshot::Sender;
 
 static SESSION_POOL: RwLock<BTreeMap<SessionID, _Session>> = RwLock::new(BTreeMap::new());
 
-type LogContent = String;
+type LogContent = (AsstMsg, String);
 type CallBackContent = String;
 
 // re-export
@@ -32,7 +35,7 @@ impl Session {
     /// Return [None] if already taken
     pub fn take_subscriber(
         session_id: SessionID,
-    ) -> Option<tokio::sync::mpsc::UnboundedReceiver<std::string::String>> {
+    ) -> Option<tokio::sync::mpsc::UnboundedReceiver<LogContent>> {
         SESSION_POOL
             .write()
             .get_mut(&session_id)
@@ -84,7 +87,7 @@ impl Tasks {
             state.reason(new);
         }
     }
-    pub fn update(self, task_id: TaskId, message: String) {
+    pub fn update(self, task_id: TaskId, message: LogContent) {
         if let Some(session) = SESSION_POOL.write().get_mut(&self.0) {
             session
                 .tasks
@@ -111,7 +114,7 @@ impl Log {
         if let Some(session) = SESSION_POOL.write().get_mut(&self.0) {
             session.log(message)
         } else {
-            tracing::warn!(from = ?self.0, "Unknown Log: {}", message)
+            tracing::warn!(from = ?self.0, "Unknown Log: {:?}", message)
         }
     }
 }
@@ -119,7 +122,7 @@ impl Log {
 struct _Session {
     tasks: BTreeMap<TaskId, state::TaskState>,
     channel: log::Channel,
-    logs: Vec<String>,
+    logs: Vec<LogContent>,
 }
 
 impl _Session {
@@ -217,8 +220,7 @@ mod state {
             );
             self.state = reason;
         }
-        pub fn update(&mut self, new: String) {
-            debug_assert_eq!(self.state, State::Running);
+        pub fn update(&mut self, new: LogContent) {
             self.content.push(new);
         }
     }
