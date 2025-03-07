@@ -1,14 +1,12 @@
-use crate::{
-    callback::AsstMsg,
-    types::{SessionID, TaskId},
-};
+use crate::types::{SessionID, TaskId};
+use maa_types::TaskStateType;
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use tokio::sync::oneshot::Sender;
 
 static SESSION_POOL: RwLock<BTreeMap<SessionID, _Session>> = RwLock::new(BTreeMap::new());
 
-type LogContent = (AsstMsg, String);
+type LogContent = (TaskStateType, String);
 type CallBackContent = String;
 
 // re-export

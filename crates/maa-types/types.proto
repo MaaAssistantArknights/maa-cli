@@ -27,3 +27,30 @@ enum TaskType {
   SingleStep = 14;
   VideoRecognition = 15;
 }
+
+enum TaskStateType {
+  /* Global Info */
+  InternalError = 0;
+  InitFailed = 1;
+  ConnectionInfo = 2;
+  AllTasksCompleted = 3;
+  AsyncCallInfo = 4;
+  Destroyed = 5;
+
+  /* TaskChain Info */
+  TaskChainError = 6;
+  TaskChainStart = 7;
+  TaskChainCompleted = 8;
+  TaskChainExtraInfo = 9;
+  TaskChainStopped = 10;
+
+  /* SubTask Info */
+  SubTaskError = 11;
+  SubTaskStart = 12;
+  SubTaskCompleted = 13;
+  SubTaskExtraInfo = 14;
+  SubTaskStopped = 15;
+  
+  /* Unknown */
+  Unknown = 16;
+}
