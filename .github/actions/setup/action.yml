@@ -50,9 +50,8 @@ runs:
       run: rustup target add $CARGO_BUILD_TARGET
     - name: Setup Cross Compiling Toolchain (gcc and libc for aarch64 on x86_64 Linux)
       if: >
-        inputs.target_arch == 'aarch64' &&
-          inputs.host_arch == 'x86_64' &&
-          startsWith(inputs.os, 'ubuntu')
+        startsWith(env.CARGO_BUILD_TARGET, 'aarch64-unknown-linux') &&
+          runner.arch == 'X64'
       shell: bash
       run: |
         sudo apt-get update
@@ -65,9 +64,8 @@ runs:
         echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
     - name: Setup Cross Compiling Toolchain (LLVM for aarch64 on x86_64 Windows)
       if: >
-        inputs.target_arch == 'aarch64' &&
-          inputs.host_arch == 'x86_64' &&
-          startsWith(inputs.os, 'windows')
+        startsWith(env.CARGO_BUILD_TARGET, 'aarch64-pc-windows') &&
+          runner.arch == 'X64'
       shell: powershell
       run: |
         Add-Content $env:GITHUB_PATH "C:\Program Files (x86)\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\x64\bin"
