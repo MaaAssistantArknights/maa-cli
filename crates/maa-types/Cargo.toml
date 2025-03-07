@@ -8,6 +8,7 @@ repository.workspace = true
 
 [dependencies]
 serde = { workspace = true, optional = true }
+prost = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_test = { workspace = true }

@@ -50,6 +50,7 @@ windows-result = "0.3.0"
 windows-strings = "0.3.0"
 windows-sys = "0.59.0"
 zip = { version = "2", default-features = false }
+prost = { version = "*", default-features = false, features = ["derive"] }
 
 [workspace.dependencies.reqwest]
 version = "0.12"
