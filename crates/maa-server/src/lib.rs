@@ -425,6 +425,47 @@ pub mod callback;
 pub mod types {
     pub type SessionID = [u8; 16];
     pub use maa_types::primitive::AsstTaskId as TaskId;
+
+    #[cfg(test)]
+    mod tests {
+        use std::str::FromStr;
+
+        #[test]
+        fn uuid_ffi() {
+            let rust: [u8; 8] = [1, 7, 45, 31, 5, 21, 46, 1];
+
+            let ptr = {
+                let mut rust_copy = rust.to_vec();
+                let ptr = rust_copy.as_mut_ptr();
+                std::mem::forget(rust_copy);
+                ptr as *mut std::ffi::c_void
+            };
+            let len = 8;
+
+            let mut cffi = [0u8; 8];
+
+            assert_ne!(rust, cffi);
+
+            let ptr = ptr as *mut u8;
+            cffi.copy_from_slice(unsafe { std::slice::from_raw_parts(ptr, len) });
+
+            assert_eq!(rust, cffi);
+        }
+
+        #[test]
+        fn uuid_string() {
+            let uuid = uuid::Uuid::now_v7();
+            let str = uuid.to_string();
+            let bytes = uuid.to_bytes_le();
+
+            let bytes_from_str = uuid::Uuid::from_str(&str).unwrap();
+
+            assert_eq!(uuid, bytes_from_str);
+            assert_eq!(bytes, bytes_from_str.to_bytes_le());
+        }
+    }
 }
 
 pub mod session;
+
+pub mod server_impl;
