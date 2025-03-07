@@ -38,25 +38,29 @@ async fn connect() -> Channel {
 #[tokio::main]
 async fn main() {
     let channel = connect().await;
+    println!("Connected to server");
 
     let mut coreclient = maa_server::core::core_client::CoreClient::new(channel.clone());
-    coreclient
+    let success = coreclient
         .load_core(maa_server::core::CoreConfig {
             static_ops: Some(maa_server::core::core_config::StaticOptions {
                 cpu_ocr: true,
                 gpu_ocr: None,
             }),
             log_ops: Some(maa_server::core::core_config::LogOptions {
-                path: "test".to_owned(),
+                path: "/home/maa/".to_owned(),
                 level: maa_server::core::core_config::LogLevel::Debug.into(),
             }),
         })
         .await
-        .unwrap();
+        .unwrap()
+        .into_inner();
+
+    if !success {
+        println!("Core has been configured");
+    }
 
     let mut taskclient = maa_server::task::task_client::TaskClient::new(channel);
-
-    println!("Connected to server");
 
     let session_id = taskclient
         .new_connection(maa_server::task::NewConnectionRequest {
@@ -109,15 +113,15 @@ async fn main() {
         .await
         .unwrap();
     println!("Deactivate task Fight");
-    let mut payload = NewTaskRequest::default();
-    payload.set_task_type(TaskType::Fight.into());
-    payload.task_params = r#" { "stage": "1-7" } "#.to_owned();
-    taskclient
-        .append_task(make_request(payload, &session_id))
-        .await
-        .unwrap()
-        .into_inner();
-    println!("Add task Fight 1-7");
+    // let mut payload = NewTaskRequest::default();
+    // payload.set_task_type(TaskType::Fight.into());
+    // payload.task_params = r#" { "stage": "1-7" } "#.to_owned();
+    // taskclient
+    //     .append_task(make_request(payload, &session_id))
+    //     .await
+    //     .unwrap()
+    //     .into_inner();
+    // println!("Add task Fight 1-7");
     taskclient
         .start_tasks(make_request((), &session_id))
         .await

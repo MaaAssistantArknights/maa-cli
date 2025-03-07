@@ -24,8 +24,10 @@ mod tests {
         let rust: [u8; 8] = [1, 7, 45, 31, 5, 21, 46, 1];
 
         let ptr = {
-            let mut rust_copy = rust;
-            rust_copy.as_mut_ptr() as *mut std::ffi::c_void
+            let mut rust_copy = rust.to_vec();
+            let ptr = rust_copy.as_mut_ptr();
+            std::mem::forget(rust_copy);
+            ptr as *mut std::ffi::c_void
         };
         let len = 8;
 
@@ -52,31 +54,20 @@ mod tests {
     }
 }
 
-type SessionID = [u8; 16];
-use maa_types::primitive::AsstTaskId as TaskId;
-
-type MaaUuid = String;
+use maa_server::{session::Session, types::*};
 
 mod callback {
-    use crate::{SessionID, TaskId};
+    use crate::{Session, SessionID, TaskId};
     use maa_server::callback::AsstMsg;
     use tracing::{debug, error, info, trace, warn};
 
-    pub type Map = serde_json::Map<String, serde_json::Value>;
+    type Map = serde_json::Map<String, serde_json::Value>;
 
     #[tracing::instrument("C CallBack", skip_all)]
     pub fn main(code: maa_server::callback::AsstMsg, json_str: &str, session_id: SessionID) {
-        use crate::log::{Logger, TX_HANDLERS};
         trace!("Session ID: {:?}", session_id);
 
-        if let Some(tx) = TX_HANDLERS.read().get(&session_id) {
-            if tx.log(json_str.to_string(), session_id.to_owned()) {
-                warn!("Log Handler Removed");
-                TX_HANDLERS.write().remove(&session_id);
-            }
-        } else {
-            Logger::log_to_pool(json_str, session_id.to_owned());
-        }
+        Session::log(session_id).log(json_str.to_string());
 
         let map: Map = serde_json::from_str(json_str).unwrap();
 
@@ -90,7 +81,7 @@ mod callback {
         }
     }
 
-    pub fn process_message(code: AsstMsg, message: Map, session_id: SessionID) -> Option<()> {
+    fn process_message(code: AsstMsg, message: Map, session_id: SessionID) -> Option<()> {
         use AsstMsg::*;
 
         match code {
@@ -134,23 +125,13 @@ mod callback {
         match what.as_str() {
             "UuidGot" => {
                 debug!("Got UUID: {}", details.get("uuid")?.as_str()?);
-                // safety: this should be called only during Task::new_connection
-                crate::log::TX_HANDLERS
-                    .write()
-                    .get_mut(&session_id)
-                    .unwrap()
-                    .connect_success();
+                Session::test_connection_result(session_id, None);
             }
             "ConnectFailed" => {
                 let err = format!("Failed to connect to android device, {}, Please check your connect configuration: {}",
                     why.unwrap(),serde_json::to_string_pretty(&details).unwrap());
                 error!(err);
-                // safety: this should be called only during Task::new_connection
-                crate::log::TX_HANDLERS
-                    .write()
-                    .remove(&session_id)
-                    .unwrap()
-                    .connect_failed(err);
+                Session::test_connection_result(session_id, Some(err));
             }
             // Resolution
             "ResolutionGot" => trace!(
@@ -210,25 +191,25 @@ mod callback {
         let TaskChain { taskchain, taskid } =
             serde_json::from_value(serde_json::Value::Object(message)).unwrap();
 
-        use crate::state::{Reason, StatePool};
+        use maa_server::session::{Session, State};
         use AsstMsg::*;
 
         match code {
             TaskChainStart => {
                 info!("{} {}", taskchain, "Start");
-                StatePool::reason_task(session_id, taskid, Reason::Start);
+                Session::tasks(session_id).state(taskid, State::Running);
             }
             TaskChainCompleted => {
                 info!("{} {}", taskchain, "Completed");
-                StatePool::reason_task(session_id, taskid, Reason::Complete);
+                Session::tasks(session_id).state(taskid, State::Completed);
             }
             TaskChainStopped => {
                 warn!("{} {}", taskchain, "Stopped");
-                StatePool::reason_task(session_id, taskid, Reason::Cancel);
+                Session::tasks(session_id).state(taskid, State::Canceled);
             }
             TaskChainError => {
                 error!("{} {}", taskchain, "Error");
-                StatePool::reason_task(session_id, taskid, Reason::Error);
+                Session::tasks(session_id).state(taskid, State::Error);
             }
             TaskChainExtraInfo => {}
 
@@ -244,191 +225,8 @@ mod callback {
         pub fn process_subtask(_code: AsstMsg, message: Map, session_id: SessionID) -> Option<()> {
             let msg = serde_json::to_string_pretty(&message).unwrap();
             let taskid = message.get("taskid")?.as_i64()? as TaskId;
-            crate::state::StatePool::update_task(session_id, taskid, msg);
+            Session::tasks(session_id).update(taskid, msg);
             Some(())
-        }
-    }
-}
-
-mod state {
-    use crate::{SessionID, TaskId};
-    use parking_lot::RwLock;
-    use std::collections::BTreeMap;
-
-    type Pool = RwLock<BTreeMap<SessionID, BTreeMap<TaskId, TaskState>>>;
-    static STATE_POOL: Pool = RwLock::new(BTreeMap::new());
-
-    #[derive(Debug, Clone)]
-    pub enum TaskState {
-        NotStarted,
-        Running(Vec<String>),
-        Completed(Vec<String>),
-        Canceled(Vec<String>),
-        Error(Vec<String>),
-    }
-
-    impl std::fmt::Display for TaskState {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(
-                f,
-                "{}",
-                match self {
-                    TaskState::NotStarted => "Not Started".to_owned(),
-                    TaskState::Running(items) => format!("Running\n{}", items.join("\n")),
-                    TaskState::Completed(items) => format!("Completed\n{}", items.join("\n")),
-                    TaskState::Canceled(items) => format!("Canceled\n{}", items.join("\n")),
-                    TaskState::Error(items) => format!("Error\n{}", items.join("\n")),
-                }
-            )
-        }
-    }
-
-    pub enum Reason {
-        Start,
-        Complete,
-        Cancel,
-        Error,
-    }
-
-    impl TaskState {
-        pub fn reason(&mut self, reason: Reason) {
-            match reason {
-                Reason::Start => {
-                    let TaskState::NotStarted = self else {
-                        unreachable!()
-                    };
-                    *self = TaskState::Running(vec![]);
-                }
-                reason => {
-                    let TaskState::Running(items) = self else {
-                        unreachable!()
-                    };
-                    let vec = std::mem::take(items);
-                    match reason {
-                        Reason::Start => unreachable!(),
-                        Reason::Complete => std::mem::replace(self, TaskState::Completed(vec)),
-                        Reason::Cancel => std::mem::replace(self, TaskState::Canceled(vec)),
-                        Reason::Error => std::mem::replace(self, TaskState::Error(vec)),
-                    };
-                }
-            }
-        }
-        pub fn update(&mut self, new: String) {
-            let TaskState::Running(items) = self else {
-                unreachable!()
-            };
-            items.push(new);
-        }
-    }
-
-    pub struct StatePool;
-
-    impl StatePool {
-        pub fn new_task(uuid: SessionID, id: TaskId) {
-            STATE_POOL
-                .write()
-                .entry(uuid)
-                .or_default()
-                .insert(id, TaskState::NotStarted);
-        }
-
-        pub fn reason_task(uuid: SessionID, id: TaskId, reason: Reason) {
-            if let Some(state) = STATE_POOL
-                .write()
-                .get_mut(&uuid)
-                .and_then(|map| map.get_mut(&id))
-            {
-                state.reason(reason)
-            }
-        }
-
-        pub fn update_task(uuid: SessionID, id: TaskId, new: String) {
-            if let Some(state) = STATE_POOL
-                .write()
-                .get_mut(&uuid)
-                .and_then(|map| map.get_mut(&id))
-            {
-                state.update(new)
-            }
-        }
-    }
-}
-
-mod log {
-    use crate::SessionID;
-    use parking_lot::RwLock;
-    use std::collections::BTreeMap;
-    use tokio::sync::{
-        mpsc::{UnboundedReceiver, UnboundedSender},
-        oneshot,
-    };
-
-    type SessionIDMap<V> = RwLock<BTreeMap<SessionID, V>>;
-
-    static LOG_POOL: SessionIDMap<Vec<String>> = RwLock::new(BTreeMap::new());
-
-    pub fn get_skip_len(uuid: SessionID, len: i32) -> Vec<String> {
-        LOG_POOL
-            .read()
-            .get(&uuid)
-            .iter()
-            .flat_map(|vec| vec.iter())
-            .skip(len as usize)
-            .cloned()
-            .collect()
-    }
-
-    /// will be used in callback,
-    /// which is out of tokio runtime
-    pub static TX_HANDLERS: SessionIDMap<crate::log::Logger<String, Result<(), String>>> =
-        RwLock::new(BTreeMap::new());
-
-    pub struct Logger<T, R> {
-        tx: UnboundedSender<T>,
-        rx: Option<UnboundedReceiver<T>>,
-        oneshot: Option<oneshot::Sender<R>>,
-    }
-
-    impl Logger<String, Result<(), String>> {
-        pub fn new() -> (Self, oneshot::Receiver<Result<(), String>>) {
-            let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-            let (oneshot_tx, oneshot_rx) = oneshot::channel();
-            (
-                Self {
-                    tx,
-                    rx: Some(rx),
-                    oneshot: Some(oneshot_tx),
-                },
-                oneshot_rx,
-            )
-        }
-
-        pub fn connect_failed(mut self, err: String) {
-            if let Some(shot) = self.oneshot.take() {
-                let _ = shot.send(Err(err));
-            }
-        }
-        pub fn connect_success(&mut self) {
-            if let Some(shot) = self.oneshot.take() {
-                let _ = shot.send(Ok(()));
-            }
-        }
-
-        pub fn take_rx(&mut self) -> Option<UnboundedReceiver<String>> {
-            self.rx.take()
-        }
-        /// if true, the channel is closed, so drop this
-        pub fn log(&self, message: String, session_id: SessionID) -> bool {
-            Self::log_to_pool(&message, session_id);
-            // log to channel
-            self.tx.send(message).is_err()
-        }
-        pub fn log_to_pool(message: &str, session_id: SessionID) {
-            LOG_POOL
-                .write()
-                .entry(session_id)
-                .or_default()
-                .push(message.to_owned());
         }
     }
 }
@@ -441,7 +239,7 @@ mod task {
     use std::collections::BTreeMap;
     use tokio::sync::RwLock;
 
-    use crate::{log::TX_HANDLERS, SessionID};
+    use crate::{Session, SessionID};
 
     /// build service under package task
     ///
@@ -583,17 +381,16 @@ mod task {
             let asst = Assistant::new(session_id);
             tracing::debug!("Instance Created");
 
-            let (logger, oneshot) = crate::log::Logger::new();
             tracing::debug!("Register C CallBack");
-            // ensure we can get callback
-            TX_HANDLERS.write().insert(session_id, logger);
+            let (tx, rx) = tokio::sync::oneshot::channel();
+            Session::new(session_id, tx);
 
             req.apply_to(asst.inner_unchecked())?;
             tracing::debug!("Check Connection");
-            oneshot
-                .await
+            rx.await
                 .unwrap()
                 .map_err(|e| tonic::Status::unavailable(e.to_string()))?;
+
             tracing::debug!("Register Task State CallBack");
             TASK_HANDLERS.write().await.insert(session_id, asst);
 
@@ -606,7 +403,7 @@ mod task {
 
             Ok(Response::new(
                 TASK_HANDLERS.write().await.remove(&session_id).is_some()
-                    && TX_HANDLERS.write().remove(&session_id).is_some(),
+                    && Session::remove(session_id),
             ))
         }
 
@@ -633,7 +430,7 @@ mod task {
 
             match ret {
                 Ok(id) => {
-                    crate::state::StatePool::new_task(session_id, id);
+                    Session::tasks(session_id).new(id);
                     Ok(Response::new(id.into()))
                 }
                 Err(e) => Err(tonic::Status::from_error(Box::new(e))),
@@ -734,11 +531,7 @@ mod task {
         async fn task_state_update(&self, req: Request<()>) -> Ret<Self::TaskStateUpdateStream> {
             let session_id = req.get_session_id()?;
 
-            let Some(rx) = TX_HANDLERS
-                .write()
-                .get_mut(&session_id)
-                .and_then(|logger| logger.take_rx())
-            else {
+            let Some(rx) = Session::take_subscriber(session_id) else {
                 return Err(tonic::Status::resource_exhausted("rx has been taken"));
             };
 
@@ -764,7 +557,7 @@ mod task {
 
             let session_id = meta.get_session_id()?;
 
-            let logs = crate::log::get_skip_len(session_id, skip);
+            let logs = Session::log(session_id).get_skip(skip);
 
             Ok(Response::new(LogArray {
                 items: logs
