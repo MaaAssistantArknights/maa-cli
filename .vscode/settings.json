@@ -1,5 +1,5 @@
 {
     "protoc": {
-        "options": ["-I","crates/maa-types"]
+        "options": ["-I","${workspaceRoot}/crates/maa-types"]
     }
 }

@@ -60,34 +60,7 @@ message TaskId { int32 id = 1; }
 
 message TaskState {
     string content = 1;
-    State state = 2;
-
-    enum State {
-        /* Global Info */
-        InternalError = 0;
-        InitFailed = 1;
-        ConnectionInfo = 2;
-        AllTasksCompleted = 3;
-        AsyncCallInfo = 4;
-        Destroyed = 5;
-    
-        /* TaskChain Info */
-        TaskChainError = 6;
-        TaskChainStart = 7;
-        TaskChainCompleted = 8;
-        TaskChainExtraInfo = 9;
-        TaskChainStopped = 10;
-    
-        /* SubTask Info */
-        SubTaskError = 11;
-        SubTaskStart = 12;
-        SubTaskCompleted = 13;
-        SubTaskExtraInfo = 14;
-        SubTaskStopped = 15;
-    
-        /* Unknown */
-        Unknown = 16;
-    }
+    types.TaskStateType state = 2;
 }
 
 message LogArray {

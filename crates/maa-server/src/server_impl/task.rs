@@ -1,6 +1,6 @@
 use crate::{
     session::Session,
-    task::{task_server::TaskServer, *,},
+    task::{task_server::TaskServer, *},
     tonic::{self, Request, Response},
     types::SessionID,
 };
@@ -186,7 +186,6 @@ impl task_server::Task for TaskImpl {
         let session_id = meta.get_session_id()?;
 
         let task_type: TaskType = task_type.try_into().unwrap();
-        let task_type: maa_types::TaskType = task_type.into();
 
         let ret = func_with(session_id, |handler| {
             handler.append_task(task_type, task_params.as_str())
@@ -305,7 +304,7 @@ impl task_server::Task for TaskImpl {
             tokio_stream::wrappers::UnboundedReceiverStream::new(rx).map(|(state, log)| {
                 Ok(TaskState {
                     content: log,
-                    state: task_state::State::from(state).into(),
+                    state: state.into(),
                 })
             });
 
@@ -325,7 +324,7 @@ impl task_server::Task for TaskImpl {
                 .into_iter()
                 .map(|(state, log)| TaskState {
                     content: log,
-                    state: task_state::State::from(state).into(),
+                    state: state.into(),
                 })
                 .collect(),
         }))
