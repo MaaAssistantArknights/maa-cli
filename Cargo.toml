@@ -11,6 +11,7 @@ repository = "https://github.com/MaaAssistantArknights/maa-cli"
 maa-dirs = { path = "crates/maa-dirs", version = "0.1.1" }
 maa-sys = { path = "crates/maa-sys", version = "0.6.0" }
 maa-types = { path = "crates/maa-types", version = "0.1" }
+maa-server = { path = "crates/maa-server", version = "0.1" }
 
 anyhow = "1"
 async-trait = "0.1.81"
