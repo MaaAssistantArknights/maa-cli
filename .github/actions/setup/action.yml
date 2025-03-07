@@ -1,17 +1,10 @@
 name: Setup Cross Compilation Toolchains
 description: Setup Cross Compilation Toolchains for Rust and C
 inputs:
-  os:
-    description: Host and target OS # cross system compilation are not supported
-    required: true
-  host_arch:
-    description: Host architecture
-    required: false
-    default: "x86_64"
   target_arch:
     description: Target architecture
     required: false
-    default: "x86_64"
+    default: ${{ runner.arch }}
 
 runs:
   using: composite
@@ -19,27 +12,40 @@ runs:
     - name: Compute Target Triple
       shell: bash
       env:
-        TARGET_OS: ${{ inputs.os }}
+        OS: ${{ runner.os }}
         TARGET_ARCH: ${{ inputs.target_arch }}
       run: |
-        case "$TARGET_OS" in
-          ubuntu*)
-            target="$TARGET_ARCH-unknown-linux-gnu"
+        case "$OS" in
+          Linux)
+            suffix="unknown-linux-gnu"
             ;;
-          macos*)
-            target="$TARGET_ARCH-apple-darwin"
+          macOS)
+            suffix="apple-darwin"
             ;;
-          windows*)
-            target="$TARGET_ARCH-pc-windows-msvc"
+          Windows)
+            suffix="pc-windows-msvc"
             ;;
           *)
-            echo "Unknown target OS: $TARGET_OS"
+            echo "Unknown target OS: $OS"
             exit 1
             ;;
         esac
+
+        case "$TARGET_ARCH" in
+          ARM64|aarch64)
+            target="aarch64-$suffix"
+            ;;
+          X64|x86_64)
+            target="x86_64-$suffix"
+            ;;
+          *)
+            echo "Unknown target architecture: $TARGET_ARCH"
+            exit 1
+            ;;
+        esac
+
         echo "CARGO_BUILD_TARGET=$target" >> $GITHUB_ENV
     - name: Setup Rust Target
-      if: inputs.host_arch != inputs.target_arch
       shell: bash
       run: rustup target add $CARGO_BUILD_TARGET
     - name: Setup Cross Compiling Toolchain (gcc and libc for aarch64 on x86_64 Linux)
