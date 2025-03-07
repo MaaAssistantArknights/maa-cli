@@ -6,34 +6,33 @@ license.workspace = true
 homepage.workspace = true
 repository.workspace = true
 
-[[bin]]
+[[example]]
 name = "server"
+required-features = ["tokio/rt-multi-thread", "tonic/transport"]
 
-[[bin]]
+[[example]]
 name = "client"
+required-features = ["tokio/rt-multi-thread", "tonic/transport", "client"]
 
 [features]
-default = ["client","unix-socket"]
-
 client = []
-
-unix-socket = ["dep:tower", "dep:hyper-util"]
 
 [dependencies]
 maa-types = { workspace = true, features = ["serde"] }
 maa-sys = { workspace = true, features = ["runtime"] }
-maa-dirs.workspace = true
 
-tonic = { version = "0.12" }
-prost = "*"
-hyper-util = { version = "0.1.10", default-features = false, optional = true }
-tower = { version = "0.5.2", optional = true }
+tonic = { version = "0.12", default-features = false, features = [
+    "codegen",
+    "prost",
+] }
+prost = { version = "*", default-features = false, features = ["derive"] }
 
-tokio = { workspace = true, features = ["rt-multi-thread"] }
-tokio-stream = { version = "0.1", features = ["sync"] }
+tokio = { workspace = true }
+tokio-stream = { version = "0.1", default-features = false, features = [
+    "sync",
+] }
 
 tracing = "0.1.41"
-tracing-subscriber = "0.3.19"
 
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
@@ -42,4 +41,12 @@ parking_lot = "0.12.3"
 uuid = { version = "1.15.1", features = ["v7"] }
 
 [build-dependencies]
-tonic-build = { version = "0.12" }
+tonic-build = { version = "0.12", default-features = false, features = [
+    "prost",
+] }
+
+[dev-dependencies]
+maa-dirs.workspace = true
+tracing-subscriber = "0.3.19"
+hyper-util = { version = "0.1.10", default-features = false }
+tower = { version = "0.5.2" }
