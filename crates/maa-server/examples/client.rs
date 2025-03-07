@@ -1,5 +1,5 @@
-use maa_server::task::{task_state::State, NewTaskRequest};
-use maa_types::TaskType;
+use maa_server::task::NewTaskRequest;
+use maa_types::{TaskStateType, TaskType};
 use tokio_stream::StreamExt;
 use tonic::transport::Endpoint;
 
@@ -96,7 +96,7 @@ async fn main() {
 
     let mut taskclient = maa_server::task::task_client::TaskClient::new(channel);
 
-    let session_id = taskclient
+    let Ok(session_id) = taskclient
         .new_connection(maa_server::task::NewConnectionRequest {
             conncfg: Some(maa_server::task::new_connection_request::ConnectionConfig {
                 adb_path: "adb".to_owned(),
@@ -111,8 +111,12 @@ async fn main() {
             }),
         })
         .await
-        .unwrap()
-        .into_inner();
+        .map(|resp| resp.into_inner())
+    else {
+        println!("Failed to create new connection");
+        coreclient.unload_core(()).await.unwrap();
+        return;
+    };
 
     println!("session_id: {}", session_id);
 
@@ -165,7 +169,7 @@ async fn main() {
         if let Some(msg) = channel.next().await {
             let msg = msg.unwrap();
             println!("{}: {}", msg.state, msg.content);
-            if msg.state == State::AllTasksCompleted as i32 {
+            if msg.state == TaskStateType::AllTasksCompleted as i32 {
                 break;
             }
         }

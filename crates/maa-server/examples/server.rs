@@ -18,6 +18,8 @@ async fn main() {
     let cancel_token = CancellationToken::new();
     let child_cancel_token = cancel_token.child_token();
 
+    let timeout = std::time::Duration::from_micros(100);
+
     let server = Server::builder()
         .add_service(maa_server::server_impl::task::gen_service())
         // need to be the parent node
@@ -41,7 +43,8 @@ async fn main() {
                 let token = child_cancel_token.child_token();
                 token.cancelled().await
             }) => {}
-            _ = child_cancel_token.cancelled() => {}
+            // make sure connection is closed
+            _ = child_cancel_token.cancelled() => {tokio::time::sleep(timeout).await}
         );
 
         if maa_sys::binding::loaded() {
@@ -60,7 +63,7 @@ async fn main() {
                 let token = child_cancel_token.child_token();
                 token.cancelled().await
             }) => {}
-            _ = child_cancel_token.cancelled() => {}
+            _ = child_cancel_token.cancelled() => {tokio::time::sleep(timeout).await}
         );
 
         if maa_sys::binding::loaded() {

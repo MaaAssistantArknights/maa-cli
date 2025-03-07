@@ -223,10 +223,10 @@ pub mod tests {
                 &[Token::Map { len: Some(0) }, Token::MapEnd],
             );
 
-            assert_de_tokens(&*DEFAULT_CONFIG, &[
-                Token::Map { len: Some(0) },
-                Token::MapEnd,
-            ]);
+            assert_de_tokens(
+                &*DEFAULT_CONFIG,
+                &[Token::Map { len: Some(0) }, Token::MapEnd],
+            );
 
             assert_de_tokens(
                 &Config {

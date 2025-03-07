@@ -526,16 +526,22 @@ mod tests {
             }
             .is_active());
             assert!(!Condition::And {
-                conditions: vec![Condition::Always, Condition::Not {
-                    condition: Box::new(Condition::Always)
-                },]
+                conditions: vec![
+                    Condition::Always,
+                    Condition::Not {
+                        condition: Box::new(Condition::Always)
+                    },
+                ]
             }
             .is_active());
 
             assert!(Condition::Or {
-                conditions: vec![Condition::Always, Condition::Not {
-                    condition: Box::new(Condition::Always)
-                }]
+                conditions: vec![
+                    Condition::Always,
+                    Condition::Not {
+                        condition: Box::new(Condition::Always)
+                    }
+                ]
             }
             .is_active());
 
@@ -635,25 +641,31 @@ mod tests {
                 timezone: TimeOffset::Local,
             };
 
-            assert_de_tokens(&cond, &[
-                Token::Map { len: Some(3) },
-                Token::Str("type"),
-                Token::Str("DayMod"),
-                Token::Str("divisor"),
-                Token::U32(7),
-                Token::Str("remainder"),
-                Token::U32(0),
-                Token::MapEnd,
-            ]);
+            assert_de_tokens(
+                &cond,
+                &[
+                    Token::Map { len: Some(3) },
+                    Token::Str("type"),
+                    Token::Str("DayMod"),
+                    Token::Str("divisor"),
+                    Token::U32(7),
+                    Token::Str("remainder"),
+                    Token::U32(0),
+                    Token::MapEnd,
+                ],
+            );
 
-            assert_de_tokens(&cond, &[
-                Token::Map { len: Some(2) },
-                Token::Str("type"),
-                Token::Str("DayMod"),
-                Token::Str("divisor"),
-                Token::U32(7),
-                Token::MapEnd,
-            ]);
+            assert_de_tokens(
+                &cond,
+                &[
+                    Token::Map { len: Some(2) },
+                    Token::Str("type"),
+                    Token::Str("DayMod"),
+                    Token::Str("divisor"),
+                    Token::U32(7),
+                    Token::MapEnd,
+                ],
+            );
         }
 
         #[test]
