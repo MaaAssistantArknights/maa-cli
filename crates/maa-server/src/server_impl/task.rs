@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 
 use tokio::sync::RwLock;
+use tonic::{self, Request, Response};
 
 use crate::{
     session::Session,
     task::{task_server::TaskServer, *},
-    tonic::{self, Request, Response},
     types::SessionID,
 };
 
