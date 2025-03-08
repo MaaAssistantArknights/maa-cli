@@ -1,6 +1,4 @@
-pub use tonic;
-
-pub mod task {
+mod task {
     tonic::include_proto!("task");
 
     pub use maa_types::TaskType;
@@ -103,7 +101,7 @@ pub mod task {
     }
 }
 
-pub mod core {
+mod core {
     tonic::include_proto!("core");
 
     impl core_config::StaticOptions {
@@ -182,6 +180,13 @@ pub mod core {
     }
 }
 
+pub mod prelude {
+    pub use crate::server_impl::{
+        core::gen_service as core_service, task::gen_service as task_service,
+    };
+    pub use tonic;
+}
+
 mod utils {
     pub fn load_core(path_to_core: std::path::PathBuf) -> Result<(), String> {
         tracing::debug!("Loading MaaCore from: {}", path_to_core.display());
@@ -211,9 +216,9 @@ mod utils {
     }
 }
 
-pub mod callback;
+mod callback;
 
-pub mod types {
+mod types {
     pub type SessionID = [u8; 16];
     pub use maa_types::{primitive::AsstTaskId as TaskId, TaskStateType};
 
@@ -241,6 +246,12 @@ pub mod types {
             cffi.copy_from_slice(unsafe { std::slice::from_raw_parts(ptr, len) });
 
             assert_eq!(rust, cffi);
+            let vec = unsafe {
+                let len = 16;
+                let cap = 16;
+                Vec::from_raw_parts(ptr, len, cap)
+            };
+            drop(vec);
         }
 
         #[test]
@@ -257,6 +268,6 @@ pub mod types {
     }
 }
 
-pub mod session;
+mod session;
 
-pub mod server_impl;
+mod server_impl;

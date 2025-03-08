@@ -1,3 +1,4 @@
+use maa_server::prelude::*;
 use tokio_util::sync::CancellationToken;
 use tonic::transport::Server;
 use tracing_subscriber::{filter, fmt, layer::SubscriberExt, util::SubscriberInitExt, Layer};
@@ -22,9 +23,9 @@ async fn main() {
 
     let child_cancel_token = cancel_token.child_token();
     let server = Server::builder()
-        .add_service(maa_server::server_impl::task::gen_service())
         // need to be the parent node
-        .add_service(maa_server::server_impl::core::gen_service(cancel_token));
+        .add_service(core_service(cancel_token))
+        .add_service(task_service());
 
     if USING_UDS {
         println!("Using Unix Socket");

@@ -1,9 +1,7 @@
 use tokio_util::sync::CancellationToken;
+use tonic::{self, Request, Response};
 
-use crate::{
-    core::{core_server::CoreServer, *},
-    tonic::{self, Request, Response},
-};
+use crate::core::{core_server::CoreServer, *};
 
 /// build service under package core
 ///
