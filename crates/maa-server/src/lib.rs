@@ -1,4 +1,4 @@
-mod task {
+pub mod task {
     tonic::include_proto!("task");
 
     pub use maa_types::TaskType;
@@ -101,7 +101,7 @@ mod task {
     }
 }
 
-mod core {
+pub mod core {
     tonic::include_proto!("core");
 
     impl core_config::StaticOptions {
@@ -181,10 +181,13 @@ mod core {
 }
 
 pub mod prelude {
-    pub use crate::server_impl::{
-        core::gen_service as core_service, task::gen_service as task_service,
-    };
     pub use tonic;
+
+    pub use crate::{
+        core,
+        server_impl::{core::gen_service as core_service, task::gen_service as task_service},
+        task,
+    };
 }
 
 mod utils {
