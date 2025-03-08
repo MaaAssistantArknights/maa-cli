@@ -425,8 +425,6 @@ impl AsstResult for maa_types::primitive::AsstId {
 
 #[cfg(test)]
 mod tests {
-    use std::ffi::OsStr;
-
     use super::*;
 
     #[cfg(not(feature = "runtime"))]
