@@ -73,12 +73,6 @@ zip = { workspace = true, optional = true, features = ["deflate"] }
 self-replace = { workspace = true }
 tempfile = { workspace = true }
 
-# Windows specific dependencies
-[target.'cfg(windows)'.dependencies]
-windows-result = { workspace = true }
-windows-strings = { workspace = true }
-windows-sys = { workspace = true, features = ["Win32_System_LibraryLoader"] }
-
 [dev-dependencies]
 regex = { workspace = true }
 serde_test = { workspace = true }

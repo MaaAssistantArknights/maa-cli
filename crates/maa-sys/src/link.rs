@@ -48,19 +48,22 @@ macro_rules! link {
         pub fn load(path: impl AsRef<std::ffi::OsStr>) -> Result<(), libloading::Error> {
             let lib = SharedLibrary::new(path)?;
 
-            SHARED_LIBRARY.write().expect("Failed to lock shared library").replace(lib);
+            // Unwrap: The RwLock only errors if it is poisoned, which should never happen.
+            SHARED_LIBRARY.write().unwrap().replace(lib);
 
             Ok(())
         }
 
         /// Unload the shared library of MaaCore in this thread.
         pub fn unload() {
-            SHARED_LIBRARY.write().expect("Failed to lock shared library").take();
+            // Unwrap: The RwLock only errors if it is poisoned, which should never happen.
+            SHARED_LIBRARY.write().unwrap().take();
         }
 
         /// Check if the shared library of MaaCore is loaded in this thread.
         pub fn loaded() -> bool {
-            SHARED_LIBRARY.read().expect("Failed to lock shared library").is_some()
+            // Unwrap: The RwLock only errors if it is poisoned, which should never happen.
+            SHARED_LIBRARY.read().unwrap().is_some()
         }
 
         $(
