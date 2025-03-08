@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package types;
+
+enum TouchMode {
+  Adb = 0;
+  MiniTouch = 1;
+  MaaTouch = 2;
+  MacPlayTools = 3;
+}
+
+enum TaskType {
+  StartUp = 0;
+  CloseDown = 1;
+  Fight = 2;
+  Recruit = 3;
+  Infrast = 4;
+  Mall = 5;
+  Award = 6;
+  Roguelike = 7;
+  Copilot = 8;
+  SSSCopilot = 9;
+  Depot = 10;
+  OperBox = 11;
+  Reclamation = 12;
+  Custom = 13;
+  SingleStep = 14;
+  VideoRecognition = 15;
+}
+
+enum TaskStateType {
+  /* Global Info */
+  InternalError = 0;
+  InitFailed = 1;
+  ConnectionInfo = 2;
+  AllTasksCompleted = 3;
+  AsyncCallInfo = 4;
+  Destroyed = 5;
+
+  /* TaskChain Info */
+  TaskChainError = 6;
+  TaskChainStart = 7;
+  TaskChainCompleted = 8;
+  TaskChainExtraInfo = 9;
+  TaskChainStopped = 10;
+
+  /* SubTask Info */
+  SubTaskError = 11;
+  SubTaskStart = 12;
+  SubTaskCompleted = 13;
+  SubTaskExtraInfo = 14;
+  SubTaskStopped = 15;
+  
+  /* Unknown */
+  Unknown = 16;
+}
