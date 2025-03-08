@@ -265,35 +265,23 @@ pub fn core_version() -> Result<String> {
 
     let v_str = Assistant::get_version().context("Failed to get MaaCore version!")?;
 
-    maa_sys::binding::unload();
+    Assistant::unload()?;
 
     Ok(v_str)
 }
 
 fn load_core() -> Result<()> {
-    if maa_sys::binding::loaded() {
+    if Assistant::loaded() {
         debug!("MaaCore already loaded");
         return Ok(());
     }
 
     if let Some(lib_dir) = dirs::find_library() {
         debug!("Loading MaaCore from: {}", lib_dir.display());
-        // Set DLL directory on Windows
-        #[cfg(target_os = "windows")]
-        {
-            use windows_strings::HSTRING;
-            use windows_sys::Win32::System::LibraryLoader::SetDllDirectoryW;
-
-            let code = unsafe { SetDllDirectoryW(HSTRING::from(lib_dir.as_ref()).as_ptr()) };
-            if code == 0 {
-                return Err(anyhow::Error::new(windows_result::Error::from_win32())
-                    .context("Failed to set DLL directory!"));
-            }
-        }
-        maa_sys::binding::load(lib_dir.join(MAA_CORE_LIB))
+        Assistant::load(lib_dir.join(MAA_CORE_LIB))
     } else {
         debug!("MaaCore not found, trying to load from system library path");
-        maa_sys::binding::load(MAA_CORE_LIB)
+        Assistant::load(MAA_CORE_LIB)
     }
     .context("Failed to load MaaCore!")?;
 

@@ -1157,9 +1157,6 @@ dependencies = [
  "tempfile",
  "tokio",
  "toml",
- "windows-result 0.3.0",
- "windows-strings 0.3.0",
- "windows-sys 0.59.0",
  "zip",
 ]
 
@@ -1181,6 +1178,9 @@ dependencies = [
  "libloading",
  "maa-types",
  "thiserror 2.0.11",
+ "windows-result 0.3.0",
+ "windows-strings 0.3.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

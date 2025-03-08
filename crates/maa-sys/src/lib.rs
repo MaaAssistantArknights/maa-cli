@@ -1,4 +1,4 @@
-use std::ffi::CStr;
+use std::{ffi::CStr, path::Path};
 
 use maa_types::primitive::*;
 pub use maa_types::{InstanceOptionKey, StaticOptionKey, TaskType, TouchMode};
@@ -12,7 +12,6 @@ mod link;
 /// Raw binding of MaaCore API
 pub mod binding;
 
-#[cfg_attr(test, derive(PartialEq, Eq))]
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("MaaCore returned an error, check its log for details")]
@@ -27,6 +26,11 @@ pub enum Error {
     InvalidUtf8(#[from] std::str::Utf8Error),
     #[error("Invalid UTF-8")]
     InvalidUtf8NoInfo,
+    #[cfg(target_os = "windows")]
+    #[error("OS error")]
+    OS(#[from] windows_result::Error),
+    #[error("Failed to load the shared library")]
+    LoadError(#[from] libloading::Error),
     #[error("{0}")]
     Custom(String),
 }
@@ -52,23 +56,69 @@ impl Drop for Assistant {
     }
 }
 
+// Load and unload Assistant
+#[cfg(feature = "runtime")]
 impl Assistant {
-    /// Create a new assistant instance with the given callback and argument.
-    pub fn new(callback: binding::AsstApiCallback, arg: Option<*mut std::os::raw::c_void>) -> Self {
-        match callback {
-            Some(cb) => unsafe {
-                let handle = binding::AsstCreateEx(Some(cb), arg.unwrap_or(std::ptr::null_mut()));
-                Self { handle }
-            },
-            None => unsafe {
-                let handle = binding::AsstCreate();
-                Self { handle }
-            },
+    /// Load the shared library of the MaaCore
+    ///
+    /// Must be called first before any other method.
+    pub fn load(path: impl AsRef<Path>) -> Result<()> {
+        let path = path.as_ref();
+
+        #[cfg(target_os = "windows")]
+        if path.parent().is_some_and(|dir| dir != Path::new(".")) {
+            use windows_strings::HSTRING;
+            use windows_sys::Win32::System::LibraryLoader::SetDllDirectoryW;
+
+            let code = unsafe { SetDllDirectoryW(HSTRING::from(lib_dir.as_ref()).as_ptr()) };
+            if code == 0 {
+                return Err(anyhow::Error::new(windows_result::Error::from_win32())
+                    .context("Failed to set DLL directory!"));
+            }
         }
+
+        binding::load(path)?;
+
+        Ok(())
     }
 
-    /* ------------------------- Static Methods ------------------------- */
+    /// Unload the shared library of the MaaCore.
+    ///
+    /// The shared library is used to load the assistant.
+    ///
+    /// Must be called after all assistant instances are destroyed.
+    pub fn unload() -> Result<()> {
+        binding::unload();
 
+        Ok(())
+    }
+
+    /// Check if the shared library of the MaaCore is loaded in this thread.
+    pub fn loaded() -> bool {
+        binding::loaded()
+    }
+}
+
+#[cfg(not(feature = "runtime"))]
+impl Assistant {
+    /// Do nothing, as MaaCore is linked dynamically at compile time
+    pub fn load() -> Result<()> {
+        Ok(())
+    }
+
+    /// Do nothing, as MaaCore is linked dynamically at compile time
+    pub fn unload() -> Result<()> {
+        Ok(())
+    }
+
+    /// Always returns true, as MaaCore is linked dynamically at compile time
+    pub fn loaded() -> bool {
+        true
+    }
+}
+
+// Static Methods
+impl Assistant {
     /// Set the user directory of the assistant.
     ///
     /// The user directory is used to store the log file and some cache files.
@@ -114,11 +164,6 @@ impl Assistant {
         unsafe { binding::AsstLoadResource(path.to_cstring()?.as_ptr()) }.to_result()
     }
 
-    /// Get the null size of the assistant.
-    pub fn get_null_size() -> maa_types::primitive::AsstSize {
-        unsafe { binding::AsstGetNullSize() }
-    }
-
     /// Get the version of the assistant.
     ///
     /// # Errors
@@ -137,8 +182,24 @@ impl Assistant {
         unsafe { binding::AsstLog(level.to_cstring()?.as_ptr(), msg.to_cstring()?.as_ptr()) };
         Ok(())
     }
+}
 
-    /* ------------------------ Instance Methods ------------------------ */
+// Instance Methods
+impl Assistant {
+    /// Create a new assistant instance with the given callback and argument.
+    pub fn new(callback: binding::AsstApiCallback, arg: Option<*mut std::os::raw::c_void>) -> Self {
+        match callback {
+            Some(cb) => unsafe {
+                let handle = binding::AsstCreateEx(Some(cb), arg.unwrap_or(std::ptr::null_mut()));
+                Self { handle }
+            },
+            None => unsafe {
+                let handle = binding::AsstCreate();
+                Self { handle }
+            },
+        }
+    }
+
     //// Set the instance option of the assistant.
     pub fn set_instance_option(&self, key: InstanceOptionKey, value: impl ToCString) -> Result<()> {
         unsafe {
@@ -378,21 +439,27 @@ mod tests {
 
     #[test]
     fn asst_bool() {
-        assert_eq!(0u8.to_result(), Err(super::Error::MAAError));
-        assert_eq!(1u8.to_result(), Ok(()));
+        assert!(matches!(0u8.to_result(), Err(super::Error::MAAError)));
+        assert!(matches!(1u8.to_result(), Ok(())));
     }
 
     #[test]
     fn asst_size() {
-        assert_eq!(NULL_SIZE.to_result(), Err(super::Error::BufferTooSmall));
-        assert_eq!(1u64.to_result(), Ok(1u64));
+        assert!(matches!(
+            NULL_SIZE.to_result(),
+            Err(super::Error::BufferTooSmall)
+        ));
+        assert!(matches!(1u64.to_result(), Ok(1u64)));
         #[cfg(not(feature = "runtime"))]
         assert_eq!(unsafe { binding::AsstGetNullSize() }, NULL_SIZE);
     }
 
     #[test]
     fn asst_id() {
-        assert_eq!(INVALID_ID.to_result(), Err(super::Error::MAAError));
-        assert_eq!(1u64.to_result(), Ok(1u64));
+        assert!(matches!(
+            INVALID_ID.to_result(),
+            Err(super::Error::MAAError)
+        ));
+        assert!(matches!(1u64.to_result(), Ok(1u64)));
     }
 }
