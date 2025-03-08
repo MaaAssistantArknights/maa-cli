@@ -165,13 +165,11 @@ async fn main() {
         .unwrap();
 
     println!("Starting show callback");
-    loop {
-        if let Some(msg) = channel.next().await {
-            let msg = msg.unwrap();
-            println!("{}: {}", msg.state, msg.content);
-            if msg.state == TaskStateType::AllTasksCompleted as i32 {
-                break;
-            }
+    while let Some(msg) = channel.next().await {
+        let msg = msg.unwrap();
+        println!("{}: {}", msg.state, msg.content);
+        if msg.state == TaskStateType::AllTasksCompleted as i32 {
+            break;
         }
     }
 
