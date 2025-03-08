@@ -6,8 +6,9 @@ pub mod task {
     pub use maa_types::TaskType;
 
     mod convert {
-        use super::*;
         use maa_types::primitive::AsstTaskId;
+
+        use super::*;
 
         impl From<TaskId> for AsstTaskId {
             fn from(value: TaskId) -> Self {
@@ -24,8 +25,9 @@ pub mod task {
     }
 
     mod utils {
-        use super::*;
         use maa_types::TouchMode;
+
+        use super::*;
 
         impl new_connection_request::InstanceOptions {
             pub fn apply_to(self, asst: &maa_sys::Assistant) -> Result<(), String> {
@@ -213,8 +215,7 @@ pub mod callback;
 
 pub mod types {
     pub type SessionID = [u8; 16];
-    pub use maa_types::primitive::AsstTaskId as TaskId;
-    pub use maa_types::TaskStateType;
+    pub use maa_types::{primitive::AsstTaskId as TaskId, TaskStateType};
 
     #[cfg(test)]
     mod tests {

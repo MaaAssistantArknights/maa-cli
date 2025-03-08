@@ -127,17 +127,14 @@ mod tests {
             MAAPrimate::String("".to_string()),
         ];
 
-        assert_de_tokens(
-            &values,
-            &[
-                Token::Seq { len: Some(4) },
-                Token::Bool(true),
-                Token::I32(1),
-                Token::F32(1.0),
-                Token::Str(""),
-                Token::SeqEnd,
-            ],
-        );
+        assert_de_tokens(&values, &[
+            Token::Seq { len: Some(4) },
+            Token::Bool(true),
+            Token::I32(1),
+            Token::F32(1.0),
+            Token::Str(""),
+            Token::SeqEnd,
+        ]);
     }
 
     #[test]

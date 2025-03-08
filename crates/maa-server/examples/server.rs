@@ -15,11 +15,13 @@ async fn main() {
         )
         .init();
 
-    let cancel_token = CancellationToken::new();
-    let child_cancel_token = cancel_token.child_token();
+    let parent_cancel_token = CancellationToken::new();
+    let cancel_token = parent_cancel_token.child_token();
+    ctrlc::set_handler(move || parent_cancel_token.cancel()).unwrap();
 
     let timeout = std::time::Duration::from_micros(100);
 
+    let child_cancel_token = cancel_token.child_token();
     let server = Server::builder()
         .add_service(maa_server::server_impl::task::gen_service())
         // need to be the parent node
@@ -46,11 +48,6 @@ async fn main() {
             // make sure connection is closed
             _ = child_cancel_token.cancelled() => {tokio::time::sleep(timeout).await}
         );
-
-        if maa_sys::binding::loaded() {
-            println!("Clean Up");
-            maa_sys::binding::unload();
-        }
     } else {
         println!("Using Http Port");
         let stream = tokio_stream::wrappers::TcpListenerStream::new(
@@ -65,10 +62,11 @@ async fn main() {
             }) => {}
             _ = child_cancel_token.cancelled() => {tokio::time::sleep(timeout).await}
         );
+    }
 
-        if maa_sys::binding::loaded() {
-            println!("Clean Up");
-            maa_sys::binding::unload();
-        }
+    println!("Exiting");
+    if maa_sys::binding::loaded() {
+        println!("Clean Up");
+        maa_sys::binding::unload();
     }
 }
