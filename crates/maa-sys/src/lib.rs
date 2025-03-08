@@ -1,5 +1,3 @@
-use std::{ffi::CStr, path::Path};
-
 use maa_types::primitive::*;
 pub use maa_types::{InstanceOptionKey, StaticOptionKey, TaskType, TouchMode};
 
@@ -26,7 +24,7 @@ pub enum Error {
     InvalidUtf8(#[from] std::str::Utf8Error),
     #[error("Invalid UTF-8")]
     InvalidUtf8NoInfo,
-    #[cfg(target_os = "windows")]
+    #[cfg(all(feature = "runtime", target_os = "windows"))]
     #[error("OS error")]
     OS(#[from] windows_result::Error),
     #[cfg(feature = "runtime")]
@@ -63,11 +61,14 @@ impl Assistant {
     /// Load the shared library of the MaaCore
     ///
     /// Must be called first before any other method.
-    pub fn load(path: impl AsRef<Path>) -> Result<()> {
+    pub fn load(path: impl AsRef<std::path::Path>) -> Result<()> {
         let path = path.as_ref();
 
         #[cfg(target_os = "windows")]
-        if path.parent().is_some_and(|dir| dir != Path::new(".")) {
+        if path
+            .parent()
+            .is_some_and(|p| p != std::path::Path::new("."))
+        {
             use windows_strings::HSTRING;
             use windows_sys::Win32::System::LibraryLoader::SetDllDirectoryW;
 
@@ -172,7 +173,7 @@ impl Assistant {
     pub fn get_version() -> Result<String> {
         unsafe {
             let c_str = binding::AsstGetVersion();
-            let version = CStr::from_ptr(c_str).to_str()?;
+            let version = std::ffi::CStr::from_ptr(c_str).to_str()?;
             Ok(String::from(version))
         }
     }
@@ -425,6 +426,8 @@ impl AsstResult for maa_types::primitive::AsstId {
 
 #[cfg(test)]
 mod tests {
+    use std::ffi::OsStr;
+
     use super::*;
 
     #[cfg(not(feature = "runtime"))]

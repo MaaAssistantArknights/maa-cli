@@ -9,7 +9,12 @@ repository.workspace = true
 homepage.workspace = true
 
 [features]
-runtime = ["libloading"]
+runtime = [
+  "dep:libloading",
+  "dep:windows-result",
+  "dep:windows-strings",
+  "dep:windows-sys",
+]
 
 [dependencies]
 maa-types = { workspace = true }
@@ -17,6 +22,8 @@ libloading = { workspace = true, optional = true }
 thiserror = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
-windows-result = { workspace = true }
-windows-strings = { workspace = true }
-windows-sys = { workspace = true, features = ["Win32_System_LibraryLoader"] }
+windows-result = { workspace = true, optional = true }
+windows-strings = { workspace = true, optional = true }
+windows-sys = { workspace = true, optional = true, features = [
+  "Win32_System_LibraryLoader",
+] }
