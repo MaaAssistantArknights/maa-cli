@@ -48,7 +48,7 @@ impl Session {
         if let Some(err) = err {
             SESSION_POOL
                 .write()
-                .remove(&session_id)
+                .get_mut(&session_id)
                 .unwrap()
                 .channel
                 .connect_failed(err);
@@ -197,7 +197,7 @@ mod log {
             let _ = self.tx.send(message);
         }
 
-        pub fn connect_failed(mut self, err: CallBackContent) {
+        pub fn connect_failed(&mut self, err: CallBackContent) {
             if let Some(shot) = self.oneshot.take() {
                 let _ = shot.send(Err(err));
             }
