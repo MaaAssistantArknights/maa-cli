@@ -1,7 +1,9 @@
-use crate::types::{SessionID, TaskId, TaskStateType};
-use parking_lot::RwLock;
 use std::collections::BTreeMap;
+
+use parking_lot::RwLock;
 use tokio::sync::oneshot::Sender;
+
+use crate::types::{SessionID, TaskId, TaskStateType};
 
 static SESSION_POOL: RwLock<BTreeMap<SessionID, _Session>> = RwLock::new(BTreeMap::new());
 
@@ -21,12 +23,14 @@ impl Session {
         let session = _Session::new(callback);
         SESSION_POOL.write().insert(session_id, session);
     }
+
     /// Remove [Session] with given `session_id`
     ///
     /// Return [false] if no such one
     pub fn remove(session_id: SessionID) -> bool {
         SESSION_POOL.write().remove(&session_id).is_some()
     }
+
     /// Take the rx side to create a `Stream`` to client
     ///
     /// Return [None] if already taken
@@ -38,6 +42,7 @@ impl Session {
             .get_mut(&session_id)
             .and_then(|logger| logger.channel.take_rx())
     }
+
     /// safety: this should be called only during Task::new_connection
     pub fn test_connection_result(session_id: SessionID, err: Option<CallBackContent>) {
         if let Some(err) = err {
@@ -69,6 +74,7 @@ impl Session {
     pub fn tasks(session_id: SessionID) -> Tasks {
         Tasks(session_id)
     }
+
     pub fn log(session_id: SessionID) -> Log {
         Log(session_id)
     }
@@ -84,6 +90,7 @@ impl Tasks {
             session.new_task(task_id);
         }
     }
+
     pub fn state(self, task_id: TaskId, new: state::State) {
         if let Some(state) = SESSION_POOL
             .write()
@@ -93,6 +100,7 @@ impl Tasks {
             state.reason(new);
         }
     }
+
     pub fn update(self, task_id: TaskId, message: LogContent) {
         if let Some(session) = SESSION_POOL.write().get_mut(&self.0) {
             session
@@ -116,6 +124,7 @@ impl Log {
             vec![]
         }
     }
+
     pub fn log(self, message: LogContent) {
         if let Some(session) = SESSION_POOL.write().get_mut(&self.0) {
             session.log(message)
@@ -139,23 +148,27 @@ impl _Session {
             logs: Default::default(),
         }
     }
+
     fn new_task(&mut self, task_id: TaskId) {
         self.tasks.insert(task_id, state::TaskState::default());
     }
+
     fn log(&mut self, log: LogContent) {
         self.logs.push(log);
     }
+
     fn get_skip_len(&self, len: usize) -> Vec<LogContent> {
         self.logs.iter().skip(len).cloned().collect()
     }
 }
 
 mod log {
-    use super::{CallBackContent, LogContent};
     use tokio::sync::{
         mpsc::{UnboundedReceiver, UnboundedSender},
         oneshot,
     };
+
+    use super::{CallBackContent, LogContent};
 
     pub type Channel = Logger<LogContent, CallBack>;
     pub(super) type CallBack = Result<(), CallBackContent>;
@@ -175,17 +188,21 @@ mod log {
                 oneshot: Some(oneshot),
             }
         }
+
         pub fn take_rx(&mut self) -> Option<UnboundedReceiver<LogContent>> {
             self.rx.take()
         }
+
         pub(super) fn log_to_channel(&self, message: LogContent) {
             let _ = self.tx.send(message);
         }
+
         pub fn connect_failed(mut self, err: CallBackContent) {
             if let Some(shot) = self.oneshot.take() {
                 let _ = shot.send(Err(err));
             }
         }
+
         pub fn connect_success(&mut self) {
             if let Some(shot) = self.oneshot.take() {
                 let _ = shot.send(Ok(()));
@@ -216,16 +233,14 @@ mod state {
 
     impl TaskState {
         pub fn reason(&mut self, reason: State) {
-            debug_assert_eq!(
-                self.state,
-                match reason {
-                    State::Waiting => unreachable!(),
-                    State::Running => State::Waiting,
-                    State::Completed | State::Canceled | State::Error => State::Running,
-                }
-            );
+            debug_assert_eq!(self.state, match reason {
+                State::Waiting => unreachable!(),
+                State::Running => State::Waiting,
+                State::Completed | State::Canceled | State::Error => State::Running,
+            });
             self.state = reason;
         }
+
         pub fn update(&mut self, new: LogContent) {
             self.content.push(new);
         }

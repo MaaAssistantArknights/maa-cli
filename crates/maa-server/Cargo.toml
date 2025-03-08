@@ -8,11 +8,10 @@ repository.workspace = true
 
 [[example]]
 name = "server"
-required-features = ["tokio/rt-multi-thread", "tonic/transport", "tokio/macros"]
 
 [[example]]
 name = "client"
-required-features = ["tokio/rt-multi-thread", "tonic/transport", "client"]
+required-features = ["client"]
 
 [features]
 client = []
@@ -51,3 +50,6 @@ maa-dirs.workspace = true
 tracing-subscriber = "0.3.19"
 hyper-util = { version = "0.1.10", default-features = false }
 tower = { version = "0.5.2" }
+ctrlc = "3.4"
+tonic = { version = "0.12", features = ["transport"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

@@ -1,11 +1,13 @@
+use std::collections::BTreeMap;
+
+use tokio::sync::RwLock;
+
 use crate::{
     session::Session,
     task::{task_server::TaskServer, *},
     tonic::{self, Request, Response},
     types::SessionID,
 };
-use std::collections::BTreeMap;
-use tokio::sync::RwLock;
 
 /// build service under package task
 ///
@@ -13,7 +15,8 @@ use tokio::sync::RwLock;
 ///
 /// In order to trace and sync client, an additional header `SESSION_KEY` is needed.
 ///
-/// Client get one by calling [`Task::new_connection`], and destroy by calling [`Task::close_connection`]
+/// Client get one by calling [`Task::new_connection`], and destroy by calling
+/// [`Task::close_connection`]
 ///
 /// ### Usage:
 /// ```no_run
@@ -138,6 +141,10 @@ type Ret<T> = tonic::Result<Response<T>>;
 
 #[tonic::async_trait]
 impl task_server::Task for TaskImpl {
+    type TaskStateUpdateStream = std::pin::Pin<
+        Box<dyn tokio_stream::Stream<Item = tonic::Result<TaskState>> + Send + 'static>,
+    >;
+
     #[tracing::instrument(skip_all)]
     async fn new_connection(&self, req: Request<NewConnectionRequest>) -> Ret<String> {
         let req = req.into_inner();
@@ -288,10 +295,6 @@ impl task_server::Task for TaskImpl {
             Err(e) => Err(tonic::Status::from_error(Box::new(e))),
         }
     }
-
-    type TaskStateUpdateStream = std::pin::Pin<
-        Box<dyn tokio_stream::Stream<Item = tonic::Result<TaskState>> + Send + 'static>,
-    >;
 
     #[tracing::instrument(skip_all)]
     async fn task_state_update(&self, req: Request<()>) -> Ret<Self::TaskStateUpdateStream> {
