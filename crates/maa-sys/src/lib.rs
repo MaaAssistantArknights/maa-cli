@@ -65,16 +65,15 @@ impl Assistant {
         let path = path.as_ref();
 
         #[cfg(target_os = "windows")]
-        if path
-            .parent()
-            .is_some_and(|p| p != std::path::Path::new("."))
-        {
+        if let Some(dir) = path.parent() {
             use windows_strings::HSTRING;
             use windows_sys::Win32::System::LibraryLoader::SetDllDirectoryW;
 
-            let code = unsafe { SetDllDirectoryW(HSTRING::from(lib_dir.as_ref()).as_ptr()) };
-            if code == 0 {
-                return Err(windows_result::Error::from_win32());
+            if dir != std::path::Path::new(".") {
+                let code = unsafe { SetDllDirectoryW(HSTRING::from(dir.as_ref()).as_ptr()) };
+                if code == 0 {
+                    return Err(windows_result::Error::from_win32().into());
+                }
             }
         }
 
