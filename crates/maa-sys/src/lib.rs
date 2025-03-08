@@ -29,6 +29,7 @@ pub enum Error {
     #[cfg(target_os = "windows")]
     #[error("OS error")]
     OS(#[from] windows_result::Error),
+    #[cfg(feature = "runtime")]
     #[error("Failed to load the shared library")]
     LoadError(#[from] libloading::Error),
     #[error("{0}")]
@@ -72,8 +73,7 @@ impl Assistant {
 
             let code = unsafe { SetDllDirectoryW(HSTRING::from(lib_dir.as_ref()).as_ptr()) };
             if code == 0 {
-                return Err(anyhow::Error::new(windows_result::Error::from_win32())
-                    .context("Failed to set DLL directory!"));
+                return Err(windows_result::Error::from_win32());
             }
         }
 
