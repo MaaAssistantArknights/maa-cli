@@ -7,8 +7,9 @@ use crate::{
 
 type Map = serde_json::Map<String, serde_json::Value>;
 
+#[must_use = "If true, we should destory the session and session_id"]
 #[tracing::instrument("C CallBack", skip_all)]
-pub fn main(code: TaskStateType, json_str: &str, session_id: SessionID) {
+pub fn entry(code: TaskStateType, json_str: &str, session_id: SessionID) -> bool {
     trace!("Session ID: {:?}", session_id);
 
     Session::log(session_id).log((code, json_str.to_string()));
@@ -17,34 +18,36 @@ pub fn main(code: TaskStateType, json_str: &str, session_id: SessionID) {
 
     // if ret is None, which means the message is not processed well
     // we should print the message to trace the error
-    if process_message(code, map, session_id).is_none() {
+    if let Some(destory) = process_message(code, map, session_id) {
+        if destory {
+            return true;
+        }
         debug!(
             "FailedToProcessMessage, code: {:?}, message: {}",
             code, json_str
         )
     }
+    false
 }
 
-fn process_message(code: TaskStateType, message: Map, session_id: SessionID) -> Option<()> {
+fn process_message(code: TaskStateType, message: Map, session_id: SessionID) -> Option<bool> {
     use TaskStateType::*;
 
     match code {
-        InternalError => Some(()),
+        InternalError => {}
         InitFailed => {
             error!("InitializationError");
-            Some(())
         }
         ConnectionInfo => process_connection_info(message, session_id),
         AllTasksCompleted => {
             let msg = serde_json::to_string_pretty(&message).unwrap();
             Session::info_to_channel(session_id, (code, msg));
             info!("AllTasksCompleted");
-            Some(())
         }
-        AsyncCallInfo => Some(()),
+        AsyncCallInfo => {}
         Destroyed => {
-            debug!("Instance destroyed");
-            Some(())
+            info!("Instance destroyed");
+            return Some(true);
         }
 
         TaskChainError | TaskChainStart | TaskChainCompleted | TaskChainExtraInfo
@@ -54,11 +57,12 @@ fn process_message(code: TaskStateType, message: Map, session_id: SessionID) -> 
             subtask::process_subtask(code, message, session_id)
         }
 
-        Unknown => None,
+        Unknown => return Some(false),
     }
+    None
 }
 
-fn process_connection_info(message: Map, session_id: SessionID) -> Option<()> {
+fn process_connection_info(message: Map, session_id: SessionID) {
     #[derive(serde::Deserialize)]
     struct ConnectionInfo {
         what: String,
@@ -70,7 +74,10 @@ fn process_connection_info(message: Map, session_id: SessionID) -> Option<()> {
 
     match what.as_str() {
         "UuidGot" => {
-            debug!("Got UUID: {}", details.get("uuid")?.as_str()?);
+            debug!(
+                "Got UUID: {}",
+                details.get("uuid").unwrap().as_str().unwrap()
+            );
             Session::test_connection_result(session_id, None);
         }
         "ConnectFailed" => {
@@ -82,8 +89,8 @@ fn process_connection_info(message: Map, session_id: SessionID) -> Option<()> {
         // Resolution
         "ResolutionGot" => trace!(
             "Got Resolution: {} X {}",
-            details.get("width")?.as_i64()?,
-            details.get("height")?.as_i64()?
+            details.get("width").unwrap().as_i64().unwrap(),
+            details.get("height").unwrap().as_i64().unwrap()
         ),
         "UnsupportedResolution" => error!("Unsupported Resolution"),
         "ResolutionError" => error!("Resolution Acquisition Failure"),
@@ -94,7 +101,7 @@ fn process_connection_info(message: Map, session_id: SessionID) -> Option<()> {
         "Reconnecting" => warn!(
             "{} {} {}",
             "Reconnect",
-            details.get("times")?.as_i64()?,
+            details.get("times").unwrap().as_i64().unwrap(),
             "times"
         ),
         "Reconnected" => info!("Reconnect Success"),
@@ -104,15 +111,15 @@ fn process_connection_info(message: Map, session_id: SessionID) -> Option<()> {
         "FastestWayToScreencap" => trace!(
             "{} {} {}",
             "Fastest Way To Screencap",
-            details.get("method")?.as_str()?,
-            details.get("cost")?.as_i64()?,
+            details.get("method").unwrap().as_str().unwrap(),
+            details.get("cost").unwrap().as_i64().unwrap(),
         ),
         "ScreencapCost" => trace!(
             "{} {} ({} ~ {})",
             "Screencap Cost",
-            details.get("avg")?.as_i64()?,
-            details.get("min")?.as_i64()?,
-            details.get("max")?.as_i64()?,
+            details.get("avg").unwrap().as_i64().unwrap(),
+            details.get("min").unwrap().as_i64().unwrap(),
+            details.get("max").unwrap().as_i64().unwrap(),
         ),
 
         "TouchModeNotAvailable" => error!("Touch Mode Not Available"),
@@ -124,11 +131,9 @@ fn process_connection_info(message: Map, session_id: SessionID) -> Option<()> {
             serde_json::to_string_pretty(&details).unwrap()
         ),
     }
-
-    Some(())
 }
 
-fn process_taskchain(code: TaskStateType, message: Map, session_id: SessionID) -> Option<()> {
+fn process_taskchain(code: TaskStateType, message: Map, session_id: SessionID) {
     #[derive(serde::Deserialize)]
     struct TaskChain {
         taskchain: maa_types::TaskType,
@@ -161,17 +166,14 @@ fn process_taskchain(code: TaskStateType, message: Map, session_id: SessionID) -
 
         _ => unreachable!(),
     };
-
-    Some(())
 }
 
 mod subtask {
     use super::*;
 
-    pub fn process_subtask(code: TaskStateType, message: Map, session_id: SessionID) -> Option<()> {
+    pub fn process_subtask(code: TaskStateType, message: Map, session_id: SessionID) {
         let msg = serde_json::to_string_pretty(&message).unwrap();
-        let taskid = message.get("taskid")?.as_i64()? as TaskId;
+        let taskid = message.get("taskid").unwrap().as_i64().unwrap() as TaskId;
         Session::tasks(session_id).update(taskid, (code, msg));
-        Some(())
     }
 }
