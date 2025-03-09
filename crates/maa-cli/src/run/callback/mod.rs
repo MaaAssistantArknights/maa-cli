@@ -249,7 +249,7 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
             "StartButton2" | "AnnihilationConfirm" => {
                 // Maybe need to update if MAA fight a stage multiple times in one run
                 let exec_times = details.get("exec_times")?.as_i64()?;
-                edit_current_task_detail(|detail| {
+                edit_current_task_detail(move |detail| {
                     if let Some(detail) = detail.as_fight_mut() {
                         detail.set_times(exec_times);
                     }
@@ -258,7 +258,7 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
             }
             "StoneConfirm" => {
                 let exec_times = details.get("exec_times")?.as_i64()?;
-                edit_current_task_detail(|detail| {
+                edit_current_task_detail(move |detail| {
                     if let Some(detail) = detail.as_fight_mut() {
                         detail.set_stone(exec_times)
                     }
@@ -268,7 +268,7 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
             "AbandonAction" => warn!("{}", "PRTS error"),
             // Recruit
             "RecruitRefreshConfirm" => {
-                edit_current_task_detail(|detail| {
+                edit_current_task_detail(move |detail| {
                     if let Some(detail) = detail.as_recruit_mut() {
                         detail.refresh()
                     }
@@ -276,7 +276,7 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
                 info!("{}", "Refresh Tags")
             }
             "RecruitConfirm" => {
-                edit_current_task_detail(|detail| {
+                edit_current_task_detail(move |detail| {
                     if let Some(detail) = detail.as_recruit_mut() {
                         detail.recruit()
                     }
@@ -288,7 +288,7 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
             // RogueLike
             "StartExplore" => {
                 let exec_times = details.get("exec_times")?.as_i64()?;
-                edit_current_task_detail(|detail| {
+                edit_current_task_detail(move |detail| {
                     if let Some(detail) = detail.as_roguelike_mut() {
                         detail.start_exploration()
                     }
@@ -296,7 +296,7 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
                 info!("Start exploration {} times", exec_times)
             }
             "ExitThenAbandon" => {
-                edit_current_task_detail(|detail| {
+                edit_current_task_detail(move |detail| {
                     if let Some(detail) = detail.as_roguelike_mut() {
                         detail.set_state(summary::ExplorationState::Abandoned)
                     }
@@ -309,7 +309,7 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
                 // Deposit In some cases a failed mission doesn't mean failed exploration
                 // If a exploration was not failed, it's state would be overwritten later
                 if message.get("taskchain")?.as_str()? == "Roguelike" {
-                    edit_current_task_detail(|detail| {
+                    edit_current_task_detail(move |detail| {
                         if let Some(detail) = detail.as_roguelike_mut() {
                             detail.set_state(summary::ExplorationState::Failed)
                         }
@@ -382,16 +382,16 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
                     .unwrap_or_else(|| "none".to_owned())
             );
 
-            edit_current_task_detail(|detail| {
+            edit_current_task_detail(move |detail| {
                 if let Some(detail) = detail.as_fight_mut() {
                     detail.push_drop(all_drops);
                 }
             });
 
-            let stage = details.get("stage")?.get("stageCode")?.as_str()?;
-            edit_current_task_detail(|detail| {
+            let stage = details.get("stage")?.get("stageCode")?.as_str()?.to_owned();
+            edit_current_task_detail(move |detail| {
                 if let Some(detail) = detail.as_fight_mut() {
-                    detail.set_stage(stage);
+                    detail.set_stage(stage.as_str());
                 }
             });
         }
@@ -405,7 +405,7 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
         "UseMedicine" => {
             let count = details.get("count")?.as_i64()?;
             let is_expiring = details.get("is_expiring")?.as_bool()?;
-            edit_current_task_detail(|detail| {
+            edit_current_task_detail(move |detail| {
                 if let Some(detail) = detail.as_fight_mut() {
                     detail.use_medicine(count, is_expiring);
                 }
@@ -430,25 +430,25 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
         "ProductChanged" => info!("{}", "ProductChanged"),
         "NotEnoughStaff" => error!("{}", "NotEnoughStaff"),
         "ProductOfFacility" => {
-            let facility = details.get("facility")?.as_str()?;
+            let facility = details.get("facility")?.as_str()?.to_owned();
             let index = details.get("index")?.as_i64()?;
-            let product = details.get("product")?.as_str()?;
+            let product = details.get("product")?.as_str()?.to_owned();
 
-            edit_current_task_detail(|detail| {
+            info!("{}: {}", "ProductOfFacility", product);
+
+            edit_current_task_detail(move |detail| {
                 if let Some(detail) = detail.as_infrast_mut() {
-                    detail.set_product(facility.parse().unwrap(), index, product);
+                    detail.set_product(facility.parse().unwrap(), index, product.as_str());
                 }
             });
-
-            info!("{}: {}", "ProductOfFacility", product)
         }
         "CustomInfrastRoomOperators" => {
-            let facility = details.get("facility")?.as_str()?;
+            let facility = details.get("facility")?.as_str()?.to_owned();
             let index = details.get("index")?.as_i64()?;
-            let operators = details.get("names")?.as_array()?;
-            let candidates = details.get("candidates")?.as_array()?;
+            let operators = details.get("names")?.as_array()?.to_owned();
+            let candidates = details.get("candidates")?.as_array()?.to_owned();
 
-            edit_current_task_detail(|detail| {
+            edit_current_task_detail(move |detail| {
                 if let Some(detail) = detail.as_infrast_mut() {
                     detail.set_operators(
                         facility.parse().unwrap(),
@@ -484,16 +484,7 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
         "RecruitRobotTag" => info!("{}: {}", "RecruitingTips", details.get("tag")?.as_str()?),
         "RecruitResult" => {
             let level = details.get("level")?.as_u64()?;
-            let tags = details.get("tags")?.as_array()?;
-
-            edit_current_task_detail(|detail| {
-                if let Some(detail) = detail.as_recruit_mut() {
-                    detail.push_recruit(
-                        level,
-                        tags.iter().filter_map(|x| x.as_str().map(|x| x.to_owned())),
-                    );
-                }
-            });
+            let tags = details.get("tags")?.as_array()?.to_owned();
 
             info!(
                 "{}: {} {}",
@@ -503,7 +494,16 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
                     .filter_map(|x| x.as_str())
                     .join(", ")
                     .unwrap_or_else(|| "none".to_owned())
-            )
+            );
+
+            edit_current_task_detail(move |detail| {
+                if let Some(detail) = detail.as_recruit_mut() {
+                    detail.push_recruit(
+                        level,
+                        tags.iter().filter_map(|x| x.as_str().map(|x| x.to_owned())),
+                    );
+                }
+            });
         }
         "RecruitTagsSelected" => info!("{}: {}", "RecruitTagsSelected", {
             details
@@ -526,7 +526,7 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
             let total = details.get("total")?.as_i64()?;
             let deposit = details.get("deposit")?.as_i64()?;
 
-            edit_current_task_detail(|detail| {
+            edit_current_task_detail(move |detail| {
                 if let Some(detail) = detail.as_roguelike_mut() {
                     detail.invest(count);
                 }
@@ -536,7 +536,7 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
         }
         "RoguelikeSettlement" => {
             let exp = details.get("exp")?.as_i64()?;
-            edit_current_task_detail(|detail| {
+            edit_current_task_detail(move |detail| {
                 if let Some(detail) = detail.as_roguelike_mut() {
                     detail.set_exp(exp)
                 }

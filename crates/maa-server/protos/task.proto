@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+// add/modify/activate/deactivate task
+// and subscribe task state update
+package task;
+
+import "types.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/wrappers.proto";
+
+service Task {
+    rpc NewConnection(NewConnectionRequest) returns (google.protobuf.StringValue);
+    rpc CloseConnection(google.protobuf.Empty) returns (google.protobuf.BoolValue);
+
+    // Append a task to task list.
+    rpc AppendTask(NewTaskRequest) returns (TaskId);
+    // Set task parameters for task with given `task_id`.
+    rpc ModifyTask(ModifyTaskRequest) returns (google.protobuf.BoolValue);
+
+    rpc ActivateTask(TaskId) returns (google.protobuf.BoolValue);
+    rpc DeactivateTask(TaskId) returns (google.protobuf.BoolValue);
+
+    rpc StartTasks(google.protobuf.Empty) returns (google.protobuf.BoolValue);
+    rpc StopTasks(google.protobuf.Empty) returns (google.protobuf.BoolValue);
+
+    rpc TaskStateUpdate(google.protobuf.Empty) returns (stream TaskState);
+    rpc FetchLogs(google.protobuf.Int32Value) returns (LogArray);
+}
+
+message NewConnectionRequest {
+    ConnectionConfig conncfg = 1;
+    InstanceOptions instcfg = 2;
+
+    message ConnectionConfig {
+        string adb_path = 1;
+        // alias `device`
+        string address = 2;
+        string config = 3;
+        }
+
+    message InstanceOptions {
+        types.TouchMode touch_mode = 1;
+        bool deployment_with_pause = 2;
+        bool adb_lite_enabled = 3;
+        bool kill_adb_on_exit = 4;
+    }
+}
+
+message NewTaskRequest {
+    types.TaskType task_type = 1;
+    string task_params = 2;
+}
+
+message ModifyTaskRequest {
+    TaskId task_id = 1;
+    string task_params = 2;
+}
+
+message TaskId { int32 id = 1; }
+
+message TaskState {
+    string content = 1;
+    types.TaskStateType state = 2;
+}
+
+message LogArray {
+    repeated TaskState items = 1;
+}
