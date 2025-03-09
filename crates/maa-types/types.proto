@@ -38,19 +38,19 @@ enum TaskStateType {
   Destroyed = 5;
 
   /* TaskChain Info */
-  TaskChainError = 6;
-  TaskChainStart = 7;
-  TaskChainCompleted = 8;
-  TaskChainExtraInfo = 9;
-  TaskChainStopped = 10;
+  TaskChainError = 10000;
+  TaskChainStart = 10001;
+  TaskChainCompleted = 10002;
+  TaskChainExtraInfo = 10003;
+  TaskChainStopped = 10004;
 
   /* SubTask Info */
-  SubTaskError = 11;
-  SubTaskStart = 12;
-  SubTaskCompleted = 13;
-  SubTaskExtraInfo = 14;
-  SubTaskStopped = 15;
+  SubTaskError = 20000;
+  SubTaskStart = 20001;
+  SubTaskCompleted = 20002;
+  SubTaskExtraInfo = 20003;
+  SubTaskStopped = 20004;
   
   /* Unknown */
-  Unknown = 16;
+  Unknown = -1;
 }
