@@ -193,20 +193,7 @@ pub mod prelude {
 mod utils {
     pub fn load_core(path_to_core: std::path::PathBuf) -> Result<(), String> {
         tracing::debug!("Loading MaaCore from: {}", path_to_core.display());
-        // Set DLL directory on Windows
-        #[cfg(target_os = "windows")]
-        {
-            use windows_strings::HSTRING;
-            use windows_sys::Win32::System::LibraryLoader::SetDllDirectoryW;
-
-            let code =
-                unsafe { SetDllDirectoryW(HSTRING::from(path_to_core.parent().unwrap()).as_ptr()) };
-            if code == 0 {
-                return Err(anyhow::Error::new(windows_result::Error::from_win32())
-                    .context("Failed to set DLL directory!"));
-            }
-        }
-        maa_sys::binding::load(path_to_core).map_err(|e| e.to_string())
+        maa_sys::Assistant::load(path_to_core).map_err(|e| e.to_string())
     }
 
     pub fn load_resource(resource_dirs: Vec<String>) -> maa_sys::Result<()> {

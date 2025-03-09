@@ -34,7 +34,7 @@ impl core_server::Core for CoreImpl {
     async fn load_core(&self, req: Request<CoreConfig>) -> Ret<bool> {
         let core_cfg = req.into_inner();
 
-        if maa_sys::binding::loaded() {
+        if maa_sys::Assistant::loaded() {
             tracing::debug!("MaaCore already loaded, skipping Core load");
             // using false here to info the client that core is already loaded
             return Ok(Response::new(false));
@@ -47,7 +47,7 @@ impl core_server::Core for CoreImpl {
 
     #[tracing::instrument(skip_all)]
     async fn unload_core(&self, _: Request<()>) -> Ret<bool> {
-        maa_sys::binding::unload();
+        maa_sys::Assistant::unload().map_err(|e| tonic::Status::internal(e.to_string()))?;
 
         tracing::info!("Unload Core");
         self.cancel_token.cancel();
