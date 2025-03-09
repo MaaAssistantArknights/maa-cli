@@ -67,9 +67,9 @@ async fn main() {
     // make sure connection is closed
     tokio::time::sleep(timeout).await;
     println!("Exiting");
-    if maa_sys::binding::loaded() {
+    if maa_sys::Assistant::loaded() {
         println!("Clean Up");
-        maa_sys::binding::unload();
+        maa_sys::Assistant::unload().unwrap();
     }
 }
 
