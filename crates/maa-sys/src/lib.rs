@@ -1,5 +1,3 @@
-use std::ffi::CStr;
-
 use maa_types::primitive::*;
 pub use maa_types::{InstanceOptionKey, StaticOptionKey, TaskType, TouchMode};
 
@@ -12,7 +10,6 @@ mod link;
 /// Raw binding of MaaCore API
 pub mod binding;
 
-#[cfg_attr(test, derive(PartialEq, Eq))]
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("MaaCore returned an error, check its log for details")]
@@ -27,6 +24,12 @@ pub enum Error {
     InvalidUtf8(#[from] std::str::Utf8Error),
     #[error("Invalid UTF-8")]
     InvalidUtf8NoInfo,
+    #[cfg(all(feature = "runtime", target_os = "windows"))]
+    #[error("OS error")]
+    OS(#[from] windows_result::Error),
+    #[cfg(feature = "runtime")]
+    #[error("Failed to load the shared library")]
+    LoadError(#[from] libloading::Error),
     #[error("{0}")]
     Custom(String),
 }
@@ -52,23 +55,70 @@ impl Drop for Assistant {
     }
 }
 
+// Load and unload Assistant
+#[cfg(feature = "runtime")]
 impl Assistant {
-    /// Create a new assistant instance with the given callback and argument.
-    pub fn new(callback: binding::AsstApiCallback, arg: Option<*mut std::os::raw::c_void>) -> Self {
-        match callback {
-            Some(cb) => unsafe {
-                let handle = binding::AsstCreateEx(Some(cb), arg.unwrap_or(std::ptr::null_mut()));
-                Self { handle }
-            },
-            None => unsafe {
-                let handle = binding::AsstCreate();
-                Self { handle }
-            },
+    /// Load the shared library of the MaaCore
+    ///
+    /// Must be called first before any other method.
+    pub fn load(path: impl AsRef<std::path::Path>) -> Result<()> {
+        let path = path.as_ref();
+
+        #[cfg(target_os = "windows")]
+        if let Some(dir) = path.parent() {
+            use windows_strings::HSTRING;
+            use windows_sys::Win32::System::LibraryLoader::SetDllDirectoryW;
+
+            if dir != std::path::Path::new(".") {
+                let code = unsafe { SetDllDirectoryW(HSTRING::from(dir).as_ptr()) };
+                if code == 0 {
+                    return Err(windows_result::Error::from_win32().into());
+                }
+            }
         }
+
+        binding::load(path)?;
+
+        Ok(())
     }
 
-    /* ------------------------- Static Methods ------------------------- */
+    /// Unload the shared library of the MaaCore.
+    ///
+    /// The shared library is used to load the assistant.
+    ///
+    /// Must be called after all assistant instances are destroyed.
+    pub fn unload() -> Result<()> {
+        binding::unload();
 
+        Ok(())
+    }
+
+    /// Check if the shared library of the MaaCore is loaded in this thread.
+    pub fn loaded() -> bool {
+        binding::loaded()
+    }
+}
+
+#[cfg(not(feature = "runtime"))]
+impl Assistant {
+    /// Do nothing, as MaaCore is linked dynamically at compile time
+    pub fn load() -> Result<()> {
+        Ok(())
+    }
+
+    /// Do nothing, as MaaCore is linked dynamically at compile time
+    pub fn unload() -> Result<()> {
+        Ok(())
+    }
+
+    /// Always returns true, as MaaCore is linked dynamically at compile time
+    pub fn loaded() -> bool {
+        true
+    }
+}
+
+// Static Methods
+impl Assistant {
     /// Set the user directory of the assistant.
     ///
     /// The user directory is used to store the log file and some cache files.
@@ -114,11 +164,6 @@ impl Assistant {
         unsafe { binding::AsstLoadResource(path.to_cstring()?.as_ptr()) }.to_result()
     }
 
-    /// Get the null size of the assistant.
-    pub fn get_null_size() -> maa_types::primitive::AsstSize {
-        unsafe { binding::AsstGetNullSize() }
-    }
-
     /// Get the version of the assistant.
     ///
     /// # Errors
@@ -127,7 +172,7 @@ impl Assistant {
     pub fn get_version() -> Result<String> {
         unsafe {
             let c_str = binding::AsstGetVersion();
-            let version = CStr::from_ptr(c_str).to_str()?;
+            let version = std::ffi::CStr::from_ptr(c_str).to_str()?;
             Ok(String::from(version))
         }
     }
@@ -137,8 +182,24 @@ impl Assistant {
         unsafe { binding::AsstLog(level.to_cstring()?.as_ptr(), msg.to_cstring()?.as_ptr()) };
         Ok(())
     }
+}
 
-    /* ------------------------ Instance Methods ------------------------ */
+// Instance Methods
+impl Assistant {
+    /// Create a new assistant instance with the given callback and argument.
+    pub fn new(callback: binding::AsstApiCallback, arg: Option<*mut std::os::raw::c_void>) -> Self {
+        match callback {
+            Some(cb) => unsafe {
+                let handle = binding::AsstCreateEx(Some(cb), arg.unwrap_or(std::ptr::null_mut()));
+                Self { handle }
+            },
+            None => unsafe {
+                let handle = binding::AsstCreate();
+                Self { handle }
+            },
+        }
+    }
+
     //// Set the instance option of the assistant.
     pub fn set_instance_option(&self, key: InstanceOptionKey, value: impl ToCString) -> Result<()> {
         unsafe {
@@ -376,23 +437,36 @@ mod tests {
         }
     }
 
+    #[cfg(not(feature = "runtime"))]
+    #[test]
+    fn load_core() {
+        // For compiletime linked, so it's always loaded
+        assert!(Assistant::loaded());
+    }
+
     #[test]
     fn asst_bool() {
-        assert_eq!(0u8.to_result(), Err(super::Error::MAAError));
-        assert_eq!(1u8.to_result(), Ok(()));
+        assert!(matches!(0u8.to_result(), Err(super::Error::MAAError)));
+        assert!(matches!(1u8.to_result(), Ok(())));
     }
 
     #[test]
     fn asst_size() {
-        assert_eq!(NULL_SIZE.to_result(), Err(super::Error::BufferTooSmall));
-        assert_eq!(1u64.to_result(), Ok(1u64));
+        assert!(matches!(
+            NULL_SIZE.to_result(),
+            Err(super::Error::BufferTooSmall)
+        ));
+        assert!(matches!(1u64.to_result(), Ok(1u64)));
         #[cfg(not(feature = "runtime"))]
         assert_eq!(unsafe { binding::AsstGetNullSize() }, NULL_SIZE);
     }
 
     #[test]
     fn asst_id() {
-        assert_eq!(INVALID_ID.to_result(), Err(super::Error::MAAError));
-        assert_eq!(1u64.to_result(), Ok(1u64));
+        assert!(matches!(
+            INVALID_ID.to_result(),
+            Err(super::Error::MAAError)
+        ));
+        assert!(matches!(1u64.to_result(), Ok(1u64)));
     }
 }
