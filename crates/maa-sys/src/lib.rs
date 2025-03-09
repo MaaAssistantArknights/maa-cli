@@ -437,6 +437,13 @@ mod tests {
         }
     }
 
+    #[cfg(not(feature = "runtime"))]
+    #[test]
+    fn load_core() {
+        // For compiletime linked, so it's always loaded
+        assert!(Assistant::loaded());
+    }
+
     #[test]
     fn asst_bool() {
         assert!(matches!(0u8.to_result(), Err(super::Error::MAAError)));

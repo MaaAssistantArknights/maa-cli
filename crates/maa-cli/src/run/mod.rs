@@ -306,12 +306,20 @@ mod tests {
 
     #[test]
     #[ignore = "need installed MaaCore"]
-    fn version() {
+    fn basic_ffi() {
         if env::var_os("SKIP_CORE_TEST").is_some() {
             return;
         }
         let version = env::var_os("MAA_CORE_VERSION").unwrap();
         assert_eq!(core_version().unwrap().as_str(), version);
+
+        assert!(!Assistant::loaded());
+        load_core().unwrap();
+        assert!(Assistant::loaded());
+        load_core().unwrap();
+        assert!(Assistant::loaded());
+        Assistant::unload().unwrap();
+        assert!(!Assistant::loaded());
     }
 
     #[test]
