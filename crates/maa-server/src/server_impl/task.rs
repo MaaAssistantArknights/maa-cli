@@ -4,7 +4,7 @@ use tokio::sync::RwLock;
 use tonic::{self, Request, Response};
 
 use crate::{
-    session::Session,
+    session::SessionExt,
     task::{task_server::TaskServer, *},
     types::SessionID,
 };
@@ -66,11 +66,7 @@ mod wrapper {
             // otherwise the raw content will be dropped
             // and callback will get an different SessionID
             // which is dangerous
-            let mut session_id = session_id.to_vec();
-            assert_eq!(session_id.capacity(), 16);
-            assert_eq!(session_id.len(), 16);
-            let ptr = session_id.as_mut_ptr();
-            std::mem::forget(session_id);
+            let ptr = session_id.to_ptr();
             let instance = Self {
                 inner: maa_sys::Assistant::new(
                     Some(crate::server_impl::default_callback),
@@ -93,27 +89,26 @@ mod wrapper {
         }
     }
 
-    pub trait SessionExt {
+    pub trait SessionIDExt {
         fn get_session_id(&self) -> tonic::Result<SessionID>;
     }
 
-    impl<T> SessionExt for tonic::Request<T> {
+    impl<T> SessionIDExt for tonic::Request<T> {
         fn get_session_id(&self) -> tonic::Result<SessionID> {
             self.metadata().get_session_id()
         }
     }
 
-    impl SessionExt for tonic::metadata::MetadataMap {
+    impl SessionIDExt for tonic::metadata::MetadataMap {
         fn get_session_id(&self) -> tonic::Result<SessionID> {
             self.get("x-session-id")
                 .ok_or(tonic::Status::not_found("session_id is not found"))?
                 .to_str()
                 .map_err(|_| tonic::Status::invalid_argument("session_id should be ascii"))
                 .and_then(|str| {
-                    uuid::Uuid::from_str(str)
+                    SessionID::from_str(str)
                         .map_err(|_| tonic::Status::invalid_argument("session_id is not valid"))
                 })
-                .map(|uuid| uuid.to_bytes_le())
         }
     }
 
@@ -131,7 +126,7 @@ mod wrapper {
     }
 }
 
-use wrapper::{func_with, Assistant, SessionExt};
+use wrapper::{func_with, Assistant, SessionIDExt};
 
 static TASK_HANDLERS: RwLock<BTreeMap<SessionID, Assistant>> = RwLock::const_new(BTreeMap::new());
 
@@ -149,15 +144,14 @@ impl task_server::Task for TaskImpl {
     async fn new_connection(&self, req: Request<NewConnectionRequest>) -> Ret<String> {
         let req = req.into_inner();
 
-        let raw_session_id = uuid::Uuid::now_v7();
-        let session_id = raw_session_id.to_bytes_le();
+        let session_id = SessionID::new();
 
         let asst = Assistant::new(session_id);
         tracing::debug!("Instance Created");
 
         tracing::debug!("Register C CallBack");
         let (tx, rx) = tokio::sync::oneshot::channel();
-        Session::new(session_id, tx);
+        session_id.add(tx);
 
         req.apply_to(asst.inner_unchecked())?;
         tracing::debug!("Check Connection");
@@ -168,7 +162,7 @@ impl task_server::Task for TaskImpl {
         tracing::debug!("Register Task State CallBack");
         TASK_HANDLERS.write().await.insert(session_id, asst);
 
-        Ok(Response::new(raw_session_id.to_string()))
+        Ok(Response::new(session_id.to_string()))
     }
 
     #[tracing::instrument(skip_all)]
@@ -176,8 +170,7 @@ impl task_server::Task for TaskImpl {
         let session_id = req.get_session_id()?;
 
         Ok(Response::new(
-            TASK_HANDLERS.write().await.remove(&session_id).is_some()
-                && Session::remove(session_id),
+            TASK_HANDLERS.write().await.remove(&session_id).is_some(),
         ))
     }
 
@@ -203,7 +196,7 @@ impl task_server::Task for TaskImpl {
 
         match ret {
             Ok(id) => {
-                Session::tasks(session_id).new(id);
+                session_id.tasks().new(id);
                 Ok(Response::new(id.into()))
             }
             Err(e) => Err(tonic::Status::from_error(Box::new(e))),
@@ -300,7 +293,7 @@ impl task_server::Task for TaskImpl {
     async fn task_state_update(&self, req: Request<()>) -> Ret<Self::TaskStateUpdateStream> {
         let session_id = req.get_session_id()?;
 
-        let Some(rx) = Session::take_subscriber(session_id) else {
+        let Some(rx) = session_id.take_subscriber() else {
             return Err(tonic::Status::resource_exhausted("rx has been taken"));
         };
 
@@ -322,7 +315,7 @@ impl task_server::Task for TaskImpl {
 
         let session_id = meta.get_session_id()?;
 
-        let logs = Session::log(session_id).get_skip(skip);
+        let logs = session_id.log().get_skip(skip);
 
         Ok(Response::new(LogArray {
             items: logs

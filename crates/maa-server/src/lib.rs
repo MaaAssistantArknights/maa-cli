@@ -209,8 +209,64 @@ mod utils {
 mod callback;
 
 mod types {
-    pub type SessionID = [u8; 16];
     pub use maa_types::{primitive::AsstTaskId as TaskId, TaskStateType};
+    use uuid::Uuid;
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    pub struct SessionID(Uuid);
+
+    impl SessionID {
+        pub fn new() -> Self {
+            Self(Uuid::now_v7())
+        }
+
+        pub fn to_ptr(self) -> *const u8 {
+            let vec = self.0.into_bytes().to_vec();
+            assert_eq!(vec.capacity(), 16);
+            assert_eq!(vec.len(), 16);
+            let ptr = vec.as_ptr();
+            std::mem::forget(vec);
+            ptr
+        }
+
+        /// Create a SessionID from a raw pointer to a byte array
+        ///
+        /// # Safety
+        ///
+        /// The pointer must be valid and point to a byte array of length 16.
+        pub fn from_ptr(ptr: *const u8) -> Self {
+            let mut bytes = const { [0; 16] };
+            let slice = unsafe { std::slice::from_raw_parts(ptr, 16) };
+            bytes.copy_from_slice(slice);
+            Self(Uuid::from_bytes(bytes))
+        }
+
+        /// Free the pointer's memory
+        ///
+        /// # Safety
+        ///
+        /// The pointer must be valid and point to a byte array of length 16.
+        pub fn drop_ptr(ptr: *const u8) {
+            let ptr = ptr as *mut u8;
+            let len = 16;
+            let cap = 16;
+            let _ = unsafe { Vec::from_raw_parts(ptr, len, cap) };
+        }
+    }
+
+    impl std::fmt::Display for SessionID {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{}", self.0)
+        }
+    }
+
+    impl std::str::FromStr for SessionID {
+        type Err = uuid::Error;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            Uuid::from_str(s).map(Self)
+        }
+    }
 
     #[cfg(test)]
     mod tests {

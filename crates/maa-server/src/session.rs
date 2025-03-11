@@ -13,13 +13,12 @@ type CallBackContent = String;
 // re-export
 pub use state::State;
 
-/// Wrapper around [RwLock<BTreeMap<SessionID, Session>>],
-/// providing function about session
-pub struct Session;
-impl Session {
-    #[allow(clippy::new_ret_no_self)]
+pub trait SessionExt: Sized {
+    fn as_id(self) -> SessionID;
+
     /// Create a [Session] with given `callback` and insert with `session_id`
-    pub fn new(session_id: SessionID, callback: Sender<log::CallBack>) {
+    fn add(self, callback: Sender<log::CallBack>) {
+        let session_id = self.as_id();
         let session = _Session::new(callback);
         SESSION_POOL.write().insert(session_id, session);
     }
@@ -27,16 +26,16 @@ impl Session {
     /// Remove [Session] with given `session_id`
     ///
     /// Return [false] if no such one
-    pub fn remove(session_id: SessionID) -> bool {
+    fn remove(self) -> bool {
+        let session_id = self.as_id();
         SESSION_POOL.write().remove(&session_id).is_some()
     }
 
     /// Take the rx side to create a `Stream`` to client
     ///
     /// Return [None] if already taken
-    pub fn take_subscriber(
-        session_id: SessionID,
-    ) -> Option<tokio::sync::mpsc::UnboundedReceiver<LogContent>> {
+    fn take_subscriber(self) -> Option<tokio::sync::mpsc::UnboundedReceiver<LogContent>> {
+        let session_id = self.as_id();
         SESSION_POOL
             .write()
             .get_mut(&session_id)
@@ -44,7 +43,8 @@ impl Session {
     }
 
     /// safety: this should be called only during Task::new_connection
-    pub fn test_connection_result(session_id: SessionID, err: Option<CallBackContent>) {
+    fn test_connection_result(self, err: Option<CallBackContent>) {
+        let session_id = self.as_id();
         if let Some(err) = err {
             SESSION_POOL
                 .write()
@@ -62,7 +62,8 @@ impl Session {
         }
     }
 
-    pub fn info_to_channel(session_id: SessionID, msg: LogContent) {
+    fn info_to_channel(self, msg: LogContent) {
+        let session_id = self.as_id();
         SESSION_POOL
             .read()
             .get(&session_id)
@@ -71,12 +72,18 @@ impl Session {
             .log_to_channel(msg);
     }
 
-    pub fn tasks(session_id: SessionID) -> Tasks {
-        Tasks(session_id)
+    fn tasks(self) -> Tasks {
+        Tasks(self.as_id())
     }
 
-    pub fn log(session_id: SessionID) -> Log {
-        Log(session_id)
+    fn log(self) -> Log {
+        Log(self.as_id())
+    }
+}
+
+impl SessionExt for SessionID {
+    fn as_id(self) -> SessionID {
+        todo!()
     }
 }
 

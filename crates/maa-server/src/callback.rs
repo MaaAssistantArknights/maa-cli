@@ -1,7 +1,7 @@
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
-    session::{Session, State},
+    session::{SessionExt, State},
     types::{SessionID, TaskId, TaskStateType},
 };
 
@@ -12,7 +12,7 @@ type Map = serde_json::Map<String, serde_json::Value>;
 pub fn entry(code: TaskStateType, json_str: &str, session_id: SessionID) -> bool {
     trace!("Session ID: {:?}", session_id);
 
-    Session::log(session_id).log((code, json_str.to_string()));
+    session_id.log().log((code, json_str.to_string()));
 
     let map: Map = serde_json::from_str(json_str).unwrap();
 
@@ -41,7 +41,7 @@ fn process_message(code: TaskStateType, message: Map, session_id: SessionID) -> 
         ConnectionInfo => process_connection_info(message, session_id),
         AllTasksCompleted => {
             let msg = serde_json::to_string_pretty(&message).unwrap();
-            Session::info_to_channel(session_id, (code, msg));
+            session_id.info_to_channel((code, msg));
             info!("AllTasksCompleted");
         }
         AsyncCallInfo => {}
@@ -78,13 +78,13 @@ fn process_connection_info(message: Map, session_id: SessionID) {
                 "Got UUID: {}",
                 details.get("uuid").unwrap().as_str().unwrap()
             );
-            Session::test_connection_result(session_id, None);
+            session_id.test_connection_result(None);
         }
         "ConnectFailed" => {
             let err = format!("Failed to connect to android device, {}, Please check your connect configuration: {}",
                 why.unwrap(),serde_json::to_string_pretty(&details).unwrap());
             error!(err);
-            Session::test_connection_result(session_id, Some(err));
+            session_id.test_connection_result(Some(err));
         }
         // Resolution
         "ResolutionGot" => trace!(
@@ -142,30 +142,31 @@ fn process_taskchain(code: TaskStateType, message: Map, session_id: SessionID) {
     let msg = serde_json::to_string_pretty(&message).unwrap();
     let TaskChain { taskchain, taskid } =
         serde_json::from_value(serde_json::Value::Object(message)).unwrap();
-    Session::tasks(session_id).update(taskid, (code, msg));
+    session_id.tasks().update(taskid, (code, msg));
 
     use TaskStateType::*;
-    match code {
+    let state = match code {
         TaskChainStart => {
             info!("{} {}", taskchain, "Start");
-            Session::tasks(session_id).state(taskid, State::Running);
+            State::Running
         }
         TaskChainCompleted => {
             info!("{} {}", taskchain, "Completed");
-            Session::tasks(session_id).state(taskid, State::Completed);
+            State::Completed
         }
         TaskChainStopped => {
             warn!("{} {}", taskchain, "Stopped");
-            Session::tasks(session_id).state(taskid, State::Canceled);
+            State::Canceled
         }
         TaskChainError => {
             error!("{} {}", taskchain, "Error");
-            Session::tasks(session_id).state(taskid, State::Error);
+            State::Error
         }
-        TaskChainExtraInfo => {}
+        TaskChainExtraInfo => return,
 
         _ => unreachable!(),
     };
+    session_id.tasks().state(taskid, state);
 }
 
 mod subtask {
@@ -174,6 +175,6 @@ mod subtask {
     pub fn process_subtask(code: TaskStateType, message: Map, session_id: SessionID) {
         let msg = serde_json::to_string_pretty(&message).unwrap();
         let taskid = message.get("taskid").unwrap().as_i64().unwrap() as TaskId;
-        Session::tasks(session_id).update(taskid, (code, msg));
+        session_id.tasks().update(taskid, (code, msg));
     }
 }
