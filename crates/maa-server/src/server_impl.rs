@@ -3,7 +3,7 @@ use crate::session::SessionExt;
 pub mod core;
 pub mod task;
 
-unsafe extern "C" fn default_callback(
+pub(crate) unsafe extern "C" fn default_callback(
     code: maa_types::primitive::AsstMsgId,
     json_str: *const std::ffi::c_char,
     session_id_ptr: *mut std::ffi::c_void,
@@ -18,9 +18,9 @@ unsafe extern "C" fn default_callback(
     let session_id = SessionID::from_ptr(session_id_ptr as *const u8);
 
     if entry(code, json_str, session_id) {
+        // should be already removed by close_connection
+        debug_assert!(!session_id.remove());
         // restore and free the mem
-        tracing::info!("Remove Session");
-        assert!(session_id.remove());
         SessionID::drop_ptr(session_id_ptr as *const u8);
     }
 }

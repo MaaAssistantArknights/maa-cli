@@ -78,13 +78,13 @@ fn process_connection_info(message: Map, session_id: SessionID) {
                 "Got UUID: {}",
                 details.get("uuid").unwrap().as_str().unwrap()
             );
-            session_id.test_connection_result(None);
+            session_id.adb().success();
         }
         "ConnectFailed" => {
             let err = format!("Failed to connect to android device, {}, Please check your connect configuration: {}",
                 why.unwrap(),serde_json::to_string_pretty(&details).unwrap());
             error!(err);
-            session_id.test_connection_result(Some(err));
+            session_id.adb().fail(err);
         }
         // Resolution
         "ResolutionGot" => trace!(
@@ -142,7 +142,7 @@ fn process_taskchain(code: TaskStateType, message: Map, session_id: SessionID) {
     let msg = serde_json::to_string_pretty(&message).unwrap();
     let TaskChain { taskchain, taskid } =
         serde_json::from_value(serde_json::Value::Object(message)).unwrap();
-    session_id.tasks().update(taskid, (code, msg));
+    session_id.tasks().update_log(taskid, (code, msg));
 
     use TaskStateType::*;
     let state = match code {
@@ -166,7 +166,7 @@ fn process_taskchain(code: TaskStateType, message: Map, session_id: SessionID) {
 
         _ => unreachable!(),
     };
-    session_id.tasks().state(taskid, state);
+    session_id.tasks().update_state(taskid, state);
 }
 
 mod subtask {
@@ -175,6 +175,6 @@ mod subtask {
     pub fn process_subtask(code: TaskStateType, message: Map, session_id: SessionID) {
         let msg = serde_json::to_string_pretty(&message).unwrap();
         let taskid = message.get("taskid").unwrap().as_i64().unwrap() as TaskId;
-        session_id.tasks().update(taskid, (code, msg));
+        session_id.tasks().update_log(taskid, (code, msg));
     }
 }

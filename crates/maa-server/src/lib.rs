@@ -93,7 +93,7 @@ pub mod task {
             }
 
             let (adb_path, address, config) = conncfg.unwrap().connect_args();
-            asst.async_connect(adb_path.as_str(), address.as_str(), config.as_str(), true)
+            asst.async_connect(adb_path.as_str(), address.as_str(), config.as_str(), false)
                 .unwrap();
 
             Ok(())
@@ -187,6 +187,7 @@ pub mod prelude {
         core,
         server_impl::{core::gen_service as core_service, task::gen_service as task_service},
         task,
+        types::HEADER_SESSION_ID,
     };
 }
 
@@ -212,6 +213,8 @@ mod types {
     pub use maa_types::{primitive::AsstTaskId as TaskId, TaskStateType};
     use uuid::Uuid;
 
+    pub const HEADER_SESSION_ID: &str = "x-session-id";
+
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
     pub struct SessionID(Uuid);
 
@@ -220,6 +223,11 @@ mod types {
             Self(Uuid::now_v7())
         }
 
+        /// Convert s SessionID to a raw pointer
+        ///
+        /// # Safety
+        ///
+        /// Remember to call [`SessionID::drop_ptr`] to free the memory
         pub fn to_ptr(self) -> *const u8 {
             let vec = self.0.into_bytes().to_vec();
             assert_eq!(vec.capacity(), 16);
@@ -229,7 +237,7 @@ mod types {
             ptr
         }
 
-        /// Create a SessionID from a raw pointer to a byte array
+        /// Create a SessionID from a raw pointer via a byte array
         ///
         /// # Safety
         ///
@@ -245,7 +253,7 @@ mod types {
         ///
         /// # Safety
         ///
-        /// The pointer must be valid and point to a byte array of length 16.
+        /// The pointer must be created by [`SessionID::to_ptr`]
         pub fn drop_ptr(ptr: *const u8) {
             let ptr = ptr as *mut u8;
             let len = 16;

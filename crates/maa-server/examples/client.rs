@@ -1,12 +1,13 @@
-use maa_server::task::NewTaskRequest;
+use maa_server::{prelude::HEADER_SESSION_ID, task::NewTaskRequest};
 use maa_types::{TaskStateType, TaskType};
 use tokio_stream::StreamExt;
 use tonic::transport::Endpoint;
+use tracing_subscriber::{filter, fmt, layer::SubscriberExt, util::SubscriberInitExt, Layer};
 
 fn make_request<T>(payload: T, session_id: &str) -> tonic::Request<T> {
     let mut req = tonic::Request::new(payload);
     req.metadata_mut()
-        .insert("x-session-id", session_id.parse().unwrap());
+        .insert(HEADER_SESSION_ID, session_id.parse().unwrap());
     req
 }
 
@@ -41,8 +42,17 @@ const USING_UDS: bool = cfg!(unix);
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::Registry::default()
+        .with(
+            fmt::layer()
+                .compact()
+                .with_ansi(true)
+                .with_filter(filter::LevelFilter::DEBUG),
+        )
+        .init();
+
     let channel = if USING_UDS {
-        println!("Using Unix Socket");
+        tracing::debug!("Using Unix Socket");
         Endpoint::from_static("http://127.0.0.1:50051")
             .connect_with_connector(tower::service_fn(|_: tonic::transport::Uri| async {
                 let path = "/tmp/tonic/testing.sock";
@@ -51,16 +61,15 @@ async fn main() {
                 ))
             }))
             .await
-            .unwrap()
     } else {
-        println!("Using Http Port");
+        tracing::debug!("Using Http Port");
         Endpoint::try_from("http://127.0.0.1:50051")
             .unwrap()
             .connect()
             .await
-            .unwrap()
-    };
-    println!("Connected to server");
+    }
+    .unwrap();
+    tracing::info!("Connected to server");
 
     let mut coreclient = maa_server::core::core_client::CoreClient::new(channel.clone());
     let success = coreclient
@@ -91,7 +100,7 @@ async fn main() {
         .into_inner();
 
     if !success {
-        println!("Core has been configured");
+        tracing::warn!("Core has been configured");
     }
 
     let mut taskclient = maa_server::task::task_client::TaskClient::new(channel);
@@ -113,12 +122,13 @@ async fn main() {
         .await
         .map(|resp| resp.into_inner())
     else {
-        println!("Failed to create new connection");
+        tracing::error!("Failed to create new connection");
+        tracing::info!("Close Server");
         coreclient.unload_core(()).await.unwrap();
         return;
     };
 
-    println!("session_id: {}", session_id);
+    tracing::debug!("session_id: {}", session_id);
 
     let mut channel = taskclient
         .task_state_update(make_request((), &session_id))
@@ -126,65 +136,79 @@ async fn main() {
         .unwrap()
         .into_inner();
 
-    let mut payload = NewTaskRequest::default();
-    payload.set_task_type(TaskType::StartUp.into());
-    payload.task_params =
-        r#"{ "enable": true, "client_type": "Official", "start_game_enabled": true, "account_name": "" }"#.to_owned();
     taskclient
-        .append_task(make_request(payload, &session_id))
+        .append_task(make_request(
+            NewTaskRequest {
+                task_type: TaskType::StartUp.into(),
+                task_params: r#"{ "enable": true, "client_type": "Official", "start_game_enabled": true, "account_name": "" }"#.to_owned(),
+            },
+            &session_id,
+        ))
         .await
         .unwrap();
-    println!("Add task StartUp");
-    let mut payload = NewTaskRequest::default();
-    payload.set_task_type(TaskType::Fight.into());
-    payload.task_params = r#" { "stage": "1-7" } "#.to_owned();
+    tracing::info!("Add task StartUp");
+
     let id = taskclient
-        .append_task(make_request(payload, &session_id))
+        .append_task(make_request(
+            NewTaskRequest {
+                task_type: TaskType::Fight.into(),
+                task_params: r#" { "stage": "1-7" } "#.to_owned(),
+            },
+            &session_id,
+        ))
         .await
         .unwrap()
         .into_inner();
-    println!("Add task Fight");
+    tracing::info!("Add task Fight 1-7");
+
     taskclient
         .deactivate_task(make_request(id, &session_id))
         .await
         .unwrap();
-    println!("Deactivate task Fight");
-    let mut payload = NewTaskRequest::default();
-    payload.set_task_type(TaskType::Fight.into());
-    // payload.task_params = r#" { "stage": "EA-6" } "#.to_owned();
-    payload.task_params = r#" { } "#.to_owned();
-    taskclient
-        .append_task(make_request(payload, &session_id))
+    tracing::info!("Deactivate task Fight 1-7");
+
+    let _id = taskclient
+        .append_task(make_request(
+            NewTaskRequest {
+                task_type: TaskType::Fight.into(),
+                task_params: r#" { } "#.to_owned(),
+            },
+            &session_id,
+        ))
         .await
         .unwrap()
         .into_inner();
-    println!("Add task Fight EA-6");
+    tracing::info!("Add task Fight");
+
     taskclient
         .start_tasks(make_request((), &session_id))
         .await
         .unwrap();
+    tracing::info!("Start Tasks");
 
-    println!("Starting show callback");
+    tracing::info!("Starting show callback");
     while let Some(msg) = channel.next().await {
         let msg = msg.unwrap();
-        println!("{}: {}", msg.state, msg.content);
+        tracing::debug!("{}: {}", msg.state, msg.content);
         if msg.state == TaskStateType::AllTasksCompleted as i32 {
             break;
         }
     }
+    drop(channel);
 
-    println!("Grab remote log");
-    // skip first 10 log
+    tracing::info!("Grab remote log");
+    // skip first 100 log
     let logs = taskclient
-        .fetch_logs(make_request(10, &session_id))
+        .fetch_logs(make_request(100, &session_id))
         .await
         .unwrap();
-    println!("{:?}", logs.into_inner());
+    tracing::debug!("{:?}", logs.into_inner());
 
-    println!("Clean up");
+    tracing::info!("Clean up");
     taskclient
         .close_connection(make_request((), &session_id))
         .await
         .unwrap();
+    tracing::info!("Close Server");
     coreclient.unload_core(()).await.unwrap();
 }

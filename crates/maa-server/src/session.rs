@@ -1,71 +1,49 @@
 use std::collections::BTreeMap;
 
-use parking_lot::RwLock;
+use parking_lot::Mutex;
 use tokio::sync::oneshot::Sender;
 
 use crate::types::{SessionID, TaskId, TaskStateType};
 
-static SESSION_POOL: RwLock<BTreeMap<SessionID, _Session>> = RwLock::new(BTreeMap::new());
+static SESSION_POOL: Mutex<BTreeMap<SessionID, Session>> = Mutex::new(BTreeMap::new());
+static PRE_SESSION_POOL: Mutex<BTreeMap<SessionID, Sender<CallBack>>> = Mutex::new(BTreeMap::new());
 
 type LogContent = (TaskStateType, String);
+
 type CallBackContent = String;
+type CallBack = Result<(), CallBackContent>;
 
 // re-export
 pub use state::State;
 
 pub trait SessionExt: Sized {
-    fn as_id(self) -> SessionID;
+    fn as_id(&self) -> SessionID;
 
     /// Create a [Session] with given `callback` and insert with `session_id`
-    fn add(self, callback: Sender<log::CallBack>) {
+    fn add(self, asst: Assistant) {
         let session_id = self.as_id();
-        let session = _Session::new(callback);
-        SESSION_POOL.write().insert(session_id, session);
+        let session = Session::new(asst);
+        SESSION_POOL.lock().insert(session_id, session);
     }
 
     /// Remove [Session] with given `session_id`
     ///
-    /// Return [false] if no such one
+    /// Return [false] if already dropped
     fn remove(self) -> bool {
         let session_id = self.as_id();
-        SESSION_POOL.write().remove(&session_id).is_some()
-    }
-
-    /// Take the rx side to create a `Stream`` to client
-    ///
-    /// Return [None] if already taken
-    fn take_subscriber(self) -> Option<tokio::sync::mpsc::UnboundedReceiver<LogContent>> {
-        let session_id = self.as_id();
-        SESSION_POOL
-            .write()
-            .get_mut(&session_id)
-            .and_then(|logger| logger.channel.take_rx())
-    }
-
-    /// safety: this should be called only during Task::new_connection
-    fn test_connection_result(self, err: Option<CallBackContent>) {
-        let session_id = self.as_id();
-        if let Some(err) = err {
-            SESSION_POOL
-                .write()
-                .get_mut(&session_id)
-                .unwrap()
-                .channel
-                .connect_failed(err);
-        } else {
-            SESSION_POOL
-                .write()
-                .get_mut(&session_id)
-                .unwrap()
-                .channel
-                .connect_success();
-        }
+        tracing::info!("Remove Session");
+        // here we must let lock have a binding, or this will block the thread
+        // I don't know why, but this just work
+        // hope it won't be worse later
+        let mut lock = SESSION_POOL.lock();
+        lock.remove(&session_id).is_some()
+        // SESSION_POOL.lock().remove(&session_id).is_some()
     }
 
     fn info_to_channel(self, msg: LogContent) {
         let session_id = self.as_id();
         SESSION_POOL
-            .read()
+            .lock()
             .get(&session_id)
             .unwrap()
             .channel
@@ -79,11 +57,51 @@ pub trait SessionExt: Sized {
     fn log(self) -> Log {
         Log(self.as_id())
     }
+
+    fn adb(self) -> InitAdb {
+        InitAdb(self.as_id())
+    }
 }
 
 impl SessionExt for SessionID {
-    fn as_id(self) -> SessionID {
-        todo!()
+    fn as_id(&self) -> SessionID {
+        *self
+    }
+}
+
+pub type Result<T, E = Box<dyn core::error::Error + Send + Sync>> = core::result::Result<T, E>;
+
+pub struct InitAdb(SessionID);
+impl InitAdb {
+    pub fn register(self, callback: Sender<CallBack>) {
+        let session_id = self.0;
+        PRE_SESSION_POOL.lock().insert(session_id, callback);
+    }
+
+    /// safety: this should be called only during Task::new_connection
+    fn result(self, err: Option<CallBackContent>) {
+        let session_id = self.0;
+        if let Some(shot) = PRE_SESSION_POOL.lock().remove(&session_id) {
+            if shot
+                .send(match err {
+                    Some(err) => Err(err),
+                    None => Ok(()),
+                })
+                .is_err()
+            {
+                tracing::warn!("");
+            }
+        } else {
+            tracing::warn!("");
+        }
+    }
+
+    pub fn success(self) {
+        self.result(None);
+    }
+
+    pub fn fail(self, err: CallBackContent) {
+        self.result(Some(err));
     }
 }
 
@@ -91,16 +109,46 @@ impl SessionExt for SessionID {
 /// providing function about tasks
 pub struct Tasks(SessionID);
 impl Tasks {
-    #[allow(clippy::new_ret_no_self, clippy::wrong_self_convention)]
-    pub fn new(self, task_id: TaskId) {
-        if let Some(session) = SESSION_POOL.write().get_mut(&self.0) {
-            session.new_task(task_id);
+    pub fn append(self, task_type: maa_sys::TaskType, params: &str) -> Result<TaskId> {
+        if let Some(session) = SESSION_POOL.lock().get_mut(&self.0) {
+            let task_id = session
+                .asst
+                .inner_unchecked()
+                .append_task(task_type, params)?;
+            session.tasks.insert(task_id, state::TaskState::default());
+            Ok(task_id)
+        } else {
+            todo!()
         }
     }
 
-    pub fn state(self, task_id: TaskId, new: state::State) {
+    pub fn start(self) -> Result<()> {
+        if let Some(session) = SESSION_POOL.lock().get_mut(&self.0) {
+            session.asst.inner_unchecked().start()?;
+        };
+        Ok(())
+    }
+
+    pub fn stop(self) -> Result<()> {
+        if let Some(session) = SESSION_POOL.lock().get_mut(&self.0) {
+            session.asst.inner_unchecked().stop()?;
+        };
+        Ok(())
+    }
+
+    pub fn patch_params(self, task_id: TaskId, params: &str) -> Result<()> {
+        if let Some(session) = SESSION_POOL.lock().get_mut(&self.0) {
+            session
+                .asst
+                .inner_unchecked()
+                .set_task_params(task_id, params)?;
+        };
+        Ok(())
+    }
+
+    pub fn update_state(self, task_id: TaskId, new: state::State) {
         if let Some(state) = SESSION_POOL
-            .write()
+            .lock()
             .get_mut(&self.0)
             .and_then(|session| session.tasks.get_mut(&task_id))
         {
@@ -108,8 +156,8 @@ impl Tasks {
         }
     }
 
-    pub fn update(self, task_id: TaskId, message: LogContent) {
-        if let Some(session) = SESSION_POOL.write().get_mut(&self.0) {
+    pub fn update_log(self, task_id: TaskId, message: LogContent) {
+        if let Some(session) = SESSION_POOL.lock().get_mut(&self.0) {
             session
                 .tasks
                 .get_mut(&task_id)
@@ -124,76 +172,67 @@ impl Tasks {
 /// providing function about log
 pub struct Log(SessionID);
 impl Log {
-    pub fn get_skip(self, len: i32) -> Vec<LogContent> {
-        if let Some(session) = SESSION_POOL.read().get(&self.0) {
-            session.get_skip_len(len as usize)
+    /// Take the rx side to create a `Stream`` to client
+    ///
+    /// Return [None] if allocky taken
+    pub fn take_subscriber(self) -> Option<tokio::sync::mpsc::UnboundedReceiver<LogContent>> {
+        let session_id = self.0;
+        SESSION_POOL
+            .lock()
+            .get_mut(&session_id)
+            .and_then(|logger| logger.channel.take_rx())
+    }
+
+    pub fn get_skip(self, len: usize) -> Vec<LogContent> {
+        if let Some(session) = SESSION_POOL.lock().get(&self.0) {
+            session.logs.iter().skip(len).cloned().collect()
         } else {
             vec![]
         }
     }
 
     pub fn log(self, message: LogContent) {
-        if let Some(session) = SESSION_POOL.write().get_mut(&self.0) {
-            session.log(message)
+        if let Some(session) = SESSION_POOL.lock().get_mut(&self.0) {
+            session.logs.push(message);
         } else {
             tracing::warn!(from = ?self.0, "Unknown Log: {:?}", message)
         }
     }
 }
 
-struct _Session {
+struct Session {
     tasks: BTreeMap<TaskId, state::TaskState>,
     channel: log::Channel,
     logs: Vec<LogContent>,
+    asst: Assistant,
 }
 
-impl _Session {
-    fn new(callback: tokio::sync::oneshot::Sender<log::CallBack>) -> Self {
+impl Session {
+    fn new(asst: Assistant) -> Self {
         Self {
             tasks: Default::default(),
-            channel: log::Channel::new(callback),
+            channel: log::Channel::new(),
             logs: Default::default(),
+            asst,
         }
-    }
-
-    fn new_task(&mut self, task_id: TaskId) {
-        self.tasks.insert(task_id, state::TaskState::default());
-    }
-
-    fn log(&mut self, log: LogContent) {
-        self.logs.push(log);
-    }
-
-    fn get_skip_len(&self, len: usize) -> Vec<LogContent> {
-        self.logs.iter().skip(len).cloned().collect()
     }
 }
 
 mod log {
-    use tokio::sync::{
-        mpsc::{UnboundedReceiver, UnboundedSender},
-        oneshot,
-    };
+    use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
-    use super::{CallBackContent, LogContent};
+    use super::LogContent;
 
-    pub type Channel = Logger<LogContent, CallBack>;
-    pub(super) type CallBack = Result<(), CallBackContent>;
+    pub type Channel = Logger<LogContent>;
 
-    pub struct Logger<T, R> {
+    pub struct Logger<T> {
         tx: UnboundedSender<T>,
         rx: Option<UnboundedReceiver<T>>,
-        /// used for check adb connection
-        oneshot: Option<oneshot::Sender<R>>,
     }
-    impl Logger<LogContent, CallBack> {
-        pub(super) fn new(oneshot: oneshot::Sender<CallBack>) -> Self {
+    impl Logger<LogContent> {
+        pub(super) fn new() -> Self {
             let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-            Self {
-                tx,
-                rx: Some(rx),
-                oneshot: Some(oneshot),
-            }
+            Self { tx, rx: Some(rx) }
         }
 
         pub fn take_rx(&mut self) -> Option<UnboundedReceiver<LogContent>> {
@@ -202,18 +241,6 @@ mod log {
 
         pub(super) fn log_to_channel(&self, message: LogContent) {
             let _ = self.tx.send(message);
-        }
-
-        pub fn connect_failed(&mut self, err: CallBackContent) {
-            if let Some(shot) = self.oneshot.take() {
-                let _ = shot.send(Err(err));
-            }
-        }
-
-        pub fn connect_success(&mut self) {
-            if let Some(shot) = self.oneshot.take() {
-                let _ = shot.send(Ok(()));
-            }
         }
     }
 }
@@ -251,5 +278,32 @@ mod state {
         pub fn update(&mut self, new: LogContent) {
             self.content.push(new);
         }
+    }
+}
+
+/// A wrapper for [`maa_sys::Assistant`]
+///
+/// The inner can be [Send] but not [Sync],
+/// because every fn related is actually a `ref mut` rather `ref`,
+/// which may cause data race
+pub struct Assistant {
+    inner: maa_sys::Assistant,
+}
+
+unsafe impl Sync for Assistant {}
+
+impl Assistant {
+    pub fn new(session_id: SessionID) -> Self {
+        let ptr = session_id.to_ptr();
+        Self {
+            inner: maa_sys::Assistant::new(
+                Some(crate::server_impl::default_callback),
+                Some(ptr as *mut std::ffi::c_void),
+            ),
+        }
+    }
+
+    pub fn inner_unchecked(&self) -> &maa_sys::Assistant {
+        &self.inner
     }
 }

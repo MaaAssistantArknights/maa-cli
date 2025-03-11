@@ -1,6 +1,3 @@
-use std::collections::BTreeMap;
-
-use tokio::sync::RwLock;
 use tonic::{self, Request, Response};
 
 use crate::{
@@ -38,97 +35,29 @@ pub fn gen_service() -> TaskServer<TaskImpl> {
     TaskServer::new(TaskImpl)
 }
 
-mod wrapper {
-    use std::str::FromStr;
+pub trait SessionIDExt {
+    fn get_session_id(&self) -> tonic::Result<SessionID>;
+}
 
-    use tokio::sync::Notify;
-
-    use super::SessionID;
-
-    /// A wrapper for [`maa_sys::Assistant`]
-    ///
-    /// The inner can be [Send] but not [Sync],
-    /// because every fn related is actually a `ref mut` rather `ref`,
-    /// which may cause data race
-    ///
-    /// By using [Notify], only one request can reach handler at a time
-    /// and there should be no data racing
-    pub struct Assistant {
-        inner: maa_sys::Assistant,
-        lock: Notify,
-    }
-
-    unsafe impl Sync for Assistant {}
-
-    impl Assistant {
-        pub fn new(session_id: SessionID) -> Self {
-            // this Vec created is used to forget
-            // otherwise the raw content will be dropped
-            // and callback will get an different SessionID
-            // which is dangerous
-            let ptr = session_id.to_ptr();
-            let instance = Self {
-                inner: maa_sys::Assistant::new(
-                    Some(crate::server_impl::default_callback),
-                    Some(ptr as *mut std::ffi::c_void),
-                ),
-                lock: Notify::new(),
-            };
-            instance.lock.notify_one();
-            instance
-        }
-
-        pub async fn wait(&self) -> &maa_sys::Assistant {
-            self.lock.notified().await;
-            self.lock.notify_one();
-            self.inner_unchecked()
-        }
-
-        pub fn inner_unchecked(&self) -> &maa_sys::Assistant {
-            &self.inner
-        }
-    }
-
-    pub trait SessionIDExt {
-        fn get_session_id(&self) -> tonic::Result<SessionID>;
-    }
-
-    impl<T> SessionIDExt for tonic::Request<T> {
-        fn get_session_id(&self) -> tonic::Result<SessionID> {
-            self.metadata().get_session_id()
-        }
-    }
-
-    impl SessionIDExt for tonic::metadata::MetadataMap {
-        fn get_session_id(&self) -> tonic::Result<SessionID> {
-            self.get("x-session-id")
-                .ok_or(tonic::Status::not_found("session_id is not found"))?
-                .to_str()
-                .map_err(|_| tonic::Status::invalid_argument("session_id should be ascii"))
-                .and_then(|str| {
-                    SessionID::from_str(str)
-                        .map_err(|_| tonic::Status::invalid_argument("session_id is not valid"))
-                })
-        }
-    }
-
-    pub async fn func_with<T>(
-        session_id: SessionID,
-        f: impl FnOnce(&maa_sys::Assistant) -> T,
-    ) -> tonic::Result<T> {
-        let read_lock = super::TASK_HANDLERS.read().await;
-
-        let handler = read_lock
-            .get(&session_id)
-            .ok_or(tonic::Status::not_found("session_id is not found"))?;
-
-        Ok(f(handler.wait().await))
+impl<T> SessionIDExt for tonic::Request<T> {
+    fn get_session_id(&self) -> tonic::Result<SessionID> {
+        self.metadata().get_session_id()
     }
 }
 
-use wrapper::{func_with, Assistant, SessionIDExt};
-
-static TASK_HANDLERS: RwLock<BTreeMap<SessionID, Assistant>> = RwLock::const_new(BTreeMap::new());
+impl SessionIDExt for tonic::metadata::MetadataMap {
+    fn get_session_id(&self) -> tonic::Result<SessionID> {
+        use std::str::FromStr;
+        self.get(crate::types::HEADER_SESSION_ID)
+            .ok_or(tonic::Status::not_found("session_id is not found"))?
+            .to_str()
+            .map_err(|_| tonic::Status::invalid_argument("session_id should be ascii"))
+            .and_then(|str| {
+                SessionID::from_str(str)
+                    .map_err(|_| tonic::Status::invalid_argument("session_id is not valid"))
+            })
+    }
+}
 
 pub struct TaskImpl;
 
@@ -146,21 +75,20 @@ impl task_server::Task for TaskImpl {
 
         let session_id = SessionID::new();
 
-        let asst = Assistant::new(session_id);
-        tracing::debug!("Instance Created");
+        let asst = crate::session::Assistant::new(session_id);
+        tracing::debug!("Instance Created, SessionID: {}", session_id);
 
-        tracing::debug!("Register C CallBack");
         let (tx, rx) = tokio::sync::oneshot::channel();
-        session_id.add(tx);
+        session_id.adb().register(tx);
+        tracing::debug!("Register C CallBack");
 
         req.apply_to(asst.inner_unchecked())?;
+        session_id.add(asst);
+
         tracing::debug!("Check Connection");
         rx.await
             .unwrap()
             .map_err(|e| tonic::Status::unavailable(e.to_string()))?;
-
-        tracing::debug!("Register Task State CallBack");
-        TASK_HANDLERS.write().await.insert(session_id, asst);
 
         Ok(Response::new(session_id.to_string()))
     }
@@ -169,9 +97,7 @@ impl task_server::Task for TaskImpl {
     async fn close_connection(&self, req: Request<()>) -> Ret<bool> {
         let session_id = req.get_session_id()?;
 
-        Ok(Response::new(
-            TASK_HANDLERS.write().await.remove(&session_id).is_some(),
-        ))
+        Ok(Response::new(session_id.remove()))
     }
 
     #[tracing::instrument(skip_all)]
@@ -189,17 +115,11 @@ impl task_server::Task for TaskImpl {
 
         let task_type: TaskType = task_type.try_into().unwrap();
 
-        let ret = func_with(session_id, |handler| {
-            handler.append_task(task_type, task_params.as_str())
-        })
-        .await?;
+        let ret = session_id.tasks().append(task_type, task_params.as_str());
 
         match ret {
-            Ok(id) => {
-                session_id.tasks().new(id);
-                Ok(Response::new(id.into()))
-            }
-            Err(e) => Err(tonic::Status::from_error(Box::new(e))),
+            Ok(id) => Ok(Response::new(id.into())),
+            Err(e) => Err(tonic::Status::from_error(e)),
         }
     }
 
@@ -220,14 +140,11 @@ impl task_server::Task for TaskImpl {
 
         let session_id = meta.get_session_id()?;
 
-        let ret = func_with(session_id, |handler| {
-            handler.set_task_params(task_id, task_params.as_str())
-        })
-        .await?;
+        let ret = session_id.tasks().patch_params(task_id, &task_params);
 
         match ret {
             Ok(()) => Ok(Response::new(true)),
-            Err(e) => Err(tonic::Status::from_error(Box::new(e))),
+            Err(e) => Err(tonic::Status::from_error(e)),
         }
     }
 
@@ -237,14 +154,13 @@ impl task_server::Task for TaskImpl {
 
         let session_id = meta.get_session_id()?;
 
-        let ret = func_with(session_id, |handler| {
-            handler.set_task_params(task_id.into(), r#"{ "enable": true }"#)
-        })
-        .await?;
+        let ret = session_id
+            .tasks()
+            .patch_params(task_id.into(), r#"{ "enable": true }"#);
 
         match ret {
             Ok(()) => Ok(Response::new(true)),
-            Err(e) => Err(tonic::Status::from_error(Box::new(e))),
+            Err(e) => Err(tonic::Status::from_error(e)),
         }
     }
 
@@ -254,14 +170,13 @@ impl task_server::Task for TaskImpl {
 
         let session_id = meta.get_session_id()?;
 
-        let ret = func_with(session_id, |handler| {
-            handler.set_task_params(task_id.into(), r#"{ "enable": false }"#)
-        })
-        .await?;
+        let ret = session_id
+            .tasks()
+            .patch_params(task_id.into(), r#"{ "enable": false }"#);
 
         match ret {
             Ok(()) => Ok(Response::new(true)),
-            Err(e) => Err(tonic::Status::from_error(Box::new(e))),
+            Err(e) => Err(tonic::Status::from_error(e)),
         }
     }
 
@@ -269,11 +184,11 @@ impl task_server::Task for TaskImpl {
     async fn start_tasks(&self, req: Request<()>) -> Ret<bool> {
         let session_id = req.get_session_id()?;
 
-        let ret = func_with(session_id, |handler| handler.start()).await?;
+        let ret = session_id.tasks().start();
 
         match ret {
             Ok(()) => Ok(Response::new(true)),
-            Err(e) => Err(tonic::Status::from_error(Box::new(e))),
+            Err(e) => Err(tonic::Status::from_error(e)),
         }
     }
 
@@ -281,11 +196,11 @@ impl task_server::Task for TaskImpl {
     async fn stop_tasks(&self, req: Request<()>) -> Ret<bool> {
         let session_id = req.get_session_id()?;
 
-        let ret = func_with(session_id, |handler| handler.stop()).await?;
+        let ret = session_id.tasks().stop();
 
         match ret {
             Ok(()) => Ok(Response::new(true)),
-            Err(e) => Err(tonic::Status::from_error(Box::new(e))),
+            Err(e) => Err(tonic::Status::from_error(e)),
         }
     }
 
@@ -293,7 +208,7 @@ impl task_server::Task for TaskImpl {
     async fn task_state_update(&self, req: Request<()>) -> Ret<Self::TaskStateUpdateStream> {
         let session_id = req.get_session_id()?;
 
-        let Some(rx) = session_id.take_subscriber() else {
+        let Some(rx) = session_id.log().take_subscriber() else {
             return Err(tonic::Status::resource_exhausted("rx has been taken"));
         };
 
@@ -315,7 +230,7 @@ impl task_server::Task for TaskImpl {
 
         let session_id = meta.get_session_id()?;
 
-        let logs = session_id.log().get_skip(skip);
+        let logs = session_id.log().get_skip(skip as usize);
 
         Ok(Response::new(LogArray {
             items: logs
