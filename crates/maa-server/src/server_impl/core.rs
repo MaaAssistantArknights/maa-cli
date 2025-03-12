@@ -11,7 +11,8 @@ use crate::core::{core_server::CoreServer, *};
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let addr = "[::1]:10000".parse().unwrap();
 ///
-///     let svc = core::gen_service();
+///     let cancel_token = CancellationToken::new();
+///     let svc = core::gen_service(cancel_token);
 ///
 ///     Server::builder().add_service(svc).serve(addr).await?;
 ///

@@ -80,15 +80,15 @@ impl task_server::Task for TaskImpl {
 
         let (tx, rx) = tokio::sync::oneshot::channel();
         session_id.adb().register(tx);
-        tracing::debug!("Register C CallBack");
+        tracing::trace!("Register C CallBack");
 
         req.apply_to(asst.inner_unchecked())?;
         session_id.add(asst);
 
-        tracing::debug!("Check Connection");
+        tracing::trace!("Check Connection");
         rx.await
             .unwrap()
-            .map_err(|e| tonic::Status::unavailable(e.to_string()))?;
+            .map_err(|e| tonic::Status::failed_precondition(e.to_string()))?;
 
         Ok(Response::new(session_id.to_string()))
     }

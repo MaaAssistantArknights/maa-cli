@@ -21,6 +21,7 @@ pub(crate) unsafe extern "C" fn default_callback(
         // should be already removed by close_connection
         debug_assert!(!session_id.remove());
         // restore and free the mem
+        tracing::debug!(id = %session_id, "Free here");
         SessionID::drop_ptr(session_id_ptr as *const u8);
     }
 }

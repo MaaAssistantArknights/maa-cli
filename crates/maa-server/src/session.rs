@@ -3,15 +3,19 @@ use std::collections::BTreeMap;
 use parking_lot::Mutex;
 use tokio::sync::oneshot::Sender;
 
-use crate::types::{SessionID, TaskId, TaskStateType};
+use crate::{
+    error::NO_SUCH_SESSION,
+    types::{SessionID, TaskId, TaskStateType},
+};
 
-static SESSION_POOL: Mutex<BTreeMap<SessionID, Session>> = Mutex::new(BTreeMap::new());
-static PRE_SESSION_POOL: Mutex<BTreeMap<SessionID, Sender<CallBack>>> = Mutex::new(BTreeMap::new());
-
+type MMap<S, ID = SessionID> = Mutex<BTreeMap<ID, S>>;
 type LogContent = (TaskStateType, String);
-
 type CallBackContent = String;
 type CallBack = Result<(), CallBackContent>;
+type Result<T, E = Box<dyn core::error::Error + Send + Sync>> = core::result::Result<T, E>;
+
+static SESSION_POOL: MMap<Session> = Mutex::new(BTreeMap::new());
+static CONNECT_POOL: MMap<Sender<CallBack>> = Mutex::new(BTreeMap::new());
 
 // re-export
 pub use state::State;
@@ -19,35 +23,25 @@ pub use state::State;
 pub trait SessionExt: Sized {
     fn as_id(&self) -> SessionID;
 
-    /// Create a [Session] with given `callback` and insert with `session_id`
+    /// Insert the [Session] with current `session_id`
     fn add(self, asst: Assistant) {
         let session_id = self.as_id();
         let session = Session::new(asst);
         SESSION_POOL.lock().insert(session_id, session);
     }
 
-    /// Remove [Session] with given `session_id`
+    /// Remove [Session] with current `session_id`
     ///
     /// Return [false] if already dropped
     fn remove(self) -> bool {
         let session_id = self.as_id();
-        tracing::info!("Remove Session");
+        tracing::info!("Terminate Session");
         // here we must let lock have a binding, or this will block the thread
         // I don't know why, but this just work
         // hope it won't be worse later
         let mut lock = SESSION_POOL.lock();
         lock.remove(&session_id).is_some()
         // SESSION_POOL.lock().remove(&session_id).is_some()
-    }
-
-    fn info_to_channel(self, msg: LogContent) {
-        let session_id = self.as_id();
-        SESSION_POOL
-            .lock()
-            .get(&session_id)
-            .unwrap()
-            .channel
-            .log_to_channel(msg);
     }
 
     fn tasks(self) -> Tasks {
@@ -69,19 +63,17 @@ impl SessionExt for SessionID {
     }
 }
 
-pub type Result<T, E = Box<dyn core::error::Error + Send + Sync>> = core::result::Result<T, E>;
-
 pub struct InitAdb(SessionID);
 impl InitAdb {
     pub fn register(self, callback: Sender<CallBack>) {
         let session_id = self.0;
-        PRE_SESSION_POOL.lock().insert(session_id, callback);
+        CONNECT_POOL.lock().insert(session_id, callback);
     }
 
     /// safety: this should be called only during Task::new_connection
     fn result(self, err: Option<CallBackContent>) {
         let session_id = self.0;
-        if let Some(shot) = PRE_SESSION_POOL.lock().remove(&session_id) {
+        if let Some(shot) = CONNECT_POOL.lock().remove(&session_id) {
             if shot
                 .send(match err {
                     Some(err) => Err(err),
@@ -89,10 +81,10 @@ impl InitAdb {
                 })
                 .is_err()
             {
-                tracing::warn!("");
+                tracing::error!("CallBack Rx dropped before tx send.");
             }
         } else {
-            tracing::warn!("");
+            tracing::error!("Call result for more than once");
         }
     }
 
@@ -110,53 +102,53 @@ impl InitAdb {
 pub struct Tasks(SessionID);
 impl Tasks {
     pub fn append(self, task_type: maa_sys::TaskType, params: &str) -> Result<TaskId> {
-        if let Some(session) = SESSION_POOL.lock().get_mut(&self.0) {
-            let task_id = session
-                .asst
-                .inner_unchecked()
-                .append_task(task_type, params)?;
-            session.tasks.insert(task_id, state::TaskState::default());
-            Ok(task_id)
-        } else {
-            todo!()
-        }
+        let mut binding = SESSION_POOL.lock();
+        let session = binding.get_mut(&self.0).ok_or(NO_SUCH_SESSION)?;
+        let task_id = session
+            .asst
+            .inner_unchecked()
+            .append_task(task_type, params)?;
+        session.tasks.insert(task_id, state::TaskState::default());
+        Ok(task_id)
     }
 
     pub fn start(self) -> Result<()> {
-        if let Some(session) = SESSION_POOL.lock().get_mut(&self.0) {
-            session.asst.inner_unchecked().start()?;
-        };
+        let mut binding = SESSION_POOL.lock();
+        let session = binding.get_mut(&self.0).ok_or(NO_SUCH_SESSION)?;
+        session.asst.inner_unchecked().start()?;
         Ok(())
     }
 
     pub fn stop(self) -> Result<()> {
-        if let Some(session) = SESSION_POOL.lock().get_mut(&self.0) {
-            session.asst.inner_unchecked().stop()?;
-        };
+        let mut binding = SESSION_POOL.lock();
+        let session = binding.get_mut(&self.0).ok_or(NO_SUCH_SESSION)?;
+        session.asst.inner_unchecked().stop()?;
         Ok(())
     }
 
     pub fn patch_params(self, task_id: TaskId, params: &str) -> Result<()> {
-        if let Some(session) = SESSION_POOL.lock().get_mut(&self.0) {
-            session
-                .asst
-                .inner_unchecked()
-                .set_task_params(task_id, params)?;
-        };
+        let mut binding = SESSION_POOL.lock();
+        let session = binding.get_mut(&self.0).ok_or(NO_SUCH_SESSION)?;
+        session
+            .asst
+            .inner_unchecked()
+            .set_task_params(task_id, params)?;
         Ok(())
     }
 
-    pub fn update_state(self, task_id: TaskId, new: state::State) {
+    pub fn callback_state(self, task_id: TaskId, new: state::State) {
         if let Some(state) = SESSION_POOL
             .lock()
             .get_mut(&self.0)
             .and_then(|session| session.tasks.get_mut(&task_id))
         {
             state.reason(new);
+        } else {
+            tracing::warn!("State Update for Unknown Session")
         }
     }
 
-    pub fn update_log(self, task_id: TaskId, message: LogContent) {
+    pub fn callback_log(self, task_id: TaskId, message: LogContent) {
         if let Some(session) = SESSION_POOL.lock().get_mut(&self.0) {
             session
                 .tasks
@@ -164,6 +156,8 @@ impl Tasks {
                 .unwrap()
                 .update(message.clone());
             session.channel.log_to_channel(message);
+        } else {
+            tracing::warn!("New Log for Unknown Session")
         }
     }
 }
@@ -191,11 +185,20 @@ impl Log {
         }
     }
 
+    pub fn to_channel(self, msg: LogContent) {
+        let session_id = self.0;
+        if let Some(session) = SESSION_POOL.lock().get(&session_id) {
+            session.channel.log_to_channel(msg);
+        } else {
+            tracing::warn!("New Log for Unknown Session")
+        }
+    }
+
     pub fn log(self, message: LogContent) {
         if let Some(session) = SESSION_POOL.lock().get_mut(&self.0) {
             session.logs.push(message);
         } else {
-            tracing::warn!(from = ?self.0, "Unknown Log: {:?}", message)
+            tracing::warn!("Unknown Log: {:?}", message)
         }
     }
 }
@@ -295,6 +298,7 @@ unsafe impl Sync for Assistant {}
 impl Assistant {
     pub fn new(session_id: SessionID) -> Self {
         let ptr = session_id.to_ptr();
+        tracing::debug!(id = %session_id, "Forget here");
         Self {
             inner: maa_sys::Assistant::new(
                 Some(crate::server_impl::default_callback),

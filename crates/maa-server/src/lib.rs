@@ -31,14 +31,14 @@ pub mod task {
             pub fn apply_to(self, asst: &maa_sys::Assistant) -> Result<(), String> {
                 use maa_sys::InstanceOptionKey;
                 if let Ok(touch_mode) = TryInto::<TouchMode>::try_into(self.touch_mode) {
-                    tracing::debug!("Setting touch mode to {}", touch_mode.to_str());
+                    tracing::trace!("Setting touch mode to {}", touch_mode.to_str());
                     asst.set_instance_option(InstanceOptionKey::TouchMode, touch_mode.to_str())
                         .map_err(|_| {
                             format!("Failed to set touch mode to {}", touch_mode.to_str())
                         })?;
                 }
                 if self.deployment_with_pause {
-                    tracing::debug!(
+                    tracing::trace!(
                         "Setting deployment with pause to {}",
                         self.deployment_with_pause
                     );
@@ -49,7 +49,7 @@ pub mod task {
                     .map_err(|_| "Failed to set deployment with pause")?;
                 }
                 if self.adb_lite_enabled {
-                    tracing::debug!("Setting adb lite enabled to {}", self.adb_lite_enabled);
+                    tracing::trace!("Setting adb lite enabled to {}", self.adb_lite_enabled);
                     asst.set_instance_option(
                         InstanceOptionKey::AdbLiteEnabled,
                         self.adb_lite_enabled,
@@ -57,7 +57,7 @@ pub mod task {
                     .map_err(|_| "Failed to set adb lite enabled")?;
                 }
                 if self.kill_adb_on_exit {
-                    tracing::debug!("Setting kill adb on exit to {}", self.kill_adb_on_exit);
+                    tracing::trace!("Setting kill adb on exit to {}", self.kill_adb_on_exit);
                     asst.set_instance_option(
                         InstanceOptionKey::KillAdbOnExit,
                         self.kill_adb_on_exit,
@@ -75,7 +75,7 @@ pub mod task {
                 let config = self.config;
                 tracing::debug!(
                     "Connecting to {address} with config {config} via {}",
-                    &adb_path
+                    adb_path
                 );
 
                 (adb_path, address, config)
@@ -325,3 +325,7 @@ mod types {
 mod session;
 
 mod server_impl;
+
+mod error {
+    pub const NO_SUCH_SESSION: &str = "No such session";
+}

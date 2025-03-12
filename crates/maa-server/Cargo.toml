@@ -14,6 +14,8 @@ name = "client"
 required-features = ["client"]
 
 [features]
+default = ["client"]
+
 client = []
 
 [dependencies]
@@ -30,6 +32,7 @@ tokio = { workspace = true }
 tokio-stream = { version = "0.1", default-features = false, features = [
     "sync",
 ] }
+tokio-util = "0.7.13"
 
 tracing = "0.1.41"
 
@@ -38,7 +41,6 @@ serde_json.workspace = true
 
 parking_lot = "0.12.3"
 uuid = { version = "1.15.1", features = ["v7"] }
-tokio-util = "0.7.13"
 
 [build-dependencies]
 tonic-build = { version = "0.12", default-features = false, features = [

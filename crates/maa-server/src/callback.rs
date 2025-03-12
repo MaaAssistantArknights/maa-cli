@@ -8,24 +8,23 @@ use crate::{
 type Map = serde_json::Map<String, serde_json::Value>;
 
 #[must_use = "If true, we should destory the session and session_id"]
-#[tracing::instrument("C CallBack", skip_all)]
+#[tracing::instrument("C CallBack", skip_all, fields(from = %session_id))]
 pub fn entry(code: TaskStateType, json_str: &str, session_id: SessionID) -> bool {
-    trace!("Session ID: {:?}", session_id);
-
     session_id.log().log((code, json_str.to_string()));
 
     let map: Map = serde_json::from_str(json_str).unwrap();
 
     // if ret is None, which means the message is not processed well
     // we should print the message to trace the error
-    if let Some(destory) = process_message(code, map, session_id) {
-        if destory {
+    if let Some(destoried) = process_message(code, map, session_id) {
+        if destoried {
             return true;
+        } else {
+            debug!(
+                "Failed To Process Message, code: {:?}, message: {}",
+                code, json_str
+            )
         }
-        debug!(
-            "FailedToProcessMessage, code: {:?}, message: {}",
-            code, json_str
-        )
     }
     false
 }
@@ -41,7 +40,7 @@ fn process_message(code: TaskStateType, message: Map, session_id: SessionID) -> 
         ConnectionInfo => process_connection_info(message, session_id),
         AllTasksCompleted => {
             let msg = serde_json::to_string_pretty(&message).unwrap();
-            session_id.info_to_channel((code, msg));
+            session_id.log().to_channel((code, msg));
             info!("AllTasksCompleted");
         }
         AsyncCallInfo => {}
@@ -142,7 +141,7 @@ fn process_taskchain(code: TaskStateType, message: Map, session_id: SessionID) {
     let msg = serde_json::to_string_pretty(&message).unwrap();
     let TaskChain { taskchain, taskid } =
         serde_json::from_value(serde_json::Value::Object(message)).unwrap();
-    session_id.tasks().update_log(taskid, (code, msg));
+    session_id.tasks().callback_log(taskid, (code, msg));
 
     use TaskStateType::*;
     let state = match code {
@@ -166,7 +165,7 @@ fn process_taskchain(code: TaskStateType, message: Map, session_id: SessionID) {
 
         _ => unreachable!(),
     };
-    session_id.tasks().update_state(taskid, state);
+    session_id.tasks().callback_state(taskid, state);
 }
 
 mod subtask {
@@ -175,6 +174,6 @@ mod subtask {
     pub fn process_subtask(code: TaskStateType, message: Map, session_id: SessionID) {
         let msg = serde_json::to_string_pretty(&message).unwrap();
         let taskid = message.get("taskid").unwrap().as_i64().unwrap() as TaskId;
-        session_id.tasks().update_log(taskid, (code, msg));
+        session_id.tasks().callback_log(taskid, (code, msg));
     }
 }

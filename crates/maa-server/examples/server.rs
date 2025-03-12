@@ -29,7 +29,7 @@ async fn main() {
 
     if USING_UDS {
         println!("Using Unix Socket");
-        let path = "/tmp/tonic/testing.sock";
+        let path = "/tmp/maa_server/testing.sock";
         let path = std::path::Path::new(path);
         if path.exists() {
             std::fs::remove_file(path).unwrap()
