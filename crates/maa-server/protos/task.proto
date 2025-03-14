@@ -19,7 +19,6 @@ service Task {
     // Set task parameters for task with given `task_id`.
     rpc ModifyTask(ModifyTaskRequest) returns (google.protobuf.BoolValue);
 
-    rpc ActivateTask(TaskId) returns (google.protobuf.BoolValue);
     rpc DeactivateTask(TaskId) returns (google.protobuf.BoolValue);
 
     rpc StartTasks(google.protobuf.Empty) returns (google.protobuf.BoolValue);

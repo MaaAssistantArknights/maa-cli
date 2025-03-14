@@ -149,22 +149,6 @@ impl task_server::Task for TaskImpl {
     }
 
     #[tracing::instrument(skip_all)]
-    async fn activate_task(&self, req: Request<TaskId>) -> Ret<bool> {
-        let (meta, _, task_id) = req.into_parts();
-
-        let session_id = meta.get_session_id()?;
-
-        let ret = session_id
-            .tasks()
-            .patch_params(task_id.into(), r#"{ "enable": true }"#);
-
-        match ret {
-            Ok(()) => Ok(Response::new(true)),
-            Err(e) => Err(tonic::Status::from_error(e)),
-        }
-    }
-
-    #[tracing::instrument(skip_all)]
     async fn deactivate_task(&self, req: Request<TaskId>) -> Ret<bool> {
         let (meta, _, task_id) = req.into_parts();
 

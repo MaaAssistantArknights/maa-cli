@@ -1,6 +1,6 @@
 use maa_server::{
     prelude::HEADER_SESSION_ID,
-    task::{NewTaskRequest, TaskState},
+    task::{ModifyTaskRequest, NewTaskRequest, TaskState},
 };
 use maa_types::{TaskStateType, TaskType};
 use tokio_stream::StreamExt;
@@ -119,7 +119,7 @@ async fn main() {
                 touch_mode: maa_types::TouchMode::MaaTouch.into(),
                 deployment_with_pause: false,
                 adb_lite_enabled: false,
-                kill_adb_on_exit: true,
+                kill_adb_on_exit: false,
             }),
         })
         .await
@@ -170,41 +170,42 @@ async fn main() {
         .unwrap();
     tracing::info!("Deactivate task Fight 1-7");
 
-    // let _id = taskclient
-    //     .append_task(make_request(
-    //         NewTaskRequest {
-    //             task_type: TaskType::Fight.into(),
-    //             task_params: r#" { "stage" : "Annihilation", "times" : 1 } "#.to_owned(),
-    //         },
-    //         &session_id,
-    //     ))
-    //     .await
-    //     .unwrap()
-    //     .into_inner();
-    // tracing::info!("Add task Annihilation");
+    let _id = taskclient
+        .append_task(make_request(
+            NewTaskRequest {
+                task_type: TaskType::Fight.into(),
+                task_params: r#" { "stage" : "Annihilation", "times" : 1 } "#.to_owned(),
+            },
+            &session_id,
+        ))
+        .await
+        .unwrap()
+        .into_inner();
+    tracing::info!("Add task Annihilation");
 
-    // let _id = taskclient
-    //     .append_task(make_request(
-    //         NewTaskRequest {
-    //             task_type: TaskType::Fight.into(),
-    //             task_params: r#" { "stage" : "EA-6" } "#.to_owned(),
-    //         },
-    //         &session_id,
-    //     ))
-    //     .await
-    //     .unwrap()
-    //     .into_inner();
-    // tracing::info!("Add task Fight");
+    let _id = taskclient
+        .append_task(make_request(
+            NewTaskRequest {
+                task_type: TaskType::Fight.into(),
+                task_params: r#" { "stage" : "EA-6" } "#.to_owned(),
+            },
+            &session_id,
+        ))
+        .await
+        .unwrap()
+        .into_inner();
+    tracing::info!("Add task Fight");
 
     let id = taskclient
         .append_task(make_request(
             NewTaskRequest {
                 task_type: TaskType::Mall.into(),
-                task_params: r#" { "enable": true, 
-                "shopping" : true, 
-                "credit_fight": true, 
-                "buy_first": ["招聘许可", "加急许可", "龙门币"], 
-                "blacklist": ["碳", "家具"] } "#.to_owned(),
+                task_params: r#" { "enable": false,
+                "shopping" : true,
+                "credit_fight": true,
+                "buy_first": ["招聘许可", "加急许可", "龙门币"],
+                "blacklist": ["碳", "家具"] } "#
+                    .to_owned(),
             },
             &session_id,
         ))
@@ -214,7 +215,18 @@ async fn main() {
     tracing::info!("Add inactive task Mall");
 
     taskclient
-        .activate_task(make_request(id, &session_id))
+        .modify_task(make_request(
+            ModifyTaskRequest {
+                task_id: Some(id),
+                task_params: r#" { "enable": true,
+                "shopping" : true,
+                "credit_fight": true,
+                "buy_first": ["招聘许可", "加急许可", "龙门币"],
+                "blacklist": ["碳", "家具"] } "#
+                    .to_owned(),
+            },
+            &session_id,
+        ))
         .await
         .unwrap();
     tracing::info!("Activate task Mall");
@@ -231,6 +243,19 @@ async fn main() {
         .unwrap()
         .into_inner();
     tracing::info!("Add task Award");
+
+    let _id = taskclient
+        .append_task(make_request(
+            NewTaskRequest {
+                task_type: TaskType::Roguelike.into(),
+                task_params: r#" { "theme": "Mizuki", "starts_count": 1 } "#.to_owned(),
+            },
+            &session_id,
+        ))
+        .await
+        .unwrap()
+        .into_inner();
+    tracing::info!("Add task Roguelike");
 
     taskclient
         .start_tasks(make_request((), &session_id))

@@ -181,8 +181,6 @@ pub mod core {
 }
 
 pub mod prelude {
-    pub use tonic;
-
     pub use crate::{
         core,
         server_impl::{core::gen_service as core_service, task::gen_service as task_service},

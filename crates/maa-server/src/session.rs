@@ -150,14 +150,14 @@ impl Tasks {
 
     pub fn callback_log(self, task_id: TaskId, message: LogContent) {
         if let Some(session) = SESSION_POOL.lock().get_mut(&self.0) {
-            session
-                .tasks
-                .get_mut(&task_id)
-                .unwrap()
-                .update(message.clone());
+            if let Some(task_state) = session.tasks.get_mut(&task_id) {
+                task_state.update(message.clone());
+            } else {
+                tracing::warn!(task_id = %task_id, "New Log for Unknown Task: {:?}", message)
+            }
             session.channel.log_to_channel(message);
         } else {
-            tracing::warn!("New Log for Unknown Session")
+            tracing::warn!("New Log for Unknown Session: {:?}", message)
         }
     }
 }
@@ -270,11 +270,14 @@ mod state {
 
     impl TaskState {
         pub fn reason(&mut self, reason: State) {
-            debug_assert_eq!(self.state, match reason {
-                State::Waiting => unreachable!(),
-                State::Running => State::Waiting,
-                State::Completed | State::Canceled | State::Error => State::Running,
-            });
+            debug_assert_eq!(
+                self.state,
+                match reason {
+                    State::Waiting => unreachable!(),
+                    State::Running => State::Waiting,
+                    State::Completed | State::Canceled | State::Error => State::Running,
+                }
+            );
             self.state = reason;
         }
 
