@@ -32,6 +32,9 @@ pub fn entry(code: TaskStateType, json_str: &str, session_id: SessionID) -> bool
 fn process_message(code: TaskStateType, message: Map, session_id: SessionID) -> Option<bool> {
     use TaskStateType::*;
 
+    let msg = serde_json::to_string(&message).unwrap();
+    session_id.log().to_channel((code, msg));
+
     match code {
         InternalError => {}
         InitFailed => {
@@ -39,8 +42,6 @@ fn process_message(code: TaskStateType, message: Map, session_id: SessionID) -> 
         }
         ConnectionInfo => process_connection_info(message, session_id),
         AllTasksCompleted => {
-            let msg = serde_json::to_string_pretty(&message).unwrap();
-            session_id.log().to_channel((code, msg));
             info!("AllTasksCompleted");
         }
         AsyncCallInfo => {}

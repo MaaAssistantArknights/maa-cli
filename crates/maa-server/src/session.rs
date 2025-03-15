@@ -155,7 +155,6 @@ impl Tasks {
             } else {
                 tracing::warn!(task_id = %task_id, "New Log for Unknown Task: {:?}", message)
             }
-            session.channel.log_to_channel(message);
         } else {
             tracing::warn!("New Log for Unknown Session: {:?}", message)
         }
