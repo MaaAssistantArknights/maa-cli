@@ -70,6 +70,17 @@ impl task_server::Task for TaskImpl {
     >;
 
     #[tracing::instrument(skip_all)]
+    async fn test_connection(&self, _req: Request<()>) -> Ret<String> {
+        let session_id = SessionID::new();
+
+        let asst = crate::session::Assistant::new(session_id);
+        tracing::debug!("Test Instance Created, SessionID: {}", session_id);
+        session_id.add(asst);
+
+        Ok(Response::new(session_id.to_string()))
+    }
+
+    #[tracing::instrument(skip_all)]
     async fn new_connection(&self, req: Request<NewConnectionRequest>) -> Ret<String> {
         let req = req.into_inner();
 

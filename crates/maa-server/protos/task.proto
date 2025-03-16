@@ -10,6 +10,9 @@ import "google/protobuf/wrappers.proto";
 
 service Task {
     rpc NewConnection(NewConnectionRequest) returns (google.protobuf.StringValue);
+    // Return a session which can only used for test task params.
+    // call StartTasks will cause error.
+    rpc TestConnection(google.protobuf.Empty) returns (google.protobuf.StringValue);
     // Terminate this session,
     // return true on success, false if not found (maybe already terminated)
     rpc CloseConnection(google.protobuf.Empty) returns (google.protobuf.BoolValue);
