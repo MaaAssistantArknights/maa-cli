@@ -1,6 +1,7 @@
+use std::net::TcpStream;
+
 use anyhow::{Context, Result};
 use log::{info, trace};
-use std::net::TcpStream;
 
 use crate::config::task::ClientType;
 
