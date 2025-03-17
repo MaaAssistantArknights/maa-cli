@@ -31,7 +31,7 @@ impl<'a> WaydroidApp<'a> {
 impl super::ExternalApp for WaydroidApp<'_> {
     fn open(&self) -> Result<()> {
         if self.connect().is_ok_and(|b| b) {
-            info!("Game is already running!");
+            info!("Waydroid is already running!");
             return Ok(());
         }
 
@@ -42,7 +42,7 @@ impl super::ExternalApp for WaydroidApp<'_> {
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::piped())
             .spawn()
-            .context("Failed to start game!")?;
+            .context("Failed to start Waydroid!")?;
 
         let mut rdr = std::io::BufReader::new(task.stderr.take().unwrap());
         let mut buf = String::new();
@@ -54,7 +54,7 @@ impl super::ExternalApp for WaydroidApp<'_> {
             rdr.read_line(&mut buf)?;
             trace!("{}", buf);
             if buf.contains("ADB") {
-                info!("Game ready!");
+                info!("Waydroid ready!");
                 break;
             }
             trace!("Waiting for game ready...");
@@ -69,7 +69,7 @@ impl super::ExternalApp for WaydroidApp<'_> {
             .arg("session")
             .arg("stop")
             .spawn()
-            .context("Failed to start game!")?;
+            .context("Failed to stop Waydroid!")?;
 
         Ok(())
     }
