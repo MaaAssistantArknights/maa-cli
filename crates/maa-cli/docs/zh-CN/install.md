@@ -56,6 +56,15 @@ Homebrew 用户可以通过非官方的 [tap](https://github.com/MaaAssistantArk
 - [Windows x86_64 (x64, amd64)](https://github.com/MaaAssistantArknights/maa-cli/releases/latest/download/maa_cli-x86_64-pc-windows-msvc.zip)
 - [Windows aarch64 (arm64)](https://github.com/MaaAssistantArknights/maa-cli/releases/latest/download/maa_cli-aarch64-pc-windows-msvc.zip)
 
+### 依赖库安装
+
+对于Windows平台用户，请以管理员身份在命令提示符或powershell中运行以下命令以安装必要依赖库
+
+```bat
+winget install "Microsoft.VCRedist.2015+.x64" --override "/repair /passive /norestart" --uninstall-previous --accept-package-agreements --force
+winget install "Microsoft.DotNet.DesktopRuntime.8" --override "/repair /passive /norestart" --uninstall-previous --accept-package-agreements --force
+```
+
 如果你的平台不在上述列表中，可以尝试自行编译安装（参见下文）。
 
 ## 编译安装
