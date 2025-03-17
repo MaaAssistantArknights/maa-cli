@@ -7,7 +7,7 @@ use crate::{
 
 type Map = serde_json::Map<String, serde_json::Value>;
 
-#[must_use = "If true, we should destory the session and session_id"]
+#[must_use = "If true, we should destroy the session and session_id"]
 #[tracing::instrument("C CallBack", skip_all, fields(from = %session_id))]
 pub fn entry(code: TaskStateType, json_str: &str, session_id: SessionID) -> bool {
     session_id.log().log((code, json_str.to_string()));
@@ -16,8 +16,8 @@ pub fn entry(code: TaskStateType, json_str: &str, session_id: SessionID) -> bool
 
     // if ret is None, which means the message is not processed well
     // we should print the message to trace the error
-    if let Some(destoried) = process_message(code, map, session_id) {
-        if destoried {
+    if let Some(destroyed) = process_message(code, map, session_id) {
+        if destroyed {
             return true;
         } else {
             debug!(
