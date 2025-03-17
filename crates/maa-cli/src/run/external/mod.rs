@@ -9,3 +9,8 @@ pub(super) trait ExternalApp {
 mod playcover;
 #[cfg(target_os = "macos")]
 pub(super) use playcover::PlayCoverApp;
+
+#[cfg(target_os = "linux")]
+mod waydroid;
+#[cfg(target_os = "linux")]
+pub(super) use waydroid::WaydroidApp;

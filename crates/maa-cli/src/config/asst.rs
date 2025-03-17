@@ -122,6 +122,7 @@ impl ConnectionConfig {
 pub enum Preset {
     MuMuPro,
     PlayCover,
+    Waydroid,
     #[default]
     Adb,
 }
@@ -148,6 +149,7 @@ impl<'de> Deserialize<'de> for Preset {
                     "MuMuPro" => Ok(Preset::MuMuPro),
                     "PlayCover" | "PlayTools" => Ok(Preset::PlayCover),
                     "ADB" | "Adb" | "adb" => Ok(Preset::Adb),
+                    "Waydroid" | "waydroid" => Ok(Preset::Waydroid),
                     _ => {
                         warn!("Unknown connection preset: {}, ignoring", value);
                         Ok(Preset::Adb)
@@ -164,15 +166,18 @@ impl Preset {
     fn default_adb_path(self) -> &'static str {
         match self {
             Preset::MuMuPro => "/Applications/MuMuPlayer.app/Contents/MacOS/MuMuEmulator.app/Contents/MacOS/tools/adb",
+            Preset::Waydroid => "",
             Preset::PlayCover => "",
             Preset::Adb => "adb",
-        }
+                    }
     }
 
     fn default_address(self, adb_path: &str) -> Cow<'static, str> {
         match self {
             Preset::MuMuPro => "127.0.0.1:16384".into(),
             Preset::PlayCover => "127.0.0.1:1717".into(),
+            // NOT Official, users should Grab waydroid IP address from Android Settings-> About
+            Preset::Waydroid => "192.168.240.112:5555".into(),
             Preset::Adb => std::process::Command::new(adb_path)
                 .arg("devices")
                 .output()
@@ -526,42 +531,45 @@ mod tests {
             )
             .unwrap();
 
-            assert_eq!(config, AsstConfig {
-                connection: ConnectionConfig {
-                    preset: Preset::Adb,
-                    adb_path: Some(String::from("adb")),
-                    address: Some(String::from("emulator-5554")),
-                    config: Some(String::from("CompatMac")),
-                },
-                resource: ResourceConfig {
-                    resource_base_dirs: {
-                        let mut base_dirs = default_resource_base_dirs();
-                        base_dirs.push(user_resource_dir);
-                        base_dirs
+            assert_eq!(
+                config,
+                AsstConfig {
+                    connection: ConnectionConfig {
+                        preset: Preset::Adb,
+                        adb_path: Some(String::from("adb")),
+                        address: Some(String::from("emulator-5554")),
+                        config: Some(String::from("CompatMac")),
                     },
-                    global_resource: Some(PathBuf::from("YoStarEN")),
-                    platform_diff_resource: Some(PathBuf::from("iOS")),
-                    user_resource: true,
-                },
-                static_options: StaticOptions {
-                    cpu_ocr: Some(false),
-                    gpu_ocr: Some(1),
-                },
-                instance_options: InstanceOptions {
-                    touch_mode: Some(TouchMode::MaaTouch),
-                    deployment_with_pause: Some(false),
-                    adb_lite_enabled: Some(false),
-                    kill_adb_on_exit: Some(false),
-                },
-            });
+                    resource: ResourceConfig {
+                        resource_base_dirs: {
+                            let mut base_dirs = default_resource_base_dirs();
+                            base_dirs.push(user_resource_dir);
+                            base_dirs
+                        },
+                        global_resource: Some(PathBuf::from("YoStarEN")),
+                        platform_diff_resource: Some(PathBuf::from("iOS")),
+                        user_resource: true,
+                    },
+                    static_options: StaticOptions {
+                        cpu_ocr: Some(false),
+                        gpu_ocr: Some(1),
+                    },
+                    instance_options: InstanceOptions {
+                        touch_mode: Some(TouchMode::MaaTouch),
+                        deployment_with_pause: Some(false),
+                        adb_lite_enabled: Some(false),
+                        kill_adb_on_exit: Some(false),
+                    },
+                }
+            );
         }
 
         #[test]
         fn connection_config() {
-            assert_de_tokens(&ConnectionConfig::default(), &[
-                Token::Map { len: Some(0) },
-                Token::MapEnd,
-            ]);
+            assert_de_tokens(
+                &ConnectionConfig::default(),
+                &[Token::Map { len: Some(0) }, Token::MapEnd],
+            );
 
             assert_de_tokens(
                 &ConnectionConfig {
@@ -806,12 +814,15 @@ mod tests {
 
         #[test]
         fn default() {
-            assert_matches!(ConnectionConfig::default(), ConnectionConfig {
-                preset: Preset::Adb,
-                adb_path: None,
-                address: None,
-                config: None,
-            });
+            assert_matches!(
+                ConnectionConfig::default(),
+                ConnectionConfig {
+                    preset: Preset::Adb,
+                    adb_path: None,
+                    address: None,
+                    config: None,
+                }
+            );
         }
 
         #[cfg(target_os = "macos")]
@@ -938,12 +949,15 @@ mod tests {
 
         #[test]
         fn default() {
-            assert_eq!(ResourceConfig::default(), ResourceConfig {
-                resource_base_dirs: default_resource_base_dirs(),
-                global_resource: None,
-                platform_diff_resource: None,
-                user_resource: false,
-            });
+            assert_eq!(
+                ResourceConfig::default(),
+                ResourceConfig {
+                    resource_base_dirs: default_resource_base_dirs(),
+                    global_resource: None,
+                    platform_diff_resource: None,
+                    user_resource: false,
+                }
+            );
         }
 
         #[test]
@@ -1034,9 +1048,10 @@ mod tests {
 
             resource_dir.ensure().unwrap();
 
-            assert_eq!(push_resource(&mut Vec::new(), resource_dir.clone()), &[
-                resource_dir.clone()
-            ]);
+            assert_eq!(
+                push_resource(&mut Vec::new(), resource_dir.clone()),
+                &[resource_dir.clone()]
+            );
 
             assert_eq!(
                 push_resource(&mut Vec::new(), unexists_resource_dir.clone()),

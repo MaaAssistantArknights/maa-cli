@@ -183,6 +183,9 @@ where
             task_config.client_type,
             address.as_ref(),
         ))),
+        crate::config::asst::Preset::Waydroid => {
+            Some(Box::new(external::WaydroidApp::new(address.as_ref())))
+        }
         _ => None,
     };
 
