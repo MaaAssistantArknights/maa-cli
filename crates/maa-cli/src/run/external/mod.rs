@@ -1,8 +1,7 @@
-#[async_trait::async_trait]
 pub(super) trait ExternalApp {
-    async fn open(&self) -> anyhow::Result<()>;
+    fn open(&self) -> anyhow::Result<()>;
 
-    async fn close(&self) -> anyhow::Result<()>;
+    fn close(&self) -> anyhow::Result<()>;
 }
 
 #[cfg(target_os = "macos")]

@@ -190,12 +190,9 @@ where
     };
 
     if !args.dry_run {
-        let rt = tokio::runtime::Runtime::new().context("Failed to create tokio runtime")?;
-
         // Startup external app
         if let (Some(app), true) = (app.as_deref(), task_config.start_app) {
-            rt.block_on(app.open())
-                .context("Failed to open external app")?;
+            app.open().context("Failed to open external app")?;
         }
 
         // Connect to game or emulator
@@ -214,8 +211,7 @@ where
 
         // Close external app
         if let (Some(app), true) = (app.as_deref(), task_config.close_app) {
-            rt.block_on(app.close())
-                .context("Failed to close external app")?;
+            app.close().context("Failed to close external app")?;
         }
     }
 

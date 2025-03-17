@@ -28,9 +28,8 @@ impl<'a> WaydroidApp<'a> {
     }
 }
 
-#[async_trait::async_trait]
 impl super::ExternalApp for WaydroidApp<'_> {
-    async fn open(&self) -> Result<()> {
+    fn open(&self) -> Result<()> {
         if self.connect().is_ok_and(|b| b) {
             info!("Game is already running!");
             return Ok(());
@@ -64,7 +63,7 @@ impl super::ExternalApp for WaydroidApp<'_> {
         Ok(())
     }
 
-    async fn close(&self) -> Result<()> {
+    fn close(&self) -> Result<()> {
         info!("Closing waydroid");
         std::process::Command::new("waydroid")
             .arg("session")
