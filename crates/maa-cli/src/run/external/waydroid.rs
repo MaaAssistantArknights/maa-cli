@@ -11,7 +11,7 @@ impl<'a> WaydroidApp<'a> {
         Self { address }
     }
 
-    fn connect(&self) -> Result<bool> {
+    fn check_adb_devices(&self) -> Result<bool> {
         let ret = String::from_utf8(
             std::process::Command::new("adb")
                 .arg("devices")
@@ -30,7 +30,7 @@ impl<'a> WaydroidApp<'a> {
 
 impl super::ExternalApp for WaydroidApp<'_> {
     fn open(&self) -> Result<()> {
-        if self.connect().is_ok_and(|b| b) {
+        if self.check_adb_devices().is_ok_and(|b| b) {
             info!("Waydroid is already running!");
             return Ok(());
         }

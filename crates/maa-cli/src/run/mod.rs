@@ -183,6 +183,7 @@ where
             task_config.client_type,
             address.as_ref(),
         ))),
+        #[cfg(target_os = "linux")]
         crate::config::asst::Preset::Waydroid => {
             Some(Box::new(external::WaydroidApp::new(address.as_ref())))
         }
