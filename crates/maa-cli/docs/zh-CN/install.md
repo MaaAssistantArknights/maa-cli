@@ -93,9 +93,9 @@ maa install
 
 对于Windows平台用户，请以管理员身份在命令提示符或powershell中运行以下命令，以安装必要工具组VC++
 
-```bat
-winget install "Microsoft.VCRedist.2015+.x64" --override "/repair /passive /norestart" --uninstall-previous --accept-package-agreements --force
-```
+  ```bat
+  winget install "Microsoft.VCRedist.2015+.x64" --override "/repair /passive /norestart" --uninstall-previous --accept-package-agreements --force
+  ```
 
 对于使用包管理器安装的用户，可以通过包管理器安装 MaaCore：
 
