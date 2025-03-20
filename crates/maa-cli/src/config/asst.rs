@@ -169,16 +169,14 @@ impl Preset {
             Preset::Waydroid => "",
             Preset::PlayCover => "",
             Preset::Adb => "adb",
-                    }
+        }
     }
 
     fn default_address(self, adb_path: &str) -> Cow<'static, str> {
         match self {
             Preset::MuMuPro => "127.0.0.1:16384".into(),
             Preset::PlayCover => "127.0.0.1:1717".into(),
-            // NOT Official, users should Grab waydroid IP address from Android Settings-> About
-            Preset::Waydroid => "192.168.240.112:5555".into(),
-            Preset::Adb => std::process::Command::new(adb_path)
+            Preset::Waydroid | Preset::Adb => std::process::Command::new(adb_path)
                 .arg("devices")
                 .output()
                 .ok()
@@ -749,6 +747,8 @@ mod tests {
             assert_de_tokens(&Preset::Adb, &[Token::Str("adb")]);
 
             assert_de_tokens(&Preset::MuMuPro, &[Token::Str("MuMuPro")]);
+            assert_de_tokens(&Preset::Waydroid, &[Token::Str("Waydroid")]);
+            assert_de_tokens(&Preset::Waydroid, &[Token::Str("waydroid")]);
         }
 
         #[test]
