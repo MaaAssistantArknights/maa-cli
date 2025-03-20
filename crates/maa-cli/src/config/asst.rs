@@ -166,9 +166,8 @@ impl Preset {
     fn default_adb_path(self) -> &'static str {
         match self {
             Preset::MuMuPro => "/Applications/MuMuPlayer.app/Contents/MacOS/MuMuEmulator.app/Contents/MacOS/tools/adb",
-            Preset::Waydroid => "",
             Preset::PlayCover => "",
-            Preset::Adb => "adb",
+            Preset::Waydroid | Preset::Adb => "adb",
         }
     }
 
