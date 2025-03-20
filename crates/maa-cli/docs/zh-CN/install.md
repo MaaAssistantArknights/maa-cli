@@ -93,15 +93,9 @@ maa install
 
 对于Windows平台用户，请以管理员身份在命令提示符或PowerShell中运行以下命令，以安装必要工具组VC++
 
-- Command Promot:
+- Windows:
 
   ```bat
-  winget install "Microsoft.VCRedist.2015+.x64" --override "/repair /passive /norestart" --uninstall-previous --accept-package-agreements --force
-  ```
-
-- PowerShell:
-
-  ```powershell
   winget install "Microsoft.VCRedist.2015+.x64" --override "/repair /passive /norestart" --uninstall-previous --accept-package-agreements --force
   ```
 
