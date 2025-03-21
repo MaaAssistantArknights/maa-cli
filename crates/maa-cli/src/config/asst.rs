@@ -190,8 +190,11 @@ impl Preset {
     }
 
     fn default_config(self) -> &'static str {
-        // May be preset specific in the future
-        config_based_on_os()
+        match self {
+            Preset::Waydroid => "Waydroid",
+            // May be preset specific in the future
+            Preset::MuMuPro | Preset::PlayCover | Preset::Adb => config_based_on_os(),
+        }
     }
 }
 
@@ -902,7 +905,7 @@ mod tests {
                     config: None,
                 }
                 .connect_args(),
-                ("adb", "emulator-5554", config_based_on_os()),
+                ("adb", "emulator-5554", "Waydroid"),
             );
 
             args_eq(

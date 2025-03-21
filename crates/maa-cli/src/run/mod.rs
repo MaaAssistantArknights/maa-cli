@@ -176,8 +176,7 @@ where
         // Prepare connection
         let (adb_path, address, config) = asst_config.connection.connect_args();
 
-        // Launch external app like PlayCover or Emulator
-        // Only support PlayCover on macOS now, may support more in the future
+        // Launch external apps
         let app: Option<Box<dyn external::ExternalApp>> = match asst_config.connection.preset() {
             #[cfg(target_os = "macos")]
             crate::config::asst::Preset::PlayCover => Some(Box::new(external::PlayCoverApp::new(
