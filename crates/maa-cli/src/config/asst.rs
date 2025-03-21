@@ -896,6 +896,17 @@ mod tests {
 
             args_eq(
                 ConnectionConfig {
+                    preset: Preset::Waydroid,
+                    adb_path: None,
+                    address: None,
+                    config: None,
+                }
+                .connect_args(),
+                ("adb", "emulator-5554", config_based_on_os()),
+            );
+
+            args_eq(
+                ConnectionConfig {
                     preset: Preset::Adb,
                     adb_path: Some("/path/to/adb".to_owned()),
                     address: Some("127.0.0.1:11111".to_owned()),
