@@ -63,7 +63,7 @@ impl super::ExternalApp for WaydroidApp<'_> {
             trace!("Waiting for game ready...");
         }
 
-        Ok(self.check_adb_devices()?)
+        self.check_adb_devices()
     }
 
     fn close(&self) -> Result<()> {
