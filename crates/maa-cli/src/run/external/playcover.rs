@@ -24,10 +24,10 @@ impl<'a> PlayCoverApp<'a> {
 }
 
 impl super::ExternalApp for PlayCoverApp<'_> {
-    fn open(&self) -> Result<()> {
+    fn open(&self) -> Result<bool> {
         if self.connect().is_ok() {
             info!("Game is already running!");
-            return Ok(());
+            return Ok(true);
         }
 
         let app = self.client.app();
@@ -48,7 +48,7 @@ impl super::ExternalApp for PlayCoverApp<'_> {
             std::thread::sleep(std::time::Duration::from_millis(500));
         }
 
-        Ok(())
+        Ok(true)
     }
 
     fn close(&self) -> Result<()> {

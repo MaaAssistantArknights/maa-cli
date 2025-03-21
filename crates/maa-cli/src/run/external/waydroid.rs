@@ -29,10 +29,13 @@ impl<'a> WaydroidApp<'a> {
 }
 
 impl super::ExternalApp for WaydroidApp<'_> {
-    fn open(&self) -> Result<()> {
+    /// Return true on success and address match
+    ///
+    /// Return false if given address not in `adb devices``
+    fn open(&self) -> Result<bool> {
         if self.check_adb_devices().is_ok_and(|b| b) {
             info!("Waydroid is already running!");
-            return Ok(());
+            return Ok(true);
         }
 
         info!("Starting waydroid");
@@ -60,7 +63,7 @@ impl super::ExternalApp for WaydroidApp<'_> {
             trace!("Waiting for game ready...");
         }
 
-        Ok(())
+        Ok(self.check_adb_devices()?)
     }
 
     fn close(&self) -> Result<()> {

@@ -1,5 +1,5 @@
 pub(super) trait ExternalApp {
-    fn open(&self) -> anyhow::Result<()>;
+    fn open(&self) -> anyhow::Result<bool>;
 
     fn close(&self) -> anyhow::Result<()>;
 }

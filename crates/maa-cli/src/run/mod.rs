@@ -172,29 +172,38 @@ where
         summary::init(s);
     }
 
-    // Prepare connection
-    let (adb_path, address, config) = asst_config.connection.connect_args();
-
-    // Launch external app like PlayCover or Emulator
-    // Only support PlayCover on macOS now, may support more in the future
-    let app: Option<Box<dyn external::ExternalApp>> = match asst_config.connection.preset() {
-        #[cfg(target_os = "macos")]
-        crate::config::asst::Preset::PlayCover => Some(Box::new(external::PlayCoverApp::new(
-            task_config.client_type,
-            address.as_ref(),
-        ))),
-        #[cfg(target_os = "linux")]
-        crate::config::asst::Preset::Waydroid => {
-            Some(Box::new(external::WaydroidApp::new(address.as_ref())))
-        }
-        _ => None,
-    };
-
     if !args.dry_run {
+        // Prepare connection
+        let (adb_path, address, config) = asst_config.connection.connect_args();
+
+        // Launch external app like PlayCover or Emulator
+        // Only support PlayCover on macOS now, may support more in the future
+        let app: Option<Box<dyn external::ExternalApp>> = match asst_config.connection.preset() {
+            #[cfg(target_os = "macos")]
+            crate::config::asst::Preset::PlayCover => Some(Box::new(external::PlayCoverApp::new(
+                task_config.client_type,
+                address.as_ref(),
+            ))),
+            #[cfg(target_os = "linux")]
+            crate::config::asst::Preset::Waydroid => {
+                Some(Box::new(external::WaydroidApp::new(address.as_ref())))
+            }
+            _ => None,
+        };
+
         // Startup external app
-        if let (Some(app), true) = (app.as_deref(), task_config.start_app) {
-            app.open().context("Failed to open external app")?;
-        }
+        let need_reconfigure = if let (Some(app), true) = (app.as_deref(), task_config.start_app) {
+            !app.open().context("Failed to open external app")?
+        } else {
+            false
+        };
+
+        let address = if need_reconfigure {
+            debug!("Resetting address");
+            asst_config.connection.connect_args().1
+        } else {
+            address.clone()
+        };
 
         // Connect to game or emulator
         asst.async_connect(adb_path, address.as_ref(), config, true)?;
