@@ -1,0 +1,56 @@
+[package]
+name = "maa-server"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[[example]]
+name = "server"
+
+[[example]]
+name = "client"
+required-features = ["client"]
+
+[features]
+default = ["client"]
+
+client = []
+
+[dependencies]
+maa-types = { workspace = true, features = ["serde", "prost"] }
+maa-sys = { workspace = true, features = ["runtime"] }
+
+tonic = { version = "0.12", default-features = false, features = [
+    "codegen",
+    "prost",
+] }
+prost.workspace = true
+
+tokio = { workspace = true }
+tokio-stream = { version = "0.1", default-features = false, features = [
+    "sync",
+] }
+tokio-util = "0.7.13"
+
+tracing = "0.1.41"
+
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+
+parking_lot = "0.12.3"
+uuid = { version = "1.15.1", features = ["v7"] }
+
+[build-dependencies]
+tonic-build = { version = "0.12", default-features = false, features = [
+    "prost",
+] }
+
+[dev-dependencies]
+maa-dirs.workspace = true
+tracing-subscriber = "0.3.19"
+hyper-util = { version = "0.1.10", default-features = false }
+tower = { version = "0.5.2" }
+tonic = { version = "0.12", features = ["transport"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
