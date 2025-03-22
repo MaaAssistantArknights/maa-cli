@@ -17,11 +17,15 @@ use crate::{
 ///
 /// ### Usage:
 /// ```no_run
+/// use tokio_util::sync::CancellationToken;
+/// use tonic::transport::Server;
+/// use maa_server::prelude::task_service;
+/// 
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let addr = "[::1]:10000".parse().unwrap();
 ///
-///     let svc = task::gen_service();
+///     let svc = task_service();
 ///
 ///     Server::builder().add_service(svc).serve(addr).await?;
 ///
