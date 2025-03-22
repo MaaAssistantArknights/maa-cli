@@ -41,8 +41,6 @@ fn get_resource_dirs() -> Vec<std::path::PathBuf> {
     resource_dirs
 }
 
-const USING_UDS: bool = cfg!(unix);
-
 #[tokio::main]
 async fn main() {
     tracing_subscriber::Registry::default()
@@ -54,24 +52,30 @@ async fn main() {
         )
         .init();
 
-    let channel = if USING_UDS {
-        tracing::debug!("Using Unix Socket");
-        Endpoint::from_static("http://127.0.0.1:50051")
-            .connect_with_connector(tower::service_fn(|_: tonic::transport::Uri| async {
-                let path = "/tmp/maa_server/testing.sock";
-                Ok::<_, std::io::Error>(hyper_util::rt::TokioIo::new(
-                    tokio::net::UnixStream::connect(path).await?,
-                ))
-            }))
-            .await
-    } else {
-        tracing::debug!("Using Http Port");
-        Endpoint::try_from("http://127.0.0.1:50051")
-            .unwrap()
-            .connect()
-            .await
-    }
-    .unwrap();
+    let channel = {
+        #[cfg(unix)]
+        {
+            tracing::debug!("Using Unix Socket");
+            Endpoint::from_static("http://127.0.0.1:50051")
+                .connect_with_connector(tower::service_fn(|_: tonic::transport::Uri| async {
+                    let path = "/tmp/maa_server/testing.sock";
+                    Ok::<_, std::io::Error>(hyper_util::rt::TokioIo::new(
+                        tokio::net::UnixStream::connect(path).await?,
+                    ))
+                }))
+                .await
+                .unwrap()
+        }
+        #[cfg(windows)]
+        {
+            tracing::debug!("Using Http Port");
+            Endpoint::try_from("http://127.0.0.1:50051")
+                .unwrap()
+                .connect()
+                .await
+                .unwrap()
+        }
+    };
     tracing::info!("Connected to server");
 
     let mut coreclient = maa_server::core::core_client::CoreClient::new(channel.clone());

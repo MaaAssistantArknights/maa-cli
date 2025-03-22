@@ -3,8 +3,6 @@ use tokio_util::sync::CancellationToken;
 use tonic::transport::Server;
 use tracing_subscriber::{Layer, filter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
-const USING_UDS: bool = cfg!(unix);
-
 #[tokio::main]
 async fn main() {
     tracing_subscriber::Registry::default()
@@ -27,7 +25,8 @@ async fn main() {
         .add_service(core_service(cancel_token))
         .add_service(task_service());
 
-    if USING_UDS {
+    #[cfg(unix)]
+    {
         println!("Using Unix Socket");
         let path = "/tmp/maa_server/testing.sock";
         let path = std::path::Path::new(path);
@@ -48,7 +47,9 @@ async fn main() {
             _ = child_cancel_token.cancelled() => {}
             _ = wait_for_signal() => {parent_cancel_token.cancel()}
         );
-    } else {
+    }
+    #[cfg(windows)]
+    {
         println!("Using Http Port");
         let stream = tokio_stream::wrappers::TcpListenerStream::new(
             tokio::net::TcpListener::bind("127.0.0.1:50051")
