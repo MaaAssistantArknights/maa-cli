@@ -531,7 +531,28 @@ mod tests {
                 `Depot`, `OperBox`, `Reclamation`, `Custom`, `SingleStep`, `VideoRecognition`",
             );
 
-            todo!("TryFrom Tests")
+            #[cfg(feature = "prost")]
+            {
+                assert_eq!(Ok(StartUp), TaskType::try_from(0));
+                assert_eq!(Ok(CloseDown), TaskType::try_from(1));
+                assert_eq!(Ok(Fight), TaskType::try_from(2));
+                assert_eq!(Ok(Recruit), TaskType::try_from(3));
+                assert_eq!(Ok(Infrast), TaskType::try_from(4));
+                assert_eq!(Ok(Mall), TaskType::try_from(5));
+                assert_eq!(Ok(Award), TaskType::try_from(6));
+                assert_eq!(Ok(Roguelike), TaskType::try_from(7));
+                assert_eq!(Ok(Copilot), TaskType::try_from(8));
+                assert_eq!(Ok(SSSCopilot), TaskType::try_from(9));
+                assert_eq!(Ok(Depot), TaskType::try_from(10));
+                assert_eq!(Ok(OperBox), TaskType::try_from(11));
+                assert_eq!(Ok(Reclamation), TaskType::try_from(12));
+                assert_eq!(Ok(Custom), TaskType::try_from(13));
+                assert_eq!(Ok(SingleStep), TaskType::try_from(14));
+                assert_eq!(Ok(VideoRecognition), TaskType::try_from(15));
+
+                assert_eq!(Ok(Unknown), TaskType::try_from(-1));
+                assert_eq!(Err(prost::UnknownEnumValue(9527)), TaskType::try_from(9527));
+            }
         }
 
         #[cfg(feature = "serde")]
