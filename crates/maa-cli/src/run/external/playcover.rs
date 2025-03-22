@@ -1,6 +1,7 @@
+use std::net::TcpStream;
+
 use anyhow::{Context, Result};
 use log::{info, trace};
-use tokio::net::TcpStream;
 
 use crate::config::task::ClientType;
 
@@ -15,21 +16,18 @@ impl<'a> PlayCoverApp<'a> {
         Self { client, address }
     }
 
-    async fn connect(&self) -> Result<TcpStream> {
-        let stream = TcpStream::connect(self.address)
-            .await
-            .context("Failed to connect to game!")?;
+    fn connect(&self) -> Result<TcpStream> {
+        let stream = TcpStream::connect(self.address).context("Failed to connect to game!")?;
 
         Ok(stream)
     }
 }
 
-#[async_trait::async_trait]
 impl super::ExternalApp for PlayCoverApp<'_> {
-    async fn open(&self) -> Result<()> {
-        if self.connect().await.is_ok() {
+    fn open(&self) -> Result<bool> {
+        if self.connect().is_ok() {
             info!("Game is already running!");
-            return Ok(());
+            return Ok(true);
         }
 
         let app = self.client.app();
@@ -42,7 +40,7 @@ impl super::ExternalApp for PlayCoverApp<'_> {
 
         // Wait for game ready
         loop {
-            if self.connect().await.is_ok() {
+            if self.connect().is_ok() {
                 info!("Game ready!");
                 break;
             }
@@ -50,10 +48,10 @@ impl super::ExternalApp for PlayCoverApp<'_> {
             std::thread::sleep(std::time::Duration::from_millis(500));
         }
 
-        Ok(())
+        Ok(true)
     }
 
-    async fn close(&self) -> Result<()> {
+    fn close(&self) -> Result<()> {
         // MaaCore will close the game, so we don't need to do anything here
         Ok(())
     }

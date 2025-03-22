@@ -122,6 +122,7 @@ impl ConnectionConfig {
 pub enum Preset {
     MuMuPro,
     PlayCover,
+    Waydroid,
     #[default]
     Adb,
 }
@@ -148,6 +149,7 @@ impl<'de> Deserialize<'de> for Preset {
                     "MuMuPro" => Ok(Preset::MuMuPro),
                     "PlayCover" | "PlayTools" => Ok(Preset::PlayCover),
                     "ADB" | "Adb" | "adb" => Ok(Preset::Adb),
+                    "Waydroid" | "waydroid" => Ok(Preset::Waydroid),
                     _ => {
                         warn!("Unknown connection preset: {}, ignoring", value);
                         Ok(Preset::Adb)
@@ -165,7 +167,7 @@ impl Preset {
         match self {
             Preset::MuMuPro => "/Applications/MuMuPlayer.app/Contents/MacOS/MuMuEmulator.app/Contents/MacOS/tools/adb",
             Preset::PlayCover => "",
-            Preset::Adb => "adb",
+            Preset::Waydroid | Preset::Adb => "adb",
         }
     }
 
@@ -173,7 +175,7 @@ impl Preset {
         match self {
             Preset::MuMuPro => "127.0.0.1:16384".into(),
             Preset::PlayCover => "127.0.0.1:1717".into(),
-            Preset::Adb => std::process::Command::new(adb_path)
+            Preset::Waydroid | Preset::Adb => std::process::Command::new(adb_path)
                 .arg("devices")
                 .output()
                 .ok()
@@ -188,8 +190,11 @@ impl Preset {
     }
 
     fn default_config(self) -> &'static str {
-        // May be preset specific in the future
-        config_based_on_os()
+        match self {
+            Preset::Waydroid => "Waydroid",
+            // May be preset specific in the future
+            Preset::MuMuPro | Preset::PlayCover | Preset::Adb => config_based_on_os(),
+        }
     }
 }
 
@@ -744,6 +749,8 @@ mod tests {
             assert_de_tokens(&Preset::Adb, &[Token::Str("adb")]);
 
             assert_de_tokens(&Preset::MuMuPro, &[Token::Str("MuMuPro")]);
+            assert_de_tokens(&Preset::Waydroid, &[Token::Str("Waydroid")]);
+            assert_de_tokens(&Preset::Waydroid, &[Token::Str("waydroid")]);
         }
 
         #[test]
@@ -888,6 +895,17 @@ mod tests {
                 }
                 .connect_args(),
                 ("", "127.0.0.1:1717", config_based_on_os()),
+            );
+
+            args_eq(
+                ConnectionConfig {
+                    preset: Preset::Waydroid,
+                    adb_path: None,
+                    address: None,
+                    config: None,
+                }
+                .connect_args(),
+                ("adb", "emulator-5554", "Waydroid"),
             );
 
             args_eq(
