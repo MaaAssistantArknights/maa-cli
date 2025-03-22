@@ -284,10 +284,6 @@ mod state {
 }
 
 /// A wrapper for [`maa_sys::Assistant`]
-///
-/// The inner can be [Send] but not [Sync],
-/// because every fn related is actually a `ref mut` rather `ref`,
-/// which may cause data race
 pub struct Assistant {
     inner: maa_sys::Assistant,
 }
@@ -308,5 +304,49 @@ impl Assistant {
 
     pub fn inner_unchecked(&self) -> &maa_sys::Assistant {
         &self.inner
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn init_adb() {
+        let session = SessionID::new();
+
+        let (tx, mut rx) = tokio::sync::oneshot::channel();
+        session.adb().register(tx);
+        assert_eq!(
+            Err(tokio::sync::oneshot::error::TryRecvError::Empty),
+            rx.try_recv()
+        );
+
+        session.adb().fail("err".to_owned());
+        assert_eq!(Ok(Err("err".to_owned())), rx.try_recv());
+
+        session.adb().success();
+        assert_eq!(
+            Err(tokio::sync::oneshot::error::TryRecvError::Closed),
+            rx.try_recv()
+        );
+    }
+
+    #[test]
+    fn logger() {
+        let mut logger = log::Logger::new();
+        let mut rx = logger.take_rx().unwrap();
+        assert!(matches!(logger.take_rx(), None));
+
+        assert_eq!(
+            Err(tokio::sync::mpsc::error::TryRecvError::Empty),
+            rx.try_recv()
+        );
+
+        logger.log_to_channel((TaskStateType::Unknown, "content".to_owned()));
+        assert_eq!(
+            Ok((TaskStateType::Unknown, "content".to_owned())),
+            rx.try_recv()
+        );
     }
 }

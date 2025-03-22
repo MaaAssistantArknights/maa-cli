@@ -20,6 +20,21 @@ pub mod task {
                 Self { id }
             }
         }
+
+        #[cfg(test)]
+        mod tests {
+            use super::*;
+            #[test]
+            fn pack() {
+                let id: AsstTaskId = 1;
+                assert_eq!(TaskId { id }, id.into());
+            }
+            #[test]
+            fn unpack() {
+                let id = TaskId { id: 1 };
+                assert_eq!(1, <TaskId as Into<AsstTaskId>>::into(id));
+            }
+        }
     }
 
     mod utils {
@@ -278,44 +293,27 @@ mod types {
     mod tests {
         use std::str::FromStr;
 
+        use super::*;
         #[test]
-        fn uuid_ffi() {
-            let rust: [u8; 8] = [1, 7, 45, 31, 5, 21, 46, 1];
+        fn ffi() {
+            let session_id = SessionID::new();
+            let ptr = session_id.to_ptr();
 
-            let ptr = {
-                let mut rust_copy = rust.to_vec();
-                let ptr = rust_copy.as_mut_ptr();
-                std::mem::forget(rust_copy);
-                ptr as *mut std::ffi::c_void
-            };
-            let len = 8;
+            let re_session_id = SessionID::from_ptr(ptr);
+            assert_eq!(session_id, re_session_id);
 
-            let mut cffi = [0u8; 8];
-
-            assert_ne!(rust, cffi);
-
-            let ptr = ptr as *mut u8;
-            cffi.copy_from_slice(unsafe { std::slice::from_raw_parts(ptr, len) });
-
-            assert_eq!(rust, cffi);
-            let vec = unsafe {
-                let len = 16;
-                let cap = 16;
-                Vec::from_raw_parts(ptr, len, cap)
-            };
-            drop(vec);
+            SessionID::drop_ptr(ptr);
+            let wrong_and_danger = SessionID::from_ptr(ptr);
+            assert_ne!(session_id, wrong_and_danger);
         }
 
         #[test]
-        fn uuid_string() {
-            let uuid = uuid::Uuid::now_v7();
-            let str = uuid.to_string();
-            let bytes = uuid.to_bytes_le();
+        fn string() {
+            let session_id = SessionID::new();
+            let str = session_id.to_string();
 
-            let bytes_from_str = uuid::Uuid::from_str(&str).unwrap();
-
-            assert_eq!(uuid, bytes_from_str);
-            assert_eq!(bytes, bytes_from_str.to_bytes_le());
+            let re_session_id = SessionID::from_str(&str);
+            assert_eq!(Ok(session_id), re_session_id);
         }
     }
 }
