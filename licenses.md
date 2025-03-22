@@ -4,7 +4,7 @@ This page lists the licenses of the projects used in cargo-about.
 
 ## Overview of licenses
 
-- Apache License 2.0 (33)
+- Apache License 2.0 (32)
 - GNU Affero General Public License v3.0 (4)
 - MIT License (3)
 - BSD 3-Clause "New" or "Revised" License (1)
@@ -1111,7 +1111,6 @@ Apache License 2.0
 #### Used by
 
 - [anyhow](https://github.com/dtolnay/anyhow)
-- [async-trait](https://github.com/dtolnay/async-trait)
 - [semver](https://github.com/dtolnay/semver)
 - [serde](https://github.com/serde-rs/serde)
 - [serde_json](https://github.com/serde-rs/json)
