@@ -1,5 +1,12 @@
 {
     "protoc": {
-        "options": ["-I","${workspaceRoot}/crates/maa-types"]
-    }
+        "options": [
+            "-I",
+            "${workspaceRoot}/crates/maa-types"
+        ]
+    },
+    "rust-analyzer.rustfmt.overrideCommand": [
+        "rustfmt",
+        "+nightly"
+    ]
 }
