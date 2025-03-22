@@ -184,7 +184,7 @@ impl Log {
         }
     }
 
-    pub fn to_channel(self, msg: LogContent) {
+    pub fn send_to_channel(self, msg: LogContent) {
         let session_id = self.0;
         if let Some(session) = SESSION_POOL.lock().get(&session_id) {
             session.channel.log_to_channel(msg);

@@ -33,7 +33,7 @@ fn process_message(code: TaskStateType, message: Map, session_id: SessionID) -> 
     use TaskStateType::*;
 
     let msg = serde_json::to_string(&message).unwrap();
-    session_id.log().to_channel((code, msg));
+    session_id.log().send_to_channel((code, msg));
 
     match code {
         InternalError => {}
