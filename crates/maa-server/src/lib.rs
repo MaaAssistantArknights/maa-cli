@@ -208,7 +208,7 @@ mod utils {
 mod callback;
 
 mod types {
-    pub use maa_types::{primitive::AsstTaskId as TaskId, TaskStateType};
+    pub use maa_types::{TaskStateType, primitive::AsstTaskId as TaskId};
     use uuid::Uuid;
 
     pub const HEADER_SESSION_ID: &str = "x-session-id";

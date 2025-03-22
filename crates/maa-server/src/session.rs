@@ -269,14 +269,11 @@ mod state {
 
     impl TaskState {
         pub fn reason(&mut self, reason: State) {
-            debug_assert_eq!(
-                self.state,
-                match reason {
-                    State::Waiting => unreachable!(),
-                    State::Running => State::Waiting,
-                    State::Completed | State::Canceled | State::Error => State::Running,
-                }
-            );
+            debug_assert_eq!(self.state, match reason {
+                State::Waiting => unreachable!(),
+                State::Running => State::Waiting,
+                State::Completed | State::Canceled | State::Error => State::Running,
+            });
             self.state = reason;
         }
 

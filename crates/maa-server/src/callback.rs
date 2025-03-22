@@ -81,8 +81,11 @@ fn process_connection_info(message: Map, session_id: SessionID) {
             session_id.adb().success();
         }
         "ConnectFailed" => {
-            let err = format!("Failed to connect to android device, {}, Please check your connect configuration: {}",
-                why.unwrap(),serde_json::to_string_pretty(&details).unwrap());
+            let err = format!(
+                "Failed to connect to android device, {}, Please check your connect configuration: {}",
+                why.unwrap(),
+                serde_json::to_string_pretty(&details).unwrap()
+            );
             error!(err);
             session_id.adb().fail(err);
         }

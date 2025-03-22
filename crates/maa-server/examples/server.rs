@@ -1,7 +1,7 @@
 use maa_server::prelude::*;
 use tokio_util::sync::CancellationToken;
 use tonic::transport::Server;
-use tracing_subscriber::{filter, fmt, layer::SubscriberExt, util::SubscriberInitExt, Layer};
+use tracing_subscriber::{Layer, filter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 const USING_UDS: bool = cfg!(unix);
 
@@ -76,7 +76,7 @@ async fn main() {
 /// Waits for a signal that requests a graceful shutdown, like SIGTERM or SIGINT.
 #[cfg(unix)]
 async fn wait_for_signal_impl() {
-    use tokio::signal::unix::{signal, SignalKind};
+    use tokio::signal::unix::{SignalKind, signal};
 
     // Infos here:
     // https://www.gnu.org/software/libc/manual/html_node/Termination-Signals.html

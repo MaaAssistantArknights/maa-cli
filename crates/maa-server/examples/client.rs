@@ -5,7 +5,7 @@ use maa_server::{
 use maa_types::{TaskStateType, TaskType};
 use tokio_stream::StreamExt;
 use tonic::transport::Endpoint;
-use tracing_subscriber::{filter, fmt, layer::SubscriberExt, util::SubscriberInitExt, Layer};
+use tracing_subscriber::{Layer, filter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 fn make_request<T>(payload: T, session_id: &str) -> tonic::Request<T> {
     let mut req = tonic::Request::new(payload);
