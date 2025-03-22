@@ -17,10 +17,10 @@ use crate::{
 ///
 /// ### Usage:
 /// ```no_run
+/// use maa_server::prelude::task_service;
 /// use tokio_util::sync::CancellationToken;
 /// use tonic::transport::Server;
-/// use maa_server::prelude::task_service;
-/// 
+///
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let addr = "[::1]:10000".parse().unwrap();
