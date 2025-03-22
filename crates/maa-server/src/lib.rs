@@ -303,8 +303,9 @@ mod types {
             assert_eq!(session_id, re_session_id);
 
             SessionID::drop_ptr(ptr);
-            let wrong_and_danger = SessionID::from_ptr(ptr);
-            assert_ne!(session_id, wrong_and_danger);
+            // DO NOT DO SO!
+            // let wrong_and_danger = SessionID::from_ptr(ptr);
+            // assert_ne!(session_id, wrong_and_danger);
         }
 
         #[test]
