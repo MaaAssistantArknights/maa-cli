@@ -202,7 +202,7 @@ impl TaskSummary {
         use TaskType::*;
 
         let detail = match task {
-            Fight => Detail::Fight(FightDetail::new()),
+            Fight => Detail::Fight(FightDetail::default()),
             Infrast => Detail::Infrast(InfrastDetail::new()),
             Recruit => Detail::Recruit(RecruitDetail::new()),
             Roguelike => Detail::Roguelike(RoguelikeDetail::new()),
@@ -552,6 +552,8 @@ impl std::fmt::Display for InfrastRoomInfo {
     }
 }
 
+#[derive(struct_patch::Patch, Default)]
+#[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct FightDetail {
     // stage name to fight
     stage: Option<String>,
@@ -566,44 +568,34 @@ pub struct FightDetail {
     // because some fight may not drop anything or failed to recognize the drop
     drops: Vec<Map<String, i64>>,
 }
-
-impl FightDetail {
-    pub fn new() -> Self {
-        Self {
-            stage: None,
-            times: None,
-            medicine: None,
-            stone: None,
-            drops: Vec::new(),
-        }
-    }
-
+impl FightDetailPatch {
     pub fn set_stage(&mut self, stage: &str) {
-        if self.stage.is_some() {
-            return;
-        }
-        self.stage = Some(stage.to_owned());
+        self.stage = Some(Some(stage.to_owned()));
     }
 
     pub fn set_times(&mut self, times: i64) {
-        self.times = Some(times);
+        self.times = Some(Some(times));
     }
 
     pub fn use_medicine(&mut self, count: i64, is_expiring: bool) {
-        let (mut all, mut expiring) = self.medicine.unwrap_or((0, 0));
+        let (mut all, mut expiring) = self.medicine.flatten().unwrap_or((0, 0));
         all += count;
         if is_expiring {
             expiring += count
         }
-        self.medicine = Some((all, expiring))
+        self.medicine = Some(Some((all, expiring)))
     }
 
     pub fn set_stone(&mut self, stone: i64) {
-        self.stone = Some(stone);
+        self.stone = Some(Some(stone));
     }
 
     pub fn push_drop(&mut self, drop: Map<String, i64>) {
-        self.drops.push(drop);
+        if let Some(drops) = self.drops.as_mut() {
+            drops.push(drop);
+        } else {
+            self.drops = Some(vec![drop])
+        }
     }
 }
 
@@ -933,6 +925,7 @@ mod tests {
 
     mod summary {
         use regex::Regex;
+        use struct_patch::Patch;
 
         use super::*;
         use crate::assert_matches;
@@ -950,8 +943,10 @@ mod tests {
 
             summary.start_task(1);
             summary.edit_current_task_detail(|detail| {
+                let mut patch = FightDetail::new_empty_patch();
+                patch.set_stage("TS-9");
                 let detail = detail.as_fight_mut().unwrap();
-                detail.set_stage("TS-9");
+                detail.apply(patch);
             });
             summary.end_current_task(Reason::Completed);
 
@@ -1020,6 +1015,8 @@ mod tests {
     }
 
     mod detail {
+        use struct_patch::Patch;
+
         use super::*;
         use crate::assert_matches;
 
@@ -1037,7 +1034,7 @@ mod tests {
             assert!(detail.as_recruit_mut().is_none());
             assert!(detail.as_roguelike_mut().is_none());
 
-            detail = Detail::Fight(FightDetail::new());
+            detail = Detail::Fight(FightDetail::default());
             assert!(detail.as_infrast_mut().is_none());
             assert!(detail.as_fight_mut().is_some());
             assert!(detail.as_recruit_mut().is_none());
@@ -1104,24 +1101,26 @@ mod tests {
 
         #[test]
         fn fight() {
-            let mut detail = FightDetail::new();
-            detail.set_stage("TS-9");
-            detail.set_times(2);
-            detail.use_medicine(1, true);
-            detail.use_medicine(1, false);
-            detail.set_stone(1);
-            detail.push_drop(
+            let mut detail = FightDetail::default();
+            let mut patch = FightDetail::new_empty_patch();
+            patch.set_stage("TS-9");
+            patch.set_times(2);
+            patch.use_medicine(1, true);
+            patch.use_medicine(1, false);
+            patch.set_stone(1);
+            patch.push_drop(
                 [("A", 1), ("B", 2)]
                     .into_iter()
                     .map(|(k, v)| (k.to_owned(), v))
                     .collect(),
             );
-            detail.push_drop(
+            patch.push_drop(
                 [("A", 1), ("C", 3)]
                     .into_iter()
                     .map(|(k, v)| (k.to_owned(), v))
                     .collect(),
             );
+            detail.apply(patch);
             assert_eq!(
                 detail.to_string(),
                 "Fight TS-9 2 times, used 2 medicine (1 expiring), used 1 stone, drops:\n\
@@ -1130,13 +1129,41 @@ mod tests {
                  total drops: A × 2, B × 2, C × 3\n",
             );
 
-            let mut detail = FightDetail::new();
-            detail.set_stage("TS-9");
-            detail.set_times(1);
+            let mut detail = FightDetail::default();
+            let mut patch = FightDetail::new_empty_patch();
+            patch.set_stage("TS-9");
+            patch.set_times(1);
+            detail.apply(patch);
             assert_eq!(detail.to_string(), "Fight TS-9 1 times\n");
 
-            let detail = FightDetail::new();
+            let detail = FightDetail::default();
+            assert_eq!(detail, FightDetail {
+                stage: None,
+                times: None,
+                medicine: None,
+                stone: None,
+                drops: Vec::new(),
+            });
             assert_eq!(detail.to_string(), "");
+
+            let mut detail = FightDetail::default();
+            let mut patch = FightDetail::new_empty_patch();
+            patch.set_stage("TS-1");
+            patch.set_stage("TS-9");
+            detail.apply(patch);
+            assert_eq!(detail.to_string(), "Fight TS-9\n");
+
+            // We can't keep the stage from being overwritten now
+            // But an issue is created to the upstream crate repo
+            // maybe this can be fixed in near future
+            let mut detail = FightDetail::default();
+            let mut patch = FightDetail::new_empty_patch();
+            patch.set_stage("TS-1");
+            detail.apply(patch);
+            let mut patch = FightDetail::new_empty_patch();
+            patch.set_stage("TS-9");
+            detail.apply(patch);
+            assert_eq!(detail.to_string(), "Fight TS-9\n");
         }
 
         #[test]

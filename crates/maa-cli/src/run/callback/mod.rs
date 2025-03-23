@@ -4,7 +4,8 @@ use std::{fmt::Write, sync::atomic::AtomicBool};
 use log::{debug, error, info, trace, warn};
 use maa_types::primitive::{AsstMsgId, AsstTaskId};
 use serde_json::{Map, Value};
-use summary::{edit_current_task_detail, end_current_task, start_task};
+use struct_patch::Patch;
+use summary::{edit_current_task_detail, end_current_task, start_task, FightDetail};
 
 pub static MAA_CORE_ERRORED: AtomicBool = AtomicBool::new(false);
 
@@ -250,8 +251,10 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
                 // Maybe need to update if MAA fight a stage multiple times in one run
                 let exec_times = details.get("exec_times")?.as_i64()?;
                 edit_current_task_detail(move |detail| {
+                    let mut patch = FightDetail::new_empty_patch();
+                    patch.set_times(exec_times);
                     if let Some(detail) = detail.as_fight_mut() {
-                        detail.set_times(exec_times);
+                        detail.apply(patch);
                     }
                 });
                 info!("{} {} {}", "MissionStart", exec_times, "times");
@@ -259,8 +262,10 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
             "StoneConfirm" => {
                 let exec_times = details.get("exec_times")?.as_i64()?;
                 edit_current_task_detail(move |detail| {
+                    let mut patch = FightDetail::new_empty_patch();
+                    patch.set_stone(exec_times);
                     if let Some(detail) = detail.as_fight_mut() {
-                        detail.set_stone(exec_times)
+                        detail.apply(patch);
                     }
                 });
                 info!("Use {} stones", exec_times);
@@ -383,15 +388,19 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
             );
 
             edit_current_task_detail(move |detail| {
+                let mut patch = FightDetail::new_empty_patch();
+                patch.push_drop(all_drops);
                 if let Some(detail) = detail.as_fight_mut() {
-                    detail.push_drop(all_drops);
+                    detail.apply(patch);
                 }
             });
 
             let stage = details.get("stage")?.get("stageCode")?.as_str()?.to_owned();
             edit_current_task_detail(move |detail| {
+                let mut patch = FightDetail::new_empty_patch();
+                patch.set_stage(stage.as_str());
                 if let Some(detail) = detail.as_fight_mut() {
-                    detail.set_stage(stage.as_str());
+                    detail.apply(patch);
                 }
             });
         }
@@ -406,8 +415,10 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
             let count = details.get("count")?.as_i64()?;
             let is_expiring = details.get("is_expiring")?.as_bool()?;
             edit_current_task_detail(move |detail| {
+                let mut patch = FightDetail::new_empty_patch();
+                patch.use_medicine(count, is_expiring);
                 if let Some(detail) = detail.as_fight_mut() {
-                    detail.use_medicine(count, is_expiring);
+                    detail.apply(patch);
                 }
             });
 
