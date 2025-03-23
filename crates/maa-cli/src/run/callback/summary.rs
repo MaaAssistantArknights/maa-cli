@@ -822,14 +822,14 @@ enum RecruitState {
 impl RecruitDetailPatch {
     pub(super) fn refresh(&mut self) {
         self.refresh_times = Some(Some(self.refresh_times.flatten().unwrap_or_default() + 1));
-        if let Some((_, _, state)) = self.record.as_mut().map(|v| v.last_mut()).flatten() {
+        if let Some((_, _, state)) = self.record.as_mut().and_then(|v| v.last_mut()) {
             *state = RecruitState::Refreshed;
         }
     }
 
     pub(super) fn recruit(&mut self) {
         self.recruit_times = Some(Some(self.recruit_times.flatten().unwrap_or_default() + 1));
-        if let Some((_, _, state)) = self.record.as_mut().map(|v| v.last_mut()).flatten() {
+        if let Some((_, _, state)) = self.record.as_mut().and_then(|v| v.last_mut()) {
             *state = RecruitState::Recruited;
         }
     }
