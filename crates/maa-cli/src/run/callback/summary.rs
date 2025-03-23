@@ -12,6 +12,22 @@ use maa_types::primitive::AsstTaskId;
 
 use super::IterJoin;
 
+pub(super) trait PatchExt<P>: struct_patch::Patch<P> + Default + Sized
+where
+    P: std::ops::Add<Output = P>,
+{
+    fn apply_(&mut self, patch: P) {
+        let old_patch = std::mem::take(self).into_patch();
+        let new_patch = patch + old_patch;
+        self.apply(new_patch);
+    }
+}
+
+impl PatchExt<FightDetailPatch> for FightDetail {}
+impl PatchExt<InfrastDetailPatch> for InfrastDetail {}
+impl PatchExt<RoguelikeDetailPatch> for RoguelikeDetail {}
+impl PatchExt<RecruitDetailPatch> for RecruitDetail {}
+
 static PIPE: OnceLock<Sender<TaskState>> = OnceLock::new();
 
 enum TaskState {
@@ -203,9 +219,9 @@ impl TaskSummary {
 
         let detail = match task {
             Fight => Detail::Fight(FightDetail::default()),
-            Infrast => Detail::Infrast(InfrastDetail::new()),
-            Recruit => Detail::Recruit(RecruitDetail::new()),
-            Roguelike => Detail::Roguelike(RoguelikeDetail::new()),
+            Infrast => Detail::Infrast(InfrastDetail::default()),
+            Recruit => Detail::Recruit(RecruitDetail::default()),
+            Roguelike => Detail::Roguelike(RoguelikeDetail::default()),
             _ => Detail::None,
         };
 
@@ -383,24 +399,43 @@ impl std::fmt::Display for Detail {
     }
 }
 
-pub struct InfrastDetail(Map<Facility, Map<i64, InfrastRoomInfo>>);
+impl std::ops::Add for InfrastDetailPatch {
+    type Output = InfrastDetailPatch;
 
-struct InfrastRoomInfo {
-    product: Option<String>,
-    operators: Vec<String>,
-    candidates: Vec<String>,
+    fn add(mut self, rhs: Self) -> Self::Output {
+        let Self { inner } = rhs;
+        match (self.inner.as_mut(), inner) {
+            (None, None) => (),
+            (Some(_), None) => (),
+            (None, Some(new)) => self.inner = Some(new),
+            (Some(a), Some(b)) => {
+                for (facility, v) in b.into_iter() {
+                    for (id, info) in v.into_iter() {
+                        a.entry(facility).or_default().insert(id, info);
+                    }
+                }
+            }
+        }
+        self
+    }
 }
 
-impl InfrastDetail {
-    pub fn new() -> Self {
-        Self(Map::new())
-    }
-
+#[derive(struct_patch::Patch, Default)]
+#[cfg_attr(test, derive(PartialEq, Debug))]
+pub struct InfrastDetail {
+    inner: Map<Facility, Map<i64, InfrastRoomInfo>>,
+}
+impl InfrastDetailPatch {
     pub(super) fn set_product(&mut self, facility: Facility, id: i64, info: &str) {
         use Facility::*;
         // only the product of Mfg and Trade is useful
         if matches!(facility, Mfg | Trade) {
-            self.0
+            if self.inner.is_none() {
+                self.inner = Some(Map::new())
+            }
+            self.inner
+                .as_mut()
+                .unwrap()
                 .entry(facility)
                 .or_default()
                 .entry(id)
@@ -416,7 +451,10 @@ impl InfrastDetail {
         operators: Vec<String>,
         candidates: Vec<String>,
     ) {
-        let map = self.0.entry(facility).or_default();
+        if self.inner.is_none() {
+            self.inner = Some(Map::new())
+        }
+        let map = self.inner.as_mut().unwrap().entry(facility).or_default();
 
         if let Some(room_info) = map.get_mut(&id) {
             room_info.set_operators(operators, candidates);
@@ -429,9 +467,17 @@ impl InfrastDetail {
     }
 }
 
+#[derive(PartialEq)]
+#[cfg_attr(test, derive(Debug))]
+struct InfrastRoomInfo {
+    product: Option<String>,
+    operators: Vec<String>,
+    candidates: Vec<String>,
+}
+
 impl std::fmt::Display for InfrastDetail {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (facility, map) in &self.0 {
+        for (facility, map) in &self.inner {
             for room_info in map.values() {
                 writeln!(f, "{}{}", facility, room_info)?;
             }
@@ -552,6 +598,46 @@ impl std::fmt::Display for InfrastRoomInfo {
     }
 }
 
+impl std::ops::Add for FightDetailPatch {
+    type Output = Self;
+
+    fn add(mut self, rhs: Self) -> Self::Output {
+        let Self {
+            stage,
+            times,
+            medicine,
+            stone,
+            drops,
+        } = rhs;
+        if let Some(stage) = stage.flatten() {
+            self.stage = Some(Some(stage))
+        }
+        if let Some(times) = times.flatten() {
+            self.times = Some(Some(self.times.flatten().unwrap_or_default() + times));
+        }
+        match (self.medicine.flatten().as_mut(), medicine.flatten()) {
+            (None, None) => (),
+            (None, Some(_)) => self.medicine = medicine,
+            (Some(_), None) => (),
+            (Some(a), Some(b)) => {
+                a.0 += b.0;
+                a.1 += b.1;
+            }
+        }
+        if let Some(stone) = stone.flatten() {
+            self.stone = Some(Some(self.stone.flatten().unwrap_or_default() + stone));
+        }
+        if let Some(drops) = drops {
+            if let Some(cur) = self.drops.as_mut() {
+                cur.extend(drops);
+            } else {
+                self.drops = Some(drops)
+            }
+        }
+        self
+    }
+}
+
 #[derive(struct_patch::Patch, Default)]
 #[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct FightDetail {
@@ -646,6 +732,54 @@ impl std::fmt::Display for FightDetail {
     }
 }
 
+impl std::ops::Add for RecruitDetailPatch {
+    type Output = Self;
+
+    fn add(mut self, rhs: Self) -> Self::Output {
+        let Self {
+            refresh_times,
+            recruit_times,
+            record,
+        } = rhs;
+
+        match (self.recruit_times, recruit_times) {
+            (None, None) => (),
+            (None, Some(_)) => self.recruit_times = recruit_times,
+            (Some(_), None) => (),
+            (Some(_), Some(_)) => {
+                self.recruit_times = Some(Some(
+                    self.recruit_times.flatten().unwrap_or_default()
+                        + recruit_times.flatten().unwrap_or_default(),
+                ))
+            }
+        }
+
+        match (self.refresh_times, refresh_times) {
+            (None, None) => (),
+            (None, Some(_)) => self.refresh_times = refresh_times,
+            (Some(_), None) => (),
+            (Some(_), Some(_)) => {
+                self.refresh_times = Some(Some(
+                    self.refresh_times.flatten().unwrap_or_default()
+                        + refresh_times.flatten().unwrap_or_default(),
+                ))
+            }
+        }
+
+        if let Some(rec) = record {
+            match self.record.as_mut() {
+                Some(v) => {
+                    v.extend(rec);
+                }
+                None => self.record = Some(rec),
+            }
+        }
+        self
+    }
+}
+
+#[derive(struct_patch::Patch, Default)]
+#[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct RecruitDetail {
     refresh_times: Option<i64>,
     recruit_times: Option<i64>,
@@ -653,37 +787,36 @@ pub struct RecruitDetail {
     record: Vec<(u64, Vec<String>, RecruitState)>,
 }
 
+#[derive(PartialEq)]
+#[cfg_attr(test, derive(Debug))]
 enum RecruitState {
     Refreshed,
     Recruited,
     None,
 }
 
-impl RecruitDetail {
-    pub fn new() -> Self {
-        Self {
-            refresh_times: None,
-            recruit_times: None,
-            record: Vec::new(),
-        }
-    }
-
+impl RecruitDetailPatch {
     pub(super) fn refresh(&mut self) {
-        self.refresh_times = Some(self.refresh_times.unwrap_or_default() + 1);
-        if let Some((_, _, state)) = self.record.last_mut() {
+        self.refresh_times = Some(Some(self.refresh_times.flatten().unwrap_or_default() + 1));
+        if let Some((_, _, state)) = self.record.as_mut().map(|v| v.last_mut()).flatten() {
             *state = RecruitState::Refreshed;
         }
     }
 
     pub(super) fn recruit(&mut self) {
-        self.recruit_times = Some(self.recruit_times.unwrap_or_default() + 1);
-        if let Some((_, _, state)) = self.record.last_mut() {
+        self.recruit_times = Some(Some(self.recruit_times.flatten().unwrap_or_default() + 1));
+        if let Some((_, _, state)) = self.record.as_mut().map(|v| v.last_mut()).flatten() {
             *state = RecruitState::Recruited;
         }
     }
 
     pub(super) fn push_recruit(&mut self, level: u64, tags: impl IntoIterator<Item = String>) {
+        if self.record.is_none() {
+            self.record = Some(Vec::new())
+        }
         self.record
+            .as_mut()
+            .unwrap()
             .push((level, tags.into_iter().collect(), RecruitState::None));
     }
 }
@@ -720,23 +853,43 @@ impl std::fmt::Display for RecruitDetail {
     }
 }
 
+impl std::ops::Add for RoguelikeDetailPatch {
+    type Output = Self;
+
+    fn add(mut self, rhs: Self) -> Self::Output {
+        let Self { explorations } = rhs;
+        match (self.explorations.as_mut(), explorations) {
+            (None, None) => (),
+            (Some(_), None) => (),
+            (None, Some(exp)) => self.explorations = Some(exp),
+            (Some(a), Some(b)) => a.extend(b),
+        }
+        self
+    }
+}
+
+#[derive(struct_patch::Patch, Default)]
+#[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct RoguelikeDetail {
     explorations: Vec<ExplorationDetail>,
 }
 
-impl RoguelikeDetail {
-    fn new() -> Self {
-        Self {
-            explorations: Vec::new(),
-        }
-    }
-
+impl RoguelikeDetailPatch {
     pub(super) fn start_exploration(&mut self) {
-        self.explorations.push(ExplorationDetail::new());
+        if self.explorations.is_none() {
+            self.explorations = Some(Vec::new());
+        }
+        self.explorations
+            .as_mut()
+            .unwrap()
+            .push(ExplorationDetail::new());
     }
 
     fn get_current_exploration(&mut self) -> Option<&mut ExplorationDetail> {
-        self.explorations.last_mut()
+        if self.explorations.is_none() {
+            self.explorations = Some(Vec::new());
+        }
+        self.explorations.as_mut().unwrap().last_mut()
     }
 
     pub(super) fn set_state(&mut self, state: ExplorationState) {
@@ -789,7 +942,7 @@ impl std::fmt::Display for RoguelikeDetail {
 }
 
 #[repr(u8)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) enum ExplorationState {
     Passed = 0,
     Failed,
@@ -836,6 +989,8 @@ impl std::fmt::Display for ExplorationState {
     }
 }
 
+#[derive(PartialEq)]
+#[cfg_attr(test, derive(Debug))]
 struct ExplorationDetail {
     /// current state of this exploration
     state: ExplorationState,
@@ -946,22 +1101,26 @@ mod tests {
                 let mut patch = FightDetail::new_empty_patch();
                 patch.set_stage("TS-9");
                 let detail = detail.as_fight_mut().unwrap();
-                detail.apply(patch);
+                detail.apply_(patch);
             });
             summary.end_current_task(Reason::Completed);
 
             summary.start_task(2);
             summary.edit_current_task_detail(|detail| {
                 let detail = detail.as_infrast_mut().unwrap();
-                detail.set_product(Facility::Mfg, 1, "Product");
+                let mut patch = InfrastDetail::new_empty_patch();
+                patch.set_product(Facility::Mfg, 1, "Product");
+                detail.apply_(patch);
             });
             summary.end_current_task(Reason::Stopped);
 
             summary.start_task(3);
             summary.edit_current_task_detail(|detail| {
                 let detail = detail.as_recruit_mut().unwrap();
-                detail.push_recruit(3, ["A", "B"].into_iter().map(|s| s.to_owned()));
-                detail.recruit();
+                let mut patch = RecruitDetail::new_empty_patch();
+                patch.push_recruit(3, ["A", "B"].into_iter().map(|s| s.to_owned()));
+                patch.recruit();
+                detail.apply_(patch);
             });
             summary.end_current_task(Reason::Error);
 
@@ -1028,7 +1187,7 @@ mod tests {
             assert!(detail.as_recruit_mut().is_none());
             assert!(detail.as_roguelike_mut().is_none());
 
-            detail = Detail::Infrast(InfrastDetail::new());
+            detail = Detail::Infrast(InfrastDetail::default());
             assert!(detail.as_infrast_mut().is_some());
             assert!(detail.as_fight_mut().is_none());
             assert!(detail.as_recruit_mut().is_none());
@@ -1040,13 +1199,13 @@ mod tests {
             assert!(detail.as_recruit_mut().is_none());
             assert!(detail.as_roguelike_mut().is_none());
 
-            detail = Detail::Recruit(RecruitDetail::new());
+            detail = Detail::Recruit(RecruitDetail::default());
             assert!(detail.as_infrast_mut().is_none());
             assert!(detail.as_fight_mut().is_none());
             assert!(detail.as_recruit_mut().is_some());
             assert!(detail.as_roguelike_mut().is_none());
 
-            detail = Detail::Roguelike(RoguelikeDetail::new());
+            detail = Detail::Roguelike(RoguelikeDetail::default());
             assert!(detail.as_infrast_mut().is_none());
             assert!(detail.as_fight_mut().is_none());
             assert!(detail.as_recruit_mut().is_none());
@@ -1082,16 +1241,23 @@ mod tests {
 
         #[test]
         fn infrast() {
-            let mut detail = InfrastDetail::new();
-            detail.set_product(Facility::Mfg, 1, "Product");
-            detail.set_operators(
+            let detail = InfrastDetail::default();
+            assert_eq!(detail, InfrastDetail { inner: Map::new() });
+
+            let mut detail = InfrastDetail::default();
+            let mut patch = InfrastDetail::new_empty_patch();
+            patch.set_product(Facility::Mfg, 1, "Product");
+            patch.set_operators(
                 Facility::Mfg,
                 1,
                 ["A", "B"].into_iter().map(|s| s.to_owned()).collect(),
                 ["C", "D"].into_iter().map(|s| s.to_owned()).collect(),
             );
-            detail.set_product(Facility::Office, 1, "Product");
-            detail.set_operators(Facility::Office, 1, Vec::new(), Vec::new());
+            detail.apply_(patch);
+            let mut patch = InfrastDetail::new_empty_patch();
+            patch.set_product(Facility::Office, 1, "Product");
+            patch.set_operators(Facility::Office, 1, Vec::new(), Vec::new());
+            detail.apply_(patch);
             assert_eq!(
                 detail.to_string(),
                 "Mfg(Product) with operators: A, B, [C, D]\n\
@@ -1101,6 +1267,15 @@ mod tests {
 
         #[test]
         fn fight() {
+            let detail = FightDetail::default();
+            assert_eq!(detail, FightDetail {
+                stage: None,
+                times: None,
+                medicine: None,
+                stone: None,
+                drops: Vec::new(),
+            });
+
             let mut detail = FightDetail::default();
             let mut patch = FightDetail::new_empty_patch();
             patch.set_stage("TS-9");
@@ -1120,7 +1295,7 @@ mod tests {
                     .map(|(k, v)| (k.to_owned(), v))
                     .collect(),
             );
-            detail.apply(patch);
+            detail.apply_(patch);
             assert_eq!(
                 detail.to_string(),
                 "Fight TS-9 2 times, used 2 medicine (1 expiring), used 1 stone, drops:\n\
@@ -1133,51 +1308,50 @@ mod tests {
             let mut patch = FightDetail::new_empty_patch();
             patch.set_stage("TS-9");
             patch.set_times(1);
-            detail.apply(patch);
+            detail.apply_(patch);
             assert_eq!(detail.to_string(), "Fight TS-9 1 times\n");
 
             let detail = FightDetail::default();
-            assert_eq!(detail, FightDetail {
-                stage: None,
-                times: None,
-                medicine: None,
-                stone: None,
-                drops: Vec::new(),
-            });
             assert_eq!(detail.to_string(), "");
 
             let mut detail = FightDetail::default();
             let mut patch = FightDetail::new_empty_patch();
             patch.set_stage("TS-1");
             patch.set_stage("TS-9");
-            detail.apply(patch);
+            detail.apply_(patch);
             assert_eq!(detail.to_string(), "Fight TS-9\n");
 
-            // We can't keep the stage from being overwritten now
-            // But an issue is created to the upstream crate repo
-            // maybe this can be fixed in near future
             let mut detail = FightDetail::default();
             let mut patch = FightDetail::new_empty_patch();
             patch.set_stage("TS-1");
-            detail.apply(patch);
+            detail.apply_(patch);
             let mut patch = FightDetail::new_empty_patch();
             patch.set_stage("TS-9");
-            detail.apply(patch);
-            assert_eq!(detail.to_string(), "Fight TS-9\n");
+            detail.apply_(patch);
+            assert_eq!(detail.to_string(), "Fight TS-1\n");
         }
 
         #[test]
         fn recruit() {
-            let mut detail = RecruitDetail::new();
-            detail.push_recruit(3, ["A", "B"].into_iter().map(|s| s.to_owned()));
-            detail.refresh();
-            detail.push_recruit(4, ["C", "D"].into_iter().map(|s| s.to_owned()));
-            detail.recruit();
-            detail.push_recruit(3, ["E", "F"].into_iter().map(|s| s.to_owned()));
-            detail.refresh();
-            detail.push_recruit(4, ["G", "H"].into_iter().map(|s| s.to_owned()));
-            detail.recruit();
-            detail.push_recruit(5, ["I", "J"].into_iter().map(|s| s.to_owned()));
+            let detail = RecruitDetail::default();
+            assert_eq!(detail, RecruitDetail {
+                refresh_times: None,
+                recruit_times: None,
+                record: Vec::new(),
+            });
+
+            let mut detail = RecruitDetail::default();
+            let mut patch = RecruitDetail::new_empty_patch();
+            patch.push_recruit(3, ["A", "B"].into_iter().map(|s| s.to_owned()));
+            patch.refresh();
+            patch.push_recruit(4, ["C", "D"].into_iter().map(|s| s.to_owned()));
+            patch.recruit();
+            patch.push_recruit(3, ["E", "F"].into_iter().map(|s| s.to_owned()));
+            patch.refresh();
+            patch.push_recruit(4, ["G", "H"].into_iter().map(|s| s.to_owned()));
+            patch.recruit();
+            patch.push_recruit(5, ["I", "J"].into_iter().map(|s| s.to_owned()));
+            detail.apply_(patch);
             assert_eq!(
                 detail.to_string(),
                 "Detected tags:\n\
@@ -1190,19 +1364,23 @@ mod tests {
                  Refreshed 2 times\n",
             );
 
-            let mut detail = RecruitDetail::new();
-            detail.push_recruit(3, ["A", "B"].into_iter().map(|s| s.to_owned()));
-            detail.recruit();
+            let mut detail = RecruitDetail::default();
+            let mut patch = RecruitDetail::new_empty_patch();
+            patch.push_recruit(3, ["A", "B"].into_iter().map(|s| s.to_owned()));
+            patch.recruit();
+            detail.apply_(patch);
             assert_eq!(
                 detail.to_string(),
                 "Detected tags:\n\
                  1. ★★★ A, B, Recruited\n\
                  Recruited 1 times\n",
             );
-            let mut detail = RecruitDetail::new();
-            detail.push_recruit(3, ["A", "B"].into_iter().map(|s| s.to_owned()));
-            detail.refresh();
-            detail.push_recruit(4, ["C", "D"].into_iter().map(|s| s.to_owned()));
+            let mut detail = RecruitDetail::default();
+            let mut patch = RecruitDetail::new_empty_patch();
+            patch.push_recruit(3, ["A", "B"].into_iter().map(|s| s.to_owned()));
+            patch.refresh();
+            patch.push_recruit(4, ["C", "D"].into_iter().map(|s| s.to_owned()));
+            detail.apply_(patch);
             assert_eq!(
                 detail.to_string(),
                 "Detected tags:\n\
@@ -1234,17 +1412,24 @@ mod tests {
 
         #[test]
         fn roguelike() {
-            let mut detail = RoguelikeDetail::new();
-            detail.start_exploration();
-            detail.invest(10);
-            detail.set_state(ExplorationState::Failed);
-            detail.set_exp(100);
-            detail.start_exploration();
-            detail.invest(17);
-            detail.invest(1);
-            detail.set_state(ExplorationState::Passed);
-            detail.set_exp(200);
-            detail.start_exploration();
+            let detail = RoguelikeDetail::default();
+            assert_eq!(detail, RoguelikeDetail {
+                explorations: Vec::new()
+            });
+
+            let mut detail = RoguelikeDetail::default();
+            let mut patch = RoguelikeDetail::new_empty_patch();
+            patch.start_exploration();
+            patch.invest(10);
+            patch.set_state(ExplorationState::Failed);
+            patch.set_exp(100);
+            patch.start_exploration();
+            patch.invest(17);
+            patch.invest(1);
+            patch.set_state(ExplorationState::Passed);
+            patch.set_exp(200);
+            patch.start_exploration();
+            detail.apply(patch);
             assert_eq!(
                 detail.to_string(),
                 "Explorations:\n\

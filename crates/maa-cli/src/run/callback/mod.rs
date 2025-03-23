@@ -5,7 +5,10 @@ use log::{debug, error, info, trace, warn};
 use maa_types::primitive::{AsstMsgId, AsstTaskId};
 use serde_json::{Map, Value};
 use struct_patch::Patch;
-use summary::{edit_current_task_detail, end_current_task, start_task, FightDetail};
+use summary::{
+    edit_current_task_detail, end_current_task, start_task, FightDetail, InfrastDetail, PatchExt,
+    RecruitDetail, RoguelikeDetail,
+};
 
 pub static MAA_CORE_ERRORED: AtomicBool = AtomicBool::new(false);
 
@@ -254,7 +257,7 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
                     let mut patch = FightDetail::new_empty_patch();
                     patch.set_times(exec_times);
                     if let Some(detail) = detail.as_fight_mut() {
-                        detail.apply(patch);
+                        detail.apply_(patch);
                     }
                 });
                 info!("{} {} {}", "MissionStart", exec_times, "times");
@@ -265,7 +268,7 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
                     let mut patch = FightDetail::new_empty_patch();
                     patch.set_stone(exec_times);
                     if let Some(detail) = detail.as_fight_mut() {
-                        detail.apply(patch);
+                        detail.apply_(patch);
                     }
                 });
                 info!("Use {} stones", exec_times);
@@ -274,16 +277,20 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
             // Recruit
             "RecruitRefreshConfirm" => {
                 edit_current_task_detail(move |detail| {
+                    let mut patch = RecruitDetail::new_empty_patch();
+                    patch.refresh();
                     if let Some(detail) = detail.as_recruit_mut() {
-                        detail.refresh()
+                        detail.apply_(patch);
                     }
                 });
                 info!("{}", "Refresh Tags")
             }
             "RecruitConfirm" => {
                 edit_current_task_detail(move |detail| {
+                    let mut patch = RecruitDetail::new_empty_patch();
+                    patch.recruit();
                     if let Some(detail) = detail.as_recruit_mut() {
-                        detail.recruit()
+                        detail.apply_(patch);
                     }
                 });
                 info!("{}", "Recruit")
@@ -294,16 +301,20 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
             "StartExplore" => {
                 let exec_times = details.get("exec_times")?.as_i64()?;
                 edit_current_task_detail(move |detail| {
+                    let mut patch = RoguelikeDetail::new_empty_patch();
+                    patch.start_exploration();
                     if let Some(detail) = detail.as_roguelike_mut() {
-                        detail.start_exploration()
+                        detail.apply_(patch);
                     }
                 });
                 info!("Start exploration {} times", exec_times)
             }
             "ExitThenAbandon" => {
                 edit_current_task_detail(move |detail| {
+                    let mut patch = RoguelikeDetail::new_empty_patch();
+                    patch.set_state(summary::ExplorationState::Abandoned);
                     if let Some(detail) = detail.as_roguelike_mut() {
-                        detail.set_state(summary::ExplorationState::Abandoned)
+                        detail.apply_(patch);
                     }
                 });
                 info!("Exploration Abandoned")
@@ -315,8 +326,10 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
                 // If a exploration was not failed, it's state would be overwritten later
                 if message.get("taskchain")?.as_str()? == "Roguelike" {
                     edit_current_task_detail(move |detail| {
+                        let mut patch = RoguelikeDetail::new_empty_patch();
+                        patch.set_state(summary::ExplorationState::Failed);
                         if let Some(detail) = detail.as_roguelike_mut() {
-                            detail.set_state(summary::ExplorationState::Failed)
+                            detail.apply_(patch);
                         }
                     });
                 }
@@ -391,7 +404,7 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
                 let mut patch = FightDetail::new_empty_patch();
                 patch.push_drop(all_drops);
                 if let Some(detail) = detail.as_fight_mut() {
-                    detail.apply(patch);
+                    detail.apply_(patch);
                 }
             });
 
@@ -400,7 +413,7 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
                 let mut patch = FightDetail::new_empty_patch();
                 patch.set_stage(stage.as_str());
                 if let Some(detail) = detail.as_fight_mut() {
-                    detail.apply(patch);
+                    detail.apply_(patch);
                 }
             });
         }
@@ -418,7 +431,7 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
                 let mut patch = FightDetail::new_empty_patch();
                 patch.use_medicine(count, is_expiring);
                 if let Some(detail) = detail.as_fight_mut() {
-                    detail.apply(patch);
+                    detail.apply_(patch);
                 }
             });
 
@@ -448,8 +461,10 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
             info!("{}: {}", "ProductOfFacility", product);
 
             edit_current_task_detail(move |detail| {
+                let mut patch = InfrastDetail::new_empty_patch();
+                patch.set_product(facility.parse().unwrap(), index, product.as_str());
                 if let Some(detail) = detail.as_infrast_mut() {
-                    detail.set_product(facility.parse().unwrap(), index, product.as_str());
+                    detail.apply_(patch);
                 }
             });
         }
@@ -460,19 +475,21 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
             let candidates = details.get("candidates")?.as_array()?.to_owned();
 
             edit_current_task_detail(move |detail| {
+                let mut patch = InfrastDetail::new_empty_patch();
+                patch.set_operators(
+                    facility.parse().unwrap(),
+                    index,
+                    operators
+                        .iter()
+                        .filter_map(|x| x.as_str().map(|x| x.to_owned()))
+                        .collect(),
+                    candidates
+                        .iter()
+                        .filter_map(|x| x.as_str().map(|x| x.to_owned()))
+                        .collect(),
+                );
                 if let Some(detail) = detail.as_infrast_mut() {
-                    detail.set_operators(
-                        facility.parse().unwrap(),
-                        index,
-                        operators
-                            .iter()
-                            .filter_map(|x| x.as_str().map(|x| x.to_owned()))
-                            .collect(),
-                        candidates
-                            .iter()
-                            .filter_map(|x| x.as_str().map(|x| x.to_owned()))
-                            .collect(),
-                    );
+                    detail.apply_(patch);
                 }
             });
 
@@ -508,11 +525,13 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
             );
 
             edit_current_task_detail(move |detail| {
+                let mut patch = RecruitDetail::new_empty_patch();
+                patch.push_recruit(
+                    level,
+                    tags.iter().filter_map(|x| x.as_str().map(|x| x.to_owned())),
+                );
                 if let Some(detail) = detail.as_recruit_mut() {
-                    detail.push_recruit(
-                        level,
-                        tags.iter().filter_map(|x| x.as_str().map(|x| x.to_owned())),
-                    );
+                    detail.apply_(patch);
                 }
             });
         }
@@ -538,8 +557,10 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
             let deposit = details.get("deposit")?.as_i64()?;
 
             edit_current_task_detail(move |detail| {
+                let mut patch = RoguelikeDetail::new_empty_patch();
+                patch.invest(count);
                 if let Some(detail) = detail.as_roguelike_mut() {
-                    detail.invest(count);
+                    detail.apply_(patch);
                 }
             });
 
@@ -548,8 +569,10 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
         "RoguelikeSettlement" => {
             let exp = details.get("exp")?.as_i64()?;
             edit_current_task_detail(move |detail| {
+                let mut patch = RoguelikeDetail::new_empty_patch();
+                patch.set_exp(exp);
                 if let Some(detail) = detail.as_roguelike_mut() {
-                    detail.set_exp(exp)
+                    detail.apply_(patch);
                 }
             });
             info!("Gain {} exp during this exploration", exp);
