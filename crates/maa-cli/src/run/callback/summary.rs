@@ -1,14 +1,15 @@
-//! **ALWAYS** call [`init_pipe`] before using other functions,
+//! **ALWAYS** call [`get_or_init`] before using other functions,
 //! otherwise program will panic
 pub use std::collections::BTreeMap as Map;
 use std::sync::{
-    mpsc::{channel, Receiver, Sender, TryRecvError},
+    // mpsc::{channel, Receiver, Sender, TryRecvError},
     OnceLock,
 };
 
 use chrono;
 use maa_sys::TaskType;
 use maa_types::primitive::AsstTaskId;
+use tokio::sync::broadcast::{channel, error::TryRecvError, Receiver, Sender};
 
 use super::IterJoin;
 
@@ -35,6 +36,7 @@ impl PatchExt<RecruitDetailPatch> for RecruitDetail {}
 
 static PIPE: OnceLock<Sender<TaskState>> = OnceLock::new();
 
+#[derive(Clone)]
 enum TaskState {
     Start(AsstTaskId),
     End(Reason),
@@ -104,7 +106,8 @@ impl SummarySubscriber {
                     };
                 }
                 Err(TryRecvError::Empty) => break,
-                Err(TryRecvError::Disconnected) => unreachable!(),
+                Err(TryRecvError::Closed) => unreachable!(),
+                Err(TryRecvError::Lagged(_lag)) => unimplemented!(),
             }
         }
         (!delta.is_empty()).then_some(
@@ -120,9 +123,8 @@ impl SummarySubscriber {
     }
 }
 
-pub fn init_pipe() -> SummarySubscriber {
-    let (tx, rx) = channel();
-    PIPE.set(tx).unwrap();
+pub fn get_or_init() -> SummarySubscriber {
+    let rx = PIPE.get_or_init(|| channel(1024).0).subscribe();
     SummarySubscriber::new(rx)
 }
 
@@ -134,6 +136,7 @@ pub fn insert(id: AsstTaskId, name: Option<String>, task: impl Into<TaskType>) {
             name,
             task: task.into(),
         })
+        .map_err(|_| ())
         .unwrap();
 }
 
@@ -143,15 +146,27 @@ pub(crate) fn display(mut rx: SummarySubscriber) {
 }
 
 pub(super) fn start_task(id: AsstTaskId) -> Option<()> {
-    PIPE.get().unwrap().send(TaskState::Start(id)).ok()
+    PIPE.get()
+        .unwrap()
+        .send(TaskState::Start(id))
+        .ok()
+        .map(|_| ())
 }
 
 pub(super) fn end_current_task(reason: Reason) -> Option<()> {
-    PIPE.get().unwrap().send(TaskState::End(reason)).ok()
+    PIPE.get()
+        .unwrap()
+        .send(TaskState::End(reason))
+        .ok()
+        .map(|_| ())
 }
 
 pub(super) fn edit_current_task_detail(patch: DetailPatch) -> Option<()> {
-    PIPE.get().unwrap().send(TaskState::Detail(patch)).ok()
+    PIPE.get()
+        .unwrap()
+        .send(TaskState::Detail(patch))
+        .ok()
+        .map(|_| ())
 }
 
 struct Summary {
@@ -306,6 +321,7 @@ impl std::fmt::Display for TaskSummary {
     }
 }
 
+#[derive(Clone, Copy)]
 pub(super) enum Reason {
     Completed,
     Stopped,
@@ -360,6 +376,7 @@ impl std::fmt::Display for FormattedDuration {
     }
 }
 
+#[derive(Clone)]
 pub enum DetailPatch {
     Infrast(InfrastDetailPatch),
     Fight(FightDetailPatch),
@@ -445,6 +462,7 @@ impl std::ops::Add for InfrastDetailPatch {
 }
 
 #[derive(struct_patch::Patch, Default)]
+#[patch(attribute(derive(Clone)))]
 #[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct InfrastDetail {
     inner: Map<Facility, Map<i64, InfrastRoomInfo>>,
@@ -491,7 +509,7 @@ impl InfrastDetailPatch {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 #[cfg_attr(test, derive(Debug))]
 struct InfrastRoomInfo {
     product: Option<String>,
@@ -663,6 +681,7 @@ impl std::ops::Add for FightDetailPatch {
 }
 
 #[derive(struct_patch::Patch, Default)]
+#[patch(attribute(derive(Clone)))]
 #[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct FightDetail {
     // stage name to fight
@@ -803,6 +822,7 @@ impl std::ops::Add for RecruitDetailPatch {
 }
 
 #[derive(struct_patch::Patch, Default)]
+#[patch(attribute(derive(Clone)))]
 #[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct RecruitDetail {
     refresh_times: Option<i64>,
@@ -811,7 +831,7 @@ pub struct RecruitDetail {
     record: Vec<(u64, Vec<String>, RecruitState)>,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone, Copy)]
 #[cfg_attr(test, derive(Debug))]
 enum RecruitState {
     Refreshed,
@@ -893,6 +913,7 @@ impl std::ops::Add for RoguelikeDetailPatch {
 }
 
 #[derive(struct_patch::Patch, Default)]
+#[patch(attribute(derive(Clone)))]
 #[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct RoguelikeDetail {
     explorations: Vec<ExplorationDetail>,
@@ -1013,7 +1034,7 @@ impl std::fmt::Display for ExplorationState {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 #[cfg_attr(test, derive(Debug))]
 struct ExplorationDetail {
     /// current state of this exploration

@@ -236,7 +236,7 @@ pub fn run<F>(f: F, args: CommonArgs) -> Result<()>
 where
     F: FnOnce(&AsstConfig) -> Result<TaskConfig>,
 {
-    let mut rx = summary::init_pipe();
+    let mut rx = summary::get_or_init();
 
     let ret = run_core(f, args, &mut rx);
 
