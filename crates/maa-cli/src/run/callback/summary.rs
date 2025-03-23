@@ -16,10 +16,15 @@ pub(super) trait PatchExt<P>: struct_patch::Patch<P> + Default + Sized
 where
     P: std::ops::Add<Output = P>,
 {
-    fn apply_(&mut self, patch: P) {
+    fn apply(&mut self, patch: P) {
         let old_patch = std::mem::take(self).into_patch();
         let new_patch = patch + old_patch;
-        self.apply(new_patch);
+        struct_patch::Patch::apply(self, new_patch);
+    }
+
+    #[cfg(test)]
+    fn new_empty_patch() -> P {
+        <Self as struct_patch::Patch<P>>::new_empty_patch()
     }
 }
 
@@ -33,7 +38,7 @@ static PIPE: OnceLock<Sender<TaskState>> = OnceLock::new();
 enum TaskState {
     Start(AsstTaskId),
     End(Reason),
-    Detail(Box<dyn FnOnce(&mut Detail) + Send>),
+    Detail(DetailPatch),
     Insert {
         id: AsstTaskId,
         name: Option<String>,
@@ -78,8 +83,23 @@ impl SummarySubscriber {
                         delta.push(format!("Task End:\n{}", task));
                     };
                 }
-                Ok(TaskState::Detail(detail)) => {
-                    if let Some(task) = summary.edit_current_task_detail(detail) {
+                Ok(TaskState::Detail(patch)) => {
+                    if let Some(task) = summary.edit_current_task_detail(|detail| {
+                        match patch {
+                            DetailPatch::Infrast(patch) => {
+                                detail.as_infrast_mut().map(|detail| detail.apply(patch))
+                            }
+                            DetailPatch::Fight(patch) => {
+                                detail.as_fight_mut().map(|detail| detail.apply(patch))
+                            }
+                            DetailPatch::Recruit(patch) => {
+                                detail.as_recruit_mut().map(|detail| detail.apply(patch))
+                            }
+                            DetailPatch::Roguelike(patch) => {
+                                detail.as_roguelike_mut().map(|detail| detail.apply(patch))
+                            }
+                        };
+                    }) {
                         delta.push(format!("Task State Change:\n{}", task));
                     };
                 }
@@ -130,11 +150,8 @@ pub(super) fn end_current_task(reason: Reason) -> Option<()> {
     PIPE.get().unwrap().send(TaskState::End(reason)).ok()
 }
 
-pub(super) fn edit_current_task_detail(f: impl FnOnce(&mut Detail) + Send + 'static) -> Option<()> {
-    PIPE.get()
-        .unwrap()
-        .send(TaskState::Detail(Box::new(f)))
-        .ok()
+pub(super) fn edit_current_task_detail(patch: DetailPatch) -> Option<()> {
+    PIPE.get().unwrap().send(TaskState::Detail(patch)).ok()
 }
 
 struct Summary {
@@ -341,6 +358,13 @@ impl std::fmt::Display for FormattedDuration {
         }
         Ok(())
     }
+}
+
+pub enum DetailPatch {
+    Infrast(InfrastDetailPatch),
+    Fight(FightDetailPatch),
+    Recruit(RecruitDetailPatch),
+    Roguelike(RoguelikeDetailPatch),
 }
 
 pub enum Detail {
@@ -613,7 +637,7 @@ impl std::ops::Add for FightDetailPatch {
             self.stage = Some(Some(stage))
         }
         if let Some(times) = times.flatten() {
-            self.times = Some(Some(self.times.flatten().unwrap_or_default() + times));
+            self.times = Some(Some(times));
         }
         match (self.medicine.flatten().as_mut(), medicine.flatten()) {
             (None, None) => (),
@@ -625,7 +649,7 @@ impl std::ops::Add for FightDetailPatch {
             }
         }
         if let Some(stone) = stone.flatten() {
-            self.stone = Some(Some(self.stone.flatten().unwrap_or_default() + stone));
+            self.stone = Some(Some(stone));
         }
         if let Some(drops) = drops {
             if let Some(cur) = self.drops.as_mut() {
@@ -1080,7 +1104,6 @@ mod tests {
 
     mod summary {
         use regex::Regex;
-        use struct_patch::Patch;
 
         use super::*;
         use crate::assert_matches;
@@ -1101,7 +1124,7 @@ mod tests {
                 let mut patch = FightDetail::new_empty_patch();
                 patch.set_stage("TS-9");
                 let detail = detail.as_fight_mut().unwrap();
-                detail.apply_(patch);
+                detail.apply(patch);
             });
             summary.end_current_task(Reason::Completed);
 
@@ -1110,7 +1133,7 @@ mod tests {
                 let detail = detail.as_infrast_mut().unwrap();
                 let mut patch = InfrastDetail::new_empty_patch();
                 patch.set_product(Facility::Mfg, 1, "Product");
-                detail.apply_(patch);
+                detail.apply(patch);
             });
             summary.end_current_task(Reason::Stopped);
 
@@ -1120,7 +1143,7 @@ mod tests {
                 let mut patch = RecruitDetail::new_empty_patch();
                 patch.push_recruit(3, ["A", "B"].into_iter().map(|s| s.to_owned()));
                 patch.recruit();
-                detail.apply_(patch);
+                detail.apply(patch);
             });
             summary.end_current_task(Reason::Error);
 
@@ -1174,8 +1197,6 @@ mod tests {
     }
 
     mod detail {
-        use struct_patch::Patch;
-
         use super::*;
         use crate::assert_matches;
 
@@ -1253,11 +1274,11 @@ mod tests {
                 ["A", "B"].into_iter().map(|s| s.to_owned()).collect(),
                 ["C", "D"].into_iter().map(|s| s.to_owned()).collect(),
             );
-            detail.apply_(patch);
+            detail.apply(patch);
             let mut patch = InfrastDetail::new_empty_patch();
             patch.set_product(Facility::Office, 1, "Product");
             patch.set_operators(Facility::Office, 1, Vec::new(), Vec::new());
-            detail.apply_(patch);
+            detail.apply(patch);
             assert_eq!(
                 detail.to_string(),
                 "Mfg(Product) with operators: A, B, [C, D]\n\
@@ -1295,7 +1316,7 @@ mod tests {
                     .map(|(k, v)| (k.to_owned(), v))
                     .collect(),
             );
-            detail.apply_(patch);
+            detail.apply(patch);
             assert_eq!(
                 detail.to_string(),
                 "Fight TS-9 2 times, used 2 medicine (1 expiring), used 1 stone, drops:\n\
@@ -1308,7 +1329,7 @@ mod tests {
             let mut patch = FightDetail::new_empty_patch();
             patch.set_stage("TS-9");
             patch.set_times(1);
-            detail.apply_(patch);
+            detail.apply(patch);
             assert_eq!(detail.to_string(), "Fight TS-9 1 times\n");
 
             let detail = FightDetail::default();
@@ -1318,16 +1339,16 @@ mod tests {
             let mut patch = FightDetail::new_empty_patch();
             patch.set_stage("TS-1");
             patch.set_stage("TS-9");
-            detail.apply_(patch);
+            detail.apply(patch);
             assert_eq!(detail.to_string(), "Fight TS-9\n");
 
             let mut detail = FightDetail::default();
             let mut patch = FightDetail::new_empty_patch();
             patch.set_stage("TS-1");
-            detail.apply_(patch);
+            detail.apply(patch);
             let mut patch = FightDetail::new_empty_patch();
             patch.set_stage("TS-9");
-            detail.apply_(patch);
+            detail.apply(patch);
             assert_eq!(detail.to_string(), "Fight TS-1\n");
         }
 
@@ -1351,7 +1372,7 @@ mod tests {
             patch.push_recruit(4, ["G", "H"].into_iter().map(|s| s.to_owned()));
             patch.recruit();
             patch.push_recruit(5, ["I", "J"].into_iter().map(|s| s.to_owned()));
-            detail.apply_(patch);
+            detail.apply(patch);
             assert_eq!(
                 detail.to_string(),
                 "Detected tags:\n\
@@ -1368,7 +1389,7 @@ mod tests {
             let mut patch = RecruitDetail::new_empty_patch();
             patch.push_recruit(3, ["A", "B"].into_iter().map(|s| s.to_owned()));
             patch.recruit();
-            detail.apply_(patch);
+            detail.apply(patch);
             assert_eq!(
                 detail.to_string(),
                 "Detected tags:\n\
@@ -1380,7 +1401,7 @@ mod tests {
             patch.push_recruit(3, ["A", "B"].into_iter().map(|s| s.to_owned()));
             patch.refresh();
             patch.push_recruit(4, ["C", "D"].into_iter().map(|s| s.to_owned()));
-            detail.apply_(patch);
+            detail.apply(patch);
             assert_eq!(
                 detail.to_string(),
                 "Detected tags:\n\
