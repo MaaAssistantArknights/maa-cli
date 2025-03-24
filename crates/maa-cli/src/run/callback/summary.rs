@@ -19,7 +19,7 @@ where
 {
     fn apply(&mut self, patch: P) {
         let old_patch = std::mem::take(self).into_patch();
-        let new_patch = patch + old_patch;
+        let new_patch = old_patch + patch;
         struct_patch::Patch::apply(self, new_patch);
     }
 
@@ -440,31 +440,24 @@ impl std::fmt::Display for Detail {
     }
 }
 
-impl std::ops::Add for InfrastDetailPatch {
-    type Output = InfrastDetailPatch;
-
-    fn add(mut self, rhs: Self) -> Self::Output {
-        let Self { inner } = rhs;
-        match (self.inner.as_mut(), inner) {
-            (None, None) => (),
-            (Some(_), None) => (),
-            (None, Some(new)) => self.inner = Some(new),
-            (Some(a), Some(b)) => {
-                for (facility, v) in b.into_iter() {
-                    for (id, info) in v.into_iter() {
-                        a.entry(facility).or_default().insert(id, info);
-                    }
-                }
-            }
+fn merge_map<K, K2, V>(mut a: Map<K, Map<K2, V>>, b: Map<K, Map<K2, V>>) -> Map<K, Map<K2, V>>
+where
+    K: Copy + std::cmp::Ord,
+    K2: std::cmp::Ord,
+{
+    for (facility, v) in b.into_iter() {
+        for (id, info) in v.into_iter() {
+            a.entry(facility).or_default().insert(id, info);
         }
-        self
     }
+    a
 }
 
 #[derive(struct_patch::Patch, Default)]
 #[patch(attribute(derive(Clone)))]
 #[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct InfrastDetail {
+    #[patch(add = merge_map)]
     inner: Map<Facility, Map<i64, InfrastRoomInfo>>,
 }
 impl InfrastDetailPatch {
@@ -640,58 +633,30 @@ impl std::fmt::Display for InfrastRoomInfo {
     }
 }
 
-impl std::ops::Add for FightDetailPatch {
-    type Output = Self;
-
-    fn add(mut self, rhs: Self) -> Self::Output {
-        let Self {
-            stage,
-            times,
-            medicine,
-            stone,
-            drops,
-        } = rhs;
-        if let Some(stage) = stage.flatten() {
-            self.stage = Some(Some(stage))
-        }
-        if let Some(times) = times.flatten() {
-            self.times = Some(Some(times));
-        }
-        match (self.medicine.flatten().as_mut(), medicine.flatten()) {
-            (None, None) => (),
-            (None, Some(_)) => self.medicine = medicine,
-            (Some(_), None) => (),
-            (Some(a), Some(b)) => {
-                a.0 += b.0;
-                a.1 += b.1;
-            }
-        }
-        if let Some(stone) = stone.flatten() {
-            self.stone = Some(Some(stone));
-        }
-        if let Some(drops) = drops {
-            if let Some(cur) = self.drops.as_mut() {
-                cur.extend(drops);
-            } else {
-                self.drops = Some(drops)
-            }
-        }
-        self
-    }
+fn keep<T>(a: Option<T>, b: Option<T>) -> Option<T> {
+    a.or(b)
+}
+fn replace<T>(a: Option<T>, b: Option<T>) -> Option<T> {
+    b.or(a)
 }
 
 #[derive(struct_patch::Patch, Default)]
 #[patch(attribute(derive(Clone)))]
 #[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct FightDetail {
+    #[patch(add = keep)]
     // stage name to fight
     stage: Option<String>,
+    #[patch(add = replace)]
     // times of fight
     times: Option<i64>,
+    #[patch(add = replace)]
     // used medicine
     medicine: Option<(i64, i64)>,
+    #[patch(add = replace)]
     // used stone
     stone: Option<i64>,
+    #[patch(add = merge_vec)]
     // [(item, count), ...], each element is corresponding to a fight
     // the length of this vector may smaller than times,
     // because some fight may not drop anything or failed to recognize the drop
@@ -775,58 +740,22 @@ impl std::fmt::Display for FightDetail {
     }
 }
 
-impl std::ops::Add for RecruitDetailPatch {
-    type Output = Self;
-
-    fn add(mut self, rhs: Self) -> Self::Output {
-        let Self {
-            refresh_times,
-            recruit_times,
-            record,
-        } = rhs;
-
-        match (self.recruit_times, recruit_times) {
-            (None, None) => (),
-            (None, Some(_)) => self.recruit_times = recruit_times,
-            (Some(_), None) => (),
-            (Some(_), Some(_)) => {
-                self.recruit_times = Some(Some(
-                    self.recruit_times.flatten().unwrap_or_default()
-                        + recruit_times.flatten().unwrap_or_default(),
-                ))
-            }
-        }
-
-        match (self.refresh_times, refresh_times) {
-            (None, None) => (),
-            (None, Some(_)) => self.refresh_times = refresh_times,
-            (Some(_), None) => (),
-            (Some(_), Some(_)) => {
-                self.refresh_times = Some(Some(
-                    self.refresh_times.flatten().unwrap_or_default()
-                        + refresh_times.flatten().unwrap_or_default(),
-                ))
-            }
-        }
-
-        if let Some(rec) = record {
-            match self.record.as_mut() {
-                Some(v) => {
-                    v.extend(rec);
-                }
-                None => self.record = Some(rec),
-            }
-        }
-        self
+fn option_add<T: Copy + std::ops::Add<Output = T>>(a: Option<T>, b: Option<T>) -> Option<T> {
+    if let (Some(a), Some(b)) = (a, b) {
+        return Some(a + b);
     }
+    a.or(b)
 }
 
 #[derive(struct_patch::Patch, Default)]
 #[patch(attribute(derive(Clone)))]
 #[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct RecruitDetail {
+    #[patch(add = option_add)]
     refresh_times: Option<i64>,
+    #[patch(add = option_add)]
     recruit_times: Option<i64>,
+    #[patch(add = merge_vec)]
     // [(tags, level, state), ...]
     record: Vec<(u64, Vec<String>, RecruitState)>,
 }
@@ -897,25 +826,16 @@ impl std::fmt::Display for RecruitDetail {
     }
 }
 
-impl std::ops::Add for RoguelikeDetailPatch {
-    type Output = Self;
-
-    fn add(mut self, rhs: Self) -> Self::Output {
-        let Self { explorations } = rhs;
-        match (self.explorations.as_mut(), explorations) {
-            (None, None) => (),
-            (Some(_), None) => (),
-            (None, Some(exp)) => self.explorations = Some(exp),
-            (Some(a), Some(b)) => a.extend(b),
-        }
-        self
-    }
+fn merge_vec<T>(mut a: Vec<T>, b: Vec<T>) -> Vec<T> {
+    a.extend(b);
+    a
 }
 
 #[derive(struct_patch::Patch, Default)]
 #[patch(attribute(derive(Clone)))]
 #[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct RoguelikeDetail {
+    #[patch(add = merge_vec)]
     explorations: Vec<ExplorationDetail>,
 }
 
