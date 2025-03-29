@@ -47,6 +47,23 @@ enum TaskState {
         task: TaskType,
     },
 }
+
+pub enum TaskSummaryState {
+    Add(String),
+    Start(String),
+    End(String),
+    Working(String),
+}
+impl std::fmt::Display for TaskSummaryState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TaskSummaryState::Add(s) => write!(f, "Task Add:\n{s}{LINE_SEP}"),
+            TaskSummaryState::Start(s) => write!(f, "Task Start:\n{s}{LINE_SEP}"),
+            TaskSummaryState::End(s) => write!(f, "Task End:\n{s}{LINE_SEP}"),
+            TaskSummaryState::Working(s) => write!(f, "Task Update:\n{s}{LINE_SEP}"),
+        }
+    }
+}
 /// provider real-time log from MaaCore
 pub struct SummarySubscriber {
     rx: Receiver<TaskState>,
@@ -58,7 +75,7 @@ impl SummarySubscriber {
     }
 
     /// collect all cached content in pipe, and show the delta
-    pub fn try_update(&mut self) -> Option<String> {
+    pub fn try_update(&mut self) -> Option<Vec<TaskSummaryState>> {
         if self.summary.is_none() {
             self.summary = Some(Summary::new())
         }
@@ -68,7 +85,7 @@ impl SummarySubscriber {
             match self.rx.try_recv() {
                 Ok(TaskState::Insert { id, name, task }) => {
                     let task = TaskSummary::new(name, task);
-                    delta.push(format!("Task Add:\n{}", task));
+                    delta.push(TaskSummaryState::Add(task.to_string()));
                     summary.insert(id, task);
                 }
                 Ok(TaskState::Start(id)) => {
@@ -77,12 +94,12 @@ impl SummarySubscriber {
                         // which can cause a mistake
                         //
                         // But this couldn't happen?
-                        delta.push(format!("Task Start:\n{}", task));
+                        delta.push(TaskSummaryState::Start(task.to_string()));
                     };
                 }
                 Ok(TaskState::End(reason)) => {
                     if let Some(task) = summary.end_current_task(reason) {
-                        delta.push(format!("Task End:\n{}", task));
+                        delta.push(TaskSummaryState::End(task.to_string()));
                     };
                 }
                 Ok(TaskState::Detail(patch)) => {
@@ -102,7 +119,7 @@ impl SummarySubscriber {
                             }
                         };
                     }) {
-                        delta.push(format!("Task State Change:\n{}", task));
+                        delta.push(TaskSummaryState::Working(task.to_string()));
                     };
                 }
                 Err(TryRecvError::Empty) => break,
@@ -110,16 +127,40 @@ impl SummarySubscriber {
                 Err(TryRecvError::Lagged(_lag)) => unimplemented!(),
             }
         }
-        (!delta.is_empty()).then_some(
-            delta
-                .into_iter()
-                .fold("".to_owned(), |acc, new| format!("{acc}{LINE_SEP}\n{new}")),
-        )
+        (!delta.is_empty()).then_some(delta)
     }
 
-    /// get [`Summary`] as String
-    pub fn sync(&self) -> String {
-        self.summary.as_ref().unwrap_or(&Summary::new()).to_string()
+    // /// get [`Summary`] as String
+    // pub fn sync(&self) -> String {
+    //     self.summary.as_ref().unwrap_or(&Summary::new()).to_string()
+    // }
+
+    pub fn get_todo_task_names(&self) -> Vec<String> {
+        self.summary
+            .as_ref()
+            .unwrap_or(&Summary::new())
+            .task_summarys
+            .values()
+            .filter(|task| matches!(task.reason, Reason::Unstarted | Reason::Unfinished))
+            .map(|task| {
+                task.name
+                    .as_deref()
+                    .unwrap_or(task.task.to_str())
+                    .to_string()
+            })
+            .collect()
+    }
+
+    pub fn get_todo_tasks(&self) -> String {
+        self.summary
+            .as_ref()
+            .unwrap_or(&Summary::new())
+            .task_summarys
+            .values()
+            .filter(|task| matches!(task.reason, Reason::Unstarted | Reason::Unfinished))
+            .map(|task| task.to_string())
+            .collect::<Vec<_>>()
+            .join(&format!("{LINE_SEP}\n"))
     }
 }
 
@@ -140,10 +181,10 @@ pub fn insert(id: AsstTaskId, name: Option<String>, task: impl Into<TaskType>) {
         .unwrap();
 }
 
-pub(crate) fn display(mut rx: SummarySubscriber) {
-    rx.try_update();
-    println!("{}", rx.sync());
-}
+// pub(crate) fn display(mut rx: SummarySubscriber) {
+//     rx.try_update();
+//     println!("{}", rx.sync());
+// }
 
 pub(super) fn start_task(id: AsstTaskId) -> Option<()> {
     PIPE.get()
@@ -220,7 +261,7 @@ impl Summary {
     }
 }
 
-const LINE_SEP: &str = "----------------------------------------";
+pub(super) const LINE_SEP: &str = "----------------------------------------";
 
 impl std::fmt::Display for Summary {
     // we print literal but it will be replace by a localizable string, so it's fine

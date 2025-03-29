@@ -1,6 +1,3 @@
-// mod message;
-// use message::callback;
-//
 mod callback;
 use callback::summary::{self, SummarySubscriber};
 
@@ -8,17 +5,13 @@ mod external;
 
 pub mod preset;
 
-use std::{
-    path::Path,
-    sync::{atomic, Arc},
-};
+use std::{path::Path, sync::atomic};
 
 use anyhow::{bail, Context, Result};
 use clap::Args;
 use log::{debug, warn};
 use maa_dirs::{self as dirs, Ensure, MAA_CORE_LIB};
 use maa_sys::Assistant;
-use signal_hook::consts::TERM_SIGNALS;
 
 use crate::{
     config::{asst::AsstConfig, task::TaskConfig, FindFile},
@@ -133,15 +126,6 @@ where
     load_core().context("Failed to load MaaCore!")?;
     setup_core(&asst_config)?;
 
-    // Register signal handlers
-    let stop_bool = Arc::new(std::sync::atomic::AtomicBool::new(false));
-    for sig in TERM_SIGNALS {
-        signal_hook::flag::register_conditional_default(*sig, Arc::clone(&stop_bool))
-            .context("Failed to register signal handler!")?;
-        signal_hook::flag::register(*sig, Arc::clone(&stop_bool))
-            .context("Failed to register signal handler!")?;
-    }
-
     // Create and setup Assistant
     let asst = Assistant::new(Some(callback::default_callback), None);
     asst_config.instance_options.apply_to(&asst)?;
@@ -206,15 +190,7 @@ where
 
         asst.start()?;
 
-        while asst.running() {
-            if stop_bool.load(atomic::Ordering::Relaxed) {
-                bail!("Interrupted by user!");
-            }
-            if let Some(updated) = rx.try_update() {
-                print!("{}", updated)
-            }
-            std::thread::sleep(std::time::Duration::from_millis(500));
-        }
+        callback::cli::entry(&asst, rx)?;
 
         asst.stop()?;
 
@@ -223,9 +199,6 @@ where
             app.close().context("Failed to close external app")?;
         }
     }
-
-    // TODO: Better ways to restore signal handlers?
-    stop_bool.store(true, atomic::Ordering::Relaxed);
 
     Ok(())
 }
@@ -240,7 +213,7 @@ where
 
     let ret = run_core(f, args, &mut rx);
 
-    summary::display(rx);
+    // summary::display(rx);
 
     ret?;
 

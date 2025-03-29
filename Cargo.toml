@@ -57,3 +57,6 @@ features = ["charset", "http2", "macos-system-configuration", "rustls-tls"]
 
 [workspace.metadata.typos.files]
 extend-exclude = ["licenses.md"]
+
+[workspace.metadata.typos.default.extend-words]
+"ratatui" = "ratatui"

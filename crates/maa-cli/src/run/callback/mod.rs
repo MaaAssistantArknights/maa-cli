@@ -1,3 +1,4 @@
+pub mod cli;
 pub mod summary;
 use std::{fmt::Write, sync::atomic::AtomicBool};
 

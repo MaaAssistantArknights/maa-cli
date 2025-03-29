@@ -48,9 +48,7 @@ clap = { workspace = true, features = ["derive"] }
 clap_complete = { workspace = true }
 clap_mangen = { workspace = true }
 color-print = { workspace = true }
-constcat = { workspace = true }
 digest = { workspace = true, optional = true }
-dunce = { workspace = true }
 env_logger = { workspace = true, features = ["auto-color"] }
 flate2 = { workspace = true, optional = true }
 futures-util = { workspace = true, optional = true }
@@ -64,14 +62,25 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 sha2 = { workspace = true, optional = true }
-signal-hook = { workspace = true }
 tar = { workspace = true, optional = true }
-tokio = { workspace = true, features = ["rt", "rt-multi-thread"] }
+tokio = { workspace = true, features = [
+  "rt",
+  "rt-multi-thread",
+  "sync",
+  "signal",
+  "macros",
+  "time",
+] }
 toml = { workspace = true }
 zip = { workspace = true, optional = true, features = ["deflate"] }
 self-replace = { workspace = true }
 tempfile = { workspace = true }
-struct-patch = { version = "0.8.7", default-features = false ,features = ["op"]}
+struct-patch = { version = "0.8.7", default-features = false, features = [
+  "op",
+] }
+ratatui = { version = "0.29.0", default-features = false, features = [
+  "crossterm",
+] }
 
 [dev-dependencies]
 regex = { workspace = true }
