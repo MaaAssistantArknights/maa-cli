@@ -1,10 +1,15 @@
+pub mod cli;
 pub mod summary;
 use std::{fmt::Write, sync::atomic::AtomicBool};
 
 use log::{debug, error, info, trace, warn};
 use maa_types::primitive::{AsstMsgId, AsstTaskId};
 use serde_json::{Map, Value};
-use summary::{edit_current_task_detail, end_current_task, start_task};
+use struct_patch::Patch;
+use summary::{
+    edit_current_task_detail, end_current_task, start_task, DetailPatch, FightDetail,
+    InfrastDetail, RecruitDetail, RoguelikeDetail,
+};
 
 pub static MAA_CORE_ERRORED: AtomicBool = AtomicBool::new(false);
 
@@ -249,38 +254,30 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
             "StartButton2" | "AnnihilationConfirm" => {
                 // Maybe need to update if MAA fight a stage multiple times in one run
                 let exec_times = details.get("exec_times")?.as_i64()?;
-                edit_current_task_detail(|detail| {
-                    if let Some(detail) = detail.as_fight_mut() {
-                        detail.set_times(exec_times);
-                    }
-                });
+                let mut patch = FightDetail::new_empty_patch();
+                patch.set_times(exec_times);
+                edit_current_task_detail(DetailPatch::Fight(patch));
                 info!("{} {} {}", "MissionStart", exec_times, "times");
             }
             "StoneConfirm" => {
                 let exec_times = details.get("exec_times")?.as_i64()?;
-                edit_current_task_detail(|detail| {
-                    if let Some(detail) = detail.as_fight_mut() {
-                        detail.set_stone(exec_times)
-                    }
-                });
+                let mut patch = FightDetail::new_empty_patch();
+                patch.set_stone(exec_times);
+                edit_current_task_detail(DetailPatch::Fight(patch));
                 info!("Use {} stones", exec_times);
             }
             "AbandonAction" => warn!("{}", "PRTS error"),
             // Recruit
             "RecruitRefreshConfirm" => {
-                edit_current_task_detail(|detail| {
-                    if let Some(detail) = detail.as_recruit_mut() {
-                        detail.refresh()
-                    }
-                });
+                let mut patch = RecruitDetail::new_empty_patch();
+                patch.refresh();
+                edit_current_task_detail(DetailPatch::Recruit(patch));
                 info!("{}", "Refresh Tags")
             }
             "RecruitConfirm" => {
-                edit_current_task_detail(|detail| {
-                    if let Some(detail) = detail.as_recruit_mut() {
-                        detail.recruit()
-                    }
-                });
+                let mut patch = RecruitDetail::new_empty_patch();
+                patch.recruit();
+                edit_current_task_detail(DetailPatch::Recruit(patch));
                 info!("{}", "Recruit")
             }
             // Infrast
@@ -288,19 +285,15 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
             // RogueLike
             "StartExplore" => {
                 let exec_times = details.get("exec_times")?.as_i64()?;
-                edit_current_task_detail(|detail| {
-                    if let Some(detail) = detail.as_roguelike_mut() {
-                        detail.start_exploration()
-                    }
-                });
+                let mut patch = RoguelikeDetail::new_empty_patch();
+                patch.start_exploration();
+                edit_current_task_detail(DetailPatch::Roguelike(patch));
                 info!("Start exploration {} times", exec_times)
             }
             "ExitThenAbandon" => {
-                edit_current_task_detail(|detail| {
-                    if let Some(detail) = detail.as_roguelike_mut() {
-                        detail.set_state(summary::ExplorationState::Abandoned)
-                    }
-                });
+                let mut patch = RoguelikeDetail::new_empty_patch();
+                patch.set_state(summary::ExplorationState::Abandoned);
+                edit_current_task_detail(DetailPatch::Roguelike(patch));
                 info!("Exploration Abandoned")
             }
             "ExitThenConfirm" => info!("{}", "ExplorationConfirmed"),
@@ -309,11 +302,9 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
                 // Deposit In some cases a failed mission doesn't mean failed exploration
                 // If a exploration was not failed, it's state would be overwritten later
                 if message.get("taskchain")?.as_str()? == "Roguelike" {
-                    edit_current_task_detail(|detail| {
-                        if let Some(detail) = detail.as_roguelike_mut() {
-                            detail.set_state(summary::ExplorationState::Failed)
-                        }
-                    });
+                    let mut patch = RoguelikeDetail::new_empty_patch();
+                    patch.set_state(summary::ExplorationState::Failed);
+                    edit_current_task_detail(DetailPatch::Roguelike(patch));
                 }
                 info!("MissionFailed")
             }
@@ -382,18 +373,14 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
                     .unwrap_or_else(|| "none".to_owned())
             );
 
-            edit_current_task_detail(|detail| {
-                if let Some(detail) = detail.as_fight_mut() {
-                    detail.push_drop(all_drops);
-                }
-            });
+            let mut patch = FightDetail::new_empty_patch();
+            patch.push_drop(all_drops);
+            edit_current_task_detail(DetailPatch::Fight(patch));
 
-            let stage = details.get("stage")?.get("stageCode")?.as_str()?;
-            edit_current_task_detail(|detail| {
-                if let Some(detail) = detail.as_fight_mut() {
-                    detail.set_stage(stage);
-                }
-            });
+            let stage = details.get("stage")?.get("stageCode")?.as_str()?.to_owned();
+            let mut patch = FightDetail::new_empty_patch();
+            patch.set_stage(stage.as_str());
+            edit_current_task_detail(DetailPatch::Fight(patch));
         }
 
         // Sanity and Medicines
@@ -405,11 +392,9 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
         "UseMedicine" => {
             let count = details.get("count")?.as_i64()?;
             let is_expiring = details.get("is_expiring")?.as_bool()?;
-            edit_current_task_detail(|detail| {
-                if let Some(detail) = detail.as_fight_mut() {
-                    detail.use_medicine(count, is_expiring);
-                }
-            });
+            let mut patch = FightDetail::new_empty_patch();
+            patch.use_medicine(count, is_expiring);
+            edit_current_task_detail(DetailPatch::Fight(patch));
 
             if is_expiring {
                 info!("Use {} expiring medicine", count);
@@ -430,40 +415,36 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
         "ProductChanged" => info!("{}", "ProductChanged"),
         "NotEnoughStaff" => error!("{}", "NotEnoughStaff"),
         "ProductOfFacility" => {
-            let facility = details.get("facility")?.as_str()?;
+            let facility = details.get("facility")?.as_str()?.to_owned();
             let index = details.get("index")?.as_i64()?;
-            let product = details.get("product")?.as_str()?;
+            let product = details.get("product")?.as_str()?.to_owned();
 
-            edit_current_task_detail(|detail| {
-                if let Some(detail) = detail.as_infrast_mut() {
-                    detail.set_product(facility.parse().unwrap(), index, product);
-                }
-            });
+            info!("{}: {}", "ProductOfFacility", product);
 
-            info!("{}: {}", "ProductOfFacility", product)
+            let mut patch = InfrastDetail::new_empty_patch();
+            patch.set_product(facility.parse().unwrap(), index, product.as_str());
+            edit_current_task_detail(DetailPatch::Infrast(patch));
         }
         "CustomInfrastRoomOperators" => {
-            let facility = details.get("facility")?.as_str()?;
+            let facility = details.get("facility")?.as_str()?.to_owned();
             let index = details.get("index")?.as_i64()?;
-            let operators = details.get("names")?.as_array()?;
-            let candidates = details.get("candidates")?.as_array()?;
+            let operators = details.get("names")?.as_array()?.to_owned();
+            let candidates = details.get("candidates")?.as_array()?.to_owned();
 
-            edit_current_task_detail(|detail| {
-                if let Some(detail) = detail.as_infrast_mut() {
-                    detail.set_operators(
-                        facility.parse().unwrap(),
-                        index,
-                        operators
-                            .iter()
-                            .filter_map(|x| x.as_str().map(|x| x.to_owned()))
-                            .collect(),
-                        candidates
-                            .iter()
-                            .filter_map(|x| x.as_str().map(|x| x.to_owned()))
-                            .collect(),
-                    );
-                }
-            });
+            let mut patch = InfrastDetail::new_empty_patch();
+            patch.set_operators(
+                facility.parse().unwrap(),
+                index,
+                operators
+                    .iter()
+                    .filter_map(|x| x.as_str().map(|x| x.to_owned()))
+                    .collect(),
+                candidates
+                    .iter()
+                    .filter_map(|x| x.as_str().map(|x| x.to_owned()))
+                    .collect(),
+            );
+            edit_current_task_detail(DetailPatch::Infrast(patch));
 
             info!(
                 "{}: {}",
@@ -484,16 +465,7 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
         "RecruitRobotTag" => info!("{}: {}", "RecruitingTips", details.get("tag")?.as_str()?),
         "RecruitResult" => {
             let level = details.get("level")?.as_u64()?;
-            let tags = details.get("tags")?.as_array()?;
-
-            edit_current_task_detail(|detail| {
-                if let Some(detail) = detail.as_recruit_mut() {
-                    detail.push_recruit(
-                        level,
-                        tags.iter().filter_map(|x| x.as_str().map(|x| x.to_owned())),
-                    );
-                }
-            });
+            let tags = details.get("tags")?.as_array()?.to_owned();
 
             info!(
                 "{}: {} {}",
@@ -503,7 +475,14 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
                     .filter_map(|x| x.as_str())
                     .join(", ")
                     .unwrap_or_else(|| "none".to_owned())
-            )
+            );
+
+            let mut patch = RecruitDetail::new_empty_patch();
+            patch.push_recruit(
+                level,
+                tags.iter().filter_map(|x| x.as_str().map(|x| x.to_owned())),
+            );
+            edit_current_task_detail(DetailPatch::Recruit(patch));
         }
         "RecruitTagsSelected" => info!("{}: {}", "RecruitTagsSelected", {
             details
@@ -526,21 +505,17 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
             let total = details.get("total")?.as_i64()?;
             let deposit = details.get("deposit")?.as_i64()?;
 
-            edit_current_task_detail(|detail| {
-                if let Some(detail) = detail.as_roguelike_mut() {
-                    detail.invest(count);
-                }
-            });
+            let mut patch = RoguelikeDetail::new_empty_patch();
+            patch.invest(count);
+            edit_current_task_detail(DetailPatch::Roguelike(patch));
 
             info!("Deposit {count} / {total} / {deposit} originium ingots")
         }
         "RoguelikeSettlement" => {
             let exp = details.get("exp")?.as_i64()?;
-            edit_current_task_detail(|detail| {
-                if let Some(detail) = detail.as_roguelike_mut() {
-                    detail.set_exp(exp)
-                }
-            });
+            let mut patch = RoguelikeDetail::new_empty_patch();
+            patch.set_exp(exp);
+            edit_current_task_detail(DetailPatch::Roguelike(patch));
             info!("Gain {} exp during this exploration", exp);
         }
 

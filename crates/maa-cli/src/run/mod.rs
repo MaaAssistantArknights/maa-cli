@@ -1,24 +1,17 @@
-// mod message;
-// use message::callback;
-//
 mod callback;
-use callback::summary;
+use callback::summary::{self, SummarySubscriber};
 
 mod external;
 
 pub mod preset;
 
-use std::{
-    path::Path,
-    sync::{atomic, Arc},
-};
+use std::{path::Path, sync::atomic};
 
 use anyhow::{bail, Context, Result};
 use clap::Args;
 use log::{debug, warn};
 use maa_dirs::{self as dirs, Ensure, MAA_CORE_LIB};
 use maa_sys::Assistant;
-use signal_hook::consts::TERM_SIGNALS;
 
 use crate::{
     config::{asst::AsstConfig, task::TaskConfig, FindFile},
@@ -111,7 +104,7 @@ fn find_profile(root: impl AsRef<Path>, profile: Option<&str>) -> Result<AsstCon
     }
 }
 
-fn run_core<F>(f: F, args: CommonArgs) -> Result<()>
+fn run_core<F>(f: F, args: CommonArgs, rx: &mut SummarySubscriber) -> Result<()>
 where
     F: FnOnce(&AsstConfig) -> Result<TaskConfig>,
 {
@@ -133,21 +126,12 @@ where
     load_core().context("Failed to load MaaCore!")?;
     setup_core(&asst_config)?;
 
-    // Register signal handlers
-    let stop_bool = Arc::new(std::sync::atomic::AtomicBool::new(false));
-    for sig in TERM_SIGNALS {
-        signal_hook::flag::register_conditional_default(*sig, Arc::clone(&stop_bool))
-            .context("Failed to register signal handler!")?;
-        signal_hook::flag::register(*sig, Arc::clone(&stop_bool))
-            .context("Failed to register signal handler!")?;
-    }
-
     // Create and setup Assistant
     let asst = Assistant::new(Some(callback::default_callback), None);
     asst_config.instance_options.apply_to(&asst)?;
 
     // Register tasks to Assistant and prepare summary
-    let mut task_summary = (!args.no_summary).then(summary::Summary::new);
+    let task_summary = !args.no_summary;
     for task in task_config.tasks {
         let task_type = task.task_type;
         let params = serde_json::to_string_pretty(&task.params)?;
@@ -164,12 +148,9 @@ where
                 )
             })?;
 
-        if let Some(s) = task_summary.as_mut() {
-            s.insert(id, task.name, task_type);
+        if task_summary {
+            summary::insert(id, task.name, task_type);
         }
-    }
-    if let Some(s) = task_summary {
-        summary::init(s);
     }
 
     if !args.dry_run {
@@ -209,12 +190,11 @@ where
 
         asst.start()?;
 
-        while asst.running() {
-            if stop_bool.load(atomic::Ordering::Relaxed) {
-                bail!("Interrupted by user!");
-            }
-            std::thread::sleep(std::time::Duration::from_millis(500));
-        }
+        log::warn!("Suspend log output");
+        crate::log::Router::reroute(Box::new(crate::log::Dummy));
+        callback::cli::entry(&asst, rx)?;
+        crate::log::Router::recover();
+        log::warn!("Recover log output");
 
         asst.stop()?;
 
@@ -223,9 +203,6 @@ where
             app.close().context("Failed to close external app")?;
         }
     }
-
-    // TODO: Better ways to restore signal handlers?
-    stop_bool.store(true, atomic::Ordering::Relaxed);
 
     Ok(())
 }
@@ -236,9 +213,11 @@ pub fn run<F>(f: F, args: CommonArgs) -> Result<()>
 where
     F: FnOnce(&AsstConfig) -> Result<TaskConfig>,
 {
-    let ret = run_core(f, args);
+    let mut rx = summary::get_or_init();
 
-    summary::display();
+    let ret = run_core(f, args, &mut rx);
+
+    // summary::display(rx);
 
     ret?;
 

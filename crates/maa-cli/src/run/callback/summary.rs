@@ -1,48 +1,216 @@
+//! **ALWAYS** call [`get_or_init`] before using other functions,
+//! otherwise program will panic
 pub use std::collections::BTreeMap as Map;
-use std::sync::Mutex;
+use std::sync::{
+    // mpsc::{channel, Receiver, Sender, TryRecvError},
+    OnceLock,
+};
 
 use chrono;
 use maa_sys::TaskType;
 use maa_types::primitive::AsstTaskId;
+use tokio::sync::broadcast::{channel, error::TryRecvError, Receiver, Sender};
 
 use super::IterJoin;
 
-static SUMMARY: Mutex<Option<Summary>> = Mutex::new(None);
+pub(super) trait PatchExt<P>: struct_patch::Patch<P> + Default + Sized
+where
+    P: std::ops::Add<Output = P>,
+{
+    fn apply(&mut self, patch: P) {
+        let old_patch = std::mem::take(self).into_patch();
+        let new_patch = old_patch + patch;
+        struct_patch::Patch::apply(self, new_patch);
+    }
 
-// It's safe to unwarp the mutex all there, because lock() returns a error only when
-// another thread failed inside the lock, which is impossible in this case, because
-// there is no function that can panic inside the lock, unless the print!, which is
-// not a problem.
-
-pub(crate) fn init(summary: Summary) {
-    *SUMMARY.lock().unwrap() = Some(summary);
+    #[cfg(test)]
+    fn new_empty_patch() -> P {
+        <Self as struct_patch::Patch<P>>::new_empty_patch()
+    }
 }
 
-fn with_summary<T>(f: impl FnOnce(&Summary) -> T) -> Option<T> {
-    SUMMARY.lock().unwrap().as_ref().map(f)
+impl PatchExt<FightDetailPatch> for FightDetail {}
+impl PatchExt<InfrastDetailPatch> for InfrastDetail {}
+impl PatchExt<RoguelikeDetailPatch> for RoguelikeDetail {}
+impl PatchExt<RecruitDetailPatch> for RecruitDetail {}
+
+static PIPE: OnceLock<Sender<TaskState>> = OnceLock::new();
+
+#[derive(Clone)]
+enum TaskState {
+    Start(AsstTaskId),
+    End(Reason),
+    Detail(DetailPatch),
+    Insert {
+        id: AsstTaskId,
+        name: Option<String>,
+        task: TaskType,
+    },
 }
 
-fn with_summary_mut<T>(f: impl FnOnce(&mut Summary) -> T) -> Option<T> {
-    SUMMARY.lock().unwrap().as_mut().map(f)
+pub enum TaskSummaryState {
+    Add(String),
+    Start(String),
+    End(String),
+    Working(String),
+}
+impl std::fmt::Display for TaskSummaryState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TaskSummaryState::Add(s) => write!(f, "Task Add:\n{s}{LINE_SEP}"),
+            TaskSummaryState::Start(s) => write!(f, "Task Start:\n{s}{LINE_SEP}"),
+            TaskSummaryState::End(s) => write!(f, "Task End:\n{s}{LINE_SEP}"),
+            TaskSummaryState::Working(s) => write!(f, "Task Update:\n{s}{LINE_SEP}"),
+        }
+    }
+}
+/// provider real-time log from MaaCore
+pub struct SummarySubscriber {
+    rx: Receiver<TaskState>,
+    summary: Option<Summary>,
+}
+impl SummarySubscriber {
+    fn new(rx: Receiver<TaskState>) -> Self {
+        Self { rx, summary: None }
+    }
+
+    /// collect all cached content in pipe, and show the delta
+    pub fn try_update(&mut self) -> Option<Vec<TaskSummaryState>> {
+        if self.summary.is_none() {
+            self.summary = Some(Summary::new())
+        }
+        let summary = self.summary.as_mut().unwrap();
+        let mut delta = vec![];
+        loop {
+            match self.rx.try_recv() {
+                Ok(TaskState::Insert { id, name, task }) => {
+                    let task = TaskSummary::new(name, task);
+                    delta.push(TaskSummaryState::Add(task.to_string()));
+                    summary.insert(id, task);
+                }
+                Ok(TaskState::Start(id)) => {
+                    if let Some(task) = summary.start_task(id) {
+                        // NOTE: if id is not in the map, then current task won't change
+                        // which can cause a mistake
+                        //
+                        // But this couldn't happen?
+                        delta.push(TaskSummaryState::Start(task.to_string()));
+                    };
+                }
+                Ok(TaskState::End(reason)) => {
+                    if let Some(task) = summary.end_current_task(reason) {
+                        delta.push(TaskSummaryState::End(task.to_string()));
+                    };
+                }
+                Ok(TaskState::Detail(patch)) => {
+                    if let Some(task) = summary.edit_current_task_detail(|detail| {
+                        match patch {
+                            DetailPatch::Infrast(patch) => {
+                                detail.as_infrast_mut().map(|detail| detail.apply(patch))
+                            }
+                            DetailPatch::Fight(patch) => {
+                                detail.as_fight_mut().map(|detail| detail.apply(patch))
+                            }
+                            DetailPatch::Recruit(patch) => {
+                                detail.as_recruit_mut().map(|detail| detail.apply(patch))
+                            }
+                            DetailPatch::Roguelike(patch) => {
+                                detail.as_roguelike_mut().map(|detail| detail.apply(patch))
+                            }
+                        };
+                    }) {
+                        delta.push(TaskSummaryState::Working(task.to_string()));
+                    };
+                }
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Closed) => unreachable!(),
+                Err(TryRecvError::Lagged(_lag)) => unimplemented!(),
+            }
+        }
+        (!delta.is_empty()).then_some(delta)
+    }
+
+    // /// get [`Summary`] as String
+    // pub fn sync(&self) -> String {
+    //     self.summary.as_ref().unwrap_or(&Summary::new()).to_string()
+    // }
+
+    pub fn get_todo_task_names(&self) -> Vec<String> {
+        self.summary
+            .as_ref()
+            .unwrap_or(&Summary::new())
+            .task_summarys
+            .values()
+            .filter(|task| matches!(task.reason, Reason::Unstarted | Reason::Unfinished))
+            .map(|task| {
+                task.name
+                    .as_deref()
+                    .unwrap_or(task.task.to_str())
+                    .to_string()
+            })
+            .collect()
+    }
+
+    pub fn get_todo_tasks(&self) -> String {
+        self.summary
+            .as_ref()
+            .unwrap_or(&Summary::new())
+            .task_summarys
+            .values()
+            .filter(|task| matches!(task.reason, Reason::Unstarted | Reason::Unfinished))
+            .map(|task| task.to_string())
+            .collect::<Vec<_>>()
+            .join(&format!("{LINE_SEP}\n"))
+    }
 }
 
-pub(crate) fn display() -> Option<()> {
-    with_summary(|summary| print!("{}", summary))
+pub fn get_or_init() -> SummarySubscriber {
+    let rx = PIPE.get_or_init(|| channel(1024).0).subscribe();
+    SummarySubscriber::new(rx)
 }
+
+pub fn insert(id: AsstTaskId, name: Option<String>, task: impl Into<TaskType>) {
+    PIPE.get()
+        .unwrap()
+        .send(TaskState::Insert {
+            id,
+            name,
+            task: task.into(),
+        })
+        .map_err(|_| ())
+        .unwrap();
+}
+
+// pub(crate) fn display(mut rx: SummarySubscriber) {
+//     rx.try_update();
+//     println!("{}", rx.sync());
+// }
 
 pub(super) fn start_task(id: AsstTaskId) -> Option<()> {
-    with_summary_mut(|summary| summary.start_task(id)).flatten()
+    PIPE.get()
+        .unwrap()
+        .send(TaskState::Start(id))
+        .ok()
+        .map(|_| ())
 }
 
 pub(super) fn end_current_task(reason: Reason) -> Option<()> {
-    with_summary_mut(|summary| summary.end_current_task(reason)).flatten()
+    PIPE.get()
+        .unwrap()
+        .send(TaskState::End(reason))
+        .ok()
+        .map(|_| ())
 }
 
-pub(super) fn edit_current_task_detail(f: impl FnOnce(&mut Detail)) -> Option<()> {
-    with_summary_mut(|summary| summary.edit_current_task_detail(f)).flatten()
+pub(super) fn edit_current_task_detail(patch: DetailPatch) -> Option<()> {
+    PIPE.get()
+        .unwrap()
+        .send(TaskState::Detail(patch))
+        .ok()
+        .map(|_| ())
 }
 
-pub struct Summary {
+struct Summary {
     task_summarys: Map<AsstTaskId, TaskSummary>,
     current_task: Option<AsstTaskId>,
 }
@@ -55,9 +223,8 @@ impl Summary {
         }
     }
 
-    pub fn insert(&mut self, id: AsstTaskId, name: Option<String>, task: impl Into<TaskType>) {
-        self.task_summarys
-            .insert(id, TaskSummary::new(name, task.into()));
+    pub fn insert(&mut self, id: AsstTaskId, task: TaskSummary) {
+        self.task_summarys.insert(id, task);
     }
 
     fn current_mut(&mut self) -> Option<&mut TaskSummary> {
@@ -65,25 +232,36 @@ impl Summary {
             .and_then(|id| self.task_summarys.get_mut(&id))
     }
 
-    fn start_task(&mut self, id: AsstTaskId) -> Option<()> {
-        self.task_summarys.get_mut(&id).map(|summary| {
-            self.current_task = Some(id);
-            summary.start();
-        })
+    fn current(&self) -> Option<&TaskSummary> {
+        self.current_task.and_then(|id| self.task_summarys.get(&id))
     }
 
-    fn end_current_task(&mut self, reason: Reason) -> Option<()> {
+    fn start_task(&mut self, id: AsstTaskId) -> Option<&TaskSummary> {
+        self.task_summarys
+            .get_mut(&id)
+            .map(|summary| {
+                self.current_task = Some(id);
+                summary.start();
+            })
+            .and(self.current())
+    }
+
+    fn end_current_task(&mut self, reason: Reason) -> Option<&TaskSummary> {
+        self.current_mut().map(|summary| summary.end(reason)).and(
+            self.current_task
+                .take()
+                .and_then(|id| self.task_summarys.get(&id)),
+        )
+    }
+
+    fn edit_current_task_detail(&mut self, f: impl FnOnce(&mut Detail)) -> Option<&TaskSummary> {
         self.current_mut()
-            .map(|summary| summary.end(reason))
-            .map(|_| self.current_task = None)
-    }
-
-    fn edit_current_task_detail(&mut self, f: impl FnOnce(&mut Detail)) -> Option<()> {
-        self.current_mut().map(|summary| summary.edit_detail(f))
+            .map(|summary| summary.edit_detail(f))
+            .and(self.current())
     }
 }
 
-const LINE_SEP: &str = "----------------------------------------";
+pub(super) const LINE_SEP: &str = "----------------------------------------";
 
 impl std::fmt::Display for Summary {
     // we print literal but it will be replace by a localizable string, so it's fine
@@ -113,10 +291,10 @@ impl TaskSummary {
         use TaskType::*;
 
         let detail = match task {
-            Fight => Detail::Fight(FightDetail::new()),
-            Infrast => Detail::Infrast(InfrastDetail::new()),
-            Recruit => Detail::Recruit(RecruitDetail::new()),
-            Roguelike => Detail::Roguelike(RoguelikeDetail::new()),
+            Fight => Detail::Fight(FightDetail::default()),
+            Infrast => Detail::Infrast(InfrastDetail::default()),
+            Recruit => Detail::Recruit(RecruitDetail::default()),
+            Roguelike => Detail::Roguelike(RoguelikeDetail::default()),
             _ => Detail::None,
         };
 
@@ -184,6 +362,7 @@ impl std::fmt::Display for TaskSummary {
     }
 }
 
+#[derive(Clone, Copy)]
 pub(super) enum Reason {
     Completed,
     Stopped,
@@ -236,6 +415,14 @@ impl std::fmt::Display for FormattedDuration {
         }
         Ok(())
     }
+}
+
+#[derive(Clone)]
+pub enum DetailPatch {
+    Infrast(InfrastDetailPatch),
+    Fight(FightDetailPatch),
+    Recruit(RecruitDetailPatch),
+    Roguelike(RoguelikeDetailPatch),
 }
 
 pub enum Detail {
@@ -294,24 +481,37 @@ impl std::fmt::Display for Detail {
     }
 }
 
-pub struct InfrastDetail(Map<Facility, Map<i64, InfrastRoomInfo>>);
-
-struct InfrastRoomInfo {
-    product: Option<String>,
-    operators: Vec<String>,
-    candidates: Vec<String>,
+fn merge_map<K, K2, V>(mut a: Map<K, Map<K2, V>>, b: Map<K, Map<K2, V>>) -> Map<K, Map<K2, V>>
+where
+    K: Copy + std::cmp::Ord,
+    K2: std::cmp::Ord,
+{
+    for (facility, v) in b.into_iter() {
+        for (id, info) in v.into_iter() {
+            a.entry(facility).or_default().insert(id, info);
+        }
+    }
+    a
 }
 
-impl InfrastDetail {
-    pub fn new() -> Self {
-        Self(Map::new())
-    }
-
+#[derive(struct_patch::Patch, Default)]
+#[patch(attribute(derive(Clone)))]
+#[cfg_attr(test, derive(PartialEq, Debug))]
+pub struct InfrastDetail {
+    #[patch(add = merge_map)]
+    inner: Map<Facility, Map<i64, InfrastRoomInfo>>,
+}
+impl InfrastDetailPatch {
     pub(super) fn set_product(&mut self, facility: Facility, id: i64, info: &str) {
         use Facility::*;
         // only the product of Mfg and Trade is useful
         if matches!(facility, Mfg | Trade) {
-            self.0
+            if self.inner.is_none() {
+                self.inner = Some(Map::new())
+            }
+            self.inner
+                .as_mut()
+                .unwrap()
                 .entry(facility)
                 .or_default()
                 .entry(id)
@@ -327,7 +527,10 @@ impl InfrastDetail {
         operators: Vec<String>,
         candidates: Vec<String>,
     ) {
-        let map = self.0.entry(facility).or_default();
+        if self.inner.is_none() {
+            self.inner = Some(Map::new())
+        }
+        let map = self.inner.as_mut().unwrap().entry(facility).or_default();
 
         if let Some(room_info) = map.get_mut(&id) {
             room_info.set_operators(operators, candidates);
@@ -340,9 +543,17 @@ impl InfrastDetail {
     }
 }
 
+#[derive(PartialEq, Clone)]
+#[cfg_attr(test, derive(Debug))]
+struct InfrastRoomInfo {
+    product: Option<String>,
+    operators: Vec<String>,
+    candidates: Vec<String>,
+}
+
 impl std::fmt::Display for InfrastDetail {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (facility, map) in &self.0 {
+        for (facility, map) in &self.inner {
             for room_info in map.values() {
                 writeln!(f, "{}{}", facility, room_info)?;
             }
@@ -463,58 +674,63 @@ impl std::fmt::Display for InfrastRoomInfo {
     }
 }
 
+fn keep<T>(a: Option<T>, b: Option<T>) -> Option<T> {
+    a.or(b)
+}
+fn replace<T>(a: Option<T>, b: Option<T>) -> Option<T> {
+    b.or(a)
+}
+
+#[derive(struct_patch::Patch, Default)]
+#[patch(attribute(derive(Clone)))]
+#[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct FightDetail {
+    #[patch(add = keep)]
     // stage name to fight
     stage: Option<String>,
+    #[patch(add = replace)]
     // times of fight
     times: Option<i64>,
+    #[patch(add = replace)]
     // used medicine
     medicine: Option<(i64, i64)>,
+    #[patch(add = replace)]
     // used stone
     stone: Option<i64>,
+    #[patch(add = merge_vec)]
     // [(item, count), ...], each element is corresponding to a fight
     // the length of this vector may smaller than times,
     // because some fight may not drop anything or failed to recognize the drop
     drops: Vec<Map<String, i64>>,
 }
-
-impl FightDetail {
-    pub fn new() -> Self {
-        Self {
-            stage: None,
-            times: None,
-            medicine: None,
-            stone: None,
-            drops: Vec::new(),
-        }
-    }
-
+impl FightDetailPatch {
     pub fn set_stage(&mut self, stage: &str) {
-        if self.stage.is_some() {
-            return;
-        }
-        self.stage = Some(stage.to_owned());
+        self.stage = Some(Some(stage.to_owned()));
     }
 
     pub fn set_times(&mut self, times: i64) {
-        self.times = Some(times);
+        self.times = Some(Some(times));
     }
 
     pub fn use_medicine(&mut self, count: i64, is_expiring: bool) {
-        let (mut all, mut expiring) = self.medicine.unwrap_or((0, 0));
+        let (mut all, mut expiring) = self.medicine.flatten().unwrap_or((0, 0));
         all += count;
         if is_expiring {
             expiring += count
         }
-        self.medicine = Some((all, expiring))
+        self.medicine = Some(Some((all, expiring)))
     }
 
     pub fn set_stone(&mut self, stone: i64) {
-        self.stone = Some(stone);
+        self.stone = Some(Some(stone));
     }
 
     pub fn push_drop(&mut self, drop: Map<String, i64>) {
-        self.drops.push(drop);
+        if let Some(drops) = self.drops.as_mut() {
+            drops.push(drop);
+        } else {
+            self.drops = Some(vec![drop])
+        }
     }
 }
 
@@ -565,44 +781,56 @@ impl std::fmt::Display for FightDetail {
     }
 }
 
+fn option_add<T: Copy + std::ops::Add<Output = T>>(a: Option<T>, b: Option<T>) -> Option<T> {
+    if let (Some(a), Some(b)) = (a, b) {
+        return Some(a + b);
+    }
+    a.or(b)
+}
+
+#[derive(struct_patch::Patch, Default)]
+#[patch(attribute(derive(Clone)))]
+#[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct RecruitDetail {
+    #[patch(add = option_add)]
     refresh_times: Option<i64>,
+    #[patch(add = option_add)]
     recruit_times: Option<i64>,
+    #[patch(add = merge_vec)]
     // [(tags, level, state), ...]
     record: Vec<(u64, Vec<String>, RecruitState)>,
 }
 
+#[derive(PartialEq, Clone, Copy)]
+#[cfg_attr(test, derive(Debug))]
 enum RecruitState {
     Refreshed,
     Recruited,
     None,
 }
 
-impl RecruitDetail {
-    pub fn new() -> Self {
-        Self {
-            refresh_times: None,
-            recruit_times: None,
-            record: Vec::new(),
-        }
-    }
-
+impl RecruitDetailPatch {
     pub(super) fn refresh(&mut self) {
-        self.refresh_times = Some(self.refresh_times.unwrap_or_default() + 1);
-        if let Some((_, _, state)) = self.record.last_mut() {
+        self.refresh_times = Some(Some(self.refresh_times.flatten().unwrap_or_default() + 1));
+        if let Some((_, _, state)) = self.record.as_mut().and_then(|v| v.last_mut()) {
             *state = RecruitState::Refreshed;
         }
     }
 
     pub(super) fn recruit(&mut self) {
-        self.recruit_times = Some(self.recruit_times.unwrap_or_default() + 1);
-        if let Some((_, _, state)) = self.record.last_mut() {
+        self.recruit_times = Some(Some(self.recruit_times.flatten().unwrap_or_default() + 1));
+        if let Some((_, _, state)) = self.record.as_mut().and_then(|v| v.last_mut()) {
             *state = RecruitState::Recruited;
         }
     }
 
     pub(super) fn push_recruit(&mut self, level: u64, tags: impl IntoIterator<Item = String>) {
+        if self.record.is_none() {
+            self.record = Some(Vec::new())
+        }
         self.record
+            .as_mut()
+            .unwrap()
             .push((level, tags.into_iter().collect(), RecruitState::None));
     }
 }
@@ -639,23 +867,35 @@ impl std::fmt::Display for RecruitDetail {
     }
 }
 
+fn merge_vec<T>(mut a: Vec<T>, b: Vec<T>) -> Vec<T> {
+    a.extend(b);
+    a
+}
+
+#[derive(struct_patch::Patch, Default)]
+#[patch(attribute(derive(Clone)))]
+#[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct RoguelikeDetail {
+    #[patch(add = merge_vec)]
     explorations: Vec<ExplorationDetail>,
 }
 
-impl RoguelikeDetail {
-    fn new() -> Self {
-        Self {
-            explorations: Vec::new(),
-        }
-    }
-
+impl RoguelikeDetailPatch {
     pub(super) fn start_exploration(&mut self) {
-        self.explorations.push(ExplorationDetail::new());
+        if self.explorations.is_none() {
+            self.explorations = Some(Vec::new());
+        }
+        self.explorations
+            .as_mut()
+            .unwrap()
+            .push(ExplorationDetail::new());
     }
 
     fn get_current_exploration(&mut self) -> Option<&mut ExplorationDetail> {
-        self.explorations.last_mut()
+        if self.explorations.is_none() {
+            self.explorations = Some(Vec::new());
+        }
+        self.explorations.as_mut().unwrap().last_mut()
     }
 
     pub(super) fn set_state(&mut self, state: ExplorationState) {
@@ -708,7 +948,7 @@ impl std::fmt::Display for RoguelikeDetail {
 }
 
 #[repr(u8)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) enum ExplorationState {
     Passed = 0,
     Failed,
@@ -755,6 +995,8 @@ impl std::fmt::Display for ExplorationState {
     }
 }
 
+#[derive(PartialEq, Clone)]
+#[cfg_attr(test, derive(Debug))]
 struct ExplorationDetail {
     /// current state of this exploration
     state: ExplorationState,
@@ -853,31 +1095,37 @@ mod tests {
             use TaskType::*;
 
             let mut summary = Summary::new();
-            summary.insert(1, Some("Fight TS".to_owned()), Fight);
-            summary.insert(2, None, Infrast);
-            summary.insert(3, None, Recruit);
-            summary.insert(4, None, Roguelike);
-            summary.insert(5, None, CloseDown);
+            summary.insert(1, TaskSummary::new(Some("Fight TS".to_owned()), Fight));
+            summary.insert(2, TaskSummary::new(None, Infrast));
+            summary.insert(3, TaskSummary::new(None, Recruit));
+            summary.insert(4, TaskSummary::new(None, Roguelike));
+            summary.insert(5, TaskSummary::new(None, CloseDown));
 
             summary.start_task(1);
             summary.edit_current_task_detail(|detail| {
+                let mut patch = FightDetail::new_empty_patch();
+                patch.set_stage("TS-9");
                 let detail = detail.as_fight_mut().unwrap();
-                detail.set_stage("TS-9");
+                detail.apply(patch);
             });
             summary.end_current_task(Reason::Completed);
 
             summary.start_task(2);
             summary.edit_current_task_detail(|detail| {
                 let detail = detail.as_infrast_mut().unwrap();
-                detail.set_product(Facility::Mfg, 1, "Product");
+                let mut patch = InfrastDetail::new_empty_patch();
+                patch.set_product(Facility::Mfg, 1, "Product");
+                detail.apply(patch);
             });
             summary.end_current_task(Reason::Stopped);
 
             summary.start_task(3);
             summary.edit_current_task_detail(|detail| {
                 let detail = detail.as_recruit_mut().unwrap();
-                detail.push_recruit(3, ["A", "B"].into_iter().map(|s| s.to_owned()));
-                detail.recruit();
+                let mut patch = RecruitDetail::new_empty_patch();
+                patch.push_recruit(3, ["A", "B"].into_iter().map(|s| s.to_owned()));
+                patch.recruit();
+                detail.apply(patch);
             });
             summary.end_current_task(Reason::Error);
 
@@ -942,25 +1190,25 @@ mod tests {
             assert!(detail.as_recruit_mut().is_none());
             assert!(detail.as_roguelike_mut().is_none());
 
-            detail = Detail::Infrast(InfrastDetail::new());
+            detail = Detail::Infrast(InfrastDetail::default());
             assert!(detail.as_infrast_mut().is_some());
             assert!(detail.as_fight_mut().is_none());
             assert!(detail.as_recruit_mut().is_none());
             assert!(detail.as_roguelike_mut().is_none());
 
-            detail = Detail::Fight(FightDetail::new());
+            detail = Detail::Fight(FightDetail::default());
             assert!(detail.as_infrast_mut().is_none());
             assert!(detail.as_fight_mut().is_some());
             assert!(detail.as_recruit_mut().is_none());
             assert!(detail.as_roguelike_mut().is_none());
 
-            detail = Detail::Recruit(RecruitDetail::new());
+            detail = Detail::Recruit(RecruitDetail::default());
             assert!(detail.as_infrast_mut().is_none());
             assert!(detail.as_fight_mut().is_none());
             assert!(detail.as_recruit_mut().is_some());
             assert!(detail.as_roguelike_mut().is_none());
 
-            detail = Detail::Roguelike(RoguelikeDetail::new());
+            detail = Detail::Roguelike(RoguelikeDetail::default());
             assert!(detail.as_infrast_mut().is_none());
             assert!(detail.as_fight_mut().is_none());
             assert!(detail.as_recruit_mut().is_none());
@@ -996,16 +1244,23 @@ mod tests {
 
         #[test]
         fn infrast() {
-            let mut detail = InfrastDetail::new();
-            detail.set_product(Facility::Mfg, 1, "Product");
-            detail.set_operators(
+            let detail = InfrastDetail::default();
+            assert_eq!(detail, InfrastDetail { inner: Map::new() });
+
+            let mut detail = InfrastDetail::default();
+            let mut patch = InfrastDetail::new_empty_patch();
+            patch.set_product(Facility::Mfg, 1, "Product");
+            patch.set_operators(
                 Facility::Mfg,
                 1,
                 ["A", "B"].into_iter().map(|s| s.to_owned()).collect(),
                 ["C", "D"].into_iter().map(|s| s.to_owned()).collect(),
             );
-            detail.set_product(Facility::Office, 1, "Product");
-            detail.set_operators(Facility::Office, 1, Vec::new(), Vec::new());
+            detail.apply(patch);
+            let mut patch = InfrastDetail::new_empty_patch();
+            patch.set_product(Facility::Office, 1, "Product");
+            patch.set_operators(Facility::Office, 1, Vec::new(), Vec::new());
+            detail.apply(patch);
             assert_eq!(
                 detail.to_string(),
                 "Mfg(Product) with operators: A, B, [C, D]\n\
@@ -1015,24 +1270,35 @@ mod tests {
 
         #[test]
         fn fight() {
-            let mut detail = FightDetail::new();
-            detail.set_stage("TS-9");
-            detail.set_times(2);
-            detail.use_medicine(1, true);
-            detail.use_medicine(1, false);
-            detail.set_stone(1);
-            detail.push_drop(
+            let detail = FightDetail::default();
+            assert_eq!(detail, FightDetail {
+                stage: None,
+                times: None,
+                medicine: None,
+                stone: None,
+                drops: Vec::new(),
+            });
+
+            let mut detail = FightDetail::default();
+            let mut patch = FightDetail::new_empty_patch();
+            patch.set_stage("TS-9");
+            patch.set_times(2);
+            patch.use_medicine(1, true);
+            patch.use_medicine(1, false);
+            patch.set_stone(1);
+            patch.push_drop(
                 [("A", 1), ("B", 2)]
                     .into_iter()
                     .map(|(k, v)| (k.to_owned(), v))
                     .collect(),
             );
-            detail.push_drop(
+            patch.push_drop(
                 [("A", 1), ("C", 3)]
                     .into_iter()
                     .map(|(k, v)| (k.to_owned(), v))
                     .collect(),
             );
+            detail.apply(patch);
             assert_eq!(
                 detail.to_string(),
                 "Fight TS-9 2 times, used 2 medicine (1 expiring), used 1 stone, drops:\n\
@@ -1041,27 +1307,54 @@ mod tests {
                  total drops: A × 2, B × 2, C × 3\n",
             );
 
-            let mut detail = FightDetail::new();
-            detail.set_stage("TS-9");
-            detail.set_times(1);
+            let mut detail = FightDetail::default();
+            let mut patch = FightDetail::new_empty_patch();
+            patch.set_stage("TS-9");
+            patch.set_times(1);
+            detail.apply(patch);
             assert_eq!(detail.to_string(), "Fight TS-9 1 times\n");
 
-            let detail = FightDetail::new();
+            let detail = FightDetail::default();
             assert_eq!(detail.to_string(), "");
+
+            let mut detail = FightDetail::default();
+            let mut patch = FightDetail::new_empty_patch();
+            patch.set_stage("TS-1");
+            patch.set_stage("TS-9");
+            detail.apply(patch);
+            assert_eq!(detail.to_string(), "Fight TS-9\n");
+
+            let mut detail = FightDetail::default();
+            let mut patch = FightDetail::new_empty_patch();
+            patch.set_stage("TS-1");
+            detail.apply(patch);
+            let mut patch = FightDetail::new_empty_patch();
+            patch.set_stage("TS-9");
+            detail.apply(patch);
+            assert_eq!(detail.to_string(), "Fight TS-1\n");
         }
 
         #[test]
         fn recruit() {
-            let mut detail = RecruitDetail::new();
-            detail.push_recruit(3, ["A", "B"].into_iter().map(|s| s.to_owned()));
-            detail.refresh();
-            detail.push_recruit(4, ["C", "D"].into_iter().map(|s| s.to_owned()));
-            detail.recruit();
-            detail.push_recruit(3, ["E", "F"].into_iter().map(|s| s.to_owned()));
-            detail.refresh();
-            detail.push_recruit(4, ["G", "H"].into_iter().map(|s| s.to_owned()));
-            detail.recruit();
-            detail.push_recruit(5, ["I", "J"].into_iter().map(|s| s.to_owned()));
+            let detail = RecruitDetail::default();
+            assert_eq!(detail, RecruitDetail {
+                refresh_times: None,
+                recruit_times: None,
+                record: Vec::new(),
+            });
+
+            let mut detail = RecruitDetail::default();
+            let mut patch = RecruitDetail::new_empty_patch();
+            patch.push_recruit(3, ["A", "B"].into_iter().map(|s| s.to_owned()));
+            patch.refresh();
+            patch.push_recruit(4, ["C", "D"].into_iter().map(|s| s.to_owned()));
+            patch.recruit();
+            patch.push_recruit(3, ["E", "F"].into_iter().map(|s| s.to_owned()));
+            patch.refresh();
+            patch.push_recruit(4, ["G", "H"].into_iter().map(|s| s.to_owned()));
+            patch.recruit();
+            patch.push_recruit(5, ["I", "J"].into_iter().map(|s| s.to_owned()));
+            detail.apply(patch);
             assert_eq!(
                 detail.to_string(),
                 "Detected tags:\n\
@@ -1074,19 +1367,23 @@ mod tests {
                  Refreshed 2 times\n",
             );
 
-            let mut detail = RecruitDetail::new();
-            detail.push_recruit(3, ["A", "B"].into_iter().map(|s| s.to_owned()));
-            detail.recruit();
+            let mut detail = RecruitDetail::default();
+            let mut patch = RecruitDetail::new_empty_patch();
+            patch.push_recruit(3, ["A", "B"].into_iter().map(|s| s.to_owned()));
+            patch.recruit();
+            detail.apply(patch);
             assert_eq!(
                 detail.to_string(),
                 "Detected tags:\n\
                  1. ★★★ A, B, Recruited\n\
                  Recruited 1 times\n",
             );
-            let mut detail = RecruitDetail::new();
-            detail.push_recruit(3, ["A", "B"].into_iter().map(|s| s.to_owned()));
-            detail.refresh();
-            detail.push_recruit(4, ["C", "D"].into_iter().map(|s| s.to_owned()));
+            let mut detail = RecruitDetail::default();
+            let mut patch = RecruitDetail::new_empty_patch();
+            patch.push_recruit(3, ["A", "B"].into_iter().map(|s| s.to_owned()));
+            patch.refresh();
+            patch.push_recruit(4, ["C", "D"].into_iter().map(|s| s.to_owned()));
+            detail.apply(patch);
             assert_eq!(
                 detail.to_string(),
                 "Detected tags:\n\
@@ -1118,17 +1415,24 @@ mod tests {
 
         #[test]
         fn roguelike() {
-            let mut detail = RoguelikeDetail::new();
-            detail.start_exploration();
-            detail.invest(10);
-            detail.set_state(ExplorationState::Failed);
-            detail.set_exp(100);
-            detail.start_exploration();
-            detail.invest(17);
-            detail.invest(1);
-            detail.set_state(ExplorationState::Passed);
-            detail.set_exp(200);
-            detail.start_exploration();
+            let detail = RoguelikeDetail::default();
+            assert_eq!(detail, RoguelikeDetail {
+                explorations: Vec::new()
+            });
+
+            let mut detail = RoguelikeDetail::default();
+            let mut patch = RoguelikeDetail::new_empty_patch();
+            patch.start_exploration();
+            patch.invest(10);
+            patch.set_state(ExplorationState::Failed);
+            patch.set_exp(100);
+            patch.start_exploration();
+            patch.invest(17);
+            patch.invest(1);
+            patch.set_state(ExplorationState::Passed);
+            patch.set_exp(200);
+            patch.start_exploration();
+            detail.apply(patch);
             assert_eq!(
                 detail.to_string(),
                 "Explorations:\n\
