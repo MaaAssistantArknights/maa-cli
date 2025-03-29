@@ -4,7 +4,7 @@ This page lists the licenses of the projects used in cargo-about.
 
 ## Overview of licenses
 
-- Apache License 2.0 (31)
+- Apache License 2.0 (32)
 - MIT License (5)
 - GNU Affero General Public License v3.0 (4)
 - BSD 3-Clause "New" or "Revised" License (1)
@@ -1737,6 +1737,7 @@ Apache License 2.0
 
 #### Used by
 
+- [arc-swap](https://github.com/vorner/arc-swap)
 - [flate2](https://github.com/rust-lang/flate2-rs)
 - [git2](https://github.com/rust-lang/git2-rs)
 - [log](https://github.com/rust-lang/log)
