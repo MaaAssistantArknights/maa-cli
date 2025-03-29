@@ -190,7 +190,11 @@ where
 
         asst.start()?;
 
+        log::warn!("Suspend log output");
+        crate::log::Router::reroute(Box::new(crate::log::Dummy));
         callback::cli::entry(&asst, rx)?;
+        crate::log::Router::recover();
+        log::warn!("Recover log output");
 
         asst.stop()?;
 

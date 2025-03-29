@@ -74,8 +74,7 @@ pub async fn entry(asst: &maa_sys::Assistant, rx: &mut SummarySubscriber) -> any
             Ok::<(), std::io::Error>(())
         })?;
     }
-    // terminal.clear()?;
-    ratatui::try_restore()?;
+    terminal.clear()?;
     Ok(())
 }
 
