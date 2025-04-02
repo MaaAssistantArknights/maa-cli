@@ -1,6 +1,7 @@
+use crossterm::event::KeyModifiers;
+use futures_util::StreamExt;
 use ratatui::{
     layout::{Constraint, Layout},
-    prelude::CrosstermBackend,
     widgets::{Paragraph, Widget},
     TerminalOptions,
 };
@@ -10,6 +11,7 @@ use crate::run::callback::summary::TaskSummaryState;
 
 #[tokio::main]
 pub async fn headless(asst: &maa_sys::Assistant, rx: &mut SummarySubscriber) -> anyhow::Result<()> {
+    println!("Summary\n{LINE_SEP}");
     while asst.running() {
         tokio::select! {
             _ = tokio::time::sleep(std::time::Duration::from_millis(500)) => (),
@@ -18,47 +20,75 @@ pub async fn headless(asst: &maa_sys::Assistant, rx: &mut SummarySubscriber) -> 
             },
         };
         for state in rx.try_update().unwrap_or_default() {
-            println!("{}", state)
+            print!("{}", state)
         }
     }
+    println!("{LINE_SEP}");
     Ok(())
 }
 
 #[tokio::main]
 pub async fn entry(asst: &maa_sys::Assistant, rx: &mut SummarySubscriber) -> anyhow::Result<()> {
-    let mut terminal = ratatui::Terminal::with_options(
-        CrosstermBackend::new(std::io::stdout()),
-        TerminalOptions {
-            viewport: ratatui::Viewport::Inline(16),
-        },
-    )?;
+    let mut terminal = ratatui::try_init_with_options(TerminalOptions {
+        viewport: ratatui::Viewport::Inline(16),
+    })?;
+    terminal.insert_before(1, |buf| Paragraph::new("Summary").render(buf.area, buf))?;
     terminal.insert_before(1, |buf| Paragraph::new(LINE_SEP).render(buf.area, buf))?;
     let mut content = vec![];
     let mut roller = Roller::default();
+    let mut events = crossterm::event::EventStream::new();
+    let mut offset: u16 = 0;
+    let mut interrupted = false;
     while asst.running() {
         tokio::select! {
             _ = tokio::time::sleep(std::time::Duration::from_millis(500)) => (),
             _ = wait_for_signal() => {
-                let undones = rx.get_todo_tasks();
-                terminal.insert_before(undones.lines().count() as u16, |buf| {
-                    Paragraph::new(undones.as_str()).render(buf.area, buf)
-                })?;
-                terminal.clear()?;
-                anyhow::bail!("Interrupted by user!")
+                interrupted = true;
             },
+            Some(ev) = events.next() => {
+                if let crossterm::event::Event::Key(key_event) = ev?{
+                    match key_event.code {
+                        // crossterm::event::KeyCode::Left => todo!(),
+                        // crossterm::event::KeyCode::Right => todo!(),
+                        crossterm::event::KeyCode::Up => offset += 1,
+                        crossterm::event::KeyCode::Down => offset = offset.saturating_sub(1),
+
+                        // crossterm::event::KeyCode::Home => todo!(),
+                        // crossterm::event::KeyCode::End => todo!(),
+                        // crossterm::event::KeyCode::PageUp => todo!(),
+                        // crossterm::event::KeyCode::PageDown => todo!(),
+
+                        // Ctrl+C
+                        crossterm::event::KeyCode::Char('c') | crossterm::event::KeyCode::Char('C')
+                            if key_event.modifiers.contains(KeyModifiers::CONTROL) =>
+                        {
+                            interrupted = true;
+                        }
+                        _ => (),
+                    }
+                }
+            }
         };
+
+        if interrupted {
+            let undones = rx.get_todo_tasks();
+            terminal.insert_before(undones.lines().count() as u16, |buf| {
+                Paragraph::new(undones.as_str()).render(buf.area, buf)
+            })?;
+            terminal.insert_before(1, |buf| Paragraph::new(LINE_SEP).render(buf.area, buf))?;
+            ratatui::try_restore()?;
+            anyhow::bail!("Interrupted by user!")
+        }
 
         for state in rx.try_update().unwrap_or_default() {
             if let TaskSummaryState::End(task) = &state {
                 terminal.insert_before(task.lines().count() as u16, |buf| {
                     Paragraph::new(task.as_str()).render(buf.area, buf)
                 })?;
-                terminal.insert_before(1, |buf| Paragraph::new(LINE_SEP).render(buf.area, buf))?;
             }
             content.extend(state.to_string().lines().map(|s| s.to_owned()));
         }
 
-        let header = "Log:";
         let footer = rx.get_todo_task_names();
         terminal.autoresize()?;
         terminal.try_draw(|f| {
@@ -71,12 +101,14 @@ pub async fn entry(asst: &maa_sys::Assistant, rx: &mut SummarySubscriber) -> any
             .split(area);
 
             let header_area = split[0];
-            let header = Paragraph::new(header);
+            let header = Paragraph::new(LINE_SEP);
             f.render_widget(header, header_area);
 
             let para_area = split[1];
-            let para = Paragraph::new(content.join("\n"))
-                .scroll(((content.len() as u16).saturating_sub(para_area.height), 0));
+            let para = Paragraph::new(content.join("\n")).scroll((
+                (content.len() as u16).saturating_sub(para_area.height + offset),
+                0,
+            ));
             f.render_widget(para, para_area);
 
             let footer_area = split[2];
@@ -90,7 +122,8 @@ pub async fn entry(asst: &maa_sys::Assistant, rx: &mut SummarySubscriber) -> any
             Ok::<(), std::io::Error>(())
         })?;
     }
-    terminal.clear()?;
+    terminal.insert_before(1, |buf| Paragraph::new(LINE_SEP).render(buf.area, buf))?;
+    ratatui::try_restore()?;
     Ok(())
 }
 

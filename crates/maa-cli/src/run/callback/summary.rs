@@ -57,10 +57,10 @@ pub enum TaskSummaryState {
 impl std::fmt::Display for TaskSummaryState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TaskSummaryState::Add(s) => write!(f, "Task Add:\n{s}{LINE_SEP}"),
-            TaskSummaryState::Start(s) => write!(f, "Task Start:\n{s}{LINE_SEP}"),
-            TaskSummaryState::End(s) => write!(f, "Task End:\n{s}{LINE_SEP}"),
-            TaskSummaryState::Working(s) => write!(f, "Task Update:\n{s}{LINE_SEP}"),
+            TaskSummaryState::Add(s) => write!(f, "Task Add:\n{s}"),
+            TaskSummaryState::Start(s) => write!(f, "{LINE_SEP}\nTask Start:\n{s}"),
+            TaskSummaryState::End(s) => write!(f, "Task End:\n{s}"),
+            TaskSummaryState::Working(s) => write!(f, "Task Update:\n{s}"),
         }
     }
 }
@@ -160,7 +160,7 @@ impl SummarySubscriber {
             .filter(|task| matches!(task.reason, Reason::Unstarted | Reason::Unfinished))
             .map(|task| task.to_string())
             .collect::<Vec<_>>()
-            .join(&format!("{LINE_SEP}\n"))
+            .join("")
     }
 }
 

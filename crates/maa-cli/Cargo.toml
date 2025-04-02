@@ -82,6 +82,7 @@ ratatui = { version = "0.29.0", default-features = false, features = [
   "crossterm",
 ] }
 arc-swap = "1.7.1"
+crossterm = { version = "0.28.1", features = ["event-stream"] }
 
 [dev-dependencies]
 regex = { workspace = true }
