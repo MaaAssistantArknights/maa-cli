@@ -13,7 +13,7 @@ use crate::run::callback::summary::TaskSummaryState;
 
 #[tokio::main]
 pub async fn headless(asst: &maa_sys::Assistant, rx: &mut SummarySubscriber) -> anyhow::Result<()> {
-    println!("Summary\n{LINE_SEP}");
+    log::info!("Summary\n{LINE_SEP}");
     while asst.running() {
         tokio::select! {
             _ = tokio::time::sleep(std::time::Duration::from_millis(500)) => (),
@@ -22,10 +22,10 @@ pub async fn headless(asst: &maa_sys::Assistant, rx: &mut SummarySubscriber) -> 
             },
         };
         for state in rx.try_update().unwrap_or_default() {
-            print!("{}", state)
+            log::info!("{}", state)
         }
     }
-    println!("{LINE_SEP}");
+    log::info!("{LINE_SEP}");
     Ok(())
 }
 
