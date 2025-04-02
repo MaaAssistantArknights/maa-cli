@@ -1,3 +1,5 @@
+use std::io::BufRead;
+
 use crossterm::event::KeyModifiers;
 use futures_util::StreamExt;
 use ratatui::{
@@ -39,6 +41,11 @@ pub async fn entry(asst: &maa_sys::Assistant, rx: &mut SummarySubscriber) -> any
     let mut events = crossterm::event::EventStream::new();
     let mut offset: u16 = 0;
     let mut interrupted = false;
+    let mut log_file = std::io::BufReader::new(std::fs::File::open(
+        crate::log::TMP_LOG_PATH.get().unwrap(),
+    )?)
+    .lines();
+    let mut total_tasks = 0;
     while asst.running() {
         tokio::select! {
             _ = tokio::time::sleep(std::time::Duration::from_millis(500)) => (),
@@ -88,8 +95,11 @@ pub async fn entry(asst: &maa_sys::Assistant, rx: &mut SummarySubscriber) -> any
             }
             content.extend(state.to_string().lines().map(|s| s.to_owned()));
         }
+        for line in log_file.by_ref() {
+            content.push(line?);
+        }
 
-        let footer = rx.get_todo_task_names();
+        let mut footer = rx.get_todo_task_names();
         terminal.autoresize()?;
         terminal.try_draw(|f| {
             let area = f.area();
@@ -112,9 +122,16 @@ pub async fn entry(asst: &maa_sys::Assistant, rx: &mut SummarySubscriber) -> any
             f.render_widget(para, para_area);
 
             let footer_area = split[2];
+            let todo_tasks = footer.len();
+            if todo_tasks > total_tasks {
+                total_tasks = todo_tasks;
+            }
             let footer = Paragraph::new(format!(
-                " {} Todo Tasks: {}",
+                " {} [{}/{}] {} | Todo Tasks: {}",
                 roller.next(),
+                total_tasks - todo_tasks,
+                total_tasks,
+                footer.remove(0),
                 footer.join(", ")
             ));
             f.render_widget(footer, footer_area);

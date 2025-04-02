@@ -58,8 +58,10 @@ impl Args {
     pub fn init_logger(self) -> anyhow::Result<()> {
         let mut builder = env_logger::Builder::new();
 
-        builder.filter_level(self.to_filter());
-        builder.format(LogPrefix::from_env().format(self.log_file.is_some()));
+        let formatter = LogPrefix::from_env().format(self.log_file.is_some());
+        let level = self.to_filter();
+
+        builder.filter_level(level).format(formatter);
 
         if let Some(path) = log_path(self.log_file) {
             if let Some(dir) = path.parent() {
@@ -70,14 +72,25 @@ impl Args {
                 .create(true)
                 .append(true)
                 .open(path)?;
-            builder.target(env_logger::Target::Pipe(Box::new(file)));
+            let logger = builder
+                .target(env_logger::Target::Pipe(Box::new(file)))
+                .build();
+            Router::keep(logger);
+        } else {
+            let (file, path) = tempfile::NamedTempFile::new()?.into_parts();
+            TMP_LOG_PATH.set(path).unwrap();
+
+            let logger = builder.build();
+            let next_logger = env_logger::Builder::new()
+                .filter_level(level)
+                .format(formatter)
+                .target(env_logger::Target::Pipe(Box::new(file)))
+                .build();
+            Router::exchangeable(logger, next_logger);
         }
 
-        let logger = builder.build();
-        let filter = logger.filter();
-        Router::reroute(Box::new(logger));
         if log::set_logger(&*ROUTER).is_ok() {
-            log::set_max_level(filter);
+            log::set_max_level(level);
         }
 
         Ok(())
@@ -98,65 +111,91 @@ fn log_path(path: Option<Option<PathBuf>>) -> Option<PathBuf> {
     })
 }
 
-static ROUTER: std::sync::LazyLock<Router> =
-    std::sync::LazyLock::new(|| Router::init(Box::new(Dummy)));
+static ROUTER: std::sync::LazyLock<Router> = std::sync::LazyLock::new(|| Router {
+    inner: _Router::Dummy.into(),
+});
 
-pub struct Dummy;
-impl log::Log for Dummy {
-    fn enabled(&self, _: &log::Metadata) -> bool {
-        false
+pub static TMP_LOG_PATH: std::sync::OnceLock<tempfile::TempPath> = std::sync::OnceLock::new();
+
+impl log::Log for _Router {
+    fn enabled(&self, metadata: &log::Metadata) -> bool {
+        match self {
+            _Router::Dummy => false,
+            _Router::Keep(inner) | _Router::Exchangeable { inner, next: _ } => {
+                inner.enabled(metadata)
+            }
+        }
     }
 
-    fn log(&self, _: &log::Record) {}
+    fn log(&self, record: &log::Record) {
+        match self {
+            _Router::Dummy => (),
+            _Router::Keep(inner) | _Router::Exchangeable { inner, next: _ } => {
+                inner.log(record);
+            }
+        }
+    }
 
-    fn flush(&self) {}
+    fn flush(&self) {
+        match self {
+            _Router::Dummy => (),
+            _Router::Keep(inner) | _Router::Exchangeable { inner, next: _ } => inner.flush(),
+        }
+    }
 }
 
+pub enum _Router<L = Box<dyn log::Log>> {
+    Dummy,
+    Keep(L),
+    Exchangeable { inner: L, next: L },
+}
+impl _Router {
+    fn reroute(&mut self) {
+        if let Self::Exchangeable { inner, next } = self {
+            std::mem::swap(inner, next)
+        }
+    }
+
+    fn replace(&mut self, new: Self) {
+        let _ = std::mem::replace(self, new);
+    }
+}
 pub struct Router {
-    inner: arc_swap::ArcSwap<Box<dyn log::Log>>,
-    old: std::sync::Mutex<Option<std::sync::Arc<Box<dyn log::Log>>>>,
+    inner: std::sync::Mutex<_Router>,
 }
 
 impl Router {
-    fn init(logger: Box<dyn log::Log>) -> Self {
-        Self {
-            inner: arc_swap::ArcSwap::new(std::sync::Arc::new(logger)),
-            old: Default::default(),
-        }
+    fn keep(logger: impl log::Log + 'static) {
+        ROUTER
+            .inner
+            .lock()
+            .unwrap()
+            .replace(_Router::Keep(Box::new(logger)));
     }
 
-    fn _reroute(&self, new: Box<dyn log::Log>) {
-        let boxed = std::sync::Arc::new(new);
-        let old = self.inner.swap(boxed);
-        self.old.lock().unwrap().replace(old);
+    fn exchangeable(logger: impl log::Log + 'static, next: impl log::Log + 'static) {
+        ROUTER.inner.lock().unwrap().replace(_Router::Exchangeable {
+            inner: Box::new(logger),
+            next: Box::new(next),
+        });
     }
 
-    fn _recover(&self) {
-        if let Some(old) = self.old.lock().unwrap().take() {
-            self.inner.store(old);
-        }
-    }
-
-    pub fn reroute(new: Box<dyn log::Log>) {
-        ROUTER._reroute(new);
-    }
-
-    pub fn recover() {
-        ROUTER._recover();
+    pub fn reroute() {
+        ROUTER.inner.lock().unwrap().reroute();
     }
 }
 
 impl log::Log for Router {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
-        self.inner.load().enabled(metadata)
+        self.inner.lock().unwrap().enabled(metadata)
     }
 
     fn log(&self, record: &log::Record) {
-        self.inner.load().log(record);
+        self.inner.lock().unwrap().log(record);
     }
 
     fn flush(&self) {
-        self.inner.load().flush();
+        self.inner.lock().unwrap().flush();
     }
 }
 

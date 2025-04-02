@@ -193,11 +193,9 @@ where
         if crate::value::userinput::is_batch_mode() {
             callback::cli::headless(&asst, rx)?;
         } else {
-            log::warn!("Suspend log output");
-            crate::log::Router::reroute(Box::new(crate::log::Dummy));
+            crate::log::Router::reroute();
             callback::cli::entry(&asst, rx)?;
-            crate::log::Router::recover();
-            log::warn!("Recover log output");
+            crate::log::Router::reroute();
         }
 
         asst.stop()?;
