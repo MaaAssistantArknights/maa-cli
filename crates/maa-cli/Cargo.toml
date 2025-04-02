@@ -23,7 +23,6 @@ vendored-openssl = ["git2?/vendored-openssl"]
 # Common features used to install and update MAA Core and maa-cli self
 __installer = [
   "indicatif",
-  "futures-util",
   "sha2",
   "digest",
   "semver",
@@ -51,7 +50,7 @@ color-print = { workspace = true }
 digest = { workspace = true, optional = true }
 env_logger = { workspace = true, features = ["auto-color"] }
 flate2 = { workspace = true, optional = true }
-futures-util = { workspace = true, optional = true }
+futures-util = { workspace = true }
 git2 = { workspace = true, optional = true }
 indicatif = { workspace = true, optional = true }
 log = { workspace = true }
