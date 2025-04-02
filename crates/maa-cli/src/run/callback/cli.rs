@@ -9,6 +9,22 @@ use super::summary::{SummarySubscriber, LINE_SEP};
 use crate::run::callback::summary::TaskSummaryState;
 
 #[tokio::main]
+pub async fn headless(asst: &maa_sys::Assistant, rx: &mut SummarySubscriber) -> anyhow::Result<()> {
+    while asst.running() {
+        tokio::select! {
+            _ = tokio::time::sleep(std::time::Duration::from_millis(500)) => (),
+            _ = wait_for_signal() => {
+                anyhow::bail!("Interrupted by user!")
+            },
+        };
+        for state in rx.try_update().unwrap_or_default() {
+            println!("{}", state)
+        }
+    }
+    Ok(())
+}
+
+#[tokio::main]
 pub async fn entry(asst: &maa_sys::Assistant, rx: &mut SummarySubscriber) -> anyhow::Result<()> {
     let mut terminal = ratatui::Terminal::with_options(
         CrosstermBackend::new(std::io::stdout()),

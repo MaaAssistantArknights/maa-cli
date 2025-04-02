@@ -11,7 +11,7 @@ pub fn enable_batch_mode() {
     BATCH_MODE.store(true, Ordering::Relaxed);
 }
 
-fn is_batch_mode() -> bool {
+pub fn is_batch_mode() -> bool {
     BATCH_MODE.load(Ordering::Relaxed)
 }
 
