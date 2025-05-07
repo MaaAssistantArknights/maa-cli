@@ -84,6 +84,7 @@ fn normalize_url(url: &str) -> String {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use serde_json;
     use serde_test::{assert_de_tokens, Token};

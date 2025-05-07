@@ -1,3 +1,5 @@
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
+
 use std::{
     borrow::Cow,
     env::consts,
@@ -494,6 +496,7 @@ fn ensure_name(name: &str) -> &str {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use std::env;
 

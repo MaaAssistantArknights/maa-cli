@@ -113,6 +113,7 @@ macro_rules! impl_from {
 impl_from!(bool, i32, f32, String, &str);
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
 

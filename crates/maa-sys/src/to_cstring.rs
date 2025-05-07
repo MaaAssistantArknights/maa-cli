@@ -102,6 +102,7 @@ impl ToCString for maa_types::TaskType {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use std::{
         ffi::{OsStr, OsString},

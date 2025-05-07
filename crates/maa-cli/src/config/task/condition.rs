@@ -181,6 +181,7 @@ pub fn remainder_of_day_mod(tz: TimeOffset, divisor: u32) -> u32 {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use chrono::{Local, TimeZone};
 

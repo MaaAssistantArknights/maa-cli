@@ -160,6 +160,7 @@ fn plain_format(buf: &mut env_logger::fmt::Formatter, record: &log::Record) -> s
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
 

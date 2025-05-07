@@ -299,6 +299,7 @@ pub(crate) enum Dir {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub(crate) fn parse_from<I, T>(args: I) -> Cli
 where
     I: IntoIterator<Item = T>,
@@ -308,6 +309,7 @@ where
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod test {
     use super::*;
     use crate::config::cli::Channel;

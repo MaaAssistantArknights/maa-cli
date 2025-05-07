@@ -282,6 +282,7 @@ pub fn download<'p>(
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use serde_json;
 

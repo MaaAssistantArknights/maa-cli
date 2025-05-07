@@ -129,6 +129,7 @@ mod select;
 pub use select::{SelectD, Selectable, ValueWithDesc};
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
 

@@ -117,6 +117,7 @@ impl Default for CLIComponents {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub mod tests {
     use super::*;
 
