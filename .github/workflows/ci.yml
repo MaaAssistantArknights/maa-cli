@@ -185,6 +185,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Toolchains
         uses: ./.github/actions/setup
+      - name: Install MaaCore
+        uses: ./.github/actions/install-core
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2
         with:
