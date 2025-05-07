@@ -185,21 +185,18 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Toolchains
         uses: ./.github/actions/setup
-      - name: Install Cargo tarpaulin
+      - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-tarpaulin
-      - name: Install MaaCore
-        uses: ./.github/actions/install-core
-      - name: Setup Cache
-        uses: Swatinem/rust-cache@v2
+          tool: cargo-llvm-cov
       - name: Coverage
         run: |
-          cargo tarpaulin --out xml --workspace --timeout 120 \
-            ${{ github.run_attempt == 1 && '--skip-clean' || '' }} \
+          cargo llvm-cov --workspace \
+            --codecov --output-path codecov.json \
             -- --include-ignored
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: codecov.json
           fail_ci_if_error: true
