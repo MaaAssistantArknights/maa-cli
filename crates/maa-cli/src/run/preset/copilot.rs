@@ -429,6 +429,7 @@ fn get_str_key(value: &JsonValue, key: impl AsRef<str>) -> Result<&str> {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use std::{env::temp_dir, path::PathBuf};
 

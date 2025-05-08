@@ -352,6 +352,7 @@ pub mod task;
 pub mod init;
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use std::env::temp_dir;
 

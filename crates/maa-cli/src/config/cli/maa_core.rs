@@ -156,6 +156,7 @@ pub struct CommonArgs {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub mod tests {
     use std::sync::LazyLock;
 

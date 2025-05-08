@@ -109,6 +109,7 @@ mod reclamation;
 pub use reclamation::ReclamationParams;
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use maa_dirs::Ensure;
 

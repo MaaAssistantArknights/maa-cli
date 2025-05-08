@@ -811,6 +811,7 @@ pub fn insert_or_add_by_ref(map: &mut Map<String, i64>, key: &str, value: i64) {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
 

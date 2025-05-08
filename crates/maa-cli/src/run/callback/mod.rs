@@ -607,6 +607,7 @@ trait IterJoin: Iterator {
 impl<I> IterJoin for I where I: Iterator {}
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
 

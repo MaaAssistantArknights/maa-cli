@@ -434,6 +434,7 @@ impl<'a> TryFromMAAValue<'a> for &str {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use userinput::{BoolInput, Input, SelectD};
 

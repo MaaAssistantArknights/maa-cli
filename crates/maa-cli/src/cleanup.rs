@@ -184,6 +184,7 @@ fn del_item(path: &Path) -> Result<(), std::io::Error> {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use std::{
         collections::BTreeSet,

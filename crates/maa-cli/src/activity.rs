@@ -203,6 +203,7 @@ impl<T, E: std::fmt::Display> WarnError<T> for std::result::Result<T, E> {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use std::env::var_os;
 

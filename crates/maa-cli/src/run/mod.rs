@@ -307,6 +307,7 @@ fn setup_core(config: &AsstConfig) -> Result<()> {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use std::env::{self, temp_dir};
 

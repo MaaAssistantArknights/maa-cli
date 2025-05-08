@@ -83,6 +83,7 @@ impl From<ReclamationParams> for MAAValue {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
 

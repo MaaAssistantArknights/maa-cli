@@ -235,6 +235,7 @@ pub fn init(name: Option<PathBuf>, filetype: Option<super::Filetype>, force: boo
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod test {
     use super::{super::Filetype, *};
 

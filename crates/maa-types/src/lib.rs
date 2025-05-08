@@ -1,3 +1,5 @@
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
+
 pub mod primitive {
     /// Boolean type for assistant API.
     pub type AsstBool = u8;
@@ -346,6 +348,7 @@ impl std::fmt::Display for TaskType {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
 

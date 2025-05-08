@@ -82,6 +82,7 @@ impl<F: FromStr + Display + Clone> UserInput for Input<F> {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use serde_test::{assert_de_tokens, Token};
 

@@ -103,6 +103,7 @@ impl_into_maa_value!(
 );
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
 

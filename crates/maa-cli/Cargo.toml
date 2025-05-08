@@ -8,6 +8,9 @@ description = "A simple CLI for MAA (MaaAssistantArknights)"
 repository.workspace = true
 license.workspace = true
 
+[lints]
+workspace = true
+
 [features]
 default = ["cli_installer", "core_installer", "git2"]
 

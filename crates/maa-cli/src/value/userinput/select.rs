@@ -353,6 +353,7 @@ impl Selectable for ValueWithDesc<String> {
 pub type SelectD<T> = Select<ValueWithDesc<T>>;
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use serde_test::{assert_de_tokens, Token};
 
