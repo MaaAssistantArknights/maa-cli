@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use log::debug;
 use semver::Version;
 use serde::Deserialize;
@@ -20,8 +20,8 @@ use super::{
 };
 use crate::{
     config::cli::{
-        maa_core::{CommonArgs, Components, Config},
         CLI_CONFIG,
+        maa_core::{CommonArgs, Components, Config},
     },
     dirs::{self, Ensure},
     run,
@@ -84,7 +84,9 @@ pub fn install(force: bool, args: &CommonArgs) -> Result<()> {
     let lib_name = format!("{}MaaCore{}", DLL_PREFIX, DLL_SUFFIX);
 
     if lib_dir.join(lib_name).exists() && !force {
-        bail!("MaaCore already exists, use `maa update` to update it or `maa install --force` to force reinstall")
+        bail!(
+            "MaaCore already exists, use `maa update` to update it or `maa install --force` to force reinstall"
+        )
     }
 
     println!(
@@ -362,15 +364,21 @@ mod tests {
         let version_json: VersionJSON<Details> =
             serde_json::from_str(json_str).expect("Failed to parse json");
 
-        assert!(version_json
-            .can_update("MaaCore", &Version::parse("4.26.0").unwrap())
-            .unwrap());
-        assert!(version_json
-            .can_update("MaaCore", &Version::parse("4.26.1-beta.1").unwrap())
-            .unwrap());
-        assert!(!version_json
-            .can_update("MaaCore", &Version::parse("4.27.0").unwrap())
-            .unwrap());
+        assert!(
+            version_json
+                .can_update("MaaCore", &Version::parse("4.26.0").unwrap())
+                .unwrap()
+        );
+        assert!(
+            version_json
+                .can_update("MaaCore", &Version::parse("4.26.1-beta.1").unwrap())
+                .unwrap()
+        );
+        assert!(
+            !version_json
+                .can_update("MaaCore", &Version::parse("4.27.0").unwrap())
+                .unwrap()
+        );
 
         assert_eq!(
             version_json.version(),

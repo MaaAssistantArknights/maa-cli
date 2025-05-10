@@ -375,14 +375,14 @@ mod tests {
                 Err(UnknownTouchModeError("Unknown".to_owned()))
             );
             assert_eq!(
-            UnknownTouchModeError("Unknown".to_owned()).to_string(),
-            "unknown touch mode `Unknown`, expected one of `adb`, `minitouch`, `maatouch`, `MacPlayTools`",
-        );
+                UnknownTouchModeError("Unknown".to_owned()).to_string(),
+                "unknown touch mode `Unknown`, expected one of `adb`, `minitouch`, `maatouch`, `MacPlayTools`",
+            );
         }
 
         #[cfg(feature = "serde")]
         mod serde {
-            use serde_test::{assert_de_tokens, assert_de_tokens_error, Token};
+            use serde_test::{Token, assert_de_tokens, assert_de_tokens_error};
 
             use super::*;
 
@@ -478,7 +478,7 @@ mod tests {
 
         #[cfg(feature = "serde")]
         mod serde {
-            use serde_test::{assert_de_tokens, assert_de_tokens_error, Token};
+            use serde_test::{Token, assert_de_tokens, assert_de_tokens_error};
 
             use super::*;
 

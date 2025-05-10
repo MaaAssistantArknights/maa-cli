@@ -1,7 +1,7 @@
 use clap::Args;
 use serde::Deserialize;
 
-use super::{normalize_url, return_true, Channel};
+use super::{Channel, normalize_url, return_true};
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Clone)]
@@ -133,7 +133,7 @@ pub mod tests {
     }
 
     mod serde {
-        use serde_test::{assert_de_tokens, Token};
+        use serde_test::{Token, assert_de_tokens};
 
         use super::*;
 

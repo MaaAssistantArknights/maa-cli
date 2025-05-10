@@ -1,18 +1,18 @@
 use std::{collections::BTreeMap, time::Duration};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use maa_dirs::MAA_CLI_EXE;
 use semver::Version;
 use serde::Deserialize;
 use tokio::runtime::Runtime;
 
 use super::{
-    download::{download, Checker},
+    download::{Checker, download},
     extract::Archive,
     version_json::VersionJSON,
 };
 use crate::{
-    config::cli::{maa_cli::CommonArgs, CLI_CONFIG},
+    config::cli::{CLI_CONFIG, maa_cli::CommonArgs},
     dirs::{self, Ensure},
 };
 

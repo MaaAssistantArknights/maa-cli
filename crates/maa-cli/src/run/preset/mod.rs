@@ -3,9 +3,9 @@ use maa_sys::TaskType;
 
 use crate::{
     config::{
+        FindFileOrDefault,
         asst::AsstConfig,
         task::{ClientType, Task, TaskConfig},
-        FindFileOrDefault,
     },
     value::MAAValue,
 };
@@ -115,7 +115,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        command::{parse_from, Command},
+        command::{Command, parse_from},
         object,
     };
 

@@ -194,10 +194,12 @@ mod tests {
         // Test empty input when default is not set
         let mut output = Vec::new();
         let bool_input = BoolInput::new(None, Some("hello"));
-        assert!(bool_input
-            .clone()
-            .ask(&mut output, input!("\ny\n"))
-            .unwrap());
+        assert!(
+            bool_input
+                .clone()
+                .ask(&mut output, input!("\ny\n"))
+                .unwrap()
+        );
         assert_eq!(
             String::from_utf8(output).unwrap(),
             "Whether to hello [y/n]: Default value not set, please input y/n: "
@@ -205,10 +207,12 @@ mod tests {
 
         // Test invalid input
         let mut output = Vec::new();
-        assert!(bool_input
-            .clone()
-            .ask(&mut output, input!("invalid\ny\n"))
-            .unwrap());
+        assert!(
+            bool_input
+                .clone()
+                .ask(&mut output, input!("invalid\ny\n"))
+                .unwrap()
+        );
 
         assert_eq!(
             String::from_utf8(output).unwrap(),

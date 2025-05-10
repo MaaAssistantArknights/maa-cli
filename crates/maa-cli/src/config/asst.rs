@@ -165,7 +165,9 @@ impl<'de> Deserialize<'de> for Preset {
 impl Preset {
     fn default_adb_path(self) -> &'static str {
         match self {
-            Preset::MuMuPro => "/Applications/MuMuPlayer.app/Contents/MacOS/MuMuEmulator.app/Contents/MacOS/tools/adb",
+            Preset::MuMuPro => {
+                "/Applications/MuMuPlayer.app/Contents/MacOS/MuMuEmulator.app/Contents/MacOS/tools/adb"
+            }
             Preset::PlayCover => "",
             Preset::Waydroid | Preset::Adb => "adb",
         }
@@ -518,7 +520,7 @@ mod tests {
     });
 
     mod serde {
-        use serde_test::{assert_de_tokens, Token};
+        use serde_test::{Token, assert_de_tokens};
 
         use super::*;
 

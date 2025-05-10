@@ -87,7 +87,9 @@ macro_rules! impl_to_cstring_by_to_string {
     };
 }
 
-impl_to_cstring_by_to_string!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
+impl_to_cstring_by_to_string!(
+    i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize
+);
 
 impl ToCString for maa_types::TouchMode {
     fn to_cstring(self) -> Result<CString> {

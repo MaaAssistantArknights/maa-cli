@@ -1,6 +1,6 @@
 use std::{
     cmp::min,
-    fs::{remove_file, File},
+    fs::{File, remove_file},
     io::Write,
     path::Path,
     time::{Duration, Instant},

@@ -228,7 +228,9 @@ impl TryFrom<RoguelikeParams> for MAAValue {
                     value.insert("check_collapsal_paradigms", true);
                     value.insert("double_check_collapsal_paradigms", true);
                     if params.expected_collapsal_paradigms.is_empty() {
-                        bail!("At least one expected collapsal paradigm is required when mode 5 is enabled");
+                        bail!(
+                            "At least one expected collapsal paradigm is required when mode 5 is enabled"
+                        );
                     }
                     value.insert(
                         "expected_collapsal_paradigms",
@@ -257,7 +259,7 @@ impl TryFrom<RoguelikeParams> for MAAValue {
 mod tests {
     use super::*;
     use crate::{
-        command::{parse_from, Command},
+        command::{Command, parse_from},
         object,
         value::MAAValue,
     };

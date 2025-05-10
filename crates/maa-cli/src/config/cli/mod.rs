@@ -87,7 +87,7 @@ fn normalize_url(url: &str) -> String {
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use serde_json;
-    use serde_test::{assert_de_tokens, Token};
+    use serde_test::{Token, assert_de_tokens};
     use toml;
 
     use super::{resource::GitBackend, *};
@@ -141,7 +141,9 @@ mod tests {
                 Token::Str("test_time"),
                 Token::I64(0),
                 Token::Str("api_url"),
-                Token::Str("https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version/"),
+                Token::Str(
+                    "https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api/version/",
+                ),
                 Token::Str("components"),
                 Token::Map { len: Some(2) },
                 Token::Str("library"),

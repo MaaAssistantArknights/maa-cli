@@ -1,6 +1,6 @@
 use std::{io::Write, path::Path, sync::LazyLock};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use chrono::{DateTime, FixedOffset, NaiveDateTime};
 use log::warn;
 use serde::Deserialize;
@@ -397,44 +397,48 @@ mod tests {
 
     #[test]
     fn stage_activity_content() {
-        assert!(StageActivityContent {
-            side_story_stage: vec![StageInfo {
-                value: "FC-7".to_string(),
-                drop: "31043".to_string(),
-                activity: ActivityInfo {
+        assert!(
+            StageActivityContent {
+                side_story_stage: vec![StageInfo {
+                    value: "FC-7".to_string(),
+                    drop: "31043".to_string(),
+                    activity: ActivityInfo {
+                        tip: "Test".to_string(),
+                        utc_start_time: "1970/01/01 00:00:00".to_string(),
+                        utc_expire_time: "3000/01/01 00:00:00".to_string(),
+                        time_zone: 8,
+                    },
+                }],
+                resource_collection: ActivityInfo {
                     tip: "Test".to_string(),
                     utc_start_time: "1970/01/01 00:00:00".to_string(),
                     utc_expire_time: "3000/01/01 00:00:00".to_string(),
                     time_zone: 8,
                 },
-            }],
-            resource_collection: ActivityInfo {
-                tip: "Test".to_string(),
-                utc_start_time: "1970/01/01 00:00:00".to_string(),
-                utc_expire_time: "3000/01/01 00:00:00".to_string(),
-                time_zone: 8,
-            },
-        }
-        .has_side_story_open());
-        assert!(!StageActivityContent {
-            side_story_stage: vec![StageInfo {
-                value: "FC-7".to_string(),
-                drop: "31043".to_string(),
-                activity: ActivityInfo {
+            }
+            .has_side_story_open()
+        );
+        assert!(
+            !StageActivityContent {
+                side_story_stage: vec![StageInfo {
+                    value: "FC-7".to_string(),
+                    drop: "31043".to_string(),
+                    activity: ActivityInfo {
+                        tip: "Test".to_string(),
+                        utc_start_time: "1970/01/01 00:00:00".to_string(),
+                        utc_expire_time: "1970/01/01 00:00:00".to_string(),
+                        time_zone: 8,
+                    },
+                }],
+                resource_collection: ActivityInfo {
                     tip: "Test".to_string(),
                     utc_start_time: "1970/01/01 00:00:00".to_string(),
                     utc_expire_time: "1970/01/01 00:00:00".to_string(),
                     time_zone: 8,
                 },
-            }],
-            resource_collection: ActivityInfo {
-                tip: "Test".to_string(),
-                utc_start_time: "1970/01/01 00:00:00".to_string(),
-                utc_expire_time: "1970/01/01 00:00:00".to_string(),
-                time_zone: 8,
-            },
-        }
-        .has_side_story_open());
+            }
+            .has_side_story_open()
+        );
     }
 
     #[test]
