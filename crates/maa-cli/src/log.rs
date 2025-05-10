@@ -171,7 +171,8 @@ mod tests {
 
         #[test]
         fn to_filter() {
-            env::remove_var("MAA_LOG");
+            // Safety: MAA_LOG is only modify and read in this test
+            unsafe { std::env::remove_var("MAA_LOG") };
 
             use log::LevelFilter::*;
             assert_eq!(parse_from(["maa", "list"]).log.to_filter(), Warn);
@@ -205,37 +206,42 @@ mod tests {
 
             assert_eq!(parse_from(["maa", "list", "-q"]).log.to_filter(), Error);
 
-            env::set_var("MAA_LOG", "Info");
-            assert_eq!(parse_from(["maa", "list"]).log.to_filter(), Info);
-            env::set_var("MAA_LOG", "Debug");
-            assert_eq!(parse_from(["maa", "list"]).log.to_filter(), Debug);
-            env::set_var("MAA_LOG", "Trace");
-            assert_eq!(parse_from(["maa", "list"]).log.to_filter(), Trace);
-
-            env::remove_var("MAA_LOG");
+            unsafe {
+                env::set_var("MAA_LOG", "Info");
+                assert_eq!(parse_from(["maa", "list"]).log.to_filter(), Info);
+                env::set_var("MAA_LOG", "Debug");
+                assert_eq!(parse_from(["maa", "list"]).log.to_filter(), Debug);
+                env::set_var("MAA_LOG", "Trace");
+                assert_eq!(parse_from(["maa", "list"]).log.to_filter(), Trace);
+                env::remove_var("MAA_LOG");
+            }
         }
 
         #[test]
         fn log_path() {
             use std::path::Path;
             assert!(parse_from(["maa", "list"]).log.log_file().is_none());
-            assert!(parse_from(["maa", "list", "--log-file"])
-                .log
-                .log_file()
-                .is_some_and(|x| {
-                    let now = chrono::Local::now();
-                    let dir = crate::dirs::log()
-                        .join(now.format("%Y").to_string())
-                        .join(now.format("%m").to_string())
-                        .join(now.format("%d").to_string());
+            assert!(
+                parse_from(["maa", "list", "--log-file"])
+                    .log
+                    .log_file()
+                    .is_some_and(|x| {
+                        let now = chrono::Local::now();
+                        let dir = crate::dirs::log()
+                            .join(now.format("%Y").to_string())
+                            .join(now.format("%m").to_string())
+                            .join(now.format("%d").to_string());
 
-                    // the file name is dependent on the current time, it's hard to test
-                    x.starts_with(dir)
-                }));
-            assert!(parse_from(["maa", "list", "--log-file=path"])
-                .log
-                .log_file()
-                .is_some_and(|x| x == Path::new("path")));
+                        // the file name is dependent on the current time, it's hard to test
+                        x.starts_with(dir)
+                    })
+            );
+            assert!(
+                parse_from(["maa", "list", "--log-file=path"])
+                    .log
+                    .log_file()
+                    .is_some_and(|x| x == Path::new("path"))
+            );
         }
     }
 
@@ -255,20 +261,23 @@ mod tests {
 
         #[test]
         fn from_env() {
-            std::env::remove_var("MAA_LOG_PREFIX");
-            assert_eq!(LogPrefix::from_env(), LogPrefix::Always);
+            // Safety: MAA_LOG_PREFIX only modify and read in this test
+            unsafe {
+                std::env::remove_var("MAA_LOG_PREFIX");
+                assert_eq!(LogPrefix::from_env(), LogPrefix::Always);
 
-            std::env::set_var("MAA_LOG_PREFIX", "Always");
-            assert_eq!(LogPrefix::from_env(), LogPrefix::Always);
+                std::env::set_var("MAA_LOG_PREFIX", "Always");
+                assert_eq!(LogPrefix::from_env(), LogPrefix::Always);
 
-            std::env::set_var("MAA_LOG_PREFIX", "Never");
-            assert_eq!(LogPrefix::from_env(), LogPrefix::Never);
+                std::env::set_var("MAA_LOG_PREFIX", "Never");
+                assert_eq!(LogPrefix::from_env(), LogPrefix::Never);
 
-            std::env::set_var("MAA_LOG_PREFIX", "Auto");
-            assert_eq!(LogPrefix::from_env(), LogPrefix::Auto);
+                std::env::set_var("MAA_LOG_PREFIX", "Auto");
+                assert_eq!(LogPrefix::from_env(), LogPrefix::Auto);
 
-            std::env::set_var("MAA_LOG_PREFIX", "unknown");
-            assert_eq!(LogPrefix::from_env(), LogPrefix::Always);
+                std::env::set_var("MAA_LOG_PREFIX", "unknown");
+                assert_eq!(LogPrefix::from_env(), LogPrefix::Always);
+            }
         }
 
         #[test]

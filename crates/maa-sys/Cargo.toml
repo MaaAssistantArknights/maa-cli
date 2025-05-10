@@ -2,7 +2,7 @@
 name = "maa-sys"
 authors = ["Loong Wang <wangl-cc@outlook.com>"]
 version = "0.6.0"
-edition = "2021"
+edition = "2024"
 description = "Low-level bindings to MAA (MaaAssistantArknights)"
 license.workspace = true
 repository.workspace = true

@@ -376,7 +376,7 @@ pub mod tests {
     }
 
     mod serde {
-        use serde_test::{assert_de_tokens, assert_de_tokens_error, Token};
+        use serde_test::{Token, assert_de_tokens, assert_de_tokens_error};
 
         use super::*;
 
@@ -667,11 +667,13 @@ pub mod tests {
             Some(Cow::Borrowed("password"))
         );
 
-        assert!(Passphrase::Env(String::from("MMA_TEST_SSH_PASSPHRASE"))
-            .get()
-            .is_err());
+        assert!(
+            Passphrase::Env(String::from("MMA_TEST_SSH_PASSPHRASE"))
+                .get()
+                .is_err()
+        );
 
-        std::env::set_var("MMA_TEST_SSH_PASSPHRASE", "password");
+        unsafe { std::env::set_var("MMA_TEST_SSH_PASSPHRASE", "password") };
         assert_eq!(
             Passphrase::Env(String::from("MMA_TEST_SSH_PASSPHRASE"))
                 .get()
@@ -679,7 +681,7 @@ pub mod tests {
                 .unwrap(),
             "password"
         );
-        std::env::remove_var("MMA_TEST_SSH_PASSPHRASE");
+        unsafe { std::env::remove_var("MMA_TEST_SSH_PASSPHRASE") };
 
         assert_eq!(
             Passphrase::Command(vec![String::from("echo"), String::from("password")])
