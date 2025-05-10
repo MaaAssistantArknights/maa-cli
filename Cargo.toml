@@ -4,13 +4,16 @@ members = ["crates/*"]
 
 [workspace.package]
 license = "AGPL-3.0-only"
+authors = ["Long Wang <loong@loongw.cc>"]
 homepage = "https://github.com/MaaAssistantArknights/maa-cli"
 repository = "https://github.com/MaaAssistantArknights/maa-cli"
+rust-version = "1.84"
+edition = "2024"
 
 [workspace.dependencies]
-maa-dirs = { path = "crates/maa-dirs", version = "0.1.1" }
-maa-sys = { path = "crates/maa-sys", version = "0.6.0" }
-maa-types = { path = "crates/maa-types", version = "0.1" }
+maa-dirs = { path = "crates/maa-dirs", version = "0.2" }
+maa-sys = { path = "crates/maa-sys", version = "0.7" }
+maa-types = { path = "crates/maa-types", version = "0.2" }
 
 anyhow = "1"
 async-trait = "0.1.81"
@@ -19,7 +22,7 @@ clap = "4.4"
 clap_complete = "4.4"
 clap_mangen = "0.2.20"
 color-print = "0.3.6"
-constcat = "0.5.1"
+constcat = "0.6.0"
 digest = "0.10.7"
 directories = "6"
 dunce = "1.0.4"
@@ -46,7 +49,7 @@ thiserror = "2"
 tokio = "1.44"
 toml = "0.8"
 windows-result = "0.3.0"
-windows-strings = "0.3.0"
+windows-strings = "0.4.0"
 windows-sys = "0.59.0"
 zip = { version = "2", default-features = false }
 

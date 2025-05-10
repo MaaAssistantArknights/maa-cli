@@ -215,16 +215,20 @@ mod tests {
             let should_be_prev_day = now_in_cn.time() < server_start_of_day;
 
             use TimeOffset::*;
-            assert!(Condition::Weekday {
-                weekdays: vec![weekday],
-                timezone: Local
-            }
-            .is_active());
-            assert!(!Condition::Weekday {
-                weekdays: vec![weekday.pred(), weekday.succ()],
-                timezone: Local,
-            }
-            .is_active());
+            assert!(
+                Condition::Weekday {
+                    weekdays: vec![weekday],
+                    timezone: Local
+                }
+                .is_active()
+            );
+            assert!(
+                !Condition::Weekday {
+                    weekdays: vec![weekday.pred(), weekday.succ()],
+                    timezone: Local,
+                }
+                .is_active()
+            );
 
             assert_eq!(
                 Condition::Weekday {
@@ -361,12 +365,14 @@ mod tests {
 
             let num_days = Local::now().num_days_from_ce() as u32;
 
-            assert!(Condition::DayMod {
-                divisor: 1,
-                remainder: 0,
-                timezone: TimeOffset::Local,
-            }
-            .is_active());
+            assert!(
+                Condition::DayMod {
+                    divisor: 1,
+                    remainder: 0,
+                    timezone: TimeOffset::Local,
+                }
+                .is_active()
+            );
 
             assert_eq!(
                 Condition::DayMod {
@@ -398,48 +404,62 @@ mod tests {
             let now = chrono::Local::now();
             let now_time = now.time();
 
-            assert!(Condition::Time {
-                start: Some(now_time + seconds(-10)),
-                end: Some(now_time + seconds(10)),
-                timezone: TimeOffset::Local,
-            }
-            .is_active());
-            assert!(Condition::Time {
-                start: Some(now_time + seconds(-10)),
-                end: None,
-                timezone: TimeOffset::Local
-            }
-            .is_active());
-            assert!(Condition::Time {
-                start: None,
-                end: Some(now_time + seconds(10)),
-                timezone: TimeOffset::Local
-            }
-            .is_active());
-            assert!(Condition::Time {
-                start: None,
-                end: None,
-                timezone: TimeOffset::Local
-            }
-            .is_active());
-            assert!(!Condition::Time {
-                start: Some(now_time + seconds(10)),
-                end: Some(now_time + seconds(20)),
-                timezone: TimeOffset::Local
-            }
-            .is_active());
-            assert!(!Condition::Time {
-                start: Some(now_time + seconds(10)),
-                end: None,
-                timezone: TimeOffset::Local
-            }
-            .is_active());
-            assert!(!Condition::Time {
-                start: None,
-                end: Some(now_time + seconds(-10)),
-                timezone: TimeOffset::Local
-            }
-            .is_active());
+            assert!(
+                Condition::Time {
+                    start: Some(now_time + seconds(-10)),
+                    end: Some(now_time + seconds(10)),
+                    timezone: TimeOffset::Local,
+                }
+                .is_active()
+            );
+            assert!(
+                Condition::Time {
+                    start: Some(now_time + seconds(-10)),
+                    end: None,
+                    timezone: TimeOffset::Local
+                }
+                .is_active()
+            );
+            assert!(
+                Condition::Time {
+                    start: None,
+                    end: Some(now_time + seconds(10)),
+                    timezone: TimeOffset::Local
+                }
+                .is_active()
+            );
+            assert!(
+                Condition::Time {
+                    start: None,
+                    end: None,
+                    timezone: TimeOffset::Local
+                }
+                .is_active()
+            );
+            assert!(
+                !Condition::Time {
+                    start: Some(now_time + seconds(10)),
+                    end: Some(now_time + seconds(20)),
+                    timezone: TimeOffset::Local
+                }
+                .is_active()
+            );
+            assert!(
+                !Condition::Time {
+                    start: Some(now_time + seconds(10)),
+                    end: None,
+                    timezone: TimeOffset::Local
+                }
+                .is_active()
+            );
+            assert!(
+                !Condition::Time {
+                    start: None,
+                    end: Some(now_time + seconds(-10)),
+                    timezone: TimeOffset::Local
+                }
+                .is_active()
+            );
         }
 
         #[test]
@@ -472,48 +492,62 @@ mod tests {
             let now = chrono::Local::now();
             let now_datetime = now.naive_local();
 
-            assert!(Condition::DateTime {
-                start: Some(now_datetime + seconds(-10)),
-                end: Some(now_datetime + seconds(10)),
-                timezone: TimeOffset::Local,
-            }
-            .is_active());
-            assert!(Condition::DateTime {
-                start: Some(now_datetime + seconds(-10)),
-                end: None,
-                timezone: TimeOffset::Local
-            }
-            .is_active());
-            assert!(Condition::DateTime {
-                start: None,
-                end: Some(now_datetime + seconds(10)),
-                timezone: TimeOffset::Local
-            }
-            .is_active());
-            assert!(Condition::DateTime {
-                start: None,
-                end: None,
-                timezone: TimeOffset::Local
-            }
-            .is_active());
-            assert!(!Condition::DateTime {
-                start: Some(now_datetime + seconds(10)),
-                end: Some(now_datetime + seconds(20)),
-                timezone: TimeOffset::Local
-            }
-            .is_active());
-            assert!(!Condition::DateTime {
-                start: Some(now_datetime + seconds(10)),
-                end: None,
-                timezone: TimeOffset::Local
-            }
-            .is_active());
-            assert!(!Condition::DateTime {
-                start: None,
-                end: Some(now_datetime + seconds(-10)),
-                timezone: TimeOffset::Local
-            }
-            .is_active());
+            assert!(
+                Condition::DateTime {
+                    start: Some(now_datetime + seconds(-10)),
+                    end: Some(now_datetime + seconds(10)),
+                    timezone: TimeOffset::Local,
+                }
+                .is_active()
+            );
+            assert!(
+                Condition::DateTime {
+                    start: Some(now_datetime + seconds(-10)),
+                    end: None,
+                    timezone: TimeOffset::Local
+                }
+                .is_active()
+            );
+            assert!(
+                Condition::DateTime {
+                    start: None,
+                    end: Some(now_datetime + seconds(10)),
+                    timezone: TimeOffset::Local
+                }
+                .is_active()
+            );
+            assert!(
+                Condition::DateTime {
+                    start: None,
+                    end: None,
+                    timezone: TimeOffset::Local
+                }
+                .is_active()
+            );
+            assert!(
+                !Condition::DateTime {
+                    start: Some(now_datetime + seconds(10)),
+                    end: Some(now_datetime + seconds(20)),
+                    timezone: TimeOffset::Local
+                }
+                .is_active()
+            );
+            assert!(
+                !Condition::DateTime {
+                    start: Some(now_datetime + seconds(10)),
+                    end: None,
+                    timezone: TimeOffset::Local
+                }
+                .is_active()
+            );
+            assert!(
+                !Condition::DateTime {
+                    start: None,
+                    end: Some(now_datetime + seconds(-10)),
+                    timezone: TimeOffset::Local
+                }
+                .is_active()
+            );
         }
 
         // It's hart to test OnSideStory, because it depends on real world data
@@ -522,45 +556,55 @@ mod tests {
 
         #[test]
         fn boolean() {
-            assert!(Condition::And {
-                conditions: vec![Condition::Always, Condition::Always]
-            }
-            .is_active());
-            assert!(!Condition::And {
-                conditions: vec![Condition::Always, Condition::Not {
-                    condition: Box::new(Condition::Always)
-                },]
-            }
-            .is_active());
-
-            assert!(Condition::Or {
-                conditions: vec![Condition::Always, Condition::Not {
-                    condition: Box::new(Condition::Always)
-                }]
-            }
-            .is_active());
-
-            assert!(!Condition::Or {
-                conditions: vec![
-                    Condition::Not {
+            assert!(
+                Condition::And {
+                    conditions: vec![Condition::Always, Condition::Always]
+                }
+                .is_active()
+            );
+            assert!(
+                !Condition::And {
+                    conditions: vec![Condition::Always, Condition::Not {
                         condition: Box::new(Condition::Always)
-                    },
-                    Condition::Not {
-                        condition: Box::new(Condition::Always)
-                    }
-                ]
-            }
-            .is_active());
+                    },]
+                }
+                .is_active()
+            );
 
-            assert!(!Condition::Not {
-                condition: Box::new(Condition::Always)
-            }
-            .is_active());
+            assert!(
+                Condition::Or {
+                    conditions: vec![Condition::Always, Condition::Not {
+                        condition: Box::new(Condition::Always)
+                    }]
+                }
+                .is_active()
+            );
+
+            assert!(
+                !Condition::Or {
+                    conditions: vec![
+                        Condition::Not {
+                            condition: Box::new(Condition::Always)
+                        },
+                        Condition::Not {
+                            condition: Box::new(Condition::Always)
+                        }
+                    ]
+                }
+                .is_active()
+            );
+
+            assert!(
+                !Condition::Not {
+                    condition: Box::new(Condition::Always)
+                }
+                .is_active()
+            );
         }
     }
 
     mod serde {
-        use serde_test::{assert_de_tokens, Token};
+        use serde_test::{Token, assert_de_tokens};
 
         use super::*;
 

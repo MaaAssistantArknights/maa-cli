@@ -10,10 +10,10 @@ pub mod preset;
 
 use std::{
     path::Path,
-    sync::{atomic, Arc},
+    sync::{Arc, atomic},
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use clap::Args;
 use log::{debug, warn};
 use maa_dirs::{self as dirs, Ensure, MAA_CORE_LIB};
@@ -21,7 +21,7 @@ use maa_sys::Assistant;
 use signal_hook::consts::TERM_SIGNALS;
 
 use crate::{
-    config::{asst::AsstConfig, task::TaskConfig, FindFile},
+    config::{FindFile, asst::AsstConfig, task::TaskConfig},
     installer::resource,
 };
 
@@ -104,7 +104,9 @@ fn find_profile(root: impl AsRef<Path>, profile: Option<&str>) -> Result<AsstCon
     {
         Ok(config)
     } else if let Some(config) = AsstConfig::find_file_or_none(join!(root, "asst"))? {
-        warn!("The config file `asst.toml` is deprecated, please use `profiles/default.toml` instead!");
+        warn!(
+            "The config file `asst.toml` is deprecated, please use `profiles/default.toml` instead!"
+        );
         Ok(config)
     } else {
         Ok(AsstConfig::default())

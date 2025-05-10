@@ -1,4 +1,4 @@
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 
 use super::MAAValue;
 use crate::config::task::ClientType;
@@ -127,7 +127,7 @@ impl TryFrom<FightParams> for MAAValue {
 mod tests {
     use super::*;
     use crate::{
-        command::{parse_from, Command},
+        command::{Command, parse_from},
         object,
     };
 

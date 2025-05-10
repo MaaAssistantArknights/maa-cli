@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 use condition::Condition;
-pub use condition::{remainder_of_day_mod, TimeOffset};
+pub use condition::{TimeOffset, remainder_of_day_mod};
 use maa_sys::TaskType;
 use serde::Deserialize;
 
@@ -680,13 +680,16 @@ mod tests {
                     client_type: None,
                     startup: None,
                     closedown: None,
-                    tasks: vec![Task::new(StartUp, object!("start_game_enabled" => true))
-                        .with_variants(vec![TaskVariant {
-                            condition: Condition::Not {
-                                condition: Box::new(Condition::Always),
-                            },
-                            params: object!(),
-                        }]),],
+                    tasks: vec![
+                        Task::new(StartUp, object!("start_game_enabled" => true)).with_variants(
+                            vec![TaskVariant {
+                                condition: Condition::Not {
+                                    condition: Box::new(Condition::Always),
+                                },
+                                params: object!(),
+                            }]
+                        ),
+                    ],
                 }
                 .init()
                 .unwrap(),
@@ -703,14 +706,16 @@ mod tests {
                     client_type: None,
                     startup: None,
                     closedown: None,
-                    tasks: vec![Task::new(
-                        StartUp,
-                        object!(
-                            "start_game_enabled" => true,
-                            "client_type" => "YoStarEN",
+                    tasks: vec![
+                        Task::new(
+                            StartUp,
+                            object!(
+                                "start_game_enabled" => true,
+                                "client_type" => "YoStarEN",
+                            )
                         )
-                    )
-                    .with_name(String::from("StartUp"))],
+                        .with_name(String::from("StartUp"))
+                    ],
                 }
                 .init()
                 .unwrap(),
@@ -718,14 +723,16 @@ mod tests {
                     client_type: YoStarEN,
                     start_app: true,
                     close_app: false,
-                    tasks: vec![InitializedTask::new(
-                        StartUp,
-                        object!(
-                            "start_game_enabled" => true,
-                            "client_type" => "YoStarEN",
+                    tasks: vec![
+                        InitializedTask::new(
+                            StartUp,
+                            object!(
+                                "start_game_enabled" => true,
+                                "client_type" => "YoStarEN",
+                            )
                         )
-                    )
-                    .with_name(String::from("StartUp"))]
+                        .with_name(String::from("StartUp"))
+                    ]
                 }
             );
 

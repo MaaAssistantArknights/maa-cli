@@ -357,7 +357,7 @@ mod tests {
     use std::env::temp_dir;
 
     use serde::Deserialize;
-    use serde_json::{json, Value as JsonValue};
+    use serde_json::{Value as JsonValue, json};
 
     use super::*;
     use crate::assert_matches;
@@ -427,9 +427,11 @@ mod tests {
         )
         .unwrap();
 
-        assert!(TestConfig::find_file_or_none(&non_exist_file)
-            .unwrap()
-            .is_none());
+        assert!(
+            TestConfig::find_file_or_none(&non_exist_file)
+                .unwrap()
+                .is_none()
+        );
         assert_eq!(
             TestConfig::find_file_or_none(&test_file).unwrap().unwrap(),
             TestConfig {

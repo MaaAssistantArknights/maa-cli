@@ -1,10 +1,9 @@
 [package]
 name = "maa-cli"
-authors = ["Loong Wang <wangl-cc@outlook.com>"]
-version = "0.5.4"
-edition = "2021"
-readme = "../README-EN.md"
 description = "A simple CLI for MAA (MaaAssistantArknights)"
+version = "0.5.5"
+authors.workspace = true
+edition.workspace = true
 repository.workspace = true
 license.workspace = true
 

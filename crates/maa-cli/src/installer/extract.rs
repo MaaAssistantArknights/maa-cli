@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 
 use crate::dirs::Ensure;
 
@@ -144,7 +144,7 @@ where
         #[cfg(unix)]
         {
             use std::{
-                fs::{set_permissions, Permissions},
+                fs::{Permissions, set_permissions},
                 os::unix::fs::PermissionsExt,
             };
 

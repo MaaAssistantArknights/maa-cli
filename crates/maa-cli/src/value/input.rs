@@ -3,9 +3,9 @@ use std::io;
 use serde::Deserialize;
 
 use super::{
+    MAAValue,
     primate::MAAPrimate,
     userinput::{BoolInput, Input, SelectD, UserInput},
-    MAAValue,
 };
 
 #[cfg_attr(test, derive(PartialEq, Debug))]
@@ -113,7 +113,7 @@ mod tests {
 
     #[test]
     fn deserialize() {
-        use serde_test::{assert_de_tokens, Token};
+        use serde_test::{Token, assert_de_tokens};
 
         let values: Vec<MAAInput> = vec![
             BoolInput::new(Some(true), None).into(),

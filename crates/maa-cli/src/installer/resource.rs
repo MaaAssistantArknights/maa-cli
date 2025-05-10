@@ -1,10 +1,10 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use log::{debug, warn};
 
 use crate::{
     config::cli::{
-        resource::{Certificate, GitBackend},
         CLI_CONFIG,
+        resource::{Certificate, GitBackend},
     },
     dirs,
 };
@@ -114,7 +114,7 @@ fn update_core(
 mod git {
     use std::{path::Path, process::Command};
 
-    use anyhow::{bail, Context, Result};
+    use anyhow::{Context, Result, bail};
 
     use super::StatusExt;
     use crate::config::cli::resource::Certificate;
@@ -195,8 +195,8 @@ mod git {
 mod git2 {
     use std::path::Path;
 
-    use anyhow::{bail, Context, Result};
-    use git2::{build::RepoBuilder, Repository};
+    use anyhow::{Context, Result, bail};
+    use git2::{Repository, build::RepoBuilder};
     use log::debug;
 
     use crate::config::cli::resource::Certificate;

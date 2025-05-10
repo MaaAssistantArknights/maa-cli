@@ -1,9 +1,9 @@
 use std::{borrow::Cow, fs, io::Write, path::Path};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use log::{debug, trace};
 use maa_sys::TaskType;
-use prettytable::{format, row, Table};
+use prettytable::{Table, format, row};
 use serde_json::Value as JsonValue;
 
 use super::{FindFileOrDefault, IntoTaskConfig, ToTaskType};
@@ -12,8 +12,8 @@ use crate::{
     dirs::{self, Ensure},
     object,
     value::{
-        userinput::{BoolInput, UserInput},
         MAAValue,
+        userinput::{BoolInput, UserInput},
     },
 };
 
@@ -441,10 +441,12 @@ mod tests {
             let mut params = $params.clone();
             match (params.get_mut("filename"), $expected.get("filename")) {
                 (Some(filename), Some(expected_filename)) => {
-                    assert!(filename
-                        .as_str()
-                        .unwrap()
-                        .ends_with(expected_filename.as_str().unwrap()));
+                    assert!(
+                        filename
+                            .as_str()
+                            .unwrap()
+                            .ends_with(expected_filename.as_str().unwrap())
+                    );
 
                     *filename = expected_filename.clone();
                 }
@@ -514,10 +516,12 @@ mod tests {
                     let mut params = $params.clone();
                     match (params.get_mut("filename"), $expected.get("filename")) {
                         (Some(filename), Some(expected_filename)) => {
-                            assert!(filename
-                                .as_str()
-                                .unwrap()
-                                .ends_with(expected_filename.as_str().unwrap()));
+                            assert!(
+                                filename
+                                    .as_str()
+                                    .unwrap()
+                                    .ends_with(expected_filename.as_str().unwrap())
+                            );
 
                             *filename = expected_filename.clone();
                         }

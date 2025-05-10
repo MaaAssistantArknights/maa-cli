@@ -1,11 +1,11 @@
 use std::{
     borrow::Cow,
-    fs::{read_dir, DirEntry},
+    fs::{DirEntry, read_dir},
     path::{Path, PathBuf},
     sync::LazyLock,
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 use crate::{
     dirs::{cache, log, state},
@@ -166,7 +166,9 @@ where
     }
 
     if has_err {
-        bail!("Some errors occurred during cleanup, at least one file or directory failed to be deleted.");
+        bail!(
+            "Some errors occurred during cleanup, at least one file or directory failed to be deleted."
+        );
     }
 
     Ok(())

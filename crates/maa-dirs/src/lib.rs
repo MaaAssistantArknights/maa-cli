@@ -518,14 +518,16 @@ mod tests {
     fn env_var_os() {
         use std::env;
 
-        // A random environment variable name to avoid conflict
-        const VAR: &str = "DEAWPMONUBYASDCOPBH";
+        // Safety: the variable name is safe to avoid conflicts and only modified in this thread
+        unsafe {
+            const VAR: &str = "DEAWPMONUBYASDCOPBH";
 
-        env::set_var(VAR, "foo");
-        assert_eq!(EnvVarOs.var_os(VAR), Some(OsString::from("foo")));
+            env::set_var(VAR, "foo");
+            assert_eq!(EnvVarOs.var_os(VAR), Some(OsString::from("foo")));
 
-        env::remove_var(VAR);
-        assert_eq!(EnvVarOs.var_os(VAR), None);
+            env::remove_var(VAR);
+            assert_eq!(EnvVarOs.var_os(VAR), None);
+        }
     }
 
     mod get_dir {

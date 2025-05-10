@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 use crate::{
     object,
     value::{
-        userinput::{BoolInput, Input, SelectD, ValueWithDesc},
         MAAValue,
+        userinput::{BoolInput, Input, SelectD, ValueWithDesc},
     },
 };
 
@@ -158,9 +158,9 @@ pub fn init(name: Option<PathBuf>, filetype: Option<super::Filetype>, force: boo
                     }
                 } else {
                     bail!(
-                    "profile `{}` already exists or use another name to create a new profile or use --force to overwrite the existing profile.",
-                    name.display()
-                );
+                        "profile `{}` already exists or use another name to create a new profile or use --force to overwrite the existing profile.",
+                        name.display()
+                    );
                 }
             }
         }
