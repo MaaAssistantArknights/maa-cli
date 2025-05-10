@@ -28,7 +28,12 @@ pub struct FightParams {
     /// e.g. `-D30012=100 -D30011=100` to exit after get 100 Orirock or 100 Orirock Cube.
     drops: Vec<String>,
     #[clap(long)]
-    /// Repeat times of single proxy combat, 1 ~ 6, default to 1
+    /// Repeat times of single proxy combat (-1 ~ 6), default to 1
+    ///
+    /// - -1: disable switching series,
+    /// - 0: automatically switch to the maximum number of series currently available, if the
+    ///   current sanity is less than 6 times, select the minimum number of times available,
+    /// - 1 ~ 6: uee the specified number of times (default to 1).
     series: Option<i32>,
     #[clap(long)]
     /// Whether report drops to the Penguin Statistics
@@ -40,7 +45,7 @@ pub struct FightParams {
     /// Whether report drops to the yituliu
     report_to_yituliu: bool,
     #[clap(long)]
-    /// Whether to report drops to the yituliu
+    /// Yituliu ID to report drops, leave empty to report anonymously
     yituliu_id: Option<String>,
     #[clap(long)]
     /// Client type used to restart the game client if game crashed

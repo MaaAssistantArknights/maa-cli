@@ -246,16 +246,6 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
 
         match task {
             // Fight
-            "StartButton2" | "AnnihilationConfirm" => {
-                // Maybe need to update if MAA fight a stage multiple times in one run
-                let exec_times = details.get("exec_times")?.as_i64()?;
-                edit_current_task_detail(|detail| {
-                    if let Some(detail) = detail.as_fight_mut() {
-                        detail.set_times(exec_times);
-                    }
-                });
-                info!("{} {} {}", "MissionStart", exec_times, "times");
-            }
             "StoneConfirm" => {
                 let exec_times = details.get("exec_times")?.as_i64()?;
                 edit_current_task_detail(|detail| {
@@ -362,6 +352,18 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
     let details = message.get("details")?;
 
     match what {
+        "FightTimes" => {
+            let fight_times = details.get("times_finished")?.as_i64()?;
+            let series = details.get("series")?.as_i64()?;
+            let sanity_cost = details.get("sanity_cost")?.as_i64()?;
+            edit_current_task_detail(|detail| {
+                if let Some(detail) = detail.as_fight_mut() {
+                    detail.set_times(fight_times);
+                }
+            });
+            info!("Start Fight with {sanity_cost} sanity cost to fight {series} times");
+        }
+
         "StageDrops" => {
             let drops = details.get("drops")?.as_array()?;
             let mut all_drops = summary::Map::new();
