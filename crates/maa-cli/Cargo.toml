@@ -34,7 +34,7 @@ __installer = [
   "reqwest/stream",
 ]
 
-[[bin]] # Vendored openssl
+[[bin]]
 name = "maa"
 path = "src/main.rs"
 
