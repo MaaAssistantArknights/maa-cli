@@ -1,7 +1,8 @@
 [package]
 name = "maa-types"
-version = "0.1.0"
-edition = "2024"
+version = "0.2.0"
+authors.workspace = true
+edition.workspace = true
 license.workspace = true
 homepage.workspace = true
 repository.workspace = true

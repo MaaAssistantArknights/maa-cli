@@ -96,9 +96,9 @@ macro_rules! link {
         )+
     ) => (
         #[link(name = "MaaCore")]
-        extern "C" {
+        unsafe extern "C" {
             $(
-                pub fn $name($($pname: $pty), *) $(-> $ret)*;
+                pub unsafe fn $name($($pname: $pty), *) $(-> $ret)*;
             )+
         }
     )

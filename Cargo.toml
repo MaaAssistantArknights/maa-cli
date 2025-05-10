@@ -4,13 +4,16 @@ members = ["crates/*"]
 
 [workspace.package]
 license = "AGPL-3.0-only"
+authors = ["Long Wang <loong@loongw.cc>"]
 homepage = "https://github.com/MaaAssistantArknights/maa-cli"
 repository = "https://github.com/MaaAssistantArknights/maa-cli"
+rust-version = "1.84"
+edition = "2024"
 
 [workspace.dependencies]
-maa-dirs = { path = "crates/maa-dirs", version = "0.1.1" }
-maa-sys = { path = "crates/maa-sys", version = "0.6.0" }
-maa-types = { path = "crates/maa-types", version = "0.1" }
+maa-dirs = { path = "crates/maa-dirs", version = "0.2" }
+maa-sys = { path = "crates/maa-sys", version = "0.7" }
+maa-types = { path = "crates/maa-types", version = "0.2" }
 
 anyhow = "1"
 async-trait = "0.1.81"
