@@ -23,6 +23,8 @@
 
 <!-- markdownlint-enable MD033 MD041 -->
 
+由于本项目当前维护者不具备 Windows 环境，对 Windows 平台及相关功能的支持较为有限，**因此我们非常欢迎并迫切需要对 Windows 相关部分的贡献**。
+
 ## 功能
 
 - 运行预定义或自定义的任务，例如 `maa fight`，`maa run <task>`;
