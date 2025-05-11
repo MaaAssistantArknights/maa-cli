@@ -40,6 +40,10 @@
 
 [maa-home]: https://github.com/MaaAssistantArknights/MaaAssistantArknights/
 
+## 开发文档
+
+如果想参与开发，可以参考 [开发文档](DEVELOPMENT.md)。
+
 ## 许可证
 
 本项目使用 [AGPL-3.0-only](LICENSE) 许可证。相关第三方项目的许可证请参阅 [licenses](licenses.md)。
