@@ -15,7 +15,7 @@
 
 项目结构如下：
 
-```
+```text
 maa-cli/
 ├── .cargo/            # Cargo 配置
 ├── .github/           # GitHub 工作流和配置
