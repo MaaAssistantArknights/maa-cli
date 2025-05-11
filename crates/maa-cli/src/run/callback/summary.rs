@@ -1037,7 +1037,9 @@ mod tests {
         fn fight() {
             let mut detail = FightDetail::new();
             detail.set_stage("TS-9");
+            assert_eq!(detail.get_series(), None);
             detail.set_series(2, 36);
+            assert_eq!(detail.get_series(), Some((2, 36)));
             detail.use_medicine(1, true);
             detail.set_series(2, 36);
             detail.start();
