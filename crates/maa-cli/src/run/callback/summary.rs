@@ -466,12 +466,14 @@ impl std::fmt::Display for InfrastRoomInfo {
 pub struct FightDetail {
     // stage name to fight
     stage: Option<String>,
-    // times of fight
-    times: Option<i64>,
-    // used medicine
-    medicine: Option<(i64, i64)>,
+    // Total times
+    times: i64,
+    // series and sanity cost of last fight
+    series: (i64, i64),
+    // used medicine / expiring medicine
+    medicine: (i64, i64),
     // used stone
-    stone: Option<i64>,
+    stone: i64,
     // [(item, count), ...], each element is corresponding to a fight
     // the length of this vector may smaller than times,
     // because some fight may not drop anything or failed to recognize the drop
@@ -482,10 +484,23 @@ impl FightDetail {
     pub fn new() -> Self {
         Self {
             stage: None,
-            times: None,
-            medicine: None,
-            stone: None,
+            times: 0,
+            series: (0, 0),
+            medicine: (0, 0),
+            stone: 0,
             drops: Vec::new(),
+        }
+    }
+
+    pub fn get_stage(&self) -> Option<&str> {
+        self.stage.as_deref()
+    }
+
+    pub fn get_series(&self) -> Option<(i64, i64)> {
+        if self.series == (0, 0) {
+            None
+        } else {
+            Some(self.series)
         }
     }
 
@@ -496,21 +511,22 @@ impl FightDetail {
         self.stage = Some(stage.to_owned());
     }
 
-    pub fn set_times(&mut self, times: i64) {
-        self.times = Some(times);
+    pub fn set_series(&mut self, series: i64, sanity: i64) {
+        self.series = (series, sanity);
+        self.times += series;
     }
 
     pub fn use_medicine(&mut self, count: i64, is_expiring: bool) {
-        let (mut all, mut expiring) = self.medicine.unwrap_or((0, 0));
+        let (mut all, mut expiring) = self.series;
         all += count;
         if is_expiring {
             expiring += count
         }
-        self.medicine = Some((all, expiring))
+        self.medicine = (all, expiring);
     }
 
     pub fn set_stone(&mut self, stone: i64) {
-        self.stone = Some(stone);
+        self.stone = stone;
     }
 
     pub fn push_drop(&mut self, drop: Map<String, i64>) {
@@ -526,14 +542,18 @@ impl std::fmt::Display for FightDetail {
             return Ok(());
         }
 
-        if let Some(times) = self.times {
-            write!(f, " {times} times")?;
+        if self.times != 0 {
+            write!(f, " {} times", self.times)?;
         }
-        if let Some((all, expiring)) = self.medicine {
-            write!(f, ", used {all} medicine ({expiring} expiring)")?;
+        let (all, expiring) = self.medicine;
+        if all != 0 {
+            write!(f, ", used {all} medicine")?;
         }
-        if let Some(stone) = self.stone {
-            write!(f, ", used {stone} stone")?;
+        if expiring != 0 {
+            write!(f, " ({expiring} expiring)")?;
+        }
+        if self.stone != 0 {
+            write!(f, ", used {} stone", self.stone)?;
         }
         if !self.drops.is_empty() {
             writeln!(f, ", drops:")?;
@@ -1018,16 +1038,16 @@ mod tests {
         fn fight() {
             let mut detail = FightDetail::new();
             detail.set_stage("TS-9");
-            detail.set_times(2);
             detail.use_medicine(1, true);
-            detail.use_medicine(1, false);
-            detail.set_stone(1);
+            detail.set_series(2, 36);
             detail.push_drop(
                 [("A", 1), ("B", 2)]
                     .into_iter()
                     .map(|(k, v)| (k.to_owned(), v))
                     .collect(),
             );
+            detail.set_stone(1);
+            detail.set_series(2, 36);
             detail.push_drop(
                 [("A", 1), ("C", 3)]
                     .into_iter()
@@ -1036,7 +1056,7 @@ mod tests {
             );
             assert_eq!(
                 detail.to_string(),
-                "Fight TS-9 2 times, used 2 medicine (1 expiring), used 1 stone, drops:\n\
+                "Fight TS-9 4 times, used 1 medicine (1 expiring), used 1 stone, drops:\n\
                  1. A × 1, B × 2\n\
                  2. A × 1, C × 3\n\
                  total drops: A × 2, B × 2, C × 3\n",
@@ -1044,7 +1064,7 @@ mod tests {
 
             let mut detail = FightDetail::new();
             detail.set_stage("TS-9");
-            detail.set_times(1);
+            detail.set_series(1, 18);
             assert_eq!(detail.to_string(), "Fight TS-9 1 times\n");
 
             let detail = FightDetail::new();
