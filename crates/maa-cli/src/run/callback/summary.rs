@@ -492,16 +492,16 @@ impl FightDetail {
         }
     }
 
-    pub fn get_stage(&self) -> Option<&str> {
-        self.stage.as_deref()
-    }
-
     pub fn get_series(&self) -> Option<(i64, i64)> {
         if self.series == (0, 0) {
             None
         } else {
             Some(self.series)
         }
+    }
+
+    pub fn start(&mut self) {
+        self.times += self.series.0;
     }
 
     pub fn set_stage(&mut self, stage: &str) {
@@ -513,11 +513,10 @@ impl FightDetail {
 
     pub fn set_series(&mut self, series: i64, sanity: i64) {
         self.series = (series, sanity);
-        self.times += series;
     }
 
     pub fn use_medicine(&mut self, count: i64, is_expiring: bool) {
-        let (mut all, mut expiring) = self.series;
+        let (mut all, mut expiring) = self.medicine;
         all += count;
         if is_expiring {
             expiring += count
@@ -1038,16 +1037,20 @@ mod tests {
         fn fight() {
             let mut detail = FightDetail::new();
             detail.set_stage("TS-9");
+            detail.set_series(2, 36);
             detail.use_medicine(1, true);
             detail.set_series(2, 36);
+            detail.start();
             detail.push_drop(
                 [("A", 1), ("B", 2)]
                     .into_iter()
                     .map(|(k, v)| (k.to_owned(), v))
                     .collect(),
             );
+            detail.set_series(2, 36);
             detail.set_stone(1);
             detail.set_series(2, 36);
+            detail.start();
             detail.push_drop(
                 [("A", 1), ("C", 3)]
                     .into_iter()
@@ -1065,6 +1068,7 @@ mod tests {
             let mut detail = FightDetail::new();
             detail.set_stage("TS-9");
             detail.set_series(1, 18);
+            detail.start();
             assert_eq!(detail.to_string(), "Fight TS-9 1 times\n");
 
             let detail = FightDetail::new();

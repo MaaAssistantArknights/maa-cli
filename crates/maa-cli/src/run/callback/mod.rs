@@ -248,15 +248,13 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
             "StartButton2" | "AnnihilationConfirm" => {
                 edit_current_task_detail(|detail| {
                     if let Some(detail) = detail.as_fight_mut() {
-                        let stage = detail.get_stage().unwrap_or("Unknown");
                         if let Some((series, sanity)) = detail.get_series() {
-                            info!("Start to fight {stage} {series} times (use {sanity} sanity)");
-                        } else {
-                            info!("Start to fight {stage}");
+                            info!("Mission started ({series} times, use {sanity} sanity)");
+                            detail.start();
+                            return;
                         }
-                    } else {
-                        info!("Start to fight");
                     }
+                    info!("Mission started");
                 });
             }
             // Fight
