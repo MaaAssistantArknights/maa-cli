@@ -1,5 +1,36 @@
 # Release Notes
 
+## Release 0.5.5
+
+### Features
+
+- Add `load` related methods for Assistant safe API by [@wangl-cc](https://github.com/wangl-cc) in [#383](https://github.com/MaaAssistantArknights/maa-cli/pull/383)
+- 为Waydroid实现ExternalApp by [@Jackhr-arch](https://github.com/Jackhr-arch) in [#388](https://github.com/MaaAssistantArknights/maa-cli/pull/388)
+- Switch reqwest to use native-tls by [@wangl-cc](https://github.com/wangl-cc) in [#396](https://github.com/MaaAssistantArknights/maa-cli/pull/396)
+- Adapt recent update of fight series by [@wangl-cc](https://github.com/wangl-cc) in [#392](https://github.com/MaaAssistantArknights/maa-cli/pull/392)
+
+### Documentation
+
+- 在 install.md 中添加 windows 依赖库安装指引 by [@LushMoon](https://github.com/LushMoon) in [#387](https://github.com/MaaAssistantArknights/maa-cli/pull/387)
+- Note about limited Windows support by [@wangl-cc](https://github.com/wangl-cc)
+- Add development docs by [@wangl-cc](https://github.com/wangl-cc) in [#400](https://github.com/MaaAssistantArknights/maa-cli/pull/400)
+
+### Testing
+
+- Switch to cargo-llvm-cov for coverage by [@wangl-cc](https://github.com/wangl-cc) in [#393](https://github.com/MaaAssistantArknights/maa-cli/pull/393)
+
+### Security
+
+- Bump ring from 0.17.8 to 0.17.13 by [@dependabot](https://github.com/dependabot) in [#382](https://github.com/MaaAssistantArknights/maa-cli/pull/382)
+- Bump tokio from 1.43.0 to 1.44.2 by [@dependabot](https://github.com/dependabot) in [#390](https://github.com/MaaAssistantArknights/maa-cli/pull/390)
+
+### Miscellaneous
+
+- Update dependencies and migrate to Rust 2024 edition by [@wangl-cc](https://github.com/wangl-cc) in [#395](https://github.com/MaaAssistantArknights/maa-cli/pull/395)
+- Update vendored-openssl feature to include reqwest by [@wangl-cc](https://github.com/wangl-cc)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.5.4...v0.5.5>
+
 ## Release 0.5.4
 
 ### Features
