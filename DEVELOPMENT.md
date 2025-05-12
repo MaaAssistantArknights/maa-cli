@@ -4,42 +4,37 @@
 
 本项目采用 AGPL-3.0-only 许可证。您的所有贡献都将被纳入本项目，并遵循相同的许可证。
 
-## 项目结构
+## 贡献指南
 
-本项目采用工作空间（Workspace）结构组织代码。目前包含以下子项目：
+### 贡献流程
 
-- **maa-cli**：主应用程序，提供命令行接口和具体功能实现
-- **maa-dirs**：处理 MAA 相关目录管理
-- **maa-sys**：提供与 MaaCore 底层库的绑定和安全封装
-- **maa-types**：定义核心数据类型
+1. **Fork 本仓库**：在 GitHub 上 fork 本项目到你的个人账户。
 
-项目结构如下：
+2. **创建分支**：从主分支（`main` 或 `master`）拉取最新代码，并基于此创建分支（如 `feature/xxx`、`fix/xxx`）。
 
-```text
-maa-cli/
-├── .cargo/            # Cargo 配置
-├── .github/           # GitHub 工作流和配置
-├── crates/            # 项目的各个 crate 组件
-│   ├── maa-cli/       # 主命令行应用
-│   │   ├── completions/      # 命令补全脚本，后续可能删除，由 clap 自动生成
-│   │   ├── config_examples/  # 配置文件示例，同时用于测试
-│   │   ├── docs/             # 多语言文档
-│   │   ├── schemas/          # JSON Schema 文件，后续可能删除，由 schemars 自动生成
-│   │   └── src/              # 源代码
-│   ├── maa-dirs/      # 目录管理 crate
-│   ├── maa-sys/       # 系统接口 crate，提供底层绑定
-│   └── maa-types/     # 类型定义 crate
-├── Cargo.toml         # 工作空间配置
-├── Cargo.lock         # 依赖锁定文件
-└── ...                # 其他配置文件
-```
+3. **开发与提交**：按照[代码规范](#代码规范)进行开发，确保代码格式、质量和测试覆盖率达标。建议每次提交前运行 `cargo +nightly fmt` 和 `cargo clippy`。
+
+4. **推送分支并发起 PR**：将你的分支推送到 fork 仓库，并发起 Pull Request（PR）。PR 标题和描述需遵循 [Conventional Commits](https://www.conventionalcommits.org/zh-hans/) 规范，简明扼要说明变更内容和动机，并在 PR 中关联相关 Issue。
+
+5. **代码评审与修改**：项目维护者会尽快进行代码评审，并提出修改建议。
+
+6. **合并与发布**：通过评审后，PR 会以 squash 方式合并，你的贡献将被记录在 Change Log 中。
+
+### 注意事项
+
+- 避免直接向主分支提交代码，始终通过 PR 进行贡献。
+- 提交 PR 前，确保自己的分支已经与主分支同步，避免合并冲突。
+- 对于较大或影响范围广的变更，建议先在 Issue 中充分讨论方案。
+- 如对现有代码有任何疑问，可以在 Issue 中提出，以获得帮助和反馈。
+- 欢迎任何形式的贡献，包括文档、测试、CI 配置等。
 
 ## 开发环境
 
-- **Rust 工具链**：需要 1.84 版本或更高。推荐使用 [rustup](https://rustup.rs/) 安装。
-- **C 编译器**：如需在 Linux 上从源码编译 OpenSSL，或启用 `git2` 功能（默认启用）时需要。建议关闭 `git2` 功能以避免依赖 C 编译器和额外的 OpenSSL 库。待 gix 完全替代 git2 后，将移除该依赖。
+### 环境要求
 
-## 构建与测试
+- **Rust 工具链**：需要 1.84 版本或更高。推荐使用 [rustup](https://rustup.rs/) 安装。
+  - 安装 nightly 版本的 `rustfmt`：`rustup component add rustfmt --toolchain nightly`
+- **C 编译器**：如需在 Linux 上从源码编译 OpenSSL，或启用 `git2` 功能（默认启用）时需要。建议关闭 `git2` 功能以避免依赖 C 编译器和额外的 OpenSSL 库。待 gix 完全替代 git2 后，将移除该依赖。
 
 ### 构建项目
 
@@ -54,7 +49,7 @@ cargo build --release
 cargo build -p maa-cli
 ```
 
-注意：不要使用 `--all-features`，否则会强制从源码编译 OpenSSL，严重拖慢构建速度。
+注意：不要使用 `--all-features`，否则 `cargo` 会强制从源码编译 OpenSSL，严重拖慢构建速度。
 
 ### 运行测试
 
@@ -71,12 +66,12 @@ cargo test <测试名称>
 
 ## 代码规范
 
-- **格式化**：使用 nightly 版 `rustfmt` 格式化代码。提交前请运行 `cargo +nightly fmt` 保证格式一致。可通过 `rustup component add rustfmt --toolchain nightly` 安装。
+- **格式化**：使用 nightly 版 `rustfmt` 格式化代码。提交前请运行 `cargo +nightly fmt` 保证格式一致。
 - **质量检查**：使用 `cargo clippy` 检查代码质量。任何警告都会导致 CI 失败。不可避免的警告请用 `#[allow]` 或 `#[expect]` 注明原因。
 - **Unsafe**：尽量避免 `unsafe`。如必须使用，请添加注释解释原因。
 - **错误处理**：
   - `maa-cli` 使用 `anyhow`。
-  - `maa-sys` 使用 `thiserror`。
+  - 其他组件使用 `thiserror` 或者自行编写错误类型来处理错误。
   - 避免 `unwrap` 和 `expect`，如必须使用请注释说明原因。
 - **测试规范**：
   - 新代码应尽量编写测试，修复旧代码时请添加相关 bug 测试。
@@ -91,9 +86,3 @@ cargo test <测试名称>
 - 文档以简体中文为主，英文为辅，其他语言（繁体、韩文、日文）尽量翻译，无法翻译时可用简体中文占位。
 - 所有文档为 Markdown 格式，使用 [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2) 检查。
 - 段落内不换行，每段仅一行，段落间空行分隔。非段落换行请用 `<br>`，不要用尾随空格。
-
-## 提交规范
-
-- 一般通过 PR 合并代码，避免直接向主分支提交。
-- PR 默认使用 squash 合并，PR 内 commit message 不做限制。
-- PR 标题和描述需遵循 [Conventional Commits](https://www.conventionalcommits.org/zh-hans/) 标准。
