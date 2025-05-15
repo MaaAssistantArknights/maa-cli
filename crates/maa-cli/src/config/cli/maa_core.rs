@@ -86,7 +86,7 @@ fn default_test_time() -> u64 {
 }
 
 fn default_api_url() -> String {
-    String::from("https://ota.maa.plus/MaaAssistantArknights/api/version/")
+    String::from("https://api.maa.plus/MaaAssistantArknights/api/version/")
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -286,15 +286,15 @@ pub mod tests {
         fn api_url() {
             assert_eq!(
                 default_config().set_channel(Channel::Stable).api_url(),
-                "https://ota.maa.plus/MaaAssistantArknights/api/version/stable.json"
+                "https://api.maa.plus/MaaAssistantArknights/api/version/stable.json"
             );
             assert_eq!(
                 default_config().set_channel(Channel::Beta).api_url(),
-                "https://ota.maa.plus/MaaAssistantArknights/api/version/beta.json"
+                "https://api.maa.plus/MaaAssistantArknights/api/version/beta.json"
             );
             assert_eq!(
                 default_config().set_channel(Channel::Alpha).api_url(),
-                "https://ota.maa.plus/MaaAssistantArknights/api/version/alpha.json"
+                "https://api.maa.plus/MaaAssistantArknights/api/version/alpha.json"
             );
             assert_eq!(
                 default_config()
