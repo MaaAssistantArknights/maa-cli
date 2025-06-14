@@ -61,6 +61,7 @@ link! {
     pub fn AsstStop(handle: AsstHandle) -> AsstBool;
     pub fn AsstRunning(handle: AsstHandle) -> AsstBool;
     pub fn AsstConnected(handle: AsstHandle) -> AsstBool;
+    pub fn AsstBackToHome(handle: AsstHandle) -> AsstBool;
 
     pub fn AsstAsyncConnect(
         handle: AsstHandle,
@@ -69,6 +70,11 @@ link! {
         config: *const ::std::os::raw::c_char,
         block: AsstBool,
     ) -> AsstAsyncCallId;
+    pub fn AsstSetConnectionExtras(
+        name: *const ::std::os::raw::c_char,
+        extras: *const ::std::os::raw::c_char
+    );
+
     pub fn AsstAsyncClick(handle: AsstHandle, x: i32, y: i32, block: AsstBool) -> AsstAsyncCallId;
     pub fn AsstAsyncScreencap(handle: AsstHandle, block: AsstBool) -> AsstAsyncCallId;
 

@@ -252,6 +252,11 @@ impl Assistant {
         unsafe { binding::AsstConnected(self.handle) != 0 }
     }
 
+    /// Back to home page.
+    pub fn back_to_home(&self) -> Result<()> {
+        unsafe { binding::AsstBackToHome(self.handle) }.to_result()
+    }
+
     /// Connect to device with the given adb path, address and config asynchronously
     pub fn async_connect(
         &self,
@@ -270,6 +275,21 @@ impl Assistant {
             )
         }
         .to_result()
+    }
+
+    /// Set extra adb connection config, like MUMU12 and LD
+    pub fn set_connection_extras(
+        &self,
+        name: impl ToCString,
+        extras: impl ToCString,
+    ) -> Result<()> {
+        unsafe {
+            binding::AsstSetConnectionExtras(
+                name.to_cstring()?.as_ptr(),
+                extras.to_cstring()?.as_ptr(),
+            )
+        }
+        Ok(())
     }
 
     /// Click the screen at the given position
