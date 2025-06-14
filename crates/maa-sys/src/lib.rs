@@ -184,6 +184,17 @@ impl Assistant {
         unsafe { binding::AsstLog(level.to_cstring()?.as_ptr(), msg.to_cstring()?.as_ptr()) };
         Ok(())
     }
+
+    /// Set extra adb connection config, like MUMU12 and LD
+    pub fn set_connection_extras(name: impl ToCString, extras: impl ToCString) -> Result<()> {
+        unsafe {
+            binding::AsstSetConnectionExtras(
+                name.to_cstring()?.as_ptr(),
+                extras.to_cstring()?.as_ptr(),
+            )
+        }
+        Ok(())
+    }
 }
 
 // Instance Methods
@@ -275,21 +286,6 @@ impl Assistant {
             )
         }
         .to_result()
-    }
-
-    /// Set extra adb connection config, like MUMU12 and LD
-    pub fn set_connection_extras(
-        &self,
-        name: impl ToCString,
-        extras: impl ToCString,
-    ) -> Result<()> {
-        unsafe {
-            binding::AsstSetConnectionExtras(
-                name.to_cstring()?.as_ptr(),
-                extras.to_cstring()?.as_ptr(),
-            )
-        }
-        Ok(())
     }
 
     /// Click the screen at the given position
