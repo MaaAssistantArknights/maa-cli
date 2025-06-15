@@ -31,8 +31,7 @@ pub trait UserInput: Sized {
     fn value(self) -> io::Result<Self::Value> {
         if is_batch_mode() {
             self.batch_default().map_err(|_| {
-                io::Error::new(
-                    io::ErrorKind::Other,
+                io::Error::other(
                     "can not get default value in batch mode",
                 )
             })

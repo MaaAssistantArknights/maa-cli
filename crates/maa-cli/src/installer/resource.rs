@@ -18,8 +18,7 @@ impl StatusExt for std::io::Result<std::process::ExitStatus> {
     fn check(self) -> std::io::Result<()> {
         self.and_then(|status| {
             if !status.success() {
-                Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
+                Err(std::io::Error::other(
                     "Command failed",
                 ))
             } else {
