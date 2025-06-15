@@ -184,6 +184,17 @@ impl Assistant {
         unsafe { binding::AsstLog(level.to_cstring()?.as_ptr(), msg.to_cstring()?.as_ptr()) };
         Ok(())
     }
+
+    /// Set extra adb connection config, like MUMU12 and LD
+    pub fn set_connection_extras(name: impl ToCString, extras: impl ToCString) -> Result<()> {
+        unsafe {
+            binding::AsstSetConnectionExtras(
+                name.to_cstring()?.as_ptr(),
+                extras.to_cstring()?.as_ptr(),
+            )
+        }
+        Ok(())
+    }
 }
 
 // Instance Methods
@@ -250,6 +261,11 @@ impl Assistant {
     /// Check if the assistant is connected.
     pub fn connected(&self) -> bool {
         unsafe { binding::AsstConnected(self.handle) != 0 }
+    }
+
+    /// Back to home page.
+    pub fn back_to_home(&self) -> Result<()> {
+        unsafe { binding::AsstBackToHome(self.handle) }.to_result()
     }
 
     /// Connect to device with the given adb path, address and config asynchronously
