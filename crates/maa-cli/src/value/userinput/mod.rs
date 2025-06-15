@@ -30,12 +30,8 @@ pub trait UserInput: Sized {
     /// - If not in batch mode and `ask` returns an io::Error, return the error.
     fn value(self) -> io::Result<Self::Value> {
         if is_batch_mode() {
-            self.batch_default().map_err(|_| {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    "can not get default value in batch mode",
-                )
-            })
+            self.batch_default()
+                .map_err(|_| io::Error::other("can not get default value in batch mode"))
         } else {
             self.ask(&mut std::io::stdout(), &mut std::io::stdin().lock())
         }
