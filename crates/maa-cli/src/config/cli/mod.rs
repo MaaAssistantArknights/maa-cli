@@ -79,7 +79,7 @@ fn normalize_url(url: &str) -> String {
     if url.ends_with('/') {
         url.to_owned()
     } else {
-        format!("{}/", url)
+        format!("{url}/")
     }
 }
 

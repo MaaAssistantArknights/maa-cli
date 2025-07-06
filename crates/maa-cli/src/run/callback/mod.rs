@@ -265,7 +265,7 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
                         detail.set_stone(exec_times)
                     }
                 });
-                info!("Use {} stones", exec_times);
+                info!("Use {exec_times} stones");
             }
             "AbandonAction" => warn!("{}", "PRTS error"),
             // Recruit
@@ -295,7 +295,7 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
                         detail.start_exploration()
                     }
                 });
-                info!("Start exploration {} times", exec_times)
+                info!("Start exploration {exec_times} times")
             }
             "ExitThenAbandon" => {
                 edit_current_task_detail(|detail| {
@@ -388,7 +388,7 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
                 "Drops",
                 all_drops
                     .iter()
-                    .map(|(item, count)| format!("{} × {}", item, count))
+                    .map(|(item, count)| format!("{item} × {count}"))
                     .join(", ")
                     .unwrap_or_else(|| "none".to_owned())
             );
@@ -423,9 +423,9 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
             });
 
             if is_expiring {
-                info!("Use {} expiring medicine", count);
+                info!("Use {count} expiring medicine");
             } else {
-                info!("Use {} medicine", count);
+                info!("Use {count} medicine");
             }
         }
 
@@ -527,7 +527,7 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
         }),
         "RecruitTagsRefreshed" => info!("{}: {}", "RecruitTagsRefreshed", {
             let count = details.get("count")?.as_i64()?;
-            format!("{} times", count)
+            format!("{count} times")
         }),
         // RogueLike
         "StageInfo" => info!("{} {}", "StartCombat", details.get("name")?.as_str()?),
@@ -552,7 +552,7 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
                     detail.set_exp(exp)
                 }
             });
-            info!("Gain {} exp during this exploration", exp);
+            info!("Gain {exp} exp during this exploration");
         }
 
         // Copilot
@@ -605,10 +605,10 @@ trait IterJoin: Iterator {
             // estimate lower bound of capacity needed
             let (lower, _) = self.size_hint();
             let mut result = String::with_capacity(sep.len() * lower);
-            write!(&mut result, "{}", first_item).unwrap();
+            write!(&mut result, "{first_item}").unwrap();
             self.for_each(|elt| {
                 result.push_str(sep);
-                write!(&mut result, "{}", elt).unwrap();
+                write!(&mut result, "{elt}").unwrap();
             });
             result
         })

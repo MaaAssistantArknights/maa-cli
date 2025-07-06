@@ -158,7 +158,7 @@ where
     for path in target_paths {
         print!("Deleting {}", path.display());
         if let Err(e) = del_item(&path) {
-            println!(", \x1B[31mfailed\x1B[0m: {}", e);
+            println!(", \x1B[31mfailed\x1B[0m: {e}");
             has_err = true;
         } else {
             println!(", \x1B[32msuccess\x1B[0m.");

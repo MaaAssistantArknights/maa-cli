@@ -25,11 +25,11 @@ impl std::fmt::Display for Error {
         match self {
             Error::UnsupportedFiletype => write!(f, "Unsupported or unknown filetype"),
             Error::FormatNotGiven => write!(f, "Format not given"),
-            Error::Io(e) => write!(f, "IO error, {}", e),
-            Error::Json(e) => write!(f, "JSON parse error, {}", e),
-            Error::TomlSer(e) => write!(f, "TOML serialize error, {}", e),
-            Error::TomlDe(e) => write!(f, "TOML deserialize error, {}", e),
-            Error::Yaml(e) => write!(f, "YAML parse error, {}", e),
+            Error::Io(e) => write!(f, "IO error, {e}"),
+            Error::Json(e) => write!(f, "JSON parse error, {e}"),
+            Error::TomlSer(e) => write!(f, "TOML serialize error, {e}"),
+            Error::TomlDe(e) => write!(f, "TOML deserialize error, {e}"),
+            Error::Yaml(e) => write!(f, "YAML parse error, {e}"),
         }
     }
 }
@@ -72,7 +72,7 @@ fn file_not_found(path: impl AsRef<Path>) -> Error {
         path.as_ref()
             .to_str()
             .map_or("File not found".to_owned(), |s| {
-                format!("File not found: {}", s)
+                format!("File not found: {s}")
             }),
     )
     .into()
@@ -337,7 +337,7 @@ fn type_to_dir(config_type: &str) -> (bool, std::path::PathBuf) {
             (false, dirs::config().join(config_type))
         }
         _ => {
-            log::warn!("Unknown configuration type: {}", config_type);
+            log::warn!("Unknown configuration type: {config_type}");
             (false, dirs::config().join(config_type))
         }
     }

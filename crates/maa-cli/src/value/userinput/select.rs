@@ -168,7 +168,7 @@ where
         }
         write!(writer, "Please select")?;
         if let Some(description) = &self.description {
-            write!(writer, " {}", description)?;
+            write!(writer, " {description}")?;
         } else {
             write!(writer, " one of the alternatives")?;
         }
@@ -185,7 +185,7 @@ where
     fn prompt_no_default(&self, writer: &mut impl Write) -> io::Result<()> {
         write!(writer, "Default not set, please select")?;
         if let Some(description) = &self.description {
-            write!(writer, " {}", description)?;
+            write!(writer, " {description}")?;
         } else {
             write!(writer, " one of the alternatives")?;
         }

@@ -151,7 +151,7 @@ impl<'de> Deserialize<'de> for Preset {
                     "ADB" | "Adb" | "adb" => Ok(Preset::Adb),
                     "Waydroid" | "waydroid" => Ok(Preset::Waydroid),
                     _ => {
-                        warn!("Unknown connection preset: {}, ignoring", value);
+                        warn!("Unknown connection preset: {value}, ignoring");
                         Ok(Preset::Adb)
                     }
                 }
@@ -206,7 +206,7 @@ fn parse_adb_devices(output: impl AsRef<str>) -> Option<String> {
         if line.ends_with("device") {
             let mut parts = line.split_whitespace();
             if let Some(address) = parts.next() {
-                info!("Detected online device: {}", address);
+                info!("Detected online device: {address}");
                 return Some(address.to_owned());
             }
         }
@@ -432,9 +432,9 @@ impl StaticOptions {
                 if cpu_ocr.is_some_and(|cpu_ocr| cpu_ocr) {
                     warn!("Both CPU OCR and GPU OCR are enabled, CPU OCR will be ignored");
                 }
-                debug!("Using GPU OCR with GPU ID {}", gpu_id);
+                debug!("Using GPU OCR with GPU ID {gpu_id}");
                 Assistant::set_static_option(StaticOptionKey::GpuOCR, gpu_id)
-                    .with_context(|| format!("Failed to enable GPU OCR with GPU ID {}", gpu_id))?;
+                    .with_context(|| format!("Failed to enable GPU OCR with GPU ID {gpu_id}"))?;
             }
             (Some(cpu_ocr), None) if cpu_ocr => {
                 debug!("Using CPU OCR");
@@ -477,12 +477,12 @@ impl InstanceOptions {
 
     pub fn apply_to(&self, asst: &Assistant) -> Result<()> {
         if let Some(touch_mode) = self.touch_mode {
-            debug!("Setting touch mode to {}", touch_mode);
+            debug!("Setting touch mode to {touch_mode}");
             asst.set_instance_option(InstanceOptionKey::TouchMode, touch_mode)
-                .with_context(|| format!("Failed to set touch mode to {}", touch_mode))?;
+                .with_context(|| format!("Failed to set touch mode to {touch_mode}"))?;
         }
         if let Some(deployment_with_pause) = self.deployment_with_pause {
-            debug!("Setting deployment with pause to {}", deployment_with_pause);
+            debug!("Setting deployment with pause to {deployment_with_pause}");
             asst.set_instance_option(
                 InstanceOptionKey::DeploymentWithPause,
                 deployment_with_pause,
@@ -490,12 +490,12 @@ impl InstanceOptions {
             .context("Failed to set deployment with pause")?;
         }
         if let Some(adb_lite_enabled) = self.adb_lite_enabled {
-            debug!("Setting adb lite enabled to {}", adb_lite_enabled);
+            debug!("Setting adb lite enabled to {adb_lite_enabled}");
             asst.set_instance_option(InstanceOptionKey::AdbLiteEnabled, adb_lite_enabled)
                 .context("Failed to set adb lite enabled")?;
         }
         if let Some(kill_adb_on_exit) = self.kill_adb_on_exit {
-            debug!("Setting kill adb on exit to {}", kill_adb_on_exit);
+            debug!("Setting kill adb on exit to {kill_adb_on_exit}");
             asst.set_instance_option(InstanceOptionKey::KillAdbOnExit, kill_adb_on_exit)
                 .context("Failed to set kill adb on exit")?;
         }

@@ -73,7 +73,7 @@ pub fn update(is_auto: bool) -> Result<()> {
 
     if config.warn_on_update_failure() {
         if let Err(err) = result {
-            warn!("Failed to update resource repository: {}", err);
+            warn!("Failed to update resource repository: {err}");
         }
     } else {
         result?
@@ -260,7 +260,7 @@ mod git2 {
         if analysis.is_fast_forward() {
             debug!("Fast-forwarding");
 
-            let refname = format!("refs/heads/{}", branch);
+            let refname = format!("refs/heads/{branch}");
             let mut reference = repo
                 .find_reference(&refname)
                 .context("Failed to find reference")?;

@@ -175,7 +175,7 @@ mod tests {
         let version_json: VersionJSON<Details> = serde_json::from_str(json).unwrap();
         let asset = version_json.details().asset().unwrap();
 
-        assert_eq!(asset.name(), format!("maa_cli-0.1.0-{}.zip", PLATFORM));
+        assert_eq!(asset.name(), format!("maa_cli-0.1.0-{PLATFORM}.zip"));
         assert_eq!(asset.size(), 123456);
         assert_eq!(
             asset.checksum(),
