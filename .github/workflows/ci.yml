@@ -159,13 +159,12 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Toolchains
         uses: ./.github/actions/setup
+      - name: Install MaaCore
+        uses: ./.github/actions/install-core
       - name: Build
         run: cargo build --package maa-sys --locked
       - name: Lint (clippy)
         run: cargo clippy --package maa-sys -- -D warnings
-      - name: Install MaaCore
-        if: ${{ !startsWith(matrix.os, 'windows') }}
-        uses: ./.github/actions/install-core
       - name: Test
         # It seems rust needs a static library to check the linking.
         # Without this, we can not link maa-sys to MaaCore on Windows.
