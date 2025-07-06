@@ -104,7 +104,7 @@ impl Assistant {
 #[cfg(not(feature = "runtime"))]
 impl Assistant {
     /// Do nothing, as MaaCore is linked dynamically at compile time
-    pub fn load() -> Result<()> {
+    pub fn load(_: impl AsRef<std::path::Path>) -> Result<()> {
         Ok(())
     }
 
@@ -461,6 +461,10 @@ mod tests {
     fn load_core() {
         // For compiletime linked, so it's always loaded
         assert!(Assistant::loaded());
+        assert!(Assistant::load(std::path::Path::new("")).is_ok());
+        assert!(Assistant::loaded());
+        assert!(Assistant::unload().is_ok());
+        assert!(Assistant::loaded());
     }
 
     #[test]
@@ -486,6 +490,6 @@ mod tests {
             INVALID_ID.to_result(),
             Err(super::Error::MAAError)
         ));
-        assert!(matches!(1u64.to_result(), Ok(1u64)));
+        assert_eq!(1i32.to_result().unwrap(), 1i32);
     }
 }

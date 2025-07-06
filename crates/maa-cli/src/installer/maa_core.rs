@@ -196,21 +196,25 @@ fn get_version_json(config: &Config) -> Result<VersionJSON<Details>> {
     Ok(version_json)
 }
 
+pub(crate) fn name(version: &Version) -> Result<String> {
+    asset_name(version, OS, ARCH)
+}
+
 /// Get the name of the asset for the current platform
-pub fn name(version: &Version) -> Result<String> {
-    match OS {
+fn asset_name(version: &Version, os: &str, arch: &str) -> Result<String> {
+    match os {
         "macos" => Ok(format!("MAA-v{version}-macos-runtime-universal.zip")),
-        "linux" => match ARCH {
+        "linux" => match arch {
             "x86_64" => Ok(format!("MAA-v{version}-linux-x86_64.tar.gz")),
             "aarch64" => Ok(format!("MAA-v{version}-linux-aarch64.tar.gz")),
-            _ => Err(anyhow!("Unsupported architecture: {}", ARCH)),
+            _ => Err(anyhow!("Unsupported architecture: {arch}")),
         },
-        "windows" => match ARCH {
+        "windows" => match arch {
             "x86_64" => Ok(format!("MAA-v{version}-win-x64.zip")),
             "aarch64" => Ok(format!("MAA-v{version}-win-arm64.zip")),
-            _ => Err(anyhow!("Unsupported architecture: {}", ARCH)),
+            _ => Err(anyhow!("Unsupported architecture: {arch}")),
         },
-        _ => Err(anyhow!("Unsupported platform: {}", OS)),
+        _ => Err(anyhow!("Unsupported platform: {os}")),
     }
 }
 
@@ -289,6 +293,53 @@ mod tests {
     use serde_json;
 
     use super::*;
+
+    #[test]
+    fn test_asset_name() {
+        let version = Version::parse("4.26.1").unwrap();
+        assert_eq!(
+            asset_name(&version, "macos", "aarch64").unwrap(),
+            format!("MAA-v{version}-macos-runtime-universal.zip")
+        );
+        assert_eq!(
+            asset_name(&version, "macos", "x86_64").unwrap(),
+            format!("MAA-v{version}-macos-runtime-universal.zip")
+        );
+        assert_eq!(
+            asset_name(&version, "linux", "aarch64").unwrap(),
+            format!("MAA-v{version}-linux-aarch64.tar.gz")
+        );
+        assert_eq!(
+            asset_name(&version, "linux", "x86_64").unwrap(),
+            format!("MAA-v{version}-linux-x86_64.tar.gz")
+        );
+        assert_eq!(
+            asset_name(&version, "linux", "x86")
+                .unwrap_err()
+                .to_string(),
+            "Unsupported architecture: x86"
+        );
+        assert_eq!(
+            asset_name(&version, "windows", "aarch64").unwrap(),
+            format!("MAA-v{version}-win-arm64.zip")
+        );
+        assert_eq!(
+            asset_name(&version, "windows", "x86_64").unwrap(),
+            format!("MAA-v{version}-win-x64.zip")
+        );
+        assert_eq!(
+            asset_name(&version, "windows", "x86")
+                .unwrap_err()
+                .to_string(),
+            "Unsupported architecture: x86"
+        );
+        assert_eq!(
+            asset_name(&version, "freebsd", "x86_64")
+                .unwrap_err()
+                .to_string(),
+            "Unsupported platform: freebsd"
+        );
+    }
 
     #[test]
     fn deserialize_version_json() {

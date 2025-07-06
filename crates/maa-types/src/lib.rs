@@ -382,7 +382,7 @@ mod tests {
 
         #[cfg(feature = "serde")]
         mod serde {
-            use serde_test::{Token, assert_de_tokens, assert_de_tokens_error};
+            use serde_test::{Token, assert_de_tokens, assert_de_tokens_error, assert_ser_tokens};
 
             use super::*;
 
@@ -423,6 +423,14 @@ mod tests {
                     &[Token::U64(4)],
                     "invalid value: integer `4`, expected a valid touch mode",
                 );
+            }
+
+            #[test]
+            fn serialize() {
+                assert_ser_tokens(&Adb, &[Token::U64(0)]);
+                assert_ser_tokens(&MiniTouch, &[Token::U64(1)]);
+                assert_ser_tokens(&MaaTouch, &[Token::U64(2)]);
+                assert_ser_tokens(&MacPlayTools, &[Token::U64(3)]);
             }
         }
 
@@ -478,7 +486,7 @@ mod tests {
 
         #[cfg(feature = "serde")]
         mod serde {
-            use serde_test::{Token, assert_de_tokens, assert_de_tokens_error};
+            use serde_test::{Token, assert_de_tokens, assert_de_tokens_error, assert_ser_tokens};
 
             use super::*;
 
@@ -514,6 +522,26 @@ mod tests {
                     &[Token::U64(16)],
                     "invalid value: integer `16`, expected a valid task type",
                 );
+            }
+
+            #[test]
+            fn serialize() {
+                assert_ser_tokens(&StartUp, &[Token::U64(0)]);
+                assert_ser_tokens(&CloseDown, &[Token::U64(1)]);
+                assert_ser_tokens(&Fight, &[Token::U64(2)]);
+                assert_ser_tokens(&Recruit, &[Token::U64(3)]);
+                assert_ser_tokens(&Infrast, &[Token::U64(4)]);
+                assert_ser_tokens(&Mall, &[Token::U64(5)]);
+                assert_ser_tokens(&Award, &[Token::U64(6)]);
+                assert_ser_tokens(&Roguelike, &[Token::U64(7)]);
+                assert_ser_tokens(&Copilot, &[Token::U64(8)]);
+                assert_ser_tokens(&SSSCopilot, &[Token::U64(9)]);
+                assert_ser_tokens(&Depot, &[Token::U64(10)]);
+                assert_ser_tokens(&OperBox, &[Token::U64(11)]);
+                assert_ser_tokens(&Reclamation, &[Token::U64(12)]);
+                assert_ser_tokens(&Custom, &[Token::U64(13)]);
+                assert_ser_tokens(&SingleStep, &[Token::U64(14)]);
+                assert_ser_tokens(&VideoRecognition, &[Token::U64(15)]);
             }
         }
 
