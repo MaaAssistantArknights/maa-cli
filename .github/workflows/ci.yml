@@ -157,6 +157,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Setup Toolchains
+        uses: ./.github/actions/setup
       - name: Install MaaCore
         uses: ./.github/actions/install-core
       - name: Build
@@ -169,10 +171,27 @@ jobs:
         # https://stackoverflow.com/questions/63394094/rust-linker-seeks-a-lib-rather-than-a-dll
         if: ${{ !startsWith(matrix.os, 'windows') }}
         run: cargo test --package maa-sys
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      - name: Coverage
+        if: ${{ !startsWith(matrix.os, 'windows') }}
+        run: |
+          cargo +nightly llvm-cov --package maa-sys \
+            --codecov --output-path codecov.json \
+            -- --include-ignored
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v5
+        if: ${{ !startsWith(matrix.os, 'windows') }}
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: codecov.json
+          fail_ci_if_error: true
 
   coverage:
     name: Coverage
-    needs: [build, build-sys]
+    needs: [build]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false

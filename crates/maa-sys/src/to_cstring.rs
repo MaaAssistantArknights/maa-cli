@@ -121,6 +121,8 @@ mod tests {
             };
         }
 
+        compare_cstring!(CString::new("foo").unwrap(), c"foo");
+
         compare_cstring!("foo", c"foo");
         compare_cstring!(String::from("foo"), c"foo");
 
