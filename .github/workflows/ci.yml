@@ -176,12 +176,14 @@ jobs:
         with:
           tool: cargo-llvm-cov
       - name: Coverage
+        if: ${{ !startsWith(matrix.os, 'windows') }}
         run: |
           cargo +nightly llvm-cov --package maa-sys \
             --codecov --output-path codecov.json \
             -- --include-ignored
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
+        if: ${{ !startsWith(matrix.os, 'windows') }}
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: codecov.json
