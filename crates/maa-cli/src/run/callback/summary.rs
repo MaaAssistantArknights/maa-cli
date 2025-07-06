@@ -27,7 +27,7 @@ fn with_summary_mut<T>(f: impl FnOnce(&mut Summary) -> T) -> Option<T> {
 }
 
 pub(crate) fn display() -> Option<()> {
-    with_summary(|summary| print!("{}", summary))
+    with_summary(|summary| print!("{summary}"))
 }
 
 pub(super) fn start_task(id: AsstTaskId) -> Option<()> {
@@ -344,7 +344,7 @@ impl std::fmt::Display for InfrastDetail {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (facility, map) in &self.0 {
             for room_info in map.values() {
-                writeln!(f, "{}{}", facility, room_info)?;
+                writeln!(f, "{facility}{room_info}")?;
             }
         }
 
@@ -441,7 +441,7 @@ impl InfrastRoomInfo {
 impl std::fmt::Display for InfrastRoomInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(info) = self.product.as_ref() {
-            write!(f, "({})", info)?;
+            write!(f, "({info})")?;
         }
         write!(
             f,
@@ -561,11 +561,11 @@ impl std::fmt::Display for FightDetail {
                 write!(f, "{}.", i + 1)?;
                 let mut iter = drop.iter();
                 if let Some((item, count)) = iter.next() {
-                    write!(f, " {} × {}", item, count)?;
+                    write!(f, " {item} × {count}")?;
                     insert_or_add_by_ref(&mut total_drop, item, *count);
                 }
                 for (item, count) in iter {
-                    write!(f, ", {} × {}", item, count)?;
+                    write!(f, ", {item} × {count}")?;
                     insert_or_add_by_ref(&mut total_drop, item, *count);
                 }
                 writeln!(f)?;
@@ -573,10 +573,10 @@ impl std::fmt::Display for FightDetail {
             write!(f, "total drops:")?;
             let mut iter = total_drop.iter();
             if let Some((item, count)) = iter.next() {
-                write!(f, " {} × {}", item, count)?;
+                write!(f, " {item} × {count}")?;
             }
             for (item, count) in iter {
-                write!(f, ", {} × {}", item, count)?;
+                write!(f, ", {item} × {count}")?;
             }
         }
         writeln!(f)?;
@@ -648,10 +648,10 @@ impl std::fmt::Display for RecruitDetail {
                 writeln!(f)?
             }
             if let Some(times) = self.recruit_times {
-                writeln!(f, "Recruited {} times", times)?;
+                writeln!(f, "Recruited {times} times")?;
             }
             if let Some(times) = self.refresh_times {
-                writeln!(f, "Refreshed {} times", times)?;
+                writeln!(f, "Refreshed {times} times")?;
             }
         }
         Ok(())
@@ -719,8 +719,8 @@ impl std::fmt::Display for RoguelikeDetail {
                 }
             }
             writeln!(f)?;
-            writeln!(f, "Total invest {} originium ingotes", total_invest)?;
-            writeln!(f, "Total gained {} exp", total_exp)?;
+            writeln!(f, "Total invest {total_invest} originium ingotes")?;
+            writeln!(f, "Total gained {total_exp} exp")?;
         }
         Ok(())
     }
@@ -812,10 +812,10 @@ impl std::fmt::Display for ExplorationDetail {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.state)?;
         if let Some(invest) = self.invest {
-            write!(f, ", invest {} originium ingotes", invest)?;
+            write!(f, ", invest {invest} originium ingotes")?;
         }
         if let Some(exp) = self.exp {
-            write!(f, ", gained {} exp", exp)?;
+            write!(f, ", gained {exp} exp")?;
         }
         Ok(())
     }

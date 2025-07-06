@@ -81,7 +81,7 @@ pub fn install(force: bool, args: &CommonArgs) -> Result<()> {
     let config = CLI_CONFIG.core_config().apply_args(args);
 
     let lib_dir = dirs::library();
-    let lib_name = format!("{}MaaCore{}", DLL_PREFIX, DLL_SUFFIX);
+    let lib_name = format!("{DLL_PREFIX}MaaCore{DLL_SUFFIX}");
 
     if lib_dir.join(lib_name).exists() && !force {
         bail!(
@@ -98,7 +98,7 @@ pub fn install(force: bool, args: &CommonArgs) -> Result<()> {
     let asset_name = name(asset_version)?;
     let asset = version_json.details().asset(&asset_name)?;
 
-    println!("Downloading MaaCore {}...", asset_version);
+    println!("Downloading MaaCore {asset_version}...");
     let cache_dir = dirs::cache().ensure()?;
     let archive = download(
         cache_dir.join(asset_name).into(),
@@ -162,7 +162,7 @@ pub fn update(args: &CommonArgs) -> Result<()> {
     let asset_name = name(asset_version)?;
     let asset = version_json.details().asset(&asset_name)?;
 
-    println!("Downloading MaaCore {}...", asset_version);
+    println!("Downloading MaaCore {asset_version}...");
     let cache_dir = dirs::cache().ensure()?;
     let asset_path = cache_dir.join(asset_name);
     let archive = download(
@@ -189,7 +189,7 @@ pub fn update(args: &CommonArgs) -> Result<()> {
 fn get_version_json(config: &Config) -> Result<VersionJSON<Details>> {
     let url = config.api_url();
     let version_json = reqwest::blocking::get(&url)
-        .with_context(|| format!("Failed to fetch version info from {}", url))?
+        .with_context(|| format!("Failed to fetch version info from {url}"))?
         .json()
         .with_context(|| "Failed to parse version info")?;
 
@@ -199,15 +199,15 @@ fn get_version_json(config: &Config) -> Result<VersionJSON<Details>> {
 /// Get the name of the asset for the current platform
 pub fn name(version: &Version) -> Result<String> {
     match OS {
-        "macos" => Ok(format!("MAA-v{}-macos-runtime-universal.zip", version)),
+        "macos" => Ok(format!("MAA-v{version}-macos-runtime-universal.zip")),
         "linux" => match ARCH {
-            "x86_64" => Ok(format!("MAA-v{}-linux-x86_64.tar.gz", version)),
-            "aarch64" => Ok(format!("MAA-v{}-linux-aarch64.tar.gz", version)),
+            "x86_64" => Ok(format!("MAA-v{version}-linux-x86_64.tar.gz")),
+            "aarch64" => Ok(format!("MAA-v{version}-linux-aarch64.tar.gz")),
             _ => Err(anyhow!("Unsupported architecture: {}", ARCH)),
         },
         "windows" => match ARCH {
-            "x86_64" => Ok(format!("MAA-v{}-win-x64.zip", version)),
-            "aarch64" => Ok(format!("MAA-v{}-win-arm64.zip", version)),
+            "x86_64" => Ok(format!("MAA-v{version}-win-x64.zip")),
+            "aarch64" => Ok(format!("MAA-v{version}-win-arm64.zip")),
             _ => Err(anyhow!("Unsupported architecture: {}", ARCH)),
         },
         _ => Err(anyhow!("Unsupported platform: {}", OS)),

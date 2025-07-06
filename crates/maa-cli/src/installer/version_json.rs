@@ -41,13 +41,10 @@ impl<D> VersionJSON<D> {
     pub fn can_update(&self, name: &str, current_version: &Version) -> Result<bool, semver::Error> {
         let version = self.version();
         if version > current_version {
-            println!(
-                "Found newer {} version: v{} (current: v{})",
-                name, version, current_version
-            );
+            println!("Found newer {name} version: v{version} (current: v{current_version})");
             Ok(true)
         } else {
-            println!("Up to date: {} v{}.", name, current_version);
+            println!("Up to date: {name} v{current_version}.");
             Ok(false)
         }
     }

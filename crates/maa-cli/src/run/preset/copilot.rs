@@ -246,7 +246,7 @@ impl TryFrom<SSSCopilotParams> for MAAValue {
                 .context("No details in doc")?
                 .as_str()
                 .context("Details is not a string")?;
-            println!("{}", doc);
+            println!("{doc}");
         }
 
         while !BoolInput::new(Some(true), Some("continue")).value()? {
@@ -310,7 +310,7 @@ impl<'a> CopilotFile<'a> {
                 }
 
                 const COPILOT_API: &str = "https://prts.maa.plus/copilot/get/";
-                let url = format!("{}{}", COPILOT_API, code);
+                let url = format!("{COPILOT_API}{code}");
                 debug!("Cache miss, downloading copilot from {url}");
                 let resp: JsonValue = reqwest::blocking::get(url)
                     .context("Failed to send request")?
@@ -341,7 +341,7 @@ impl<'a> CopilotFile<'a> {
             }
             CopilotFile::RemoteSet(code) => {
                 const COPILOT_SET_API: &str = "https://prts.maa.plus/set/get?id=";
-                let url = format!("{}{}", COPILOT_SET_API, code);
+                let url = format!("{COPILOT_SET_API}{code}");
                 debug!("Get copilot set from {url}");
                 let resp: JsonValue = reqwest::blocking::get(url)
                     .context("Failed to send request")?
@@ -819,7 +819,7 @@ mod tests {
                     let ids = [40051, 40052, 40053, 40055, 40056, 40057, 40058, 40059];
 
                     ids.iter()
-                        .map(|id| test_root.join(format!("{}.json", id)))
+                        .map(|id| test_root.join(format!("{id}.json")))
                         .collect::<Vec<PathBuf>>()
                 }
             );

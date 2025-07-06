@@ -37,7 +37,7 @@ impl UserInput for BoolInput {
     fn prompt(&self, writer: &mut impl Write) -> Result<(), io::Error> {
         write!(writer, "Whether to")?;
         if let Some(description) = &self.description {
-            write!(writer, " {}", description)?;
+            write!(writer, " {description}")?;
         } else {
             write!(writer, " do something")?;
         }

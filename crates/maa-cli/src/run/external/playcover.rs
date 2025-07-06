@@ -31,7 +31,7 @@ impl super::ExternalApp for PlayCoverApp<'_> {
         }
 
         let app = self.client.app();
-        info!("Starting app: {}", app);
+        info!("Starting app: {app}");
         std::process::Command::new("open")
             .arg("-a")
             .arg(app)

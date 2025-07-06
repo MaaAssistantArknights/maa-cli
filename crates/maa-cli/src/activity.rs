@@ -195,7 +195,7 @@ impl<T, E: std::fmt::Display> WarnError<T> for std::result::Result<T, E> {
         match self {
             Ok(t) => Some(t),
             Err(err) => {
-                warn!("{}", err);
+                warn!("{err}");
                 None
             }
         }

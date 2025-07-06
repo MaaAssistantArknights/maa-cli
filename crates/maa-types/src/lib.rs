@@ -114,9 +114,9 @@ impl std::fmt::Display for UnknownTouchModeError {
         write!(f, "unknown touch mode `{}`, expected one of ", self.0)?;
         let mut iter = TouchMode::NAMES.iter();
         if let Some(name) = iter.next() {
-            write!(f, "`{}`", name)?;
+            write!(f, "`{name}`")?;
             for v in iter {
-                write!(f, ", `{}`", v)?;
+                write!(f, ", `{v}`")?;
             }
         }
         Ok(())
@@ -267,9 +267,9 @@ impl std::fmt::Display for UnknownTaskType {
         write!(f, "unknown task type `{}`, expected one of ", self.0)?;
         let mut iter = TaskType::NAMES.iter();
         if let Some(v) = iter.next() {
-            write!(f, "`{}`", v)?;
+            write!(f, "`{v}`")?;
             for v in iter {
-                write!(f, ", `{}`", v)?;
+                write!(f, ", `{v}`")?;
             }
         }
         Ok(())
@@ -436,8 +436,8 @@ mod tests {
 
         #[test]
         fn fmt() {
-            assert_eq!(format!("{}", Adb), "adb");
-            assert_eq!(format!("{:?}", MiniTouch), "minitouch");
+            assert_eq!(format!("{Adb}"), "adb");
+            assert_eq!(format!("{MiniTouch:?}"), "minitouch");
         }
     }
 
@@ -539,8 +539,8 @@ mod tests {
 
         #[test]
         fn fmt() {
-            assert_eq!(format!("{}", StartUp), "StartUp");
-            assert_eq!(format!("{:?}", StartUp), "StartUp");
+            assert_eq!(format!("{StartUp}"), "StartUp");
+            assert_eq!(format!("{StartUp:?}"), "StartUp");
         }
     }
 }

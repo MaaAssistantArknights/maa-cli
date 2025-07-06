@@ -47,12 +47,12 @@ impl<F: FromStr + Display + Clone> UserInput for Input<F> {
     fn prompt(&self, writer: &mut impl Write) -> io::Result<()> {
         write!(writer, "Please input")?;
         if let Some(description) = self.description.as_deref() {
-            write!(writer, " {}", description)?;
+            write!(writer, " {description}")?;
         } else {
             write!(writer, " a {}", std::any::type_name::<F>())?;
         }
         if let Some(default) = &self.default {
-            write!(writer, " [default: {}]", default)?;
+            write!(writer, " [default: {default}]")?;
         }
         Ok(())
     }
@@ -60,7 +60,7 @@ impl<F: FromStr + Display + Clone> UserInput for Input<F> {
     fn prompt_no_default(&self, writer: &mut impl Write) -> io::Result<()> {
         write!(writer, "Default value not set, please input")?;
         if let Some(description) = self.description.as_deref() {
-            write!(writer, " {}", description)?;
+            write!(writer, " {description}")?;
         } else {
             write!(writer, " a {}", std::any::type_name::<F>())?;
         }

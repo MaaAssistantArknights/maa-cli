@@ -203,7 +203,7 @@ pub async fn download_mirrors(
 
     if t == 0 {
         println!("Skip speed test, downloading from first link...");
-        debug!("First link: {}", download_link);
+        debug!("First link: {download_link}");
         download(client, download_link, path, size, checker).await?;
         return Ok(());
     }
@@ -213,13 +213,10 @@ pub async fn download_mirrors(
 
     println!("Testing download speed...");
     for link in mirrors.iter() {
-        debug!("Testing {}", link);
+        debug!("Testing {link}");
         if let Ok(downloaded) = try_download(client, link, test_duration).await {
             if downloaded > largest {
-                debug!(
-                    "Found faster link {} with {} bytes downloaded",
-                    link, downloaded
-                );
+                debug!("Found faster link {link} with {downloaded} bytes downloaded");
                 download_link = link;
                 largest = downloaded;
             }
@@ -227,7 +224,7 @@ pub async fn download_mirrors(
     }
 
     println!("Downloading from fastest mirror...");
-    debug!("Fastest link: {}", download_link);
+    debug!("Fastest link: {download_link}");
     download(client, download_link, path, size, checker).await?;
 
     Ok(())
