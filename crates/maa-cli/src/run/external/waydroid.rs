@@ -55,7 +55,7 @@ impl super::ExternalApp for WaydroidApp<'_> {
             use std::io::BufRead;
 
             rdr.read_line(&mut buf)?;
-            trace!("{}", buf);
+            trace!("{buf}");
             if buf.contains("ADB") {
                 info!("Waydroid ready!");
                 break;
