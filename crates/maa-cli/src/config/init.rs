@@ -96,7 +96,7 @@ fn asst_config_template() -> MAAValue {
                         Some("resource for English client"),
                     ),
                     ValueWithDesc::new(
-                        "Txwy",
+                        "txwy",
                         Some("resource for Traditional Chinese client"),
                     ),
                 ],
