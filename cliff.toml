@@ -96,7 +96,7 @@ commit_preprocessors = [
 # regex for parsing and grouping commits
 commit_parsers = [
   # skip commits with `[no changelog]` marker
-  { message = "\\[no changelog\\]", skip = true },
+  { message = "\\[(no|skip) changelog\\]", skip = true },
 
   { message = "^feat", group = "<!-- 0 -->Features" },
   { message = "^fix", group = "<!-- 1 -->Bug Fixes" },

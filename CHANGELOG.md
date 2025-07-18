@@ -1,5 +1,37 @@
 # Release Notes
 
+## Release 0.5.7
+
+### Features
+
+- Add roguelike theme `JieGarden` by [@wangl-cc](https://github.com/wangl-cc) in [#411](https://github.com/MaaAssistantArknights/maa-cli/pull/411)
+
+### Bug Fixes
+
+- Use `txwy` instead of `Txwy` when init by [@PFiS1737](https://github.com/PFiS1737) in [#410](https://github.com/MaaAssistantArknights/maa-cli/pull/410)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.5.6...v0.5.7>
+
+## Release 0.5.6
+
+### Features
+
+- Add AsstBackToHome and AsstSetConnectionExtras bindings by [@YinY1](https://github.com/YinY1) in [#404](https://github.com/MaaAssistantArknights/maa-cli/pull/404)
+
+### Documentation
+
+- Update DEVELOPMENT.md with contribution guidelines by [@wangl-cc](https://github.com/wangl-cc) in [#401](https://github.com/MaaAssistantArknights/maa-cli/pull/401)
+
+### Testing
+
+- Improve test coverage by [@wangl-cc](https://github.com/wangl-cc) in [#409](https://github.com/MaaAssistantArknights/maa-cli/pull/409)
+
+### Miscellaneous
+
+- Ota.maa.plus -> api.maa.plus by [@MistEO](https://github.com/MistEO)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.5.5...v0.5.6>
+
 ## Release 0.5.5
 
 ### Features
