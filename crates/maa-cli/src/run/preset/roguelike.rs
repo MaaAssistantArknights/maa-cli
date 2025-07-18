@@ -11,6 +11,7 @@ pub enum Theme {
     Mizuki,
     Sami,
     Sarkaz,
+    JieGarden,
 }
 
 impl Theme {
@@ -20,13 +21,20 @@ impl Theme {
             Self::Mizuki => "Mizuki",
             Self::Sami => "Sami",
             Self::Sarkaz => "Sarkaz",
+            Self::JieGarden => "JieGarden",
         }
     }
 }
 
 impl ValueEnum for Theme {
     fn value_variants<'a>() -> &'a [Self] {
-        &[Self::Phantom, Self::Mizuki, Self::Sami, Self::Sarkaz]
+        &[
+            Self::Phantom,
+            Self::Mizuki,
+            Self::Sami,
+            Self::Sarkaz,
+            Self::JieGarden,
+        ]
     }
 
     fn to_possible_value(&self) -> Option<clap::builder::PossibleValue> {
