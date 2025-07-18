@@ -11,6 +11,7 @@ pub enum Theme {
     Mizuki,
     Sami,
     Sarkaz,
+    JieGarden,
 }
 
 impl Theme {
@@ -20,13 +21,20 @@ impl Theme {
             Self::Mizuki => "Mizuki",
             Self::Sami => "Sami",
             Self::Sarkaz => "Sarkaz",
+            Self::JieGarden => "JieGarden",
         }
     }
 }
 
 impl ValueEnum for Theme {
     fn value_variants<'a>() -> &'a [Self] {
-        &[Self::Phantom, Self::Mizuki, Self::Sami, Self::Sarkaz]
+        &[
+            Self::Phantom,
+            Self::Mizuki,
+            Self::Sami,
+            Self::Sarkaz,
+            Self::JieGarden,
+        ]
     }
 
     fn to_possible_value(&self) -> Option<clap::builder::PossibleValue> {
@@ -273,6 +281,7 @@ mod tests {
             assert_eq!(Theme::Mizuki.to_str(), "Mizuki");
             assert_eq!(Theme::Sami.to_str(), "Sami");
             assert_eq!(Theme::Sarkaz.to_str(), "Sarkaz");
+            assert_eq!(Theme::JieGarden.to_str(), "JieGarden");
         }
 
         #[test]
@@ -281,7 +290,8 @@ mod tests {
                 Theme::Phantom,
                 Theme::Mizuki,
                 Theme::Sami,
-                Theme::Sarkaz
+                Theme::Sarkaz,
+                Theme::JieGarden,
             ]);
         }
 
@@ -302,6 +312,10 @@ mod tests {
             assert_eq!(
                 Theme::Sarkaz.to_possible_value(),
                 Some(clap::builder::PossibleValue::new("Sarkaz"))
+            );
+            assert_eq!(
+                Theme::JieGarden.to_possible_value(),
+                Some(clap::builder::PossibleValue::new("JieGarden"))
             );
         }
     }
