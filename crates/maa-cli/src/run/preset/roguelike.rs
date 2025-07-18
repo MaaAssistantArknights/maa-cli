@@ -281,6 +281,7 @@ mod tests {
             assert_eq!(Theme::Mizuki.to_str(), "Mizuki");
             assert_eq!(Theme::Sami.to_str(), "Sami");
             assert_eq!(Theme::Sarkaz.to_str(), "Sarkaz");
+            assert_eq!(Theme::JieGarden.to_str(), "JieGarden");
         }
 
         #[test]
@@ -289,7 +290,8 @@ mod tests {
                 Theme::Phantom,
                 Theme::Mizuki,
                 Theme::Sami,
-                Theme::Sarkaz
+                Theme::Sarkaz,
+                Theme::JieGarden,
             ]);
         }
 
@@ -310,6 +312,10 @@ mod tests {
             assert_eq!(
                 Theme::Sarkaz.to_possible_value(),
                 Some(clap::builder::PossibleValue::new("Sarkaz"))
+            );
+            assert_eq!(
+                Theme::JieGarden.to_possible_value(),
+                Some(clap::builder::PossibleValue::new("JieGarden"))
             );
         }
     }
