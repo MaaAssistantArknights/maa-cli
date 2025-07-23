@@ -103,7 +103,7 @@ complete -c maa -n "__fish_seen_subcommand_from copilot" -f -l select-formation 
 complete -c maa -n "__fish_seen_subcommand_from copilot" -f -l support-unit-name -d 'Support unit name' -r
 complete -c maa -n "__fish_seen_subcommand_from sscopilot" -f -s l -l loop-times -d 'Loop times' -r
 
-complete -c maa -n "__fish_seen_subcommand_from roguelike" -a "Phantom Mizuki Sami Sarkaz"
+complete -c maa -n "__fish_seen_subcommand_from roguelike" -a "Phantom Mizuki Sami Sarkaz JieGarden"
 complete -c maa -n "__fish_seen_subcommand_from roguelike" -l mode -d 'Mode of roguelike' -a "0 1 2 3 4"
 complete -c maa -n "__fish_seen_subcommand_from roguelike" -l squad -d 'Squad to use' -r
 complete -c maa -n "__fish_seen_subcommand_from roguelike" -l roles -d 'Roles to use' -r
