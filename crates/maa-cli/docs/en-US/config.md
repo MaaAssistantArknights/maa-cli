@@ -465,7 +465,7 @@ With the help of JSON schema, you can get auto-completion and validation in some
 [emulator-ports]: https://maa.plus/docs/en-us/manual/connection.html#obtain-port-number
 [playcover-doc]: https://maa.plus/docs/en-us/manual/device/macos.html#%E2%9C%85-playcover-the-software-runs-most-fluently-for-its-nativity-%F0%9F%9A%80
 [example-config]: ../../config_examples
-[wangl-cc-dotfiles]: https://github.com/wangl-cc/dotfiles/tree/master/.config/maa
+[wangl-cc-dotfiles]: https://github.com/wangl-cc/dotfiles/tree/main/home/dot_config/maa
 [schema-dir]: ../../schemas/
 [task-schema]: ../../schemas/task.schema.json
 [asst-schema]: ../../schemas/asst.schema.json

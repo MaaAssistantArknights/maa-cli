@@ -463,7 +463,7 @@ passphrase = "password"       # ssh 密钥的密码
 [emulator-ports]: https://maa.plus/docs/zh-cn/manual/connection.html#获取端口号
 [playcover-doc]: https://maa.plus/docs/zh-cn/manual/device/macos.html#✅-playcover-原生运行最流畅-🚀
 [example-config]: ../../config_examples
-[wangl-cc-dotfiles]: https://github.com/wangl-cc/dotfiles/tree/master/.config/maa
+[wangl-cc-dotfiles]: https://github.com/wangl-cc/dotfiles/tree/main/home/dot_config/maa
 [schema-dir]: ../../schemas/
 [task-schema]: ../../schemas/task.schema.json
 [asst-schema]: ../../schemas/asst.schema.json
