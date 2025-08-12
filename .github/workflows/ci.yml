@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Format Check
         run: |
           rustup toolchain install nightly --profile minimal --component rustfmt
@@ -61,7 +61,7 @@ jobs:
       MAA_EXTRA_SHARE_NAME: maa-test
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup Toolchains
         uses: ./.github/actions/setup
       - name: Setup Cache
@@ -110,7 +110,7 @@ jobs:
           - windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup Toolchains
         uses: ./.github/actions/setup
         with:
@@ -132,7 +132,7 @@ jobs:
           - git2 # disabled both cli_installer and core_installer, used by appimage
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup Toolchains
         uses: ./.github/actions/setup
       - name: Build and Test
@@ -156,7 +156,7 @@ jobs:
           - windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup Toolchains
         uses: ./.github/actions/setup
       - name: Install MaaCore
@@ -204,7 +204,7 @@ jobs:
       MAA_EXTRA_SHARE_NAME: maa-test
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup Toolchains
         uses: ./.github/actions/setup
       - name: Setup Cache
