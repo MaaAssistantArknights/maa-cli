@@ -59,7 +59,9 @@ impl Args {
         let mut builder = env_logger::Builder::new();
 
         builder.filter_level(self.to_filter());
-        builder.format(LogPrefix::from_env().format(self.log_file.is_some()));
+
+        let formatter = LogPrefix::from_env().formatter(self.log_file.is_some());
+        builder.format(move |buf, record| formatter.format(buf, record));
 
         if let Some(path) = log_path(self.log_file) {
             if let Some(dir) = path.parent() {
@@ -122,41 +124,50 @@ impl LogPrefix {
             .unwrap_or_default()
     }
 
-    fn format(
-        &self,
-        log_file: bool,
-    ) -> fn(&mut env_logger::fmt::Formatter, &log::Record) -> std::io::Result<()> {
+    fn formatter(&self, log_file: bool) -> LogFormatter {
         match self {
-            LogPrefix::Always => prefixed_format,
-            LogPrefix::Never => plain_format,
+            LogPrefix::Always => LogFormatter::Prefixed,
+            LogPrefix::Never => LogFormatter::Plain,
             LogPrefix::Auto => {
                 if log_file {
-                    prefixed_format
+                    LogFormatter::Prefixed
                 } else {
-                    plain_format
+                    LogFormatter::Plain
                 }
             }
         }
     }
 }
 
-fn prefixed_format(
-    buf: &mut env_logger::fmt::Formatter,
-    record: &log::Record,
-) -> std::io::Result<()> {
-    writeln!(
-        buf,
-        "[{} {}{:<5}{}] {}",
-        chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-        buf.default_level_style(record.level()),
-        record.level(),
-        env_logger::fmt::style::Reset,
-        record.args()
-    )
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LogFormatter {
+    Prefixed,
+    Plain,
 }
 
-fn plain_format(buf: &mut env_logger::fmt::Formatter, record: &log::Record) -> std::io::Result<()> {
-    writeln!(buf, "{}", record.args())
+impl LogFormatter {
+    fn format(
+        self,
+        buf: &mut env_logger::fmt::Formatter,
+        record: &log::Record,
+    ) -> std::io::Result<()> {
+        match self {
+            LogFormatter::Prefixed => {
+                writeln!(
+                    buf,
+                    "[{} {}{:<5}{}] {}",
+                    chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                    buf.default_level_style(record.level()),
+                    record.level(),
+                    env_logger::fmt::style::Reset,
+                    record.args()
+                )
+            }
+            LogFormatter::Plain => {
+                writeln!(buf, "{}", record.args())
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -281,20 +292,15 @@ mod tests {
         }
 
         #[test]
-        fn format() {
-            let pff = prefixed_format
-                as fn(&mut env_logger::fmt::Formatter, &log::Record) -> std::io::Result<()>;
-            let plf = plain_format
-                as fn(&mut env_logger::fmt::Formatter, &log::Record) -> std::io::Result<()>;
+        fn formatter() {
+            assert_eq!(LogPrefix::Always.formatter(true), LogFormatter::Prefixed);
+            assert_eq!(LogPrefix::Always.formatter(false), LogFormatter::Prefixed);
 
-            assert_eq!(LogPrefix::Always.format(true), pff);
-            assert_eq!(LogPrefix::Always.format(false), pff);
+            assert_eq!(LogPrefix::Never.formatter(true), LogFormatter::Plain);
+            assert_eq!(LogPrefix::Never.formatter(false), LogFormatter::Plain);
 
-            assert_eq!(LogPrefix::Never.format(true), plf);
-            assert_eq!(LogPrefix::Never.format(false), plf);
-
-            assert_eq!(LogPrefix::Auto.format(true), pff);
-            assert_eq!(LogPrefix::Auto.format(false), plf);
+            assert_eq!(LogPrefix::Auto.formatter(true), LogFormatter::Prefixed);
+            assert_eq!(LogPrefix::Auto.formatter(false), LogFormatter::Plain);
         }
     }
 }

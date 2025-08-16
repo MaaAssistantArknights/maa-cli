@@ -198,7 +198,7 @@ mod git2 {
 
     use crate::config::cli::resource::Certificate;
 
-    fn create_fetch_options(cert: &Certificate) -> git2::FetchOptions {
+    fn create_fetch_options(cert: &Certificate) -> git2::FetchOptions<'_> {
         let mut callbacks = git2::RemoteCallbacks::new();
         callbacks.credentials(|_, username, _| {
             username

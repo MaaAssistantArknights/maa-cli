@@ -247,12 +247,12 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
         match task {
             "StartButton2" | "AnnihilationConfirm" => {
                 edit_current_task_detail(|detail| {
-                    if let Some(detail) = detail.as_fight_mut() {
-                        if let Some((series, sanity)) = detail.get_series() {
-                            info!("Mission started ({series} times, use {sanity} sanity)");
-                            detail.start();
-                            return;
-                        }
+                    if let Some(detail) = detail.as_fight_mut()
+                        && let Some((series, sanity)) = detail.get_series()
+                    {
+                        info!("Mission started ({series} times, use {sanity} sanity)");
+                        detail.start();
+                        return;
                     }
                     info!("Mission started");
                 });

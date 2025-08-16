@@ -283,7 +283,7 @@ impl Passphrase {
         matches!(self, Passphrase::None | Passphrase::Prompt)
     }
 
-    pub fn get(&self) -> std::io::Result<Option<Cow<str>>> {
+    pub fn get(&self) -> std::io::Result<Option<Cow<'_, str>>> {
         match self {
             Passphrase::None => Ok(None),
             Passphrase::Prompt => Input::<String>::new(None, Some("passphrase"))
