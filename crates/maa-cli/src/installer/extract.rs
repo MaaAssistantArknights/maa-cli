@@ -117,21 +117,20 @@ where
 
                 const S_IFLNK: u32 = 0o120000;
 
-                if let Some(mode) = file.unix_mode() {
-                    if mode & S_IFLNK == S_IFLNK {
-                        let mut contents = Vec::new();
-                        file.read_to_end(&mut contents)?;
-                        let link_target = std::ffi::OsString::from_vec(contents);
-                        if dst.exists() {
-                            remove_file(dst).with_context(|| {
-                                format!("Failed to remove existing file: {}", dst.display())
-                            })?;
-                        }
-                        symlink(link_target, dst).with_context(|| {
-                            format!("Failed to extract file: {}", dst.display())
+                if let Some(mode) = file.unix_mode()
+                    && mode & S_IFLNK == S_IFLNK
+                {
+                    let mut contents = Vec::new();
+                    file.read_to_end(&mut contents)?;
+                    let link_target = std::ffi::OsString::from_vec(contents);
+                    if dst.exists() {
+                        remove_file(dst).with_context(|| {
+                            format!("Failed to remove existing file: {}", dst.display())
                         })?;
-                        continue;
                     }
+                    symlink(link_target, dst)
+                        .with_context(|| format!("Failed to extract file: {}", dst.display()))?;
+                    continue;
                 }
             }
 

@@ -694,7 +694,7 @@ mod tests {
 
             let stage_id = "act35side_ex01";
 
-            let stage_info = get_stage_info(stage_id, &[resource_dir.clone()]).unwrap();
+            let stage_info = get_stage_info(stage_id, std::slice::from_ref(&resource_dir)).unwrap();
 
             assert_eq!(stage_info["code"], "AS-EX-1");
             assert_eq!(stage_info["name"], "小偷与收款人");

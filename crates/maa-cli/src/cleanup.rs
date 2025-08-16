@@ -14,7 +14,7 @@ use crate::{
 
 pub trait PathProvider {
     /// Path to a directory to be cleaned up
-    fn target_dir(&self) -> Cow<Path>;
+    fn target_dir(&self) -> Cow<'_, Path>;
 
     /// Determine whether an entry in the directory should be deleted
     ///
@@ -60,7 +60,7 @@ pub enum CleanupTarget {
 use CleanupTarget::*;
 
 impl PathProvider for CleanupTarget {
-    fn target_dir(&self) -> Cow<Path> {
+    fn target_dir(&self) -> Cow<'_, Path> {
         match *self {
             CliCache => cache().into(),
             CoreCache => join!(state(), "cache").into(),
@@ -305,7 +305,7 @@ mod tests {
         struct All;
 
         impl PathProvider for All {
-            fn target_dir(&self) -> Cow<Path> {
+            fn target_dir(&self) -> Cow<'_, Path> {
                 join!(temp_dir(), "maa-cli-test-cleanup").into()
             }
         }
@@ -313,7 +313,7 @@ mod tests {
         struct BlackList(Vec<&'static str>);
 
         impl PathProvider for BlackList {
-            fn target_dir(&self) -> Cow<Path> {
+            fn target_dir(&self) -> Cow<'_, Path> {
                 join!(temp_dir(), "maa-cli-test-cleanup").into()
             }
 
@@ -328,7 +328,7 @@ mod tests {
         struct WhiteList(Vec<&'static str>);
 
         impl PathProvider for WhiteList {
-            fn target_dir(&self) -> Cow<Path> {
+            fn target_dir(&self) -> Cow<'_, Path> {
                 join!(temp_dir(), "maa-cli-test-cleanup").into()
             }
 

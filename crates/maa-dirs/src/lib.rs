@@ -376,7 +376,7 @@ fn home() -> &'static Path {
     HOME.as_ref()
 }
 
-pub fn expand_tilde(path: &Path) -> Cow<Path> {
+pub fn expand_tilde(path: &Path) -> Cow<'_, Path> {
     if let Ok(path) = path.strip_prefix("~") {
         home().join(path).into()
     } else {
@@ -385,7 +385,7 @@ pub fn expand_tilde(path: &Path) -> Cow<Path> {
 }
 
 /// Similar to `finder(exe_path.parent()?)`, but try to canonicalize the path first.
-fn _find_from<F>(exe_path: &Path, finder: F) -> Option<Cow<Path>>
+fn _find_from<F>(exe_path: &Path, finder: F) -> Option<Cow<'_, Path>>
 where
     F: Fn(Cow<Path>) -> Option<Cow<Path>>,
 {

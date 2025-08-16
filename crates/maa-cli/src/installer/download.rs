@@ -214,12 +214,12 @@ pub async fn download_mirrors(
     println!("Testing download speed...");
     for link in mirrors.iter() {
         debug!("Testing {link}");
-        if let Ok(downloaded) = try_download(client, link, test_duration).await {
-            if downloaded > largest {
-                debug!("Found faster link {link} with {downloaded} bytes downloaded");
-                download_link = link;
-                largest = downloaded;
-            }
+        if let Ok(downloaded) = try_download(client, link, test_duration).await
+            && downloaded > largest
+        {
+            debug!("Found faster link {link} with {downloaded} bytes downloaded");
+            download_link = link;
+            largest = downloaded;
         }
     }
 

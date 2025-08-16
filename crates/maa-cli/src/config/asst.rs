@@ -90,7 +90,7 @@ impl ConnectionConfig {
         self
     }
 
-    pub fn connect_args(&self) -> (&str, Cow<str>, &str) {
+    pub fn connect_args(&self) -> (&str, Cow<'_, str>, &str) {
         let adb_path = self
             .adb_path
             .as_deref()
@@ -1055,9 +1055,10 @@ mod tests {
 
             resource_dir.ensure().unwrap();
 
-            assert_eq!(push_resource(&mut Vec::new(), resource_dir.clone()), &[
-                resource_dir.clone()
-            ]);
+            assert_eq!(
+                push_resource(&mut Vec::new(), resource_dir.clone()),
+                std::slice::from_ref(&resource_dir)
+            );
 
             assert_eq!(
                 push_resource(&mut Vec::new(), unexists_resource_dir.clone()),
@@ -1089,7 +1090,7 @@ mod tests {
                     ..Default::default()
                 }
                 .resource_dirs(),
-                [resource_dir.clone()]
+                std::slice::from_ref(&resource_dir)
             );
 
             assert_eq!(
@@ -1109,7 +1110,7 @@ mod tests {
                     ..Default::default()
                 }
                 .resource_dirs(),
-                [resource_dir.clone()]
+                std::slice::from_ref(&resource_dir)
             );
 
             assert_eq!(
@@ -1129,7 +1130,7 @@ mod tests {
                     ..Default::default()
                 }
                 .resource_dirs(),
-                [resource_dir.clone()]
+                std::slice::from_ref(&resource_dir)
             );
 
             fs::remove_dir_all(test_root).unwrap();
