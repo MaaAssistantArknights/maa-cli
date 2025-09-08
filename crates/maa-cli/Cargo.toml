@@ -1,7 +1,7 @@
 [package]
 name = "maa-cli"
 description = "A simple CLI for MAA (MaaAssistantArknights)"
-version = "0.5.7"
+version = "0.5.8"
 authors.workspace = true
 edition.workspace = true
 repository.workspace = true
