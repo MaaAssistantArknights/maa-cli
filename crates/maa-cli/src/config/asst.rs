@@ -908,7 +908,7 @@ mod tests {
                     config: None,
                 }
                 .connect_args(),
-                ("adb", "emulator-5554", "Waydroid"),
+                ("adb", &device, "Waydroid"),
             );
 
             args_eq(
