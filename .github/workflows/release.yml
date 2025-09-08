@@ -110,23 +110,23 @@ jobs:
       matrix:
         os:
           - ubuntu-22.04
+          - ubuntu-22.04-arm
+          - macos-13 # x86_64 runner
+          - macos-latest # aarch64 runner
+          - windows-11-arm
           - windows-latest
-        target-arch:
-          - x86_64
-          - aarch64
-        # macOS can be natively built on both x86_64 and aarch64
-        include:
-          - os: macos-13
-            target-arch: x86_64
-          - os: macos-latest
-            target-arch: aarch64
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-      - name: Setup Cross Compilation Toolchains
-        uses: ./.github/actions/setup
-        with:
-          target_arch: ${{ matrix.target-arch }}
+      - name: Update Rust
+        run: rustup update stable
+      - name: Get Host Triplet
+        id: host-triplet
+        run: |
+          {
+            echo -n "triplet="
+            rustc -vV | grep '^host:' | awk '{print $2}'
+          } >> "$GITHUB_OUTPUT"
       - name: Build
         env:
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 1
@@ -151,12 +151,12 @@ jobs:
           if [[ "$IS_CROSS" == "false" ]]; then
             "$target_dir/$exe" --version
           fi
-          tar -cvf "$CARGO_BUILD_TARGET.tar" -C "$target_dir" "$exe"
+          tar -cvf "${{ steps.host-triplet.outputs.triplet }}.tar" -C "$target_dir" "$exe"
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: maa_cli-${{ env.CARGO_BUILD_TARGET }}
-          path: ${{ env.CARGO_BUILD_TARGET }}.tar
+          name: maa_cli-${{ steps.host-triplet.outputs.triplet }}
+          path: ${{ steps.host-triplet.outputs.triplet }}.tar
           retention-days: 1
           if-no-files-found: error
 
