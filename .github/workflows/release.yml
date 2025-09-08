@@ -256,8 +256,6 @@ jobs:
             checksum=$(sha256sum "$archive_name")
             checksum_hash=${checksum:0:64}
             size=$(stat -c%s "$archive_name")
-            echo "$checksum" > "$archive_name.sha256"
-            sha256sum "$archive_name_unversioned" > "$archive_name_unversioned.sha256"
 
             # target dependent version info
             for version_file in "${version_files[@]}"; do
@@ -290,9 +288,9 @@ jobs:
           body: ${{ needs.release-note.outputs.content }}
           fail_on_unmatched_files: true
           files: |
-            maa_cli-*-unknown-linux-gnu.tar.gz*
-            maa_cli-*-apple-darwin.zip*
-            maa_cli-*-pc-windows-msvc.zip*
+            maa_cli-*-unknown-linux-gnu.tar.gz
+            maa_cli-*-apple-darwin.zip
+            maa_cli-*-pc-windows-msvc.zip
       - name: Commit version.json and Push
         working-directory: version
         run: |
