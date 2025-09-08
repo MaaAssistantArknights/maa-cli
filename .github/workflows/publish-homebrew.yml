@@ -56,9 +56,3 @@ jobs:
               --no-browse \
               --version='${{ inputs.version }}'
           done
-          for cask in maa-cli-bin; do
-            brew bump-cask-pr "$cask" \
-              ${{ inputs.dryrun && '--dry-run' || '' }} \
-              --no-browse \
-              --version='${{ inputs.version }}'
-          done
