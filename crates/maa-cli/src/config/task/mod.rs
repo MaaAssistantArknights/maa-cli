@@ -82,6 +82,7 @@ impl Task {
         }
     }
 
+    #[cfg(test)]
     pub fn with_name(mut self, name: String) -> Self {
         self.name = Some(name);
         self
