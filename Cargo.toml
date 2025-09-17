@@ -7,7 +7,7 @@ license = "AGPL-3.0-only"
 authors = ["Long Wang <loong@loongw.cc>"]
 homepage = "https://github.com/MaaAssistantArknights/maa-cli"
 repository = "https://github.com/MaaAssistantArknights/maa-cli"
-rust-version = "1.84"
+rust-version = "1.88"
 edition = "2024"
 
 [workspace.dependencies]
