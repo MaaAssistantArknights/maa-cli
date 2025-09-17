@@ -78,6 +78,7 @@ struct StageOpts {
     filename: PathBuf,
     stage_name: String,
     is_raid: bool,
+    is_paradox: bool,
 }
 
 impl From<StageOpts> for MAAValue {
@@ -86,6 +87,7 @@ impl From<StageOpts> for MAAValue {
             "filename" => opts.filename.to_string_lossy().to_string(),
             "stage_name" => opts.stage_name,
             "is_raid" => opts.is_raid,
+            "is_paradox" => opts.is_paradox,
         )
     }
 }
@@ -167,17 +169,20 @@ impl IntoTaskConfig for CopilotParams {
                     filename: file.to_path_buf(),
                     stage_name: stage_code.to_owned(),
                     is_raid: self.raid == 1,
+                    is_paradox: false,
                 }),
                 2 => {
                     stage_list.push(StageOpts {
                         filename: file.to_path_buf(),
                         stage_name: stage_code.to_owned(),
                         is_raid: false,
+                        is_paradox: false,
                     });
                     stage_list.push(StageOpts {
                         filename: file.to_path_buf(),
                         stage_name: stage_code.to_owned(),
                         is_raid: true,
+                        is_paradox: false,
                     });
                 }
                 n => bail!("Invalid raid mode {n}, should be 0, 1 or 2"),
@@ -541,6 +546,7 @@ mod tests {
                         "filename" => path_from_cache_dir("40051.json"),
                         "stage_name" => "AS-EX-1",
                         "is_raid" => false,
+                        "is_paradox" => false,
                     )],
                     "formation" => false,
                     "use_sanity_potion" => false,
@@ -576,6 +582,7 @@ mod tests {
                         "filename" => path_from_cache_dir("40051.json"),
                         "stage_name" => "AS-EX-1",
                         "is_raid" => true,
+                        "is_paradox" => false,
                     )],
                     "formation" => true,
                     "use_sanity_potion" => true,
@@ -607,6 +614,7 @@ mod tests {
                         "filename" => path_from_cache_dir("40051.json"),
                         "stage_name" => "AS-EX-1",
                         "is_raid" => false,
+                        "is_paradox" => false,
                     )],
                     "formation" => false,
                     "use_sanity_potion" => false,
@@ -636,11 +644,13 @@ mod tests {
                         "filename" => path_from_cache_dir("40051.json"),
                         "stage_name" => "AS-EX-1",
                         "is_raid" => false,
+                        "is_paradox" => false,
                     ),
                     object!(
                         "filename" => path_from_cache_dir("40051.json"),
                         "stage_name" => "AS-EX-1",
                         "is_raid" => true,
+                        "is_paradox" => false,
                     )],
                     "formation" => true,
                     "use_sanity_potion" => false,
@@ -661,11 +671,13 @@ mod tests {
                         "filename" => path_from_cache_dir("40051.json"),
                         "stage_name" => "AS-EX-1",
                         "is_raid" => false,
+                        "is_paradox" => false,
                     ),
                     object!(
                         "filename" => path_from_cache_dir("40052.json"),
                         "stage_name" => "AS-EX-2",
                         "is_raid" => false,
+                        "is_paradox" => false,
                     )],
                     "formation" => true,
                     "use_sanity_potion" => false,
