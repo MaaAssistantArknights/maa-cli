@@ -240,6 +240,17 @@ impl MAAValue {
         self.as_object_mut().and_then(|map| map.get_mut(key))
     }
 
+    /// Get value of given key with given type
+    ///
+    /// If the value is an object and the key exists, get the value and try to convert it given
+    /// type. Otherwise, return `None`.
+    pub fn get_typed<'a, T>(&'a self, key: &str) -> Option<T>
+    where
+        T: TryFromMAAValue<'a, Value = T>,
+    {
+        self.get(key).and_then(T::try_from_value)
+    }
+
     /// Get value of given key or return default value
     ///
     /// If the value is an object and the key exists, get the value and try to convert it to type of
@@ -248,7 +259,7 @@ impl MAAValue {
     where
         T: TryFromMAAValue<'a, Value = T>,
     {
-        self.get(key).and_then(T::try_from_value).unwrap_or(default)
+        self.get_typed(key).unwrap_or(default)
     }
 
     /// Insert a key-value pair into the object

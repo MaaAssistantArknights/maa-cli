@@ -1,4 +1,9 @@
-use std::{borrow::Cow, fs, io::Write, path::Path};
+use std::{
+    borrow::Cow,
+    fs,
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{Context, Result, bail};
 use log::{debug, trace};
@@ -43,7 +48,7 @@ pub struct CopilotParams {
     /// Otherwise, default to true.
     #[arg(long)]
     use_sanity_potion: bool,
-    /// Whether to navigate to the stage
+    /// Whether to navigate to the stage [Deprecated, also navigate to the stage]
     ///
     /// When multiple uri are provided or the uri is a copilot task set, force to true.
     /// Otherwise, default to false.
@@ -52,14 +57,37 @@ pub struct CopilotParams {
     /// Whether to add operators to empty slots in the formation to earn trust
     #[arg(long)]
     add_trust: bool,
+
+    /// Deprecated, use `formation_index` instead
+    #[arg(long)]
+    select_formation: Option<i32>,
+
     /// Select which formation to use [1-4]
     ///
     /// If not provided, use the current formation
     #[arg(long)]
-    select_formation: Option<i32>,
+    formation_index: Option<i32>,
+
     /// Use given support unit name, don't use support unit if not provided
     #[arg(long)]
     support_unit_name: Option<String>,
+}
+
+#[derive(Debug)]
+struct StageOpts {
+    filename: PathBuf,
+    stage_name: String,
+    is_raid: bool,
+}
+
+impl From<StageOpts> for MAAValue {
+    fn from(opts: StageOpts) -> Self {
+        object!(
+            "filename" => opts.filename.to_string_lossy().to_string(),
+            "stage_name" => opts.stage_name,
+            "is_raid" => opts.is_raid,
+        )
+    }
 }
 
 impl IntoTaskConfig for CopilotParams {
@@ -78,16 +106,43 @@ impl IntoTaskConfig for CopilotParams {
 
         let is_task_list = copilot_files.len() > 1;
         let formation = self.formation || is_task_list || default.get_or("formation", false);
-        let need_navigate =
-            self.need_navigate || is_task_list || default.get_or("need_navigate", false);
+
+        let need_navigate = self.need_navigate || default.get_or("need_navigate", false);
+        if need_navigate {
+            log::warn!("`need_navigate` is deprecated and no longer required");
+        }
+
         let use_sanity_potion =
             self.use_sanity_potion || default.get_or("use_sanity_potion", false);
         let add_trust = self.add_trust || default.get_or("add_trust", false);
+
         let select_formation = self
             .select_formation
-            .unwrap_or_else(|| default.get_or("select_formation", 0));
+            .or_else(|| default.get_typed("select_formation"));
 
-        let mut task_config = TaskConfig::new();
+        let formation_index = self
+            .formation_index
+            .or_else(|| default.get_typed("formation_index"));
+
+        let formation_index = match (formation_index, select_formation) {
+            (Some(formation_index), None) => formation_index,
+            (formation_index, Some(select_formation)) => {
+                log::warn!(
+                    "`select_formation` is deprecated, please use `formation_index` instead"
+                );
+                if let Some(index) = formation_index {
+                    log::warn!(
+                        "Both `formation_index` and `select_formation` are provided, using `formation_index`"
+                    );
+                    index
+                } else {
+                    select_formation
+                }
+            }
+            (None, None) => 0,
+        };
+
+        let mut stage_list = Vec::new();
         for file in copilot_files {
             let copilot_info = json_from_file(&file)?;
             let stage_id = copilot_info
@@ -98,17 +153,6 @@ impl IntoTaskConfig for CopilotParams {
 
             let stage_info = get_stage_info(stage_id, base_dirs.iter().map(|dir| dir.as_path()))?;
             let stage_code = get_str_key(&stage_info, "code")?;
-            let stage_name = get_str_key(&stage_info, "name")?;
-
-            if !need_navigate {
-                println!(
-                    "Fight Stage: {stage_code} {stage_name}, please navigate to the stage manually"
-                );
-
-                while !BoolInput::new(Some(true), Some("continue")).value()? {
-                    println!("Please confirm you have navigated to the stage");
-                }
-            }
 
             if !formation {
                 println!("Operators:\n{}", operator_table(&copilot_info)?);
@@ -118,49 +162,40 @@ impl IntoTaskConfig for CopilotParams {
                 }
             }
 
-            let mut value = object!(
-                "filename" => String::from(file.to_str().context("Invalid file path")?),
-                "need_navigate" => need_navigate,
-                "formation" => formation,
-                "navigate_name" => stage_code,
-                "use_sanity_potion" => use_sanity_potion,
-                "add_trust" => add_trust,
-                "select_formation" => select_formation,
-            );
-
-            value.maybe_insert("support_unit_name", self.support_unit_name.clone());
-
             match self.raid {
-                0 => {
-                    task_config.push(
-                        Task::new(TaskType::Copilot, value)
-                            .with_name(format!("{stage_code} {stage_name} Normal")),
-                    );
-                }
-                1 => {
-                    value.insert("is_raid", true);
-                    task_config.push(
-                        Task::new(TaskType::Copilot, value)
-                            .with_name(format!("{stage_code} {stage_name} Raid")),
-                    );
-                }
+                0 | 1 => stage_list.push(StageOpts {
+                    filename: file.to_path_buf(),
+                    stage_name: stage_code.to_owned(),
+                    is_raid: self.raid == 1,
+                }),
                 2 => {
-                    task_config.push(
-                        Task::new(TaskType::Copilot, value.clone())
-                            .with_name(format!("{stage_code} {stage_name} Normal")),
-                    );
-
-                    value.insert("is_raid", true);
-                    value.insert("need_navigate", true);
-                    value.insert("formation", false); // use the same formation as normal mode
-                    task_config.push(
-                        Task::new(TaskType::Copilot, value)
-                            .with_name(format!("{stage_code} {stage_name} Raid",)),
-                    );
+                    stage_list.push(StageOpts {
+                        filename: file.to_path_buf(),
+                        stage_name: stage_code.to_owned(),
+                        is_raid: false,
+                    });
+                    stage_list.push(StageOpts {
+                        filename: file.to_path_buf(),
+                        stage_name: stage_code.to_owned(),
+                        is_raid: true,
+                    });
                 }
                 n => bail!("Invalid raid mode {n}, should be 0, 1 or 2"),
             }
         }
+
+        let mut params = object!(
+            "formation" => formation,
+            "use_sanity_potion" => use_sanity_potion,
+            "add_trust" => add_trust,
+            "formation_index" => formation_index,
+            "copilot_list" => stage_list,
+        );
+        params.maybe_insert("support_unit_name", self.support_unit_name.clone());
+
+        let mut task_config = TaskConfig::new();
+
+        task_config.push(Task::new(TaskType::Copilot, params));
 
         Ok(task_config)
     }
@@ -436,27 +471,6 @@ mod tests {
     use super::*;
     use crate::config::asst::AsstConfig;
 
-    macro_rules! assert_params {
-        ($params:expr, $expected:expr $(,)?) => {
-            let mut params = $params.clone();
-            match (params.get_mut("filename"), $expected.get("filename")) {
-                (Some(filename), Some(expected_filename)) => {
-                    assert!(
-                        filename
-                            .as_str()
-                            .unwrap()
-                            .ends_with(expected_filename.as_str().unwrap())
-                    );
-
-                    *filename = expected_filename.clone();
-                }
-                _ => panic!("filename not found in params"),
-            }
-
-            assert_eq!(params, $expected);
-        };
-    }
-
     fn retry<T>(times: usize, f: impl Fn() -> Result<T>) -> T {
         for i in 0..times {
             match f() {
@@ -468,6 +482,12 @@ mod tests {
         }
 
         panic!("Failed to run test after {times} retries");
+    }
+
+    fn path_from_cache_dir(path: &str) -> String {
+        join!(maa_dirs::cache(), "copilot", path)
+            .to_string_lossy()
+            .to_string()
     }
 
     mod copilot_params {
@@ -511,44 +531,21 @@ mod tests {
                     .tasks
             }
 
-            macro_rules! assert_params {
-                ($params:expr, $expected:expr $(,)?) => {
-                    let mut params = $params.clone();
-                    match (params.get_mut("filename"), $expected.get("filename")) {
-                        (Some(filename), Some(expected_filename)) => {
-                            assert!(
-                                filename
-                                    .as_str()
-                                    .unwrap()
-                                    .ends_with(expected_filename.as_str().unwrap())
-                            );
-
-                            *filename = expected_filename.clone();
-                        }
-                        _ => panic!("filename not found in params"),
-                    }
-
-                    assert_eq!(params, $expected);
-                };
-            }
-
             let tasks = parse_to_taskes(["maa", "copilot", "maa://40051"], &config);
             assert_eq!(tasks.len(), 1);
-            assert_eq!(
-                tasks[0].name.as_deref(),
-                Some("AS-EX-1 小偷与收款人 Normal")
-            );
             assert_eq!(tasks[0].task_type, TaskType::Copilot);
-            assert_params!(
+            assert_eq!(
                 tasks[0].params,
                 object!(
-                    "filename" => "40051.json",
+                    "copilot_list" => [object!(
+                        "filename" => path_from_cache_dir("40051.json"),
+                        "stage_name" => "AS-EX-1",
+                        "is_raid" => false,
+                    )],
                     "formation" => false,
-                    "need_navigate" => false,
                     "use_sanity_potion" => false,
-                    "navigate_name" => "AS-EX-1",
                     "add_trust" => false,
-                    "select_formation" => 0,
+                    "formation_index" => 0,
                 ),
             );
 
@@ -563,7 +560,7 @@ mod tests {
                     "--use-sanity-potion",
                     "--need-navigate",
                     "--add-trust",
-                    "--select-formation",
+                    "--formation-index",
                     "4",
                     "--support-unit-name",
                     "维什戴尔",
@@ -571,26 +568,54 @@ mod tests {
                 &config,
             );
             assert_eq!(tasks_no_default.len(), 1);
-            assert_eq!(
-                tasks_no_default[0].name.as_deref(),
-                Some("AS-EX-1 小偷与收款人 Raid")
-            );
             assert_eq!(tasks_no_default[0].task_type, TaskType::Copilot);
-            assert_params!(
+            assert_eq!(
                 tasks_no_default[0].params,
                 object!(
-                    "filename" => "40051.json",
-                    "need_navigate" => true,
+                    "copilot_list" => [object!(
+                        "filename" => path_from_cache_dir("40051.json"),
+                        "stage_name" => "AS-EX-1",
+                        "is_raid" => true,
+                    )],
                     "formation" => true,
                     "use_sanity_potion" => true,
-                    "navigate_name" => "AS-EX-1",
-                    "is_raid" => true,
                     "add_trust" => true,
-                    "select_formation" => 4,
+                    "formation_index" => 4,
                     "support_unit_name" => "维什戴尔",
                 ),
             );
 
+            // Test formation index
+            let tasks_formation_index = parse_to_taskes(
+                [
+                    "maa",
+                    "copilot",
+                    "maa://40051",
+                    "--select-formation",
+                    "2",
+                    "--formation-index",
+                    "4",
+                ],
+                &config,
+            );
+            assert_eq!(tasks_formation_index.len(), 1);
+            assert_eq!(tasks_formation_index[0].task_type, TaskType::Copilot);
+            assert_eq!(
+                tasks_formation_index[0].params,
+                object!(
+                    "copilot_list" => [object!(
+                        "filename" => path_from_cache_dir("40051.json"),
+                        "stage_name" => "AS-EX-1",
+                        "is_raid" => false,
+                    )],
+                    "formation" => false,
+                    "use_sanity_potion" => false,
+                    "add_trust" => false,
+                    "formation_index" => 4,
+                ),
+            );
+
+            // Test raid mode 2
             let tasks_raid_2 = parse_to_taskes(
                 [
                     "maa",
@@ -602,79 +627,50 @@ mod tests {
                 ],
                 &config,
             );
-            assert_eq!(tasks_raid_2.len(), 2);
-            assert_eq!(
-                tasks_raid_2[0].name.as_deref(),
-                Some("AS-EX-1 小偷与收款人 Normal")
-            );
-            assert_eq!(
-                tasks_raid_2[1].name.as_deref(),
-                Some("AS-EX-1 小偷与收款人 Raid")
-            );
+            assert_eq!(tasks_raid_2.len(), 1);
             assert_eq!(tasks_raid_2[0].task_type, TaskType::Copilot);
-            assert_eq!(tasks_raid_2[1].task_type, TaskType::Copilot);
-            assert_params!(
+            assert_eq!(
                 tasks_raid_2[0].params,
                 object!(
-                    "filename" => "40051.json",
+                    "copilot_list" => [object!(
+                        "filename" => path_from_cache_dir("40051.json"),
+                        "stage_name" => "AS-EX-1",
+                        "is_raid" => false,
+                    ),
+                    object!(
+                        "filename" => path_from_cache_dir("40051.json"),
+                        "stage_name" => "AS-EX-1",
+                        "is_raid" => true,
+                    )],
                     "formation" => true,
-                    "need_navigate" => false,
                     "use_sanity_potion" => false,
-                    "navigate_name" => "AS-EX-1",
                     "add_trust" => false,
-                    "select_formation" => 0,
-                ),
-            );
-            assert_params!(
-                tasks_raid_2[1].params,
-                object!(
-                    "filename" => "40051.json",
-                    "formation" => false,
-                    "need_navigate" => true,
-                    "use_sanity_potion" => false,
-                    "navigate_name" => "AS-EX-1",
-                    "is_raid" => true,
-                    "add_trust" => false,
-                    "select_formation" => 0,
+                    "formation_index" => 0,
                 ),
             );
 
             let tasks_multiple =
                 parse_to_taskes(["maa", "copilot", "maa://40051", "maa://40052"], &config);
 
-            assert_eq!(tasks_multiple.len(), 2);
-            assert_eq!(
-                tasks_multiple[0].name.as_deref(),
-                Some("AS-EX-1 小偷与收款人 Normal")
-            );
-            assert_eq!(
-                tasks_multiple[1].name.as_deref(),
-                Some("AS-EX-2 被吹碎的镜子 Normal")
-            );
+            assert_eq!(tasks_multiple.len(), 1);
             assert_eq!(tasks_multiple[0].task_type, TaskType::Copilot);
-            assert_eq!(tasks_multiple[1].task_type, TaskType::Copilot);
-            assert_params!(
+            assert_eq!(
                 tasks_multiple[0].params,
                 object!(
-                    "filename" => "40051.json",
+                    "copilot_list" => [object!(
+                        "filename" => path_from_cache_dir("40051.json"),
+                        "stage_name" => "AS-EX-1",
+                        "is_raid" => false,
+                    ),
+                    object!(
+                        "filename" => path_from_cache_dir("40052.json"),
+                        "stage_name" => "AS-EX-2",
+                        "is_raid" => false,
+                    )],
                     "formation" => true,
-                    "need_navigate" => true,
                     "use_sanity_potion" => false,
-                    "navigate_name" => "AS-EX-1",
                     "add_trust" => false,
-                    "select_formation" => 0,
-                ),
-            );
-            assert_params!(
-                tasks_multiple[1].params,
-                object!(
-                    "filename" => "40052.json",
-                    "formation" => true,
-                    "need_navigate" => true,
-                    "use_sanity_potion" => false,
-                    "navigate_name" => "AS-EX-2",
-                    "add_trust" => false,
-                    "select_formation" => 0,
+                    "formation_index" => 0,
                 ),
             );
         }
@@ -730,11 +726,11 @@ mod tests {
             }
 
             assert!(parse(["maa", "ssscopilot", "maa://40051"]).is_err());
-            assert_params!(
+            assert_eq!(
                 retry(3, || parse(["maa", "ssscopilot", "maa://40451"])),
                 object!("filename" => "40451.json", "loop_times" => 1)
             );
-            assert_params!(
+            assert_eq!(
                 retry(3, || parse([
                     "maa",
                     "ssscopilot",
