@@ -728,7 +728,7 @@ mod tests {
             assert!(parse(["maa", "ssscopilot", "maa://40051"]).is_err());
             assert_eq!(
                 retry(3, || parse(["maa", "ssscopilot", "maa://40451"])),
-                object!("filename" => "40451.json", "loop_times" => 1)
+                object!("filename" => path_from_cache_dir("40451.json"), "loop_times" => 1)
             );
             assert_eq!(
                 retry(3, || parse([
@@ -738,7 +738,7 @@ mod tests {
                     "--loop-times",
                     "2"
                 ])),
-                object!("filename" => "40451.json", "loop_times" => 2)
+                object!("filename" => path_from_cache_dir("40451.json"), "loop_times" => 2)
             );
         }
     }
