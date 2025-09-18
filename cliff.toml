@@ -25,7 +25,7 @@ body = """
 
 {%- macro user_link(username) -%}
   {%- set username = username | trim_end_matches(pat="[bot]") -%}
-  {%- if get_env(name="CI", default="false") == "true" -%}
+  {%- if get_env(name="CLIFF_SHORT_USERNAME", default="false") == "true" -%}
     @{{ username }}
   {%- else -%}
     [@{{ username }}](https://github.com/{{ username }})

@@ -1,0 +1,72 @@
+name: Sync to MAA Main Repository
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version number
+        required: true
+        type: string
+      dryrun:
+        description: Do not push commits
+        required: false
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      version:
+        description: Version number
+        required: true
+        type: string
+      dryrun:
+        description: Do not push commits
+        required: false
+        type: boolean
+        default: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release-note:
+    name: Update Changelog
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Generate Release Notes
+        id: git_cliff
+        uses: orhun/git-cliff-action@v4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          config: cliff.toml
+          # If the release is triggered by a tag, process commits starting
+          # from the latest tag, otherwise tag will be create later, so use
+          # unreleased commits
+          args: -v -l -p CHANGELOG.md
+
+      - name: Setup Git User
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Preview Changes
+        if: ${{ inputs.dryrun }}
+        run: |
+          {
+            echo "Changes to CHANGELOG.md"
+            echo '```diff'
+            git diff CHANGELOG.md
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit Changes
+        if: ${{ !inputs.dryrun }}
+        run: |
+          git add CHANGELOG.md
+          git commit -m "chore(Changelog): update changelog for ${{ inputs.version }}"
+          git push

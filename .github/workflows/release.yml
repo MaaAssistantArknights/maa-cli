@@ -67,6 +67,8 @@ jobs:
     if: ${{ !fromJson(needs.meta.outputs.skip) }}
     runs-on: ubuntu-latest
     needs: [meta]
+    env:
+      CLIFF_SHORT_USERNAME: true
     outputs:
       content: ${{ steps.git_cliff.outputs.content }}
     steps:
@@ -321,6 +323,15 @@ jobs:
         run: |
           git tag -f stable ${{ needs.meta.outputs.commit }}
           git push --verbose --force origin stable
+
+  update-changelog:
+    name: Update Changelog
+    needs: [meta, release]
+    if: ${{ fromJson(needs.meta.outputs.publish) && !fromJson(needs.meta.outputs.prerelease) }}
+    uses: ./.github/workflows/publish-changelog.yml
+    with:
+      version: ${{ needs.meta.outputs.version }}
+      dryrun: false
 
   sync:
     name: Sync to MAA Main Repository
