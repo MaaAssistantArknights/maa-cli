@@ -153,10 +153,12 @@ impl IntoTaskConfig for CopilotParams {
                 .as_str()
                 .context("stage_name is not a string")?;
 
+            let is_paradox = stage_id.starts_with("mem_");
+
             let stage_info = get_stage_info(stage_id, base_dirs.iter().map(|dir| dir.as_path()))?;
             let stage_code = get_str_key(&stage_info, "code")?;
 
-            if !formation {
+            if !(is_paradox || formation) {
                 println!("Operators:\n{}", operator_table(&copilot_info)?);
                 println!("Please set up your formation manually");
                 while !BoolInput::new(Some(true), Some("continue")).value()? {
@@ -164,25 +166,33 @@ impl IntoTaskConfig for CopilotParams {
                 }
             }
 
-            match self.raid {
+            let mut raid = self.raid;
+            if is_paradox && raid != 0 {
+                log::warn!(
+                    "Paradox simulation is not supported in raid mode, force raid mode to 0"
+                );
+                raid = 0;
+            }
+
+            match raid {
                 0 | 1 => stage_list.push(StageOpts {
                     filename: file.to_path_buf(),
                     stage_name: stage_code.to_owned(),
-                    is_raid: self.raid == 1,
-                    is_paradox: false,
+                    is_raid: raid == 1,
+                    is_paradox,
                 }),
                 2 => {
                     stage_list.push(StageOpts {
                         filename: file.to_path_buf(),
                         stage_name: stage_code.to_owned(),
                         is_raid: false,
-                        is_paradox: false,
+                        is_paradox,
                     });
                     stage_list.push(StageOpts {
                         filename: file.to_path_buf(),
                         stage_name: stage_code.to_owned(),
                         is_raid: true,
-                        is_paradox: false,
+                        is_paradox,
                     });
                 }
                 n => bail!("Invalid raid mode {n}, should be 0, 1 or 2"),
@@ -680,6 +690,48 @@ mod tests {
                         "is_paradox" => false,
                     )],
                     "formation" => true,
+                    "use_sanity_potion" => false,
+                    "add_trust" => false,
+                    "formation_index" => 0,
+                ),
+            );
+
+            // Test paradox simulation (with maa://63896)
+            let tasks_paradox = parse_to_taskes(["maa", "copilot", "maa://63896"], &config);
+            assert_eq!(tasks_paradox.len(), 1);
+            assert_eq!(tasks_paradox[0].task_type, TaskType::Copilot);
+            assert_eq!(
+                tasks_paradox[0].params,
+                object!(
+                    "copilot_list" => [object!(
+                        "filename" => path_from_cache_dir("63896.json"),
+                        "stage_name" => "mem_hsguma_1",
+                        "is_raid" => false,
+                        "is_paradox" => true,
+                    )],
+                    "formation" => false,
+                    "use_sanity_potion" => false,
+                    "add_trust" => false,
+                    "formation_index" => 0,
+                ),
+            );
+
+            // Test paradox simulation with wrong raid mode
+            // Test paradox simulation with wrong raid mode
+            let tasks_paradox_raid_2 =
+                parse_to_taskes(["maa", "copilot", "maa://63896", "--raid", "2"], &config);
+            assert_eq!(tasks_paradox_raid_2.len(), 1);
+            assert_eq!(tasks_paradox_raid_2[0].task_type, TaskType::Copilot);
+            assert_eq!(
+                tasks_paradox_raid_2[0].params,
+                object!(
+                    "copilot_list" => [object!(
+                        "filename" => path_from_cache_dir("63896.json"),
+                        "stage_name" => "mem_hsguma_1",
+                        "is_raid" => false,
+                        "is_paradox" => true,
+                    )],
+                    "formation" => false,
                     "use_sanity_potion" => false,
                     "add_trust" => false,
                     "formation_index" => 0,
