@@ -3,12 +3,9 @@ name = "maa-dirs"
 version = "0.2.0"
 authors.workspace = true
 edition.workspace = true
-license.workspace = true
 homepage.workspace = true
 repository.workspace = true
-
-[lints]
-workspace = true
+license.workspace = true
 
 [dependencies]
 constcat = { workspace = true }
@@ -18,3 +15,6 @@ log = { workspace = true }
 
 [dev-dependencies]
 tempfile.workspace = true
+
+[lints]
+workspace = true

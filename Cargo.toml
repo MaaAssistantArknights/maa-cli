@@ -1,20 +1,19 @@
+#:tombi schema.strict = false
+
 [workspace]
 resolver = "2"
 members = ["crates/*"]
 
 [workspace.package]
-license = "AGPL-3.0-only"
+# tombi: lint.rules.deprecated.disabled = true
 authors = ["Long Wang <loong@loongw.cc>"]
+edition = "2024"
+rust-version = "1.88"
 homepage = "https://github.com/MaaAssistantArknights/maa-cli"
 repository = "https://github.com/MaaAssistantArknights/maa-cli"
-rust-version = "1.88"
-edition = "2024"
+license = "AGPL-3.0-only"
 
 [workspace.dependencies]
-maa-dirs = { path = "crates/maa-dirs", version = "0.2" }
-maa-sys = { path = "crates/maa-sys", version = "0.7" }
-maa-types = { path = "crates/maa-types", version = "0.2" }
-
 anyhow = "1"
 async-trait = "0.1.81"
 chrono = { version = "0.4.31", default-features = false }
@@ -27,15 +26,23 @@ digest = "0.10.7"
 directories = "6"
 dunce = "1.0.4"
 env_logger = { version = "0.11", default-features = false }
-flate2 = "1"
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 futures-util = "0.3.28"
 git2 = "0.20"
-indicatif = "0.17.7"
+indicatif = "0.18"
 libloading = "0.8"
 log = "0.4.20"
+maa-dirs = { path = "crates/maa-dirs", version = "0.2" }
+maa-sys = { path = "crates/maa-sys", version = "0.7" }
+maa-types = { path = "crates/maa-types", version = "0.2" }
 prettytable = { version = "0.10.0", default-features = false }
 regex = "1.10.2"
-reqwest = { version = "0.12", features = ["native-tls"] }
+reqwest = { version = "0.12", default-features = false, features = [
+  "charset",
+  "http2",
+  "rustls-tls",
+  "system-proxy",
+] }
 self-replace = "1.5.0"
 semver = "1.0.19"
 serde = "1"
@@ -48,16 +55,16 @@ tar = "0.4.40"
 tempfile = "3.14.0"
 thiserror = "2"
 tokio = "1.44"
-toml = "0.8"
-windows-result = "0.3.0"
-windows-strings = "0.4.0"
-windows-sys = "0.59.0"
-zip = { version = "2", default-features = false }
+toml = "0.9"
+windows-result = "0.4.0"
+windows-strings = "0.5.0"
+windows-sys = "0.61.0"
+zip = { version = "5", default-features = false, features = ["deflate-flate2"] }
+
+[workspace.lints.rust]
+unexpected_cfgs = { check-cfg = [
+  "cfg(coverage,coverage_nightly)",
+], level = "warn" }
 
 [workspace.metadata.typos.files]
 extend-exclude = ["licenses.md"]
-
-[workspace.lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = [
-  'cfg(coverage,coverage_nightly)',
-] }

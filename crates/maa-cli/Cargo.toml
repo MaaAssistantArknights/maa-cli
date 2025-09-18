@@ -1,50 +1,18 @@
 [package]
 name = "maa-cli"
-description = "A simple CLI for MAA (MaaAssistantArknights)"
 version = "0.5.9"
-authors.workspace = true
 edition.workspace = true
+description = "A simple CLI for MAA (MaaAssistantArknights)"
 repository.workspace = true
 license.workspace = true
-
-[lints]
-workspace = true
-
-[features]
-default = ["cli_installer", "core_installer", "git2"]
-
-# Features used to install and update MAA Core
-core_installer = ["__installer"]
-
-# Features used to install update maa-cli self
-cli_installer = ["__installer"]
-
-vendored-openssl = ["git2?/vendored-openssl", "reqwest/native-tls-vendored"]
-
-# Common features used to install and update MAA Core and maa-cli self
-__installer = [
-  "indicatif",
-  "futures-util",
-  "sha2",
-  "digest",
-  "semver",
-  "flate2",
-  "tar",
-  "zip",
-  "reqwest/stream",
-]
 
 [[bin]]
 name = "maa"
 path = "src/main.rs"
 
 [dependencies]
-maa-dirs = { workspace = true }
-maa-sys = { workspace = true, features = ["runtime"] }
-maa-types = { workspace = true, features = ["serde"] }
-
 anyhow = { workspace = true }
-chrono = { workspace = true, features = ["std", "clock", "serde"] }
+chrono = { workspace = true, features = ["clock", "serde", "std"] }
 clap = { workspace = true, features = ["derive"] }
 clap_complete = { workspace = true }
 clap_mangen = { workspace = true }
@@ -58,21 +26,47 @@ futures-util = { workspace = true, optional = true }
 git2 = { workspace = true, optional = true }
 indicatif = { workspace = true, optional = true }
 log = { workspace = true }
+maa-dirs = { workspace = true }
+maa-sys = { workspace = true, features = ["runtime"] }
+maa-types = { workspace = true, features = ["serde"] }
 prettytable = { workspace = true }
 reqwest = { workspace = true, features = ["blocking", "json"] }
-semver = { workspace = true, optional = true, features = ["serde"] }
+self-replace = { workspace = true }
+semver = { workspace = true, features = ["serde"], optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 sha2 = { workspace = true, optional = true }
 signal-hook = { workspace = true }
 tar = { workspace = true, optional = true }
+tempfile = { workspace = true }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread"] }
 toml = { workspace = true }
-zip = { workspace = true, optional = true, features = ["deflate"] }
-self-replace = { workspace = true }
-tempfile = { workspace = true }
+zip = { workspace = true, optional = true }
 
 [dev-dependencies]
 regex = { workspace = true }
 serde_test = { workspace = true }
+
+[features]
+default = ["cli_installer", "core_installer", "git2"]
+# Common features used to install and update MAA Core and maa-cli self
+__installer = [
+  "digest",
+  "flate2",
+  "futures-util",
+  "indicatif",
+  "reqwest/stream",
+  "semver",
+  "sha2",
+  "tar",
+  "zip",
+]
+# Features used to install update maa-cli self
+cli_installer = ["__installer"]
+# Features used to install and update MAA Core
+core_installer = ["__installer"]
+vendored-openssl = ["git2?/vendored-openssl"]
+
+[lints]
+workspace = true
