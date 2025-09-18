@@ -1,15 +1,24 @@
 [package]
 name = "maa-sys"
-description = "Low-level bindings and Safe Wrapper for MaaCore"
 version = "0.7.0"
 authors.workspace = true
 edition.workspace = true
-license.workspace = true
-repository.workspace = true
+description = "Low-level bindings and Safe Wrapper for MaaCore"
 homepage.workspace = true
+repository.workspace = true
+license.workspace = true
 
-[lints]
-workspace = true
+[dependencies]
+libloading = { workspace = true, optional = true }
+maa-types = { workspace = true }
+thiserror = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+windows-result = { workspace = true, optional = true }
+windows-strings = { workspace = true, optional = true }
+windows-sys = { workspace = true, features = [
+  "Win32_System_LibraryLoader",
+], optional = true }
 
 [features]
 runtime = [
@@ -19,14 +28,5 @@ runtime = [
   "dep:windows-sys",
 ]
 
-[dependencies]
-maa-types = { workspace = true }
-libloading = { workspace = true, optional = true }
-thiserror = { workspace = true }
-
-[target.'cfg(windows)'.dependencies]
-windows-result = { workspace = true, optional = true }
-windows-strings = { workspace = true, optional = true }
-windows-sys = { workspace = true, optional = true, features = [
-  "Win32_System_LibraryLoader",
-] }
+[lints]
+workspace = true
