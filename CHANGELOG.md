@@ -1,5 +1,47 @@
 # Release Notes
 
+## Release 0.5.9
+
+### Features
+
+- Support new copilot list by [@wangl-cc](https://github.com/wangl-cc)
+- Add support for paradox simulation by [@wangl-cc](https://github.com/wangl-cc) in [#424](https://github.com/MaaAssistantArknights/maa-cli/pull/424)
+
+### Bug Fixes
+
+- Pass `is_paradox` in copilot_list to core by [@wangl-cc](https://github.com/wangl-cc)
+
+### Documentation
+
+- Improve en_US docs by [@wangl-cc](https://github.com/wangl-cc) in [#422](https://github.com/MaaAssistantArknights/maa-cli/pull/422)
+
+### Testing
+
+- Fix file path for ssscopilot by [@wangl-cc](https://github.com/wangl-cc)
+
+### Miscellaneous
+
+- Update MSRV to 1.88 by [@wangl-cc](https://github.com/wangl-cc)
+- Make clippy happy by [@wangl-cc](https://github.com/wangl-cc)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.5.8...v0.5.9>
+
+## Release 0.5.8
+
+### Documentation
+
+- Update url to example dotfiles by [@wangl-cc](https://github.com/wangl-cc)
+
+### Testing
+
+- Fix waydroid device by [@wangl-cc](https://github.com/wangl-cc) in [#421](https://github.com/MaaAssistantArknights/maa-cli/pull/421)
+
+### Miscellaneous
+
+- Update fish completion for `maa roguelike JieGarden` by [@Jisu-Woniu](https://github.com/Jisu-Woniu) in [#412](https://github.com/MaaAssistantArknights/maa-cli/pull/412)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.5.7...v0.5.8>
+
 ## Release 0.5.7
 
 ### Features
