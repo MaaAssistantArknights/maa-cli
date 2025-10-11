@@ -250,6 +250,12 @@ jobs:
                 zip -vr "$archive_name" "$dir/maa.exe"
                 cp "$archive_name" "$archive_name_unversioned"
                 ;;
+              *-windows-msvc-winget)
+                archive_name="maa_cli-v$VERSION-$target.zip"
+                archive_name_unversioned="maa_cli-$target.zip"
+                zip -j "$archive_name" "$dir/maa.exe"
+                cp "$archive_name" "$archive_name_unversioned"
+                ;;  
               *)
                 echo "Unknown target: $target"
                 exit 1
@@ -293,6 +299,7 @@ jobs:
             maa_cli-*-unknown-linux-gnu.tar.gz
             maa_cli-*-apple-darwin.zip
             maa_cli-*-pc-windows-msvc.zip
+            maa_cli-*-pc-windows-msvc-winget.zip
       - name: Commit version.json and Push
         working-directory: version
         run: |
