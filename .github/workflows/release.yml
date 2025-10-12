@@ -1,0 +1,375 @@
+name: Release
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+  # Just used for testing
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/release.yml"
+      - ".github/actions/setup/**"
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: The release channel
+        default: beta
+        required: true
+        type: choice
+        options:
+          - alpha
+          - beta
+          - stable
+      publish:
+        description: Whether to publish a new release
+        default: false
+        required: true
+        type: boolean
+  schedule:
+    # Release alpha every day at 20:00 UTC (4:00 AM UTC+8)
+    - cron: "0 20 * * *"
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+
+jobs:
+  meta:
+    name: Meta
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      commit: ${{ steps.version.outputs.commit }}
+      channel: ${{ steps.version.outputs.channel }}
+      prerelease: ${{ steps.version.outputs.channel != 'stable' }}
+      publish: ${{ steps.version.outputs.publish }}
+      skip: ${{ steps.version.outputs.skip }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Checkout Version Branch
+        uses: actions/checkout@v5
+        with:
+          ref: version
+          path: version
+      - name: Get Version
+        id: version
+        run: |
+          bash .github/scripts/parse_version.sh
+
+  release-note:
+    name: Generate Release Notes
+    if: ${{ !fromJson(needs.meta.outputs.skip) }}
+    runs-on: ubuntu-latest
+    needs: [meta]
+    env:
+      CLIFF_SHORT_USERNAME: true
+    outputs:
+      content: ${{ steps.git_cliff.outputs.content }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Generate Release Notes
+        id: git_cliff
+        uses: orhun/git-cliff-action@v4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.meta.outputs.version }}
+          TAG: ${{ needs.meta.outputs.tag }}
+        with:
+          config: cliff.toml
+          # If the release is triggered by a tag, process commits starting
+          # from the latest tag, otherwise tag will be create later, so use
+          # unreleased commits
+          args: >
+            -v
+            ${{ github.event_name == 'push' && '-l' || '-u' }}
+            ${{ needs.meta.outputs.channel != 'stable' && '--tag-pattern="^v"' || '' }}
+
+      - name: Preview Release Notes
+        if: ${{ !fromJson(needs.meta.outputs.publish) }}
+        run: |
+          {
+            echo '```markdown'
+            cat '${{ steps.git_cliff.outputs.changelog }}'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    name: Build
+    needs: meta
+    if: ${{ !fromJson(needs.meta.outputs.skip) }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-22.04
+          - windows-latest
+        target-arch:
+          - x86_64
+          - aarch64
+        # macOS can be natively built on both x86_64 and aarch64
+        include:
+          - os: macos-13
+            target-arch: x86_64
+          - os: macos-latest
+            target-arch: aarch64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Setup Cross Compilation Toolchains
+        uses: ./.github/actions/setup
+        with:
+          target_arch: ${{ matrix.target-arch }}
+      - name: Build
+        env:
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 1
+          CARGO_PROFILE_RELEASE_LTO: true
+          CARGO_PROFILE_RELEASE_STRIP: true
+          MAA_VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          cargo build --release --package maa-cli --locked --features vendored-openssl
+      - name: Tar Artifact
+        env:
+          OS: ${{ matrix.os }}
+          IS_CROSS: ${{ matrix.host-arch != matrix.target-arch }}
+        run: |
+          target_dir="target/$CARGO_BUILD_TARGET/release"
+          if [[ "$OS" == "windows"* ]]; then
+            exe="maa.exe"
+          else
+            exe="maa"
+          fi
+          file "$target_dir/$exe" # check file status
+          # dry run if not cross compiling
+          if [[ "$IS_CROSS" == "false" ]]; then
+            "$target_dir/$exe" --version
+          fi
+          tar -cvf "$CARGO_BUILD_TARGET.tar" -C "$target_dir" "$exe"
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: maa_cli-${{ env.CARGO_BUILD_TARGET }}
+          path: ${{ env.CARGO_BUILD_TARGET }}.tar
+          retention-days: 1
+          if-no-files-found: error
+
+  build-universal:
+    name: Build Universal Binary
+    if: ${{ !fromJson(needs.meta.outputs.skip) }}
+    runs-on: macos-latest
+    needs: [meta, build]
+    steps:
+      # download all artifacts, even if not all are used,
+      # because this action don't support wildcards
+      - name: Download Artifacts
+        uses: actions/download-artifact@v5
+      - name: Create universal binaries
+        run: |
+          for arch in x86_64 aarch64; do
+            target="$arch-apple-darwin"
+            dir="maa_cli-$target"
+            tar -xvf "$dir/$target.tar" -C "$dir"
+          done
+          lipo -create -output maa maa_cli-x86_64-apple-darwin/maa maa_cli-aarch64-apple-darwin/maa
+          tar -cvf "universal-apple-darwin.tar" maa
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: maa_cli-universal-apple-darwin
+          path: universal-apple-darwin.tar
+          retention-days: 1
+          if-no-files-found: error
+
+  release:
+    name: Release
+    if: ${{ !fromJson(needs.meta.outputs.skip) }}
+    runs-on: ubuntu-latest
+    needs: [meta, build, build-universal, release-note]
+    permissions:
+      contents: write
+    env:
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CHANNEL: ${{ needs.meta.outputs.channel }}
+      VERSION: ${{ needs.meta.outputs.version }}
+      TAG: ${{ needs.meta.outputs.tag }}
+      COMMIT: ${{ needs.meta.outputs.commit }}
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v5
+      - name: Checkout version branch
+        uses: actions/checkout@v5
+        with:
+          ref: version
+          path: version
+      - name: Extract files, Generate checksums and Update version.json
+        run: |
+          # alpha version info will be updated in all cases
+          version_files=(version/alpha.json)
+          # beta version info will be updated in non-alpha releases
+          [[ "$CHANNEL" != "alpha" ]] && version_files+=(version/beta.json)
+          # stable version info will only be updated in stable releases
+          [[ "$CHANNEL" == "stable" ]] && version_files+=(version/stable.json)
+
+          # target independent version info
+          for version_file in "${version_files[@]}"; do
+            yq -i -oj ".version = \"$VERSION\"" "$version_file"
+            yq -i -oj ".details.tag = \"$TAG\"" "$version_file"
+            yq -i -oj ".details.commit = \"$COMMIT\"" "$version_file"
+          done
+
+          for dir in maa_cli-*; do
+            target=${dir#maa_cli-}
+            tar -xvf "$dir/$target.tar" -C "$dir"
+            # use tar on linux and zip on other platforms
+            case "$target" in
+              *-linux-*)
+                archive_name="maa_cli-v$VERSION-$target.tar.gz"
+                archive_name_unversioned="maa_cli-$target.tar.gz"
+                tar -czvf "$archive_name" "$dir/maa"
+                cp "$archive_name" "$archive_name_unversioned"
+                ;;
+              *-apple-darwin)
+                archive_name="maa_cli-v$VERSION-$target.zip"
+                archive_name_unversioned="maa_cli-$target.zip"
+                zip -vr "$archive_name" "$dir/maa"
+                cp "$archive_name" "$archive_name_unversioned"
+                ;;
+              *-windows-msvc)
+                archive_name="maa_cli-v$VERSION-$target.zip"
+                archive_name_unversioned="maa_cli-$target.zip"
+                zip -vr "$archive_name" "$dir/maa.exe"
+                cp "$archive_name" "$archive_name_unversioned"
+                ;;
+              *-windows-msvc-winget)
+                archive_name="maa_cli-v$VERSION-$target.zip"
+                archive_name_unversioned="maa_cli-$target.zip"
+                mv "$dir/maa.exe" "$dir/maa-cli.exe"
+                zip -j "$archive_name" "$dir/maa-cli.exe"
+                cp "$archive_name" "$archive_name_unversioned"
+                ;;  
+              *)
+                echo "Unknown target: $target"
+                exit 1
+                ;;
+            esac
+            checksum=$(sha256sum "$archive_name")
+            checksum_hash=${checksum:0:64}
+            size=$(stat -c%s "$archive_name")
+
+            # target dependent version info
+            for version_file in "${version_files[@]}"; do
+              yq -i -oj ".details.assets.$target.name = \"$archive_name\"" "$version_file"
+              yq -i -oj ".details.assets.$target.size = $size" "$version_file"
+              yq -i -oj ".details.assets.$target.sha256sum = \"$checksum_hash\"" "$version_file"
+            done
+          done
+      - name: Check existing release
+        if: ${{ fromJson(needs.meta.outputs.publish) }}
+        run: |
+          if gh release view "$TAG" &> /dev/null; then
+            if [ "$TAG" == "nightly" ]; then
+              echo "Release as nightly, clear existing release and tag"
+              gh release delete "$TAG" --yes  --cleanup-tag
+            else
+              echo "Release $TAG already exists, abort"
+              exit 1
+            fi
+          fi
+          sleep 5 # wait to avoid the release becomes draft
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        if: ${{ fromJson(needs.meta.outputs.publish) }}
+        with:
+          name: v${{ needs.meta.outputs.version }}
+          tag_name: ${{ needs.meta.outputs.tag }}
+          target_commitish: ${{ needs.meta.outputs.commit }}
+          prerelease: ${{ fromJson(needs.meta.outputs.prerelease) }}
+          body: ${{ needs.release-note.outputs.content }}
+          fail_on_unmatched_files: true
+          files: |
+            maa_cli-*-unknown-linux-gnu.tar.gz
+            maa_cli-*-apple-darwin.zip
+            maa_cli-*-pc-windows-msvc.zip
+            maa_cli-*-pc-windows-msvc-winget.zip
+      - name: Commit version.json and Push
+        working-directory: version
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          {
+            echo "Commit changes to version.json"
+            echo '```diff'
+            git diff ./*.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          git commit ./*.json -m 'chore: bump version to v${{ needs.meta.outputs.version }}'
+          git push --verbose ${{ !fromJson(needs.meta.outputs.publish) && '--dry-run' || ''}}
+
+  update-stable:
+    name: Update Stable Tag
+    if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'stable' }}
+    needs: [meta, release]
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.meta.outputs.commit }}
+      - name: Update Stable Tag
+        run: |
+          git tag -f stable ${{ needs.meta.outputs.commit }}
+          git push --verbose --force origin stable
+
+  update-changelog:
+    name: Update Changelog
+    needs: [meta, release]
+    if: ${{ fromJson(needs.meta.outputs.publish) && !fromJson(needs.meta.outputs.prerelease) }}
+    uses: ./.github/workflows/publish-changelog.yml
+    with:
+      version: ${{ needs.meta.outputs.version }}
+      dryrun: false
+
+  sync:
+    name: Sync to MAA Main Repository
+    if: ${{ fromJson(needs.meta.outputs.publish) && !fromJson(needs.meta.outputs.prerelease) }}
+    needs: [meta, release]
+    uses: ./.github/workflows/publish-sync.yml
+    with:
+      version: ${{ needs.meta.outputs.version }}
+      dryrun: false
+    secrets:
+      MAA_HOMEBREW_BUMP_PR: ${{ secrets.MAA_HOMEBREW_BUMP_PR }}
+
+  publish-homebrew:
+    name: Publish Homebrew Formulae
+    needs: [meta, release]
+    if: ${{ fromJson(needs.meta.outputs.publish) && !fromJson(needs.meta.outputs.prerelease) }}
+    uses: ./.github/workflows/publish-homebrew.yml
+    with:
+      version: ${{ needs.meta.outputs.version }}
+      dryrun: false
+    secrets:
+      MAA_HOMEBREW_BUMP_PR: ${{ secrets.MAA_HOMEBREW_BUMP_PR }}
+
+  publish-aur:
+    name: Publish AUR Package
+    needs: [meta, release]
+    if: ${{ fromJson(needs.meta.outputs.publish) && !fromJson(needs.meta.outputs.prerelease) }}
+    uses: ./.github/workflows/publish-aur.yml
+    with:
+      pkgver: ${{ needs.meta.outputs.version }}
+      dryrun: false
+    secrets:
+      AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
