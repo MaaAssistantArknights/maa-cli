@@ -253,7 +253,8 @@ jobs:
               *-windows-msvc-winget)
                 archive_name="maa_cli-v$VERSION-$target.zip"
                 archive_name_unversioned="maa_cli-$target.zip"
-                zip -j "$archive_name" "$dir/maa.exe"
+                mv "$dir/maa.exe" "$dir/maa-cli.exe"
+                zip -j "$archive_name" "$dir/maa-cli.exe"
                 cp "$archive_name" "$archive_name_unversioned"
                 ;;  
               *)
