@@ -32,7 +32,7 @@ jobs:
           KOMAC_VERSION: ${{ steps.version.outputs.version }}
         run: |
           komac update \
-            --id "MaaAssistantArknights.MaaAssistantArknights" \
+            --id "MaaAssistantArknights.maa-cli" \
             --version "$KOMAC_VERSION" \
             --urls "https://github.com/MaaAssistantArknights/maa-cli/releases/download/v$KOMAC_VERSION/maa_cli-x86_64-pc-windows-msvc-winget.zip,https://github.com/MaaAssistantArknights/MaaAssistantArknights/releases/download/v$KOMAC_VERSION/maa_cli-aarch64-pc-windows-msvc.zip" \
             --submit \
