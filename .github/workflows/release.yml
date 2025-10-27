@@ -171,7 +171,7 @@ jobs:
       # download all artifacts, even if not all are used,
       # because this action don't support wildcards
       - name: Download Artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
       - name: Create universal binaries
         run: |
           for arch in x86_64 aarch64; do
@@ -205,7 +205,7 @@ jobs:
       COMMIT: ${{ needs.meta.outputs.commit }}
     steps:
       - name: Download Artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
       - name: Checkout version branch
         uses: actions/checkout@v5
         with:
