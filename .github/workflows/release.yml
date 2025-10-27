@@ -155,7 +155,7 @@ jobs:
           fi
           tar -cvf "$CARGO_BUILD_TARGET.tar" -C "$target_dir" "$exe"
       - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: maa_cli-${{ env.CARGO_BUILD_TARGET }}
           path: ${{ env.CARGO_BUILD_TARGET }}.tar
@@ -182,7 +182,7 @@ jobs:
           lipo -create -output maa maa_cli-x86_64-apple-darwin/maa maa_cli-aarch64-apple-darwin/maa
           tar -cvf "universal-apple-darwin.tar" maa
       - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: maa_cli-universal-apple-darwin
           path: universal-apple-darwin.tar
