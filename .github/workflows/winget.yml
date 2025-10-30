@@ -23,7 +23,7 @@ jobs:
       - name: Determine latest version
         id: version
         run: |
-          LATEST_VERSION=$(curl -s https://api.github.com/repos/MaaAssistantArknights/maa-cli/releases/latest | jq -r .tag_name | sed 's/^v//')
+          LATEST_VERSION=$(curl -s https://github.com/MaaAssistantArknights/maa-cli/blob/version/stable.json | jq -r '.[].version' | sed 's/^v//')
           echo "Latest version: $LATEST_VERSION"
           echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
 
