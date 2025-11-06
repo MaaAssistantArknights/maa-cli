@@ -1,4 +1,4 @@
-name: Update MAA in Winget
+name: Update MAA-Cli in Winget
 
 on:
   workflow_dispatch: 
