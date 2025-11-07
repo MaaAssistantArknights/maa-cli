@@ -19,6 +19,14 @@ jobs:
       - name: Install komac
         run: |
           cargo binstall komac@2.11.2 -y
+
+      - name: Validate token
+        run: |
+          if [ -z "${{ secrets.WINGET_GITHUB_TOKEN }}" ]; then
+            echo "ERROR: WINGET_GITHUB_TOKEN secret is not set"
+            echo "Please create a Personal Access Token with 'repo' scope and add it to repository secrets"
+            exit 1
+          fi  
       
       - name: Determine latest version
         id: version
