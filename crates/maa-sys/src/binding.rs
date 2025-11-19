@@ -52,7 +52,7 @@ link! {
         params: *const ::std::os::raw::c_char,
     ) -> AsstTaskId;
     pub fn AsstSetTaskParams(
-        andle: AsstHandle,
+        handle: AsstHandle,
         id: AsstTaskId,
         params: *const ::std::os::raw::c_char,
     ) -> AsstBool;
