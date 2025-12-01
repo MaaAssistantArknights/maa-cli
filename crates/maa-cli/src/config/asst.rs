@@ -1019,7 +1019,7 @@ mod tests {
                 ResourceConfig {
                     platform_diff_resource: Some(path),
                     ..
-                } if *path == PathBuf::from("iOS")
+                } if path.to_str().unwrap() == "iOS"
             );
 
             assert_matches!(
@@ -1030,7 +1030,7 @@ mod tests {
                 ResourceConfig {
                     platform_diff_resource: Some(path),
                     ..
-                } if *path == PathBuf::from("iOS")
+                } if path.to_str().unwrap() == "iOS"
             );
         }
 

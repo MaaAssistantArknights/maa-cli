@@ -559,7 +559,7 @@ mod test {
                 input,
                 output: None,
                 format: None,
-            } if input == PathBuf::from("input.toml")
+            } if input.to_str().unwrap() == "input.toml"
         );
 
         assert_matches!(
@@ -567,7 +567,7 @@ mod test {
             Command::Convert {
                 output: Some(output),
                 ..
-            } if output == PathBuf::from("output.json")
+            } if output.to_str().unwrap() == "output.json"
         );
 
         assert_matches!(
@@ -584,7 +584,7 @@ mod test {
                 output: Some(output),
                 format: Some(config::Filetype::Yaml),
                 ..
-            } if output == PathBuf::from("output.json")
+            } if output.to_str().unwrap() == "output.json"
         );
     }
 
@@ -653,7 +653,7 @@ mod test {
                 path,
                 force: false,
                 config_type,
-            } if path == PathBuf::from("path") && config_type == "task"
+            } if path.to_str().unwrap() == "path" && config_type == "task"
         );
 
         assert_matches!(
@@ -683,7 +683,7 @@ mod test {
             Command::Init {
                 name: Some(name),
                 ..
-            } if name == PathBuf::from("name")
+            } if name.to_str().unwrap() == "name"
         );
 
         assert_matches!(
