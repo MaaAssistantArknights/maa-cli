@@ -381,7 +381,7 @@ mod tests {
                     timezone: TimeOffset::Local
                 }
                 .is_active(),
-                num_days % 2 == 0
+                num_days.is_multiple_of(2)
             );
 
             assert_eq!(
