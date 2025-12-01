@@ -51,9 +51,9 @@ jobs:
       skip: ${{ steps.version.outputs.skip }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Checkout Version Branch
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           ref: version
           path: version
@@ -73,7 +73,7 @@ jobs:
       content: ${{ steps.git_cliff.outputs.content }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Generate Release Notes
@@ -124,7 +124,7 @@ jobs:
             target-arch: aarch64
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Setup Cross Compilation Toolchains
         uses: ./.github/actions/setup
         with:
@@ -207,7 +207,7 @@ jobs:
       - name: Download Artifacts
         uses: actions/download-artifact@v5
       - name: Checkout version branch
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           ref: version
           path: version
@@ -316,7 +316,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           ref: ${{ needs.meta.outputs.commit }}
       - name: Update Stable Tag
