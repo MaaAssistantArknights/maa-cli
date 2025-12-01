@@ -311,6 +311,8 @@ where
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod test {
+    use std::path::Path;
+
     use super::*;
     use crate::config::cli::Channel;
 
@@ -559,7 +561,7 @@ mod test {
                 input,
                 output: None,
                 format: None,
-            } if input.to_str().unwrap() == "input.toml"
+            } if input == Path::new("input.toml")
         );
 
         assert_matches!(
@@ -567,7 +569,7 @@ mod test {
             Command::Convert {
                 output: Some(output),
                 ..
-            } if output.to_str().unwrap() == "output.json"
+            } if output == Path::new("output.json")
         );
 
         assert_matches!(
@@ -584,7 +586,7 @@ mod test {
                 output: Some(output),
                 format: Some(config::Filetype::Yaml),
                 ..
-            } if output.to_str().unwrap() == "output.json"
+            } if output == Path::new("output.json")
         );
     }
 
@@ -653,7 +655,7 @@ mod test {
                 path,
                 force: false,
                 config_type,
-            } if path.to_str().unwrap() == "path" && config_type == "task"
+            } if path == Path::new("path") && config_type == "task"
         );
 
         assert_matches!(
@@ -683,7 +685,7 @@ mod test {
             Command::Init {
                 name: Some(name),
                 ..
-            } if name.to_str().unwrap() == "name"
+            } if name == Path::new("name")
         );
 
         assert_matches!(

@@ -952,7 +952,7 @@ mod tests {
     }
 
     mod resource_config {
-        use std::{env::temp_dir, fs};
+        use std::{env::temp_dir, fs, path::Path};
 
         use super::*;
         use crate::dirs::Ensure;
@@ -1019,7 +1019,7 @@ mod tests {
                 ResourceConfig {
                     platform_diff_resource: Some(path),
                     ..
-                } if path.to_str().unwrap() == "iOS"
+                } if path == Path::new("iOS")
             );
 
             assert_matches!(
@@ -1030,7 +1030,7 @@ mod tests {
                 ResourceConfig {
                     platform_diff_resource: Some(path),
                     ..
-                } if path.to_str().unwrap() == "iOS"
+                } if path == Path::new("iOS")
             );
         }
 
