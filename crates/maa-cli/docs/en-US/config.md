@@ -467,7 +467,7 @@ With these schemas, you can get auto-completion and validation in supported edit
 [task-types]: https://maa.plus/docs/zh-cn/protocol/integration.html#list-of-task-types
 [emulator-ports]: https://maa.plus/docs/en-us/manual/connection.html#obtain-port-number
 [playcover-doc]: https://maa.plus/docs/en-us/manual/device/macos.html#%E2%9C%85-playcover-the-software-runs-most-fluently-for-its-nativity-%F0%9F%9A%80
-[waydroid-doc]: ../../manual/device/linux.md#✅-waydroid
+[waydroid-doc]: https://maa.plus/docs/zh-cn/manual/device/linux.html#✅-waydroid
 [example-config]: ../../config_examples
 [wangl-cc-dotfiles]: https://github.com/wangl-cc/dotfiles/tree/main/home/dot_config/maa
 [schema-dir]: ../../schemas/

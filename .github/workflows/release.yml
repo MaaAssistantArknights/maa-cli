@@ -51,9 +51,9 @@ jobs:
       skip: ${{ steps.version.outputs.skip }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Checkout Version Branch
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           ref: version
           path: version
@@ -73,7 +73,7 @@ jobs:
       content: ${{ steps.git_cliff.outputs.content }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Generate Release Notes
@@ -124,7 +124,7 @@ jobs:
             target-arch: aarch64
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Setup Cross Compilation Toolchains
         uses: ./.github/actions/setup
         with:
@@ -155,7 +155,7 @@ jobs:
           fi
           tar -cvf "$CARGO_BUILD_TARGET.tar" -C "$target_dir" "$exe"
       - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: maa_cli-${{ env.CARGO_BUILD_TARGET }}
           path: ${{ env.CARGO_BUILD_TARGET }}.tar
@@ -171,7 +171,7 @@ jobs:
       # download all artifacts, even if not all are used,
       # because this action don't support wildcards
       - name: Download Artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
       - name: Create universal binaries
         run: |
           for arch in x86_64 aarch64; do
@@ -182,7 +182,7 @@ jobs:
           lipo -create -output maa maa_cli-x86_64-apple-darwin/maa maa_cli-aarch64-apple-darwin/maa
           tar -cvf "universal-apple-darwin.tar" maa
       - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: maa_cli-universal-apple-darwin
           path: universal-apple-darwin.tar
@@ -205,9 +205,9 @@ jobs:
       COMMIT: ${{ needs.meta.outputs.commit }}
     steps:
       - name: Download Artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
       - name: Checkout version branch
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           ref: version
           path: version
@@ -316,7 +316,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           ref: ${{ needs.meta.outputs.commit }}
       - name: Update Stable Tag
