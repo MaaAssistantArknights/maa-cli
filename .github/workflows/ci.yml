@@ -54,7 +54,7 @@ jobs:
       matrix:
         os:
           - ubuntu-22.04
-          - macos-13 # x86_64 runner
+          - macos-15-intel # x86_64 runner
           - macos-latest # aarch64 runner
           - windows-latest
     env:
@@ -151,7 +151,7 @@ jobs:
       matrix:
         os:
           - ubuntu-22.04
-          - macos-13 # x86_64 runner
+          - macos-15-intel # x86_64 runner
           - macos-latest # aarch64 runner
           - windows-latest
     steps:
