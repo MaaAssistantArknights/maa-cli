@@ -1,12 +1,8 @@
-#:tombi schema.strict = false
-
 [workspace]
 resolver = "2"
 members = ["crates/*"]
 
 [workspace.package]
-# tombi: lint.rules.deprecated.disabled = true
-authors = ["Long Wang <loong@loongw.cc>"]
 edition = "2024"
 rust-version = "1.88"
 homepage = "https://github.com/MaaAssistantArknights/maa-cli"
