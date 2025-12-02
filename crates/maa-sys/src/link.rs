@@ -5,7 +5,7 @@ macro_rules! link {
             pub fn $name:ident($($pname:ident: $pty:ty), * $(,)?)$(-> $ret:ty)*;
         )+
     ) => (
-        use libloading::{Library, Symbol};
+        use libloading::{Library, Symbol, AsFilename};
 
         #[expect(non_snake_case, reason = "FFI functions are named in PascalCase")]
         struct SharedLibrary {
@@ -17,7 +17,7 @@ macro_rules! link {
 
 
         impl SharedLibrary {
-            pub fn new(path: impl AsRef<std::ffi::OsStr>) -> Result<Self, libloading::Error> {
+            pub fn new(path: impl AsFilename) -> Result<Self, libloading::Error> {
                 let handle = unsafe { libloading::Library::new(path)? };
                 let lib = Self {
                     $(
@@ -45,7 +45,7 @@ macro_rules! link {
         static SHARED_LIBRARY: RwLock<Option<SharedLibrary>> = RwLock::new(None);
 
         /// Load the shared library of MaaCore from the given path in this thread.
-        pub fn load(path: impl AsRef<std::ffi::OsStr>) -> Result<(), libloading::Error> {
+        pub fn load(path: impl AsFilename) -> Result<(), libloading::Error> {
             let lib = SharedLibrary::new(path)?;
 
             // Unwrap: The RwLock only errors if it is poisoned, which should never happen.

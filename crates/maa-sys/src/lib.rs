@@ -74,7 +74,7 @@ impl Assistant {
             if dir != std::path::Path::new(".") {
                 let code = unsafe { SetDllDirectoryW(HSTRING::from(dir).as_ptr()) };
                 if code == 0 {
-                    return Err(windows_result::Error::from_win32().into());
+                    windows_result::HRESULT::from_thread().ok()?;
                 }
             }
         }

@@ -487,8 +487,6 @@ Apache License 2.0
 
 #### Used by
 
-- [clap_complete](https://github.com/clap-rs/clap)
-- [clap_mangen](https://github.com/clap-rs/clap)
 - [constcat](https://github.com/rossmacarthur/constcat)
 
 #### Full text
@@ -705,6 +703,8 @@ Apache License 2.0
 #### Used by
 
 - [clap](https://github.com/clap-rs/clap)
+- [clap_complete](https://github.com/clap-rs/clap)
+- [clap_mangen](https://github.com/clap-rs/clap)
 - [env_logger](https://github.com/rust-cli/env_logger)
 - [toml](https://github.com/toml-rs/toml)
 
