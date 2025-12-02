@@ -64,11 +64,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Setup Toolchains
-        uses: ./.github/actions/setup
-        with:
-          arch: "${{ matrix.os != 'macos-13' || endsWith(matrix.os, 'arm') ? 'arm' : 'x86_64' }}"
-        uses: actions/checkout@v5
       - name: Update Rust
         run: rustup update stable
       - name: Setup Cache
