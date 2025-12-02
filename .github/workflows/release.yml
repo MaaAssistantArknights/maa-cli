@@ -138,21 +138,15 @@ jobs:
         run: |
           cargo build --release --package maa-cli --locked --features vendored-openssl
       - name: Tar Artifact
-        env:
-          OS: ${{ matrix.os }}
-          IS_CROSS: ${{ matrix.host-arch != matrix.target-arch }}
         run: |
           target_dir="target/$CARGO_BUILD_TARGET/release"
-          if [[ "$OS" == "windows"* ]]; then
+          if [[ "${{ matrix.runner }}" == "windows"* ]]; then
             exe="maa.exe"
           else
             exe="maa"
           fi
           file "$target_dir/$exe" # check file status
-          # dry run if not cross compiling
-          if [[ "$IS_CROSS" == "false" ]]; then
-            "$target_dir/$exe" --version
-          fi
+          "$target_dir/$exe" --version
           tar -cvf "${{ steps.host-triplet.outputs.triplet }}.tar" -C "$target_dir" "$exe"
       - name: Upload Artifact
         uses: actions/upload-artifact@v5
