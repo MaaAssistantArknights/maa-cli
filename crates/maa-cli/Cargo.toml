@@ -1,6 +1,6 @@
 [package]
 name = "maa-cli"
-version = "0.5.10"
+version = "0.5.9"
 edition.workspace = true
 description = "A simple CLI for MAA (MaaAssistantArknights)"
 repository.workspace = true
