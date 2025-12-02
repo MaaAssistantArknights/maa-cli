@@ -42,6 +42,9 @@ enum AsstMsg {
     SubTaskExtraInfo = 20003,
     SubTaskStopped = 20004,
 
+    /* External Callback */
+    ExternalCallbackPenguinStats = 30000,
+
     /* Unknown */
     Unknown = -1,
 }
@@ -67,6 +70,8 @@ impl From<AsstMsgId> for AsstMsg {
             20002 => AsstMsg::SubTaskCompleted,
             20003 => AsstMsg::SubTaskExtraInfo,
             20004 => AsstMsg::SubTaskStopped,
+
+            30000 => AsstMsg::ExternalCallbackPenguinStats,
 
             _ => AsstMsg::Unknown,
         }
@@ -107,6 +112,8 @@ fn process_message(code: AsstMsgId, json: Value) {
         SubTaskCompleted => process_subtask_completed(message),
         SubTaskExtraInfo => process_subtask_extra_info(message),
         SubTaskStopped => Some(()),
+
+        ExternalCallbackPenguinStats => process_penguin_stats_report(message),
 
         Unknown => None,
     };
@@ -341,6 +348,57 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
     Some(())
 }
 fn process_subtask_completed(_: &Map<String, Value>) -> Option<()> {
+    Some(())
+}
+
+fn process_penguin_stats_report(message: &Map<String, Value>) -> Option<()> {
+    let url = message.get("url")?.as_str()?;
+    let body = message.get("body")?.as_str()?;
+    let headers = message.get("headers")?.as_object()?;
+
+    debug!("Reporting to Penguin Stats: {}", url);
+
+    // Build HTTP client and request
+    let client = match reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+    {
+        Ok(client) => client,
+        Err(e) => {
+            error!("Failed to create HTTP client for Penguin Stats: {}", e);
+            return Some(());
+        }
+    };
+
+    let mut request = client.post(url).body(body.to_string());
+
+    // Add headers from the message
+    for (key, value) in headers {
+        if let Some(value_str) = value.as_str() {
+            request = request.header(key, value_str);
+        }
+    }
+
+    // Set content type to JSON
+    request = request.header("Content-Type", "application/json");
+
+    // Send the request
+    match request.send() {
+        Ok(response) => {
+            if response.status().is_success() {
+                info!("Successfully reported to Penguin Stats");
+            } else {
+                warn!(
+                    "Failed to report to Penguin Stats: HTTP {}",
+                    response.status()
+                );
+            }
+        }
+        Err(e) => {
+            error!("Failed to send report to Penguin Stats: {}", e);
+        }
+    }
+
     Some(())
 }
 fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {

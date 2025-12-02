@@ -121,10 +121,10 @@ mod tests {
 
     #[test]
     fn deserialize_installer_config() {
-        assert_de_tokens(&CLIConfig::default(), &[
-            Token::Map { len: Some(0) },
-            Token::MapEnd,
-        ]);
+        assert_de_tokens(
+            &CLIConfig::default(),
+            &[Token::Map { len: Some(0) }, Token::MapEnd],
+        );
 
         #[cfg(feature = "core_installer")]
         assert_de_tokens(

@@ -85,8 +85,11 @@ mod tests {
 
     #[test]
     fn from() {
-        assert_eq!(WaydroidApp::new("localhost:1717"), WaydroidApp {
-            address: "localhost:1717",
-        },);
+        assert_eq!(
+            WaydroidApp::new("localhost:1717"),
+            WaydroidApp {
+                address: "localhost:1717",
+            },
+        );
     }
 }
