@@ -106,15 +106,15 @@ jobs:
     name: Build
     needs: meta
     if: ${{ !fromJson(needs.meta.outputs.skip) }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        os:
+        runner:
           - ubuntu-22.04
           - ubuntu-22.04-arm
-          - macos-13 # x86_64 runner
-          - macos-latest # aarch64 runner
+          - macos-15-intel
+          - macos-latest
           - windows-11-arm
           - windows-latest
     steps:

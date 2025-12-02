@@ -48,15 +48,15 @@ jobs:
 
   build:
     name: Build and Test
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        os:
+        runner:
           - ubuntu-22.04
           - ubuntu-22.04-arm
-          - macos-15-intel # x86_64 runner
-          - macos-latest # aarch64 runner
+          - macos-15-intel
+          - macos-latest
           - windows-11-arm
           - windows-latest
     env:
@@ -75,6 +75,8 @@ jobs:
         run: |
           cargo clippy -- -D warnings
       - name: Install MaaCore
+        # Don't install Core on windows-11-arm (The runner don't support some Neon extension )
+        if: matrix.runner != 'windows-11-arm'
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/crates/maa-cli/config_examples
         run: |
@@ -93,7 +95,6 @@ jobs:
           echo "Downloaded MaaCore version: $version"
           {
             echo "MAA_CORE_DIR=$core_dir"
-            echo "MAA_RESOURCE_DIR=$resource_dir"
             echo "MAA_CORE_VERSION=v$version"
           } >> "$GITHUB_ENV"
       - name: Test
@@ -177,7 +178,7 @@ jobs:
       matrix:
         os:
           - ubuntu-22.04
-          - macos-latest # aarch64 runner
+          - macos-latest
           - windows-latest
     env:
       MAA_EXTRA_SHARE_NAME: maa-test
