@@ -370,7 +370,12 @@ fn process_penguin_stats_report(message: &Map<String, Value>) -> Option<()> {
         }
     };
 
-    let mut request = client.post(url).body(body.to_string());
+    let mut request = client.post(url).body(body.to_owned());
+
+    // Set content type to JSON if not provided in headers
+    if !headers.contains_key("Content-Type") {
+        request = request.header("Content-Type", "application/json");
+    }
 
     // Add headers from the message
     for (key, value) in headers {
@@ -378,9 +383,6 @@ fn process_penguin_stats_report(message: &Map<String, Value>) -> Option<()> {
             request = request.header(key, value_str);
         }
     }
-
-    // Set content type to JSON
-    request = request.header("Content-Type", "application/json");
 
     // Send the request
     match request.send() {
