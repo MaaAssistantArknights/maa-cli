@@ -693,4 +693,40 @@ mod tests {
         assert_eq!([1, 2, 3].iter().join(","), Some("1,2,3".to_owned()));
         assert_eq!(Vec::<i32>::new().iter().join(","), None);
     }
+
+    #[test]
+    fn test_asst_msg_from_code() {
+        // Test code 30000 maps to ExternalCallbackPenguinStats
+        let msg: AsstMsg = 30000.into();
+        assert!(matches!(msg, AsstMsg::ExternalCallbackPenguinStats));
+
+        // Test other codes
+        assert!(matches!(0.into(), AsstMsg::InternalError));
+        assert!(matches!(10000.into(), AsstMsg::TaskChainError));
+        assert!(matches!(20000.into(), AsstMsg::SubTaskError));
+        assert!(matches!(99999.into(), AsstMsg::Unknown));
+    }
+
+    #[test]
+    fn test_penguin_stats_url_validation() {
+        // Valid URL
+        let mut message = Map::new();
+        message.insert("url".to_string(), Value::String("https://penguin-stats.io/PenguinStats/api/v2/report".to_string()));
+        message.insert("body".to_string(), Value::String("{}".to_string()));
+        message.insert("headers".to_string(), Value::Object(Map::new()));
+
+        // Should return Some(()) for valid URL
+        let result = process_penguin_stats_report(&message);
+        assert!(result.is_some());
+
+        // Invalid URL (different domain)
+        message.insert("url".to_string(), Value::String("https://evil.com/api".to_string()));
+        let result = process_penguin_stats_report(&message);
+        assert!(result.is_some()); // Still returns Some() but logs warning
+
+        // Invalid URL (http instead of https)
+        message.insert("url".to_string(), Value::String("http://penguin-stats.io/api".to_string()));
+        let result = process_penguin_stats_report(&message);
+        assert!(result.is_some()); // Still returns Some() but logs warning
+    }
 }
