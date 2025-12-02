@@ -893,10 +893,9 @@ mod tests {
 
         std::fs::File::create(&test_file).unwrap();
 
-        assert_eq!(
-            global_path([&test_dir1, &test_dir2], "test"),
-            vec![test_file.clone()]
-        );
+        assert_eq!(global_path([&test_dir1, &test_dir2], "test"), vec![
+            test_file.clone()
+        ]);
         assert_eq!(
             global_path([&test_dir1, &test_dir2], "not_exist"),
             Vec::<PathBuf>::new()

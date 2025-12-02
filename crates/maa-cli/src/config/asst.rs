@@ -534,45 +534,42 @@ mod tests {
             )
             .unwrap();
 
-            assert_eq!(
-                config,
-                AsstConfig {
-                    connection: ConnectionConfig {
-                        preset: Preset::Adb,
-                        adb_path: Some(String::from("adb")),
-                        address: Some(String::from("emulator-5554")),
-                        config: Some(String::from("CompatMac")),
+            assert_eq!(config, AsstConfig {
+                connection: ConnectionConfig {
+                    preset: Preset::Adb,
+                    adb_path: Some(String::from("adb")),
+                    address: Some(String::from("emulator-5554")),
+                    config: Some(String::from("CompatMac")),
+                },
+                resource: ResourceConfig {
+                    resource_base_dirs: {
+                        let mut base_dirs = default_resource_base_dirs();
+                        base_dirs.push(user_resource_dir);
+                        base_dirs
                     },
-                    resource: ResourceConfig {
-                        resource_base_dirs: {
-                            let mut base_dirs = default_resource_base_dirs();
-                            base_dirs.push(user_resource_dir);
-                            base_dirs
-                        },
-                        global_resource: Some(PathBuf::from("YoStarEN")),
-                        platform_diff_resource: Some(PathBuf::from("iOS")),
-                        user_resource: true,
-                    },
-                    static_options: StaticOptions {
-                        cpu_ocr: Some(false),
-                        gpu_ocr: Some(1),
-                    },
-                    instance_options: InstanceOptions {
-                        touch_mode: Some(TouchMode::MaaTouch),
-                        deployment_with_pause: Some(false),
-                        adb_lite_enabled: Some(false),
-                        kill_adb_on_exit: Some(false),
-                    },
-                }
-            );
+                    global_resource: Some(PathBuf::from("YoStarEN")),
+                    platform_diff_resource: Some(PathBuf::from("iOS")),
+                    user_resource: true,
+                },
+                static_options: StaticOptions {
+                    cpu_ocr: Some(false),
+                    gpu_ocr: Some(1),
+                },
+                instance_options: InstanceOptions {
+                    touch_mode: Some(TouchMode::MaaTouch),
+                    deployment_with_pause: Some(false),
+                    adb_lite_enabled: Some(false),
+                    kill_adb_on_exit: Some(false),
+                },
+            });
         }
 
         #[test]
         fn connection_config() {
-            assert_de_tokens(
-                &ConnectionConfig::default(),
-                &[Token::Map { len: Some(0) }, Token::MapEnd],
-            );
+            assert_de_tokens(&ConnectionConfig::default(), &[
+                Token::Map { len: Some(0) },
+                Token::MapEnd,
+            ]);
 
             assert_de_tokens(
                 &ConnectionConfig {
@@ -819,15 +816,12 @@ mod tests {
 
         #[test]
         fn default() {
-            assert_matches!(
-                ConnectionConfig::default(),
-                ConnectionConfig {
-                    preset: Preset::Adb,
-                    adb_path: None,
-                    address: None,
-                    config: None,
-                }
-            );
+            assert_matches!(ConnectionConfig::default(), ConnectionConfig {
+                preset: Preset::Adb,
+                adb_path: None,
+                address: None,
+                config: None,
+            });
         }
 
         #[cfg(target_os = "macos")]
@@ -965,15 +959,12 @@ mod tests {
 
         #[test]
         fn default() {
-            assert_eq!(
-                ResourceConfig::default(),
-                ResourceConfig {
-                    resource_base_dirs: default_resource_base_dirs(),
-                    global_resource: None,
-                    platform_diff_resource: None,
-                    user_resource: false,
-                }
-            );
+            assert_eq!(ResourceConfig::default(), ResourceConfig {
+                resource_base_dirs: default_resource_base_dirs(),
+                global_resource: None,
+                platform_diff_resource: None,
+                user_resource: false,
+            });
         }
 
         #[test]

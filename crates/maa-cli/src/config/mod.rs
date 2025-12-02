@@ -440,13 +440,10 @@ mod tests {
             }
         );
 
-        assert_eq!(
-            TestConfig::find_file(&test_file).unwrap(),
-            TestConfig {
-                a: 1,
-                b: "test".to_string()
-            }
-        );
+        assert_eq!(TestConfig::find_file(&test_file).unwrap(), TestConfig {
+            a: 1,
+            b: "test".to_string()
+        });
 
         assert_matches!(
             TestConfig::find_file(&non_exist_file).unwrap_err(),

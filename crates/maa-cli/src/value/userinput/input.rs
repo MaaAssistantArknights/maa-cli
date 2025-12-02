@@ -98,33 +98,30 @@ mod tests {
             Input::new(None, None),
         ];
 
-        assert_de_tokens(
-            &values,
-            &[
-                Token::Seq { len: Some(4) },
-                Token::Map { len: Some(2) },
-                Token::Str("default"),
-                Token::Some,
-                Token::I32(0),
-                Token::Str("description"),
-                Token::Some,
-                Token::Str("how many medicine to use"),
-                Token::MapEnd,
-                Token::Map { len: Some(1) },
-                Token::Str("default"),
-                Token::Some,
-                Token::I32(0),
-                Token::MapEnd,
-                Token::Map { len: Some(1) },
-                Token::Str("description"),
-                Token::Some,
-                Token::Str("how many medicine to use"),
-                Token::MapEnd,
-                Token::Map { len: Some(0) },
-                Token::MapEnd,
-                Token::SeqEnd,
-            ],
-        );
+        assert_de_tokens(&values, &[
+            Token::Seq { len: Some(4) },
+            Token::Map { len: Some(2) },
+            Token::Str("default"),
+            Token::Some,
+            Token::I32(0),
+            Token::Str("description"),
+            Token::Some,
+            Token::Str("how many medicine to use"),
+            Token::MapEnd,
+            Token::Map { len: Some(1) },
+            Token::Str("default"),
+            Token::Some,
+            Token::I32(0),
+            Token::MapEnd,
+            Token::Map { len: Some(1) },
+            Token::Str("description"),
+            Token::Some,
+            Token::Str("how many medicine to use"),
+            Token::MapEnd,
+            Token::Map { len: Some(0) },
+            Token::MapEnd,
+            Token::SeqEnd,
+        ]);
     }
 
     #[test]
@@ -143,20 +140,14 @@ mod tests {
                 description: Some(s)
             } if s == "medicine to use",
         );
-        assert_matches!(
-            Input::<i64>::new(Some(0), None::<&str>),
-            Input::<i64> {
-                default: Some(0),
-                description: None,
-            },
-        );
-        assert_matches!(
-            Input::<i64>::new(None::<i64>, None::<&str>),
-            Input::<i64> {
-                default: None,
-                description: None,
-            },
-        );
+        assert_matches!(Input::<i64>::new(Some(0), None::<&str>), Input::<i64> {
+            default: Some(0),
+            description: None,
+        },);
+        assert_matches!(Input::<i64>::new(None::<i64>, None::<&str>), Input::<i64> {
+            default: None,
+            description: None,
+        },);
     }
 
     #[test]

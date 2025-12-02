@@ -391,30 +391,24 @@ mod tests {
                 let modes = [Adb, MiniTouch, MaaTouch, MacPlayTools];
 
                 // Test deserializing from string
-                assert_de_tokens(
-                    &modes,
-                    &[
-                        Token::Seq { len: Some(4) },
-                        Token::Str("adb"),
-                        Token::Str("minitouch"),
-                        Token::Str("maatouch"),
-                        Token::Str("MacPlayTools"),
-                        Token::SeqEnd,
-                    ],
-                );
+                assert_de_tokens(&modes, &[
+                    Token::Seq { len: Some(4) },
+                    Token::Str("adb"),
+                    Token::Str("minitouch"),
+                    Token::Str("maatouch"),
+                    Token::Str("MacPlayTools"),
+                    Token::SeqEnd,
+                ]);
 
                 // Test deserializing from u64
-                assert_de_tokens(
-                    &modes,
-                    &[
-                        Token::Seq { len: Some(4) },
-                        Token::U64(0),
-                        Token::U64(1),
-                        Token::U64(2),
-                        Token::U64(3),
-                        Token::SeqEnd,
-                    ],
-                );
+                assert_de_tokens(&modes, &[
+                    Token::Seq { len: Some(4) },
+                    Token::U64(0),
+                    Token::U64(1),
+                    Token::U64(2),
+                    Token::U64(3),
+                    Token::SeqEnd,
+                ]);
             }
 
             #[test]
@@ -500,25 +494,19 @@ mod tests {
             fn deserialize() {
                 let types: [TaskType; 2] = [StartUp, CloseDown];
 
-                assert_de_tokens(
-                    &types,
-                    &[
-                        Token::Seq { len: Some(2) },
-                        Token::Str("StartUp"),
-                        Token::Str("CloseDown"),
-                        Token::SeqEnd,
-                    ],
-                );
+                assert_de_tokens(&types, &[
+                    Token::Seq { len: Some(2) },
+                    Token::Str("StartUp"),
+                    Token::Str("CloseDown"),
+                    Token::SeqEnd,
+                ]);
 
-                assert_de_tokens(
-                    &types,
-                    &[
-                        Token::Seq { len: Some(2) },
-                        Token::U64(0),
-                        Token::U64(1),
-                        Token::SeqEnd,
-                    ],
-                );
+                assert_de_tokens(&types, &[
+                    Token::Seq { len: Some(2) },
+                    Token::U64(0),
+                    Token::U64(1),
+                    Token::SeqEnd,
+                ]);
             }
 
             #[test]
