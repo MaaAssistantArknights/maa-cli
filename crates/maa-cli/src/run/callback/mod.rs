@@ -356,6 +356,12 @@ fn process_penguin_stats_report(message: &Map<String, Value>) -> Option<()> {
     let body = message.get("body")?.as_str()?;
     let headers = message.get("headers")?.as_object()?;
 
+    // Validate that the URL is for Penguin Stats to prevent potential SSRF
+    if !url.starts_with("https://penguin-stats.io/") {
+        warn!("Ignoring Penguin Stats report to untrusted URL: {}", url);
+        return Some(());
+    }
+
     debug!("Reporting to Penguin Stats: {}", url);
 
     // Build HTTP client and request
