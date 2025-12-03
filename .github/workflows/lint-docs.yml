@@ -17,24 +17,34 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
-  lint:
-    name: Lint Markdown
+  typos:
+    name: Typos
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Lint Markdown
+      - name: Run typos
+        uses: crate-ci/typos@v1
+
+  markdownlint:
+    name: Markdownlint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Run markdownlint
         uses: DavidAnson/markdownlint-cli2-action@v21
         with:
           globs: "**/*.md"
           config: "crates/maa-cli/docs/.markdownlint.yaml"
 
-  check-links:
-    name: Check Dead Links
+  deadlinks:
+    name: Dead Links
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -44,7 +54,7 @@ jobs:
           path: .lycheecache
           key: cache-lychee-${{ github.sha }}
           restore-keys: cache-lychee-
-      - name: Check Dead Links
+      - name: Run lychee
         uses: lycheeverse/lychee-action@v2
         with:
           args: >
@@ -56,4 +66,4 @@ jobs:
         with:
           message: |
             Dead links found in the documentation. Please fix them.
-            Details: https://github.com/MaaAssistantArknights/maa-cli/actions/runs/${{ github.run_id }}
+            Details: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

@@ -30,13 +30,25 @@ env:
   RUST_BACKTRACE: full
   CARGO_TERM_COLOR: always
 
+permissions:
+  contents: read
+
 defaults:
   run:
     shell: bash
 
 jobs:
+  typos:
+    name: Lint (typos)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Run typos
+        uses: crate-ci/typos@v1
+
   format:
-    name: Format Check
+    name: Lint (format)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -47,7 +59,7 @@ jobs:
           cargo +nightly fmt -- --check
 
   build:
-    name: Build and Test
+    name: Build and Test (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -57,7 +69,6 @@ jobs:
           - ubuntu-22.04-arm
           - macos-15-intel
           - macos-latest
-          - windows-11-arm
           - windows-latest
     env:
       MAA_EXTRA_SHARE_NAME: maa-test
@@ -75,24 +86,14 @@ jobs:
         run: |
           cargo clippy -- -D warnings
       - name: Install MaaCore
-        # Don't install Core on windows-11-arm
-        # Windows ARM runners don't meet some requirements for OpenCV
-        if: matrix.runner != 'windows-11-arm'
         env:
           MAA_CONFIG_DIR: ${{ github.workspace }}/crates/maa-cli/config_examples
         run: |
           cargo run --package maa-cli -- install beta
           core_dir=$(cargo run -- dir library)
-          resource_dir=$(cargo run -- dir resource)
           cache_dir=$(cargo run -- dir cache)
           package_name=$(basename "$cache_dir"/MAA-v*)
-          version=${package_name#MAA-v}
-          version=${version%%-linux*}
-          version=${version%%-macos*}
-          version=${version%%-win*}
-          ls -l "$core_dir"
-          ls -l "$resource_dir"
-          ls -l "$cache_dir"
+          version=$(echo "$package_name" | sed -E 's/^MAA-v(.+)-(linux|macos|win)-.*/\1/')
           echo "Downloaded MaaCore version: $version"
           {
             echo "MAA_CORE_DIR=$core_dir"
@@ -104,8 +105,38 @@ jobs:
         run: |
           cargo test -- --include-ignored
 
+  build-tier2:
+    name: Build and Test (Tier 2, ${{ matrix.runner }})
+    needs: [build]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - windows-11-arm
+    env:
+      MAA_EXTRA_SHARE_NAME: maa-test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Update Rust
+        run: rustup update stable
+      - name: Setup Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Build (maa-cli)
+        run: |
+          cargo build --locked
+      - name: Lint (clippy)
+        run: |
+          cargo clippy -- -D warnings
+      - name: Test
+        env:
+          SKIP_CORE_TEST: true
+        run: |
+          cargo test -- --include-ignored
+
   build-no-default-features:
-    name: Build and Test (${{ matrix.feature }})
+    name: Build and Test (feature=${{ matrix.feature }})
     needs: [build]
     runs-on: ubuntu-22.04
     strategy:
@@ -117,8 +148,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-      - name: Setup Toolchains
-        uses: ./.github/actions/setup
+      - name: Update Rust
+        run: rustup update stable
       - name: Build and Test
         env:
           SKIP_CORE_TEST: true
