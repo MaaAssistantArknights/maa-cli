@@ -105,10 +105,7 @@ jobs:
         run: |
           cargo test -- --include-ignored
 
-  build-t2:
-    # Tier 2 targets
-    #
-    # It's slow and can not run all tests
+  build-tier2:
     name: Build and Test (Tier 2, ${{ matrix.runner }})
     needs: [build]
     runs-on: ${{ matrix.runner }}
@@ -139,7 +136,7 @@ jobs:
           cargo test -- --include-ignored
 
   build-no-default-features:
-    name: Build and Test (${{ matrix.feature }})
+    name: Build and Test (feature=${{ matrix.feature }})
     needs: [build]
     runs-on: ubuntu-22.04
     strategy:
@@ -151,8 +148,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-      - name: Setup Toolchains
-        uses: ./.github/actions/setup
+      - name: Update Rust
+        run: rustup update stable
       - name: Build and Test
         env:
           SKIP_CORE_TEST: true
