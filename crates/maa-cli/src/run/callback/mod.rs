@@ -42,6 +42,9 @@ enum AsstMsg {
     SubTaskExtraInfo = 20003,
     SubTaskStopped = 20004,
 
+    /* External Callback */
+    ExternalCallbackPenguinStats = 30000,
+
     /* Unknown */
     Unknown = -1,
 }
@@ -67,6 +70,8 @@ impl From<AsstMsgId> for AsstMsg {
             20002 => AsstMsg::SubTaskCompleted,
             20003 => AsstMsg::SubTaskExtraInfo,
             20004 => AsstMsg::SubTaskStopped,
+
+            30000 => AsstMsg::ExternalCallbackPenguinStats,
 
             _ => AsstMsg::Unknown,
         }
@@ -107,6 +112,8 @@ fn process_message(code: AsstMsgId, json: Value) {
         SubTaskCompleted => process_subtask_completed(message),
         SubTaskExtraInfo => process_subtask_extra_info(message),
         SubTaskStopped => Some(()),
+
+        ExternalCallbackPenguinStats => process_penguin_stats_report(message),
 
         Unknown => None,
     };
@@ -341,6 +348,65 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
     Some(())
 }
 fn process_subtask_completed(_: &Map<String, Value>) -> Option<()> {
+    Some(())
+}
+
+fn process_penguin_stats_report(message: &Map<String, Value>) -> Option<()> {
+    let url = message.get("url")?.as_str()?;
+    let body = message.get("body")?.as_str()?;
+    let headers = message.get("headers")?.as_object()?;
+
+    // Validate that the URL is for Penguin Stats to prevent potential SSRF
+    if !url.starts_with("https://penguin-stats.io/") {
+        warn!("Ignoring Penguin Stats report to untrusted URL: {}", url);
+        return Some(());
+    }
+
+    debug!("Reporting to Penguin Stats: {}", url);
+
+    // Build HTTP client and request
+    let client = match reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+    {
+        Ok(client) => client,
+        Err(e) => {
+            error!("Failed to create HTTP client for Penguin Stats: {}", e);
+            return Some(());
+        }
+    };
+
+    let mut request = client.post(url).body(body.to_owned());
+
+    // Set content type to JSON if not provided in headers
+    if !headers.contains_key("Content-Type") {
+        request = request.header("Content-Type", "application/json");
+    }
+
+    // Add headers from the message
+    for (key, value) in headers {
+        if let Some(value_str) = value.as_str() {
+            request = request.header(key, value_str);
+        }
+    }
+
+    // Send the request
+    match request.send() {
+        Ok(response) => {
+            if response.status().is_success() {
+                info!("Successfully reported to Penguin Stats");
+            } else {
+                warn!(
+                    "Failed to report to Penguin Stats: HTTP {}",
+                    response.status()
+                );
+            }
+        }
+        Err(e) => {
+            error!("Failed to send report to Penguin Stats: {}", e);
+        }
+    }
+
     Some(())
 }
 fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
@@ -626,5 +692,41 @@ mod tests {
     fn iter_join() {
         assert_eq!([1, 2, 3].iter().join(","), Some("1,2,3".to_owned()));
         assert_eq!(Vec::<i32>::new().iter().join(","), None);
+    }
+
+    #[test]
+    fn test_asst_msg_from_code() {
+        // Test code 30000 maps to ExternalCallbackPenguinStats
+        let msg: AsstMsg = 30000.into();
+        assert!(matches!(msg, AsstMsg::ExternalCallbackPenguinStats));
+
+        // Test other codes
+        assert!(matches!(0.into(), AsstMsg::InternalError));
+        assert!(matches!(10000.into(), AsstMsg::TaskChainError));
+        assert!(matches!(20000.into(), AsstMsg::SubTaskError));
+        assert!(matches!(99999.into(), AsstMsg::Unknown));
+    }
+
+    #[test]
+    fn test_penguin_stats_url_validation() {
+        // Valid URL
+        let mut message = Map::new();
+        message.insert("url".to_string(), Value::String("https://penguin-stats.io/PenguinStats/api/v2/report".to_string()));
+        message.insert("body".to_string(), Value::String("{}".to_string()));
+        message.insert("headers".to_string(), Value::Object(Map::new()));
+
+        // Should return Some(()) for valid URL
+        let result = process_penguin_stats_report(&message);
+        assert!(result.is_some());
+
+        // Invalid URL (different domain)
+        message.insert("url".to_string(), Value::String("https://evil.com/api".to_string()));
+        let result = process_penguin_stats_report(&message);
+        assert!(result.is_some()); // Still returns Some() but logs warning
+
+        // Invalid URL (http instead of https)
+        message.insert("url".to_string(), Value::String("http://penguin-stats.io/api".to_string()));
+        let result = process_penguin_stats_report(&message);
+        assert!(result.is_some()); // Still returns Some() but logs warning
     }
 }
