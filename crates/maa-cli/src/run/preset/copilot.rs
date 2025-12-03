@@ -16,6 +16,7 @@ use crate::{
     config::task::{Task, TaskConfig},
     dirs::{self, Ensure},
     object,
+    state::AGENT,
     value::{
         MAAValue,
         userinput::{BoolInput, UserInput},
@@ -362,9 +363,12 @@ impl<'a> CopilotFile<'a> {
                 const COPILOT_API: &str = "https://prts.maa.plus/copilot/get/";
                 let url = format!("{COPILOT_API}{code}");
                 debug!("Cache miss, downloading copilot from {url}");
-                let resp: JsonValue = reqwest::blocking::get(url)
+                let resp: JsonValue = AGENT
+                    .get(&url)
+                    .call()
                     .context("Failed to send request")?
-                    .json()
+                    .body_mut()
+                    .read_json()
                     .context("Failed to parse response")?;
 
                 if resp["status_code"].as_i64().unwrap() == 200 {
@@ -393,9 +397,12 @@ impl<'a> CopilotFile<'a> {
                 const COPILOT_SET_API: &str = "https://prts.maa.plus/set/get?id=";
                 let url = format!("{COPILOT_SET_API}{code}");
                 debug!("Get copilot set from {url}");
-                let resp: JsonValue = reqwest::blocking::get(url)
+                let resp: JsonValue = AGENT
+                    .get(&url)
+                    .call()
                     .context("Failed to send request")?
-                    .json()
+                    .body_mut()
+                    .read_json()
                     .context("Failed to parse response")?;
 
                 if resp["status_code"].as_i64().unwrap() == 200 {

@@ -90,14 +90,11 @@ impl PathProvider for CleanupTarget {
         match self {
             #[cfg(feature = "core_installer")]
             CliCache => {
-                use crate::installer::maa_core;
+                use crate::installer::maa_core::this_asset_name;
 
                 // Cache the name of the core package to avoid repeated calls
-                static CORE_CACHE_NAME: LazyLock<Option<String>> = LazyLock::new(|| {
-                    maa_core::version()
-                        .and_then(|version| maa_core::name(&version))
-                        .ok()
-                });
+                static CORE_CACHE_NAME: LazyLock<Option<String>> =
+                    LazyLock::new(|| crate::state::CORE_VERSION.as_ref().map(this_asset_name));
 
                 CORE_CACHE_NAME.as_deref().is_some_and(|name| {
                     entry.file_type().is_ok_and(|x| x.is_file())
@@ -292,7 +289,7 @@ mod tests {
                 let version = var_os("MAA_CORE_VERSION")
                     .expect("MAA_CORE_VERSION environment variable not set");
                 let version = version.to_str().unwrap()[1..].parse().unwrap();
-                let name = crate::installer::maa_core::name(&version).unwrap();
+                let name = crate::installer::maa_core::this_asset_name(&version);
                 assert_should_keep!(CliCache, &name, true);
             }
 
@@ -418,19 +415,15 @@ mod tests {
         {
             use semver::Version;
 
-            use crate::installer::maa_core;
+            use crate::installer::maa_core::this_asset_name;
 
-            std::fs::File::create(join!(
-                cache(),
-                maa_core::name(&Version::new(0, 0, 1)).unwrap()
-            ))
-            .unwrap();
+            std::fs::File::create(cache().join(this_asset_name(&Version::new(5, 16, 1)))).unwrap();
 
             if var_os("SKIP_CORE_TEST").is_none() {
                 let version = var_os("MAA_CORE_VERSION")
                     .expect("MAA_CORE_VERSION environment variable not set");
                 let version = version.to_str().unwrap()[1..].parse().unwrap();
-                let name = maa_core::name(&version).unwrap();
+                let name = this_asset_name(&version);
                 std::fs::File::create(join!(cache(), &name)).unwrap();
             }
         }

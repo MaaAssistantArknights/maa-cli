@@ -38,7 +38,7 @@ impl Config {
     }
 
     pub fn api_url(&self) -> String {
-        format!("{}{}.json", normalize_url(&self.api_url), self.channel())
+        format!("{}/{}.json", normalize_url(&self.api_url), self.channel())
     }
 
     pub fn set_api_url(&mut self, api_url: impl ToString) -> &mut Self {
@@ -46,8 +46,8 @@ impl Config {
         self
     }
 
-    pub fn download_url(&self, tag: &str, name: &str) -> String {
-        format!("{}{}/{}", normalize_url(&self.download_url), tag, name)
+    pub fn download_url(&self) -> &str {
+        normalize_url(&self.download_url)
     }
 
     pub fn set_download_url(&mut self, download_url: impl ToString) -> &mut Self {
@@ -224,15 +224,15 @@ pub mod tests {
         #[test]
         fn download_url() {
             assert_eq!(
-                Config::default().download_url("v0.3.12", "maa_cli.zip"),
-                "https://github.com/MaaAssistantArknights/maa-cli/releases/download/v0.3.12/maa_cli.zip",
+                Config::default().download_url(),
+                "https://github.com/MaaAssistantArknights/maa-cli/releases/download",
             );
 
             assert_eq!(
                 Config::default()
                     .set_download_url("https://foo.bar/download/")
-                    .download_url("v0.3.12", "maa_cli.zip"),
-                "https://foo.bar/download/v0.3.12/maa_cli.zip",
+                    .download_url(),
+                "https://foo.bar/download",
             );
         }
 

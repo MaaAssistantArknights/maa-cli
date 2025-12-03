@@ -1,185 +1,120 @@
-use std::{collections::BTreeMap, time::Duration};
-
-use anyhow::{Context, Result, anyhow};
-use maa_dirs::MAA_CLI_EXE;
-use semver::Version;
-use serde::Deserialize;
-use tokio::runtime::Runtime;
-
-use super::{
-    download::{Checker, download},
-    extract::Archive,
-    version_json::VersionJSON,
+use anyhow::{Context, Result};
+use maa_dirs::{Ensure, MAA_CLI_EXE};
+use maa_installer::{
+    error::WithDesc,
+    manifest::{Asset, Manifest},
+    verify::{SizeVerifier, digest::DigestVerifier},
 };
+use maa_version::{VersionManifest, cli::Details};
+use semver::Version;
+use sha2::Sha256;
+
+// use super::reporter::StepReporter;
 use crate::{
     config::cli::{CLI_CONFIG, maa_cli::CommonArgs},
-    dirs::{self, Ensure},
+    state::{AGENT, CLI_VERSION},
 };
+
+const PLATFORM: &str = env!("TARGET");
+
+struct ManifestWithBaseUrl<'a> {
+    manifest: maa_version::VersionManifest<maa_version::cli::Details>,
+    url: &'a str,
+}
+
+struct AssetWithBaseUrl<'a> {
+    base_url: &'a str,
+    tag: &'a str,
+    asset: &'a maa_version::cli::Asset,
+}
+
+impl Manifest for ManifestWithBaseUrl<'_> {
+    type Asset<'a>
+        = AssetWithBaseUrl<'a>
+    where
+        Self: 'a;
+
+    fn version(&self) -> &Version {
+        &self.manifest.version
+    }
+
+    fn asset(&self) -> Option<Self::Asset<'_>> {
+        self.manifest
+            .details
+            .assets
+            .get(PLATFORM)
+            .map(|asset| AssetWithBaseUrl {
+                base_url: self.url,
+                tag: &self.manifest.details.tag,
+                asset,
+            })
+    }
+}
+
+impl Asset for AssetWithBaseUrl<'_> {
+    type Verifier = (SizeVerifier, DigestVerifier<Sha256>);
+
+    fn name(&self) -> &str {
+        &self.asset.name
+    }
+
+    fn url(&self) -> std::borrow::Cow<'_, str> {
+        std::borrow::Cow::Owned(format!(
+            "{}/{}/{}",
+            self.base_url, self.tag, self.asset.name
+        ))
+    }
+
+    fn verifier(&self) -> maa_installer::error::Result<Self::Verifier> {
+        Ok((
+            SizeVerifier::new(self.asset.size),
+            DigestVerifier::<Sha256>::from_hex_str(&self.asset.sha256sum)?,
+        ))
+    }
+}
 
 pub fn update(args: &CommonArgs) -> Result<()> {
     let config = CLI_CONFIG.cli_config().with_args(args);
 
-    println!("Fetching maa-cli version info...");
-    let version_json: VersionJSON<Details> = reqwest::blocking::get(config.api_url())
-        .context("Failed to fetch version info")?
-        .json()
-        .context("Failed to parse version info")?;
-    let current_version: Version = env!("MAA_VERSION").parse()?;
-    if !version_json.can_update("maa-cli", &current_version)? {
+    // Check if binary component should be installed
+    if !config.components().binary {
+        println!("Binary component is disabled, skipping update");
         return Ok(());
     }
 
-    let details = version_json.details();
-    let asset = details.asset()?;
-    let asset_name = asset.name();
-    let asset_size = asset.size();
-    let asset_checksum = asset.checksum();
-    let cache_path = dirs::cache().ensure()?.join(asset_name);
+    let url = config.download_url();
 
-    if cache_path.exists() && cache_path.metadata()?.len() == asset_size {
-        println!("Found existing file: {}", cache_path.display());
-    } else {
-        let url = config.download_url(details.tag(), asset_name);
-        let client = reqwest::Client::builder()
-            .connect_timeout(Duration::from_secs(10))
-            .build()
-            .context("Failed to create reqwest client")?;
-        Runtime::new()
-            .context("Failed to create tokio runtime")?
-            .block_on(download(
-                &client,
-                &url,
-                &cache_path,
-                asset_size,
-                Some(Checker::Sha256(asset_checksum)),
-            ))
-            .context("Failed to download maa-cli")?;
-    };
-
-    let tmp_dir = tempfile::tempdir()?;
+    // Create a temp directory for extraction
+    let tmp_dir = tempfile::tempdir().context("Failed to create temp directory")?;
     let tmp_exe = tmp_dir.path().join(MAA_CLI_EXE);
 
-    Archive::new(cache_path.into())?.extract(|path| {
-        if config.components().binary && path.ends_with(MAA_CLI_EXE) {
-            Some(tmp_exe.clone())
-        } else {
-            None
-        }
-    })?;
+    let installer = maa_installer::installer::Installer::new(
+        AGENT.clone(),
+        config.api_url(),
+        |mut body| {
+            let manifest: VersionManifest<Details> =
+                body.read_json().with_desc("Failed to parse manifest")?;
+            Ok(ManifestWithBaseUrl { manifest, url })
+        },
+        |src| {
+            // Extract mapper for maa-cli binary to temp directory
+            let file_name = src.file_name()?;
+            if file_name == MAA_CLI_EXE {
+                Some(tmp_exe.clone())
+            } else {
+                None
+            }
+        },
+    )
+    .with_current_version(&CLI_VERSION)
+    .with_post_install_hook(|| {
+        // Perform self-replacement
+        self_replace::self_replace(&tmp_exe).with_desc("Failed to replace maa-cli binary")
+    });
 
-    self_replace::self_replace(tmp_exe)?;
+    installer
+        .exec(maa_dirs::cache().ensure()?)
+        .context("Failed to install maa-cli")?;
 
     Ok(())
-}
-
-#[derive(Deserialize)]
-struct Details {
-    tag: String,
-    assets: Assets,
-}
-
-impl Details {
-    fn tag(&self) -> &str {
-        &self.tag
-    }
-
-    fn asset(&self) -> Result<&Asset> {
-        self.assets.asset()
-    }
-}
-
-#[derive(Deserialize)]
-struct Assets(BTreeMap<String, Asset>);
-
-const PLATFORM: &str = env!("TARGET");
-
-impl Assets {
-    fn asset(&self) -> Result<&Asset> {
-        self.0
-            .get(PLATFORM)
-            .ok_or_else(|| anyhow!("No asset for platform: {}", PLATFORM))
-    }
-}
-
-#[derive(Deserialize)]
-struct Asset {
-    name: String,
-    size: u64,
-    sha256sum: String,
-}
-
-impl Asset {
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn size(&self) -> u64 {
-        self.size
-    }
-
-    pub fn checksum(&self) -> &str {
-        &self.sha256sum
-    }
-}
-
-#[cfg(test)]
-#[cfg_attr(coverage_nightly, coverage(off))]
-mod tests {
-    use serde_json;
-
-    use super::*;
-
-    #[test]
-    fn deserialize_version_json() {
-        let json = r#"
-{
-    "version": "0.1.0",
-    "details": {
-        "tag": "v0.1.0",
-        "assets": {
-            "x86_64-apple-darwin": {
-                "name": "maa_cli-0.1.0-x86_64-apple-darwin.zip",
-                "size": 123456,
-                "sha256sum": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-            },
-            "aarch64-apple-darwin": {
-                "name": "maa_cli-0.1.0-aarch64-apple-darwin.zip",
-                "size": 123456,
-                "sha256sum": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-            },
-            "x86_64-unknown-linux-gnu": {
-                "name": "maa_cli-0.1.0-x86_64-unknown-linux-gnu.zip",
-                "size": 123456,
-                "sha256sum": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-            },
-            "aarch64-unknown-linux-gnu": {
-                "name": "maa_cli-0.1.0-aarch64-unknown-linux-gnu.zip",
-                "size": 123456,
-                "sha256sum": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-            },
-            "x86_64-pc-windows-msvc": {
-                "name": "maa_cli-0.1.0-x86_64-pc-windows-msvc.zip",
-                "size": 123456,
-                "sha256sum": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-            },
-            "aarch64-pc-windows-msvc": {
-                "name": "maa_cli-0.1.0-aarch64-pc-windows-msvc.zip",
-                "size": 123456,
-                "sha256sum": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-            }
-        }
-    }
-}
-        "#;
-
-        let version_json: VersionJSON<Details> = serde_json::from_str(json).unwrap();
-        let asset = version_json.details().asset().unwrap();
-
-        assert_eq!(asset.name(), format!("maa_cli-0.1.0-{PLATFORM}.zip"));
-        assert_eq!(asset.size(), 123456);
-        assert_eq!(
-            asset.checksum(),
-            "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-        );
-    }
 }
