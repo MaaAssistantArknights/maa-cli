@@ -1,4 +1,4 @@
-//! Archive extracters
+//! Archive extractors
 
 use std::{
     fs::File,
