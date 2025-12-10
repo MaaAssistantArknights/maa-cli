@@ -42,7 +42,7 @@ where
 
         let mut task_config = TaskConfig::new();
 
-        task_config.push(Task::new(task_type, params));
+        task_config.push(Task::new(task_type, default));
 
         Ok(task_config)
     }
@@ -154,6 +154,10 @@ mod tests {
         }
 
         let config = AsstConfig::default();
+        let default = default_file(TaskType::Custom).with_extension("toml");
+
+        // Ensure clean state - remove overlay file if it exists
+        let _ = std::fs::remove_file(&default);
 
         // Test without overlay file and without CLI args
         let task_config = TestParams { bar: None }
@@ -167,11 +171,11 @@ mod tests {
         assert_eq!(task_config[0].params, object!());
 
         // Create overlay file with foo = 42
-        let default = default_file(TaskType::Custom).with_extension("toml");
         default.parent().unwrap().ensure().unwrap();
         let mut file = std::fs::File::create(&default).unwrap();
         use std::io::Write;
         writeln!(file, "foo = 42").unwrap();
+        drop(file);
 
         // Test with overlay file but without CLI args - should use overlay values
         let task_config = TestParams { bar: None }
@@ -188,6 +192,8 @@ mod tests {
         let mut file = std::fs::File::create(&default).unwrap();
         writeln!(file, "foo = 42").unwrap();
         writeln!(file, "bar = 100").unwrap();
+        drop(file);
+
         let task_config = TestParams { bar: Some(200) }
             .into_task_config(&config)
             .unwrap()
@@ -199,6 +205,9 @@ mod tests {
         // CLI arg "bar = 200" should override overlay "bar = 100"
         // Overlay "foo = 42" should be preserved
         assert_eq!(task_config[0].params, object!("foo" => 42, "bar" => 200));
+
+        // Clean up
+        let _ = std::fs::remove_file(&default);
     }
 
     #[test]
