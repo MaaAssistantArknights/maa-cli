@@ -221,7 +221,7 @@ jobs:
         uses: actions/checkout@v6
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
-      - name: Use nightly as default toolchain
+      - name: Use Nightly Toolchain
         run: rustup default nightly
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2
@@ -230,13 +230,9 @@ jobs:
       - name: Cleanup Coverage Artifacts
         run: cargo llvm-cov clean --workspace
       - name: Install MaaCore
-        uses: |
-          cargo +nightly llvm-cov run --package maa-cli --no-report \
-          -- install beta
-      - name: Run tests
-        run: |
-          cargo llvm-cov --workspace --no-report \
-            -- --include-ignored
+        run: cargo llvm-cov run --package maa-cli --no-report -- install beta
+      - name: Run Tests
+        run: cargo llvm-cov --workspace --no-report -- --include-ignored
       - name: Generate Coverage Report
         run: |
           cargo llvm-cov report --codecov --output-path codecov.json
