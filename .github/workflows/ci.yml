@@ -219,8 +219,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Setup Cache
-        uses: Swatinem/rust-cache@v2
       - name: Use Nightly Toolchain
         run: rustup default nightly
       - name: Install cargo-llvm-cov
