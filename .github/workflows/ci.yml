@@ -230,7 +230,17 @@ jobs:
       - name: Cleanup Coverage Artifacts
         run: cargo llvm-cov clean --workspace
       - name: Install MaaCore
-        run: cargo llvm-cov run --package maa-cli --no-report -- install beta
+        run: |
+          cargo llvm-cov run --package maa-cli --no-report -- install beta
+          core_dir=$(cargo run -- dir library)
+          cache_dir=$(cargo run -- dir cache)
+          package_name=$(basename "$cache_dir"/MAA-v*)
+          version=$(echo "$package_name" | sed -E 's/^MAA-v(.+)-(linux|macos|win)-.*/\1/')
+          echo "Downloaded MaaCore version: $version"
+          {
+            echo "MAA_CORE_DIR=$core_dir"
+            echo "MAA_CORE_VERSION=v$version"
+          } >> "$GITHUB_ENV"
       - name: Run Tests
         run: cargo llvm-cov --workspace --no-report -- --include-ignored
       - name: Generate Coverage Report
