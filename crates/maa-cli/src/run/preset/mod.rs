@@ -33,12 +33,12 @@ where
 {
     fn into_task_config(self, _: &AsstConfig) -> Result<TaskConfig> {
         let task_type = self.to_task_type();
-        let mut params: MAAValue = self.try_into().map_err(Into::into)?;
+        let params: MAAValue = self.try_into().map_err(Into::into)?;
 
-        let default = MAAValue::find_file_or_default(default_file(task_type))
+        let mut default = MAAValue::find_file_or_default(default_file(task_type))
             .context("Failed to load default task config")?;
 
-        params.merge_mut(&default);
+        default.merge_mut(&params);
 
         let mut task_config = TaskConfig::new();
 
