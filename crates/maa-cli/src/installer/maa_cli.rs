@@ -28,6 +28,20 @@ struct AssetWithBaseUrl<'a> {
     asset: &'a maa_version::cli::Asset,
 }
 
+impl ManifestWithBaseUrl<'_> {
+    fn get_asset(&self, platform: &str) -> Option<AssetWithBaseUrl<'_>> {
+        self.manifest
+            .details
+            .assets
+            .get(platform)
+            .map(|asset| AssetWithBaseUrl {
+                base_url: self.url,
+                tag: &self.manifest.details.tag,
+                asset,
+            })
+    }
+}
+
 impl Manifest for ManifestWithBaseUrl<'_> {
     type Asset<'a>
         = AssetWithBaseUrl<'a>
@@ -39,15 +53,7 @@ impl Manifest for ManifestWithBaseUrl<'_> {
     }
 
     fn asset(&self) -> Option<Self::Asset<'_>> {
-        self.manifest
-            .details
-            .assets
-            .get(PLATFORM)
-            .map(|asset| AssetWithBaseUrl {
-                base_url: self.url,
-                tag: &self.manifest.details.tag,
-                asset,
-            })
+        self.get_asset(PLATFORM)
     }
 }
 
@@ -117,4 +123,121 @@ pub fn update(args: &CommonArgs) -> Result<()> {
         .context("Failed to install maa-cli")?;
 
     Ok(())
+}
+
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+mod tests {
+    use std::sync::LazyLock;
+
+    use super::*;
+
+    const FIXTURE_JSON: &str = include_str!("../../fixtures/cli_version.json");
+    const BASE_URL: &str = "https://github.com/MaaAssistantArknights/maa-cli/releases/download";
+    static MANIFEST: LazyLock<ManifestWithBaseUrl<'static>> = LazyLock::new(|| {
+        let manifest: VersionManifest<Details> =
+            serde_json::from_str(FIXTURE_JSON).expect("Failed to parse fixture");
+        ManifestWithBaseUrl {
+            manifest,
+            url: BASE_URL,
+        }
+    });
+
+    #[test]
+    fn test_manifest() {
+        assert_eq!(MANIFEST.version(), &Version::new(0, 5, 9));
+        assert_eq!(MANIFEST.version().to_string(), "0.5.9");
+
+        assert_eq!(MANIFEST.manifest.details.tag, "v0.5.9");
+        assert_eq!(
+            MANIFEST.manifest.details.commit,
+            "f4e2418415b5cbf10d1d8e01514971c72f58cb50"
+        );
+        assert_eq!(MANIFEST.manifest.details.assets.len(), 7);
+    }
+
+    mod asset_tests {
+        use super::*;
+
+        fn get_test_asset(platform: &str) -> AssetWithBaseUrl<'static> {
+            MANIFEST.get_asset(platform).expect("Asset not found")
+        }
+
+        #[test]
+        fn test_url() {
+            let asset = get_test_asset("x86_64-unknown-linux-gnu");
+            assert_eq!(
+                asset.url(),
+                "https://github.com/MaaAssistantArknights/maa-cli/releases/download/v0.5.9/maa_cli-v0.5.9-x86_64-unknown-linux-gnu.tar.gz"
+            );
+        }
+
+        #[test]
+        fn test_different_platforms() {
+            let platforms = [
+                (
+                    "x86_64-unknown-linux-gnu",
+                    "maa_cli-v0.5.9-x86_64-unknown-linux-gnu.tar.gz",
+                    5121236,
+                    "f7bf07df03275b64018d789aabaa2628d062f9a6e56b7770589c6c6c1363f3b7",
+                ),
+                (
+                    "aarch64-unknown-linux-gnu",
+                    "maa_cli-v0.5.9-aarch64-unknown-linux-gnu.tar.gz",
+                    5301507,
+                    "6080419c2b3e09539bdabb04b0e7bcd5ee7fb93abd4e53cbddf87229285b7881",
+                ),
+                (
+                    "x86_64-pc-windows-msvc",
+                    "maa_cli-v0.5.9-x86_64-pc-windows-msvc.zip",
+                    3215593,
+                    "df1be3fbe297988f4fb27d1253c650e09beb0b1b330ce587a0bf7e5f7903fbad",
+                ),
+                (
+                    "aarch64-pc-windows-msvc",
+                    "maa_cli-v0.5.9-aarch64-pc-windows-msvc.zip",
+                    3006906,
+                    "0839ec03b0baff11142a9653af3dcbc58a4f4b28b9071e55f9f4d2cf9e7eac45",
+                ),
+                (
+                    "universal-apple-darwin",
+                    "maa_cli-v0.5.9-universal-apple-darwin.zip",
+                    8692204,
+                    "a0a2aee6e01d2c60dc1be6295c3ba4eb7aeeecdd03e27072e15afdb5c8f69453",
+                ),
+                (
+                    "x86_64-apple-darwin",
+                    "maa_cli-v0.5.9-x86_64-apple-darwin.zip",
+                    4290539,
+                    "4f77b84ef54db52373e420409e58b6300dc0b4b7babeb839675932b0e32bcb5b",
+                ),
+                (
+                    "aarch64-apple-darwin",
+                    "maa_cli-v0.5.9-aarch64-apple-darwin.zip",
+                    4401174,
+                    "19d90f7dda10ef28b6b9388862a4fcf647d83afb282d9d3103acff4144e287e2",
+                ),
+            ];
+
+            for (platform, expected_name, expected_size, expected_sha256) in platforms {
+                let asset = get_test_asset(platform);
+
+                // Test name
+                assert_eq!(asset.name(), expected_name);
+
+                // Test size
+                assert_eq!(asset.asset.size, expected_size);
+
+                // Test sha256sum
+                assert_eq!(asset.asset.sha256sum, expected_sha256);
+
+                // Test verifier can be created (validates hex parsing)
+                assert!(asset.verifier().is_ok());
+
+                // Verify URL contains the asset name
+                let url = asset.url();
+                assert!(url.contains(expected_name));
+            }
+        }
+    }
 }

@@ -34,6 +34,16 @@ impl CoreManifest {
 
         Ok(CoreManifest(manifest))
     }
+
+    fn get_asset(&self, os: &str, arch: &str) -> Option<CoreAsset<'_>> {
+        let asset_name = asset_name(self.version(), os, arch);
+        self.0
+            .details
+            .assets
+            .iter()
+            .find(|asset| asset.name == asset_name)
+            .map(CoreAsset)
+    }
 }
 
 impl Manifest for CoreManifest {
@@ -47,13 +57,7 @@ impl Manifest for CoreManifest {
     }
 
     fn asset(&self) -> Option<Self::Asset<'_>> {
-        let asset_name = this_asset_name(self.version());
-        self.0
-            .details
-            .assets
-            .iter()
-            .find(|asset| asset.name == asset_name)
-            .map(CoreAsset)
+        self.get_asset(OS, ARCH)
     }
 }
 
@@ -235,6 +239,8 @@ pub fn update(args: &CommonArgs) -> Result<()> {
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
+    use std::sync::LazyLock;
+
     use maa_dirs::MAA_CORE_LIB;
 
     use super::*;
@@ -263,5 +269,159 @@ mod tests {
             extract_mapper(Path::new("misc"), lib_dir, resource_dir, &config),
             None
         );
+    }
+
+    mod asset_name_tests {
+        use super::*;
+
+        #[test]
+        fn test_macos() {
+            let version = Version::new(1, 2, 3);
+            assert_eq!(
+                asset_name(&version, "macos", "x86_64"),
+                "MAA-v1.2.3-macos-runtime-universal.zip"
+            );
+            assert_eq!(
+                asset_name(&version, "macos", "aarch64"),
+                "MAA-v1.2.3-macos-runtime-universal.zip"
+            );
+        }
+
+        #[test]
+        fn test_linux() {
+            let version = Version::new(1, 2, 3);
+            assert_eq!(
+                asset_name(&version, "linux", "x86_64"),
+                "MAA-v1.2.3-linux-x86_64.tar.gz"
+            );
+            assert_eq!(
+                asset_name(&version, "linux", "aarch64"),
+                "MAA-v1.2.3-linux-aarch64.tar.gz"
+            );
+        }
+
+        #[test]
+        #[should_panic(expected = "Unsupported architecture")]
+        fn test_linux_unsupported_arch() {
+            let version = Version::new(1, 2, 3);
+            asset_name(&version, "linux", "armv7");
+        }
+
+        #[test]
+        fn test_windows() {
+            let version = Version::new(1, 2, 3);
+            assert_eq!(
+                asset_name(&version, "windows", "x86_64"),
+                "MAA-v1.2.3-win-x64.zip"
+            );
+            assert_eq!(
+                asset_name(&version, "windows", "aarch64"),
+                "MAA-v1.2.3-win-arm64.zip"
+            );
+        }
+
+        #[test]
+        #[should_panic(expected = "Unsupported architecture")]
+        fn test_windows_unsupported_arch() {
+            let version = Version::new(1, 2, 3);
+            asset_name(&version, "windows", "i686");
+        }
+
+        #[test]
+        #[should_panic(expected = "Unsupported OS")]
+        fn test_unsupported_os() {
+            let version = Version::new(1, 2, 3);
+            asset_name(&version, "freebsd", "x86_64");
+        }
+
+        #[test]
+        fn test_with_prerelease() {
+            let version = Version::parse("1.2.3-beta.1").unwrap();
+            assert_eq!(
+                asset_name(&version, "linux", "x86_64"),
+                "MAA-v1.2.3-beta.1-linux-x86_64.tar.gz"
+            );
+        }
+
+        #[test]
+        fn test_this_asset_name() {
+            let version = Version::new(1, 2, 3);
+            let result = this_asset_name(&version);
+            // Just verify it returns a non-empty string and contains the version
+            assert!(!result.is_empty());
+            assert!(result.contains("1.2.3"));
+        }
+    }
+
+    const FIXTURE_JSON: &str = include_str!("../../fixtures/core_version.json");
+    static MANIFEST: LazyLock<CoreManifest> = LazyLock::new(|| {
+        let version_manifest: VersionManifest<core::Details> =
+            serde_json::from_str(FIXTURE_JSON).expect("Failed to parse fixture");
+        CoreManifest(version_manifest)
+    });
+
+    #[test]
+    fn test_manifest() {
+        assert_eq!(MANIFEST.version(), &Version::new(4, 26, 1));
+        assert_eq!(MANIFEST.version().to_string(), "4.26.1");
+
+        assert_eq!(MANIFEST.0.details.assets.len(), 5);
+    }
+
+    mod core_asset {
+        use super::*;
+
+        fn get_test_asset(os: &str, arch: &str) -> CoreAsset<'static> {
+            MANIFEST.get_asset(os, arch).expect("Asset not found")
+        }
+
+        #[test]
+        fn test_url() {
+            let asset = get_test_asset("linux", "x86_64");
+            assert_eq!(
+                asset.url(),
+                "https://github.com/MaaAssistantArknights/MaaAssistantArknights/releases/download/v4.26.1/MAA-v4.26.1-linux-x86_64.tar.gz"
+            );
+        }
+
+        #[test]
+        fn test_mirror_opts() {
+            let asset = get_test_asset("linux", "x86_64");
+            let mirror_opts = asset.mirror_opts();
+
+            assert!(mirror_opts.is_some());
+            let mirror_opts = mirror_opts.unwrap();
+            let mirrors: Vec<_> = mirror_opts.mirrors.collect();
+            assert_eq!(mirrors.len(), 3);
+            assert!(mirrors[0].contains("s3.maa-org.net"));
+            assert!(mirrors[1].contains("agent.imgg.dev"));
+            assert!(mirrors[2].contains("maa.r2.imgg.dev"));
+        }
+
+        #[test]
+        fn test_different_platforms() {
+            let platforms = [
+                ("linux", "x86_64", "MAA-v4.26.1-linux-x86_64.tar.gz"),
+                ("linux", "aarch64", "MAA-v4.26.1-linux-aarch64.tar.gz"),
+                ("windows", "x86_64", "MAA-v4.26.1-win-x64.zip"),
+                ("windows", "aarch64", "MAA-v4.26.1-win-arm64.zip"),
+                ("macos", "x86_64", "MAA-v4.26.1-macos-runtime-universal.zip"),
+                (
+                    "macos",
+                    "aarch64",
+                    "MAA-v4.26.1-macos-runtime-universal.zip",
+                ),
+            ];
+
+            for (os, arch, expected_name) in platforms {
+                let asset = get_test_asset(os, arch);
+
+                assert_eq!(asset.name(), expected_name);
+                assert!(asset.verifier().is_ok());
+                assert!(asset.mirror_opts().is_some());
+                let url = asset.url();
+                assert!(url.contains(expected_name));
+            }
+        }
     }
 }

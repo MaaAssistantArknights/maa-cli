@@ -227,6 +227,7 @@ mod tar {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use std::{fs, path::Path};
 
@@ -622,5 +623,241 @@ mod tests {
         // Verify no files extracted (only the directory exists)
         let entries: Vec<_> = fs::read_dir(&extract_dir).unwrap().collect();
         assert_eq!(entries.len(), 0);
+    }
+
+    #[cfg(all(unix, feature = "zip"))]
+    #[test]
+    fn test_extract_zip_with_symlinks() {
+        use std::process::Command;
+
+        let temp_dir = TempDir::new().unwrap();
+        let archive_path = temp_dir.path().join("test.zip");
+        let source_dir = temp_dir.path().join("source");
+        let extract_dir = temp_dir.path().join("extract");
+
+        // Create test files and symlinks
+        fs::create_dir(&source_dir).unwrap();
+        fs::write(source_dir.join("target.txt"), b"target content").unwrap();
+
+        // Create a symlink
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::symlink;
+            symlink("target.txt", source_dir.join("link.txt")).unwrap();
+        }
+
+        // Create zip archive using zip command (preserves symlinks)
+        let output = Command::new("zip")
+            .arg("-ry") // -y preserves symlinks
+            .arg(&archive_path)
+            .arg(".")
+            .current_dir(&source_dir)
+            .output()
+            .expect("Failed to execute zip command - is zip installed?");
+
+        assert!(output.status.success(), "zip command failed");
+        assert!(archive_path.exists());
+
+        // Extract using our implementation
+        fs::create_dir(&extract_dir).unwrap();
+        ArchiveFile::new(&archive_path)
+            .extract(ProgressBar::hidden(), |path| Some(extract_dir.join(path)))
+            .unwrap();
+
+        // Verify target file exists
+        assert!(extract_dir.join("target.txt").exists());
+        assert_eq!(
+            fs::read_to_string(extract_dir.join("target.txt")).unwrap(),
+            "target content"
+        );
+
+        // Verify symlink was created and points to the correct target
+        let link_path = extract_dir.join("link.txt");
+        assert!(link_path.exists(), "Symlink should exist");
+
+        #[cfg(unix)]
+        {
+            let metadata = fs::symlink_metadata(&link_path).unwrap();
+            assert!(metadata.is_symlink(), "Should be a symlink");
+
+            // Verify link target
+            let link_target = fs::read_link(&link_path).unwrap();
+            assert_eq!(link_target, Path::new("target.txt"));
+
+            // Verify we can read through the symlink
+            assert_eq!(fs::read_to_string(&link_path).unwrap(), "target content");
+        }
+    }
+
+    #[cfg(all(unix, feature = "tar"))]
+    #[test]
+    fn test_extract_tar_with_symlinks() {
+        use std::process::Command;
+
+        let temp_dir = TempDir::new().unwrap();
+        let archive_path = temp_dir.path().join("test.tar");
+        let source_dir = temp_dir.path().join("source");
+        let extract_dir = temp_dir.path().join("extract");
+
+        // Create test files and symlinks
+        fs::create_dir(&source_dir).unwrap();
+        fs::write(source_dir.join("file.txt"), b"file content").unwrap();
+
+        // Create symlinks
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::symlink;
+            symlink("file.txt", source_dir.join("link_to_file.txt")).unwrap();
+
+            // Create directory and symlink to directory
+            fs::create_dir(source_dir.join("dir")).unwrap();
+            fs::write(source_dir.join("dir/inner.txt"), b"inner content").unwrap();
+            symlink("dir", source_dir.join("link_to_dir")).unwrap();
+        }
+
+        // Create tar archive using tar command
+        let output = Command::new("tar")
+            .arg("-chf") // -h dereferences symlinks, -c creates, -f specifies file
+            .arg(&archive_path)
+            .arg("-C")
+            .arg(&source_dir)
+            .arg(".")
+            .output()
+            .expect("Failed to execute tar command");
+
+        assert!(output.status.success(), "tar command failed");
+        assert!(archive_path.exists());
+
+        // Extract using our implementation
+        fs::create_dir(&extract_dir).unwrap();
+        ArchiveFile::new(&archive_path)
+            .extract(ProgressBar::hidden(), |path| Some(extract_dir.join(path)))
+            .unwrap();
+
+        // Verify files exist
+        assert!(extract_dir.join("file.txt").exists());
+        assert_eq!(
+            fs::read_to_string(extract_dir.join("file.txt")).unwrap(),
+            "file content"
+        );
+
+        // Note: with -h flag, symlinks are dereferenced so they become regular files
+        assert!(extract_dir.join("link_to_file.txt").exists());
+        assert_eq!(
+            fs::read_to_string(extract_dir.join("link_to_file.txt")).unwrap(),
+            "file content"
+        );
+    }
+
+    #[cfg(all(unix, feature = "tar"))]
+    #[test]
+    fn test_extract_tar_preserves_symlinks() {
+        use std::process::Command;
+
+        let temp_dir = TempDir::new().unwrap();
+        let archive_path = temp_dir.path().join("test.tar");
+        let source_dir = temp_dir.path().join("source");
+        let extract_dir = temp_dir.path().join("extract");
+
+        // Create test files and symlinks
+        fs::create_dir(&source_dir).unwrap();
+        fs::write(source_dir.join("original.txt"), b"original").unwrap();
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::symlink;
+            symlink("original.txt", source_dir.join("symlink.txt")).unwrap();
+        }
+
+        // Create tar archive WITHOUT -h flag to preserve symlinks
+        let output = Command::new("tar")
+            .arg("-cf")
+            .arg(&archive_path)
+            .arg("-C")
+            .arg(&source_dir)
+            .arg(".")
+            .output()
+            .expect("Failed to execute tar command");
+
+        assert!(output.status.success(), "tar command failed");
+
+        // Extract using our implementation
+        fs::create_dir(&extract_dir).unwrap();
+        ArchiveFile::new(&archive_path)
+            .extract(ProgressBar::hidden(), |path| Some(extract_dir.join(path)))
+            .unwrap();
+
+        // Verify symlink is preserved
+        #[cfg(unix)]
+        {
+            let link_path = extract_dir.join("symlink.txt");
+            let metadata = fs::symlink_metadata(&link_path).unwrap();
+            assert!(metadata.is_symlink(), "Should be a symlink");
+
+            let link_target = fs::read_link(&link_path).unwrap();
+            assert_eq!(link_target, Path::new("original.txt"));
+        }
+    }
+
+    #[cfg(all(unix, feature = "gz"))]
+    #[test]
+    fn test_extract_tar_gz_with_symlinks() {
+        use std::process::Command;
+
+        let temp_dir = TempDir::new().unwrap();
+        let archive_path = temp_dir.path().join("test.tar.gz");
+        let source_dir = temp_dir.path().join("source");
+        let extract_dir = temp_dir.path().join("extract");
+
+        // Create test structure with symlinks
+        fs::create_dir(&source_dir).unwrap();
+        fs::write(source_dir.join("data.txt"), b"data").unwrap();
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::symlink;
+            symlink("data.txt", source_dir.join("link.txt")).unwrap();
+
+            // Relative symlink
+            fs::create_dir(source_dir.join("subdir")).unwrap();
+            fs::write(source_dir.join("subdir/file.txt"), b"subfile").unwrap();
+            symlink("../data.txt", source_dir.join("subdir/parent_link.txt")).unwrap();
+        }
+
+        // Create tar.gz archive preserving symlinks
+        let output = Command::new("tar")
+            .arg("-czf")
+            .arg(&archive_path)
+            .arg("-C")
+            .arg(&source_dir)
+            .arg(".")
+            .output()
+            .expect("Failed to execute tar command");
+
+        assert!(output.status.success(), "tar command failed");
+
+        // Extract
+        fs::create_dir(&extract_dir).unwrap();
+        ArchiveFile::new(&archive_path)
+            .extract(ProgressBar::hidden(), |path| Some(extract_dir.join(path)))
+            .unwrap();
+
+        // Verify symlinks
+        #[cfg(unix)]
+        {
+            // Check simple symlink
+            let link1 = extract_dir.join("link.txt");
+            assert!(fs::symlink_metadata(&link1).unwrap().is_symlink());
+            assert_eq!(fs::read_link(&link1).unwrap(), Path::new("data.txt"));
+
+            // Check relative symlink
+            let link2 = extract_dir.join("subdir/parent_link.txt");
+            assert!(fs::symlink_metadata(&link2).unwrap().is_symlink());
+            assert_eq!(fs::read_link(&link2).unwrap(), Path::new("../data.txt"));
+
+            // Verify we can read through symlinks
+            assert_eq!(fs::read_to_string(&link1).unwrap(), "data");
+            assert_eq!(fs::read_to_string(&link2).unwrap(), "data");
+        }
     }
 }

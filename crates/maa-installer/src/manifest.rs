@@ -20,13 +20,6 @@ pub trait Manifest {
     /// Returns the semantic version of the software this manifest represents.
     fn version(&self) -> &Version;
 
-    /// Check if an update is available compared to the current version.
-    ///
-    /// Returns `true` if the manifest's version is newer than the current version.
-    fn can_update(&self, current: &Version) -> bool {
-        self.version() > current
-    }
-
     /// Get the asset for the current platform.
     ///
     /// This method automatically detects the current platform using `std::env::consts`
@@ -37,8 +30,8 @@ pub trait Manifest {
 }
 
 pub struct MirrorOptions<'a, M: Iterator<Item = Cow<'a, str>>> {
-    pub(crate) mirrors: M,
-    pub(crate) max_bytes: u64,
+    pub mirrors: M,
+    pub max_bytes: u64,
     _marker: std::marker::PhantomData<&'a str>,
 }
 
@@ -93,6 +86,7 @@ pub trait Asset {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use crate::verify::SizeVerifier;
