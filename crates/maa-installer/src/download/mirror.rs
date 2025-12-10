@@ -9,7 +9,7 @@ use std::{
 use indicatif::ProgressBar;
 
 use crate::{
-    error::{Error, ErrorKind, Result},
+    error::{Error, ErrorKind, Result, WithDesc},
     manifest::MirrorOptions,
 };
 
@@ -52,14 +52,15 @@ fn speedtest(
     let mut downloaded: u64 = 0;
     let mut buffer = vec![0; 8192];
 
-    let mut resp = agent.get(url).call()?;
+    let mut resp = agent
+        .get(url)
+        .call()
+        .with_desc("Failed to send download request")?;
     let mut reader = resp.body_mut().as_reader();
-
     loop {
         let bytes_read = reader.read(&mut buffer)?;
         if bytes_read == 0 {
-            // File fully downloaded
-            break;
+            return Ok(BytesOrTime::Time(start.elapsed()));
         }
         downloaded += bytes_read as u64;
         if downloaded >= max_bytes {
@@ -69,12 +70,6 @@ fn speedtest(
             return Ok(BytesOrTime::Bytes(downloaded));
         }
     }
-
-    // Here, the file is fully downloaded within the time limit but not exceeding the maximum bytes.
-    // This may happen that the maximum bytes are too large (larger than the file size).
-    // Or the server returns a wrong file, which is not expected.
-    // So, we want to return an error here, the caller should handle it.
-    Err(Error::new(ErrorKind::Network).with_desc("File size exceeds maximum bytes"))
 }
 
 pub fn fastest_mirror<'a, M: Iterator<Item = std::borrow::Cow<'a, str>>>(
