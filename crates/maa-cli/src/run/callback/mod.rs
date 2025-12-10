@@ -42,6 +42,9 @@ enum AsstMsg {
     SubTaskExtraInfo = 20003,
     SubTaskStopped = 20004,
 
+    /* External Callback */
+    ReportRequest = 30000,
+
     /* Unknown */
     Unknown = -1,
 }
@@ -67,6 +70,8 @@ impl From<AsstMsgId> for AsstMsg {
             20002 => AsstMsg::SubTaskCompleted,
             20003 => AsstMsg::SubTaskExtraInfo,
             20004 => AsstMsg::SubTaskStopped,
+
+            30000 => AsstMsg::ReportRequest,
 
             _ => AsstMsg::Unknown,
         }
@@ -107,6 +112,8 @@ fn process_message(code: AsstMsgId, json: Value) {
         SubTaskCompleted => process_subtask_completed(message),
         SubTaskExtraInfo => process_subtask_extra_info(message),
         SubTaskStopped => Some(()),
+
+        ReportRequest => process_report(message),
 
         Unknown => None,
     };
@@ -590,6 +597,39 @@ fn process_subtask_extra_info(message: &Map<String, Value>) -> Option<()> {
                 serde_json::to_string_pretty(message).unwrap()
             )
         }
+    }
+
+    Some(())
+}
+
+fn process_report(message: &Map<String, Value>) -> Option<()> {
+    let subtask = message.get("subtask")?.as_str()?;
+    let url = message.get("url")?.as_str()?;
+    let body = message.get("body")?.as_str()?;
+    let headers = message.get("headers")?.as_object()?;
+
+    debug!("Reporting to Penguin Stats: {}", url);
+
+    let mut request = crate::state::AGENT
+        .post(url)
+        .content_type("application/json");
+
+    for (key, value) in headers {
+        if let Some(value_str) = value.as_str() {
+            request = request.header(key, value_str);
+        }
+    }
+
+    match request.send(body) {
+        Ok(response) => {
+            let status = response.status();
+            if status.is_success() {
+                info!("Successfully {subtask}");
+            } else {
+                warn!("Failed to {subtask}: HTTP {status}");
+            }
+        }
+        Err(e) => error!("Failed to {subtask}: {e}"),
     }
 
     Some(())
