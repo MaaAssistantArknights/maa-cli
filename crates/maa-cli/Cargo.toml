@@ -17,32 +17,27 @@ clap = { workspace = true, features = ["derive"] }
 clap_complete = { workspace = true }
 clap_mangen = { workspace = true }
 color-print = { workspace = true }
-constcat = { workspace = true }
-digest = { workspace = true, optional = true }
 dunce = { workspace = true }
 env_logger = { workspace = true, features = ["auto-color"] }
-flate2 = { workspace = true, optional = true }
-futures-util = { workspace = true, optional = true }
 git2 = { workspace = true, optional = true }
-indicatif = { workspace = true, optional = true }
+indicatif = { workspace = true }
 log = { workspace = true }
 maa-dirs = { workspace = true }
+maa-installer = { workspace = true, optional = true }
 maa-sys = { workspace = true, features = ["runtime"] }
 maa-types = { workspace = true, features = ["serde"] }
+maa-version = { workspace = true, optional = true }
 prettytable = { workspace = true }
-reqwest = { workspace = true, features = ["blocking", "json"] }
 self-replace = { workspace = true }
-semver = { workspace = true, features = ["serde"], optional = true }
+semver = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 sha2 = { workspace = true, optional = true }
 signal-hook = { workspace = true }
-tar = { workspace = true, optional = true }
 tempfile = { workspace = true }
-tokio = { workspace = true, features = ["rt", "rt-multi-thread"] }
 toml = { workspace = true }
-zip = { workspace = true, optional = true }
+ureq = { workspace = true }
 
 [dev-dependencies]
 regex = { workspace = true }
@@ -52,18 +47,11 @@ serde_test = { workspace = true }
 default = ["cli_installer", "core_installer", "git2"]
 # Common features used to install and update MAA Core and maa-cli self
 __installer = [
-  "digest",
-  "flate2",
-  "futures-util",
-  "indicatif",
-  "reqwest/stream",
-  "semver",
-  "sha2",
-  "tar",
-  "zip",
+  "dep:maa-installer",
+  "dep:maa-version",
 ]
 # Features used to install update maa-cli self
-cli_installer = ["__installer"]
+cli_installer = ["__installer", "dep:sha2"]
 # Features used to install and update MAA Core
 core_installer = ["__installer"]
 vendored-openssl = ["git2?/vendored-openssl"]

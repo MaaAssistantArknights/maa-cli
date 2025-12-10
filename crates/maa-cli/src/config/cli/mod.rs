@@ -75,12 +75,9 @@ fn return_true() -> bool {
     true
 }
 
-fn normalize_url(url: &str) -> String {
-    if url.ends_with('/') {
-        url.to_owned()
-    } else {
-        format!("{url}/")
-    }
+/// Normalize URL by removing trailing slash
+fn normalize_url(url: &str) -> &str {
+    url.trim_end_matches('/')
 }
 
 #[cfg(test)]
@@ -293,7 +290,7 @@ mod tests {
 
     #[test]
     fn normalize_url_test() {
-        assert_eq!(normalize_url("https://foo.bar"), "https://foo.bar/");
-        assert_eq!(normalize_url("https://foo.bar/"), "https://foo.bar/");
+        assert_eq!(normalize_url("https://foo.bar"), "https://foo.bar");
+        assert_eq!(normalize_url("https://foo.bar/"), "https://foo.bar");
     }
 }

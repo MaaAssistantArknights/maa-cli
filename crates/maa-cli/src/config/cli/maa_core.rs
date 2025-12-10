@@ -47,7 +47,7 @@ impl Config {
     }
 
     pub fn api_url(&self) -> String {
-        format!("{}{}.json", normalize_url(&self.api_url), self.channel())
+        format!("{}/{}.json", normalize_url(&self.api_url), self.channel())
     }
 
     pub fn set_api_url(&mut self, api_url: impl ToString) -> &Self {

@@ -4,6 +4,8 @@ use maa_dirs as dirs;
 #[macro_use(join)]
 extern crate maa_dirs;
 
+mod state;
+
 mod log;
 
 mod activity;
@@ -65,18 +67,23 @@ fn main() -> Result<()> {
             Dir::Cache => println!("{}", dirs::cache().display()),
             Dir::Log => println!("{}", dirs::log().display()),
         },
-        Command::Version { component } => match component {
-            Component::All => {
-                println!("maa-cli v{}", env!("MAA_VERSION"));
-                println!("MaaCore {}", run::core_version()?);
+        Command::Version { component } => {
+            match component {
+                Component::All | Component::MaaCLI => {
+                    println!("maa-cli v{}", state::CLI_VERSION_STR)
+                }
+                _ => {}
             }
-            Component::MaaCLI => {
-                println!("maa-cli v{}", env!("MAA_VERSION"));
+            match component {
+                Component::All | Component::MaaCore => println!(
+                    "MaaCore {}",
+                    state::CORE_VERSION_STR
+                        .as_deref()
+                        .context("Failed to get MaaCore version")?
+                ),
+                _ => {}
             }
-            Component::MaaCore => {
-                println!("MaaCore {}", run::core_version()?);
-            }
-        },
+        }
         Command::Run { task, common } => run::run_custom(task, common)?,
         Command::StartUp { params, common } => run::run_preset(params, common)?,
         Command::CloseDown { params, common } => run::run_preset(params, common)?,

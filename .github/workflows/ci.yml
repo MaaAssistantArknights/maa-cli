@@ -219,19 +219,33 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Setup Cache
-        uses: Swatinem/rust-cache@v2
-      - name: Install MaaCore
-        uses: ./.github/actions/install-core
+      - name: Use Nightly Toolchain
+        run: rustup default nightly
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-llvm-cov
-      - name: Coverage
+      - name: Cleanup Coverage Artifacts
+        run: cargo llvm-cov clean --workspace
+      - name: Install MaaCore
+        env:
+          MAA_CONFIG_DIR: ${{ github.workspace }}/crates/maa-cli/config_examples
         run: |
-          cargo +nightly llvm-cov --workspace \
-            --codecov --output-path codecov.json \
-            -- --include-ignored
+          cargo llvm-cov run --package maa-cli --no-report -- install beta
+          core_dir=$(cargo run -- dir library)
+          cache_dir=$(cargo run -- dir cache)
+          package_name=$(basename "$cache_dir"/MAA-v*)
+          version=$(echo "$package_name" | sed -E 's/^MAA-v(.+)-(linux|macos|win)-.*/\1/')
+          echo "Downloaded MaaCore version: $version"
+          {
+            echo "MAA_CORE_DIR=$core_dir"
+            echo "MAA_CORE_VERSION=v$version"
+          } >> "$GITHUB_ENV"
+      - name: Run Tests
+        run: cargo llvm-cov --workspace --no-report -- --include-ignored
+      - name: Generate Coverage Report
+        run: |
+          cargo llvm-cov report --codecov --output-path codecov.json
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
         with:
