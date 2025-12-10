@@ -608,11 +608,9 @@ fn process_report(message: &Map<String, Value>) -> Option<()> {
     let body = message.get("body")?.as_str()?;
     let headers = message.get("headers")?.as_object()?;
 
-    debug!("Reporting to Penguin Stats: {}", url);
+    info!("{subtask}: {url}");
 
-    let mut request = crate::state::AGENT
-        .post(url)
-        .content_type("application/json");
+    let mut request = ureq::post(url).content_type("application/json");
 
     for (key, value) in headers {
         if let Some(value_str) = value.as_str() {
@@ -629,7 +627,7 @@ fn process_report(message: &Map<String, Value>) -> Option<()> {
                 warn!("Failed to {subtask}: HTTP {status}");
             }
         }
-        Err(e) => error!("Failed to {subtask}: {e}"),
+        Err(e) => warn!("Failed to {subtask}: {e}"),
     }
 
     Some(())
