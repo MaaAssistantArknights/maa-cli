@@ -717,7 +717,7 @@ mod tests {
 
         // Create tar archive using tar command
         let output = Command::new("tar")
-            .arg("-chf") // -h dereferences symlinks, -c creates, -f specifies file
+            .arg("-cf") // -c creates, -f specifies file
             .arg(&archive_path)
             .arg("-C")
             .arg(&source_dir)
