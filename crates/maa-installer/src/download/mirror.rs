@@ -9,7 +9,7 @@ use std::{
 use indicatif::ProgressBar;
 
 use crate::{
-    error::{Error, ErrorKind, Result, WithDesc},
+    error::{Result, WithDesc},
     manifest::MirrorOptions,
 };
 
