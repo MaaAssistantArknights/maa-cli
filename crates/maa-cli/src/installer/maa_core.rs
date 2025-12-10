@@ -150,18 +150,10 @@ fn extract_mapper(
     None
 }
 
-pub fn install(force: bool, args: &CommonArgs) -> Result<()> {
+fn create_and_exec_installer(args: &CommonArgs, current_version: Option<&Version>) -> Result<()> {
     let config = CLI_CONFIG.core_config().apply_args(args);
     let lib_dir = maa_dirs::library();
-    let lib_name = MAA_CORE_LIB;
     let resource_dir = maa_dirs::resource();
-
-    if lib_dir.join(lib_name).exists() && !force {
-        bail!(
-            "MaaCore already exists, use `maa update` to update it or `maa install --force` to force reinstall"
-        )
-    }
-
     let components = config.components();
 
     let installer = maa_installer::installer::Installer::new(
@@ -181,11 +173,30 @@ pub fn install(force: bool, args: &CommonArgs) -> Result<()> {
         Ok(())
     });
 
+    let installer = if let Some(version) = current_version {
+        installer.with_current_version(version)
+    } else {
+        installer
+    };
+
     installer
         .exec(maa_dirs::cache().ensure()?)
         .context("Failed to install MaaCore")?;
 
     Ok(())
+}
+
+pub fn install(force: bool, args: &CommonArgs) -> Result<()> {
+    let lib_dir = maa_dirs::library();
+    let lib_name = MAA_CORE_LIB;
+
+    if lib_dir.join(lib_name).exists() && !force {
+        bail!(
+            "MaaCore already exists, use `maa update` to update it or `maa install --force` to force reinstall"
+        )
+    }
+
+    create_and_exec_installer(args, None)
 }
 
 pub fn update(args: &CommonArgs) -> Result<()> {
@@ -218,34 +229,7 @@ pub fn update(args: &CommonArgs) -> Result<()> {
         )
     }
 
-    let installer = maa_installer::installer::Installer::new(
-        crate::state::AGENT.clone(),
-        config.api_url(),
-        CoreManifest::from_body,
-        |src| extract_mapper(src, lib_dir, resource_dir, components),
-    )
-    .with_test_duration(config.test_time())
-    .with_pre_install_hook(move || {
-        if components.library {
-            lib_dir.ensure_clean()?;
-        }
-        if components.resource {
-            resource_dir.ensure_clean()?;
-        }
-        Ok(())
-    });
-
-    let installer = if let Some(current_version) = CORE_VERSION.as_ref() {
-        installer.with_current_version(current_version)
-    } else {
-        installer
-    };
-
-    installer
-        .exec(maa_dirs::cache().ensure()?)
-        .context("Failed to update MaaCore")?;
-
-    Ok(())
+    create_and_exec_installer(args, CORE_VERSION.as_ref())
 }
 
 #[cfg(test)]

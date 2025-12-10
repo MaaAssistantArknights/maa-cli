@@ -29,7 +29,7 @@ maa-types = { workspace = true, features = ["serde"] }
 maa-version = { workspace = true, optional = true }
 prettytable = { workspace = true }
 self-replace = { workspace = true }
-semver = { workspace = true, optional = true }
+semver = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
@@ -49,7 +49,6 @@ default = ["cli_installer", "core_installer", "git2"]
 __installer = [
   "dep:maa-installer",
   "dep:maa-version",
-  "dep:semver",
 ]
 # Features used to install update maa-cli self
 cli_installer = ["__installer", "dep:sha2"]
