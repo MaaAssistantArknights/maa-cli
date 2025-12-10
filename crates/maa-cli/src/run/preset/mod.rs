@@ -33,16 +33,16 @@ where
 {
     fn into_task_config(self, _: &AsstConfig) -> Result<TaskConfig> {
         let task_type = self.to_task_type();
-        let mut params: MAAValue = self.try_into().map_err(Into::into)?;
+        let params: MAAValue = self.try_into().map_err(Into::into)?;
 
-        let default = MAAValue::find_file_or_default(default_file(task_type))
+        let mut default = MAAValue::find_file_or_default(default_file(task_type))
             .context("Failed to load default task config")?;
 
-        params.merge_mut(&default);
+        default.merge_mut(&params);
 
         let mut task_config = TaskConfig::new();
 
-        task_config.push(Task::new(task_type, params));
+        task_config.push(Task::new(task_type, default));
 
         Ok(task_config)
     }
@@ -133,7 +133,9 @@ mod tests {
     #[test]
     #[ignore = "write to user directory"]
     fn into_task_config() {
-        struct TestParams;
+        struct TestParams {
+            bar: Option<i32>,
+        }
 
         impl ToTaskType for TestParams {
             fn to_task_type(&self) -> TaskType {
@@ -142,14 +144,23 @@ mod tests {
         }
 
         impl From<TestParams> for MAAValue {
-            fn from(_: TestParams) -> Self {
-                object!()
+            fn from(params: TestParams) -> Self {
+                let mut value = MAAValue::new();
+                if let Some(bar) = params.bar {
+                    value.insert("bar", bar);
+                }
+                value
             }
         }
 
         let config = AsstConfig::default();
+        let default = default_file(TaskType::Custom).with_extension("toml");
 
-        let task_config = TestParams
+        // Ensure clean state - remove overlay file if it exists
+        let _ = std::fs::remove_file(&default);
+
+        // Test without overlay file and without CLI args
+        let task_config = TestParams { bar: None }
             .into_task_config(&config)
             .unwrap()
             .init()
@@ -159,12 +170,15 @@ mod tests {
         assert_eq!(task_config[0].task_type, TaskType::Custom);
         assert_eq!(task_config[0].params, object!());
 
-        let default = default_file(TaskType::Custom).with_extension("toml");
+        // Create overlay file with foo = 42
         default.parent().unwrap().ensure().unwrap();
         let mut file = std::fs::File::create(&default).unwrap();
         use std::io::Write;
         writeln!(file, "foo = 42").unwrap();
-        let task_config = TestParams
+        drop(file);
+
+        // Test with overlay file but without CLI args - should use overlay values
+        let task_config = TestParams { bar: None }
             .into_task_config(&config)
             .unwrap()
             .init()
@@ -173,6 +187,27 @@ mod tests {
         assert_eq!(task_config.len(), 1);
         assert_eq!(task_config[0].task_type, TaskType::Custom);
         assert_eq!(task_config[0].params, object!("foo" => 42));
+
+        // Test with overlay file and CLI args - CLI should override overlay
+        let mut file = std::fs::File::create(&default).unwrap();
+        writeln!(file, "foo = 42").unwrap();
+        writeln!(file, "bar = 100").unwrap();
+        drop(file);
+
+        let task_config = TestParams { bar: Some(200) }
+            .into_task_config(&config)
+            .unwrap()
+            .init()
+            .unwrap()
+            .tasks;
+        assert_eq!(task_config.len(), 1);
+        assert_eq!(task_config[0].task_type, TaskType::Custom);
+        // CLI arg "bar = 200" should override overlay "bar = 100"
+        // Overlay "foo = 42" should be preserved
+        assert_eq!(task_config[0].params, object!("foo" => 42, "bar" => 200));
+
+        // Clean up
+        let _ = std::fs::remove_file(&default);
     }
 
     #[test]
