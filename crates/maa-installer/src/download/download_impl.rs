@@ -132,3 +132,58 @@ pub fn download(
 
     Ok(())
 }
+
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_partial_path() {
+        // Unix-style absolute path
+        assert_eq!(
+            partial_path(Path::new("/tmp/file.zip")),
+            PathBuf::from("/tmp/file.zip.partial")
+        );
+
+        // File with multiple extensions
+        assert_eq!(
+            partial_path(Path::new("archive.tar.gz")),
+            PathBuf::from("archive.tar.gz.partial")
+        );
+
+        // File without extension
+        assert_eq!(
+            partial_path(Path::new("download")),
+            PathBuf::from("download.partial")
+        );
+
+        // Nested directories
+        assert_eq!(
+            partial_path(Path::new("path/to/nested/file.bin")),
+            PathBuf::from("path/to/nested/file.bin.partial")
+        );
+
+        // Relative path
+        assert_eq!(
+            partial_path(Path::new("./relative/path/file.txt")),
+            PathBuf::from("./relative/path/file.txt.partial")
+        );
+
+        // File with dots in name
+        assert_eq!(
+            partial_path(Path::new("my.file.with.dots.zip")),
+            PathBuf::from("my.file.with.dots.zip.partial")
+        );
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn test_partial_path_windows() {
+        // Windows-style absolute path
+        assert_eq!(
+            partial_path(Path::new(r"C:\Users\test\download.exe")),
+            PathBuf::from(r"C:\Users\test\download.exe.partial")
+        );
+    }
+}

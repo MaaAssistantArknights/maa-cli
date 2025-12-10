@@ -110,3 +110,53 @@ pub fn fastest_mirror<'a, M: Iterator<Item = std::borrow::Cow<'a, str>>>(
 
     fastest_mirror
 }
+
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bytes_or_time_gt() {
+        // Time comparison: Smaller time is better (greater)
+        let fast = BytesOrTime::Time(Duration::from_secs(1));
+        let slow = BytesOrTime::Time(Duration::from_secs(5));
+        assert!(fast.gt(slow));
+        assert!(!slow.gt(fast));
+
+        // Bytes comparison: More bytes is better (greater)
+        let more = BytesOrTime::Bytes(1000);
+        let less = BytesOrTime::Bytes(500);
+        assert!(more.gt(less));
+        assert!(!less.gt(more));
+
+        // Mixed comparison: Completed download (Time) is always better than incomplete (Bytes)
+        let completed_slow = BytesOrTime::Time(Duration::from_secs(100));
+        let incomplete_fast = BytesOrTime::Bytes(999999);
+        assert!(completed_slow.gt(incomplete_fast));
+        assert!(!incomplete_fast.gt(completed_slow));
+
+        // Equal values should return false for gt
+        let time1 = BytesOrTime::Time(Duration::from_secs(5));
+        let time2 = BytesOrTime::Time(Duration::from_secs(5));
+        assert!(!time1.gt(time2));
+
+        let bytes1 = BytesOrTime::Bytes(1000);
+        let bytes2 = BytesOrTime::Bytes(1000);
+        assert!(!bytes1.gt(bytes2));
+
+        // Edge cases: Zero values
+        let zero_time = BytesOrTime::Time(Duration::from_secs(0));
+        let some_time = BytesOrTime::Time(Duration::from_secs(1));
+        assert!(zero_time.gt(some_time));
+
+        let zero_bytes = BytesOrTime::Bytes(0);
+        let some_bytes = BytesOrTime::Bytes(1);
+        assert!(some_bytes.gt(zero_bytes));
+
+        // Edge case: Very small time is still better than any bytes
+        let tiny_time = BytesOrTime::Time(Duration::from_millis(1));
+        let large_bytes = BytesOrTime::Bytes(u64::MAX);
+        assert!(tiny_time.gt(large_bytes));
+    }
+}

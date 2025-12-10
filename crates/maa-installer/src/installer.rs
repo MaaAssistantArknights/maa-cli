@@ -194,3 +194,146 @@ where
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_installer_style() {
+        // Test that default style creates progress bars with valid configuration
+        let style = InstallerStyle::default();
+        let _ = style.init_spinner();
+        let _ = style.init_bar();
+
+        // Test custom style produces functional progress bars
+        let custom_spinner = ProgressStyle::default_spinner().tick_chars("⠁⠂⠄");
+        let custom_bar = ProgressStyle::with_template("{bar} {percent}%")
+            .expect("valid template")
+            .progress_chars("=> ");
+        let _ = InstallerStyle::new(custom_spinner, custom_bar);
+        let _ = style.init_spinner();
+        let _ = style.init_bar();
+    }
+
+    // Test helper types
+    struct TestManifest {
+        version: Version,
+    }
+
+    impl Manifest for TestManifest {
+        type Asset<'a>
+            = TestAsset
+        where
+            Self: 'a;
+
+        fn version(&self) -> &Version {
+            &self.version
+        }
+
+        fn asset(&self) -> Option<Self::Asset<'_>> {
+            None
+        }
+    }
+
+    struct TestAsset;
+
+    impl Asset for TestAsset {
+        type Verifier = crate::verify::SizeVerifier;
+
+        fn name(&self) -> &str {
+            "test.zip"
+        }
+
+        fn url(&self) -> Cow<'_, str> {
+            Cow::Borrowed("https://example.com/test.zip")
+        }
+
+        fn verifier(&self) -> Result<Self::Verifier> {
+            Ok(crate::verify::SizeVerifier::new(1024))
+        }
+    }
+
+    #[test]
+    fn test_installer_builder() {
+        use std::{cell::RefCell, rc::Rc};
+
+        let agent = ureq::Agent::new_with_defaults();
+        let version_1_2_3 = Version::new(1, 2, 3);
+        let version_2_0_0 = Version::new(2, 0, 0);
+
+        // Test default values after construction
+        let installer = Installer::new(
+            agent.clone(),
+            "https://example.com/manifest.json",
+            |_body| -> Result<TestManifest> { unreachable!() },
+            |_path| None,
+        );
+        assert_eq!(installer.test_duration, 0);
+        assert_eq!(installer.current_version, None);
+
+        // Test with_test_duration sets the correct value
+        let installer = Installer::new(
+            agent.clone(),
+            "https://example.com/manifest.json",
+            |_body| -> Result<TestManifest> { unreachable!() },
+            |_path| None,
+        )
+        .with_test_duration(10);
+        assert_eq!(installer.test_duration, 10);
+
+        // Test with_current_version sets the correct reference
+        let installer = Installer::new(
+            agent.clone(),
+            "https://example.com/manifest.json",
+            |_body| -> Result<TestManifest> { unreachable!() },
+            |_path| None,
+        )
+        .with_current_version(&version_1_2_3);
+        assert_eq!(installer.current_version, Some(&version_1_2_3));
+        assert_eq!(installer.current_version.unwrap(), &Version::new(1, 2, 3));
+
+        // Test that hooks can be set and are not called during construction
+        let pre_hook_called = Rc::new(RefCell::new(false));
+        let pre_hook_called_clone = pre_hook_called.clone();
+        let post_hook_called = Rc::new(RefCell::new(false));
+        let post_hook_called_clone = post_hook_called.clone();
+
+        let _installer = Installer::new(
+            agent.clone(),
+            "https://example.com/manifest.json",
+            |_body| -> Result<TestManifest> { unreachable!() },
+            |_path| None,
+        )
+        .with_pre_install_hook(move || {
+            *pre_hook_called_clone.borrow_mut() = true;
+            Ok(())
+        })
+        .with_post_install_hook(move || {
+            *post_hook_called_clone.borrow_mut() = true;
+            Ok(())
+        });
+
+        // Hooks should not be called during construction
+        assert!(!*pre_hook_called.borrow());
+        assert!(!*post_hook_called.borrow());
+
+        // Test method chaining preserves all configured values
+        let installer = Installer::new(
+            agent,
+            "https://example.com/manifest.json",
+            |_body| -> Result<TestManifest> { unreachable!() },
+            |_path| None,
+        )
+        .with_test_duration(5)
+        .with_current_version(&version_2_0_0)
+        .with_progress_style(InstallerStyle::default())
+        .with_pre_install_hook(|| Ok(()))
+        .with_post_install_hook(|| Ok(()));
+
+        assert_eq!(installer.test_duration, 5);
+        assert_eq!(installer.current_version, Some(&version_2_0_0));
+        assert_eq!(installer.current_version.unwrap(), &Version::new(2, 0, 0));
+    }
+}
