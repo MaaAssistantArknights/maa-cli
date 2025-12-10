@@ -239,5 +239,77 @@ mod tests {
                 assert!(url.contains(expected_name));
             }
         }
+
+        #[test]
+        #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+        fn test_asset_linux_x86_64() {
+            let asset = MANIFEST
+                .asset()
+                .expect("Asset should exist for current platform");
+            assert_eq!(
+                asset.name(),
+                "maa_cli-v0.5.9-x86_64-unknown-linux-gnu.tar.gz"
+            );
+            assert!(asset.url().contains("x86_64-unknown-linux-gnu.tar.gz"));
+            assert!(asset.verifier().is_ok());
+        }
+
+        #[test]
+        #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+        fn test_asset_linux_aarch64() {
+            let asset = MANIFEST
+                .asset()
+                .expect("Asset should exist for current platform");
+            assert_eq!(
+                asset.name(),
+                "maa_cli-v0.5.9-aarch64-unknown-linux-gnu.tar.gz"
+            );
+            assert!(asset.url().contains("aarch64-unknown-linux-gnu.tar.gz"));
+            assert!(asset.verifier().is_ok());
+        }
+
+        #[test]
+        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
+        fn test_asset_windows_x86_64() {
+            let asset = MANIFEST
+                .asset()
+                .expect("Asset should exist for current platform");
+            assert_eq!(asset.name(), "maa_cli-v0.5.9-x86_64-pc-windows-msvc.zip");
+            assert!(asset.url().contains("x86_64-pc-windows-msvc.zip"));
+            assert!(asset.verifier().is_ok());
+        }
+
+        #[test]
+        #[cfg(all(target_os = "windows", target_arch = "aarch64"))]
+        fn test_asset_windows_aarch64() {
+            let asset = MANIFEST
+                .asset()
+                .expect("Asset should exist for current platform");
+            assert_eq!(asset.name(), "maa_cli-v0.5.9-aarch64-pc-windows-msvc.zip");
+            assert!(asset.url().contains("aarch64-pc-windows-msvc.zip"));
+            assert!(asset.verifier().is_ok());
+        }
+
+        #[test]
+        #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+        fn test_asset_macos_x86_64() {
+            let asset = MANIFEST
+                .asset()
+                .expect("Asset should exist for current platform");
+            assert_eq!(asset.name(), "maa_cli-v0.5.9-x86_64-apple-darwin.zip");
+            assert!(asset.url().contains("x86_64-apple-darwin.zip"));
+            assert!(asset.verifier().is_ok());
+        }
+
+        #[test]
+        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+        fn test_asset_macos_aarch64() {
+            let asset = MANIFEST
+                .asset()
+                .expect("Asset should exist for current platform");
+            assert_eq!(asset.name(), "maa_cli-v0.5.9-aarch64-apple-darwin.zip");
+            assert!(asset.url().contains("aarch64-apple-darwin.zip"));
+            assert!(asset.verifier().is_ok());
+        }
     }
 }

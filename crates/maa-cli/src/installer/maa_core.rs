@@ -423,5 +423,65 @@ mod tests {
                 assert!(url.contains(expected_name));
             }
         }
+
+        #[test]
+        #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+        fn test_asset_linux_x86_64() {
+            let asset = MANIFEST
+                .asset()
+                .expect("Asset should exist for current platform");
+            assert_eq!(asset.name(), "MAA-v4.26.1-linux-x86_64.tar.gz");
+            assert!(asset.url().contains("linux-x86_64.tar.gz"));
+            assert!(asset.verifier().is_ok());
+            assert!(asset.mirror_opts().is_some());
+        }
+
+        #[test]
+        #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+        fn test_asset_linux_aarch64() {
+            let asset = MANIFEST
+                .asset()
+                .expect("Asset should exist for current platform");
+            assert_eq!(asset.name(), "MAA-v4.26.1-linux-aarch64.tar.gz");
+            assert!(asset.url().contains("linux-aarch64.tar.gz"));
+            assert!(asset.verifier().is_ok());
+            assert!(asset.mirror_opts().is_some());
+        }
+
+        #[test]
+        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
+        fn test_asset_windows_x86_64() {
+            let asset = MANIFEST
+                .asset()
+                .expect("Asset should exist for current platform");
+            assert_eq!(asset.name(), "MAA-v4.26.1-win-x64.zip");
+            assert!(asset.url().contains("win-x64.zip"));
+            assert!(asset.verifier().is_ok());
+            assert!(asset.mirror_opts().is_some());
+        }
+
+        #[test]
+        #[cfg(all(target_os = "windows", target_arch = "aarch64"))]
+        fn test_asset_windows_aarch64() {
+            let asset = MANIFEST
+                .asset()
+                .expect("Asset should exist for current platform");
+            assert_eq!(asset.name(), "MAA-v4.26.1-win-arm64.zip");
+            assert!(asset.url().contains("win-arm64.zip"));
+            assert!(asset.verifier().is_ok());
+            assert!(asset.mirror_opts().is_some());
+        }
+
+        #[test]
+        #[cfg(target_os = "macos")]
+        fn test_asset_macos() {
+            let asset = MANIFEST
+                .asset()
+                .expect("Asset should exist for current platform");
+            assert_eq!(asset.name(), "MAA-v4.26.1-macos-runtime-universal.zip");
+            assert!(asset.url().contains("macos-runtime-universal.zip"));
+            assert!(asset.verifier().is_ok());
+            assert!(asset.mirror_opts().is_some());
+        }
     }
 }

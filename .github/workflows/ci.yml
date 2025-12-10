@@ -230,6 +230,8 @@ jobs:
       - name: Cleanup Coverage Artifacts
         run: cargo llvm-cov clean --workspace
       - name: Install MaaCore
+        env:
+          MAA_CONFIG_DIR: ${{ github.workspace }}/crates/maa-cli/config_examples
         run: |
           cargo llvm-cov run --package maa-cli --no-report -- install beta
           core_dir=$(cargo run -- dir library)
