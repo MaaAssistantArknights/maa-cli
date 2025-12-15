@@ -35,7 +35,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
       - name: Run markdownlint
-        uses: DavidAnson/markdownlint-cli2-action@v21
+        uses: DavidAnson/markdownlint-cli2-action@v22
         with:
           globs: "**/*.md"
           config: "crates/maa-cli/docs/.markdownlint.yaml"
