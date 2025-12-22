@@ -97,9 +97,14 @@ pub fn update(args: &CommonArgs) -> Result<()> {
     let installer = maa_installer::installer::Installer::new(
         AGENT.clone(),
         config.api_url(),
-        |mut body| {
+        |file| {
+            use maa_installer::error::{Error, ErrorKind};
             let manifest: VersionManifest<Details> =
-                body.read_json().with_desc("Failed to parse manifest")?;
+                serde_json::from_reader(file).map_err(|e| {
+                    Error::new(ErrorKind::Other)
+                        .with_source(e)
+                        .with_desc("Failed to parse manifest")
+                })?;
             Ok(ManifestWithBaseUrl { manifest, url })
         },
         |src| {
@@ -119,7 +124,10 @@ pub fn update(args: &CommonArgs) -> Result<()> {
     });
 
     installer
-        .exec(maa_dirs::cache().ensure()?)
+        .exec(
+            maa_dirs::cache().ensure()?,
+            &format!("cli-manifest-{}.json", config.channel()),
+        )
         .context("Failed to install maa-cli")?;
 
     Ok(())

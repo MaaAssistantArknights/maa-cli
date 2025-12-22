@@ -1,4 +1,5 @@
 mod download_impl;
+pub mod etag;
 pub mod mirror;
 
 use std::{borrow::Cow, path::Path, time::Duration};
