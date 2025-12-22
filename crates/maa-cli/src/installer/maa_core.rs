@@ -33,7 +33,7 @@ impl CoreManifest {
         let manifest = serde_json::from_reader(file).map_err(|e| {
             Error::new(ErrorKind::Other)
                 .with_source(e)
-                .with_desc("Failed to parse core version minefast")
+                .with_desc("Failed to parse core version manifest")
         })?;
 
         Ok(CoreManifest(manifest))
