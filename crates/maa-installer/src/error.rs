@@ -169,7 +169,7 @@ mod tests {
         #[test]
         fn test_display() {
             assert_eq!(ErrorKind::Io.to_string(), "I/O error");
-            assert_eq!(ErrorKind::Verifier.to_string(), "Failed to build verifier");
+            assert_eq!(ErrorKind::Verifier.to_string(), "Build verifier failed");
             assert_eq!(ErrorKind::Verify.to_string(), "Verification failed");
             assert_eq!(ErrorKind::Extract.to_string(), "Extraction error");
             assert_eq!(ErrorKind::Network.to_string(), "Network error");

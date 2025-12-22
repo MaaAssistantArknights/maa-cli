@@ -15,7 +15,7 @@ use semver::Version;
 use ureq::Agent;
 
 use crate::{
-    download::{DownloadOptions, download, etag::dwonload_with_etag},
+    download::{DownloadOptions, download, etag::download_with_etag},
     error::{Result, WithDesc},
     extract::ArchiveFile,
     manifest::{Asset, Manifest},
@@ -140,7 +140,7 @@ where
         fetching_ui.set_message("Fetching version manifest...");
 
         let manifest_path = cache_dir.join(manifest_name);
-        dwonload_with_etag(
+        download_with_etag(
             &self.agent,
             &self.manifest_url,
             &manifest_path,

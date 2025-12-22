@@ -13,7 +13,7 @@ use ureq::http::StatusCode;
 
 use crate::error::{Error, ErrorKind, Result};
 
-pub fn dwonload_with_etag(
+pub fn download_with_etag(
     agent: &ureq::Agent,
     url: &str,
     dest: &Path,
