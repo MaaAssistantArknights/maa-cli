@@ -22,7 +22,7 @@ use signal_hook::consts::TERM_SIGNALS;
 
 use crate::{
     config::{FindFile, asst::AsstConfig, task::TaskConfig},
-    installer::resource,
+    installer,
 };
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -118,7 +118,8 @@ where
     F: FnOnce(&AsstConfig) -> Result<TaskConfig>,
 {
     // Auto update hot update resource
-    resource::update(true)?;
+    installer::hot_update::update()?;
+    installer::resource::update(true)?;
 
     // Load asst config
     let mut asst_config = find_profile(dirs::config(), args.profile.as_deref())?;

@@ -1,31 +1,21 @@
-use std::{io::Write, path::Path, sync::LazyLock};
+use std::{collections::BTreeMap, io::Write, path::Path, sync::LazyLock};
 
-use anyhow::{Context, Result, bail};
-use chrono::{DateTime, FixedOffset, NaiveDateTime};
+use anyhow::{Context, Result, anyhow, bail};
+use chrono::{DateTime, FixedOffset, NaiveDateTime, Utc};
 use log::warn;
 use serde::Deserialize;
 use serde_json::Value as JsonValue;
 
-use crate::{config::task::ClientType, dirs};
+use crate::config::task::ClientType;
 
-static STAGE_ACTIVITY: LazyLock<Option<StageActivityJson>> = LazyLock::new(|| {
-    load_stage_activity(
-        dirs::hot_update()
-            .join("cache")
-            .join("gui")
-            .join("StageActivity.json"),
-    )
-    .warn_err()
-});
+static STAGE_ACTIVITY: LazyLock<Option<StageActivityJson>> =
+    LazyLock::new(|| load_stage_activity(maa_dirs::activity()).warn_err());
 
 pub fn has_side_story_open(client: ClientType) -> bool {
     STAGE_ACTIVITY
         .as_ref()
-        .map(|stage_activity| {
-            stage_activity
-                .get_stage_activity(client)
-                .has_side_story_open()
-        })
+        .and_then(|stage_activity| stage_activity.get_stage_activity(client))
+        .map(|c| c.has_side_story_open())
         .unwrap_or(false)
 }
 
@@ -40,60 +30,72 @@ pub fn display_stage_activity(client: ClientType) -> std::io::Result<()> {
 // TODO: use stage activity as alternative in fight task
 // This feature require allow custom input in select
 
+// TODO: use MinimumRequired to verify stage
+
 #[derive(Deserialize)]
-pub struct StageActivityJson {
-    #[serde(rename = "Official")]
-    official: StageActivityContent,
-    #[serde(rename = "YoStarEN")]
-    yostar_en: StageActivityContent,
-    #[serde(rename = "YoStarJP")]
-    yostar_jp: StageActivityContent,
-    #[serde(rename = "YoStarKR")]
-    yostar_kr: StageActivityContent,
-    txwy: StageActivityContent,
-}
+#[serde(transparent)]
+pub struct StageActivityJson(BTreeMap<String, StageActivityContent>);
 
 fn load_stage_activity(file_path: impl AsRef<Path>) -> Result<StageActivityJson> {
     let file_path = file_path.as_ref();
-    let file = std::fs::File::open(file_path).context("Failed to open StageActivity.json")?;
-    serde_json::from_reader(file).context("Failed to parse StageActivity.json")
+    let file = std::fs::File::open(file_path)
+        .with_context(|| format!("Failed to open {}", file_path.display()))?;
+    serde_json::from_reader(file)
+        .map_err(|e| anyhow!("Failed to parse {}: {e}", file_path.display()))
 }
 
 impl StageActivityJson {
-    pub fn get_stage_activity(&self, client: ClientType) -> &StageActivityContent {
-        use ClientType::*;
-        match client {
-            Official | Bilibili => &self.official,
-            YoStarEN => &self.yostar_en,
-            YoStarJP => &self.yostar_jp,
-            YoStarKR => &self.yostar_kr,
-            Txwy => &self.txwy,
+    pub fn get_stage_activity(&self, mut client: ClientType) -> Option<&StageActivityContent> {
+        if client == ClientType::Bilibili {
+            client = ClientType::Official;
         }
+        self.0.get(client.to_str())
     }
 
     pub fn display(&self, mut f: impl Write, client: ClientType) -> std::io::Result<()> {
         let item_index = load_item_index(client);
-        let stage_activity = self.get_stage_activity(client);
+        let stage_activity = if let Some(activity) = self.get_stage_activity(client) {
+            activity
+        } else {
+            return Ok(());
+        };
+
         let mut sidestory_title = false;
-        for stage in &stage_activity.side_story_stage {
-            if stage.activity.is_active() {
+        for activity in stage_activity.side_story_stage.values() {
+            if activity.activity.is_active() {
                 if !sidestory_title {
                     writeln!(f, "Opening side story stages:")?;
                     sidestory_title = true;
                 }
-                let drop = item_index
-                    .as_ref()
-                    .warn_err()
-                    .and_then(|item_index| item_index.get(&stage.drop))
-                    .and_then(|item| item.get("name"))
-                    .and_then(|name| name.as_str())
-                    .unwrap_or(&stage.drop);
-                writeln!(f, "- {}: {}", stage.value, drop)?;
+                writeln!(f, "- {}", activity.activity.tip)?;
+                for stage in &activity.stages {
+                    let drop = item_index
+                        .as_ref()
+                        .warn_err()
+                        .and_then(|item_index| item_index.get(&stage.drop))
+                        .and_then(|item| item.get("name"))
+                        .and_then(|name| name.as_str())
+                        .unwrap_or(&stage.drop);
+                    writeln!(f, "  - {}: {}", stage.display, drop)?;
+                }
             }
         }
+
         if stage_activity.resource_collection.is_active() {
             writeln!(f, "{}", stage_activity.resource_collection.tip)?;
         }
+
+        let mut minigame_title = false;
+        for game in &stage_activity.mini_game {
+            if game.is_active() {
+                if !minigame_title {
+                    writeln!(f, "Opening mini games:")?;
+                    minigame_title = true;
+                }
+                writeln!(f, "- {}", game.display)?;
+            }
+        }
+
         Ok(())
     }
 }
@@ -102,63 +104,116 @@ impl StageActivityJson {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StageActivityContent {
-    side_story_stage: Vec<StageInfo>,
+    side_story_stage: BTreeMap<String, SideStoryActivity>,
     resource_collection: ActivityInfo,
+    #[serde(default)]
+    mini_game: Vec<MiniGameInfo>,
 }
 
 impl StageActivityContent {
     pub fn has_side_story_open(&self) -> bool {
-        for stage in &self.side_story_stage {
-            if stage.activity.is_active() {
-                return true;
-            }
-        }
-        false
+        self.side_story_stage
+            .values()
+            .any(|activity| activity.activity.is_active())
     }
 }
 
-#[cfg_attr(test, derive(Debug, PartialEq))]
+#[cfg_attr(test, derive(Debug, PartialEq, Clone))]
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
-struct StageInfo {
-    value: String,
-    drop: String,
+struct SideStoryActivity {
     activity: ActivityInfo,
+    stages: Vec<StageInfo>,
 }
 
-// Time format: 2023/12/22 16:00:00 and time zone is 8
-#[cfg_attr(test, derive(Debug, PartialEq))]
+#[cfg_attr(test, derive(Debug, PartialEq, Clone))]
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
 struct ActivityInfo {
     tip: String,
-    utc_start_time: String,
-    utc_expire_time: String,
-    time_zone: i32,
+
+    #[serde(flatten)]
+    time_info: TimeInfo,
 }
 
 impl ActivityInfo {
     pub fn is_active(&self) -> bool {
-        let now = chrono::Utc::now();
-
-        parse_time(&self.utc_start_time, self.time_zone).is_some_and(|t| t < now)
-            && parse_time(&self.utc_expire_time, self.time_zone).is_some_and(|t| t > now)
+        self.time_info.is_active()
     }
 }
 
-fn parse_time(time: &str, tz: i32) -> Option<DateTime<FixedOffset>> {
-    NaiveDateTime::parse_from_str(time, "%Y/%m/%d %H:%M:%S")
-        .ok()
-        .and_then(|t| {
-            FixedOffset::east_opt(tz * 3600).and_then(|tz| t.and_local_timezone(tz).single())
-        })
+#[cfg_attr(test, derive(Debug, PartialEq, Clone))]
+#[derive(Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct StageInfo {
+    display: String,
+    // value: String,
+    drop: String,
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq, Clone))]
+#[derive(Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct MiniGameInfo {
+    display: String,
+
+    #[serde(flatten)]
+    time_info: TimeInfo,
+}
+
+impl MiniGameInfo {
+    pub fn is_active(&self) -> bool {
+        self.time_info.is_active()
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+/// Time information for activities.
+///
+/// The utc_* prefix is quiet misleading, as it is not UTC time but local time at given time zone.
+struct TimeInfo {
+    #[serde(deserialize_with = "parse_naive_date_time")]
+    utc_start_time: NaiveDateTime,
+    #[serde(deserialize_with = "parse_naive_date_time")]
+    utc_expire_time: NaiveDateTime,
+    #[serde(deserialize_with = "parse_fixed_offset")]
+    time_zone: FixedOffset,
+}
+
+fn parse_naive_date_time<'de, D>(deserializer: D) -> Result<NaiveDateTime, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    NaiveDateTime::parse_from_str(&s, "%Y/%m/%d %H:%M:%S").map_err(serde::de::Error::custom)
+}
+
+fn parse_fixed_offset<'de, D>(deserializer: D) -> Result<FixedOffset, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    let tz = i32::deserialize(deserializer)?;
+    FixedOffset::east_opt(tz * 3600)
+        .ok_or_else(|| serde::de::Error::custom(format!("Timezone offset {tz} out of range")))
+}
+
+impl TimeInfo {
+    pub fn is_active(&self) -> bool {
+        self.is_active_at(Utc::now())
+    }
+
+    pub fn is_active_at(&self, time: DateTime<Utc>) -> bool {
+        let time = time.with_timezone(&self.time_zone).naive_local();
+        self.utc_start_time < time && time < self.utc_expire_time
+    }
 }
 
 fn load_item_index(client: ClientType) -> Result<JsonValue> {
-    let hot_update_resource_dir = dirs::hot_update().join("resource");
-    let base_resource_dir = if hot_update_resource_dir.exists() {
-        hot_update_resource_dir.into()
-    } else if let Some(resource_dir) = dirs::find_resource() {
+    let maa_resource_dir = maa_dirs::maa_resource().join("resource");
+    let base_resource_dir = if maa_resource_dir.exists() {
+        maa_resource_dir.into()
+    } else if let Some(resource_dir) = maa_dirs::find_resource() {
         resource_dir
     } else {
         bail!("Failed to find resource dir");
@@ -209,267 +264,332 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn parse_time_from_activity_info() {
-        use chrono::{TimeZone, Utc};
-
-        let time = parse_time("2023/12/22 16:00:00", 8).unwrap();
-        assert_eq!(time, Utc.with_ymd_and_hms(2023, 12, 22, 8, 0, 0).unwrap());
+    // Helper functions for creating test data
+    fn naive_dt(year: i32, month: u32, day: u32, hour: u32, min: u32, sec: u32) -> NaiveDateTime {
+        chrono::NaiveDate::from_ymd_opt(year, month, day)
+            .unwrap()
+            .and_hms_opt(hour, min, sec)
+            .unwrap()
     }
 
-    #[test]
-    fn parse_stage_activity() {
-        let json_str = r#"
-{
-    "Official": {
-        "sideStoryStage": [
-            {
-                "Display": "SSReopen-FC",
-                "Value": "SSReopen-FC",
-                "Drop": "代理1~8",
-                "MinimumRequired": "v4.28.6",
-                "Activity": {
-                    "Tip": "SideStory「照我以火」复刻",
-                    "StageName": "FC",
-                    "UtcStartTime": "2023/12/22 16:00:00",
-                    "UtcExpireTime": "2024/01/01 03:59:59",
-                    "TimeZone": 8
-                }
-            },
-            {
-                "Display": "FC-7",
-                "Value": "FC-7",
-                "Drop": "31043",
-                "MinimumRequired": "v4.28.6",
-                "Activity": {
-                    "Tip": "SideStory「照我以火」复刻",
-                    "StageName": "FC",
-                    "UtcStartTime": "2023/12/22 16:00:00",
-                    "UtcExpireTime": "2024/01/01 03:59:59",
-                    "TimeZone": 8
-                }
-            }
-        ],
-        "resourceCollection": {
-            "Tip": "2023「感谢庆典」，“资源收集”限时全天开放",
-            "UtcStartTime": "2023/11/21 16:00:00",
-            "UtcExpireTime": "2023/12/05 03:59:59",
-            "TimeZone": 8,
-            "IsResourceCollection": true
-        }
-    },
-    "YoStarJP": {
-        "sideStoryStage": [],
-        "resourceCollection": {
-            "Tip": "「資源調達」全ステージ開放",
-            "UtcStartTime": "2023/10/01 16:00:00",
-            "UtcExpireTime": "2023/10/15 03:59:59",
-            "TimeZone": 9,
-            "IsResourceCollection": true
-        }
-    },
-    "YoStarKR": {
-        "sideStoryStage": [],
-        "resourceCollection": {
-            "Tip": "[자원 수진] 제한 시간 상시 오픈",
-            "UtcStartTime": "2023/10/01 16:00:00",
-            "UtcExpireTime": "2023/10/15 03:59:59",
-            "TimeZone": 9,
-            "IsResourceCollection": true
-        }
-    },
-    "YoStarEN": {
-        "sideStoryStage": [],
-        "resourceCollection": {
-            "Tip": "SUPPLIES & CHIPS EVERYDAY ACCESS",
-            "UtcStartTime": "2023/10/01 10:00:00",
-            "UtcExpireTime": "2023/10/15 03:59:59",
-            "TimeZone": -7,
-            "IsResourceCollection": true
-        }
-    },
-    "txwy": {
-        "sideStoryStage": [],
-        "resourceCollection": {
-            "Tip": "「資源收集」限時全天開放",
-            "UtcStartTime": "2023/10/03 16:00:00",
-            "UtcExpireTime": "2023/10/17 03:59:59",
-            "TimeZone": 8,
-            "IsResourceCollection": true
-        }
-    }
-}
-    "#;
-
-        let stage_activity: StageActivityJson = serde_json::from_str(json_str).unwrap();
-
-        assert_eq!(
-            stage_activity.get_stage_activity(ClientType::Official),
-            &StageActivityContent {
-                side_story_stage: vec![
-                    StageInfo {
-                        value: "SSReopen-FC".to_string(),
-                        drop: "代理1~8".to_string(),
-                        activity: ActivityInfo {
-                            tip: "SideStory「照我以火」复刻".to_string(),
-                            utc_start_time: "2023/12/22 16:00:00".to_string(),
-                            utc_expire_time: "2024/01/01 03:59:59".to_string(),
-                            time_zone: 8,
-                        }
-                    },
-                    StageInfo {
-                        value: "FC-7".to_string(),
-                        drop: "31043".to_string(),
-                        activity: ActivityInfo {
-                            tip: "SideStory「照我以火」复刻".to_string(),
-                            utc_start_time: "2023/12/22 16:00:00".to_string(),
-                            utc_expire_time: "2024/01/01 03:59:59".to_string(),
-                            time_zone: 8,
-                        }
-                    }
-                ],
-                resource_collection: ActivityInfo {
-                    tip: "2023「感谢庆典」，“资源收集”限时全天开放".to_string(),
-                    utc_start_time: "2023/11/21 16:00:00".to_string(),
-                    utc_expire_time: "2023/12/05 03:59:59".to_string(),
-                    time_zone: 8,
-                }
-            }
-        );
-
-        assert_eq!(
-            stage_activity.get_stage_activity(ClientType::Bilibili),
-            stage_activity.get_stage_activity(ClientType::Official)
-        );
-
-        assert_eq!(
-            stage_activity.get_stage_activity(ClientType::YoStarJP),
-            &StageActivityContent {
-                side_story_stage: vec![],
-                resource_collection: ActivityInfo {
-                    tip: "「資源調達」全ステージ開放".to_string(),
-                    utc_start_time: "2023/10/01 16:00:00".to_string(),
-                    utc_expire_time: "2023/10/15 03:59:59".to_string(),
-                    time_zone: 9,
-                }
-            }
-        );
-
-        assert_eq!(
-            stage_activity.get_stage_activity(ClientType::YoStarKR),
-            &StageActivityContent {
-                side_story_stage: vec![],
-                resource_collection: ActivityInfo {
-                    tip: "[자원 수진] 제한 시간 상시 오픈".to_string(),
-                    utc_start_time: "2023/10/01 16:00:00".to_string(),
-                    utc_expire_time: "2023/10/15 03:59:59".to_string(),
-                    time_zone: 9,
-                }
-            }
-        );
-
-        assert_eq!(
-            stage_activity.get_stage_activity(ClientType::YoStarEN),
-            &StageActivityContent {
-                side_story_stage: vec![],
-                resource_collection: ActivityInfo {
-                    tip: "SUPPLIES & CHIPS EVERYDAY ACCESS".to_string(),
-                    utc_start_time: "2023/10/01 10:00:00".to_string(),
-                    utc_expire_time: "2023/10/15 03:59:59".to_string(),
-                    time_zone: -7,
-                }
-            }
-        );
-
-        assert_eq!(
-            stage_activity.get_stage_activity(ClientType::Txwy),
-            &StageActivityContent {
-                side_story_stage: vec![],
-                resource_collection: ActivityInfo {
-                    tip: "「資源收集」限時全天開放".to_string(),
-                    utc_start_time: "2023/10/03 16:00:00".to_string(),
-                    utc_expire_time: "2023/10/17 03:59:59".to_string(),
-                    time_zone: 8,
-                }
-            }
-        );
+    fn tz(hours: i32) -> FixedOffset {
+        FixedOffset::east_opt(hours * 3600).unwrap()
     }
 
-    #[test]
-    fn stage_activity_content() {
-        assert!(
-            StageActivityContent {
-                side_story_stage: vec![StageInfo {
-                    value: "FC-7".to_string(),
-                    drop: "31043".to_string(),
-                    activity: ActivityInfo {
-                        tip: "Test".to_string(),
-                        utc_start_time: "1970/01/01 00:00:00".to_string(),
-                        utc_expire_time: "3000/01/01 00:00:00".to_string(),
-                        time_zone: 8,
-                    },
-                }],
-                resource_collection: ActivityInfo {
-                    tip: "Test".to_string(),
-                    utc_start_time: "1970/01/01 00:00:00".to_string(),
-                    utc_expire_time: "3000/01/01 00:00:00".to_string(),
-                    time_zone: 8,
+    fn tz_west(hours: i32) -> FixedOffset {
+        FixedOffset::west_opt(hours * 3600).unwrap()
+    }
+
+    mod stage_activity_json {
+        use super::*;
+
+        #[test]
+        fn test_parse_activity_fixture() {
+            let json_str = include_str!("../fixtures/activity.json");
+            let stage_activity: StageActivityJson = serde_json::from_str(json_str).unwrap();
+
+            // Test Official server
+            let official = stage_activity
+                .get_stage_activity(ClientType::Official)
+                .unwrap();
+            assert_eq!(official.side_story_stage.len(), 2);
+            assert!(official.side_story_stage.contains_key("SSReopen"));
+            assert!(official.side_story_stage.contains_key("UR"));
+            assert_eq!(official.mini_game.len(), 1);
+
+            // Test SSReopen activity
+            let ssreopen = &official.side_story_stage["SSReopen"];
+            assert_eq!(ssreopen.activity.tip, "SideStory「出苍白海」复刻");
+            assert_eq!(ssreopen.stages.len(), 5);
+            assert_eq!(ssreopen.stages[0].display, "SSReopen-EP");
+            assert_eq!(ssreopen.stages[0].drop, "代理1~8");
+
+            // Test txwy server
+            let txwy = stage_activity.get_stage_activity(ClientType::Txwy).unwrap();
+            assert_eq!(txwy.side_story_stage.len(), 2);
+            assert!(txwy.side_story_stage.contains_key("巴别塔 復刻"));
+            assert!(txwy.side_story_stage.contains_key("眾生行記"));
+            assert_eq!(txwy.mini_game.len(), 1);
+        }
+
+        #[test]
+        #[ignore = "need installed resource"]
+        fn test_load_stage_activity() {
+            if var_os("SKIP_CORE_TEST").is_some() {
+                return;
+            }
+            let _ = STAGE_ACTIVITY.as_ref();
+        }
+
+        #[test]
+        #[ignore = "need installed resource"]
+        fn test_item_index() {
+            if var_os("SKIP_CORE_TEST").is_some() {
+                return;
+            }
+
+            load_item_index(ClientType::Official).unwrap();
+            load_item_index(ClientType::Bilibili).unwrap();
+            load_item_index(ClientType::YoStarEN).unwrap();
+            load_item_index(ClientType::YoStarJP).unwrap();
+            load_item_index(ClientType::YoStarKR).unwrap();
+            load_item_index(ClientType::Txwy).unwrap();
+        }
+    }
+
+    mod time_info {
+        use super::*;
+
+        #[test]
+        fn test_is_active_at_active_range() {
+            // Use a broad time range from 2024 to 2050 for active period
+            let time_info = TimeInfo {
+                utc_start_time: naive_dt(2024, 1, 1, 0, 0, 0),
+                utc_expire_time: naive_dt(2050, 12, 31, 23, 59, 59),
+                time_zone: tz(8), // UTC+8
+            };
+
+            // Test time within active range
+            let test_time = naive_dt(2025, 6, 15, 12, 0, 0).and_utc();
+            assert!(time_info.is_active_at(test_time));
+        }
+
+        #[test]
+        fn test_is_active_at_expired() {
+            // Use early time range (before 2023) for expired period
+            let time_info = TimeInfo {
+                utc_start_time: naive_dt(2020, 1, 1, 0, 0, 0),
+                utc_expire_time: naive_dt(2022, 12, 31, 23, 59, 59),
+                time_zone: tz(8),
+            };
+
+            // Test time after expiration
+            let test_time = naive_dt(2025, 1, 15, 12, 0, 0).and_utc();
+            assert!(!time_info.is_active_at(test_time));
+        }
+
+        #[test]
+        fn test_is_active_at_future() {
+            let time_info = TimeInfo {
+                utc_start_time: naive_dt(2051, 1, 1, 0, 0, 0),
+                utc_expire_time: naive_dt(2060, 12, 31, 23, 59, 59),
+                time_zone: tz(8),
+            };
+
+            // Test time before start
+            let test_time = naive_dt(2025, 6, 15, 12, 0, 0).and_utc();
+            assert!(!time_info.is_active_at(test_time));
+        }
+
+        #[test]
+        fn test_timezone_makes_difference() {
+            // Same UTC times, but activity defined in different timezones
+            // Activity from 10:00 to 18:00 in local time
+            let start = naive_dt(2025, 6, 15, 10, 0, 0);
+            let expire = naive_dt(2025, 6, 15, 18, 0, 0);
+
+            let time_info_utc8 = TimeInfo {
+                utc_start_time: start,   // UTC: 02:00
+                utc_expire_time: expire, // UTC: 10:00
+                time_zone: tz(8),
+            };
+
+            let time_info_utc_m5 = TimeInfo {
+                utc_start_time: start,   // UTC: 15:00
+                utc_expire_time: expire, // UTC: 23:00
+                time_zone: tz_west(5),
+            };
+
+            // UTC 4:00
+            let time1 = naive_dt(2025, 6, 15, 4, 0, 0).and_utc();
+
+            assert!(time_info_utc8.is_active_at(time1));
+            assert!(!time_info_utc_m5.is_active_at(time1));
+
+            // UTC 16:00
+            let time2 = naive_dt(2025, 6, 15, 16, 0, 0).and_utc();
+            assert!(!time_info_utc8.is_active_at(time2));
+            assert!(time_info_utc_m5.is_active_at(time2));
+        }
+
+        #[test]
+        fn test_timezone_boundary() {
+            // Activity from 2025-06-15 20:00 to 2025-06-16 10:00 (UTC+8)
+            // It's 2025-06-15 12:00 to 2025-06-16 2:00 in UTC
+            let time_info = TimeInfo {
+                utc_start_time: naive_dt(2025, 6, 15, 20, 0, 0),
+                utc_expire_time: naive_dt(2025, 6, 16, 10, 0, 0),
+                time_zone: tz(8),
+            };
+
+            // Test at 13:00 - should be active
+            let time1 = naive_dt(2025, 6, 15, 13, 0, 0).and_utc();
+            assert!(time_info.is_active_at(time1));
+
+            // Test at 0:00 next day - should be active
+            let time2 = naive_dt(2025, 6, 16, 0, 0, 0).and_utc();
+            assert!(time_info.is_active_at(time2));
+
+            // Test at 3:00 next day - should be inactive
+            let time3 = naive_dt(2025, 6, 16, 3, 0, 0).and_utc();
+            assert!(!time_info.is_active_at(time3));
+        }
+    }
+
+    mod activity_info {
+        use super::*;
+
+        #[test]
+        fn test_is_active() {
+            let active_activity = ActivityInfo {
+                tip: "Test Active Activity".to_string(),
+                time_info: TimeInfo {
+                    utc_start_time: naive_dt(2024, 1, 1, 0, 0, 0),
+                    utc_expire_time: naive_dt(2050, 12, 31, 23, 59, 59),
+                    time_zone: tz(8),
                 },
-            }
-            .has_side_story_open()
-        );
-        assert!(
-            !StageActivityContent {
-                side_story_stage: vec![StageInfo {
-                    value: "FC-7".to_string(),
-                    drop: "31043".to_string(),
-                    activity: ActivityInfo {
-                        tip: "Test".to_string(),
-                        utc_start_time: "1970/01/01 00:00:00".to_string(),
-                        utc_expire_time: "1970/01/01 00:00:00".to_string(),
-                        time_zone: 8,
-                    },
-                }],
-                resource_collection: ActivityInfo {
-                    tip: "Test".to_string(),
-                    utc_start_time: "1970/01/01 00:00:00".to_string(),
-                    utc_expire_time: "1970/01/01 00:00:00".to_string(),
-                    time_zone: 8,
+            };
+
+            let expired_activity = ActivityInfo {
+                tip: "Test Expired Activity".to_string(),
+                time_info: TimeInfo {
+                    utc_start_time: naive_dt(2020, 1, 1, 0, 0, 0),
+                    utc_expire_time: naive_dt(2022, 12, 31, 23, 59, 59),
+                    time_zone: tz(8),
                 },
-            }
-            .has_side_story_open()
-        );
-    }
+            };
 
-    #[test]
-    #[ignore = "need installed resource"]
-    fn test_load_stage_activity() {
-        if var_os("SKIP_CORE_TEST").is_some() {
-            return;
+            assert!(active_activity.is_active());
+            assert!(!expired_activity.is_active());
         }
-        let _ = STAGE_ACTIVITY.as_ref();
     }
 
-    #[test]
-    #[ignore = "need installed resource"]
-    fn test_item_index() {
-        if var_os("SKIP_CORE_TEST").is_some() {
-            return;
+    mod mini_game_info {
+        use super::*;
+
+        #[test]
+        fn test_is_active() {
+            let active_game = MiniGameInfo {
+                display: "Active Mini Game".to_string(),
+                time_info: TimeInfo {
+                    utc_start_time: naive_dt(2024, 1, 1, 0, 0, 0),
+                    utc_expire_time: naive_dt(2050, 12, 31, 23, 59, 59),
+                    time_zone: tz(8),
+                },
+            };
+
+            let future_game = MiniGameInfo {
+                display: "Future Mini Game".to_string(),
+                time_info: TimeInfo {
+                    utc_start_time: naive_dt(2051, 1, 1, 0, 0, 0),
+                    utc_expire_time: naive_dt(2060, 12, 31, 23, 59, 59),
+                    time_zone: tz(8),
+                },
+            };
+
+            assert!(active_game.is_active());
+            assert!(!future_game.is_active());
+        }
+    }
+
+    mod stage_activity_content {
+        use super::*;
+
+        #[test]
+        fn test_has_side_story_open_with_active() {
+            let content = StageActivityContent {
+                side_story_stage: {
+                    let mut map = BTreeMap::new();
+                    map.insert("ActiveStory".to_string(), SideStoryActivity {
+                        activity: ActivityInfo {
+                            tip: "Active Side Story".to_string(),
+                            time_info: TimeInfo {
+                                utc_start_time: naive_dt(2024, 1, 1, 0, 0, 0),
+                                utc_expire_time: naive_dt(2050, 12, 31, 23, 59, 59),
+                                time_zone: tz(8),
+                            },
+                        },
+                        stages: vec![],
+                    });
+                    map
+                },
+                resource_collection: ActivityInfo {
+                    tip: "Resource Collection".to_string(),
+                    time_info: TimeInfo {
+                        utc_start_time: naive_dt(2024, 1, 1, 0, 0, 0),
+                        utc_expire_time: naive_dt(2050, 12, 31, 23, 59, 59),
+                        time_zone: tz(8),
+                    },
+                },
+                mini_game: vec![],
+            };
+
+            // Should have active side story (using current time which is within 2024-2050)
+            assert!(content.has_side_story_open());
         }
 
-        load_item_index(ClientType::Official).unwrap();
-        load_item_index(ClientType::YoStarEN).unwrap();
-        load_item_index(ClientType::YoStarJP).unwrap();
-        load_item_index(ClientType::YoStarKR).unwrap();
-        load_item_index(ClientType::Txwy).unwrap();
+        #[test]
+        fn test_has_side_story_open_with_expired() {
+            let content = StageActivityContent {
+                side_story_stage: {
+                    let mut map = BTreeMap::new();
+                    map.insert("ExpiredStory".to_string(), SideStoryActivity {
+                        activity: ActivityInfo {
+                            tip: "Expired Side Story".to_string(),
+                            time_info: TimeInfo {
+                                utc_start_time: naive_dt(2020, 1, 1, 0, 0, 0),
+                                utc_expire_time: naive_dt(2022, 12, 31, 23, 59, 59),
+                                time_zone: tz(8),
+                            },
+                        },
+                        stages: vec![],
+                    });
+                    map
+                },
+                resource_collection: ActivityInfo {
+                    tip: "Resource Collection".to_string(),
+                    time_info: TimeInfo {
+                        utc_start_time: naive_dt(2020, 1, 1, 0, 0, 0),
+                        utc_expire_time: naive_dt(2022, 12, 31, 23, 59, 59),
+                        time_zone: tz(8),
+                    },
+                },
+                mini_game: vec![],
+            };
+
+            // Should not have active side story (expired)
+            assert!(!content.has_side_story_open());
+        }
+
+        #[test]
+        fn test_has_side_story_open_empty() {
+            let content = StageActivityContent {
+                side_story_stage: BTreeMap::new(),
+                resource_collection: ActivityInfo {
+                    tip: "Resource Collection".to_string(),
+                    time_info: TimeInfo {
+                        utc_start_time: naive_dt(2024, 1, 1, 0, 0, 0),
+                        utc_expire_time: naive_dt(2050, 12, 31, 23, 59, 59),
+                        time_zone: tz(8),
+                    },
+                },
+                mini_game: vec![],
+            };
+
+            assert!(!content.has_side_story_open());
+        }
     }
 
-    #[test]
-    fn warn_err() {
-        let ok: Result<isize, &str> = Ok(1);
-        let err: Result<isize, &str> = Err("test");
+    mod utils {
+        use super::*;
 
-        assert_eq!(ok.warn_err(), Some(1));
-        assert_eq!(err.warn_err(), None);
+        #[test]
+        fn warn_err() {
+            let ok: Result<isize, &str> = Ok(1);
+            let err: Result<isize, &str> = Err("test");
+
+            assert_eq!(ok.warn_err(), Some(1));
+            assert_eq!(err.warn_err(), None);
+        }
     }
 }

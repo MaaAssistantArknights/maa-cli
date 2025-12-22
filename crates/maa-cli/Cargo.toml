@@ -23,7 +23,7 @@ git2 = { workspace = true, optional = true }
 indicatif = { workspace = true }
 log = { workspace = true }
 maa-dirs = { workspace = true }
-maa-installer = { workspace = true, optional = true }
+maa-installer = { workspace = true }
 maa-sys = { workspace = true, features = ["runtime"] }
 maa-types = { workspace = true, features = ["serde"] }
 maa-version = { workspace = true, optional = true }
@@ -46,10 +46,7 @@ serde_test = { workspace = true }
 [features]
 default = ["cli_installer", "core_installer", "git2"]
 # Common features used to install and update MAA Core and maa-cli self
-__installer = [
-  "dep:maa-installer",
-  "dep:maa-version",
-]
+__installer = ["dep:maa-version"]
 # Features used to install update maa-cli self
 cli_installer = ["__installer", "dep:sha2"]
 # Features used to install and update MAA Core

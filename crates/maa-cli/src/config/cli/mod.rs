@@ -5,6 +5,8 @@ pub mod maa_core;
 
 pub mod resource;
 
+pub mod hot_update;
+
 use std::sync::LazyLock;
 
 use clap::ValueEnum;
@@ -26,6 +28,8 @@ pub struct CLIConfig {
     cli: maa_cli::Config,
     #[serde(default)]
     resource: resource::Config,
+    #[serde(default)]
+    hot_update: hot_update::Config,
 }
 
 impl CLIConfig {
@@ -41,6 +45,10 @@ impl CLIConfig {
 
     pub fn resource_config(&self) -> resource::Config {
         self.resource.clone()
+    }
+
+    pub fn hot_update_config(&self) -> &hot_update::Config {
+        &self.hot_update
     }
 }
 
@@ -226,6 +234,7 @@ mod tests {
             core: maa_core::tests::example_config(),
             #[cfg(feature = "cli_installer")]
             cli: maa_cli::tests::example_config(),
+            hot_update: hot_update::tests::example_config(),
             resource: resource::tests::example_config(),
         };
 
@@ -285,6 +294,18 @@ mod tests {
             }
             .resource_config(),
             resource::Config::default(),
+        );
+    }
+
+    #[test]
+    fn get_hot_update_config() {
+        assert_eq!(
+            CLIConfig {
+                hot_update: Default::default(),
+                ..Default::default()
+            }
+            .hot_update_config(),
+            &hot_update::Config::default(),
         );
     }
 

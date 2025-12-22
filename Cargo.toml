@@ -26,7 +26,7 @@ git2 = "0.20"
 indicatif = "0.18"
 libloading = "0.9"
 log = "0.4.20"
-maa-dirs = { path = "crates/maa-dirs", version = "0.2" }
+maa-dirs = { path = "crates/maa-dirs", version = "0.3" }
 maa-installer = { path = "crates/maa-installer", version = "0.2" }
 maa-sys = { path = "crates/maa-sys", version = "0.8" }
 maa-types = { path = "crates/maa-types", version = "0.2" }
