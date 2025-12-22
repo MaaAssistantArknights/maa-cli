@@ -14,11 +14,8 @@ static STAGE_ACTIVITY: LazyLock<Option<StageActivityJson>> =
 pub fn has_side_story_open(client: ClientType) -> bool {
     STAGE_ACTIVITY
         .as_ref()
-        .map(|stage_activity| {
-            stage_activity
-                .get_stage_activity(client)
-                .has_side_story_open()
-        })
+        .and_then(|stage_activity| stage_activity.get_stage_activity(client))
+        .map(|c| c.has_side_story_open())
         .unwrap_or(false)
 }
 
@@ -48,18 +45,20 @@ fn load_stage_activity(file_path: impl AsRef<Path>) -> Result<StageActivityJson>
 }
 
 impl StageActivityJson {
-    pub fn get_stage_activity(&self, mut client: ClientType) -> &StageActivityContent {
+    pub fn get_stage_activity(&self, mut client: ClientType) -> Option<&StageActivityContent> {
         if client == ClientType::Bilibili {
             client = ClientType::Official;
         }
-        self.0
-            .get(client.to_str())
-            .expect("All client types should be covered")
+        self.0.get(client.to_str())
     }
 
     pub fn display(&self, mut f: impl Write, client: ClientType) -> std::io::Result<()> {
         let item_index = load_item_index(client);
-        let stage_activity = self.get_stage_activity(client);
+        let stage_activity = if let Some(activity) = self.get_stage_activity(client) {
+            activity
+        } else {
+            return Ok(());
+        };
 
         let mut sidestory_title = false;
         for activity in stage_activity.side_story_stage.values() {
@@ -290,7 +289,9 @@ mod tests {
             let stage_activity: StageActivityJson = serde_json::from_str(json_str).unwrap();
 
             // Test Official server
-            let official = stage_activity.get_stage_activity(ClientType::Official);
+            let official = stage_activity
+                .get_stage_activity(ClientType::Official)
+                .unwrap();
             assert_eq!(official.side_story_stage.len(), 2);
             assert!(official.side_story_stage.contains_key("SSReopen"));
             assert!(official.side_story_stage.contains_key("UR"));
@@ -304,7 +305,7 @@ mod tests {
             assert_eq!(ssreopen.stages[0].drop, "代理1~8");
 
             // Test txwy server
-            let txwy = stage_activity.get_stage_activity(ClientType::Txwy);
+            let txwy = stage_activity.get_stage_activity(ClientType::Txwy).unwrap();
             assert_eq!(txwy.side_story_stage.len(), 2);
             assert!(txwy.side_story_stage.contains_key("巴别塔 復刻"));
             assert!(txwy.side_story_stage.contains_key("眾生行記"));
@@ -557,7 +558,7 @@ mod tests {
             };
 
             // Should not have active side story (expired)
-            let _ = content.has_side_story_open();
+            assert!(!content.has_side_story_open());
         }
 
         #[test]
