@@ -173,15 +173,15 @@ impl MiniGameInfo {
 ///
 /// The utc_* prefix is quiet misleading, as it is not UTC time but local time at given time zone.
 struct TimeInfo {
-    #[serde(deserialize_with = "parse_naive_data_time")]
+    #[serde(deserialize_with = "parse_naive_date_time")]
     utc_start_time: NaiveDateTime,
-    #[serde(deserialize_with = "parse_naive_data_time")]
+    #[serde(deserialize_with = "parse_naive_date_time")]
     utc_expire_time: NaiveDateTime,
     #[serde(deserialize_with = "parse_fixed_offset")]
     time_zone: FixedOffset,
 }
 
-fn parse_naive_data_time<'de, D>(deserializer: D) -> Result<NaiveDateTime, D::Error>
+fn parse_naive_date_time<'de, D>(deserializer: D) -> Result<NaiveDateTime, D::Error>
 where
     D: serde::de::Deserializer<'de>,
 {
