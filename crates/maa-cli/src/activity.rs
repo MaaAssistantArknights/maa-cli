@@ -172,7 +172,7 @@ impl MiniGameInfo {
 #[serde(rename_all = "PascalCase")]
 /// Time information for activities.
 ///
-/// The utc_* prefix is quiet missleading, as it is not UTC time but local time at given time zone.
+/// The utc_* prefix is quiet misleading, as it is not UTC time but local time at given time zone.
 struct TimeInfo {
     #[serde(deserialize_with = "parse_naive_data_time")]
     utc_start_time: NaiveDateTime,
