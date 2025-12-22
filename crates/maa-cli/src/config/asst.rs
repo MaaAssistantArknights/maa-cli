@@ -6,8 +6,6 @@ use maa_sys::Assistant;
 use maa_types::{InstanceOptionKey, StaticOptionKey, TouchMode};
 use serde::Deserialize;
 
-use crate::dirs;
-
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Default, Clone)]
 pub struct AsstConfig {
@@ -238,7 +236,7 @@ pub struct ResourceConfig {
     user_resource: bool,
     /// Resource base directories, a list of directories containing resource directories
     /// Not deserialized from config file
-    pub(crate) resource_base_dirs: Vec<PathBuf>,
+    resource_base_dirs: Vec<PathBuf>,
 }
 
 impl<'de> Deserialize<'de> for ResourceConfig {
@@ -287,24 +285,15 @@ impl Default for ResourceConfig {
 fn default_resource_base_dirs() -> Vec<PathBuf> {
     let mut resource_dirs = Vec::new();
 
-    if let Some(resource_dir) = dirs::find_resource() {
+    if let Some(resource_dir) = maa_dirs::find_resource() {
         debug!("Found resource directory: {}", resource_dir.display());
         resource_dirs.push(resource_dir.into_owned());
     } else {
         warn!("Resource directory not found!")
     }
 
-    let hot_update_dir = dirs::hot_update();
-    if hot_update_dir.exists() {
-        debug!(
-            "Found hot update resource directory: {}",
-            hot_update_dir.display()
-        );
-        resource_dirs.push(join!(hot_update_dir, "resource"));
-        resource_dirs.push(join!(hot_update_dir, "cache", "resource"));
-    } else {
-        warn!("Hot update resource directory not found!");
-    }
+    resource_dirs.push_if_exists(maa_dirs::hot_update_resource().to_path_buf());
+    resource_dirs.push_if_exists(join!(maa_dirs::maa_resource(), "resource"));
 
     resource_dirs
 }
@@ -366,7 +355,7 @@ impl ResourceConfig {
         let mut resource_dirs = base_dirs.clone();
         if let Some(global_resource) = self.global_resource.as_ref() {
             let global_resource_dir = join!("global", global_resource, "resource");
-            let full_paths = dirs::global_path(base_dirs, global_resource_dir);
+            let full_paths = maa_dirs::global_path(base_dirs, global_resource_dir);
             if full_paths.is_empty() {
                 warn!("Global resource {} not found", global_resource.display(),);
             } else {
@@ -376,7 +365,7 @@ impl ResourceConfig {
         if let Some(platform_diff_resource) = self.platform_diff_resource.as_ref() {
             let platform_diff_resource_dir =
                 join!("platform_diff", platform_diff_resource, "resource");
-            let full_paths = dirs::global_path(base_dirs, platform_diff_resource_dir);
+            let full_paths = maa_dirs::global_path(base_dirs, platform_diff_resource_dir);
             if full_paths.is_empty() {
                 warn!(
                     "Platform diff resource {} not found",
@@ -402,7 +391,7 @@ impl ResourceConfig {
 }
 
 fn push_user_resource(resource_dirs: &mut Vec<PathBuf>) -> &mut Vec<PathBuf> {
-    push_resource(resource_dirs, dirs::config().join("resource"))
+    push_resource(resource_dirs, maa_dirs::config().join("resource"))
 }
 
 fn push_resource(resource_dirs: &mut Vec<PathBuf>, dir: impl Into<PathBuf>) -> &mut Vec<PathBuf> {
@@ -414,6 +403,20 @@ fn push_resource(resource_dirs: &mut Vec<PathBuf>, dir: impl Into<PathBuf>) -> &
     }
 
     resource_dirs
+}
+
+trait PushIfExists {
+    fn push_if_exists(&mut self, dir: PathBuf);
+}
+
+impl PushIfExists for Vec<PathBuf> {
+    fn push_if_exists(&mut self, dir: PathBuf) {
+        if dir.exists() {
+            self.push(dir);
+        } else {
+            warn!("Resource directory {} not found, ignoring", dir.display(),);
+        }
+    }
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -512,7 +515,7 @@ mod tests {
     use crate::assert_matches;
 
     static USER_RESOURCE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
-        let user_resource_dir = dirs::config().join("resource");
+        let user_resource_dir = maa_dirs::config().join("resource");
         if !user_resource_dir.exists() {
             std::fs::create_dir_all(&user_resource_dir).unwrap();
         }

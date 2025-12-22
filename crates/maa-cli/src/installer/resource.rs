@@ -38,7 +38,7 @@ pub fn update(is_auto: bool) -> Result<()> {
     let url = config.remote().url();
     let branch = config.remote().branch();
     let cert = config.remote().certificate();
-    let dest = dirs::hot_update();
+    let dest = dirs::maa_resource();
 
     // check if git is available when using git backend
     let backend = match backend {

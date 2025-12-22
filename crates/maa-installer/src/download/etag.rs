@@ -11,7 +11,7 @@ use std::{fs, path::Path, time};
 
 use ureq::http::StatusCode;
 
-use crate::error::{Error, ErrorKind, Result};
+use crate::error::{Error, ErrorKind, Result, WithDesc};
 
 pub fn download_with_etag(
     agent: &ureq::Agent,
@@ -28,6 +28,7 @@ pub fn download_with_etag(
             && let Ok(duration) = time::SystemTime::now().duration_since(modified)
             && duration < check_interval
         {
+            log::trace!("File {} is fresh", dest.display());
             return Ok(());
         }
 
@@ -44,9 +45,13 @@ pub fn download_with_etag(
 
     match response.status() {
         StatusCode::OK => {
+            log::trace!("Downloaded file {}", dest.display());
             let etag = response.headers().get("ETag").and_then(|v| v.to_str().ok());
             if let Some(etag) = etag {
-                fs::write(&etag_file, etag)?;
+                log::trace!("Updated ETag {}", etag_file.display());
+                fs::write(&etag_file, etag).then_with_desc(|| {
+                    format!("Failed to update ETag at {}", etag_file.display())
+                })?;
             }
             let mut file = fs::File::create(dest)?;
             std::io::copy(&mut response.into_body().as_reader(), &mut file)?;
@@ -54,7 +59,9 @@ pub fn download_with_etag(
             Ok(())
         }
         StatusCode::NOT_MODIFIED => {
+            log::trace!("File {} is up to date", dest.display());
             if let Ok(file) = fs::File::open(&etag_file) {
+                log::trace!("Touched {}", dest.display());
                 let _ = file.set_modified(time::SystemTime::now());
             }
             Ok(())

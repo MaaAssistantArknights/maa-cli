@@ -522,12 +522,7 @@ mod tests {
                 return; // Skip test if resource is not provided
             }
 
-            let resource_dir = maa_dirs::find_resource().unwrap().into_owned();
-            let hot_update_dir = maa_dirs::hot_update().to_owned();
-            let resource_dirs = vec![resource_dir, hot_update_dir];
-
-            let mut config = AsstConfig::default();
-            config.resource.resource_base_dirs = resource_dirs;
+            let config = AsstConfig::default();
 
             fn parse<I, T>(args: I, config: &AsstConfig) -> Result<TaskConfig>
             where

@@ -14,7 +14,7 @@ api_url = "https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssis
 # Configurations for whether to install given components of MaaCore
 [core.components]
 library = true  # Whether to install libraries of MaaCore
-resource = true # Whether to install resources of MaaCore
+resource = true  # Whether to install resources of MaaCore
 
 # Configurations for maa-cli self update
 [cli]
@@ -27,20 +27,20 @@ download_url = "https://github.com/MaaAssistantArknights/maa-cli/releases/downlo
 
 # Configurations for whether to install given components of maa-cli
 [cli.components]
-binary = false # Whether to install binary of maa-cli
+binary = false  # Whether to install binary of maa-cli
 
 # Configurations for hot update of resource
 # Note: this is different from `core.components.resource`, this is for hot update of resource
 # while this is hot update resource of MaaCore
 # You cannot use this to hot update without any base resource
 [resource]
-auto_update = true            # Whether to auto update resource each time run maa task
-warn_on_update_failure = true # Whether to warn on update failure instead of panic
-backend = "libgit2"           # Backend to manipulate repository, can be `git` or `libgit2`
+auto_update = true  # Whether to auto update resource each time run maa task
+warn_on_update_failure = true  # Whether to warn on update failure instead of panic
+backend = "libgit2"  # Backend to manipulate repository, can be `git` or `libgit2`
 
 # Configurations for remote git repository of resource
 [resource.remote]
-branch = "main" # Branch of remote resource repository
+branch = "main"  # Branch of remote resource repository
 # URL of remote resource repository, leave it empty to use the default URL
 url = "https://github.com/MaaAssistantArknights/MaaResource.git"
 # Or you can use ssh to clone the repository
@@ -49,9 +49,9 @@ url = "https://github.com/MaaAssistantArknights/MaaResource.git"
 # To use ssh-agent, set `use_ssh_agent` to true, and leave `ssh_key` and `passphrase` empty
 # use_ssh_agent = true # Use ssh-agent to authenticate
 # To use ssh-key, set `ssh_key` to path of ssh key,
-ssh_key = "~/.ssh/id_ed25519" # Path of ssh key
+ssh_key = "~/.ssh/id_ed25519"  # Path of ssh key
 # A Passphrase is needed if the ssh key is encrypted
-passphrase = "password" # Passphrase of ssh key
+passphrase = "password"  # Passphrase of ssh key
 # Store plain text password in configuration file is unsafe, so there are some ways to avoid it
 # 1. set `passphrase` to true, then maa-cli will prompt you to input passphrase each time
 # passphrase = true
@@ -60,3 +60,13 @@ passphrase = "password" # Passphrase of ssh key
 # 3. set `passphrase` to a command, then maa-cli will execute the command to get passphrase
 # which is useful when you use a password manager to manage your passphrase
 # passphrase = { cmd = ["pass", "show", "ssh/id_ed25519"] }
+
+# Configurations for hot update of activity and resource files
+# Note: this is different from `resource`, this is for hot update of activity files
+# and resource files from MAA API, while `resource` is for resource repository
+[hot_update]
+# URL of the hot update API, used to get activity and hot update resource files
+api_url = "https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api"
+# Check interval in seconds, files will be re-downloaded if older than this interval
+# Set to 0 to disable caching and always download
+check_interval = 3600

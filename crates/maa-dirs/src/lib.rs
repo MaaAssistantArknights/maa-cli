@@ -134,7 +134,9 @@ pub struct Dirs {
     cache: PathBuf,
     copilot: PathBuf,
     resource: PathBuf,
-    hot_update: PathBuf,
+    maa_resource: PathBuf,
+    activity: PathBuf,
+    hot_update_resource: PathBuf,
     state: PathBuf,
     log: PathBuf,
 }
@@ -151,14 +153,16 @@ impl Dirs {
 
         Self {
             copilot: cache_dir.join("copilot"),
-            cache: cache_dir,
             config: get_config_dir(v, proj),
             library: data_dir.join("lib"),
             resource: data_dir.join("resource"),
-            hot_update: data_dir.join("MaaResource"),
+            maa_resource: data_dir.join("MaaResource"),
+            activity: cache_dir.join("StageActivityV2.json"),
+            hot_update_resource: cache_dir.join("resource"),
             data: data_dir,
             log: state_dir.join("debug"),
             state: state_dir,
+            cache: cache_dir,
         }
     }
 
@@ -289,9 +293,19 @@ impl Dirs {
         })
     }
 
+    /// Get maa resource directory.
+    pub fn maa_resource(&self) -> &Path {
+        &self.maa_resource
+    }
+
+    /// Get activity file
+    pub fn activity(&self) -> &Path {
+        &self.activity
+    }
+
     /// Get hot update resource directory.
-    pub fn hot_update(&self) -> &Path {
-        &self.hot_update
+    pub fn hot_update_resource(&self) -> &Path {
+        &self.hot_update_resource
     }
 
     /// Get state directory.
@@ -353,8 +367,16 @@ pub fn find_resource() -> Option<Cow<'static, Path>> {
     DIRS.find_resource(current_exe()?)
 }
 
-pub fn hot_update() -> &'static Path {
-    DIRS.hot_update()
+pub fn maa_resource() -> &'static Path {
+    DIRS.maa_resource()
+}
+
+pub fn hot_update_resource() -> &'static Path {
+    DIRS.hot_update_resource()
+}
+
+pub fn activity() -> &'static Path {
+    DIRS.activity()
 }
 
 pub fn state() -> &'static Path {
@@ -619,7 +641,9 @@ mod tests {
 
             assert_eq!(library(), data().join("lib"));
             assert_eq!(resource(), data().join("resource"));
-            assert_eq!(hot_update(), data().join("MaaResource"));
+            assert_eq!(maa_resource(), data().join("MaaResource"));
+            assert_eq!(activity(), cache().join("StageActivityV2.json"));
+            assert_eq!(hot_update_resource(), cache().join("resource"));
             assert_eq!(copilot(), cache().join("copilot"));
             assert_eq!(log(), state().join("debug"));
         }
@@ -649,7 +673,7 @@ mod tests {
             assert_eq!(dirs.data(), PathBuf::from("/xdg/maa"));
             assert_eq!(dirs.library(), PathBuf::from("/xdg/maa/lib"));
             assert_eq!(dirs.resource(), PathBuf::from("/xdg/maa/resource"));
-            assert_eq!(dirs.hot_update(), PathBuf::from("/xdg/maa/MaaResource"));
+            assert_eq!(dirs.maa_resource(), PathBuf::from("/xdg/maa/MaaResource"));
 
             // Test with MAA_DATA_DIR set
             let mock = MockVarOs::new().with_var("MAA_DATA_DIR", "/maa");
@@ -657,7 +681,7 @@ mod tests {
             assert_eq!(dirs.data(), PathBuf::from("/maa"));
             assert_eq!(dirs.library(), PathBuf::from("/maa/lib"));
             assert_eq!(dirs.resource(), PathBuf::from("/maa/resource"));
-            assert_eq!(dirs.hot_update(), PathBuf::from("/maa/MaaResource"));
+            assert_eq!(dirs.maa_resource(), PathBuf::from("/maa/MaaResource"));
         }
 
         #[test]
@@ -836,12 +860,22 @@ mod tests {
             let dirs = Dirs::new_inner(PROJECT.as_ref(), &mock);
             assert_eq!(dirs.cache(), PathBuf::from("/xdg/maa"));
             assert_eq!(dirs.copilot(), PathBuf::from("/xdg/maa/copilot"));
+            assert_eq!(
+                dirs.activity(),
+                PathBuf::from("/xdg/maa/StageActivityV2.json")
+            );
+            assert_eq!(
+                dirs.hot_update_resource(),
+                PathBuf::from("/xdg/maa/resource")
+            );
 
             // Test with MAA_CACHE_DIR set
             let mock = MockVarOs::new().with_var("MAA_CACHE_DIR", "/maa");
             let dirs = Dirs::new_inner(PROJECT.as_ref(), &mock);
             assert_eq!(dirs.cache(), PathBuf::from("/maa"));
             assert_eq!(dirs.copilot(), PathBuf::from("/maa/copilot"));
+            assert_eq!(dirs.activity(), PathBuf::from("/maa/StageActivityV2.json"));
+            assert_eq!(dirs.hot_update_resource(), PathBuf::from("/maa/resource"));
         }
 
         #[test]

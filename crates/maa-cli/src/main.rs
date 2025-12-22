@@ -34,18 +34,23 @@ fn main() -> Result<()> {
         #[cfg(feature = "core_installer")]
         Command::Install { force, common } => {
             installer::maa_core::install(force, &common)?;
+            installer::hot_update::update()?;
             installer::resource::update(false)?;
         }
         #[cfg(feature = "core_installer")]
         Command::Update { common } => {
             installer::maa_core::update(&common)?;
+            installer::hot_update::update()?;
             installer::resource::update(false)?;
         }
         #[cfg(feature = "cli_installer")]
         Command::SelfC(self_c) => match self_c {
             command::SelfCommand::Update { common } => installer::maa_cli::update(&common)?,
         },
-        Command::HotUpdate => installer::resource::update(false)?,
+        Command::HotUpdate => {
+            installer::hot_update::update()?;
+            installer::resource::update(false)?;
+        }
         Command::Dir { dir } => match dir {
             Dir::Data => println!("{}", dirs::data().display()),
             Dir::Library => {
@@ -62,7 +67,7 @@ fn main() -> Result<()> {
                         .display()
                 )
             }
-            Dir::HotUpdate => println!("{}", dirs::hot_update().display()),
+            Dir::HotUpdate => println!("{}", dirs::maa_resource().display()),
             Dir::Config => println!("{}", dirs::config().display()),
             Dir::Cache => println!("{}", dirs::cache().display()),
             Dir::Log => println!("{}", dirs::log().display()),
