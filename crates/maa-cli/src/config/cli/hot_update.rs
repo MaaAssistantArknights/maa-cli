@@ -32,7 +32,7 @@ fn default_check_interval() -> u64 {
 }
 
 impl Config {
-    const RESOUCE_FILES: [&[&str]; 6] = [
+    const RESOURCE_FILES: [&[&str]; 6] = [
         &["tasks.json"],
         &["platform_diff", "iOS", "resource", "tasks.json"],
         &["global", "YoStarEN", "resource", "tasks.json"],
@@ -55,7 +55,7 @@ impl Config {
 
     pub fn resource_files(&self) -> impl Iterator<Item = PathBuf> {
         let resource_dir = maa_dirs::hot_update_resource().to_path_buf();
-        Self::RESOUCE_FILES
+        Self::RESOURCE_FILES
             .iter()
             .map(move |path| resource_dir.clone().join_iter(path.iter()))
     }
@@ -68,7 +68,7 @@ impl Config {
 
     pub fn resource_urls(&self) -> impl Iterator<Item = String> {
         let resource_url = format!("{}/resource", self.api_url());
-        Self::RESOUCE_FILES
+        Self::RESOURCE_FILES
             .iter()
             .map(move |path| Url(resource_url.clone()).join_iter(path.iter()).0)
     }
