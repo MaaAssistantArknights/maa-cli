@@ -27,7 +27,7 @@ indicatif = "0.18"
 libloading = "0.9"
 log = "0.4.20"
 maa-dirs = { path = "crates/maa-dirs", version = "0.2" }
-maa-installer = { path = "crates/maa-installer", version = "0.1" }
+maa-installer = { path = "crates/maa-installer", version = "0.2" }
 maa-sys = { path = "crates/maa-sys", version = "0.8" }
 maa-types = { path = "crates/maa-types", version = "0.2" }
 maa-version = { path = "crates/maa-version", version = "0.1" }
@@ -45,7 +45,7 @@ tar = "0.4.40"
 tempfile = "3.14.0"
 thiserror = "2"
 toml = "0.9"
-ureq = { version = "3", features = ["json"] }
+ureq = { version = "3" }
 windows-result = "0.4.0"
 windows-strings = "0.5.0"
 windows-sys = "0.61.0"

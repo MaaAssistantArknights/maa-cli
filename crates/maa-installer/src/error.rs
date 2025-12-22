@@ -28,7 +28,7 @@ impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Io => f.write_str("I/O error"),
-            Self::Verifier => f.write_str("Failed to build verifier"),
+            Self::Verifier => f.write_str("Build verifier failed"),
             Self::Verify => f.write_str("Verification failed"),
             Self::Extract => f.write_str("Extraction error"),
             Self::Network => f.write_str("Network error"),
@@ -156,7 +156,7 @@ impl<T, E: Into<Error>> WithDesc<T> for std::result::Result<T, E> {
     }
 }
 
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -169,7 +169,7 @@ mod tests {
         #[test]
         fn test_display() {
             assert_eq!(ErrorKind::Io.to_string(), "I/O error");
-            assert_eq!(ErrorKind::Verifier.to_string(), "Failed to build verifier");
+            assert_eq!(ErrorKind::Verifier.to_string(), "Build verifier failed");
             assert_eq!(ErrorKind::Verify.to_string(), "Verification failed");
             assert_eq!(ErrorKind::Extract.to_string(), "Extraction error");
             assert_eq!(ErrorKind::Network.to_string(), "Network error");

@@ -5,7 +5,9 @@
 
 use std::{
     borrow::Cow,
+    fs::File,
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -13,7 +15,7 @@ use semver::Version;
 use ureq::Agent;
 
 use crate::{
-    download::{DownloadOptions, download},
+    download::{DownloadOptions, download, etag::download_with_etag},
     error::{Result, WithDesc},
     extract::ArchiveFile,
     manifest::{Asset, Manifest},
@@ -29,6 +31,7 @@ pub struct Installer<'a, M, MP, E> {
     progress_style: InstallerStyle,
     pre_install_hook: Option<Box<dyn FnOnce() -> Result<()> + 'a>>,
     post_install_hook: Option<Box<dyn FnOnce() -> Result<()> + 'a>>,
+    min_check_interval: Option<Duration>,
     _marker: std::marker::PhantomData<M>,
 }
 
@@ -73,7 +76,7 @@ impl InstallerStyle {
 impl<'a, M, MP, E> Installer<'a, M, MP, E>
 where
     M: Manifest,
-    MP: FnOnce(ureq::Body) -> Result<M>,
+    MP: FnOnce(File) -> Result<M>,
     E: FnMut(&Path) -> Option<PathBuf>,
 {
     pub fn new(
@@ -92,6 +95,7 @@ where
             progress_style: InstallerStyle::default(),
             pre_install_hook: None,
             post_install_hook: None,
+            min_check_interval: None,
             _marker: std::marker::PhantomData,
         }
     }
@@ -121,7 +125,12 @@ where
         self
     }
 
-    pub fn exec(self, cache_dir: &Path) -> Result<()> {
+    pub fn with_min_check_interval(mut self, interval: Duration) -> Self {
+        self.min_check_interval = Some(interval);
+        self
+    }
+
+    pub fn exec(self, cache_dir: &Path, manifest_name: &str) -> Result<()> {
         let ui = MultiProgress::new();
 
         let fetching_ui = self.progress_style.init_spinner();
@@ -129,13 +138,18 @@ where
 
         // Fetch and process manifest
         fetching_ui.set_message("Fetching version manifest...");
-        let raw_manifest = self
-            .agent
-            .get(&*self.manifest_url)
-            .call()
-            .with_desc("Failed to fetch manifest")?
-            .into_body();
-        let manifest = (self.manifest_processor)(raw_manifest)?;
+
+        let manifest_path = cache_dir.join(manifest_name);
+        download_with_etag(
+            &self.agent,
+            &self.manifest_url,
+            &manifest_path,
+            self.min_check_interval,
+        )
+        .with_desc("Failed to fetch version manifest")?;
+
+        let manifest_file = File::open(&manifest_path)?;
+        let manifest = (self.manifest_processor)(manifest_file)?;
 
         // Check if we need update
         if let Some(current_version) = self.current_version {
@@ -272,6 +286,7 @@ mod tests {
         );
         assert_eq!(installer.test_duration, 0);
         assert_eq!(installer.current_version, None);
+        assert!(installer.min_check_interval.is_none());
 
         // Test with_test_duration sets the correct value
         let installer = Installer::new(
@@ -329,11 +344,13 @@ mod tests {
         .with_test_duration(5)
         .with_current_version(&version_2_0_0)
         .with_progress_style(InstallerStyle::default())
+        .with_min_check_interval(Duration::from_secs(300))
         .with_pre_install_hook(|| Ok(()))
         .with_post_install_hook(|| Ok(()));
 
         assert_eq!(installer.test_duration, 5);
         assert_eq!(installer.current_version, Some(&version_2_0_0));
         assert_eq!(installer.current_version.unwrap(), &Version::new(2, 0, 0));
+        assert_eq!(installer.min_check_interval, Some(Duration::from_secs(300)));
     }
 }

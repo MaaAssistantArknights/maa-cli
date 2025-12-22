@@ -8,7 +8,6 @@ use std::{
 use anyhow::{Context, Result, bail};
 use maa_dirs::{self, Ensure, MAA_CORE_LIB};
 use maa_installer::{
-    error::WithDesc,
     manifest::{Asset, Manifest},
     verify::SizeVerifier,
 };
@@ -29,8 +28,13 @@ struct CoreManifest(VersionManifest<core::Details>);
 struct CoreAsset<'a>(&'a core::Asset);
 
 impl CoreManifest {
-    fn from_body(mut body: ureq::Body) -> maa_installer::error::Result<Self> {
-        let manifest = body.read_json().with_desc("Failed to parse manifest")?;
+    fn from_reader(file: std::fs::File) -> maa_installer::error::Result<Self> {
+        use maa_installer::error::{Error, ErrorKind};
+        let manifest = serde_json::from_reader(file).map_err(|e| {
+            Error::new(ErrorKind::Other)
+                .with_source(e)
+                .with_desc("Failed to parse core version manifest")
+        })?;
 
         Ok(CoreManifest(manifest))
     }
@@ -163,7 +167,7 @@ fn create_and_exec_installer(args: &CommonArgs, current_version: Option<&Version
     let installer = maa_installer::installer::Installer::new(
         crate::state::AGENT.clone(),
         config.api_url(),
-        CoreManifest::from_body,
+        CoreManifest::from_reader,
         |src| extract_mapper(src, lib_dir, resource_dir, components),
     )
     .with_test_duration(config.test_time())
@@ -184,7 +188,10 @@ fn create_and_exec_installer(args: &CommonArgs, current_version: Option<&Version
     };
 
     installer
-        .exec(maa_dirs::cache().ensure()?)
+        .exec(
+            maa_dirs::cache().ensure()?,
+            &format!("core-manifest-{}.json", config.channel()),
+        )
         .context("Failed to install MaaCore")?;
 
     Ok(())
