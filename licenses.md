@@ -5,7 +5,7 @@ This page lists the licenses of the projects used in cargo-about.
 ## Overview of licenses
 
 - Apache License 2.0 (32)
-- GNU Affero General Public License v3.0 only (6)
+- GNU Affero General Public License v3.0 only (7)
 - MIT License (2)
 - BSD 3-Clause "New" or "Revised" License (1)
 - ISC License (1)
@@ -20,6 +20,7 @@ GNU Affero General Public License v3.0 only
 
 - [maa-cli](https://github.com/MaaAssistantArknights/maa-cli)
 - [maa-dirs](https://github.com/MaaAssistantArknights/maa-cli)
+- [maa-ffi-string](https://github.com/MaaAssistantArknights/maa-cli)
 - [maa-installer](https://github.com/MaaAssistantArknights/maa-cli)
 - [maa-sys](https://github.com/MaaAssistantArknights/maa-cli)
 - [maa-types](https://github.com/MaaAssistantArknights/maa-cli)
