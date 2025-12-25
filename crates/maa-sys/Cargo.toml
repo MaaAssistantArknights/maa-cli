@@ -1,6 +1,6 @@
 [package]
 name = "maa-sys"
-version = "0.8.0"
+version = "0.9.0"
 edition.workspace = true
 description = "Low-level bindings and Safe Wrapper for MaaCore"
 homepage.workspace = true
@@ -9,7 +9,8 @@ license.workspace = true
 
 [dependencies]
 libloading = { workspace = true, optional = true }
-maa-types = { workspace = true }
+maa-ffi-string = { workspace = true }
+maa-types = { workspace = true, features = ["ffi"] }
 thiserror = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
