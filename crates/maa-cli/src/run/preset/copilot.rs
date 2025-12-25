@@ -603,8 +603,18 @@ mod tests {
                 }
             });
 
-            // Wait a bit for server to start
-            thread::sleep(std::time::Duration::from_millis(100));
+            // Wait for the server to start
+            let start = std::time::Instant::now();
+            let timeout = std::time::Duration::from_secs(5);
+            loop {
+                if start.elapsed() > timeout {
+                    panic!("Test server failed to start in time");
+                }
+                if std::net::TcpStream::connect(("127.0.0.1", TEST_SERVER_PORT)).is_ok() {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
         });
     }
 
