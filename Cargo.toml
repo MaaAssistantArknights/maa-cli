@@ -30,7 +30,7 @@ maa-dirs = { path = "crates/maa-dirs", version = "0.3" }
 maa-ffi-string = { path = "crates/maa-ffi-string", version = "0.1" }
 maa-installer = { path = "crates/maa-installer", version = "0.2" }
 maa-sys = { path = "crates/maa-sys", version = "0.9" }
-maa-types = { path = "crates/maa-types", version = "0.2.1" }
+maa-types = { path = "crates/maa-types", version = "0.3" }
 maa-version = { path = "crates/maa-version", version = "0.1" }
 prettytable = { version = "0.10.0", default-features = false }
 regex = "1.10.2"

@@ -126,19 +126,6 @@ impl<'de> serde::Deserialize<'de> for TaskType {
                 formatter.write_str("a valid task type")
             }
 
-            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                if let Ok(v_u8) = u8::try_from(v)
-                    && let Some(t) = TaskType::from_u8(v_u8)
-                {
-                    Ok(t)
-                } else {
-                    Err(E::invalid_value(serde::de::Unexpected::Unsigned(v), &self))
-                }
-            }
-
             fn visit_str<E>(self, value: &str) -> Result<TaskType, E>
             where
                 E: serde::de::Error,
@@ -158,7 +145,7 @@ impl serde::Serialize for TaskType {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_u64(*self as u64)
+        serializer.serialize_str(self.to_str())
     }
 }
 

@@ -165,7 +165,7 @@ impl serde::Serialize for ClientType {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_u64(*self as u64)
+        serializer.serialize_str(self.to_str())
     }
 }
 
