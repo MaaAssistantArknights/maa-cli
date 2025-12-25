@@ -1,0 +1,14 @@
+[package]
+name = "maa-ffi-string"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Utility crate for working with strings that pass to MaaCore"
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+
+[lints]
+workspace = true

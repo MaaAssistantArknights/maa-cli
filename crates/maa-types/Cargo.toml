@@ -1,16 +1,25 @@
 [package]
 name = "maa-types"
-version = "0.2.0"
+version = "0.2.1"
 edition.workspace = true
 homepage.workspace = true
 repository.workspace = true
 license.workspace = true
 
 [dependencies]
+clap = { workspace = true, optional = true }
+maa-ffi-string = { workspace = true, optional = true }
+schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_test = { workspace = true }
+
+[features]
+clap = ["dep:clap"]
+ffi = ["dep:maa-ffi-string"]
+schema = ["dep:schemars", "serde"]
+serde = ["dep:serde"]
 
 [lints]
 workspace = true

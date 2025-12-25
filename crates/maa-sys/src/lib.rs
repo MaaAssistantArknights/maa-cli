@@ -1,10 +1,8 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
+pub use maa_ffi_string::ToCString;
 use maa_types::primitive::*;
 pub use maa_types::{InstanceOptionKey, StaticOptionKey, TaskType, TouchMode};
-
-mod to_cstring;
-pub use to_cstring::ToCString;
 
 #[macro_use]
 mod link;
@@ -20,26 +18,16 @@ pub enum Error {
     BufferTooSmall,
     #[error("The content returned by MaaCore is too large (length > {0})")]
     ContentTooLarge(usize),
-    #[error("Interior null byte")]
-    Nul(#[from] std::ffi::NulError),
-    #[error("Invalid UTF-8")]
-    InvalidUtf8(#[from] std::str::Utf8Error),
-    #[error("Invalid UTF-8")]
-    InvalidUtf8NoInfo,
+    #[error("Input argument contains invalid bytes")]
+    InvalidArgument(#[from] maa_ffi_string::Error),
+    #[error("Returned value contains invalid bytes")]
+    InvalidReturnValue(#[from] std::string::FromUtf8Error),
     #[cfg(all(feature = "runtime", target_os = "windows"))]
     #[error("OS error")]
     OS(#[from] windows_result::Error),
     #[cfg(feature = "runtime")]
     #[error("Failed to load the shared library")]
     LoadError(#[from] libloading::Error),
-    #[error("{0}")]
-    Custom(String),
-}
-
-impl Error {
-    pub fn custom(msg: impl Into<String>) -> Self {
-        Error::Custom(msg.into())
-    }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -172,11 +160,8 @@ impl Assistant {
     ///
     /// This function will raise an error if the version is not a valid UTF-8 string.
     pub fn get_version() -> Result<String> {
-        unsafe {
-            let c_str = binding::AsstGetVersion();
-            let version = std::ffi::CStr::from_ptr(c_str).to_str()?;
-            Ok(String::from(version))
-        }
+        let version = unsafe { std::ffi::CStr::from_ptr(binding::AsstGetVersion()).to_owned() };
+        Ok(String::from_utf8(version.into_bytes())?)
     }
 
     /// Log a message to the assistant log.
@@ -378,7 +363,7 @@ impl Assistant {
             Ok(size) => {
                 // Safety: the buffer is initialized by FFI, the len is the actual length
                 unsafe { buff.set_len(size as usize) };
-                String::from_utf8(buff).map_err(|e| Error::InvalidUtf8(e.utf8_error()))
+                Ok(String::from_utf8(buff)?)
             }
             Err(_) => Err(Error::ContentTooLarge(UUID_BUFF_SIZE)),
         }
