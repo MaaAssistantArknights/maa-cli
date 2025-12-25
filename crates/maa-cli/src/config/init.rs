@@ -15,8 +15,25 @@ fn asst_config_template() -> MAAValue {
         "setup_connection" => BoolInput::new(Some(true), Some("setup connection")),
         "connection_config" if "setup_connection" == true => object!(
             "preset" => SelectD::<String>::new(
-                ["MuMuPro", "PlayCover", "ADB"],
-                Some(3),
+                [
+                    ValueWithDesc::new(
+                        "MuMuPro",
+                        None,
+                    ),
+                    ValueWithDesc::new(
+                        "PlayCover",
+                        Some("macOS"),
+                    ),
+                    ValueWithDesc::new(
+                        "Waydroid",
+                        Some("Linux"),
+                    ),
+                    ValueWithDesc::new(
+                        "ADB",
+                        None,
+                    ),
+                ],
+                Some(4),
                 Some("connection preset"),
                 false
             ).unwrap(),
