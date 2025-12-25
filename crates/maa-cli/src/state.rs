@@ -6,7 +6,10 @@ use std::{
 };
 
 use semver::Version;
-use ureq::Agent;
+use ureq::{
+    Agent,
+    tls::{RootCerts, TlsConfig},
+};
 
 pub const CLI_VERSION_STR: &str = env!("MAA_VERSION");
 
@@ -26,6 +29,11 @@ pub static CORE_VERSION: LazyLock<Option<Version>> = LazyLock::new(|| {
 pub static AGENT: LazyLock<Agent> = LazyLock::new(|| {
     let core_version_str = CORE_VERSION_STR.as_deref().unwrap_or("Unknown");
     Agent::config_builder()
+        .tls_config(
+            TlsConfig::builder()
+                .root_certs(RootCerts::PlatformVerifier)
+                .build(),
+        )
         .user_agent(format!(
             "maa-cli/{CLI_VERSION_STR} ({OS}; {ARCH}) libMaaCore/{core_version_str}"
         ))
