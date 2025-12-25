@@ -453,7 +453,9 @@ impl<'a> CopilotFile<'a> {
 }
 
 fn json_from_file(path: impl AsRef<Path>) -> Result<JsonValue> {
-    Ok(serde_json::from_reader(fs::File::open(path)?)?)
+    let path = path.as_ref();
+    let r: Result<JsonValue, _> = serde_json::from_reader(fs::File::open(path)?);
+    r.with_context(|| format!("Failed to parse JSON file {}", path.display()))
 }
 
 fn operator_table(value: &JsonValue) -> Result<Table> {
@@ -638,26 +640,22 @@ mod tests {
 
             let config = AsstConfig::default();
 
-            fn parse<I, T>(args: I, config: &AsstConfig) -> Result<TaskConfig>
+            use crate::config::task::InitializedTask;
+
+            #[track_caller]
+            fn parse_to_taskes<I, T>(args: I, config: &AsstConfig) -> Vec<InitializedTask>
             where
                 I: IntoIterator<Item = T>,
                 T: Into<std::ffi::OsString> + Clone,
             {
                 let command = crate::command::parse_from(args).command;
-                match command {
-                    crate::Command::Copilot { params, .. } => params.into_task_config(config),
+                let params = match command {
+                    crate::Command::Copilot { params, .. } => params,
                     _ => panic!("Not a Copilot command"),
-                }
-            }
-
-            use crate::config::task::InitializedTask;
-            fn parse_to_taskes<I, T>(args: I, config: &AsstConfig) -> Vec<InitializedTask>
-            where
-                I: AsRef<[T]>,
-                T: Into<std::ffi::OsString> + Clone,
-            {
-                parse(args.as_ref().iter().cloned(), config)
-                    .unwrap()
+                };
+                params
+                    .into_task_config(config)
+                    .expect("Failed to build task config")
                     .init()
                     .unwrap()
                     .tasks
