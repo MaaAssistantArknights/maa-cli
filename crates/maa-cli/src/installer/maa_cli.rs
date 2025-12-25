@@ -140,7 +140,7 @@ mod tests {
 
     use super::*;
 
-    const FIXTURE_JSON: &str = include_str!("../../fixtures/cli_version.json");
+    const FIXTURE_JSON: &str = include_str!("../../fixtures/version/cli_version.json");
     const BASE_URL: &str = "https://github.com/MaaAssistantArknights/maa-cli/releases/download";
     static MANIFEST: LazyLock<ManifestWithBaseUrl<'static>> = LazyLock::new(|| {
         let manifest: VersionManifest<Details> =

@@ -1,0 +1,72 @@
+{
+  "minimum_required": "v4.0.0",
+  "stage_name": "act35side_ex04",
+  "actions": [
+    { "type": "SpeedUp" },
+    { "type": "Deploy", "name": "煌", "location": [8, 1], "direction": "Down" },
+    {
+      "type": "Deploy",
+      "name": "能天使",
+      "location": [9, 2],
+      "direction": "Down"
+    },
+    { "type": "Deploy", "name": "群奶", "location": [9, 3], "direction": "Up" },
+    {
+      "type": "Deploy",
+      "name": "奶盾",
+      "location": [8, 2],
+      "direction": "Left"
+    },
+    {
+      "type": "Deploy",
+      "name": "容错奶",
+      "location": [7, 2],
+      "direction": "Right",
+      "kills": 5,
+      "costs": 25
+    },
+    {
+      "type": "Deploy",
+      "name": "拉普兰德",
+      "location": [10, 1],
+      "direction": "Down"
+    },
+    { "type": "Skill", "name": "白面鸮", "location": [9, 3], "kills": 10 },
+    { "type": "SkillDaemon" }
+  ],
+  "doc": {
+    "title": "太阳甩在身后 - AS-EX-4 - 被盗的钱包",
+    "details": "此作业全员专三且模组一级\n原作者：自在道爷\nJSON作者：星之海.\n社区评论不会提醒，有问题可以进群找我：994516079（刚建的\n原视频：【【太阳甩在身后】AS-EX-1至AS-EX-8挂机流，突袭刻章都不愁！语音快乐详解，轻松解放双手 | 明日方舟攻略(含AS-EX-8突袭，EX-3刻章等)】https://www.bilibili.com/video/BV1AE421A77r?vd_source=69f0b796ff8cde9e6cb9e9f9a99f8eec"
+  },
+  "groups": [
+    {
+      "name": "奶盾",
+      "opers": [
+        { "name": "塞雷娅", "skill": 2, "skill_usage": 0 },
+        { "name": "黍", "skill": 1, "skill_usage": 0 },
+        { "name": "临光", "skill": 1, "skill_usage": 0 }
+      ]
+    },
+    {
+      "name": "群奶",
+      "opers": [
+        { "name": "夜莺", "skill": 2, "skill_usage": 0 },
+        { "name": "白面鸮", "skill": 2, "skill_usage": 0 }
+      ]
+    },
+    {
+      "name": "容错奶",
+      "opers": [
+        { "name": "闪灵", "skill": 2, "skill_usage": 0 },
+        { "name": "纯烬艾雅法拉", "skill": 1, "skill_usage": 0 },
+        { "name": "赫默", "skill": 2, "skill_usage": 0 }
+      ]
+    }
+  ],
+  "opers": [
+    { "name": "煌", "skill": 2, "skill_usage": 0 },
+    { "name": "拉普兰德", "skill": 2, "skill_usage": 0 },
+    { "name": "能天使", "skill": 3, "skill_usage": 0 }
+  ],
+  "difficulty": 3
+}

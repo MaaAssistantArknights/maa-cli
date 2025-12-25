@@ -360,7 +360,7 @@ mod tests {
         }
     }
 
-    const FIXTURE_JSON: &str = include_str!("../../fixtures/core_version.json");
+    const FIXTURE_JSON: &str = include_str!("../../fixtures/version/core_version.json");
     static MANIFEST: LazyLock<CoreManifest> = LazyLock::new(|| {
         let version_manifest: VersionManifest<core::Details> =
             serde_json::from_str(FIXTURE_JSON).expect("Failed to parse fixture");

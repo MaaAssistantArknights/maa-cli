@@ -23,6 +23,16 @@ use crate::{
     },
 };
 
+#[cfg(not(test))]
+const COPILOT_API: &str = "https://prts.maa.plus/copilot/get/";
+#[cfg(not(test))]
+const COPILOT_SET_API: &str = "https://prts.maa.plus/set/get?id=";
+
+#[cfg(test)]
+const COPILOT_API: &str = "http://127.0.0.1:18080/copilot/get/";
+#[cfg(test)]
+const COPILOT_SET_API: &str = "http://127.0.0.1:18080/set/get?id=";
+
 #[cfg_attr(test, derive(Default))]
 #[derive(clap::Args)]
 pub struct CopilotParams {
@@ -360,7 +370,6 @@ impl<'a> CopilotFile<'a> {
                     return Ok(());
                 }
 
-                const COPILOT_API: &str = "https://prts.maa.plus/copilot/get/";
                 let url = format!("{COPILOT_API}{code}");
                 debug!("Cache miss, downloading copilot from {url}");
                 let resp: JsonValue = AGENT
@@ -394,7 +403,6 @@ impl<'a> CopilotFile<'a> {
                 }
             }
             CopilotFile::RemoteSet(code) => {
-                const COPILOT_SET_API: &str = "https://prts.maa.plus/set/get?id=";
                 let url = format!("{COPILOT_SET_API}{code}");
                 debug!("Get copilot set from {url}");
                 let resp: JsonValue = AGENT
@@ -488,22 +496,83 @@ fn get_str_key(value: &JsonValue, key: impl AsRef<str>) -> Result<&str> {
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
-    use std::{env::temp_dir, path::PathBuf};
+    use std::{
+        env::temp_dir,
+        io::{BufRead, BufReader},
+        path::PathBuf,
+        process::{Child, Command, Stdio},
+        sync::{Arc, Mutex, Weak},
+        thread,
+        time::Duration,
+    };
 
     use super::*;
     use crate::config::asst::AsstConfig;
 
-    fn retry<T>(times: usize, f: impl Fn() -> Result<T>) -> T {
-        for i in 0..times {
-            match f() {
-                Ok(x) => return x,
-                Err(e) => {
-                    eprintln!("Failed to run test: {e}, retry {i}");
+    const TEST_SERVER_PORT: u16 = 18080;
+
+    struct TestServerInner(Child);
+
+    impl Drop for TestServerInner {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+
+    static TEST_SERVER: Mutex<Weak<TestServerInner>> = Mutex::new(Weak::new());
+
+    /// A handle to the test HTTP server.
+    /// The server is started when the first handle is created and stopped when the last handle is
+    /// dropped.
+    struct TestServerHandle(#[allow(dead_code)] Arc<TestServerInner>);
+
+    impl TestServerHandle {
+        fn new() -> Self {
+            let mut guard = TEST_SERVER.lock().unwrap();
+
+            if let Some(arc) = guard.upgrade() {
+                return Self(arc);
+            }
+
+            const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
+            let fixtures_dir = PathBuf::from(MANIFEST_DIR).join("fixtures").join("copilot");
+
+            let server_script = fixtures_dir.join("http_server.py");
+
+            // Try python3 first (Unix), then python (Windows)
+            let python_cmd = if cfg!(windows) { "python" } else { "python3" };
+
+            let mut child = match Command::new(python_cmd)
+                .arg(&server_script)
+                .arg(TEST_SERVER_PORT.to_string())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null())
+                .spawn()
+            {
+                Ok(child) => child,
+                Err(e) => panic!("Failed to start test server: {e}. Python may not be available."),
+            };
+
+            // Wait for server to be ready by reading the startup message
+            if let Some(stdout) = child.stdout.take() {
+                let reader = BufReader::new(stdout);
+                for line in reader.lines() {
+                    if let Ok(line) = line
+                        && line.contains("Serving copilot test API")
+                    {
+                        break;
+                    }
                 }
             }
-        }
 
-        panic!("Failed to run test after {times} retries");
+            // Give server a moment to be fully ready
+            thread::sleep(Duration::from_millis(100));
+
+            let arc = Arc::new(TestServerInner(child));
+            *guard = Arc::downgrade(&arc);
+            Self(arc)
+        }
     }
 
     fn path_from_cache_dir(path: &str) -> String {
@@ -516,8 +585,10 @@ mod tests {
         use super::*;
 
         #[test]
-        #[ignore = "need to installed resources and network"]
+        #[ignore = "requires local test server and installed resources"]
         fn into_task_config() {
+            let _server = TestServerHandle::new();
+
             if std::env::var_os("SKIP_CORE_TEST").is_some() {
                 return; // Skip test if resource is not provided
             }
@@ -542,7 +613,8 @@ mod tests {
                 I: AsRef<[T]>,
                 T: Into<std::ffi::OsString> + Clone,
             {
-                retry(3, || parse(args.as_ref().iter().cloned(), config))
+                parse(args.as_ref().iter().cloned(), config)
+                    .unwrap()
                     .init()
                     .unwrap()
                     .tasks
@@ -777,8 +849,10 @@ mod tests {
         }
 
         #[test]
-        #[ignore = "need downloaded from internet"]
+        #[ignore = "requires local test server"]
         fn try_into_maa_value() {
+            let _server = TestServerHandle::new();
+
             fn parse<I, T>(args: I) -> Result<MAAValue>
             where
                 I: IntoIterator<Item = T>,
@@ -793,17 +867,11 @@ mod tests {
 
             assert!(parse(["maa", "ssscopilot", "maa://40051"]).is_err());
             assert_eq!(
-                retry(3, || parse(["maa", "ssscopilot", "maa://40451"])),
+                parse(["maa", "ssscopilot", "maa://40451"]).unwrap(),
                 object!("filename" => path_from_cache_dir("40451.json"), "loop_times" => 1)
             );
             assert_eq!(
-                retry(3, || parse([
-                    "maa",
-                    "ssscopilot",
-                    "maa://40451",
-                    "--loop-times",
-                    "2"
-                ])),
+                parse(["maa", "ssscopilot", "maa://40451", "--loop-times", "2"]).unwrap(),
                 object!("filename" => path_from_cache_dir("40451.json"), "loop_times" => 2)
             );
         }
@@ -838,10 +906,17 @@ mod tests {
         }
 
         #[test]
-        #[ignore = "need to download from internet"]
+        #[ignore = "requires local test server"]
         fn push_path_to() {
+            let _server = TestServerHandle::new();
+
             let test_root = temp_dir().join("maa-test-push-path-to");
             fs::create_dir_all(&test_root).unwrap();
+
+            // Clean up any cached files from previous runs
+            for id in [40051, 40052, 40053, 40055, 40056, 40057, 40058, 40059] {
+                let _ = fs::remove_file(test_root.join(format!("{id}.json")));
+            }
 
             let test_file = test_root.join("123234.json");
             let test_content = serde_json::json!({
@@ -857,34 +932,29 @@ mod tests {
             serde_json::to_writer(fs::File::create(&test_file).unwrap(), &test_content).unwrap();
 
             // Remote
-            assert_eq!(
-                retry(3, || {
-                    let mut paths = Vec::new();
-                    CopilotFile::from_uri("maa://40051")
-                        .unwrap()
-                        .push_path_to(&mut paths, &test_root)?;
-                    Ok(paths)
-                }),
-                &[test_root.join("40051.json")],
-            );
+            let mut paths = Vec::new();
+            CopilotFile::from_uri("maa://40051")
+                .unwrap()
+                .push_path_to(&mut paths, &test_root)
+                .unwrap();
+            assert_eq!(paths, &[test_root.join("40051.json")]);
+
+            // Clean up for next test
+            let _ = fs::remove_file(test_root.join("40051.json"));
 
             // RemoteSet
-            assert_eq!(
-                retry(3, || {
-                    let mut paths = Vec::new();
-                    CopilotFile::from_uri("maa://23125s")
-                        .unwrap()
-                        .push_path_to(&mut paths, &test_root)?;
-                    Ok(paths)
-                }),
-                {
-                    let ids = [40051, 40052, 40053, 40055, 40056, 40057, 40058, 40059];
+            let mut paths = Vec::new();
+            CopilotFile::from_uri("maa://23125s")
+                .unwrap()
+                .push_path_to(&mut paths, &test_root)
+                .unwrap();
+            assert_eq!(paths, {
+                let ids = [40051, 40052, 40053, 40055, 40056, 40057, 40058, 40059];
 
-                    ids.iter()
-                        .map(|id| test_root.join(format!("{id}.json")))
-                        .collect::<Vec<PathBuf>>()
-                }
-            );
+                ids.iter()
+                    .map(|id| test_root.join(format!("{id}.json")))
+                    .collect::<Vec<PathBuf>>()
+            });
 
             // Local file (absolute)
             assert_eq!(

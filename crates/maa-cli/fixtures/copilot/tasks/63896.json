@@ -1,0 +1,19 @@
+{
+  "minimum_required": "v4.0.0",
+  "stage_name": "mem_hsguma_1",
+  "actions": [
+    { "type": "SpeedUp" },
+    { "type": "Deploy", "name": "星熊", "location": [5, 5], "direction": "Up" },
+    { "type": "BulletTime", "name": "星熊", "location": [5, 5], "kills": 5 },
+    { "type": "Skill", "name": "星熊", "location": [5, 5], "kills": 6 },
+    { "type": "BulletTime", "kills": 43, "name": "星熊", "location": [5, 5] },
+    { "type": "Skill", "kills": 44, "name": "星熊", "location": [5, 5] },
+    { "type": "SkillDaemon" }
+  ],
+  "doc": {
+    "title": "星熊--悖论模拟",
+    "details": "7级3技能--精2--80级 反馈可过\n【赠送干员满潜能】【满信赖】【无模组】\n有问题请反馈 BID：童话重度依赖症"
+  },
+  "groups": [],
+  "opers": [{ "name": "星熊", "skill": 3, "skill_usage": 0 }]
+}
