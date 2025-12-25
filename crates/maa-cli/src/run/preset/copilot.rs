@@ -455,13 +455,7 @@ impl<'a> CopilotFile<'a> {
 fn json_from_file(path: impl AsRef<Path>) -> Result<JsonValue> {
     let path = path.as_ref();
     let r: Result<JsonValue, _> = serde_json::from_reader(fs::File::open(path)?);
-    r.with_context(|| {
-        format!(
-            "Failed to parse JSON file {}:\n{}",
-            path.display(),
-            fs::read_to_string(path).unwrap_or_default(),
-        )
-    })
+    r.with_context(|| format!("Failed to parse JSON file {}", path.display(),))
 }
 
 fn operator_table(value: &JsonValue) -> Result<Table> {

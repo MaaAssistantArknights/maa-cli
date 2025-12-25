@@ -246,6 +246,10 @@ jobs:
       - name: Generate Coverage Report
         run: |
           cargo llvm-cov report --codecov --output-path codecov.json
+      - name: Show cached copilot files
+        if: failure()
+        run: |
+          cat $(cargo run -- dir cache)/copilot/*
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
         with:
