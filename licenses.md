@@ -4,7 +4,7 @@ This page lists the licenses of the projects used in cargo-about.
 
 ## Overview of licenses
 
-- Apache License 2.0 (31)
+- Apache License 2.0 (32)
 - GNU Affero General Public License v3.0 only (6)
 - MIT License (2)
 - BSD 3-Clause "New" or "Revised" License (1)
@@ -933,6 +933,7 @@ Apache License 2.0
 - [signal-hook](https://github.com/vorner/signal-hook)
 - [tar](https://github.com/alexcrichton/tar-rs)
 - [tempfile](https://github.com/Stebalien/tempfile)
+- [tiny_http](https://github.com/tiny-http/tiny-http)
 
 #### Full text
 
