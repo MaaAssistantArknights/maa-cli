@@ -1,5 +1,8 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
+#[macro_use]
+mod enum_macros;
+
 mod client_type;
 mod task_type;
 mod touch_mode;

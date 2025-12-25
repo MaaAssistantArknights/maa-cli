@@ -22,25 +22,9 @@ pub enum TaskType {
 }
 
 impl TaskType {
-    pub const COUNT: usize = 16;
-    pub const NAMES: [&'static str; Self::COUNT] = {
-        let mut i = 0;
-        let mut names = [""; Self::COUNT];
-        while i < Self::COUNT {
-            names[i] = Self::VARIANTS[i].to_str();
-            i += 1;
-        }
-        names
-    };
-    pub const VARIANTS: [Self; Self::COUNT] = {
-        let mut i = 0;
-        let mut variants = [Self::StartUp; Self::COUNT];
-        while i < Self::COUNT {
-            variants[i] = unsafe { Self::from_u8_unchecked(i as u8) };
-            i += 1;
-        }
-        variants
-    };
+    impl_enum_utils!(TaskType, 16, Self::StartUp);
+
+    impl_from_str_opt!();
 
     pub const fn to_str(self) -> &'static str {
         match self {
@@ -62,92 +46,16 @@ impl TaskType {
             Self::VideoRecognition => "VideoRecognition",
         }
     }
-
-    fn from_str_opt(s: &str) -> Option<Self> {
-        Self::VARIANTS
-            .iter()
-            .find(|v| v.to_str().eq_ignore_ascii_case(s))
-            .copied()
-    }
-
-    pub const fn from_u8(v: u8) -> Option<Self> {
-        if Self::COUNT > v as usize {
-            Some(unsafe { Self::from_u8_unchecked(v) })
-        } else {
-            None
-        }
-    }
-
-    const unsafe fn from_u8_unchecked(v: u8) -> Self {
-        unsafe { std::mem::transmute(v) }
-    }
 }
 
-#[cfg_attr(test, derive(PartialEq, Eq))]
-#[derive(Debug)]
-pub struct UnknownTaskType(String);
-
-impl std::fmt::Display for UnknownTaskType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "unknown task type `{}`, expected one of ", self.0)?;
-        let mut iter = TaskType::NAMES.iter();
-        if let Some(v) = iter.next() {
-            write!(f, "`{v}`")?;
-            for v in iter {
-                write!(f, ", `{v}`")?;
-            }
-        }
-        Ok(())
-    }
-}
-
-impl std::error::Error for UnknownTaskType {}
-
-impl std::str::FromStr for TaskType {
-    type Err = UnknownTaskType;
-
-    fn from_str(s: &str) -> Result<TaskType, Self::Err> {
-        Self::from_str_opt(s).ok_or_else(|| UnknownTaskType(s.to_owned()))
-    }
-}
+impl_unknown_error!(UnknownTaskType, TaskType, "task type");
+impl_from_str!(TaskType, UnknownTaskType);
 
 #[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for TaskType {
-    fn deserialize<D>(deserializer: D) -> Result<TaskType, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct TaskTypeVisitor;
-
-        impl serde::de::Visitor<'_> for TaskTypeVisitor {
-            type Value = TaskType;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a valid task type")
-            }
-
-            fn visit_str<E>(self, value: &str) -> Result<TaskType, E>
-            where
-                E: serde::de::Error,
-            {
-                TaskType::from_str_opt(value)
-                    .ok_or_else(|| E::unknown_variant(value, &TaskType::NAMES))
-            }
-        }
-
-        deserializer.deserialize_str(TaskTypeVisitor)
-    }
-}
+impl_serde_deserialize!(TaskType, "a valid task type");
 
 #[cfg(feature = "serde")]
-impl serde::Serialize for TaskType {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(self.to_str())
-    }
-}
+impl_serde_serialize!(TaskType);
 
 #[cfg(feature = "ffi")]
 impl maa_ffi_string::ToCString for TaskType {
@@ -156,17 +64,7 @@ impl maa_ffi_string::ToCString for TaskType {
     }
 }
 
-impl std::fmt::Debug for TaskType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.to_str())
-    }
-}
-
-impl std::fmt::Display for TaskType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.to_str())
-    }
-}
+impl_debug_display!(TaskType);
 
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -219,13 +117,6 @@ mod tests {
                 Token::Str("CloseDown"),
                 Token::SeqEnd,
             ]);
-
-            assert_de_tokens(&types, &[
-                Token::Seq { len: Some(2) },
-                Token::U64(0),
-                Token::U64(1),
-                Token::SeqEnd,
-            ]);
         }
 
         #[test]
@@ -239,28 +130,30 @@ mod tests {
 
             assert_de_tokens_error::<TaskType>(
                 &[Token::U64(16)],
-                "invalid value: integer `16`, expected a valid task type",
+                "invalid type: integer `16`, expected a valid task type",
             );
         }
 
         #[test]
         fn serialize() {
-            assert_ser_tokens(&TaskType::StartUp, &[Token::U64(0)]);
-            assert_ser_tokens(&TaskType::CloseDown, &[Token::U64(1)]);
-            assert_ser_tokens(&TaskType::Fight, &[Token::U64(2)]);
-            assert_ser_tokens(&TaskType::Recruit, &[Token::U64(3)]);
-            assert_ser_tokens(&TaskType::Infrast, &[Token::U64(4)]);
-            assert_ser_tokens(&TaskType::Mall, &[Token::U64(5)]);
-            assert_ser_tokens(&TaskType::Award, &[Token::U64(6)]);
-            assert_ser_tokens(&TaskType::Roguelike, &[Token::U64(7)]);
-            assert_ser_tokens(&TaskType::Copilot, &[Token::U64(8)]);
-            assert_ser_tokens(&TaskType::SSSCopilot, &[Token::U64(9)]);
-            assert_ser_tokens(&TaskType::Depot, &[Token::U64(10)]);
-            assert_ser_tokens(&TaskType::OperBox, &[Token::U64(11)]);
-            assert_ser_tokens(&TaskType::Reclamation, &[Token::U64(12)]);
-            assert_ser_tokens(&TaskType::Custom, &[Token::U64(13)]);
-            assert_ser_tokens(&TaskType::SingleStep, &[Token::U64(14)]);
-            assert_ser_tokens(&TaskType::VideoRecognition, &[Token::U64(15)]);
+            assert_ser_tokens(&TaskType::StartUp, &[Token::Str("StartUp")]);
+            assert_ser_tokens(&TaskType::CloseDown, &[Token::Str("CloseDown")]);
+            assert_ser_tokens(&TaskType::Fight, &[Token::Str("Fight")]);
+            assert_ser_tokens(&TaskType::Recruit, &[Token::Str("Recruit")]);
+            assert_ser_tokens(&TaskType::Infrast, &[Token::Str("Infrast")]);
+            assert_ser_tokens(&TaskType::Mall, &[Token::Str("Mall")]);
+            assert_ser_tokens(&TaskType::Award, &[Token::Str("Award")]);
+            assert_ser_tokens(&TaskType::Roguelike, &[Token::Str("Roguelike")]);
+            assert_ser_tokens(&TaskType::Copilot, &[Token::Str("Copilot")]);
+            assert_ser_tokens(&TaskType::SSSCopilot, &[Token::Str("SSSCopilot")]);
+            assert_ser_tokens(&TaskType::Depot, &[Token::Str("Depot")]);
+            assert_ser_tokens(&TaskType::OperBox, &[Token::Str("OperBox")]);
+            assert_ser_tokens(&TaskType::Reclamation, &[Token::Str("Reclamation")]);
+            assert_ser_tokens(&TaskType::Custom, &[Token::Str("Custom")]);
+            assert_ser_tokens(&TaskType::SingleStep, &[Token::Str("SingleStep")]);
+            assert_ser_tokens(&TaskType::VideoRecognition, &[Token::Str(
+                "VideoRecognition",
+            )]);
         }
     }
 

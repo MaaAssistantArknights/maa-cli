@@ -14,25 +14,7 @@ pub enum ClientType {
 use ClientType::*;
 
 impl ClientType {
-    pub const COUNT: usize = 6;
-    pub const NAMES: [&'static str; Self::COUNT] = {
-        let mut i = 0;
-        let mut names = [""; Self::COUNT];
-        while i < Self::COUNT {
-            names[i] = Self::VARIANTS[i].to_str();
-            i += 1;
-        }
-        names
-    };
-    pub const VARIANTS: [ClientType; Self::COUNT] = {
-        let mut i = 0;
-        let mut variants = [Official; Self::COUNT];
-        while i < Self::COUNT {
-            variants[i] = unsafe { Self::from_u8_unchecked(i as u8) };
-            i += 1;
-        }
-        variants
-    };
+    impl_enum_utils!(ClientType, 6, Official);
 
     pub const fn to_str(self) -> &'static str {
         match self {
@@ -51,22 +33,10 @@ impl ClientType {
             return Some(Official);
         }
 
-        Self::NAMES
+        Self::VARIANTS
             .iter()
-            .position(|&name| name.eq_ignore_ascii_case(s))
-            .map(|i| Self::VARIANTS[i])
-    }
-
-    pub const fn from_u8(value: u8) -> Option<Self> {
-        if Self::COUNT > value as usize {
-            Some(unsafe { Self::from_u8_unchecked(value) })
-        } else {
-            None
-        }
-    }
-
-    const unsafe fn from_u8_unchecked(value: u8) -> Self {
-        unsafe { std::mem::transmute(value) }
+            .find(|v| v.to_str().eq_ignore_ascii_case(s))
+            .copied()
     }
 }
 
@@ -109,65 +79,14 @@ impl ClientType {
     }
 }
 
-impl std::str::FromStr for ClientType {
-    type Err = UnknownClientTypeError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::from_str_opt(s).ok_or_else(|| UnknownClientTypeError(s.to_owned()))
-    }
-}
-
-#[cfg_attr(test, derive(PartialEq, Eq))]
-#[derive(Debug)]
-pub struct UnknownClientTypeError(String);
-
-impl std::fmt::Display for UnknownClientTypeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "unknown client type `{}`, expected one of ", self.0)?;
-        let mut iter = ClientType::NAMES.iter();
-        if let Some(name) = iter.next() {
-            write!(f, "`{name}`")?;
-            for v in iter {
-                write!(f, ", `{v}`")?;
-            }
-        }
-        Ok(())
-    }
-}
-
-impl std::error::Error for UnknownClientTypeError {}
+impl_unknown_error!(UnknownClientTypeError, ClientType, "client type");
+impl_from_str!(ClientType, UnknownClientTypeError);
 
 #[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for ClientType {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        struct ClientTypeVisitor;
-
-        impl serde::de::Visitor<'_> for ClientTypeVisitor {
-            type Value = ClientType;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a valid client type")
-            }
-
-            fn visit_str<E: serde::de::Error>(self, value: &str) -> Result<Self::Value, E> {
-                ClientType::from_str_opt(value)
-                    .ok_or_else(|| E::unknown_variant(value, &ClientType::NAMES))
-            }
-        }
-
-        deserializer.deserialize_str(ClientTypeVisitor)
-    }
-}
+impl_serde_deserialize!(ClientType, "a valid client type");
 
 #[cfg(feature = "serde")]
-impl serde::Serialize for ClientType {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(self.to_str())
-    }
-}
+impl_serde_serialize!(ClientType);
 
 #[cfg(feature = "clap")]
 impl clap::ValueEnum for ClientType {
@@ -180,17 +99,7 @@ impl clap::ValueEnum for ClientType {
     }
 }
 
-impl std::fmt::Display for ClientType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.to_str())
-    }
-}
-
-impl std::fmt::Debug for ClientType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.to_str())
-    }
-}
+impl_debug_display!(ClientType);
 
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -259,12 +168,12 @@ mod tests {
 
         #[test]
         fn serialize() {
-            assert_ser_tokens(&ClientType::Official, &[Token::U64(0)]);
-            assert_ser_tokens(&ClientType::Bilibili, &[Token::U64(1)]);
-            assert_ser_tokens(&ClientType::Txwy, &[Token::U64(2)]);
-            assert_ser_tokens(&ClientType::YoStarEN, &[Token::U64(3)]);
-            assert_ser_tokens(&ClientType::YoStarJP, &[Token::U64(4)]);
-            assert_ser_tokens(&ClientType::YoStarKR, &[Token::U64(5)]);
+            assert_ser_tokens(&ClientType::Official, &[Token::Str("Official")]);
+            assert_ser_tokens(&ClientType::Bilibili, &[Token::Str("Bilibili")]);
+            assert_ser_tokens(&ClientType::Txwy, &[Token::Str("txwy")]);
+            assert_ser_tokens(&ClientType::YoStarEN, &[Token::Str("YoStarEN")]);
+            assert_ser_tokens(&ClientType::YoStarJP, &[Token::Str("YoStarJP")]);
+            assert_ser_tokens(&ClientType::YoStarKR, &[Token::Str("YoStarKR")]);
         }
     }
 

@@ -19,25 +19,9 @@ pub enum TouchMode {
 }
 
 impl TouchMode {
-    pub const COUNT: usize = 4;
-    pub const NAMES: [&'static str; Self::COUNT] = {
-        let mut i = 0;
-        let mut names = [""; Self::COUNT];
-        while i < Self::COUNT {
-            names[i] = Self::VARIANTS[i].to_str();
-            i += 1;
-        }
-        names
-    };
-    pub const VARIANTS: [TouchMode; Self::COUNT] = {
-        let mut i = 0;
-        let mut variants = [TouchMode::Adb; Self::COUNT];
-        while i < Self::COUNT {
-            variants[i] = unsafe { Self::from_u8_unchecked(i as u8) };
-            i += 1;
-        }
-        variants
-    };
+    impl_enum_utils!(TouchMode, 4, TouchMode::Adb);
+
+    impl_from_str_opt!();
 
     /// Convert TouchMode to a static string slice
     pub const fn to_str(self) -> &'static str {
@@ -48,92 +32,16 @@ impl TouchMode {
             TouchMode::MacPlayTools => "MacPlayTools",
         }
     }
-
-    fn from_str_opt(s: &str) -> Option<TouchMode> {
-        Self::VARIANTS
-            .iter()
-            .find(|v| v.to_str().eq_ignore_ascii_case(s))
-            .copied()
-    }
-
-    pub const fn from_u8(value: u8) -> Option<TouchMode> {
-        if Self::COUNT > value as usize {
-            Some(unsafe { Self::from_u8_unchecked(value) })
-        } else {
-            None
-        }
-    }
-
-    const unsafe fn from_u8_unchecked(value: u8) -> TouchMode {
-        unsafe { std::mem::transmute(value) }
-    }
 }
 
-impl std::str::FromStr for TouchMode {
-    type Err = UnknownTouchModeError;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        Self::from_str_opt(s).ok_or_else(|| UnknownTouchModeError(s.to_owned()))
-    }
-}
-
-#[cfg_attr(test, derive(PartialEq, Eq))]
-#[derive(Debug)]
-pub struct UnknownTouchModeError(String);
-
-impl std::fmt::Display for UnknownTouchModeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "unknown touch mode `{}`, expected one of ", self.0)?;
-        let mut iter = TouchMode::NAMES.iter();
-        if let Some(name) = iter.next() {
-            write!(f, "`{name}`")?;
-            for v in iter {
-                write!(f, ", `{v}`")?;
-            }
-        }
-        Ok(())
-    }
-}
-
-impl std::error::Error for UnknownTouchModeError {}
+impl_unknown_error!(UnknownTouchModeError, TouchMode, "touch mode");
+impl_from_str!(TouchMode, UnknownTouchModeError);
 
 #[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for TouchMode {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<TouchMode, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct TouchModeVisitor;
-
-        impl serde::de::Visitor<'_> for TouchModeVisitor {
-            type Value = TouchMode;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a valid touch mode")
-            }
-
-            fn visit_str<E>(self, value: &str) -> std::result::Result<TouchMode, E>
-            where
-                E: serde::de::Error,
-            {
-                TouchMode::from_str_opt(value)
-                    .ok_or_else(|| E::unknown_variant(value, &TouchMode::NAMES))
-            }
-        }
-
-        deserializer.deserialize_str(TouchModeVisitor)
-    }
-}
+impl_serde_deserialize!(TouchMode, "a valid touch mode");
 
 #[cfg(feature = "serde")]
-impl serde::Serialize for TouchMode {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(self.to_str())
-    }
-}
+impl_serde_serialize!(TouchMode);
 
 #[cfg(feature = "ffi")]
 impl maa_ffi_string::ToCString for TouchMode {
@@ -142,17 +50,7 @@ impl maa_ffi_string::ToCString for TouchMode {
     }
 }
 
-impl std::fmt::Debug for TouchMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.to_str())
-    }
-}
-
-impl std::fmt::Display for TouchMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.to_str())
-    }
-}
+impl_debug_display!(TouchMode);
 
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -206,16 +104,6 @@ mod tests {
                 Token::Str("MacPlayTools"),
                 Token::SeqEnd,
             ]);
-
-            // Test deserializing from u64
-            assert_de_tokens(&modes, &[
-                Token::Seq { len: Some(4) },
-                Token::U64(0),
-                Token::U64(1),
-                Token::U64(2),
-                Token::U64(3),
-                Token::SeqEnd,
-            ]);
         }
 
         #[test]
@@ -228,16 +116,16 @@ mod tests {
 
             assert_de_tokens_error::<TouchMode>(
                 &[Token::U64(4)],
-                "invalid value: integer `4`, expected a valid touch mode",
+                "invalid type: integer `4`, expected a valid touch mode",
             );
         }
 
         #[test]
         fn serialize() {
-            assert_ser_tokens(&TouchMode::Adb, &[Token::U64(0)]);
-            assert_ser_tokens(&TouchMode::MiniTouch, &[Token::U64(1)]);
-            assert_ser_tokens(&TouchMode::MaaTouch, &[Token::U64(2)]);
-            assert_ser_tokens(&TouchMode::MacPlayTools, &[Token::U64(3)]);
+            assert_ser_tokens(&TouchMode::Adb, &[Token::Str("adb")]);
+            assert_ser_tokens(&TouchMode::MiniTouch, &[Token::Str("minitouch")]);
+            assert_ser_tokens(&TouchMode::MaaTouch, &[Token::Str("maatouch")]);
+            assert_ser_tokens(&TouchMode::MacPlayTools, &[Token::Str("MacPlayTools")]);
         }
     }
 
