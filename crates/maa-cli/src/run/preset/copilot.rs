@@ -372,13 +372,17 @@ impl<'a> CopilotFile<'a> {
 
                 let url = format!("{COPILOT_API}{code}");
                 debug!("Cache miss, downloading copilot from {url}");
-                let resp: JsonValue = AGENT
+                let mut response = AGENT
                     .get(&url)
                     .call()
-                    .context("Failed to send request")?
+                    .with_context(|| format!("Failed to send request to {url}"))?;
+
+                let resp: JsonValue = response
                     .body_mut()
                     .read_json()
-                    .context("Failed to parse response")?;
+                    .with_context(|| {
+                        format!("Failed to parse JSON response from {url}. The server may have disconnected or returned invalid data")
+                    })?;
 
                 if resp["status_code"].as_i64().unwrap() == 200 {
                     let content = resp
@@ -405,13 +409,17 @@ impl<'a> CopilotFile<'a> {
             CopilotFile::RemoteSet(code) => {
                 let url = format!("{COPILOT_SET_API}{code}");
                 debug!("Get copilot set from {url}");
-                let resp: JsonValue = AGENT
+                let mut response = AGENT
                     .get(&url)
                     .call()
-                    .context("Failed to send request")?
+                    .with_context(|| format!("Failed to send request to {url}"))?;
+
+                let resp: JsonValue = response
                     .body_mut()
                     .read_json()
-                    .context("Failed to parse response")?;
+                    .with_context(|| {
+                        format!("Failed to parse JSON response from {url}. The server may have disconnected or returned invalid data")
+                    })?;
 
                 if resp["status_code"].as_i64().unwrap() == 200 {
                     let ids = resp
@@ -496,83 +504,108 @@ fn get_str_key(value: &JsonValue, key: impl AsRef<str>) -> Result<&str> {
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
-    use std::{
-        env::temp_dir,
-        io::{BufRead, BufReader},
-        path::PathBuf,
-        process::{Child, Command, Stdio},
-        sync::{Arc, Mutex, Weak},
-        thread,
-        time::Duration,
-    };
+    use std::{env::temp_dir, fs, path::PathBuf, sync::Once, thread};
 
     use super::*;
     use crate::config::asst::AsstConfig;
 
     const TEST_SERVER_PORT: u16 = 18080;
 
-    struct TestServerInner(Child);
+    static INIT_SERVER: Once = Once::new();
 
-    impl Drop for TestServerInner {
-        fn drop(&mut self) {
-            let _ = self.0.kill();
-            let _ = self.0.wait();
-        }
-    }
-
-    static TEST_SERVER: Mutex<Weak<TestServerInner>> = Mutex::new(Weak::new());
-
-    /// A handle to the test HTTP server.
-    /// The server is started when the first handle is created and stopped when the last handle is
-    /// dropped.
-    struct TestServerHandle(#[allow(dead_code)] Arc<TestServerInner>);
-
-    impl TestServerHandle {
-        fn new() -> Self {
-            let mut guard = TEST_SERVER.lock().unwrap();
-
-            if let Some(arc) = guard.upgrade() {
-                return Self(arc);
-            }
-
+    /// Ensures the test HTTP server is started.
+    /// The server is started once and runs for the lifetime of the test process.
+    fn ensure_test_server() {
+        INIT_SERVER.call_once(|| {
             const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
             let fixtures_dir = PathBuf::from(MANIFEST_DIR).join("fixtures").join("copilot");
 
-            let server_script = fixtures_dir.join("http_server.py");
+            // Start HTTP server in a background thread
+            thread::spawn(move || {
+                let server = tiny_http::Server::http(("127.0.0.1", TEST_SERVER_PORT))
+                    .expect("Failed to bind test server");
 
-            // Try python3 first (Unix), then python (Windows)
-            let python_cmd = if cfg!(windows) { "python" } else { "python3" };
+                for request in server.incoming_requests() {
+                    let url = request.url();
 
-            let mut child = match Command::new(python_cmd)
-                .arg(&server_script)
-                .arg(TEST_SERVER_PORT.to_string())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::null())
-                .spawn()
-            {
-                Ok(child) => child,
-                Err(e) => panic!("Failed to start test server: {e}. Python may not be available."),
-            };
+                    // Handle /copilot/get/{task_id}
+                    if let Some(task_id) = url.strip_prefix("/copilot/get/") {
+                        let file_path = fixtures_dir.join("tasks").join(format!("{task_id}.json"));
 
-            // Wait for server to be ready by reading the startup message
-            if let Some(stdout) = child.stdout.take() {
-                let reader = BufReader::new(stdout);
-                for line in reader.lines() {
-                    if let Ok(line) = line
-                        && line.contains("Serving copilot test API")
-                    {
-                        break;
+                        if let Ok(content) = fs::read_to_string(&file_path) {
+                            let response_body = serde_json::json!({
+                                "status_code": 200,
+                                "data": {
+                                    "content": content
+                                }
+                            });
+
+                            let response =
+                                tiny_http::Response::from_string(response_body.to_string())
+                                    .with_header(
+                                        tiny_http::Header::from_bytes(
+                                            &b"Content-Type"[..],
+                                            &b"application/json"[..],
+                                        )
+                                        .unwrap(),
+                                    );
+                            let _ = request.respond(response);
+                        } else {
+                            let response = tiny_http::Response::from_string(
+                                r#"{"status_code": 404, "message": "Task not found"}"#,
+                            )
+                            .with_status_code(404);
+                            let _ = request.respond(response);
+                        }
+                        continue;
                     }
+
+                    // Handle /set/get?id={set_id}
+                    if url.starts_with("/set/get") {
+                        if let Some(query) = url.split('?').nth(1) {
+                            for param in query.split('&') {
+                                if let Some((key, value)) = param.split_once('=')
+                                    && key == "id"
+                                {
+                                    let file_path =
+                                        fixtures_dir.join("sets").join(format!("{value}.json"));
+
+                                    if let Ok(content) = fs::read_to_string(&file_path) {
+                                        let response = tiny_http::Response::from_string(content)
+                                            .with_header(
+                                                tiny_http::Header::from_bytes(
+                                                    &b"Content-Type"[..],
+                                                    &b"application/json"[..],
+                                                )
+                                                .unwrap(),
+                                            );
+                                        let _ = request.respond(response);
+                                    } else {
+                                        let response = tiny_http::Response::from_string(
+                                            r#"{"status_code": 404, "message": "Set not found"}"#,
+                                        )
+                                        .with_status_code(404);
+                                        let _ = request.respond(response);
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                        continue;
+                    }
+
+                    // 404 for other paths
+                    let response = tiny_http::Response::from_string(
+                        r#"{"status_code": 404, "message": "Not found"}"#,
+                    )
+                    .with_status_code(404);
+                    let _ = request.respond(response);
                 }
-            }
+            });
 
-            // Give server a moment to be fully ready
-            thread::sleep(Duration::from_millis(100));
-
-            let arc = Arc::new(TestServerInner(child));
-            *guard = Arc::downgrade(&arc);
-            Self(arc)
-        }
+            // Wait a bit for server to start
+            thread::sleep(std::time::Duration::from_millis(100));
+        });
     }
 
     fn path_from_cache_dir(path: &str) -> String {
@@ -587,7 +620,7 @@ mod tests {
         #[test]
         #[ignore = "requires local test server and installed resources"]
         fn into_task_config() {
-            let _server = TestServerHandle::new();
+            ensure_test_server();
 
             if std::env::var_os("SKIP_CORE_TEST").is_some() {
                 return; // Skip test if resource is not provided
@@ -851,7 +884,7 @@ mod tests {
         #[test]
         #[ignore = "requires local test server"]
         fn try_into_maa_value() {
-            let _server = TestServerHandle::new();
+            ensure_test_server();
 
             fn parse<I, T>(args: I) -> Result<MAAValue>
             where
@@ -908,7 +941,7 @@ mod tests {
         #[test]
         #[ignore = "requires local test server"]
         fn push_path_to() {
-            let _server = TestServerHandle::new();
+            ensure_test_server();
 
             let test_root = temp_dir().join("maa-test-push-path-to");
             fs::create_dir_all(&test_root).unwrap();

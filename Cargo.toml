@@ -44,6 +44,7 @@ signal-hook = "0.3.17"
 tar = "0.4.40"
 tempfile = "3.14.0"
 thiserror = "2"
+tiny_http = "0.12"
 toml = "0.9"
 ureq = { version = "3" }
 windows-result = "0.4.0"
