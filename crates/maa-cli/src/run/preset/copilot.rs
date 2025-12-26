@@ -3,6 +3,8 @@ use std::{
     fs,
     io::Write,
     path::{Path, PathBuf},
+    sync::mpsc,
+    thread,
 };
 
 use anyhow::{Context, Result, bail};
@@ -110,7 +112,8 @@ impl IntoTaskConfig for CopilotParams {
         let default = MAAValue::find_file_or_default(super::default_file(TaskType::Copilot))
             .context("Failed to load default copilot task config")?;
 
-        let mut copilot_files = Vec::new();
+        // Pre-allocate with uri_list capacity (may expand if RemoteSet is used)
+        let mut copilot_files = Vec::with_capacity(self.uri_list.len());
         for uri in &self.uri_list {
             let copilot_file = CopilotFile::from_uri(uri)?;
 
@@ -155,7 +158,8 @@ impl IntoTaskConfig for CopilotParams {
             (None, None) => 0,
         };
 
-        let mut stage_list = Vec::new();
+        // Pre-allocate for common case (may need more if raid == 2)
+        let mut stage_list = Vec::with_capacity(copilot_files.len());
         for (file, cached_json) in copilot_files {
             let copilot_info = match cached_json {
                 Some(json) => json,
@@ -163,9 +167,16 @@ impl IntoTaskConfig for CopilotParams {
             };
             let stage_id = copilot_info
                 .get("stage_name")
-                .context("No stage_name")?
+                .with_context(|| {
+                    format!("Missing 'stage_name' in copilot file: {}", file.display())
+                })?
                 .as_str()
-                .context("stage_name is not a string")?;
+                .with_context(|| {
+                    format!(
+                        "'stage_name' is not a string in copilot file: {}",
+                        file.display()
+                    )
+                })?;
 
             let is_paradox = stage_id.starts_with("mem_");
 
@@ -175,9 +186,7 @@ impl IntoTaskConfig for CopilotParams {
             if !(is_paradox || formation) {
                 println!("Operators:\n{}", operator_table(&copilot_info)?);
                 println!("Please set up your formation manually");
-                while !BoolInput::new(Some(true), Some("continue")).value()? {
-                    println!("Please confirm you have set up your formation");
-                }
+                prompt_continue("Please confirm you have set up your formation")?;
             }
 
             let mut raid = self.raid;
@@ -300,9 +309,7 @@ impl TryFrom<SSSCopilotParams> for MAAValue {
         let stage_name = get_str_key(&value, "stage_name")?;
 
         println!("Fight Stage: {stage_name}, please navigate to the stage manually");
-        while !BoolInput::new(Some(true), Some("continue")).value()? {
-            println!("Please confirm you have navigated to the stage");
-        }
+        prompt_continue("Please confirm you have navigated to the stage")?;
         println!("Core Operators:\n{}", operator_table(&value)?);
         // TODO: equipment, support unit, toolmans
         if BoolInput::new(Some(false), Some("show doc")).value()? {
@@ -316,9 +323,7 @@ impl TryFrom<SSSCopilotParams> for MAAValue {
             println!("{doc}");
         }
 
-        while !BoolInput::new(Some(true), Some("continue")).value()? {
-            println!("Please confirm you have set up your formation");
-        }
+        prompt_continue("Please confirm you have set up your formation")?;
 
         let value = object!(
             "filename" => file.to_str().context("Invalid file path")?,
@@ -326,6 +331,80 @@ impl TryFrom<SSSCopilotParams> for MAAValue {
         );
 
         Ok(value)
+    }
+}
+
+/// Prompt user to continue with a confirmation message
+fn prompt_continue(message: &str) -> Result<()> {
+    while !BoolInput::new(Some(true), Some("continue")).value()? {
+        println!("{}", message);
+    }
+    Ok(())
+}
+
+/// Download result containing path and optionally parsed JSON
+type DownloadResult = Result<(PathBuf, Option<JsonValue>)>;
+
+/// Download a single copilot file by code, returns (path, parsed_json)
+fn download_copilot(code: i64, base_dir: &Path) -> DownloadResult {
+    let code_str = code.to_string();
+    let json_file = base_dir.join(&code_str).with_extension("json");
+
+    // Check cache first
+    if json_file.is_file() {
+        debug!("Cache hit, using cached json file {}", json_file.display());
+        return Ok((json_file, None));
+    }
+
+    let url = format!("{COPILOT_API}{code_str}");
+    debug!("Cache miss, downloading copilot from {url}");
+    let resp = fetch_api_response(&url)?;
+
+    let content = resp
+        .get("data")
+        .context("No data in response")?
+        .get("content")
+        .context("No content in response data")?
+        .as_str()
+        .context("Content is not a string")?;
+
+    // Parse JSON from content
+    let json_value: JsonValue = serde_json::from_str(content)
+        .with_context(|| format!("Failed to parse copilot JSON content for {}", code))?;
+
+    // Save json file for FFI usage
+    let mut file = fs::File::create(&json_file).context("Failed to create json file")?;
+    file.write_all(content.as_bytes())
+        .context("Failed to write json file")?;
+    file.sync_all()
+        .context("Failed to sync json file to disk")?;
+
+    Ok((json_file, Some(json_value)))
+}
+
+/// Fetch JSON from API with status code validation
+fn fetch_api_response(url: &str) -> Result<JsonValue> {
+    debug!("Fetching from {url}");
+    let mut response = AGENT
+        .get(url)
+        .call()
+        .with_context(|| format!("Failed to send request to {url}"))?;
+
+    let resp: JsonValue = response
+        .body_mut()
+        .read_json()
+        .with_context(|| {
+            format!("Failed to parse JSON response from {url}. The server may have disconnected or returned invalid data")
+        })?;
+
+    let status_code = resp["status_code"]
+        .as_i64()
+        .with_context(|| format!("Invalid status_code in response from {url}"))?;
+
+    if status_code == 200 {
+        Ok(resp)
+    } else {
+        bail!("Request failed with status code {}: {}", status_code, url);
     }
 }
 
@@ -367,92 +446,65 @@ impl<'a> CopilotFile<'a> {
         let base_dir = base_dir.as_ref();
         match self {
             CopilotFile::Remote(code) => {
-                let code = code.to_string();
-                let json_file = base_dir.join(&code).with_extension("json");
-
-                if json_file.is_file() {
-                    debug!("Cache hit, using cached json file {}", json_file.display());
-                    paths.push((json_file.into(), None));
-                    return Ok(());
-                }
-
-                let url = format!("{COPILOT_API}{code}");
-                debug!("Cache miss, downloading copilot from {url}");
-                let mut response = AGENT
-                    .get(&url)
-                    .call()
-                    .with_context(|| format!("Failed to send request to {url}"))?;
-
-                let resp: JsonValue = response
-                    .body_mut()
-                    .read_json()
-                    .with_context(|| {
-                        format!("Failed to parse JSON response from {url}. The server may have disconnected or returned invalid data")
-                    })?;
-
-                if resp["status_code"].as_i64().unwrap() == 200 {
-                    let content = resp
-                        .get("data")
-                        .context("No data in response")?
-                        .get("content")
-                        .context("No content in response data")?
-                        .as_str()
-                        .context("Content is not a string")?;
-
-                    // Parse JSON from content
-                    let json_value: JsonValue =
-                        serde_json::from_str(content).with_context(|| {
-                            format!("Failed to parse copilot JSON content for {}", code)
-                        })?;
-
-                    // Save json file for FFI usage
-                    let mut file =
-                        fs::File::create(&json_file).context("Failed to create json file")?;
-                    file.write_all(content.as_bytes())
-                        .context("Failed to write json file")?;
-                    file.sync_all()
-                        .context("Failed to sync json file to disk")?;
-
-                    paths.push((json_file.into(), Some(json_value)));
-
-                    Ok(())
-                } else {
-                    bail!("Request Error, code: {}", code);
-                }
+                let (path, json) = download_copilot(code, base_dir)?;
+                paths.push((path.into(), json));
+                Ok(())
             }
             CopilotFile::RemoteSet(code) => {
                 let url = format!("{COPILOT_SET_API}{code}");
-                debug!("Get copilot set from {url}");
-                let mut response = AGENT
-                    .get(&url)
-                    .call()
-                    .with_context(|| format!("Failed to send request to {url}"))?;
+                let resp = fetch_api_response(&url)?;
 
-                let resp: JsonValue = response
-                    .body_mut()
-                    .read_json()
-                    .with_context(|| {
-                        format!("Failed to parse JSON response from {url}. The server may have disconnected or returned invalid data")
-                    })?;
+                let ids: Vec<i64> = resp
+                    .get("data")
+                    .context("No data in response")?
+                    .get("copilot_ids")
+                    .context("No copilot_ids in response data")?
+                    .as_array()
+                    .context("Copilot_ids is not an array")?
+                    .iter()
+                    .map(|id| id.as_i64().context("copilot_id is not an integer"))
+                    .collect::<Result<_>>()?;
 
-                if resp["status_code"].as_i64().unwrap() == 200 {
-                    let ids = resp
-                        .get("data")
-                        .context("No data in response")?
-                        .get("copilot_ids")
-                        .context("No copilot_ids in response data")?
-                        .as_array()
-                        .context("Copilot_ids is not an array")?;
+                // Download in parallel using threads, preserving order
+                let base_dir = base_dir.to_path_buf();
+                let (tx, rx) = mpsc::channel();
 
-                    for id in ids {
-                        let id = id.as_i64().context("copilot_id is not an integer")?;
-                        CopilotFile::Remote(id).push_path_to(paths, base_dir)?;
-                    }
+                // Spawn download threads
+                let handles: Vec<_> = ids
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, id)| {
+                        let tx = tx.clone();
+                        let base_dir = base_dir.clone();
+                        thread::spawn(move || {
+                            let result = download_copilot(id, &base_dir);
+                            // Send index along with result to preserve order
+                            let _ = tx.send((index, result));
+                        })
+                    })
+                    .collect();
 
-                    Ok(())
-                } else {
-                    bail!("Request Error, code: {}", code);
+                // Drop the original sender so rx.iter() will end
+                drop(tx);
+
+                // Collect results
+                let mut results: Vec<(usize, DownloadResult)> = rx.iter().collect();
+
+                // Wait for all threads to complete
+                for handle in handles {
+                    let _ = handle.join();
                 }
+
+                // Sort by original index to preserve order
+                results.sort_by_key(|(index, _)| *index);
+
+                // Process results in order
+                for (_, result) in results {
+                    let (path, json) = result?;
+                    paths.push((path.into(), json));
+                }
+
+                Ok(())
             }
             CopilotFile::Local(file) => {
                 if file.is_absolute() {
@@ -512,9 +564,9 @@ fn get_str_key(value: &JsonValue, key: impl AsRef<str>) -> Result<&str> {
     let key = key.as_ref();
     value
         .get(key)
-        .with_context(|| format!("{key} not found in {value}"))?
+        .with_context(|| format!("Missing required field '{key}' in JSON: {value}"))?
         .as_str()
-        .with_context(|| format!("{key} is not a string in {value}"))
+        .with_context(|| format!("Field '{key}' must be a string in JSON: {value}"))
 }
 
 #[cfg(test)]
@@ -622,14 +674,22 @@ mod tests {
             // Wait for the server to start
             let start = std::time::Instant::now();
             let timeout = std::time::Duration::from_secs(5);
+            let mut last_error = None;
             loop {
                 if start.elapsed() > timeout {
-                    panic!("Test server failed to start in time");
+                    panic!(
+                        "Test server failed to start within {} seconds. Last error: {:?}",
+                        timeout.as_secs(),
+                        last_error
+                    );
                 }
-                if std::net::TcpStream::connect(("127.0.0.1", TEST_SERVER_PORT)).is_ok() {
-                    break;
+                match std::net::TcpStream::connect(("127.0.0.1", TEST_SERVER_PORT)) {
+                    Ok(_) => break,
+                    Err(e) => {
+                        last_error = Some(e);
+                        std::thread::sleep(std::time::Duration::from_millis(50));
+                    }
                 }
-                std::thread::sleep(std::time::Duration::from_millis(50));
             }
         });
     }
@@ -637,7 +697,7 @@ mod tests {
     fn path_from_cache_dir(path: &str) -> String {
         join!(maa_dirs::cache(), "copilot", path)
             .to_string_lossy()
-            .to_string()
+            .into_owned()
     }
 
     mod copilot_params {
