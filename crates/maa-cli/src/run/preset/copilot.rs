@@ -156,8 +156,11 @@ impl IntoTaskConfig for CopilotParams {
         };
 
         let mut stage_list = Vec::new();
-        for file in copilot_files {
-            let copilot_info = json_from_file(&file)?;
+        for (file, cached_json) in copilot_files {
+            let copilot_info = match cached_json {
+                Some(json) => json,
+                None => json_from_file(&file)?,
+            };
             let stage_id = copilot_info
                 .get("stage_name")
                 .context("No stage_name")?
@@ -284,8 +287,11 @@ impl TryFrom<SSSCopilotParams> for MAAValue {
             bail!("SSS Copilot don't support task set");
         }
 
-        let file = paths[0].as_ref();
-        let value = json_from_file(file)?;
+        let (file, cached_json) = &paths[0];
+        let value = match cached_json {
+            Some(json) => json.clone(),
+            None => json_from_file(file)?,
+        };
 
         if get_str_key(&value, "type")? != "SSS" {
             bail!("The given copilot file is not a SSS copilot file");
@@ -355,7 +361,7 @@ impl<'a> CopilotFile<'a> {
 
     pub fn push_path_to(
         self,
-        paths: &mut Vec<Cow<'a, Path>>,
+        paths: &mut Vec<(Cow<'a, Path>, Option<JsonValue>)>,
         base_dir: impl AsRef<Path>,
     ) -> Result<()> {
         let base_dir = base_dir.as_ref();
@@ -366,7 +372,7 @@ impl<'a> CopilotFile<'a> {
 
                 if json_file.is_file() {
                     debug!("Cache hit, using cached json file {}", json_file.display());
-                    paths.push(json_file.into());
+                    paths.push((json_file.into(), None));
                     return Ok(());
                 }
 
@@ -393,7 +399,13 @@ impl<'a> CopilotFile<'a> {
                         .as_str()
                         .context("Content is not a string")?;
 
-                    // Save json file
+                    // Parse JSON from content
+                    let json_value: JsonValue =
+                        serde_json::from_str(content).with_context(|| {
+                            format!("Failed to parse copilot JSON content for {}", code)
+                        })?;
+
+                    // Save json file for FFI usage
                     let mut file =
                         fs::File::create(&json_file).context("Failed to create json file")?;
                     file.write_all(content.as_bytes())
@@ -401,7 +413,7 @@ impl<'a> CopilotFile<'a> {
                     file.sync_all()
                         .context("Failed to sync json file to disk")?;
 
-                    paths.push(json_file.into());
+                    paths.push((json_file.into(), Some(json_value)));
 
                     Ok(())
                 } else {
@@ -444,9 +456,9 @@ impl<'a> CopilotFile<'a> {
             }
             CopilotFile::Local(file) => {
                 if file.is_absolute() {
-                    paths.push(file.into());
+                    paths.push((file.into(), None));
                 } else {
-                    paths.push(base_dir.join(file).into());
+                    paths.push((base_dir.join(file).into(), None));
                 }
                 Ok(())
             }
@@ -980,7 +992,9 @@ mod tests {
                 .unwrap()
                 .push_path_to(&mut paths, &test_root)
                 .unwrap();
-            assert_eq!(paths, &[test_root.join("40051.json")]);
+            assert_eq!(paths.len(), 1);
+            assert_eq!(paths[0].0, test_root.join("40051.json"));
+            assert!(paths[0].1.is_some()); // Should have cached JSON for remote download
 
             // Clean up for next test
             let _ = fs::remove_file(test_root.join("40051.json"));
@@ -991,39 +1005,36 @@ mod tests {
                 .unwrap()
                 .push_path_to(&mut paths, &test_root)
                 .unwrap();
-            assert_eq!(paths, {
-                let ids = [40051, 40052, 40053, 40055, 40056, 40057, 40058, 40059];
-
-                ids.iter()
-                    .map(|id| test_root.join(format!("{id}.json")))
-                    .collect::<Vec<PathBuf>>()
-            });
+            let expected_ids = [40051, 40052, 40053, 40055, 40056, 40057, 40058, 40059];
+            assert_eq!(paths.len(), expected_ids.len());
+            for (i, id) in expected_ids.iter().enumerate() {
+                assert_eq!(paths[i].0, test_root.join(format!("{id}.json")));
+                // Files downloaded from cache hit will have None, fresh downloads will have Some
+            }
 
             // Local file (absolute)
-            assert_eq!(
-                {
-                    let mut paths = Vec::new();
-                    CopilotFile::from_uri(test_file.to_str().unwrap())
-                        .unwrap()
-                        .push_path_to(&mut paths, &test_root)
-                        .unwrap();
-                    paths
-                },
-                &[test_file.as_path()]
-            );
+            {
+                let mut paths = Vec::new();
+                CopilotFile::from_uri(test_file.to_str().unwrap())
+                    .unwrap()
+                    .push_path_to(&mut paths, &test_root)
+                    .unwrap();
+                assert_eq!(paths.len(), 1);
+                assert_eq!(paths[0].0, test_file.as_path());
+                assert!(paths[0].1.is_none()); // Local files should not have cached JSON
+            }
 
             // Local file (relative)
-            assert_eq!(
-                {
-                    let mut paths = Vec::new();
-                    CopilotFile::from_uri("file.json")
-                        .unwrap()
-                        .push_path_to(&mut paths, &test_root)
-                        .unwrap();
-                    paths
-                },
-                &[test_root.join("file.json")]
-            );
+            {
+                let mut paths = Vec::new();
+                CopilotFile::from_uri("file.json")
+                    .unwrap()
+                    .push_path_to(&mut paths, &test_root)
+                    .unwrap();
+                assert_eq!(paths.len(), 1);
+                assert_eq!(paths[0].0, test_root.join("file.json"));
+                assert!(paths[0].1.is_none()); // Local files should not have cached JSON
+            }
 
             fs::remove_dir_all(&test_root).unwrap();
         }
