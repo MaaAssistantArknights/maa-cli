@@ -394,10 +394,12 @@ impl<'a> CopilotFile<'a> {
                         .context("Content is not a string")?;
 
                     // Save json file
-                    fs::File::create(&json_file)
-                        .context("Failed to create json file")?
-                        .write_all(content.as_bytes())
+                    let mut file =
+                        fs::File::create(&json_file).context("Failed to create json file")?;
+                    file.write_all(content.as_bytes())
                         .context("Failed to write json file")?;
+                    file.sync_all()
+                        .context("Failed to sync json file to disk")?;
 
                     paths.push(json_file.into());
 
