@@ -1,0 +1,8 @@
+{
+  "status_code": 200,
+  "data": {
+    "id": 99803,
+    "name": "Invalid set - copilot_id not integer",
+    "copilot_ids": ["not", "integers"]
+  }
+}

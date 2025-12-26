@@ -1,0 +1,8 @@
+{
+  "status_code": 200,
+  "data": {
+    "id": 99801,
+    "name": "Invalid set - missing copilot_ids",
+    "description": "Test fixture"
+  }
+}

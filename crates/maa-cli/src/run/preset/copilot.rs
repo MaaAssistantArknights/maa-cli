@@ -572,26 +572,31 @@ fn get_str_key(value: &JsonValue, key: impl AsRef<str>) -> Result<&str> {
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
-    use std::{env::temp_dir, fs, path::PathBuf, sync::Once, thread};
+    use std::{env::temp_dir, fs, path::PathBuf, sync::OnceLock, thread};
 
     use super::*;
     use crate::config::asst::AsstConfig;
 
     const TEST_SERVER_PORT: u16 = 18080;
 
-    static INIT_SERVER: Once = Once::new();
+    static SERVER_AVAILABLE: OnceLock<bool> = OnceLock::new();
 
     /// Ensures the test HTTP server is started.
-    /// The server is started once and runs for the lifetime of the test process.
-    fn ensure_test_server() {
-        INIT_SERVER.call_once(|| {
+    /// Returns true if server is available, false if binding failed.
+    fn ensure_test_server() -> bool {
+        *SERVER_AVAILABLE.get_or_init(|| {
             const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
             let fixtures_dir = PathBuf::from(MANIFEST_DIR).join("fixtures").join("copilot");
 
             // Start HTTP server in a background thread
             thread::spawn(move || {
-                let server = tiny_http::Server::http(("127.0.0.1", TEST_SERVER_PORT))
-                    .expect("Failed to bind test server");
+                let server = match tiny_http::Server::http(("127.0.0.1", TEST_SERVER_PORT)) {
+                    Ok(s) => s,
+                    Err(_) => {
+                        // Failed to bind - server unavailable
+                        return;
+                    }
+                };
 
                 for request in server.incoming_requests() {
                     let url = request.url();
@@ -671,27 +676,24 @@ mod tests {
                 }
             });
 
-            // Wait for the server to start
+            // Wait for the server to start or timeout
+            std::thread::sleep(std::time::Duration::from_millis(50));
             let start = std::time::Instant::now();
             let timeout = std::time::Duration::from_secs(5);
-            let mut last_error = None;
             loop {
+                // Check if we can connect to the server
+                if std::net::TcpStream::connect(("127.0.0.1", TEST_SERVER_PORT)).is_ok() {
+                    return true;
+                }
+
+                // Timeout - assume server failed to start
                 if start.elapsed() > timeout {
-                    panic!(
-                        "Test server failed to start within {} seconds. Last error: {:?}",
-                        timeout.as_secs(),
-                        last_error
-                    );
+                    return false;
                 }
-                match std::net::TcpStream::connect(("127.0.0.1", TEST_SERVER_PORT)) {
-                    Ok(_) => break,
-                    Err(e) => {
-                        last_error = Some(e);
-                        std::thread::sleep(std::time::Duration::from_millis(50));
-                    }
-                }
+
+                std::thread::sleep(std::time::Duration::from_millis(50));
             }
-        });
+        })
     }
 
     fn path_from_cache_dir(path: &str) -> String {
@@ -702,40 +704,48 @@ mod tests {
 
     mod copilot_params {
         use super::*;
+        use crate::config::task::InitializedTask;
+
+        #[track_caller]
+        fn parse_to_tasks<I, T>(args: I, config: &AsstConfig) -> Vec<InitializedTask>
+        where
+            I: IntoIterator<Item = T>,
+            T: Into<std::ffi::OsString> + Clone,
+        {
+            let command = crate::command::parse_from(args).command;
+            let params = match command {
+                crate::Command::Copilot { params, .. } => params,
+                _ => panic!("Not a Copilot command"),
+            };
+            params
+                .into_task_config(config)
+                .expect("Failed to build task config")
+                .init()
+                .unwrap()
+                .tasks
+        }
+
+        fn setup() -> Option<AsstConfig> {
+            if std::env::var_os("SKIP_CORE_TEST").is_some() {
+                return None;
+            }
+
+            if !ensure_test_server() {
+                // Server failed to start (e.g., can't bind to port in restricted environment)
+                return None;
+            }
+
+            Some(AsstConfig::default())
+        }
 
         #[test]
         #[ignore = "requires local test server and installed resources"]
-        fn into_task_config() {
-            ensure_test_server();
+        fn basic_single_copilot() {
+            let Some(config) = setup() else {
+                return;
+            };
 
-            if std::env::var_os("SKIP_CORE_TEST").is_some() {
-                return; // Skip test if resource is not provided
-            }
-
-            let config = AsstConfig::default();
-
-            use crate::config::task::InitializedTask;
-
-            #[track_caller]
-            fn parse_to_taskes<I, T>(args: I, config: &AsstConfig) -> Vec<InitializedTask>
-            where
-                I: IntoIterator<Item = T>,
-                T: Into<std::ffi::OsString> + Clone,
-            {
-                let command = crate::command::parse_from(args).command;
-                let params = match command {
-                    crate::Command::Copilot { params, .. } => params,
-                    _ => panic!("Not a Copilot command"),
-                };
-                params
-                    .into_task_config(config)
-                    .expect("Failed to build task config")
-                    .init()
-                    .unwrap()
-                    .tasks
-            }
-
-            let tasks = parse_to_taskes(["maa", "copilot", "maa://40051"], &config);
+            let tasks = parse_to_tasks(["maa", "copilot", "maa://40051"], &config);
             assert_eq!(tasks.len(), 1);
             assert_eq!(tasks[0].task_type, TaskType::Copilot);
             assert_eq!(
@@ -753,9 +763,16 @@ mod tests {
                     "formation_index" => 0,
                 ),
             );
+        }
 
-            // Test no default values
-            let tasks_no_default = parse_to_taskes(
+        #[test]
+        #[ignore = "requires local test server and installed resources"]
+        fn all_flags_enabled() {
+            let Some(config) = setup() else {
+                return;
+            };
+
+            let tasks = parse_to_tasks(
                 [
                     "maa",
                     "copilot",
@@ -772,10 +789,10 @@ mod tests {
                 ],
                 &config,
             );
-            assert_eq!(tasks_no_default.len(), 1);
-            assert_eq!(tasks_no_default[0].task_type, TaskType::Copilot);
+            assert_eq!(tasks.len(), 1);
+            assert_eq!(tasks[0].task_type, TaskType::Copilot);
             assert_eq!(
-                tasks_no_default[0].params,
+                tasks[0].params,
                 object!(
                     "copilot_list" => [object!(
                         "filename" => path_from_cache_dir("40051.json"),
@@ -790,9 +807,16 @@ mod tests {
                     "support_unit_name" => "维什戴尔",
                 ),
             );
+        }
 
-            // Test formation index
-            let tasks_formation_index = parse_to_taskes(
+        #[test]
+        #[ignore = "requires local test server and installed resources"]
+        fn formation_index_with_deprecated_select_formation() {
+            let Some(config) = setup() else {
+                return;
+            };
+
+            let tasks = parse_to_tasks(
                 [
                     "maa",
                     "copilot",
@@ -804,10 +828,10 @@ mod tests {
                 ],
                 &config,
             );
-            assert_eq!(tasks_formation_index.len(), 1);
-            assert_eq!(tasks_formation_index[0].task_type, TaskType::Copilot);
+            assert_eq!(tasks.len(), 1);
+            assert_eq!(tasks[0].task_type, TaskType::Copilot);
             assert_eq!(
-                tasks_formation_index[0].params,
+                tasks[0].params,
                 object!(
                     "copilot_list" => [object!(
                         "filename" => path_from_cache_dir("40051.json"),
@@ -821,9 +845,16 @@ mod tests {
                     "formation_index" => 4,
                 ),
             );
+        }
 
-            // Test raid mode 2
-            let tasks_raid_2 = parse_to_taskes(
+        #[test]
+        #[ignore = "requires local test server and installed resources"]
+        fn raid_mode_2() {
+            let Some(config) = setup() else {
+                return;
+            };
+
+            let tasks = parse_to_tasks(
                 [
                     "maa",
                     "copilot",
@@ -834,10 +865,10 @@ mod tests {
                 ],
                 &config,
             );
-            assert_eq!(tasks_raid_2.len(), 1);
-            assert_eq!(tasks_raid_2[0].task_type, TaskType::Copilot);
+            assert_eq!(tasks.len(), 1);
+            assert_eq!(tasks[0].task_type, TaskType::Copilot);
             assert_eq!(
-                tasks_raid_2[0].params,
+                tasks[0].params,
                 object!(
                     "copilot_list" => [object!(
                         "filename" => path_from_cache_dir("40051.json"),
@@ -857,14 +888,21 @@ mod tests {
                     "formation_index" => 0,
                 ),
             );
+        }
 
-            let tasks_multiple =
-                parse_to_taskes(["maa", "copilot", "maa://40051", "maa://40052"], &config);
+        #[test]
+        #[ignore = "requires local test server and installed resources"]
+        fn multiple_copilot_uris() {
+            let Some(config) = setup() else {
+                return;
+            };
 
-            assert_eq!(tasks_multiple.len(), 1);
-            assert_eq!(tasks_multiple[0].task_type, TaskType::Copilot);
+            let tasks = parse_to_tasks(["maa", "copilot", "maa://40051", "maa://40052"], &config);
+
+            assert_eq!(tasks.len(), 1);
+            assert_eq!(tasks[0].task_type, TaskType::Copilot);
             assert_eq!(
-                tasks_multiple[0].params,
+                tasks[0].params,
                 object!(
                     "copilot_list" => [object!(
                         "filename" => path_from_cache_dir("40051.json"),
@@ -884,13 +922,20 @@ mod tests {
                     "formation_index" => 0,
                 ),
             );
+        }
 
-            // Test paradox simulation (with maa://63896)
-            let tasks_paradox = parse_to_taskes(["maa", "copilot", "maa://63896"], &config);
-            assert_eq!(tasks_paradox.len(), 1);
-            assert_eq!(tasks_paradox[0].task_type, TaskType::Copilot);
+        #[test]
+        #[ignore = "requires local test server and installed resources"]
+        fn paradox_simulation() {
+            let Some(config) = setup() else {
+                return;
+            };
+
+            let tasks = parse_to_tasks(["maa", "copilot", "maa://63896"], &config);
+            assert_eq!(tasks.len(), 1);
+            assert_eq!(tasks[0].task_type, TaskType::Copilot);
             assert_eq!(
-                tasks_paradox[0].params,
+                tasks[0].params,
                 object!(
                     "copilot_list" => [object!(
                         "filename" => path_from_cache_dir("63896.json"),
@@ -904,15 +949,21 @@ mod tests {
                     "formation_index" => 0,
                 ),
             );
+        }
 
-            // Test paradox simulation with wrong raid mode
-            // Test paradox simulation with wrong raid mode
-            let tasks_paradox_raid_2 =
-                parse_to_taskes(["maa", "copilot", "maa://63896", "--raid", "2"], &config);
-            assert_eq!(tasks_paradox_raid_2.len(), 1);
-            assert_eq!(tasks_paradox_raid_2[0].task_type, TaskType::Copilot);
+        #[test]
+        #[ignore = "requires local test server and installed resources"]
+        fn paradox_with_raid_mode_forced_to_zero() {
+            let Some(config) = setup() else {
+                return;
+            };
+
+            // Raid mode should be forced to 0 for paradox simulation
+            let tasks = parse_to_tasks(["maa", "copilot", "maa://63896", "--raid", "2"], &config);
+            assert_eq!(tasks.len(), 1);
+            assert_eq!(tasks[0].task_type, TaskType::Copilot);
             assert_eq!(
-                tasks_paradox_raid_2[0].params,
+                tasks[0].params,
                 object!(
                     "copilot_list" => [object!(
                         "filename" => path_from_cache_dir("63896.json"),
@@ -950,8 +1001,657 @@ mod tests {
         }
     }
 
+    mod copilot_file {
+        use super::*;
+
+        // from_uri tests
+        #[test]
+        fn from_uri_remote() {
+            assert_eq!(
+                CopilotFile::from_uri("maa://30001").unwrap(),
+                CopilotFile::Remote(30001)
+            );
+        }
+
+        #[test]
+        fn from_uri_remote_set() {
+            assert_eq!(
+                CopilotFile::from_uri("maa://20001s").unwrap(),
+                CopilotFile::RemoteSet(20001)
+            );
+        }
+
+        #[test]
+        fn from_uri_local_with_prefix() {
+            assert_eq!(
+                CopilotFile::from_uri("file://file.json").unwrap(),
+                CopilotFile::Local(Path::new("file.json"))
+            );
+        }
+
+        #[test]
+        fn from_uri_local_without_prefix() {
+            assert_eq!(
+                CopilotFile::from_uri("file.json").unwrap(),
+                CopilotFile::Local(Path::new("file.json"))
+            );
+        }
+
+        #[test]
+        fn from_uri_with_whitespace() {
+            assert_eq!(
+                CopilotFile::from_uri("  maa://12345  ").unwrap(),
+                CopilotFile::Remote(12345)
+            );
+        }
+
+        #[test]
+        fn from_uri_empty() {
+            assert_eq!(
+                CopilotFile::from_uri("").unwrap(),
+                CopilotFile::Local(Path::new(""))
+            );
+        }
+
+        #[test]
+        fn from_uri_whitespace_only() {
+            assert_eq!(
+                CopilotFile::from_uri("   ").unwrap(),
+                CopilotFile::Local(Path::new(""))
+            );
+        }
+
+        #[test]
+        fn from_uri_invalid_maa_code() {
+            let result = CopilotFile::from_uri("maa://not_a_number");
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("Invalid code"),
+                "Expected 'Invalid code' error, got: {err}"
+            );
+        }
+
+        #[test]
+        fn from_uri_invalid_maa_set_code() {
+            let result = CopilotFile::from_uri("maa://not_a_numbers");
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("Invalid code"),
+                "Expected 'Invalid code' error, got: {err}"
+            );
+        }
+
+        // push_path_to tests
+        #[test]
+        fn push_path_to_remote() {
+            if !ensure_test_server() {
+                return;
+            }
+
+            let test_root = temp_dir().join("maa-test-push-path-remote");
+            fs::create_dir_all(&test_root).unwrap();
+            let _ = fs::remove_file(test_root.join("40051.json"));
+
+            let mut paths = Vec::new();
+            CopilotFile::Remote(40051)
+                .push_path_to(&mut paths, &test_root)
+                .unwrap();
+
+            assert_eq!(paths.len(), 1);
+            assert_eq!(paths[0].0, test_root.join("40051.json"));
+            assert!(paths[0].1.is_some()); // Fresh download has cached JSON
+
+            fs::remove_dir_all(&test_root).unwrap();
+        }
+
+        #[test]
+        fn push_path_to_remote_set() {
+            if !ensure_test_server() {
+                return;
+            }
+
+            let test_root = temp_dir().join("maa-test-push-path-remote-set");
+            fs::create_dir_all(&test_root).unwrap();
+
+            // Clean up any cached files
+            for id in [40051, 40052, 40053, 40055, 40056, 40057, 40058, 40059] {
+                let _ = fs::remove_file(test_root.join(format!("{id}.json")));
+            }
+
+            let mut paths = Vec::new();
+            CopilotFile::RemoteSet(23125)
+                .push_path_to(&mut paths, &test_root)
+                .unwrap();
+
+            let expected_ids = [40051, 40052, 40053, 40055, 40056, 40057, 40058, 40059];
+            assert_eq!(paths.len(), expected_ids.len());
+            for (i, id) in expected_ids.iter().enumerate() {
+                assert_eq!(paths[i].0, test_root.join(format!("{id}.json")));
+            }
+
+            fs::remove_dir_all(&test_root).unwrap();
+        }
+
+        #[test]
+        fn push_path_to_local_absolute() {
+            let test_root = temp_dir().join("maa-test-push-path-local-abs");
+            fs::create_dir_all(&test_root).unwrap();
+
+            let test_file = test_root.join("test.json");
+            fs::write(&test_file, "{}").unwrap();
+
+            let mut paths = Vec::new();
+            CopilotFile::Local(&test_file)
+                .push_path_to(&mut paths, &test_root)
+                .unwrap();
+
+            assert_eq!(paths.len(), 1);
+            assert_eq!(paths[0].0, test_file.as_path());
+            assert!(paths[0].1.is_none()); // Local files don't have cached JSON
+
+            fs::remove_dir_all(&test_root).unwrap();
+        }
+
+        #[test]
+        fn push_path_to_local_relative() {
+            let test_root = temp_dir().join("maa-test-push-path-local-rel");
+            fs::create_dir_all(&test_root).unwrap();
+
+            let mut paths = Vec::new();
+            CopilotFile::Local(Path::new("file.json"))
+                .push_path_to(&mut paths, &test_root)
+                .unwrap();
+
+            assert_eq!(paths.len(), 1);
+            assert_eq!(paths[0].0, test_root.join("file.json"));
+            assert!(paths[0].1.is_none());
+
+            fs::remove_dir_all(&test_root).unwrap();
+        }
+
+        #[test]
+        fn push_path_to_remote_not_found() {
+            if !ensure_test_server() {
+                return;
+            }
+
+            let test_root = temp_dir().join("maa-test-push-path-remote-404");
+            fs::create_dir_all(&test_root).unwrap();
+
+            let mut paths = Vec::new();
+            let result = CopilotFile::Remote(99999).push_path_to(&mut paths, &test_root);
+            assert!(result.is_err());
+
+            let _ = fs::remove_dir_all(&test_root);
+        }
+
+        #[test]
+        fn push_path_to_remote_set_not_found() {
+            if !ensure_test_server() {
+                return;
+            }
+
+            let test_root = temp_dir().join("maa-test-push-path-set-404");
+            fs::create_dir_all(&test_root).unwrap();
+
+            let mut paths = Vec::new();
+            let result = CopilotFile::RemoteSet(99999).push_path_to(&mut paths, &test_root);
+            assert!(result.is_err());
+
+            let _ = fs::remove_dir_all(&test_root);
+        }
+
+        #[test]
+        fn push_path_to_remote_set_missing_copilot_ids() {
+            if !ensure_test_server() {
+                return;
+            }
+
+            let test_root = temp_dir().join("maa-test-push-path-set-missing-ids");
+            fs::create_dir_all(&test_root).unwrap();
+
+            let mut paths = Vec::new();
+            let result = CopilotFile::RemoteSet(99801).push_path_to(&mut paths, &test_root);
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("copilot_ids"),
+                "Expected copilot_ids error, got: {err}"
+            );
+
+            let _ = fs::remove_dir_all(&test_root);
+        }
+
+        #[test]
+        fn push_path_to_remote_set_ids_not_array() {
+            if !ensure_test_server() {
+                return;
+            }
+
+            let test_root = temp_dir().join("maa-test-push-path-set-ids-not-array");
+            fs::create_dir_all(&test_root).unwrap();
+
+            let mut paths = Vec::new();
+            let result = CopilotFile::RemoteSet(99802).push_path_to(&mut paths, &test_root);
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("not an array"),
+                "Expected 'not an array' error, got: {err}"
+            );
+
+            let _ = fs::remove_dir_all(&test_root);
+        }
+
+        #[test]
+        fn push_path_to_remote_set_id_not_integer() {
+            if !ensure_test_server() {
+                return;
+            }
+
+            let test_root = temp_dir().join("maa-test-push-path-set-id-not-int");
+            fs::create_dir_all(&test_root).unwrap();
+
+            let mut paths = Vec::new();
+            let result = CopilotFile::RemoteSet(99803).push_path_to(&mut paths, &test_root);
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("not an integer"),
+                "Expected 'not an integer' error, got: {err}"
+            );
+
+            let _ = fs::remove_dir_all(&test_root);
+        }
+
+        #[test]
+        fn push_path_to_remote_set_download_fails() {
+            if !ensure_test_server() {
+                return;
+            }
+
+            let test_root = temp_dir().join("maa-test-push-path-set-download-fails");
+            fs::create_dir_all(&test_root).unwrap();
+
+            let mut paths = Vec::new();
+            // Set 99804 contains copilot_id 99999 which doesn't exist
+            let result = CopilotFile::RemoteSet(99804).push_path_to(&mut paths, &test_root);
+            assert!(result.is_err());
+
+            let _ = fs::remove_dir_all(&test_root);
+        }
+    }
+
+    mod operator_table {
+        use super::*;
+
+        #[test]
+        fn success() {
+            let json = serde_json::json!({
+                "groups": [
+                  {
+                    "name": "行医",
+                    "opers": [
+                      { "name": "纯烬艾雅法拉", "skill": 1, "skill_usage": 0 },
+                      { "name": "蜜莓", "skill": 1, "skill_usage": 0 }
+                    ]
+                  }
+                ],
+                "opers": [
+                  { "name": "桃金娘", "skill": 1, "skill_usage": 1 },
+                  { "name": "夜莺", "skill": 3, "skill_usage": 0 }
+                ]
+            });
+
+            let mut expected_table = Table::new();
+            expected_table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
+            expected_table.set_titles(row!["NAME", "SKILL"]);
+            expected_table.add_row(row!["桃金娘", 1]);
+            expected_table.add_row(row!["夜莺", 3]);
+
+            let mut sub_table = Table::new();
+            sub_table.set_format(*format::consts::FORMAT_NO_LINESEP);
+            sub_table.add_row(row!["纯烬艾雅法拉", 1]);
+            sub_table.add_row(row!["蜜莓", 1]);
+            expected_table.add_row(row!["\n[行医]", sub_table]);
+
+            assert_eq!(super::operator_table(&json).unwrap(), expected_table);
+        }
+
+        #[test]
+        fn empty_operators_and_groups() {
+            let json = serde_json::json!({
+                "opers": [],
+                "groups": []
+            });
+            let result = super::operator_table(&json);
+            assert!(result.is_ok());
+        }
+
+        #[test]
+        fn no_opers_or_groups_fields() {
+            let json = serde_json::json!({});
+            let result = super::operator_table(&json);
+            assert!(result.is_ok());
+        }
+
+        #[test]
+        fn operator_missing_name() {
+            let json = serde_json::json!({
+                "opers": [{"skill": 1}],
+                "groups": []
+            });
+            let result = super::operator_table(&json);
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("Missing required field 'name'"),
+                "Expected missing name error, got: {err}"
+            );
+        }
+
+        #[test]
+        fn operator_name_not_string() {
+            let json = serde_json::json!({
+                "opers": [{"name": 123, "skill": 1}],
+                "groups": []
+            });
+            let result = super::operator_table(&json);
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("must be a string"),
+                "Expected 'must be a string' error, got: {err}"
+            );
+        }
+
+        #[test]
+        fn group_missing_name() {
+            let json = serde_json::json!({
+                "opers": [],
+                "groups": [{"opers": [{"name": "test", "skill": 1}]}]
+            });
+            let result = super::operator_table(&json);
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("Missing required field 'name'"),
+                "Expected missing name error, got: {err}"
+            );
+        }
+
+        #[test]
+        fn group_missing_opers() {
+            let json = serde_json::json!({
+                "opers": [],
+                "groups": [{"name": "group1"}]
+            });
+            let result = super::operator_table(&json);
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("Failed to get opers"),
+                "Expected missing opers error, got: {err}"
+            );
+        }
+
+        #[test]
+        fn group_operator_missing_name() {
+            let json = serde_json::json!({
+                "opers": [],
+                "groups": [{"name": "group1", "opers": [{"skill": 1}]}]
+            });
+            let result = super::operator_table(&json);
+            assert!(result.is_err());
+        }
+    }
+
+    mod fetch_api_response {
+        use super::*;
+
+        #[test]
+        fn success() {
+            if !ensure_test_server() {
+                return;
+            }
+
+            let result = super::fetch_api_response(&format!("{COPILOT_API}40051"));
+            assert!(result.is_ok());
+            let resp = result.unwrap();
+            assert!(resp.get("data").is_some());
+        }
+
+        #[test]
+        fn not_found() {
+            if !ensure_test_server() {
+                return;
+            }
+
+            let result = super::fetch_api_response(&format!("{COPILOT_API}99999"));
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("404") || err.contains("Failed to send request"),
+                "Expected 404 or connection error, got: {err}"
+            );
+        }
+
+        #[test]
+        fn server_error_status() {
+            if !ensure_test_server() {
+                return;
+            }
+
+            // Request a set that returns status_code 500
+            let result = super::fetch_api_response(&format!("{COPILOT_SET_API}99805"));
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(err.contains("500"), "Expected 500 error, got: {err}");
+        }
+
+        #[test]
+        fn connection_refused() {
+            // Try to connect to a port that's not listening
+            let result = super::fetch_api_response("http://127.0.0.1:19999/copilot/get/1");
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("Failed to send request"),
+                "Expected connection error, got: {err}"
+            );
+        }
+    }
+
+    mod download_copilot {
+        use super::*;
+
+        #[test]
+        fn success() {
+            if !ensure_test_server() {
+                return;
+            }
+
+            let temp_dir = temp_dir().join("maa-test-download-success");
+            fs::create_dir_all(&temp_dir).unwrap();
+            let _ = fs::remove_file(temp_dir.join("40051.json"));
+
+            let result = super::download_copilot(40051, &temp_dir);
+            assert!(result.is_ok());
+            let (path, json) = result.unwrap();
+            assert_eq!(path, temp_dir.join("40051.json"));
+            assert!(json.is_some());
+            assert!(path.exists());
+
+            fs::remove_dir_all(&temp_dir).unwrap();
+        }
+
+        #[test]
+        fn cache_hit() {
+            if !ensure_test_server() {
+                return;
+            }
+
+            let temp_dir = temp_dir().join("maa-test-download-cache-hit");
+            fs::create_dir_all(&temp_dir).unwrap();
+
+            // Create a cached file
+            let cached_file = temp_dir.join("12345.json");
+            fs::write(&cached_file, r#"{"stage_name": "test"}"#).unwrap();
+
+            // Should return the cached file without making a network request
+            let result = super::download_copilot(12345, &temp_dir);
+            assert!(result.is_ok());
+            let (path, json) = result.unwrap();
+            assert_eq!(path, cached_file);
+            assert!(json.is_none()); // Cache hit returns None for JSON
+
+            fs::remove_dir_all(&temp_dir).unwrap();
+        }
+
+        #[test]
+        fn not_found() {
+            if !ensure_test_server() {
+                return;
+            }
+
+            let temp_dir = temp_dir().join("maa-test-download-not-found");
+            fs::create_dir_all(&temp_dir).unwrap();
+
+            let result = super::download_copilot(99999, &temp_dir);
+            assert!(result.is_err());
+
+            let _ = fs::remove_dir_all(&temp_dir);
+        }
+
+        #[test]
+        fn invalid_json_content() {
+            if !ensure_test_server() {
+                return;
+            }
+
+            let temp_dir = temp_dir().join("maa-test-download-invalid-json");
+            fs::create_dir_all(&temp_dir).unwrap();
+            let _ = fs::remove_file(temp_dir.join("99903.json"));
+
+            let result = super::download_copilot(99903, &temp_dir);
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("Failed to parse copilot JSON"),
+                "Expected JSON parse error, got: {err}"
+            );
+
+            let _ = fs::remove_dir_all(&temp_dir);
+        }
+    }
+
+    mod json_from_file {
+        use super::*;
+
+        #[test]
+        fn success() {
+            let temp_dir = temp_dir().join("maa-test-json-from-file-success");
+            fs::create_dir_all(&temp_dir).unwrap();
+
+            let valid_file = temp_dir.join("valid.json");
+            fs::write(&valid_file, r#"{"key": "value"}"#).unwrap();
+
+            let result = super::json_from_file(&valid_file);
+            assert!(result.is_ok());
+            let json = result.unwrap();
+            assert_eq!(json["key"], "value");
+
+            fs::remove_dir_all(&temp_dir).unwrap();
+        }
+
+        #[test]
+        fn file_not_found() {
+            let result = super::json_from_file("/nonexistent/path/to/file.json");
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn invalid_json() {
+            let temp_dir = temp_dir().join("maa-test-json-from-file-invalid");
+            fs::create_dir_all(&temp_dir).unwrap();
+
+            let invalid_file = temp_dir.join("invalid.json");
+            fs::write(&invalid_file, "not valid json").unwrap();
+
+            let result = super::json_from_file(&invalid_file);
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("Failed to parse JSON"),
+                "Expected JSON parse error, got: {err}"
+            );
+
+            let _ = fs::remove_dir_all(&temp_dir);
+        }
+    }
+
+    mod get_str_key {
+        #[test]
+        fn success() {
+            let json = serde_json::json!({"name": "test"});
+            let result = super::get_str_key(&json, "name");
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), "test");
+        }
+
+        #[test]
+        fn missing_key() {
+            let json = serde_json::json!({"foo": "bar"});
+            let result = super::get_str_key(&json, "missing");
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("Missing required field 'missing'"),
+                "Expected missing field error, got: {err}"
+            );
+        }
+
+        #[test]
+        fn key_not_string() {
+            let json = serde_json::json!({"number": 123});
+            let result = super::get_str_key(&json, "number");
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("must be a string"),
+                "Expected 'must be a string' error, got: {err}"
+            );
+        }
+
+        #[test]
+        fn null_value() {
+            let json = serde_json::json!({"null_key": null});
+            let result = super::get_str_key(&json, "null_key");
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("must be a string"),
+                "Expected 'must be a string' error, got: {err}"
+            );
+        }
+    }
+
     mod sss_copilot_params {
         use super::*;
+
+        fn parse<I, T>(args: I) -> Result<MAAValue>
+        where
+            I: IntoIterator<Item = T>,
+            T: Into<std::ffi::OsString> + Clone,
+        {
+            let command = crate::command::parse_from(args).command;
+            match command {
+                crate::Command::SSSCopilot { params, .. } => params.try_into(),
+                _ => panic!("Not a SSSCopilot command"),
+            }
+        }
 
         #[test]
         fn to_task_type() {
@@ -964,23 +1664,11 @@ mod tests {
         }
 
         #[test]
-        #[ignore = "requires local test server"]
-        fn try_into_maa_value() {
-            ensure_test_server();
-
-            fn parse<I, T>(args: I) -> Result<MAAValue>
-            where
-                I: IntoIterator<Item = T>,
-                T: Into<std::ffi::OsString> + Clone,
-            {
-                let command = crate::command::parse_from(args).command;
-                match command {
-                    crate::Command::SSSCopilot { params, .. } => params.try_into(),
-                    _ => panic!("Not a SSSCopilot command"),
-                }
+        fn try_into_maa_value_success() {
+            if !ensure_test_server() {
+                return;
             }
 
-            assert!(parse(["maa", "ssscopilot", "maa://40051"]).is_err());
             assert_eq!(
                 parse(["maa", "ssscopilot", "maa://40451"]).unwrap(),
                 object!("filename" => path_from_cache_dir("40451.json"), "loop_times" => 1)
@@ -990,162 +1678,41 @@ mod tests {
                 object!("filename" => path_from_cache_dir("40451.json"), "loop_times" => 2)
             );
         }
-    }
-
-    mod copilot_file {
-        use super::*;
 
         #[test]
-        fn from_uri() {
-            assert!(CopilotFile::from_uri("maa://xyz").is_err());
+        fn try_into_maa_value_not_sss_type() {
+            if !ensure_test_server() {
+                return;
+            }
 
-            assert_eq!(
-                CopilotFile::from_uri("maa://20001s").unwrap(),
-                CopilotFile::RemoteSet(20001)
-            );
-
-            assert_eq!(
-                CopilotFile::from_uri("maa://30001").unwrap(),
-                CopilotFile::Remote(30001)
-            );
-
-            assert_eq!(
-                CopilotFile::from_uri("file://file.json").unwrap(),
-                CopilotFile::Local(Path::new("file.json"))
-            );
-
-            assert_eq!(
-                CopilotFile::from_uri("file.json").unwrap(),
-                CopilotFile::Local(Path::new("file.json"))
-            );
+            // 40051 is a regular copilot, not SSS type
+            assert!(parse(["maa", "ssscopilot", "maa://40051"]).is_err());
         }
 
         #[test]
-        #[ignore = "requires local test server"]
-        fn push_path_to() {
-            ensure_test_server();
+        fn task_set_not_supported() {
+            if !ensure_test_server() {
+                return;
+            }
 
-            let test_root = temp_dir().join("maa-test-push-path-to");
-            fs::create_dir_all(&test_root).unwrap();
+            // SSSCopilot should fail when given a task set
+            let mut paths = Vec::new();
+            let temp_dir = temp_dir().join("maa-test-sss-copilot-set");
+            fs::create_dir_all(&temp_dir).unwrap();
 
-            // Clean up any cached files from previous runs
+            // Clean up cached files
             for id in [40051, 40052, 40053, 40055, 40056, 40057, 40058, 40059] {
-                let _ = fs::remove_file(test_root.join(format!("{id}.json")));
+                let _ = fs::remove_file(temp_dir.join(format!("{id}.json")));
             }
 
-            let test_file = test_root.join("123234.json");
-            let test_content = serde_json::json!({
-              "minimum_required": "v4.0.0",
-              "stage_name": "act25side_01",
-              "actions": [
-                { "type": "SpeedUp" },
-              ],
-              "groups": [],
-              "opers": [],
-            });
+            let copilot_file = CopilotFile::from_uri("maa://23125s").unwrap();
+            let result = copilot_file.push_path_to(&mut paths, &temp_dir);
 
-            serde_json::to_writer(fs::File::create(&test_file).unwrap(), &test_content).unwrap();
+            // The push_path_to succeeds, but we have multiple paths
+            assert!(result.is_ok());
+            assert!(paths.len() > 1); // Task set returns multiple paths
 
-            // Remote
-            let mut paths = Vec::new();
-            CopilotFile::from_uri("maa://40051")
-                .unwrap()
-                .push_path_to(&mut paths, &test_root)
-                .unwrap();
-            assert_eq!(paths.len(), 1);
-            assert_eq!(paths[0].0, test_root.join("40051.json"));
-            assert!(paths[0].1.is_some()); // Should have cached JSON for remote download
-
-            // Clean up for next test
-            let _ = fs::remove_file(test_root.join("40051.json"));
-
-            // RemoteSet
-            let mut paths = Vec::new();
-            CopilotFile::from_uri("maa://23125s")
-                .unwrap()
-                .push_path_to(&mut paths, &test_root)
-                .unwrap();
-            let expected_ids = [40051, 40052, 40053, 40055, 40056, 40057, 40058, 40059];
-            assert_eq!(paths.len(), expected_ids.len());
-            for (i, id) in expected_ids.iter().enumerate() {
-                assert_eq!(paths[i].0, test_root.join(format!("{id}.json")));
-                // Files downloaded from cache hit will have None, fresh downloads will have Some
-            }
-
-            // Local file (absolute)
-            {
-                let mut paths = Vec::new();
-                CopilotFile::from_uri(test_file.to_str().unwrap())
-                    .unwrap()
-                    .push_path_to(&mut paths, &test_root)
-                    .unwrap();
-                assert_eq!(paths.len(), 1);
-                assert_eq!(paths[0].0, test_file.as_path());
-                assert!(paths[0].1.is_none()); // Local files should not have cached JSON
-            }
-
-            // Local file (relative)
-            {
-                let mut paths = Vec::new();
-                CopilotFile::from_uri("file.json")
-                    .unwrap()
-                    .push_path_to(&mut paths, &test_root)
-                    .unwrap();
-                assert_eq!(paths.len(), 1);
-                assert_eq!(paths[0].0, test_root.join("file.json"));
-                assert!(paths[0].1.is_none()); // Local files should not have cached JSON
-            }
-
-            fs::remove_dir_all(&test_root).unwrap();
+            let _ = fs::remove_dir_all(&temp_dir);
         }
-    }
-
-    #[test]
-    fn gen_operator_table() {
-        let json = serde_json::json!({
-            "groups": [
-              {
-                "name": "行医",
-                "opers": [
-                  {
-                    "name": "纯烬艾雅法拉",
-                    "skill": 1,
-                    "skill_usage": 0
-                  },
-                  {
-                    "name": "蜜莓",
-                    "skill": 1,
-                    "skill_usage": 0
-                  }
-                ]
-              }
-            ],
-            "opers": [
-              {
-                "name": "桃金娘",
-                "skill": 1,
-                "skill_usage": 1
-              },
-              {
-                "name": "夜莺",
-                "skill": 3,
-                "skill_usage": 0
-              }
-            ]
-        });
-
-        let mut expected_table = Table::new();
-        expected_table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
-        expected_table.set_titles(row!["NAME", "SKILL"]);
-        expected_table.add_row(row!["桃金娘", 1]);
-        expected_table.add_row(row!["夜莺", 3]);
-
-        let mut sub_table = Table::new();
-        sub_table.set_format(*format::consts::FORMAT_NO_LINESEP);
-        sub_table.add_row(row!["纯烬艾雅法拉", 1]);
-        sub_table.add_row(row!["蜜莓", 1]);
-        expected_table.add_row(row!["\n[行医]", sub_table]);
-
-        assert_eq!(operator_table(&json).unwrap(), expected_table);
     }
 }

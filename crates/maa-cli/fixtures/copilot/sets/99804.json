@@ -1,0 +1,8 @@
+{
+  "status_code": 200,
+  "data": {
+    "id": 99804,
+    "name": "Set with non-existent copilot",
+    "copilot_ids": [99999]
+  }
+}

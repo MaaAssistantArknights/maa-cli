@@ -1,0 +1,8 @@
+{
+  "status_code": 200,
+  "data": {
+    "id": 99802,
+    "name": "Invalid set - copilot_ids not array",
+    "copilot_ids": "not an array"
+  }
+}
