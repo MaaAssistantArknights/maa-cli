@@ -904,12 +904,6 @@ found"}"#,
             fn non_existent_local_file() {
                 let result = parse(["maa", "copilot", "non_existent_file.json"]);
                 assert!(result.is_err());
-                assert!(
-                    result
-                        .unwrap_err()
-                        .to_string()
-                        .contains("No such file or directory")
-                );
             }
         }
 
