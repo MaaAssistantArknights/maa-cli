@@ -899,6 +899,18 @@ found"}"#,
                         .contains("Invalid raid mode")
                 );
             }
+
+            #[test]
+            fn non_existent_local_file() {
+                let result = parse(["maa", "copilot", "non_existent_file.json"]);
+                assert!(result.is_err());
+                assert!(
+                    result
+                        .unwrap_err()
+                        .to_string()
+                        .contains("No such file or directory")
+                );
+            }
         }
 
         mod get_stage_info {
@@ -1220,6 +1232,42 @@ found"}"#,
 
                     assert_eq!(files[0].0, index);
                 }
+
+                fs::remove_dir_all(&test_root).unwrap();
+            }
+
+            #[test]
+            fn non_existent_remote_task() {
+                ensure_test_server();
+
+                let test_root = temp_dir().join("maa-test-push-path-into-non-existent-remote");
+                fs::create_dir_all(&test_root).unwrap();
+
+                let mut files = Vec::new();
+                let result = CopilotFile::from_uri("maa://999999")
+                    .unwrap()
+                    .push_path_into::<CopilotTask>(0, &test_root, &mut files);
+
+                assert!(result.is_err());
+                assert!(files.is_empty());
+
+                fs::remove_dir_all(&test_root).unwrap();
+            }
+
+            #[test]
+            fn non_existent_remote_set() {
+                ensure_test_server();
+
+                let test_root = temp_dir().join("maa-test-push-path-into-non-existent-set");
+                fs::create_dir_all(&test_root).unwrap();
+
+                let mut files = Vec::new();
+                let result = CopilotFile::from_uri("maa://999999s")
+                    .unwrap()
+                    .push_path_into::<CopilotTask>(0, &test_root, &mut files);
+
+                assert!(result.is_err());
+                assert!(files.is_empty());
 
                 fs::remove_dir_all(&test_root).unwrap();
             }
