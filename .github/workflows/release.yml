@@ -200,11 +200,19 @@ jobs:
     steps:
       - name: Download Artifacts
         uses: actions/download-artifact@v7
+      - name: Checkout
+        uses: actions/checkout@v6
       - name: Checkout version branch
         uses: actions/checkout@v6
         with:
           ref: version
           path: version
+      - name: Install cargo-about
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about
+      - name: Generate Third-Party Licenses Information
+        run: cargo about generate about.hbs -o licenses.md
       - name: Extract files, Generate checksums and Update version.json
         run: |
           # alpha version info will be updated in all cases
@@ -224,24 +232,25 @@ jobs:
           for dir in maa_cli-*; do
             target=${dir#maa_cli-}
             tar -xvf "$dir/$target.tar" -C "$dir"
+            cp licenses.md "$dir/"
             # use tar on linux and zip on other platforms
             case "$target" in
               *-linux-*)
                 archive_name="maa_cli-v$VERSION-$target.tar.gz"
                 archive_name_unversioned="maa_cli-$target.tar.gz"
-                tar -czvf "$archive_name" "$dir/maa"
+                tar -czvf "$archive_name" -C "$dir" maa licenses.md
                 cp "$archive_name" "$archive_name_unversioned"
                 ;;
               *-apple-darwin)
                 archive_name="maa_cli-v$VERSION-$target.zip"
                 archive_name_unversioned="maa_cli-$target.zip"
-                zip -vr "$archive_name" "$dir/maa"
+                (cd "$dir" && zip -vr "../$archive_name" maa licenses.md)
                 cp "$archive_name" "$archive_name_unversioned"
                 ;;
               *-windows-msvc)
                 archive_name="maa_cli-v$VERSION-$target.zip"
                 archive_name_unversioned="maa_cli-$target.zip"
-                zip -vr "$archive_name" "$dir/maa.exe"
+                (cd "$dir" && zip -vr "../$archive_name" maa.exe licenses.md)
                 cp "$archive_name" "$archive_name_unversioned"
                 ;;
               *)

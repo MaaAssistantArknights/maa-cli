@@ -1,0 +1,23 @@
+[graph]
+targets = [
+  "aarch64-apple-darwin",
+  "x86_64-apple-darwin",
+  "aarch64-unknown-linux-gnu",
+  "x86_64-unknown-linux-gnu",
+  "aarch64-pc-windows-msvc",
+  "x86_64-pc-windows-msvc",
+]
+no-default-features = false
+
+[licenses]
+allow = [
+  "AGPL-3.0-only",
+  "Apache-2.0",
+  "BSD-3-Clause",
+  "CDLA-Permissive-2.0",
+  "ISC",
+  "MIT",
+  "MPL-2.0",
+  "Unicode-3.0",
+]
+confidence-threshold = 0.8

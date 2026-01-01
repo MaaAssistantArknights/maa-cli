@@ -58,6 +58,19 @@ jobs:
           rustup toolchain install nightly --profile minimal --component rustfmt
           cargo +nightly fmt -- --check
 
+  deny:
+    name: Lint (cargo deny)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+      - name: Check
+        run: cargo deny check
+
   build:
     name: Build and Test (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
