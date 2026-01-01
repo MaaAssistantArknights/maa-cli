@@ -64,21 +64,19 @@ impl super::ToTaskType for FightParams {
     }
 }
 
-impl TryFrom<FightParams> for MAAValue {
-    type Error = anyhow::Error;
-
-    fn try_from(args: FightParams) -> std::result::Result<Self, Self::Error> {
+impl super::IntoParameters for FightParams {
+    fn into_parameters(self, _: &crate::config::asst::AsstConfig) -> anyhow::Result<MAAValue> {
         let mut params = MAAValue::new();
 
-        params.insert("stage", args.stage.unwrap_or_default());
+        params.insert("stage", self.stage.unwrap_or_default());
 
         // Fight conditions
-        params.maybe_insert("medicine", args.medicine);
-        params.maybe_insert("expiring_medicine", args.expiring_medicine);
-        params.maybe_insert("stone", args.stone);
-        params.maybe_insert("times", args.times);
+        params.maybe_insert("medicine", self.medicine);
+        params.maybe_insert("expiring_medicine", self.expiring_medicine);
+        params.maybe_insert("stone", self.stone);
+        params.maybe_insert("times", self.times);
 
-        let drops = args.drops;
+        let drops = self.drops;
         if !drops.is_empty() {
             let mut drop_map = std::collections::BTreeMap::new();
 
@@ -104,24 +102,24 @@ impl TryFrom<FightParams> for MAAValue {
             params.insert("drops", MAAValue::Object(drop_map));
         }
 
-        params.maybe_insert("series", args.series);
+        params.maybe_insert("series", self.series);
 
-        if args.report_to_penguin {
+        if self.report_to_penguin {
             params.insert("report_to_penguin", true);
-            params.maybe_insert("penguin_id", args.penguin_id);
+            params.maybe_insert("penguin_id", self.penguin_id);
         }
 
-        if args.report_to_yituliu {
+        if self.report_to_yituliu {
             params.insert("report_to_yituliu", true);
-            params.maybe_insert("yituliu_id", args.yituliu_id);
+            params.maybe_insert("yituliu_id", self.yituliu_id);
         }
 
-        if let Some(client_type) = args.client_type {
+        if let Some(client_type) = self.client_type {
             params.insert("client_type", client_type.to_str());
             params.maybe_insert("server", client_type.server_report());
         }
 
-        params.insert("DrGrandet", args.dr_grandet);
+        params.insert("DrGrandet", self.dr_grandet);
 
         Ok(params)
     }
@@ -146,9 +144,9 @@ mod tests {
             let command = parse_from(args).command;
             match command {
                 Command::Fight { params, .. } => {
-                    use super::super::{TaskType, ToTaskType};
+                    use super::super::{IntoParameters, TaskType, ToTaskType};
                     assert_eq!(params.to_task_type(), TaskType::Fight);
-                    params.try_into()
+                    params.into_parameters(&crate::config::asst::AsstConfig::default())
                 }
                 _ => panic!("Not a Fight command"),
             }

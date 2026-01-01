@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
 
 use crate::config::cli::normalize_url;
@@ -53,10 +54,10 @@ impl Config {
         }
     }
 
-    pub fn resource_files(&self) -> impl Iterator<Item = PathBuf> {
+    pub fn resource_files(&self) -> impl IndexedParallelIterator<Item = PathBuf> {
         let resource_dir = maa_dirs::hot_update_resource().to_path_buf();
         Self::RESOURCE_FILES
-            .iter()
+            .par_iter()
             .map(move |path| resource_dir.clone().join_iter(path.iter()))
     }
 
@@ -66,10 +67,10 @@ impl Config {
             .0
     }
 
-    pub fn resource_urls(&self) -> impl Iterator<Item = String> {
+    pub fn resource_urls(&self) -> impl IndexedParallelIterator<Item = String> {
         let resource_url = format!("{}/resource", self.api_url());
         Self::RESOURCE_FILES
-            .iter()
+            .par_iter()
             .map(move |path| Url(resource_url.clone()).join_iter(path.iter()).0)
     }
 }

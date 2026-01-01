@@ -1,116 +1,22 @@
 {
-  "stage_name": "act35side_ex08",
-  "minimum_required": "v4.0.0",
-  "doc": {
-    "title": "太阳甩在身后 - AS-EX-8 - 无冕之王与朝圣者",
-    "details": "此作业全员专三且模组一级\n原作者：自在道爷\nJSON作者：星之海.\n社区评论不会提醒，有问题可以进群找我：994516079（刚建的\n原视频：【【太阳甩在身后】AS-EX-1至AS-EX-8挂机流，突袭刻章都不愁！语音快乐详解，轻松解放双手 | 明日方舟攻略(含AS-EX-8突袭，EX-3刻章等)】https://www.bilibili.com/video/BV1AE421A77r?vd_source=69f0b796ff8cde9e6cb9e9f9a99f8eec"
-  },
-  "opers": [
-    { "name": "拉普兰德", "skill": 2, "skill_usage": 0 },
-    { "name": "煌", "skill": 2, "skill_usage": 0 },
-    { "name": "塞雷娅", "skill": 2, "skill_usage": 0 },
-    { "name": "能天使", "skill": 3, "skill_usage": 0 },
-    { "name": "艾雅法拉", "skill": 2, "skill_usage": 0 },
-    { "name": "伊芙利特", "skill": 2, "skill_usage": 0 }
-  ],
-  "groups": [
-    {
-      "name": "单奶",
-      "opers": [
-        { "name": "闪灵", "skill": 2, "skill_usage": 0 },
-        { "name": "纯烬艾雅法拉", "skill": 1, "skill_usage": 0 },
-        { "name": "华法琳", "skill": 1, "skill_usage": 0 }
-      ]
-    },
-    {
-      "name": "群奶",
-      "opers": [
-        { "name": "夜莺", "skill": 2, "skill_usage": 0 },
-        { "name": "白面鸮", "skill": 2, "skill_usage": 0 }
-      ]
-    },
-    {
-      "name": "容错奶",
-      "opers": [
-        { "name": "赫默", "skill": 2, "skill_usage": 0 },
-        { "name": "苏苏洛", "skill": 2, "skill_usage": 0 },
-        { "name": "嘉维尔", "skill": 2, "skill_usage": 0 }
-      ]
-    }
-  ],
-  "actions": [
-    { "type": "SpeedUp" },
-    {
-      "name": "煌",
-      "location": [4, 5],
-      "direction": "Right",
-      "type": "Deploy"
-    },
-    {
-      "name": "单奶",
-      "location": [6, 6],
-      "direction": "Left",
-      "type": "Deploy"
-    },
-    {
-      "name": "能天使",
-      "location": [5, 6],
-      "direction": "Right",
-      "type": "Deploy"
-    },
-    {
-      "name": "群奶",
-      "location": [3, 4],
-      "direction": "Right",
-      "type": "Deploy"
-    },
-    {
-      "name": "艾雅法拉",
-      "location": [5, 4],
-      "direction": "Right",
-      "type": "Deploy"
-    },
-    {
-      "name": "伊芙利特",
-      "location": [2, 5],
-      "direction": "Right",
-      "type": "Deploy"
-    },
-    { "type": "Skill", "name": "白面鸮" },
-    {
-      "name": "塞雷娅",
-      "location": [2, 1],
-      "direction": "Left",
-      "type": "Deploy"
-    },
-    {
-      "name": "拉普兰德",
-      "location": [4, 1],
-      "direction": "Left",
-      "type": "Deploy"
-    },
-    {
-      "type": "Retreat",
-      "name": "能天使",
-      "location": [5, 6],
-      "kills": 37,
-      "costs": 99
-    },
-    {
-      "name": "容错奶",
-      "location": [2, 4],
-      "direction": "Up",
-      "type": "Deploy",
-      "kills": 37
-    },
-    { "type": "Retreat", "name": "容错奶", "location": [2, 4], "kills": 39 },
-    {
-      "name": "能天使",
-      "location": [5, 6],
-      "direction": "Right",
-      "type": "Deploy"
-    },
-    { "type": "SkillDaemon" }
-  ],
-  "difficulty": 3
+  "status_code": 200,
+  "data": {
+    "id": 40059,
+    "upload_time": "2025-08-26T17:58:54Z",
+    "uploader_id": "14394",
+    "uploader": "星之海.",
+    "views": 50341,
+    "hot_score": 0.074516337294612,
+    "available": true,
+    "rating_level": 10,
+    "not_enough_rating": false,
+    "rating_ratio": 1.0,
+    "rating_type": 0,
+    "comments_count": 0,
+    "content": "{\"stage_name\":\"act35side_ex08\",\"minimum_required\":\"v4.0.0\",\"doc\":{\"title\":\"太阳甩在身后 - AS-EX-8 - 无冕之王与朝圣者\",\"details\":\"此作业全员专三且模组一级\\n原作者：自在道爷\\nJSON作者：星之海.\\n社区评论不会提醒，有问题可以进群找我：994516079（刚建的\\n原视频：【【太阳甩在身后】AS-EX-1至AS-EX-8挂机流，突袭刻章都不愁！语音快乐详解，轻松解放双手 | 明日方舟攻略(含AS-EX-8突袭，EX-3刻章等)】https://www.bilibili.com/video/BV1AE421A77r?vd_source=69f0b796ff8cde9e6cb9e9f9a99f8eec\"},\"opers\":[{\"name\":\"拉普兰德\",\"skill\":2,\"skill_usage\":0},{\"name\":\"煌\",\"skill\":2,\"skill_usage\":0},{\"name\":\"塞雷娅\",\"skill\":2,\"skill_usage\":0},{\"name\":\"能天使\",\"skill\":3,\"skill_usage\":0},{\"name\":\"艾雅法拉\",\"skill\":2,\"skill_usage\":0},{\"name\":\"伊芙利特\",\"skill\":2,\"skill_usage\":0}],\"groups\":[{\"name\":\"单奶\",\"opers\":[{\"name\":\"闪灵\",\"skill\":2,\"skill_usage\":0},{\"name\":\"纯烬艾雅法拉\",\"skill\":1,\"skill_usage\":0},{\"name\":\"华法琳\",\"skill\":1,\"skill_usage\":0}]},{\"name\":\"群奶\",\"opers\":[{\"name\":\"夜莺\",\"skill\":2,\"skill_usage\":0},{\"name\":\"白面鸮\",\"skill\":2,\"skill_usage\":0}]},{\"name\":\"容错奶\",\"opers\":[{\"name\":\"赫默\",\"skill\":2,\"skill_usage\":0},{\"name\":\"苏苏洛\",\"skill\":2,\"skill_usage\":0},{\"name\":\"嘉维尔\",\"skill\":2,\"skill_usage\":0}]}],\"actions\":[{\"type\":\"SpeedUp\"},{\"name\":\"煌\",\"location\":[4,5],\"direction\":\"Right\",\"type\":\"Deploy\"},{\"name\":\"单奶\",\"location\":[6,6],\"direction\":\"Left\",\"type\":\"Deploy\"},{\"name\":\"能天使\",\"location\":[5,6],\"direction\":\"Right\",\"type\":\"Deploy\"},{\"name\":\"群奶\",\"location\":[3,4],\"direction\":\"Right\",\"type\":\"Deploy\"},{\"name\":\"艾雅法拉\",\"location\":[5,4],\"direction\":\"Right\",\"type\":\"Deploy\"},{\"name\":\"伊芙利特\",\"location\":[2,5],\"direction\":\"Right\",\"type\":\"Deploy\"},{\"type\":\"Skill\",\"name\":\"白面鸮\"},{\"name\":\"塞雷娅\",\"location\":[2,1],\"direction\":\"Left\",\"type\":\"Deploy\"},{\"name\":\"拉普兰德\",\"location\":[4,1],\"direction\":\"Left\",\"type\":\"Deploy\"},{\"type\":\"Retreat\",\"name\":\"能天使\",\"location\":[5,6],\"kills\":37,\"costs\":99},{\"name\":\"容错奶\",\"location\":[2,4],\"direction\":\"Up\",\"type\":\"Deploy\",\"kills\":37},{\"type\":\"Retreat\",\"name\":\"容错奶\",\"location\":[2,4],\"kills\":39},{\"name\":\"能天使\",\"location\":[5,6],\"direction\":\"Right\",\"type\":\"Deploy\"},{\"type\":\"SkillDaemon\"}],\"difficulty\":3}",
+    "like": 3587,
+    "dislike": 118,
+    "comment_status": "ENABLED",
+    "status": "PUBLIC"
+  }
 }

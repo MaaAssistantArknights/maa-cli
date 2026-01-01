@@ -67,18 +67,18 @@ impl super::ToTaskType for ReclamationParams {
     }
 }
 
-impl From<ReclamationParams> for MAAValue {
-    fn from(params: ReclamationParams) -> Self {
+impl super::IntoParameters for ReclamationParams {
+    fn into_parameters(self, _: &super::AsstConfig) -> anyhow::Result<MAAValue> {
         let mut value = MAAValue::new();
-        value.insert("theme", params.theme.to_str());
-        value.insert("mode", params.mode);
+        value.insert("theme", self.theme.to_str());
+        value.insert("mode", self.mode);
 
-        if params.mode == 1 {
-            value.insert("tools_to_craft", params.tools_to_craft);
-            value.insert("increase_mode", params.increase_mode);
-            value.insert("num_craft_batches", params.num_craft_batches);
+        if self.mode == 1 {
+            value.insert("tools_to_craft", self.tools_to_craft);
+            value.insert("increase_mode", self.increase_mode);
+            value.insert("num_craft_batches", self.num_craft_batches);
         }
-        value
+        Ok(value)
     }
 }
 
@@ -121,9 +121,11 @@ mod tests {
             let command = crate::command::parse_from(args).command;
             match command {
                 crate::Command::Reclamation { params, .. } => {
-                    use super::super::{TaskType, ToTaskType};
+                    use super::super::{IntoParameters, TaskType, ToTaskType};
                     assert_eq!(params.to_task_type(), TaskType::Reclamation);
-                    params.into()
+                    params
+                        .into_parameters(&crate::config::asst::AsstConfig::default())
+                        .unwrap()
                 }
                 _ => panic!("Not a Reclamation command"),
             }
