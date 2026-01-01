@@ -1,13 +1,11 @@
 use anyhow::{Context, Result};
 use maa_sys::TaskType;
+use maa_value::MAAValue;
 
-use crate::{
-    config::{
-        FindFileOrDefault,
-        asst::AsstConfig,
-        task::{ClientType, Task, TaskConfig},
-    },
-    value::MAAValue,
+use crate::config::{
+    FindFileOrDefault,
+    asst::AsstConfig,
+    task::{ClientType, Task, TaskConfig},
 };
 
 fn default_file(task_type: TaskType) -> std::path::PathBuf {
@@ -41,7 +39,7 @@ where
         let mut default = MAAValue::find_file_or_default(default_file(task_type))
             .context("Failed to load default task config")?;
 
-        default.merge_mut(&params);
+        default.merge_from(&params);
 
         let mut task_config = TaskConfig::new();
 
@@ -66,7 +64,7 @@ impl ToTaskType for StartUpParams {
 
 impl IntoParameters for StartUpParams {
     fn into_parameters(self, _: &AsstConfig) -> Result<MAAValue> {
-        let mut value = MAAValue::new();
+        let mut value = MAAValue::default();
 
         if let Some(client_type) = self.client_type {
             value.insert("start_game_enabled", true);
@@ -93,7 +91,7 @@ impl ToTaskType for CloseDownParams {
 
 impl IntoParameters for CloseDownParams {
     fn into_parameters(self, _: &AsstConfig) -> Result<MAAValue> {
-        let mut value = MAAValue::new();
+        let mut value = MAAValue::default();
         value.insert("client_type", self.client.to_str());
         Ok(value)
     }
@@ -115,23 +113,10 @@ pub use reclamation::ReclamationParams;
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use maa_dirs::Ensure;
+    use maa_value::object;
 
     use super::*;
-    use crate::{
-        command::{Command, parse_from},
-        object,
-    };
-
-    impl MAAValue {
-        /// Merge another value into this default value.
-        ///
-        /// Common use for test with default value.
-        pub(super) fn join(&self, other: MAAValue) -> MAAValue {
-            let mut value = self.clone();
-            value.merge_mut(&other);
-            value
-        }
-    }
+    use crate::command::{Command, parse_from};
 
     #[test]
     #[ignore = "write to user directory"]
@@ -148,7 +133,7 @@ mod tests {
 
         impl IntoParameters for TestParams {
             fn into_parameters(self, _: &AsstConfig) -> Result<MAAValue> {
-                let mut value = MAAValue::new();
+                let mut value = MAAValue::default();
                 if let Some(bar) = self.bar {
                     value.insert("bar", bar);
                 }

@@ -7,6 +7,10 @@ use std::{
 use anyhow::{Context, Result, bail};
 use log::{debug, trace};
 use maa_sys::TaskType;
+use maa_value::{
+    MAAValue, object,
+    userinput::{BoolInput, UserInput},
+};
 use prettytable::{Table, format, row};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use ureq::http::StatusCode;
@@ -14,12 +18,7 @@ use ureq::http::StatusCode;
 use super::{FindFileOrDefault, IntoParameters, ToTaskType};
 use crate::{
     dirs::{self, Ensure},
-    object,
     state::AGENT,
-    value::{
-        MAAValue,
-        userinput::{BoolInput, UserInput},
-    },
 };
 
 #[cfg(not(test))]
@@ -192,7 +191,10 @@ impl IntoParameters for CopilotParams {
             if !(is_paradox || formation) {
                 println!("Operators:\n{}", operator_table(&copilot_task)?);
                 println!("Please set up your formation manually");
-                while !BoolInput::new(Some(true), Some("continue")).value()? {
+                while !BoolInput::new(Some(true))
+                    .with_description("continue")
+                    .value()?
+                {
                     println!("Please confirm you have set up your formation");
                 }
             }
@@ -310,18 +312,26 @@ impl IntoParameters for SSSCopilotParams {
         let stage_name = &task.stage_name;
 
         println!("Fight Stage: {stage_name}, please navigate to the stage manually");
-        while !BoolInput::new(Some(true), Some("continue")).value()? {
+        while !BoolInput::new(Some(true))
+            .with_description("continue")
+            .value()?
+        {
             println!("Please confirm you have navigated to the stage");
         }
         println!("Core Operators:\n{}", operator_table(&task)?);
         // TODO: equipment, support unit, toolmans
         if let Some(doc) = &task.doc
-            && BoolInput::new(Some(false), Some("show doc")).value()?
+            && BoolInput::new(Some(false))
+                .with_description("show doc")
+                .value()?
         {
             println!("{}", doc.details);
         }
 
-        while !BoolInput::new(Some(true), Some("continue")).value()? {
+        while !BoolInput::new(Some(true))
+            .with_description("continue")
+            .value()?
+        {
             println!("Please confirm you have set up your formation");
         }
 

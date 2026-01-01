@@ -26,6 +26,7 @@ maa-dirs = { workspace = true }
 maa-installer = { workspace = true }
 maa-sys = { workspace = true, features = ["runtime"] }
 maa-types = { workspace = true, features = ["serde"] }
+maa-value = { workspace = true }
 maa-version = { workspace = true, optional = true }
 prettytable = { workspace = true }
 rayon = { workspace = true }
@@ -41,6 +42,7 @@ toml = { workspace = true }
 ureq = { workspace = true, features = ["json", "platform-verifier"] }
 
 [dev-dependencies]
+maa-value = { workspace = true, features = ["default_batch_mode"] }
 regex = { workspace = true }
 serde_test = { workspace = true }
 tiny_http = { workspace = true }

@@ -14,7 +14,6 @@ mod command;
 mod config;
 mod installer;
 mod run;
-mod value;
 
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser};
@@ -27,7 +26,7 @@ fn main() -> Result<()> {
     cli.log.init_logger()?;
 
     if cli.batch {
-        value::userinput::enable_batch_mode()
+        maa_value::userinput::enable_batch_mode()
     }
 
     match cli.command {

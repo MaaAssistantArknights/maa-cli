@@ -150,7 +150,7 @@ impl super::ToTaskType for RoguelikeParams {
 
 impl super::IntoParameters for RoguelikeParams {
     fn into_parameters(self, _: &super::AsstConfig) -> anyhow::Result<MAAValue> {
-        let mut value = MAAValue::new();
+        let mut value = MAAValue::default();
 
         let theme = self.theme;
         let mode = self.mode;
@@ -258,12 +258,10 @@ impl super::IntoParameters for RoguelikeParams {
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
+    use maa_value::object;
+
     use super::*;
-    use crate::{
-        command::{Command, parse_from},
-        object,
-        value::MAAValue,
-    };
+    use crate::command::{Command, parse_from};
 
     mod theme {
         use super::*;

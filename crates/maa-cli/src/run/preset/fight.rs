@@ -66,7 +66,7 @@ impl super::ToTaskType for FightParams {
 
 impl super::IntoParameters for FightParams {
     fn into_parameters(self, _: &crate::config::asst::AsstConfig) -> anyhow::Result<MAAValue> {
-        let mut params = MAAValue::new();
+        let mut params = MAAValue::default();
 
         params.insert("stage", self.stage.unwrap_or_default());
 
@@ -128,11 +128,10 @@ impl super::IntoParameters for FightParams {
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
+    use maa_value::object;
+
     use super::*;
-    use crate::{
-        command::{Command, parse_from},
-        object,
-    };
+    use crate::command::{Command, parse_from};
 
     #[test]
     fn parse_fight_params() {

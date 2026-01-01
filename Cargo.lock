@@ -1007,6 +1007,7 @@ dependencies = [
  "maa-installer",
  "maa-sys",
  "maa-types",
+ "maa-value",
  "maa-version",
  "prettytable",
  "rayon",
@@ -1079,6 +1080,16 @@ version = "0.3.0"
 dependencies = [
  "clap",
  "maa-ffi-string",
+ "schemars",
+ "serde",
+ "serde_test",
+]
+
+[[package]]
+name = "maa-value"
+version = "0.1.0"
+dependencies = [
+ "log",
  "schemars",
  "serde",
  "serde_test",

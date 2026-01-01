@@ -8,9 +8,10 @@ use anyhow::Context;
 use condition::Condition;
 pub use condition::{TimeOffset, remainder_of_day_mod};
 use maa_sys::TaskType;
+use maa_value::{MAAValue, object};
 use serde::Deserialize;
 
-use crate::{dirs, object, value::MAAValue};
+use crate::dirs;
 
 #[cfg_attr(test, derive(PartialEq, Debug))]
 #[derive(Deserialize, Default)]
@@ -126,7 +127,7 @@ impl Task {
         let mut params = self.params.clone();
         for variant in &self.variants {
             if variant.is_active() {
-                params.merge_mut(variant.params());
+                params.merge_from(variant.params());
                 if matches!(self.strategy, Strategy::First) {
                     break;
                 }
@@ -340,8 +341,9 @@ impl InitializedTask {
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
+    use maa_value::object;
+
     use super::*;
-    use crate::object;
 
     mod task {
         use super::*;
@@ -499,9 +501,9 @@ mod tests {
         mod serde {
             use chrono::{NaiveDateTime, NaiveTime, TimeZone, Weekday};
             use condition::TimeOffset;
+            use maa_value::userinput::{BoolInput, Input, SelectD};
 
             use super::*;
-            use crate::value::userinput::{BoolInput, Input, SelectD};
 
             fn naive_local_datetime(
                 y: i32,
@@ -527,19 +529,16 @@ mod tests {
                     object!(
                         "start_game_enabled" => BoolInput::new(
                             Some(true),
-                            Some("start the game"),
-                        ),
+                        ).with_description("start the game"),
                         "client_type" if "start_game_enabled" == true =>
-                            SelectD::<String>::new(
-                                vec![
+                            SelectD::<String>::from_iter(
+                                [
                                     Official.to_str(),
                                     YoStarEN.to_str(),
                                     YoStarJP.to_str(),
                                 ],
                                 None,
-                                Some("a client type"),
-                                false
-                            ).unwrap(),
+                            ).unwrap().with_description("a client type"),
                     ),
                 ));
 
@@ -560,8 +559,7 @@ mod tests {
                                 params: object!(
                                     "stage" => Input::new(
                                         Some("1-7".to_string()),
-                                        Some("a stage to fight"),
-                                    ),
+                                    ).with_description("a stage to fight"),
                                 ),
                             },
                             TaskVariant {
@@ -578,16 +576,16 @@ mod tests {
                                     timezone: TimeOffset::TimeZone(8),
                                 },
                                 params: object!(
-                                    "stage" => SelectD::<String>::new(
+                                    "stage" => SelectD::<String>::from_iter(
                                         [
                                             "SL-6",
                                             "SL-7",
                                             "SL-8",
                                         ],
-                                        Some(2),
-                                        Some("a stage to fight in summer event"),
-                                        true,
-                                    ).unwrap(),
+                                        std::num::NonZero::new(2),
+                                    ).unwrap()
+                                    .with_description("a stage to fight in summer event")
+                                    .with_allow_custom(true),
                                 ),
                             },
                         ]),
