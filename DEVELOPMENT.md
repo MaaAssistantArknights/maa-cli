@@ -49,8 +49,6 @@ cargo build --release
 cargo build -p maa-cli
 ```
 
-注意：不要使用 `--all-features`，否则 `cargo` 会强制从源码编译 OpenSSL，严重拖慢构建速度。
-
 ### 运行测试
 
 ```bash

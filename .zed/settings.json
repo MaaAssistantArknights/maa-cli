@@ -1,0 +1,16 @@
+{
+  "project_name": "maa-cli",
+  "lsp": {
+    "rust-analyzer": {
+      "initialization_options": {
+        "check": {
+          "command": "clippy",
+          "args": ["--all-targets", "--all-features"],
+        },
+        "rustfmt": {
+          "extraArgs": ["+nightly"],
+        },
+      },
+    },
+  },
+}
