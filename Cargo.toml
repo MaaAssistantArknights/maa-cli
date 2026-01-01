@@ -31,6 +31,7 @@ maa-ffi-string = { path = "crates/maa-ffi-string", version = "0.1" }
 maa-installer = { path = "crates/maa-installer", version = "0.2" }
 maa-sys = { path = "crates/maa-sys", version = "0.9" }
 maa-types = { path = "crates/maa-types", version = "0.3" }
+maa-value = { path = "crates/maa-value", version = "0.1" }
 maa-version = { path = "crates/maa-version", version = "0.1" }
 prettytable = { version = "0.10.0", default-features = false }
 rayon = "1.11.0"
@@ -54,7 +55,6 @@ windows-result = "0.4.0"
 windows-strings = "0.5.0"
 windows-sys = "0.61.0"
 zip = { version = "6", default-features = false, features = ["deflate-flate2"] }
-maa-value = { version = "0.1.0", path = "crates/maa-value" }
 
 [workspace.lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [
