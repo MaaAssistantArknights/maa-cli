@@ -22,18 +22,21 @@ trait ToTaskType {
     fn to_task_type(&self) -> TaskType;
 }
 
+trait IntoParameters {
+    fn into_parameters(self, config: &AsstConfig) -> Result<MAAValue>;
+}
+
 pub trait IntoTaskConfig {
     fn into_task_config(self, config: &AsstConfig) -> Result<TaskConfig>;
 }
 
 impl<T> IntoTaskConfig for T
 where
-    T: ToTaskType + TryInto<MAAValue>,
-    T::Error: Into<anyhow::Error>,
+    T: ToTaskType + IntoParameters,
 {
-    fn into_task_config(self, _: &AsstConfig) -> Result<TaskConfig> {
+    fn into_task_config(self, config: &AsstConfig) -> Result<TaskConfig> {
         let task_type = self.to_task_type();
-        let params: MAAValue = self.try_into().map_err(Into::into)?;
+        let params: MAAValue = self.into_parameters(config)?;
 
         let mut default = MAAValue::find_file_or_default(default_file(task_type))
             .context("Failed to load default task config")?;
@@ -61,18 +64,18 @@ impl ToTaskType for StartUpParams {
     }
 }
 
-impl From<StartUpParams> for MAAValue {
-    fn from(args: StartUpParams) -> Self {
+impl IntoParameters for StartUpParams {
+    fn into_parameters(self, _: &AsstConfig) -> Result<MAAValue> {
         let mut value = MAAValue::new();
 
-        if let Some(client_type) = args.client_type {
+        if let Some(client_type) = self.client_type {
             value.insert("start_game_enabled", true);
             value.insert("client_type", client_type.to_str());
         }
 
-        value.maybe_insert("account_name", args.account_name);
+        value.maybe_insert("account_name", self.account_name);
 
-        value
+        Ok(value)
     }
 }
 
@@ -88,11 +91,11 @@ impl ToTaskType for CloseDownParams {
     }
 }
 
-impl From<CloseDownParams> for MAAValue {
-    fn from(args: CloseDownParams) -> Self {
+impl IntoParameters for CloseDownParams {
+    fn into_parameters(self, _: &AsstConfig) -> Result<MAAValue> {
         let mut value = MAAValue::new();
-        value.insert("client_type", args.client.to_str());
-        value
+        value.insert("client_type", self.client.to_str());
+        Ok(value)
     }
 }
 
@@ -143,13 +146,13 @@ mod tests {
             }
         }
 
-        impl From<TestParams> for MAAValue {
-            fn from(params: TestParams) -> Self {
+        impl IntoParameters for TestParams {
+            fn into_parameters(self, _: &AsstConfig) -> Result<MAAValue> {
                 let mut value = MAAValue::new();
-                if let Some(bar) = params.bar {
+                if let Some(bar) = self.bar {
                     value.insert("bar", bar);
                 }
-                value
+                Ok(value)
             }
         }
 
@@ -221,7 +224,7 @@ mod tests {
             match command {
                 Command::StartUp { params, .. } => {
                     assert_eq!(params.to_task_type(), TaskType::StartUp);
-                    params.into()
+                    params.into_parameters(&AsstConfig::default()).unwrap()
                 }
                 _ => panic!("Not a StartUp command"),
             }
@@ -258,7 +261,7 @@ mod tests {
             match cmd {
                 Command::CloseDown { params, .. } => {
                     assert_eq!(params.to_task_type(), TaskType::CloseDown);
-                    params.into()
+                    params.into_parameters(&AsstConfig::default()).unwrap()
                 }
                 _ => panic!("Not a CloseDown command"),
             }

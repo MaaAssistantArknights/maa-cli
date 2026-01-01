@@ -1,7 +1,7 @@
-use std::fs;
-
 use anyhow::Result;
-use log::{debug, info};
+use log::info;
+use maa_dirs::Ensure;
+use rayon::prelude::{IndexedParallelIterator, ParallelIterator};
 
 use crate::{config::cli::CLI_CONFIG, state::AGENT};
 
@@ -10,43 +10,40 @@ pub fn update() -> Result<()> {
 
     info!("Updating hot update files...");
 
-    let check_interval = config.check_interval();
+    let downloads = rayon::iter::once((maa_dirs::activity().to_owned(), config.activity_url()))
+        .chain(config.resource_files().zip(config.resource_urls()));
 
-    // Activity file and urls
-    let activity_file = maa_dirs::activity().to_owned();
-    let activity_url = config.activity_url();
-
-    // Resource files
-    let resource_files = config.resource_files();
-    let resource_urls = config.resource_urls();
-
-    // Download all files parallelly
-    std::thread::scope(|s| {
-        std::iter::once((activity_file, activity_url))
-            .chain(resource_files.zip(resource_urls))
-            .map(|(file, url)| {
-                s.spawn(move || {
-                    if let Some(parent) = file.parent()
-                        && !parent.exists()
-                    {
-                        debug!("Creating parent directory {}", parent.display());
-                        fs::create_dir_all(parent)?;
-                    }
-                    maa_installer::download::etag::download_with_etag(
-                        &AGENT,
-                        &url,
-                        &file,
-                        check_interval,
-                    )
-                })
-            })
-            .collect::<Vec<_>>()
-            .into_iter()
-            .map(|h| h.join().expect("The download should not panic"))
-            .collect::<Result<Vec<_>, _>>()
-    })?;
+    download_with_etag(&AGENT, downloads, config.check_interval())?;
 
     info!("Hot update completed successfully");
+
+    Ok(())
+}
+
+/// Download multiple files with ETag-based caching.
+///
+/// Creates parent directories as needed and downloads files in parallel.
+pub fn download_with_etag<P, U>(
+    agent: &ureq::Agent,
+    downloads: impl ParallelIterator<Item = (P, U)>,
+    check_interval: Option<std::time::Duration>,
+) -> Result<()>
+where
+    P: AsRef<std::path::Path>,
+    U: AsRef<str>,
+{
+    downloads.try_for_each(|(dest, url)| -> anyhow::Result<()> {
+        let dest = dest.as_ref();
+        let url = url.as_ref();
+
+        if let Some(parent) = dest.parent() {
+            parent.ensure()?;
+        }
+
+        maa_installer::download::etag::download_with_etag(agent, url, dest, check_interval)?;
+
+        Ok(())
+    })?;
 
     Ok(())
 }

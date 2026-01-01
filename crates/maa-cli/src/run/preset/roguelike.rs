@@ -148,14 +148,12 @@ impl super::ToTaskType for RoguelikeParams {
     }
 }
 
-impl TryFrom<RoguelikeParams> for MAAValue {
-    type Error = anyhow::Error;
-
-    fn try_from(params: RoguelikeParams) -> Result<Self, Self::Error> {
+impl super::IntoParameters for RoguelikeParams {
+    fn into_parameters(self, _: &super::AsstConfig) -> anyhow::Result<MAAValue> {
         let mut value = MAAValue::new();
 
-        let theme = params.theme;
-        let mode = params.mode;
+        let theme = self.theme;
+        let mode = self.mode;
 
         match mode {
             5 if !matches!(theme, Theme::Sami) => {
@@ -165,66 +163,62 @@ impl TryFrom<RoguelikeParams> for MAAValue {
             _ => bail!("Mode must be in range between 0 and 5"),
         }
 
-        value.insert("theme", params.theme.to_str());
-        value.insert("mode", params.mode);
+        value.insert("theme", self.theme.to_str());
+        value.insert("mode", self.mode);
 
-        value.maybe_insert("squad", params.squad);
-        value.maybe_insert("roles", params.roles);
-        value.maybe_insert("core_char", params.core_char);
+        value.maybe_insert("squad", self.squad);
+        value.maybe_insert("roles", self.roles);
+        value.maybe_insert("core_char", self.core_char);
 
-        value.maybe_insert("start_count", params.start_count);
+        value.maybe_insert("start_count", self.start_count);
 
         if matches!(theme, Theme::Phantom) {
-            if params.difficulty.is_some() {
+            if self.difficulty.is_some() {
                 log::warn!("Difficulty is not valid for Phantom theme, ignored");
             }
         } else {
-            value.maybe_insert("difficulty", params.difficulty);
+            value.maybe_insert("difficulty", self.difficulty);
         }
 
-        if params.disable_investment {
+        if self.disable_investment {
             value.insert("investment_enabled", false);
         } else {
             value.insert("investment_enabled", true);
-            value.maybe_insert("investments_count", params.investments_count);
+            value.maybe_insert("investments_count", self.investments_count);
             value.insert(
                 "investment_with_more_score",
-                params.investment_with_more_score,
+                self.investment_with_more_score,
             );
             value.insert(
                 "stop_when_investment_full",
-                !params.no_stop_when_investment_full,
+                !self.no_stop_when_investment_full,
             );
         }
 
-        if params.use_support {
+        if self.use_support {
             value.insert("use_support", true);
-            value.insert("use_nonfriend_support", params.use_nonfriend_support);
+            value.insert("use_nonfriend_support", self.use_nonfriend_support);
         }
 
-        if params.start_with_elite_two {
+        if self.start_with_elite_two {
             value.insert("start_with_elite_two", true);
-            value.insert(
-                "only_start_with_elite_two",
-                params.only_start_with_elite_two,
-            );
+            value.insert("only_start_with_elite_two", self.only_start_with_elite_two);
         }
 
-        value.insert("stop_at_final_boss", params.stop_at_final_boss);
+        value.insert("stop_at_final_boss", self.stop_at_final_boss);
 
         // Theme specific parameters
         match theme {
             Theme::Mizuki => {
-                value.insert("refresh_trader_with_dice", params.refresh_trader_with_dice);
+                value.insert("refresh_trader_with_dice", self.refresh_trader_with_dice);
             }
             Theme::Sami => {
-                value.insert("use_foldartal", params.use_foldartal);
-                if !params.start_foldartals.is_empty() {
+                value.insert("use_foldartal", self.use_foldartal);
+                if !self.start_foldartals.is_empty() {
                     value.insert(
                         "start_foldartal_list",
                         MAAValue::Array(
-                            params
-                                .start_foldartals
+                            self.start_foldartals
                                 .into_iter()
                                 .map(MAAValue::from)
                                 .collect(),
@@ -235,7 +229,7 @@ impl TryFrom<RoguelikeParams> for MAAValue {
                 if mode == 5 {
                     value.insert("check_collapsal_paradigms", true);
                     value.insert("double_check_collapsal_paradigms", true);
-                    if params.expected_collapsal_paradigms.is_empty() {
+                    if self.expected_collapsal_paradigms.is_empty() {
                         bail!(
                             "At least one expected collapsal paradigm is required when mode 5 is enabled"
                         );
@@ -243,8 +237,7 @@ impl TryFrom<RoguelikeParams> for MAAValue {
                     value.insert(
                         "expected_collapsal_paradigms",
                         MAAValue::Array(
-                            params
-                                .expected_collapsal_paradigms
+                            self.expected_collapsal_paradigms
                                 .into_iter()
                                 .map(MAAValue::from)
                                 .collect(),
@@ -253,7 +246,7 @@ impl TryFrom<RoguelikeParams> for MAAValue {
                 }
             }
             Theme::Sarkaz if mode == 1 => {
-                value.insert("start_with_seed", params.start_with_seed);
+                value.insert("start_with_seed", self.start_with_seed);
             }
             _ => {}
         }
@@ -330,9 +323,9 @@ mod tests {
             let command = parse_from(args).command;
             match command {
                 Command::Roguelike { params, .. } => {
-                    use super::super::{TaskType, ToTaskType};
+                    use super::super::{IntoParameters, TaskType, ToTaskType};
                     assert_eq!(params.to_task_type(), TaskType::Roguelike);
-                    params.try_into()
+                    params.into_parameters(&crate::config::asst::AsstConfig::default())
                 }
                 _ => panic!("Not a Roguelike command"),
             }

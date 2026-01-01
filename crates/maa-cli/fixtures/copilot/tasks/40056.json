@@ -1,58 +1,22 @@
 {
-  "minimum_required": "v4.0.0",
-  "stage_name": "act35side_ex05",
-  "actions": [
-    { "type": "SpeedUp" },
-    {
-      "type": "Deploy",
-      "name": "塞雷娅",
-      "location": [5, 3],
-      "direction": "Right"
-    },
-    {
-      "type": "Deploy",
-      "name": "煌",
-      "location": [5, 5],
-      "direction": "Right"
-    },
-    {
-      "type": "Deploy",
-      "name": "能天使",
-      "location": [5, 2],
-      "direction": "Right"
-    },
-    {
-      "type": "Deploy",
-      "name": "拉普兰德",
-      "location": [6, 4],
-      "direction": "Right"
-    },
-    {
-      "type": "Deploy",
-      "name": "伊芙利特",
-      "location": [6, 2],
-      "direction": "Down"
-    },
-    {
-      "type": "Deploy",
-      "name": "艾雅法拉",
-      "location": [5, 6],
-      "direction": "Up"
-    },
-    { "type": "SkillDaemon" }
-  ],
-  "doc": {
-    "title": "太阳甩在身后 - AS-EX-5 - 不幸的士兵",
-    "details": "此作业全员专三且模组一级\n原作者：自在道爷\nJSON作者：星之海.\n社区评论不会提醒，有问题可以进群找我：994516079（刚建的\n原视频：【【太阳甩在身后】AS-EX-1至AS-EX-8挂机流，突袭刻章都不愁！语音快乐详解，轻松解放双手 | 明日方舟攻略(含AS-EX-8突袭，EX-3刻章等)】https://www.bilibili.com/video/BV1AE421A77r?vd_source=69f0b796ff8cde9e6cb9e9f9a99f8eec"
-  },
-  "groups": [],
-  "opers": [
-    { "name": "煌", "skill": 2, "skill_usage": 0 },
-    { "name": "拉普兰德", "skill": 2, "skill_usage": 0 },
-    { "name": "塞雷娅", "skill": 2, "skill_usage": 0 },
-    { "name": "能天使", "skill": 3, "skill_usage": 0 },
-    { "name": "艾雅法拉", "skill": 2, "skill_usage": 0 },
-    { "name": "伊芙利特", "skill": 2, "skill_usage": 0 }
-  ],
-  "difficulty": 3
+  "status_code": 200,
+  "data": {
+    "id": 40056,
+    "upload_time": "2024-08-18T23:27:06Z",
+    "uploader_id": "14394",
+    "uploader": "星之海.",
+    "views": 16486,
+    "hot_score": 0.04551681722056107,
+    "available": true,
+    "rating_level": 10,
+    "not_enough_rating": false,
+    "rating_ratio": 1.0,
+    "rating_type": 0,
+    "comments_count": 0,
+    "content": "{\"minimum_required\":\"v4.0.0\",\"stage_name\":\"act35side_ex05\",\"actions\":[{\"type\":\"SpeedUp\"},{\"type\":\"Deploy\",\"name\":\"塞雷娅\",\"location\":[5,3],\"direction\":\"Right\"},{\"type\":\"Deploy\",\"name\":\"煌\",\"location\":[5,5],\"direction\":\"Right\"},{\"type\":\"Deploy\",\"name\":\"能天使\",\"location\":[5,2],\"direction\":\"Right\"},{\"type\":\"Deploy\",\"name\":\"拉普兰德\",\"location\":[6,4],\"direction\":\"Right\"},{\"type\":\"Deploy\",\"name\":\"伊芙利特\",\"location\":[6,2],\"direction\":\"Down\"},{\"type\":\"Deploy\",\"name\":\"艾雅法拉\",\"location\":[5,6],\"direction\":\"Up\"},{\"type\":\"SkillDaemon\"}],\"doc\":{\"title\":\"太阳甩在身后 - AS-EX-5 - 不幸的士兵\",\"details\":\"此作业全员专三且模组一级\\n原作者：自在道爷\\nJSON作者：星之海.\\n社区评论不会提醒，有问题可以进群找我：994516079（刚建的\\n原视频：【【太阳甩在身后】AS-EX-1至AS-EX-8挂机流，突袭刻章都不愁！语音快乐详解，轻松解放双手 | 明日方舟攻略(含AS-EX-8突袭，EX-3刻章等)】https://www.bilibili.com/video/BV1AE421A77r?vd_source=69f0b796ff8cde9e6cb9e9f9a99f8eec\"},\"groups\":[],\"opers\":[{\"name\":\"煌\",\"skill\":2,\"skill_usage\":0},{\"name\":\"拉普兰德\",\"skill\":2,\"skill_usage\":0},{\"name\":\"塞雷娅\",\"skill\":2,\"skill_usage\":0},{\"name\":\"能天使\",\"skill\":3,\"skill_usage\":0},{\"name\":\"艾雅法拉\",\"skill\":2,\"skill_usage\":0},{\"name\":\"伊芙利特\",\"skill\":2,\"skill_usage\":0}],\"difficulty\":3}",
+    "like": 3595,
+    "dislike": 3,
+    "comment_status": "ENABLED",
+    "status": "PUBLIC"
+  }
 }

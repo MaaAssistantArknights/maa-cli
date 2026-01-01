@@ -1,5 +1,4 @@
 use std::{
-    borrow::Cow,
     fs,
     io::Write,
     path::{Path, PathBuf},
@@ -9,11 +8,11 @@ use anyhow::{Context, Result, bail};
 use log::{debug, trace};
 use maa_sys::TaskType;
 use prettytable::{Table, format, row};
-use serde_json::Value as JsonValue;
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use ureq::http::StatusCode;
 
-use super::{FindFileOrDefault, IntoTaskConfig, ToTaskType};
+use super::{FindFileOrDefault, IntoParameters, ToTaskType};
 use crate::{
-    config::task::{Task, TaskConfig},
     dirs::{self, Ensure},
     object,
     state::AGENT,
@@ -40,44 +39,47 @@ pub struct CopilotParams {
     ///
     /// It can be a maa URI or a local file path. Multiple URIs can be provided to fight multiple
     /// stages. For URI, it can be in the format of `maa://<code>`, `maa://<code>s`, `file://<path>`,
-    /// which represents a single copilot task, a copilot task set, and a local file respectively.
+    /// which represents a single copilot task, a copilot task set, and a local file respectively,
+    /// where `file://` prefix can be omitted.
     uri_list: Vec<String>,
     /// Whether to fight stage in raid mode
     ///
-    /// 0 for normal, 1 for raid, 2 run twice for both normal and raid
+    /// `0` for normal, `1` for raid, `2` run twice for both normal and raid
     #[arg(long, default_value = "0")]
     raid: u8,
-    /// Whether to auto formation
+    /// Enable auto formation
     ///
     /// When multiple uri are provided or a copilot task set contains multiple stages, force to
     /// true. Otherwise, default to false.
     #[arg(long)]
     formation: bool,
-    /// Whether to use sanity potion to restore sanity when it's not enough
-    ///
-    /// When multiple uri are provided or the uri is a copilot task set, default to false.
-    /// Otherwise, default to true.
-    #[arg(long)]
-    use_sanity_potion: bool,
-    /// Whether to navigate to the stage [Deprecated, also navigate to the stage]
-    ///
-    /// When multiple uri are provided or the uri is a copilot task set, force to true.
-    /// Otherwise, default to false.
-    #[arg(long)]
-    need_navigate: bool,
-    /// Whether to add operators to empty slots in the formation to earn trust
-    #[arg(long)]
-    add_trust: bool,
-
-    /// Deprecated, use `formation_index` instead
-    #[arg(long)]
-    select_formation: Option<i32>,
-
-    /// Select which formation to use [1-4]
+    /// Select which formation to use (1-4)
     ///
     /// If not provided, use the current formation
     #[arg(long)]
     formation_index: Option<i32>,
+    /// Fill empty slots by ascending trust value during auto formation.
+    #[arg(long)]
+    add_trust: bool,
+    // Ignore operator attribute requirements during auto formation.
+    #[arg(long)]
+    ignore_requirements: bool,
+
+    /// Use sanity potion to restore sanity when it's not enough
+    #[arg(long)]
+    use_sanity_potion: bool,
+
+    /// Support operator usage mode.
+    ///
+    /// Effective only when formation is true. Available modes:
+    ///
+    /// - `0`: Do not use support operators (default).
+    /// - `1`: Use support operator only if exactly one operator is missing; otherwise, do not use
+    ///   support.
+    /// - `2`: Use support operator if one is missing; otherwise, use the specified one.
+    /// - `3`: Use support operator if one is missing; otherwise, use a random one.
+    #[arg(long)]
+    support_unit_usage: Option<i32>,
 
     /// Use given support unit name, don't use support unit if not provided
     #[arg(long)]
@@ -103,74 +105,92 @@ impl From<StageOpts> for MAAValue {
     }
 }
 
-impl IntoTaskConfig for CopilotParams {
-    fn into_task_config(self, config: &super::AsstConfig) -> Result<TaskConfig> {
+#[derive(Debug, serde::Deserialize)]
+struct CopilotOperator {
+    name: String,
+    skill: i32,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct CopilotGroup {
+    name: String,
+    opers: Vec<CopilotOperator>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct CopilotDoc {
+    details: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct CopilotTask {
+    stage_name: String,
+    #[serde(default)]
+    opers: Vec<CopilotOperator>,
+    #[serde(default)]
+    groups: Vec<CopilotGroup>,
+    #[serde(default)]
+    doc: Option<CopilotDoc>,
+    #[serde(rename = "type", default)]
+    task_type: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct StageInfo {
+    code: String,
+}
+
+impl ToTaskType for CopilotParams {
+    fn to_task_type(&self) -> TaskType {
+        TaskType::Copilot
+    }
+}
+
+impl IntoParameters for CopilotParams {
+    fn into_parameters(self, config: &crate::config::asst::AsstConfig) -> Result<MAAValue> {
         let copilot_dir = dirs::copilot().ensure()?;
         let base_dirs = config.resource.base_dirs();
         let default = MAAValue::find_file_or_default(super::default_file(TaskType::Copilot))
             .context("Failed to load default copilot task config")?;
 
-        let mut copilot_files = Vec::new();
-        for uri in &self.uri_list {
-            let copilot_file = CopilotFile::from_uri(uri)?;
-
-            copilot_file.push_path_to(&mut copilot_files, copilot_dir)?;
-        }
+        let mut copilot_files = self
+            .uri_list
+            .into_par_iter()
+            .enumerate()
+            .try_fold(Vec::new, |mut files, (index, uri)| {
+                CopilotFile::from_uri(&uri)?.push_path_into::<CopilotTask>(
+                    index,
+                    copilot_dir,
+                    &mut files,
+                )?;
+                Ok::<_, anyhow::Error>(files)
+            })
+            .try_reduce(Vec::new, |mut a, b| {
+                a.extend(b);
+                Ok(a)
+            })?;
+        copilot_files.sort_by(|(index_a, ..), (index_b, ..)| index_a.cmp(index_b));
 
         let is_task_list = copilot_files.len() > 1;
         let formation = self.formation || is_task_list || default.get_or("formation", false);
 
-        let need_navigate = self.need_navigate || default.get_or("need_navigate", false);
-        if need_navigate {
-            log::warn!("`need_navigate` is deprecated and no longer required");
-        }
-
         let use_sanity_potion =
             self.use_sanity_potion || default.get_or("use_sanity_potion", false);
         let add_trust = self.add_trust || default.get_or("add_trust", false);
-
-        let select_formation = self
-            .select_formation
-            .or_else(|| default.get_typed("select_formation"));
-
-        let formation_index = self
-            .formation_index
-            .or_else(|| default.get_typed("formation_index"));
-
-        let formation_index = match (formation_index, select_formation) {
-            (Some(formation_index), None) => formation_index,
-            (formation_index, Some(select_formation)) => {
-                log::warn!(
-                    "`select_formation` is deprecated, please use `formation_index` instead"
-                );
-                if let Some(index) = formation_index {
-                    log::warn!(
-                        "Both `formation_index` and `select_formation` are provided, using `formation_index`"
-                    );
-                    index
-                } else {
-                    select_formation
-                }
-            }
-            (None, None) => 0,
-        };
+        let ignore_requirements =
+            self.ignore_requirements || default.get_or("ignore_requirements", false);
 
         let mut stage_list = Vec::new();
-        for file in copilot_files {
-            let copilot_info = json_from_file(&file)?;
-            let stage_id = copilot_info
-                .get("stage_name")
-                .context("No stage_name")?
-                .as_str()
-                .context("stage_name is not a string")?;
-
+        for (_, file, value) in copilot_files {
+            let copilot_task = value.map(Ok).unwrap_or_else(|| json_from_file(&file))?;
+            let stage_id = &copilot_task.stage_name;
             let is_paradox = stage_id.starts_with("mem_");
 
             let stage_info = get_stage_info(stage_id, base_dirs.iter().map(|dir| dir.as_path()))?;
-            let stage_code = get_str_key(&stage_info, "code")?;
+            let stage_code = &stage_info.code;
 
             if !(is_paradox || formation) {
-                println!("Operators:\n{}", operator_table(&copilot_info)?);
+                println!("Operators:\n{}", operator_table(&copilot_task)?);
                 println!("Please set up your formation manually");
                 while !BoolInput::new(Some(true), Some("continue")).value()? {
                     println!("Please confirm you have set up your formation");
@@ -214,20 +234,18 @@ impl IntoTaskConfig for CopilotParams {
             "formation" => formation,
             "use_sanity_potion" => use_sanity_potion,
             "add_trust" => add_trust,
-            "formation_index" => formation_index,
+            "ignore_requirements" => ignore_requirements,
             "copilot_list" => stage_list,
         );
-        params.maybe_insert("support_unit_name", self.support_unit_name.clone());
+        params.maybe_insert("formation_index", self.formation_index);
+        params.maybe_insert("support_unit_usage", self.support_unit_usage);
+        params.maybe_insert("support_unit_name", self.support_unit_name);
 
-        let mut task_config = TaskConfig::new();
-
-        task_config.push(Task::new(TaskType::Copilot, params));
-
-        Ok(task_config)
+        Ok(params)
     }
 }
 
-fn get_stage_info<P, D>(stage_id: &str, base_dirs: D) -> Result<JsonValue>
+fn get_stage_info<P, D>(stage_id: &str, base_dirs: D) -> Result<StageInfo>
 where
     P: AsRef<Path>,
     D: IntoIterator<Item = P>,
@@ -270,44 +288,37 @@ impl ToTaskType for SSSCopilotParams {
     }
 }
 
-impl TryFrom<SSSCopilotParams> for MAAValue {
-    type Error = anyhow::Error;
-
-    fn try_from(params: SSSCopilotParams) -> std::result::Result<Self, Self::Error> {
+impl IntoParameters for SSSCopilotParams {
+    fn into_parameters(self, _: &crate::config::asst::AsstConfig) -> Result<MAAValue> {
         let copilot_dir = dirs::copilot().ensure()?;
 
-        let copilot_file = CopilotFile::from_uri(&params.uri)?;
-        let mut paths = Vec::new();
-        copilot_file.push_path_to(&mut paths, copilot_dir)?;
+        let copilot_file = CopilotFile::from_uri(&self.uri)?;
+        let mut files = Vec::new();
+        copilot_file.push_path_into::<CopilotTask>(0, copilot_dir, &mut files)?;
 
-        if paths.len() != 1 {
+        if files.len() != 1 {
             bail!("SSS Copilot don't support task set");
         }
 
-        let file = paths[0].as_ref();
-        let value = json_from_file(file)?;
+        let (_, file, value) = files.pop().expect("files have length 1");
+        let task = value.map(Ok).unwrap_or_else(|| json_from_file(&file))?;
 
-        if get_str_key(&value, "type")? != "SSS" {
+        if task.task_type.as_deref() != Some("SSS") {
             bail!("The given copilot file is not a SSS copilot file");
         }
 
-        let stage_name = get_str_key(&value, "stage_name")?;
+        let stage_name = &task.stage_name;
 
         println!("Fight Stage: {stage_name}, please navigate to the stage manually");
         while !BoolInput::new(Some(true), Some("continue")).value()? {
             println!("Please confirm you have navigated to the stage");
         }
-        println!("Core Operators:\n{}", operator_table(&value)?);
+        println!("Core Operators:\n{}", operator_table(&task)?);
         // TODO: equipment, support unit, toolmans
-        if BoolInput::new(Some(false), Some("show doc")).value()? {
-            let doc = value
-                .get("doc")
-                .context("No doc in copilot file")?
-                .get("details")
-                .context("No details in doc")?
-                .as_str()
-                .context("Details is not a string")?;
-            println!("{doc}");
+        if let Some(doc) = &task.doc
+            && BoolInput::new(Some(false), Some("show doc")).value()?
+        {
+            println!("{}", doc.details);
         }
 
         while !BoolInput::new(Some(true), Some("continue")).value()? {
@@ -316,7 +327,7 @@ impl TryFrom<SSSCopilotParams> for MAAValue {
 
         let value = object!(
             "filename" => file.to_str().context("Invalid file path")?,
-            "loop_times" => params.loop_times,
+            "loop_times" => self.loop_times,
         );
 
         Ok(value)
@@ -324,41 +335,59 @@ impl TryFrom<SSSCopilotParams> for MAAValue {
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
-enum CopilotFile<'a> {
-    Remote(i64),
-    RemoteSet(i64),
-    Local(&'a Path),
+enum CopilotFile {
+    Remote(u64),
+    RemoteSet(u64),
+    Local(PathBuf),
 }
 
-impl<'a> CopilotFile<'a> {
-    fn from_uri(uri: &'a str) -> Result<Self> {
+impl CopilotFile {
+    fn from_uri(uri: &str) -> Result<Self> {
         let trimmed = uri.trim();
         if let Some(code_str) = trimmed.strip_prefix("maa://") {
             if let Some(code_str) = code_str.strip_suffix('s') {
                 Ok(CopilotFile::RemoteSet(
-                    code_str.parse::<i64>().context("Invalid code")?,
+                    code_str.parse::<u64>().context("Invalid code")?,
                 ))
             } else {
                 Ok(CopilotFile::Remote(
-                    code_str.parse::<i64>().context("Invalid code")?,
+                    code_str.parse::<u64>().context("Invalid code")?,
                 ))
             }
-        // } else if let Some(code) = trimmed.strip_prefix("maas://") {
-        //     let code_num = code.parse::<i64>().context("Invalid code")?;
-        //     Ok(CopilotFile::RemoteSet(code_num))
         } else if let Some(code) = trimmed.strip_prefix("file://") {
-            Ok(CopilotFile::Local(Path::new(code)))
+            Ok(CopilotFile::Local(PathBuf::from(code)))
         } else {
-            Ok(CopilotFile::Local(Path::new(trimmed)))
+            Ok(CopilotFile::Local(PathBuf::from(trimmed)))
         }
     }
 
-    pub fn push_path_to(
+    pub fn push_path_into<T>(
         self,
-        paths: &mut Vec<Cow<'a, Path>>,
+        index: usize,
         base_dir: impl AsRef<Path>,
-    ) -> Result<()> {
+        files: &mut Vec<(usize, PathBuf, Option<T>)>,
+    ) -> Result<()>
+    where
+        T: serde::de::DeserializeOwned + Send,
+    {
         let base_dir = base_dir.as_ref();
+
+        #[derive(serde::Deserialize)]
+        struct CopilotResponse<D> {
+            status_code: u16,
+            data: D,
+        }
+
+        #[derive(serde::Deserialize)]
+        struct SingleData {
+            content: String,
+        }
+
+        #[derive(serde::Deserialize)]
+        struct SetData {
+            copilot_ids: Vec<u64>,
+        }
+
         match self {
             CopilotFile::Remote(code) => {
                 let code = code.to_string();
@@ -366,7 +395,7 @@ impl<'a> CopilotFile<'a> {
 
                 if json_file.is_file() {
                     debug!("Cache hit, using cached json file {}", json_file.display());
-                    paths.push(json_file.into());
+                    files.push((index, json_file, None));
                     return Ok(());
                 }
 
@@ -377,33 +406,26 @@ impl<'a> CopilotFile<'a> {
                     .call()
                     .with_context(|| format!("Failed to send request to {url}"))?;
 
-                let resp: JsonValue = response
+                let resp: CopilotResponse<SingleData> = response
                     .body_mut()
                     .read_json()
                     .with_context(|| {
                         format!("Failed to parse JSON response from {url}. The server may have disconnected or returned invalid data")
                     })?;
 
-                if resp["status_code"].as_i64().unwrap() == 200 {
-                    let content = resp
-                        .get("data")
-                        .context("No data in response")?
-                        .get("content")
-                        .context("No content in response data")?
-                        .as_str()
-                        .context("Content is not a string")?;
+                if resp.status_code == StatusCode::OK {
+                    let content = resp.data.content;
 
-                    // Save json file
                     fs::File::create(&json_file)
                         .context("Failed to create json file")?
                         .write_all(content.as_bytes())
                         .context("Failed to write json file")?;
 
-                    paths.push(json_file.into());
+                    files.push((index, json_file, Some(serde_json::from_str(&content)?)));
 
                     Ok(())
                 } else {
-                    bail!("Request Error, code: {}", code);
+                    bail!("Request Error, code: {code}");
                 }
             }
             CopilotFile::RemoteSet(code) => {
@@ -414,26 +436,30 @@ impl<'a> CopilotFile<'a> {
                     .call()
                     .with_context(|| format!("Failed to send request to {url}"))?;
 
-                let resp: JsonValue = response
+                let resp: CopilotResponse<SetData>= response
                     .body_mut()
                     .read_json()
                     .with_context(|| {
                         format!("Failed to parse JSON response from {url}. The server may have disconnected or returned invalid data")
                     })?;
 
-                if resp["status_code"].as_i64().unwrap() == 200 {
-                    let ids = resp
-                        .get("data")
-                        .context("No data in response")?
-                        .get("copilot_ids")
-                        .context("No copilot_ids in response data")?
-                        .as_array()
-                        .context("Copilot_ids is not an array")?;
+                if resp.status_code == StatusCode::OK {
+                    let ids = resp.data.copilot_ids;
 
-                    for id in ids {
-                        let id = id.as_i64().context("copilot_id is not an integer")?;
-                        CopilotFile::Remote(id).push_path_to(paths, base_dir)?;
-                    }
+                    // Download all copilot files in parallel
+                    let sub_files = ids
+                        .into_par_iter()
+                        .try_fold(Vec::new, |mut files, id| {
+                            CopilotFile::Remote(id)
+                                .push_path_into::<T>(index, base_dir, &mut files)?;
+                            Ok::<_, anyhow::Error>(files)
+                        })
+                        .try_reduce(Vec::new, |mut a, b| {
+                            a.extend(b);
+                            Ok(a)
+                        })?;
+
+                    files.extend(sub_files);
 
                     Ok(())
                 } else {
@@ -441,64 +467,49 @@ impl<'a> CopilotFile<'a> {
                 }
             }
             CopilotFile::Local(file) => {
-                if file.is_absolute() {
-                    paths.push(file.into());
+                let file = if file.is_absolute() {
+                    file
                 } else {
-                    paths.push(base_dir.join(file).into());
-                }
+                    base_dir.join(file)
+                };
+
+                files.push((index, file, None));
+
                 Ok(())
             }
         }
     }
 }
 
-fn json_from_file(path: impl AsRef<Path>) -> Result<JsonValue> {
+fn json_from_file<V: serde::de::DeserializeOwned>(path: impl AsRef<Path>) -> Result<V> {
     Ok(serde_json::from_reader(fs::File::open(path)?)?)
 }
 
-fn operator_table(value: &JsonValue) -> Result<Table> {
+fn operator_table(task: &CopilotTask) -> Result<Table> {
     let mut table = Table::new();
     table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
     table.set_titles(row!["NAME", "SKILL"]);
 
-    if let Some(opers) = value["opers"].as_array() {
-        for operator in opers {
-            table.add_row(row![get_str_key(operator, "name")?, operator["skill"]]);
-        }
+    for operator in &task.opers {
+        table.add_row(row![&operator.name, operator.skill]);
     }
 
-    if let Some(groups) = value["groups"].as_array() {
-        for group in groups.iter() {
-            let opers = group["opers"].as_array().context("Failed to get opers")?;
-            let mut sub_table = Table::new();
-            sub_table.set_format(*format::consts::FORMAT_NO_LINESEP);
-            for operator in opers {
-                sub_table.add_row(row![get_str_key(operator, "name")?, operator["skill"]]);
-            }
-
-            let vertical_offset = (sub_table.len() + 2) >> 1;
-
-            table.add_row(row![
-                format!(
-                    "{}[{}]",
-                    "\n".repeat(vertical_offset - 1),
-                    get_str_key(group, "name")?
-                ),
-                sub_table
-            ]);
+    for group in &task.groups {
+        let mut sub_table = Table::new();
+        sub_table.set_format(*format::consts::FORMAT_NO_LINESEP);
+        for operator in &group.opers {
+            sub_table.add_row(row![&operator.name, operator.skill]);
         }
+
+        let vertical_offset = (sub_table.len() + 2) >> 1;
+
+        table.add_row(row![
+            format!("{}[{}]", "\n".repeat(vertical_offset - 1), &group.name),
+            sub_table
+        ]);
     }
 
     Ok(table)
-}
-
-fn get_str_key(value: &JsonValue, key: impl AsRef<str>) -> Result<&str> {
-    let key = key.as_ref();
-    value
-        .get(key)
-        .with_context(|| format!("{key} not found in {value}"))?
-        .as_str()
-        .with_context(|| format!("{key} is not a string in {value}"))
 }
 
 #[cfg(test)]
@@ -533,22 +544,14 @@ mod tests {
                         let file_path = fixtures_dir.join("tasks").join(format!("{task_id}.json"));
 
                         if let Ok(content) = fs::read_to_string(&file_path) {
-                            let response_body = serde_json::json!({
-                                "status_code": 200,
-                                "data": {
-                                    "content": content
-                                }
-                            });
+                            let response = tiny_http::Response::from_string(content).with_header(
+                                tiny_http::Header::from_bytes(
+                                    &b"Content-Type"[..],
+                                    &b"application/json"[..],
+                                )
+                                .unwrap(),
+                            );
 
-                            let response =
-                                tiny_http::Response::from_string(response_body.to_string())
-                                    .with_header(
-                                        tiny_http::Header::from_bytes(
-                                            &b"Content-Type"[..],
-                                            &b"application/json"[..],
-                                        )
-                                        .unwrap(),
-                                    );
                             let _ = request.respond(response);
                         } else {
                             let response = tiny_http::Response::from_string(
@@ -582,7 +585,8 @@ mod tests {
                                         let _ = request.respond(response);
                                     } else {
                                         let response = tiny_http::Response::from_string(
-                                            r#"{"status_code": 404, "message": "Set not found"}"#,
+                                            r#"{"status_code": 404, "message": "Set not
+found"}"#,
                                         )
                                         .with_status_code(404);
                                         let _ = request.respond(response);
@@ -617,411 +621,615 @@ mod tests {
     mod copilot_params {
         use super::*;
 
-        #[test]
-        #[ignore = "requires local test server and installed resources"]
-        fn into_task_config() {
-            ensure_test_server();
+        mod to_task_type {
+            use super::*;
 
-            if std::env::var_os("SKIP_CORE_TEST").is_some() {
-                return; // Skip test if resource is not provided
+            #[test]
+            fn to_task_type() {
+                let params = CopilotParams::default();
+                assert_eq!(params.to_task_type(), TaskType::Copilot);
             }
-
-            let config = AsstConfig::default();
-
-            fn parse<I, T>(args: I, config: &AsstConfig) -> Result<TaskConfig>
-            where
-                I: IntoIterator<Item = T>,
-                T: Into<std::ffi::OsString> + Clone,
-            {
-                let command = crate::command::parse_from(args).command;
-                match command {
-                    crate::Command::Copilot { params, .. } => params.into_task_config(config),
-                    _ => panic!("Not a Copilot command"),
-                }
-            }
-
-            use crate::config::task::InitializedTask;
-            fn parse_to_taskes<I, T>(args: I, config: &AsstConfig) -> Vec<InitializedTask>
-            where
-                I: AsRef<[T]>,
-                T: Into<std::ffi::OsString> + Clone,
-            {
-                parse(args.as_ref().iter().cloned(), config)
-                    .unwrap()
-                    .init()
-                    .unwrap()
-                    .tasks
-            }
-
-            let tasks = parse_to_taskes(["maa", "copilot", "maa://40051"], &config);
-            assert_eq!(tasks.len(), 1);
-            assert_eq!(tasks[0].task_type, TaskType::Copilot);
-            assert_eq!(
-                tasks[0].params,
-                object!(
-                    "copilot_list" => [object!(
-                        "filename" => path_from_cache_dir("40051.json"),
-                        "stage_name" => "AS-EX-1",
-                        "is_raid" => false,
-                        "is_paradox" => false,
-                    )],
-                    "formation" => false,
-                    "use_sanity_potion" => false,
-                    "add_trust" => false,
-                    "formation_index" => 0,
-                ),
-            );
-
-            // Test no default values
-            let tasks_no_default = parse_to_taskes(
-                [
-                    "maa",
-                    "copilot",
-                    "maa://40051",
-                    "--raid=1",
-                    "--formation",
-                    "--use-sanity-potion",
-                    "--need-navigate",
-                    "--add-trust",
-                    "--formation-index",
-                    "4",
-                    "--support-unit-name",
-                    "维什戴尔",
-                ],
-                &config,
-            );
-            assert_eq!(tasks_no_default.len(), 1);
-            assert_eq!(tasks_no_default[0].task_type, TaskType::Copilot);
-            assert_eq!(
-                tasks_no_default[0].params,
-                object!(
-                    "copilot_list" => [object!(
-                        "filename" => path_from_cache_dir("40051.json"),
-                        "stage_name" => "AS-EX-1",
-                        "is_raid" => true,
-                        "is_paradox" => false,
-                    )],
-                    "formation" => true,
-                    "use_sanity_potion" => true,
-                    "add_trust" => true,
-                    "formation_index" => 4,
-                    "support_unit_name" => "维什戴尔",
-                ),
-            );
-
-            // Test formation index
-            let tasks_formation_index = parse_to_taskes(
-                [
-                    "maa",
-                    "copilot",
-                    "maa://40051",
-                    "--select-formation",
-                    "2",
-                    "--formation-index",
-                    "4",
-                ],
-                &config,
-            );
-            assert_eq!(tasks_formation_index.len(), 1);
-            assert_eq!(tasks_formation_index[0].task_type, TaskType::Copilot);
-            assert_eq!(
-                tasks_formation_index[0].params,
-                object!(
-                    "copilot_list" => [object!(
-                        "filename" => path_from_cache_dir("40051.json"),
-                        "stage_name" => "AS-EX-1",
-                        "is_raid" => false,
-                        "is_paradox" => false,
-                    )],
-                    "formation" => false,
-                    "use_sanity_potion" => false,
-                    "add_trust" => false,
-                    "formation_index" => 4,
-                ),
-            );
-
-            // Test raid mode 2
-            let tasks_raid_2 = parse_to_taskes(
-                [
-                    "maa",
-                    "copilot",
-                    "maa://40051",
-                    "--raid",
-                    "2",
-                    "--formation",
-                ],
-                &config,
-            );
-            assert_eq!(tasks_raid_2.len(), 1);
-            assert_eq!(tasks_raid_2[0].task_type, TaskType::Copilot);
-            assert_eq!(
-                tasks_raid_2[0].params,
-                object!(
-                    "copilot_list" => [object!(
-                        "filename" => path_from_cache_dir("40051.json"),
-                        "stage_name" => "AS-EX-1",
-                        "is_raid" => false,
-                        "is_paradox" => false,
-                    ),
-                    object!(
-                        "filename" => path_from_cache_dir("40051.json"),
-                        "stage_name" => "AS-EX-1",
-                        "is_raid" => true,
-                        "is_paradox" => false,
-                    )],
-                    "formation" => true,
-                    "use_sanity_potion" => false,
-                    "add_trust" => false,
-                    "formation_index" => 0,
-                ),
-            );
-
-            let tasks_multiple =
-                parse_to_taskes(["maa", "copilot", "maa://40051", "maa://40052"], &config);
-
-            assert_eq!(tasks_multiple.len(), 1);
-            assert_eq!(tasks_multiple[0].task_type, TaskType::Copilot);
-            assert_eq!(
-                tasks_multiple[0].params,
-                object!(
-                    "copilot_list" => [object!(
-                        "filename" => path_from_cache_dir("40051.json"),
-                        "stage_name" => "AS-EX-1",
-                        "is_raid" => false,
-                        "is_paradox" => false,
-                    ),
-                    object!(
-                        "filename" => path_from_cache_dir("40052.json"),
-                        "stage_name" => "AS-EX-2",
-                        "is_raid" => false,
-                        "is_paradox" => false,
-                    )],
-                    "formation" => true,
-                    "use_sanity_potion" => false,
-                    "add_trust" => false,
-                    "formation_index" => 0,
-                ),
-            );
-
-            // Test paradox simulation (with maa://63896)
-            let tasks_paradox = parse_to_taskes(["maa", "copilot", "maa://63896"], &config);
-            assert_eq!(tasks_paradox.len(), 1);
-            assert_eq!(tasks_paradox[0].task_type, TaskType::Copilot);
-            assert_eq!(
-                tasks_paradox[0].params,
-                object!(
-                    "copilot_list" => [object!(
-                        "filename" => path_from_cache_dir("63896.json"),
-                        "stage_name" => "mem_hsguma_1",
-                        "is_raid" => false,
-                        "is_paradox" => true,
-                    )],
-                    "formation" => false,
-                    "use_sanity_potion" => false,
-                    "add_trust" => false,
-                    "formation_index" => 0,
-                ),
-            );
-
-            // Test paradox simulation with wrong raid mode
-            // Test paradox simulation with wrong raid mode
-            let tasks_paradox_raid_2 =
-                parse_to_taskes(["maa", "copilot", "maa://63896", "--raid", "2"], &config);
-            assert_eq!(tasks_paradox_raid_2.len(), 1);
-            assert_eq!(tasks_paradox_raid_2[0].task_type, TaskType::Copilot);
-            assert_eq!(
-                tasks_paradox_raid_2[0].params,
-                object!(
-                    "copilot_list" => [object!(
-                        "filename" => path_from_cache_dir("63896.json"),
-                        "stage_name" => "mem_hsguma_1",
-                        "is_raid" => false,
-                        "is_paradox" => true,
-                    )],
-                    "formation" => false,
-                    "use_sanity_potion" => false,
-                    "add_trust" => false,
-                    "formation_index" => 0,
-                ),
-            );
         }
 
-        #[test]
-        fn get_stage_info_from_id() {
-            // We don't use dirs::find_resource() here, because it is unreliable in tests
-            // due to some tests may change return value of it.
-            let resource_dir = if let Some(resource) = std::env::var_os("MAA_RESOURCE") {
-                PathBuf::from(resource)
-            } else {
-                return; // Skip test if resource is not provided
-            };
-
-            let arknights_tile_pos = resource_dir.join("Arknights-Tile-Pos");
-            arknights_tile_pos.ensure().unwrap();
-
-            let stage_id = "act35side_ex01";
-
-            let stage_info = get_stage_info(stage_id, std::slice::from_ref(&resource_dir)).unwrap();
-
-            assert_eq!(stage_info["code"], "AS-EX-1");
-            assert_eq!(stage_info["name"], "小偷与收款人");
-        }
-    }
-
-    mod sss_copilot_params {
-        use super::*;
-
-        #[test]
-        fn to_task_type() {
-            let params = SSSCopilotParams {
-                uri: "maa://40051".to_string(),
-                loop_times: 2,
-            };
-
-            assert_eq!(params.to_task_type(), TaskType::SSSCopilot);
-        }
-
-        #[test]
-        #[ignore = "requires local test server"]
-        fn try_into_maa_value() {
-            ensure_test_server();
+        mod into_parameters {
+            use super::*;
 
             fn parse<I, T>(args: I) -> Result<MAAValue>
             where
                 I: IntoIterator<Item = T>,
                 T: Into<std::ffi::OsString> + Clone,
             {
+                let config = AsstConfig::default();
                 let command = crate::command::parse_from(args).command;
                 match command {
-                    crate::Command::SSSCopilot { params, .. } => params.try_into(),
+                    crate::Command::Copilot { params, .. } => params.into_parameters(&config),
+                    _ => panic!("Not a Copilot command"),
+                }
+            }
+
+            #[test]
+            #[ignore = "requires installed resources"]
+            fn single_task() {
+                ensure_test_server();
+
+                if std::env::var_os("SKIP_CORE_TEST").is_some() {
+                    return;
+                }
+
+                let params = parse(["maa", "copilot", "maa://40051"]).unwrap();
+
+                assert_eq!(
+                    params,
+                    object!(
+                        "copilot_list" => [object!(
+                            "filename" => path_from_cache_dir("40051.json"),
+                            "stage_name" => "AS-EX-1",
+                            "is_raid" => false,
+                            "is_paradox" => false,
+                        )],
+                        "formation" => false,
+                        "use_sanity_potion" => false,
+                        "add_trust" => false,
+                        "ignore_requirements" => false,
+                    ),
+                );
+            }
+
+            #[test]
+            #[ignore = "requires installed resources"]
+            fn with_all_options() {
+                ensure_test_server();
+
+                if std::env::var_os("SKIP_CORE_TEST").is_some() {
+                    return;
+                }
+
+                let params = parse([
+                    "maa",
+                    "copilot",
+                    "maa://40051",
+                    "--raid=1",
+                    "--formation",
+                    "--use-sanity-potion",
+                    "--add-trust",
+                    "--formation-index",
+                    "4",
+                    "--support-unit-name",
+                    "维什戴尔",
+                ])
+                .unwrap();
+
+                assert_eq!(
+                    params,
+                    object!(
+                        "copilot_list" => [object!(
+                            "filename" => path_from_cache_dir("40051.json"),
+                            "stage_name" => "AS-EX-1",
+                            "is_raid" => true,
+                            "is_paradox" => false,
+                        )],
+                        "formation" => true,
+                        "use_sanity_potion" => true,
+                        "add_trust" => true,
+                        "ignore_requirements" => false,
+                        "formation_index" => 4,
+                        "support_unit_name" => "维什戴尔",
+                    ),
+                );
+            }
+
+            #[test]
+            #[ignore = "requires installed resources"]
+            fn with_formation_index() {
+                ensure_test_server();
+
+                if std::env::var_os("SKIP_CORE_TEST").is_some() {
+                    return;
+                }
+
+                let params =
+                    parse(["maa", "copilot", "maa://40051", "--formation-index", "4"]).unwrap();
+
+                assert_eq!(
+                    params,
+                    object!(
+                        "copilot_list" => [object!(
+                            "filename" => path_from_cache_dir("40051.json"),
+                            "stage_name" => "AS-EX-1",
+                            "is_raid" => false,
+                            "is_paradox" => false,
+                        )],
+                        "formation" => false,
+                        "use_sanity_potion" => false,
+                        "add_trust" => false,
+                        "ignore_requirements" => false,
+                        "formation_index" => 4,
+                    ),
+                );
+            }
+
+            #[test]
+            #[ignore = "requires installed resources"]
+            fn raid_mode_both() {
+                ensure_test_server();
+
+                if std::env::var_os("SKIP_CORE_TEST").is_some() {
+                    return;
+                }
+
+                let params = parse([
+                    "maa",
+                    "copilot",
+                    "maa://40051",
+                    "--raid",
+                    "2",
+                    "--formation",
+                ])
+                .unwrap();
+
+                assert_eq!(
+                    params,
+                    object!(
+                        "copilot_list" => [object!(
+                            "filename" => path_from_cache_dir("40051.json"),
+                            "stage_name" => "AS-EX-1",
+                            "is_raid" => false,
+                            "is_paradox" => false,
+                        ),
+                        object!(
+                            "filename" => path_from_cache_dir("40051.json"),
+                            "stage_name" => "AS-EX-1",
+                            "is_raid" => true,
+                            "is_paradox" => false,
+                        )],
+                        "formation" => true,
+                        "use_sanity_potion" => false,
+                        "add_trust" => false,
+                        "ignore_requirements" => false,
+                    ),
+                );
+            }
+
+            #[test]
+            #[ignore = "requires installed resources"]
+            fn multiple_tasks() {
+                ensure_test_server();
+
+                if std::env::var_os("SKIP_CORE_TEST").is_some() {
+                    return;
+                }
+
+                let params = parse(["maa", "copilot", "maa://40051", "maa://40052"]).unwrap();
+
+                assert_eq!(
+                    params,
+                    object!(
+                        "copilot_list" => [object!(
+                            "filename" => path_from_cache_dir("40051.json"),
+                            "stage_name" => "AS-EX-1",
+                            "is_raid" => false,
+                            "is_paradox" => false,
+                        ),
+                        object!(
+                            "filename" => path_from_cache_dir("40052.json"),
+                            "stage_name" => "AS-EX-2",
+                            "is_raid" => false,
+                            "is_paradox" => false,
+                        )],
+                        "formation" => true,
+                        "use_sanity_potion" => false,
+                        "add_trust" => false,
+                        "ignore_requirements" => false,
+                    ),
+                );
+            }
+
+            #[test]
+            #[ignore = "requires installed resources"]
+            fn paradox_simulation() {
+                ensure_test_server();
+
+                if std::env::var_os("SKIP_CORE_TEST").is_some() {
+                    return;
+                }
+
+                let params = parse(["maa", "copilot", "maa://63896"]).unwrap();
+
+                assert_eq!(
+                    params,
+                    object!(
+                        "copilot_list" => [object!(
+                            "filename" => path_from_cache_dir("63896.json"),
+                            "stage_name" => "mem_hsguma_1",
+                            "is_raid" => false,
+                            "is_paradox" => true,
+                        )],
+                        "formation" => false,
+                        "use_sanity_potion" => false,
+                        "add_trust" => false,
+                        "ignore_requirements" => false,
+                    ),
+                );
+            }
+
+            #[test]
+            #[ignore = "requires installed resources"]
+            fn paradox_forces_raid_zero() {
+                ensure_test_server();
+
+                if std::env::var_os("SKIP_CORE_TEST").is_some() {
+                    return;
+                }
+
+                let params = parse(["maa", "copilot", "maa://63896", "--raid", "2"]).unwrap();
+
+                assert_eq!(
+                    params,
+                    object!(
+                        "copilot_list" => [object!(
+                            "filename" => path_from_cache_dir("63896.json"),
+                            "stage_name" => "mem_hsguma_1",
+                            "is_raid" => false,
+                            "is_paradox" => true,
+                        )],
+                        "formation" => false,
+                        "use_sanity_potion" => false,
+                        "add_trust" => false,
+                        "ignore_requirements" => false,
+                    ),
+                );
+            }
+
+            #[test]
+            #[ignore = "requires installed resources"]
+            fn invalid_raid_mode() {
+                ensure_test_server();
+
+                if std::env::var_os("SKIP_CORE_TEST").is_some() {
+                    return;
+                }
+
+                let result = parse(["maa", "copilot", "maa://40051", "--raid", "3"]);
+
+                assert!(result.is_err());
+                assert!(
+                    result
+                        .unwrap_err()
+                        .to_string()
+                        .contains("Invalid raid mode")
+                );
+            }
+        }
+
+        mod get_stage_info {
+            use super::*;
+
+            #[test]
+            fn from_id() {
+                // We don't use dirs::find_resource() here, because it is unreliable in tests
+                // due to some tests may change return value of it.
+                let resource_dir = if let Some(resource) = std::env::var_os("MAA_RESOURCE") {
+                    PathBuf::from(resource)
+                } else {
+                    return; // Skip test if resource is not provided
+                };
+
+                let arknights_tile_pos = resource_dir.join("Arknights-Tile-Pos");
+                arknights_tile_pos.ensure().unwrap();
+
+                let stage_id = "act35side_ex01";
+
+                let stage_info =
+                    super::get_stage_info(stage_id, std::slice::from_ref(&resource_dir)).unwrap();
+
+                assert_eq!(stage_info.code, "AS-EX-1");
+            }
+        }
+    }
+
+    mod sss_copilot_params {
+        use super::*;
+
+        mod to_task_type {
+            use super::*;
+
+            #[test]
+            fn returns_sss_copilot() {
+                let params = SSSCopilotParams {
+                    uri: "maa://40051".to_string(),
+                    loop_times: 2,
+                };
+
+                assert_eq!(params.to_task_type(), TaskType::SSSCopilot);
+            }
+        }
+
+        mod into_parameters {
+            use super::*;
+
+            fn parse<I, T>(args: I) -> Result<MAAValue>
+            where
+                I: IntoIterator<Item = T>,
+                T: Into<std::ffi::OsString> + Clone,
+            {
+                let config = AsstConfig::default();
+                let command = crate::command::parse_from(args).command;
+                match command {
+                    crate::Command::SSSCopilot { params, .. } => params.into_parameters(&config),
                     _ => panic!("Not a SSSCopilot command"),
                 }
             }
 
-            assert!(parse(["maa", "ssscopilot", "maa://40051"]).is_err());
-            assert_eq!(
-                parse(["maa", "ssscopilot", "maa://40451"]).unwrap(),
-                object!("filename" => path_from_cache_dir("40451.json"), "loop_times" => 1)
-            );
-            assert_eq!(
-                parse(["maa", "ssscopilot", "maa://40451", "--loop-times", "2"]).unwrap(),
-                object!("filename" => path_from_cache_dir("40451.json"), "loop_times" => 2)
-            );
+            #[test]
+            fn rejects_non_sss_copilot() {
+                ensure_test_server();
+
+                let result = parse(["maa", "ssscopilot", "maa://40051"]);
+
+                assert!(result.is_err());
+                println!("Error: {:?}", result);
+            }
+
+            #[test]
+            fn default_loop_times() {
+                ensure_test_server();
+
+                let params = parse(["maa", "ssscopilot", "maa://40451"]).unwrap();
+
+                assert_eq!(
+                    params,
+                    object!("filename" => path_from_cache_dir("40451.json"), "loop_times" => 1)
+                );
+            }
+
+            #[test]
+            fn custom_loop_times() {
+                ensure_test_server();
+
+                let params =
+                    parse(["maa", "ssscopilot", "maa://40451", "--loop-times", "2"]).unwrap();
+
+                assert_eq!(
+                    params,
+                    object!("filename" => path_from_cache_dir("40451.json"), "loop_times" => 2)
+                );
+            }
+
+            #[test]
+            fn rejects_task_set() {
+                ensure_test_server();
+
+                let result = parse(["maa", "ssscopilot", "maa://23125s"]);
+
+                assert!(result.is_err());
+                assert!(
+                    result
+                        .unwrap_err()
+                        .to_string()
+                        .contains("don't support task set")
+                );
+            }
         }
     }
 
     mod copilot_file {
         use super::*;
 
-        #[test]
-        fn from_uri() {
-            assert!(CopilotFile::from_uri("maa://xyz").is_err());
+        mod from_uri {
+            use super::*;
 
-            assert_eq!(
-                CopilotFile::from_uri("maa://20001s").unwrap(),
-                CopilotFile::RemoteSet(20001)
-            );
-
-            assert_eq!(
-                CopilotFile::from_uri("maa://30001").unwrap(),
-                CopilotFile::Remote(30001)
-            );
-
-            assert_eq!(
-                CopilotFile::from_uri("file://file.json").unwrap(),
-                CopilotFile::Local(Path::new("file.json"))
-            );
-
-            assert_eq!(
-                CopilotFile::from_uri("file.json").unwrap(),
-                CopilotFile::Local(Path::new("file.json"))
-            );
-        }
-
-        #[test]
-        #[ignore = "requires local test server"]
-        fn push_path_to() {
-            ensure_test_server();
-
-            let test_root = temp_dir().join("maa-test-push-path-to");
-            fs::create_dir_all(&test_root).unwrap();
-
-            // Clean up any cached files from previous runs
-            for id in [40051, 40052, 40053, 40055, 40056, 40057, 40058, 40059] {
-                let _ = fs::remove_file(test_root.join(format!("{id}.json")));
+            #[test]
+            fn invalid_code() {
+                assert!(CopilotFile::from_uri("maa://xyz").is_err());
             }
 
-            let test_file = test_root.join("123234.json");
-            let test_content = serde_json::json!({
-              "minimum_required": "v4.0.0",
-              "stage_name": "act25side_01",
-              "actions": [
-                { "type": "SpeedUp" },
-              ],
-              "groups": [],
-              "opers": [],
-            });
+            #[test]
+            fn remote_set() {
+                assert_eq!(
+                    CopilotFile::from_uri("maa://20001s").unwrap(),
+                    CopilotFile::RemoteSet(20001)
+                );
+            }
 
-            serde_json::to_writer(fs::File::create(&test_file).unwrap(), &test_content).unwrap();
+            #[test]
+            fn remote() {
+                assert_eq!(
+                    CopilotFile::from_uri("maa://30001").unwrap(),
+                    CopilotFile::Remote(30001)
+                );
+            }
 
-            // Remote
-            let mut paths = Vec::new();
-            CopilotFile::from_uri("maa://40051")
-                .unwrap()
-                .push_path_to(&mut paths, &test_root)
-                .unwrap();
-            assert_eq!(paths, &[test_root.join("40051.json")]);
+            #[test]
+            fn local_with_file_scheme() {
+                assert_eq!(
+                    CopilotFile::from_uri("file://file.json").unwrap(),
+                    CopilotFile::Local(PathBuf::from("file.json"))
+                );
+            }
 
-            // Clean up for next test
-            let _ = fs::remove_file(test_root.join("40051.json"));
+            #[test]
+            fn local_without_scheme() {
+                assert_eq!(
+                    CopilotFile::from_uri("file.json").unwrap(),
+                    CopilotFile::Local(PathBuf::from("file.json"))
+                );
+            }
 
-            // RemoteSet
-            let mut paths = Vec::new();
-            CopilotFile::from_uri("maa://23125s")
-                .unwrap()
-                .push_path_to(&mut paths, &test_root)
-                .unwrap();
-            assert_eq!(paths, {
-                let ids = [40051, 40052, 40053, 40055, 40056, 40057, 40058, 40059];
+            #[test]
+            fn with_whitespace() {
+                assert_eq!(
+                    CopilotFile::from_uri("  maa://30001  ").unwrap(),
+                    CopilotFile::Remote(30001)
+                );
 
-                ids.iter()
-                    .map(|id| test_root.join(format!("{id}.json")))
-                    .collect::<Vec<PathBuf>>()
-            });
+                assert_eq!(
+                    CopilotFile::from_uri("  file.json  ").unwrap(),
+                    CopilotFile::Local(PathBuf::from("file.json"))
+                );
+            }
+        }
 
-            // Local file (absolute)
-            assert_eq!(
-                {
-                    let mut paths = Vec::new();
-                    CopilotFile::from_uri(test_file.to_str().unwrap())
+        mod push_path_into {
+            use super::*;
+
+            // Helper function to test push_path_into
+            fn assert_push_path_into(
+                uri: &str,
+                index: usize,
+                base_dir: &Path,
+                expected_paths: &[PathBuf],
+            ) {
+                let mut files = Vec::new();
+                CopilotFile::from_uri(uri)
+                    .unwrap()
+                    .push_path_into::<CopilotTask>(index, base_dir, &mut files)
+                    .unwrap();
+
+                assert_eq!(files.len(), expected_paths.len());
+                for (i, expected_path) in expected_paths.iter().enumerate() {
+                    assert_eq!(files[i].0, index);
+                    assert_eq!(&files[i].1, expected_path);
+                }
+            }
+
+            #[test]
+            fn remote() {
+                ensure_test_server();
+
+                let test_root = temp_dir().join("maa-test-push-path-into-remote");
+                fs::create_dir_all(&test_root).unwrap();
+
+                let _ = fs::remove_file(test_root.join("40051.json"));
+
+                assert_push_path_into(
+                    "maa://40051",
+                    0,
+                    &test_root,
+                    &[test_root.join("40051.json")],
+                );
+
+                fs::remove_dir_all(&test_root).unwrap();
+            }
+
+            #[test]
+            fn remote_uses_cache() {
+                ensure_test_server();
+
+                let test_root = temp_dir().join("maa-test-push-path-into-cache");
+                fs::create_dir_all(&test_root).unwrap();
+
+                // First call downloads the file
+                assert_push_path_into(
+                    "maa://40051",
+                    0,
+                    &test_root,
+                    &[test_root.join("40051.json")],
+                );
+
+                // Second call should use cache
+                assert_push_path_into(
+                    "maa://40051",
+                    0,
+                    &test_root,
+                    &[test_root.join("40051.json")],
+                );
+
+                fs::remove_dir_all(&test_root).unwrap();
+            }
+
+            #[test]
+            fn remote_set() {
+                ensure_test_server();
+
+                let test_root = temp_dir().join("maa-test-push-path-into-set");
+                fs::create_dir_all(&test_root).unwrap();
+
+                // Clean up any cached files from previous runs
+                for id in [40051, 40052, 40053, 40055, 40056, 40057, 40058, 40059] {
+                    let _ = fs::remove_file(test_root.join(format!("{id}.json")));
+                }
+
+                let expected_paths: Vec<PathBuf> =
+                    [40051, 40052, 40053, 40055, 40056, 40057, 40058, 40059]
+                        .iter()
+                        .map(|id| test_root.join(format!("{id}.json")))
+                        .collect();
+
+                assert_push_path_into("maa://23125s", 0, &test_root, &expected_paths);
+
+                fs::remove_dir_all(&test_root).unwrap();
+            }
+
+            #[test]
+            fn local_absolute() {
+                ensure_test_server();
+
+                let test_root = temp_dir().join("maa-test-push-path-into-local-abs");
+                fs::create_dir_all(&test_root).unwrap();
+
+                let test_file = test_root.join("123234.json");
+                let test_content = serde_json::json!({
+                  "minimum_required": "v4.0.0",
+                  "stage_name": "act25side_01",
+                  "actions": [{ "type": "SpeedUp" }],
+                  "groups": [],
+                  "opers": [],
+                });
+
+                serde_json::to_writer(fs::File::create(&test_file).unwrap(), &test_content)
+                    .unwrap();
+
+                assert_push_path_into(
+                    test_file.to_str().unwrap(),
+                    0,
+                    &test_root,
+                    std::slice::from_ref(&test_file),
+                );
+
+                fs::remove_dir_all(&test_root).unwrap();
+            }
+
+            #[test]
+            fn local_relative() {
+                ensure_test_server();
+
+                let test_root = temp_dir().join("maa-test-push-path-into-local-rel");
+                fs::create_dir_all(&test_root).unwrap();
+
+                assert_push_path_into("file.json", 0, &test_root, &[test_root.join("file.json")]);
+
+                fs::remove_dir_all(&test_root).unwrap();
+            }
+
+            #[test]
+            fn preserves_index() {
+                ensure_test_server();
+
+                let test_root = temp_dir().join("maa-test-push-path-into-index");
+                fs::create_dir_all(&test_root).unwrap();
+
+                let _ = fs::remove_file(test_root.join("40051.json"));
+
+                // Test with different indices
+                for index in [0, 1, 5, 100] {
+                    let mut files = Vec::new();
+                    CopilotFile::from_uri("maa://40051")
                         .unwrap()
-                        .push_path_to(&mut paths, &test_root)
+                        .push_path_into::<CopilotTask>(index, &test_root, &mut files)
                         .unwrap();
-                    paths
-                },
-                &[test_file.as_path()]
-            );
 
-            // Local file (relative)
-            assert_eq!(
-                {
-                    let mut paths = Vec::new();
-                    CopilotFile::from_uri("file.json")
-                        .unwrap()
-                        .push_path_to(&mut paths, &test_root)
-                        .unwrap();
-                    paths
-                },
-                &[test_root.join("file.json")]
-            );
+                    assert_eq!(files[0].0, index);
+                }
 
-            fs::remove_dir_all(&test_root).unwrap();
+                fs::remove_dir_all(&test_root).unwrap();
+            }
         }
     }
 
     #[test]
     fn gen_operator_table() {
         let json = serde_json::json!({
+            "stage_name": "test_stage",
             "groups": [
               {
                 "name": "行医",
@@ -1065,6 +1273,7 @@ mod tests {
         sub_table.add_row(row!["蜜莓", 1]);
         expected_table.add_row(row!["\n[行医]", sub_table]);
 
-        assert_eq!(operator_table(&json).unwrap(), expected_table);
+        let task: CopilotTask = serde_json::from_value(json).unwrap();
+        assert_eq!(operator_table(&task).unwrap(), expected_table);
     }
 }

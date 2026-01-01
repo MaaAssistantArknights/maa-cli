@@ -28,6 +28,7 @@ maa-sys = { workspace = true, features = ["runtime"] }
 maa-types = { workspace = true, features = ["serde"] }
 maa-version = { workspace = true, optional = true }
 prettytable = { workspace = true }
+rayon = { workspace = true }
 self-replace = { workspace = true }
 semver = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
