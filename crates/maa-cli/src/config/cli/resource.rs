@@ -306,9 +306,11 @@ impl Passphrase {
                         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
                     Ok(Some(Cow::Owned(passphrase.trim().to_owned())))
                 } else {
+                    let stderr = String::from_utf8(output.stderr).unwrap_or_default();
                     Err(anyhow::anyhow!(
-                        "Failed to execute commend: {}",
-                        String::from_utf8(output.stderr).unwrap_or_default()
+                        "Failed to execute command {:?}: {}",
+                        cmd,
+                        stderr
                     ))
                 }
             }

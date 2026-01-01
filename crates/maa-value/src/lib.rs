@@ -787,9 +787,9 @@ mod tests {
             ),
         );
 
-        let optional_unintialized = value.get("optional").unwrap().clone();
+        let optional_uninitialized = value.get("optional").unwrap().clone();
         assert!(matches!(
-            optional_unintialized.init().unwrap_err(),
+            optional_uninitialized.init().unwrap_err(),
             Error::OptionalNotInObject,
         ));
 
