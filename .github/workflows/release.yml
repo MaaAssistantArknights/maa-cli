@@ -136,7 +136,7 @@ jobs:
           CARGO_PROFILE_RELEASE_STRIP: true
           MAA_VERSION: ${{ needs.meta.outputs.version }}
         run: |
-          cargo build --release --package maa-cli --locked --features vendored-openssl
+          cargo build --release --package maa-cli --locked --features git2/vendored-openssl
       - name: Tar Artifact
         run: |
           target_dir="target/$CARGO_BUILD_TARGET/release"
