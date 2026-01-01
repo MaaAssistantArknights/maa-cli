@@ -14,7 +14,6 @@ mod command;
 mod config;
 mod installer;
 mod run;
-mod value;
 
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser};

@@ -1,3 +1,5 @@
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
+
 pub mod userinput;
 
 mod primate;
@@ -5,14 +7,16 @@ pub use primate::MAAPrimate;
 
 mod input;
 pub use std::collections::BTreeMap as Map;
-use std::io;
 
+mod error;
+pub use error::{Error, Result};
 pub use input::MAAInput;
 use serde::{Deserialize, Serialize};
 
-/// TODO: Zero-copy deserialization and reduce clone in init
-#[cfg_attr(test, derive(PartialEq, Debug))]
-#[derive(Deserialize, Clone)]
+// TODO: Zero-copy deserialization and reduce clone in init
+
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Deserialize, Clone, Debug, PartialEq)]
 #[serde(untagged)]
 pub enum MAAValue {
     /// An array of values
@@ -42,13 +46,13 @@ pub enum MAAValue {
     Primate(MAAPrimate),
 }
 
-#[cfg_attr(test, derive(PartialEq, Debug))]
-#[derive(Deserialize, Clone)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Deserialize, Clone, PartialEq, Debug)]
 #[serde(transparent)]
 pub struct BoxedMAAValue(Box<MAAValue>);
 
 impl BoxedMAAValue {
-    fn init(self) -> io::Result<MAAValue> {
+    fn init(self) -> Result<MAAValue> {
         self.0.init()
     }
 }
@@ -89,12 +93,13 @@ impl Serialize for MAAValue {
     }
 }
 
-impl MAAValue {
-    /// Create a new empty object
-    pub fn new() -> Self {
-        Self::Object(Map::new())
+impl Default for MAAValue {
+    fn default() -> Self {
+        Self::Object(Map::default())
     }
+}
 
+impl MAAValue {
     /// Initialize the value
     ///
     /// If the value is an primate value, do nothing.
@@ -113,7 +118,7 @@ impl MAAValue {
     /// ## Other
     ///
     /// Otherwise, if some value failed to initialize, forward the error.
-    pub fn init(self) -> io::Result<Self> {
+    pub fn init(self) -> Result<Self> {
         use MAAValue::*;
         match self {
             Input(v) => Ok(v.into_primate()?.into()),
@@ -136,14 +141,11 @@ impl MAAValue {
                     key: &'key str,
                     map: &'key Map<String, MAAValue>,
                     marks: &mut Map<&'key str, Mark>,
-                ) -> io::Result<()> {
+                ) -> Result<()> {
                     match marks.get(key) {
                         Some(Mark::Visited) => return Ok(()),
                         Some(Mark::Visiting) => {
-                            return Err(io::Error::new(
-                                io::ErrorKind::InvalidData,
-                                "circular dependencies",
-                            ));
+                            return Err(crate::Error::CircularDependency);
                         }
                         _ => {}
                     }
@@ -201,10 +203,7 @@ impl MAAValue {
 
                 Ok(Object(initialized))
             }
-            Optional { .. } => Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "optional input must be in an object",
-            )),
+            Optional { .. } => Err(Error::OptionalNotInObject),
             _ => Ok(self),
         }
     }
@@ -340,7 +339,7 @@ impl MAAValue {
 ///
 /// # Examples
 /// ```
-/// use maa_cli::value::MAAValue;
+/// use maa_value::{MAAValue, object};
 ///
 /// let object = object!(
 ///     "bool" => true,
@@ -351,7 +350,7 @@ impl MAAValue {
 ///     "object" => object!(
 ///         "key1" => "value1",
 ///         "key2" => "value2",
-///     )
+///     ),
 ///     "optional" if "bool" == true => 1,
 ///     "optional_no_satisfied" if "bool" == false => 1,
 ///     "optional_no_exist" if "no_exist" == true => 1,
@@ -360,29 +359,23 @@ impl MAAValue {
 /// ```
 macro_rules! object {
     () => {
-        $crate::value::MAAValue::new()
+        $crate::MAAValue::default()
     };
     ($($key:literal $(if $($cond_key:literal == $expected:expr),*)? => $value:expr),* $(,)?) => {{
-        let mut object = $crate::value::MAAValue::new();
+        let mut object = $crate::MAAValue::default();
         $(
             let value = $value;
             $(
-                let mut conditions = $crate::value::Map::new();
+                let mut conditions = $crate::Map::new();
                 $(
                     conditions.insert($cond_key.into(), $expected.into());
                 )*
-                let value = $crate::value::MAAValue::Optional { conditions, value: value.into() };
+                let value = $crate::MAAValue::Optional { conditions, value: value.into() };
             )?
             object.insert($key, value);
         )*
         object
     }};
-}
-
-impl Default for MAAValue {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl<const N: usize, S: Into<String>, V: Into<MAAValue>> From<[(S, V); N]> for MAAValue {
@@ -447,10 +440,11 @@ impl<'a> TryFromMAAValue<'a> for &str {
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
+    use std::num::NonZero;
+
     use userinput::{BoolInput, Input, SelectD};
 
     use super::*;
-    use crate::assert_matches;
 
     impl MAAValue {
         pub fn merge(&self, other: &Self) -> Self {
@@ -475,15 +469,15 @@ mod tests {
             "int" => 1,
             "object" => object!("key" => "value"),
             "string" => "string",
-            "input_bool" => BoolInput::new(Some(true), None),
-            "input_float" => Input::new(Some(1.0), None),
-            "input_int" => Input::new(Some(1), None),
-            "input_string" => Input::new(sstr("string"), None),
-            "select_int" => SelectD::new([1, 2], Some(2), None, false).unwrap(),
-            "select_float" => SelectD::new([1.0, 2.0], Some(2), None, false).unwrap(),
-            "select_string" => SelectD::<String>::new(["string1", "string2"], Some(2), None, false).unwrap(),
-            "optional" if "input_bool" == true => Input::new(Some(1), None),
-            "optional_no_satisfied" if "input_bool" == false => Input::new(Some(1), None),
+            "input_bool" => BoolInput::new(Some(true)),
+            "input_float" => Input::new(Some(1.0)),
+            "input_int" => Input::new(Some(1)),
+            "input_string" => Input::new(sstr("string")),
+            "select_int" => SelectD::from_iter([1, 2], NonZero::new(2)).unwrap(),
+            "select_float" => SelectD::from_iter([1.0, 2.0], NonZero::new(2)).unwrap(),
+            "select_string" => SelectD::<String>::from_iter(["string1", "string2"], NonZero::new(2)).unwrap(),
+            "optional" if "input_bool" == true => Input::new(Some(1)),
+            "optional_no_satisfied" if "input_bool" == false => Input::new(Some(1)),
             "optional_object" if "input_bool" == true =>
                 object!("key1" => "value1", "key2" => "value2"),
         );
@@ -643,7 +637,7 @@ mod tests {
 
         serde_test::assert_ser_tokens_error(
             &object!(
-                "input_bool" => BoolInput::new(None, None),
+                "input_bool" => BoolInput::new(None),
             ),
             &[Token::Map { len: Some(1) }, Token::Str("input_bool")],
             "cannot serialize input value, you should initialize it first",
@@ -652,7 +646,7 @@ mod tests {
 
     #[test]
     fn init() {
-        let input = BoolInput::new(Some(true), None);
+        let input = BoolInput::new(Some(true));
 
         let value = object!(
             "input" => input.clone(),
@@ -667,7 +661,11 @@ mod tests {
             ),
         );
 
-        let optional = value.get("optional").unwrap().clone();
+        let optional_unintialized = value.get("optional").unwrap().clone();
+        assert!(matches!(
+            optional_unintialized.init().unwrap_err(),
+            Error::OptionalNotInObject,
+        ));
 
         assert_eq!(value.get("input").unwrap(), &MAAValue::from(input.clone()));
         assert_eq!(
@@ -675,23 +673,26 @@ mod tests {
             &MAAValue::Array(vec![1.into()])
         );
         assert_eq!(value.get("primate").unwrap(), &MAAValue::from(1));
-        assert_matches!(value.get("optional").unwrap(), MAAValue::Optional { .. });
-        assert_matches!(
+        assert!(matches!(
+            value.get("optional").unwrap(),
+            MAAValue::Optional { .. }
+        ));
+        assert!(matches!(
             value.get("optional_no_satisfied").unwrap(),
             MAAValue::Optional { .. }
-        );
-        assert_matches!(
+        ));
+        assert!(matches!(
             value.get("optional_no_exist").unwrap(),
             MAAValue::Optional { .. }
-        );
-        assert_matches!(
+        ));
+        assert!(matches!(
             value.get("optional_chian").unwrap(),
             MAAValue::Optional { .. }
-        );
-        assert_matches!(
+        ));
+        assert!(matches!(
             value.get("optional_nested").unwrap(),
             MAAValue::Optional { .. }
-        );
+        ));
 
         let value = value.init().unwrap();
 
@@ -707,23 +708,24 @@ mod tests {
         assert_eq!(value.get("optional_chian").unwrap(), &MAAValue::from(true));
         assert_eq!(value.get("optional_nested").unwrap(), &object!());
 
-        assert_eq!(
-            optional.init().unwrap_err().kind(),
-            io::ErrorKind::InvalidData
-        );
-
         let value = object!(
             "optional1" if "optional2" == true => input.clone(),
             "optional2" if "optional1" == true => input.clone(),
         );
-        assert_eq!(value.init().unwrap_err().kind(), io::ErrorKind::InvalidData);
+        assert!(matches!(
+            value.init().unwrap_err(),
+            Error::CircularDependency,
+        ));
 
         let value = object!(
             "optional1" if "optional2" == true => input.clone(),
             "optional2" if "optional3" == true => input.clone(),
             "optional3" if "optional1" == true => input.clone(),
         );
-        assert_eq!(value.init().unwrap_err().kind(), io::ErrorKind::InvalidData);
+        assert!(matches!(
+            value.init().unwrap_err(),
+            Error::CircularDependency,
+        ));
     }
 
     #[test]
@@ -749,7 +751,7 @@ mod tests {
 
     #[test]
     fn insert() {
-        let mut value = MAAValue::new();
+        let mut value = MAAValue::default();
         assert_eq!(value.get("int"), None);
         value.insert("int", 1);
         assert_eq!(value.get("int").unwrap().as_int().unwrap(), 1);
@@ -764,7 +766,7 @@ mod tests {
 
     #[test]
     fn maybe_insert() {
-        let mut value = MAAValue::new();
+        let mut value = MAAValue::default();
         assert_eq!(value.get("int"), None);
         value.maybe_insert("int", Some(1));
         assert_eq!(value.get("int").unwrap().as_int().unwrap(), 1);
@@ -791,22 +793,19 @@ mod tests {
         assert_eq!(bool::try_from_value(&true.into()), Some(true));
         assert_eq!(i32::try_from_value(&true.into()), None);
         assert_eq!(
-            bool::try_from_value(&BoolInput::new(Some(true), None).into()),
+            bool::try_from_value(&BoolInput::new(Some(true)).into()),
             None
         );
 
         // Int
         assert_eq!(i32::try_from_value(&1.into()), Some(1));
         assert_eq!(f32::try_from_value(&1.into()), None);
-        assert_eq!(i32::try_from_value(&Input::new(Some(1), None).into()), None);
+        assert_eq!(i32::try_from_value(&Input::new(Some(1)).into()), None);
 
         // Float
         assert_eq!(f32::try_from_value(&1.0.into()), Some(1.0));
         assert_eq!(i32::try_from_value(&1.0.into()), None);
-        assert_eq!(
-            f32::try_from_value(&Input::new(Some(1.0), None).into()),
-            None
-        );
+        assert_eq!(f32::try_from_value(&Input::new(Some(1.0)).into()), None);
 
         // String
         assert_eq!(<&str>::try_from_value(&"string".into()), Some("string"));

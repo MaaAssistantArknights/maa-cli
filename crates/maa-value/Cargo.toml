@@ -1,0 +1,23 @@
+[package]
+name = "maa-value"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "A JSON value like Value but support user-defined input"
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+log = { workspace = true }
+schemars = { workspace = true, optional = true }
+serde = { workspace = true, features = ["derive"] }
+
+[dev-dependencies]
+serde_test.workspace = true
+
+[features]
+schema = ["dep:schemars"]
+
+[lints]
+workspace = true
