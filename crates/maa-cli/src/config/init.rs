@@ -1,21 +1,17 @@
 use std::path::PathBuf;
 
 use anyhow::{Result, bail};
-
-use crate::{
-    object,
-    value::{
-        MAAValue,
-        userinput::{BoolInput, Input, SelectD, ValueWithDesc},
-    },
+use maa_value::{
+    MAAValue, object,
+    userinput::{BoolInput, Input, SelectD, ValueWithDesc},
 };
 
 fn asst_config_template() -> MAAValue {
     object!(
-        "setup_connection" => BoolInput::new(Some(true), Some("setup connection")),
+        "setup_connection" => BoolInput::new(Some(true)).with_description("setup connection"),
         "connection_config" if "setup_connection" == true => object!(
             "preset" => SelectD::<String>::new(
-                [
+                vec![
                     ValueWithDesc::new(
                         "MuMuPro",
                         None,
@@ -33,27 +29,23 @@ fn asst_config_template() -> MAAValue {
                         None,
                     ),
                 ],
-                Some(4),
-                Some("connection preset"),
-                false
-            ).unwrap(),
+                std::num::NonZero::new(4),
+            ).unwrap()
+            .with_description("connection preset"),
             "adb_path" if "preset" == "ADB" => Input::<String>::new(
                 Some(String::from("adb")),
-                Some("adb path"),
-            ),
+            ).with_description("adb path"),
             "address" => Input::<String>::new(
                 Some(String::from("auto")),
-                Some("address to connect"),
-            ),
+            ).with_description("address to connect"),
             "config" => Input::<String>::new(
                 Some(String::from("auto")),
-                Some("configuration name to connect (auto for most cases)"),
-            ),
+            ).with_description("configuration name to connect (auto for most cases)"),
         ),
-        "setup_instance_options" => BoolInput::new(Some(true), Some("setup instance options")),
+        "setup_instance_options" => BoolInput::new(Some(true)).with_description("setup instance options"),
         "instance_options" if "setup_instance_options" == true => object!(
             "touch_mode" => SelectD::<String>::new(
-                [
+                vec![
                     ValueWithDesc::new(
                         "ADB",
                         Some("most compatible but slow"),
@@ -71,31 +63,26 @@ fn asst_config_template() -> MAAValue {
                         Some("this if and only if you are connecting to PlayCover"),
                     ),
                 ],
-                Some(3),
-                Some("touch mode"),
-                false
-            ).unwrap(),
+                std::num::NonZero::new(3),
+            ).unwrap()
+            .with_description("touch mode"),
             "deployment_with_pause" => BoolInput::new(
                 Some(false),
-                Some("deploy operator with pause"),
-            ),
+            ).with_description("deploy operator with pause"),
             "adb_lite_enabled" => BoolInput::new(
                 Some(false),
-                Some("enable ADB Lite (a lightweight ADB implementation)"),
-            ),
+            ).with_description("enable ADB Lite (a lightweight ADB implementation)"),
             "kill_adb_on_exit" => BoolInput::new(
                 Some(false),
-                Some("kill ADB server on exit"),
-            ),
+            ).with_description("kill ADB server on exit"),
         ),
         // most of cases don't need to setup resource
         "setup_resource" => BoolInput::new(
             Some(false),
-            Some("setup resource configurations (don't setup it for most cases)"),
-        ),
+        ).with_description("setup resource configurations (don't setup it for most cases)"),
         "resource_config" if "setup_resource" == true => object!(
             "global_resource" => SelectD::<String>::new(
-                [
+                vec![
                     ValueWithDesc::new(
                         "None",
                         Some("no global resource needed by Official and BiliBili client"),
@@ -117,12 +104,10 @@ fn asst_config_template() -> MAAValue {
                         Some("resource for Traditional Chinese client"),
                     ),
                 ],
-                Some(1),
-                Some("global resource to load"),
-                false
-            ).unwrap(),
+                std::num::NonZero::new(1),
+            ).unwrap().with_description("global resource to load"),
             "platform_diff_resource" => SelectD::<String>::new(
-                [
+                vec![
                     ValueWithDesc::new(
                         "None",
                         Some("no platform different resource needed by Android client"),
@@ -132,26 +117,18 @@ fn asst_config_template() -> MAAValue {
                         Some("resource for PlayCover which run iOS client on macOS"),
                     ),
                 ],
-                Some(1),
-                Some("platform different resource to load"),
-                false
-            ).unwrap(),
-            "user_resource" => BoolInput::new(
-                Some(false),
-                Some("load custom resource from user configuration directory"),
-            ),
+                std::num::NonZero::new(1),
+            ).unwrap().with_description("platform different resource to load"),
+            "user_resource" => BoolInput::new(Some(false))
+                .with_description("load custom resource from user configuration directory"),
         ),
         // most of cases don't need to setup static options
-        "setup_static_options" => BoolInput::new(
-            Some(false),
-            Some("setup static options (for hardware acceleration)"),
-        ),
+        "setup_static_options" => BoolInput::new(Some(false))
+            .with_description("setup static options (for hardware acceleration)"),
         "static_options" if "setup_static_options" == true => object!(
-            "cpu_ocr" => BoolInput::new(Some(true), Some("use CPU for OCR")),
-            "gpu_ocr" if "cpu_ocr" == false => Input::<i32>::new(
-                None,
-                Some("GPU device ID for OCR (make sure your MAA Core supports GPU OCR)"),
-            ),
+            "cpu_ocr" => BoolInput::new(Some(true)).with_description("use CPU for OCR"),
+            "gpu_ocr" if "cpu_ocr" == false => Input::<i32>::new(None)
+                .with_description("GPU device ID for OCR (make sure your MAA Core supports GPU OCR)"),
         ),
     )
 }

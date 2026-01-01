@@ -6,6 +6,7 @@ mod primate;
 pub use primate::MAAPrimate;
 
 mod input;
+use std::borrow::Cow;
 pub use std::collections::BTreeMap as Map;
 
 mod error;
@@ -315,15 +316,90 @@ impl MAAValue {
         self.as_primate().and_then(MAAPrimate::as_str)
     }
 
-    /// Merge other value into self
+    /// Merge another owned value into self, taking ownership of `other`.
     ///
-    /// Both self and other should be an object.
-    pub fn merge_mut(&mut self, other: &Self) {
+    /// This method consumes `other` and merges it into `self`, modifying `self` in place.
+    ///
+    /// # Behavior
+    ///
+    /// - **Objects**: Recursively merges key-value pairs. If a key exists in both objects:
+    ///   - If both values are objects, they are recursively merged
+    ///   - Otherwise, the value from `other` replaces the value in `self`
+    /// - **Non-objects**: The value in `self` is completely replaced by `other`
+    ///
+    /// # Performance
+    ///
+    /// This is the most efficient merge variant as it can move values from `other`
+    /// instead of cloning them. Use this when you don't need `other` after the merge.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use maa_value::object;
+    ///
+    /// let mut base = object!("a" => 1, "b" => 2);
+    /// let update = object!("b" => 3, "c" => 4);
+    ///
+    /// base.merge(update);
+    /// assert_eq!(base, object!("a" => 1, "b" => 3, "c" => 4));
+    /// ```
+    ///
+    /// See also: [`merge_from`](Self::merge_from) for borrowing variant, [`join`](Self::join) for
+    /// non-mutating variant
+    pub fn merge(&mut self, other: Self) {
+        match (self, other) {
+            (Self::Object(self_map), Self::Object(other_map)) => {
+                for (key, value) in other_map {
+                    if let Some(self_value) = self_map.get_mut(&key) {
+                        self_value.merge(value);
+                    } else {
+                        self_map.insert(key, value);
+                    }
+                }
+            }
+            (s, o) => *s = o,
+        }
+    }
+
+    /// Merge a borrowed value into self, cloning values from `other` as needed.
+    ///
+    /// This method borrows `other` and merges it into `self`, modifying `self` in place.
+    /// Values from `other` are cloned when inserted into `self`.
+    ///
+    /// # Behavior
+    ///
+    /// - **Objects**: Recursively merges key-value pairs. If a key exists in both objects:
+    ///   - If both values are objects, they are recursively merged
+    ///   - Otherwise, the value from `other` replaces the value in `self`
+    /// - **Non-objects**: The value in `self` is completely replaced by a clone of `other`
+    ///
+    /// # Performance
+    ///
+    /// This variant clones values from `other`, making it less efficient than
+    /// [`merge`](Self::merge). Use this when you need to keep `other` after the merge.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use maa_value::object;
+    ///
+    /// let mut base = object!("a" => 1, "b" => 2);
+    /// let update = object!("b" => 3, "c" => 4);
+    ///
+    /// base.merge_from(&update);
+    /// assert_eq!(base, object!("a" => 1, "b" => 3, "c" => 4));
+    /// // update is still usable
+    /// assert_eq!(update, object!("b" => 3, "c" => 4));
+    /// ```
+    ///
+    /// See also: [`merge`](Self::merge) for owned variant, [`join`](Self::join) for non-mutating
+    /// variant
+    pub fn merge_from(&mut self, other: &Self) {
         match (self, other) {
             (Self::Object(self_map), Self::Object(other_map)) => {
                 for (key, value) in other_map {
                     if let Some(self_value) = self_map.get_mut(key) {
-                        self_value.merge_mut(value);
+                        self_value.merge_from(value);
                     } else {
                         self_map.insert(key.clone(), value.clone());
                     }
@@ -331,6 +407,64 @@ impl MAAValue {
             }
             (s, o) => *s = o.clone(),
         }
+    }
+
+    /// Create a new value by merging `other` into a clone of `self`.
+    ///
+    /// This method clones `self` and merges `other` into the clone, returning the result.
+    /// Neither `self` nor `other` is modified.
+    ///
+    /// # Behavior
+    ///
+    /// - **Objects**: Recursively merges key-value pairs. If a key exists in both objects:
+    ///   - If both values are objects, they are recursively merged
+    ///   - Otherwise, the value from `other` replaces the value from `self` in the result
+    /// - **Non-objects**: Returns a copy/clone of `other`
+    ///
+    /// # Generic Parameter
+    ///
+    /// Accepts either `MAAValue` or `&MAAValue` for convenience:
+    /// - Passing an owned value uses [`merge`](Self::merge) internally (more efficient)
+    /// - Passing a reference uses [`merge_from`](Self::merge_from) internally
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use maa_value::object;
+    ///
+    /// let base = object!("a" => 1, "b" => 2);
+    /// let update = object!("b" => 3, "c" => 4);
+    ///
+    /// // Can use owned or borrowed
+    /// let result1 = base.join(update.clone());
+    /// let result2 = base.join(&update);
+    ///
+    /// assert_eq!(result1, object!("a" => 1, "b" => 3, "c" => 4));
+    /// assert_eq!(result2, result1);
+    /// // base and update are unchanged
+    /// ```
+    ///
+    /// See also: [`merge`](Self::merge), [`merge_from`](Self::merge_from) for mutating variants
+    pub fn join<'a, O: Into<Cow<'a, Self>>>(&self, other: O) -> Self {
+        let mut ret = self.clone();
+        let other = other.into();
+        match other {
+            Cow::Borrowed(other) => ret.merge_from(other),
+            Cow::Owned(other) => ret.merge(other),
+        }
+        ret
+    }
+}
+
+impl<'a> From<MAAValue> for Cow<'a, MAAValue> {
+    fn from(value: MAAValue) -> Self {
+        Cow::Owned(value)
+    }
+}
+
+impl<'a> From<&'a MAAValue> for Cow<'a, MAAValue> {
+    fn from(value: &'a MAAValue) -> Self {
+        Cow::Borrowed(value)
     }
 }
 
@@ -445,14 +579,6 @@ mod tests {
     use userinput::{BoolInput, Input, SelectD};
 
     use super::*;
-
-    impl MAAValue {
-        pub fn merge(&self, other: &Self) -> Self {
-            let mut ret = self.clone();
-            ret.merge_mut(other);
-            ret
-        }
-    }
 
     fn sstr(s: &str) -> Option<String> {
         Some(s.to_string())
@@ -812,44 +938,322 @@ mod tests {
         assert_eq!(bool::try_from_value(&"string".into()), None);
     }
 
-    #[test]
-    fn merge() {
-        let value = object!(
-            "bool" => true,
-            "int" => 1,
-            "float" => 1.0,
-            "string" => "string",
-            "array" => [1, 2],
-            "object" => object!(
-                "key1" => "value1",
-                "key2" => "value2",
-            ),
-        );
+    mod merge {
+        use super::*;
 
-        let value2 = object!(
-            "bool" => false,
-            "int" => 2,
-            "array" => [3, 4],
-            "object" => object!(
-                "key2" => "value2_2",
-                "key3" => "value3",
-            ),
-        );
-
-        assert_eq!(
-            value.merge(&value2),
-            object!(
-                "bool" => false,
-                "int" => 2,
+        #[test]
+        fn merge_owned_objects() {
+            let mut base = object!(
+                "bool" => true,
+                "int" => 1,
                 "float" => 1.0,
                 "string" => "string",
-                "array" => [3, 4], // array will be replaced instead of merged
+                "array" => [1, 2],
                 "object" => object!(
                     "key1" => "value1",
+                    "key2" => "value2",
+                ),
+            );
+
+            let update = object!(
+                "bool" => false,
+                "int" => 2,
+                "array" => [3, 4],
+                "object" => object!(
                     "key2" => "value2_2",
                     "key3" => "value3",
                 ),
-            ),
-        );
+            );
+
+            base.merge(update);
+
+            assert_eq!(
+                base,
+                object!(
+                    "bool" => false,
+                    "int" => 2,
+                    "float" => 1.0,
+                    "string" => "string",
+                    "array" => [3, 4], // array will be replaced instead of merged
+                    "object" => object!(
+                        "key1" => "value1",
+                        "key2" => "value2_2",
+                        "key3" => "value3",
+                    ),
+                ),
+            );
+        }
+
+        #[test]
+        fn merge_owned_primitives() {
+            let mut base = MAAValue::from(1);
+            base.merge(MAAValue::from(2));
+            assert_eq!(base, MAAValue::from(2));
+
+            let mut base = MAAValue::from("hello");
+            base.merge(MAAValue::from("world"));
+            assert_eq!(base, MAAValue::from("world"));
+        }
+
+        #[test]
+        fn merge_owned_deep_nesting() {
+            let mut base = object!(
+                "level1" => object!(
+                    "level2" => object!(
+                        "key" => "original",
+                    ),
+                ),
+            );
+
+            let update = object!(
+                "level1" => object!(
+                    "level2" => object!(
+                        "key" => "updated",
+                        "new_key" => "added",
+                    ),
+                ),
+            );
+
+            base.merge(update);
+
+            assert_eq!(
+                base,
+                object!(
+                    "level1" => object!(
+                        "level2" => object!(
+                            "key" => "updated",
+                            "new_key" => "added",
+                        ),
+                    ),
+                ),
+            );
+        }
+
+        #[test]
+        fn merge_from_objects() {
+            let mut base = object!(
+                "a" => 1,
+                "b" => 2,
+            );
+
+            let update = object!(
+                "b" => 3,
+                "c" => 4,
+            );
+
+            base.merge_from(&update);
+
+            assert_eq!(base, object!("a" => 1, "b" => 3, "c" => 4));
+            // Ensure update is unchanged
+            assert_eq!(update, object!("b" => 3, "c" => 4));
+        }
+
+        #[test]
+        fn merge_from_primitives() {
+            let mut base = MAAValue::from(1);
+            let update = MAAValue::from(2);
+
+            base.merge_from(&update);
+
+            assert_eq!(base, MAAValue::from(2));
+            assert_eq!(update, MAAValue::from(2)); // update unchanged
+        }
+
+        #[test]
+        fn merge_from_mixed_types() {
+            let mut base = MAAValue::from(1);
+            let update = object!("key" => "value");
+
+            base.merge_from(&update);
+
+            // Base should be completely replaced
+            assert_eq!(base, object!("key" => "value"));
+            assert_eq!(update, object!("key" => "value")); // update unchanged
+        }
+
+        #[test]
+        fn join_with_owned() {
+            let base = object!("a" => 1, "b" => 2);
+            let update = object!("b" => 3, "c" => 4);
+
+            let result = base.join(update);
+
+            assert_eq!(result, object!("a" => 1, "b" => 3, "c" => 4));
+            // Base should be unchanged
+            assert_eq!(base, object!("a" => 1, "b" => 2));
+        }
+
+        #[test]
+        fn join_with_borrowed() {
+            let base = object!("a" => 1, "b" => 2);
+            let update = object!("b" => 3, "c" => 4);
+
+            let result = base.join(&update);
+
+            assert_eq!(result, object!("a" => 1, "b" => 3, "c" => 4));
+            // Both should be unchanged
+            assert_eq!(base, object!("a" => 1, "b" => 2));
+            assert_eq!(update, object!("b" => 3, "c" => 4));
+        }
+
+        #[test]
+        fn join_complex_nested() {
+            let base = object!(
+                "bool" => true,
+                "int" => 1,
+                "float" => 1.0,
+                "string" => "string",
+                "array" => [1, 2],
+                "object" => object!(
+                    "key1" => "value1",
+                    "key2" => "value2",
+                ),
+            );
+
+            let update = object!(
+                "bool" => false,
+                "int" => 2,
+                "array" => [3, 4],
+                "object" => object!(
+                    "key2" => "value2_2",
+                    "key3" => "value3",
+                ),
+            );
+
+            assert_eq!(
+                base.join(&update),
+                object!(
+                    "bool" => false,
+                    "int" => 2,
+                    "float" => 1.0,
+                    "string" => "string",
+                    "array" => [3, 4],
+                    "object" => object!(
+                        "key1" => "value1",
+                        "key2" => "value2_2",
+                        "key3" => "value3",
+                    ),
+                ),
+            );
+        }
+
+        #[test]
+        fn join_empty_objects() {
+            let base = object!();
+            let update = object!("a" => 1);
+
+            assert_eq!(base.join(&update), object!("a" => 1));
+
+            let base = object!("a" => 1);
+            let update = object!();
+
+            assert_eq!(base.join(&update), object!("a" => 1));
+        }
+
+        #[test]
+        fn merge_overwrites_different_types() {
+            let mut base = object!(
+                "key" => "string_value",
+            );
+
+            let update = object!(
+                "key" => 123,
+            );
+
+            base.merge_from(&update);
+
+            assert_eq!(base, object!("key" => 123));
+        }
+
+        #[test]
+        fn merge_preserves_unmentioned_keys() {
+            let mut base = object!(
+                "keep1" => "value1",
+                "keep2" => "value2",
+                "override" => "old",
+            );
+
+            let update = object!(
+                "override" => "new",
+                "add" => "added",
+            );
+
+            base.merge_from(&update);
+
+            assert_eq!(
+                base,
+                object!(
+                    "keep1" => "value1",
+                    "keep2" => "value2",
+                    "override" => "new",
+                    "add" => "added",
+                ),
+            );
+        }
+
+        #[test]
+        fn merge_three_levels_deep() {
+            let mut base = object!(
+                "a" => object!(
+                    "b" => object!(
+                        "c" => 1,
+                        "d" => 2,
+                    ),
+                ),
+            );
+
+            let update = object!(
+                "a" => object!(
+                    "b" => object!(
+                        "c" => 999,
+                        "e" => 3,
+                    ),
+                ),
+            );
+
+            base.merge_from(&update);
+
+            assert_eq!(
+                base,
+                object!(
+                    "a" => object!(
+                        "b" => object!(
+                            "c" => 999,
+                            "d" => 2,
+                            "e" => 3,
+                        ),
+                    ),
+                ),
+            );
+        }
+
+        #[test]
+        fn merge_array_replacement() {
+            let mut base = object!(
+                "arrays" => object!(
+                    "arr1" => [1, 2, 3],
+                    "arr2" => ["a", "b"],
+                ),
+            );
+
+            let update = object!(
+                "arrays" => object!(
+                    "arr1" => [4, 5],
+                ),
+            );
+
+            base.merge_from(&update);
+
+            // Arrays should be replaced, not merged
+            assert_eq!(
+                base,
+                object!(
+                    "arrays" => object!(
+                        "arr1" => [4, 5],
+                        "arr2" => ["a", "b"],
+                    ),
+                ),
+            );
+        }
     }
 }

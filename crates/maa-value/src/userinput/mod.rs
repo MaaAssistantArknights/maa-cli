@@ -7,7 +7,7 @@ use crate::{Error, Result};
 
 // Use batch mode in tests by default to avoid blocking tests.
 // This variable can also be change at runtime by cli argument
-static BATCH_MODE: AtomicBool = AtomicBool::new(cfg!(test));
+static BATCH_MODE: AtomicBool = AtomicBool::new(cfg!(test) || cfg!(feature = "default_batch_mode"));
 
 pub fn enable_batch_mode() {
     BATCH_MODE.store(true, Ordering::Relaxed);

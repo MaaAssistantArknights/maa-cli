@@ -6,11 +6,9 @@ use std::{
 };
 
 use anyhow::{Result, bail};
+use maa_value::userinput::{BoolInput, UserInput};
 
-use crate::{
-    dirs::{cache, log, state},
-    value::userinput::{BoolInput, UserInput},
-};
+use crate::dirs::{cache, log, state};
 
 pub trait PathProvider {
     /// Path to a directory to be cleaned up
@@ -145,7 +143,10 @@ where
         println!("{}. {}", i + 1, p.display());
     }
 
-    if !BoolInput::new(Some(true), Some("clear files or folders mentioned above")).value()? {
+    if !BoolInput::new(Some(true))
+        .with_description("clear files or folders mentioned above")
+        .value()?
+    {
         println!("Canceled.");
         return Ok(());
     }

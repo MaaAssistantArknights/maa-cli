@@ -69,7 +69,7 @@ impl super::ToTaskType for ReclamationParams {
 
 impl super::IntoParameters for ReclamationParams {
     fn into_parameters(self, _: &super::AsstConfig) -> anyhow::Result<MAAValue> {
-        let mut value = MAAValue::new();
+        let mut value = MAAValue::default();
         value.insert("theme", self.theme.to_str());
         value.insert("mode", self.mode);
 
@@ -131,7 +131,7 @@ mod tests {
             }
         }
 
-        use crate::object;
+        use maa_value::object;
 
         let base_params = object!("theme" => "Tales", "mode" => 1);
 

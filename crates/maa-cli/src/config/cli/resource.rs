@@ -1,9 +1,9 @@
 use std::{borrow::Cow, path::PathBuf};
 
+use anyhow::Context;
 use maa_dirs::expand_tilde;
+use maa_value::userinput::{Input, UserInput};
 use serde::Deserialize;
-
-use crate::value::userinput::{Input, UserInput};
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Default, Clone)]
@@ -283,18 +283,20 @@ impl Passphrase {
         matches!(self, Passphrase::None | Passphrase::Prompt)
     }
 
-    pub fn get(&self) -> std::io::Result<Option<Cow<'_, str>>> {
+    pub fn get(&self) -> anyhow::Result<Option<Cow<'_, str>>> {
         match self {
             Passphrase::None => Ok(None),
-            Passphrase::Prompt => Input::<String>::new(None, Some("passphrase"))
+            Passphrase::Prompt => Input::<String>::new(None)
+                .with_description("passphrase")
                 .value()
                 .map(Cow::Owned)
-                .map(Some),
+                .map(Some)
+                .context("Failed to get passphrase from user input"),
             Passphrase::Plain(password) => Ok(Some(Cow::Borrowed(password))),
             Passphrase::Env(name) => std::env::var(name)
                 .map(Cow::Owned)
                 .map(Some)
-                .map_err(std::io::Error::other),
+                .context("Failed to get passphrase from environment variable"),
             Passphrase::Command(cmd) => {
                 let output = std::process::Command::new(&cmd[0])
                     .args(&cmd[1..])
@@ -304,8 +306,9 @@ impl Passphrase {
                         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
                     Ok(Some(Cow::Owned(passphrase.trim().to_owned())))
                 } else {
-                    Err(std::io::Error::other(
-                        String::from_utf8(output.stderr).unwrap_or_default(),
+                    Err(anyhow::anyhow!(
+                        "Failed to execute commend: {}",
+                        String::from_utf8(output.stderr).unwrap_or_default()
                     ))
                 }
             }

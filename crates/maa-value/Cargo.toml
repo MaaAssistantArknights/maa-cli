@@ -14,9 +14,11 @@ schemars = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
-serde_test.workspace = true
+serde_test = { workspace = true }
 
 [features]
+# Enable batch mode by default
+default_batch_mode = []
 schema = ["dep:schemars"]
 
 [lints]
