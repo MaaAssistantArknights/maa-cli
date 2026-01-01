@@ -1085,6 +1085,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "maa-value"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "schemars",
+ "serde",
+ "serde_test",
+]
+
+[[package]]
 name = "maa-version"
 version = "0.1.0"
 dependencies = [
