@@ -1,5 +1,0 @@
-comment:
-  # do not comment PRs if coverage is not changed
-  require_changes: true
-  # comment after receiving coverage reports from all three platforms
-  after_n_builds: 6
