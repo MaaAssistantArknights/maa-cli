@@ -13,7 +13,7 @@ license = "AGPL-3.0-only"
 [workspace.dependencies]
 anyhow = "1"
 chrono = { version = "0.4.31", default-features = false }
-clap = { version = "4.4", features = ["unstable-markdown"] }
+clap = { version = "4.4" }
 clap_complete = "4.4"
 clap_mangen = "0.2.20"
 color-print = "0.3.6"

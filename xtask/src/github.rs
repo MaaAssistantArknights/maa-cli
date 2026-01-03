@@ -7,7 +7,10 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
-use serde::Deserialize;
+use serde::{
+    Deserialize, Deserializer,
+    de::{self, MapAccess, Visitor},
+};
 
 use crate::{env, release::Channel};
 
@@ -47,9 +50,82 @@ impl EventName {
 }
 
 /// GitHub workflow event structure for workflow_dispatch events.
-#[derive(Deserialize)]
 pub struct WorkflowEvent {
     pub inputs: WorkflowInputs,
+}
+
+impl<'de> Deserialize<'de> for WorkflowEvent {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        enum Field {
+            Inputs,
+        }
+
+        impl<'de> Deserialize<'de> for Field {
+            fn deserialize<D>(deserializer: D) -> Result<Field, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                struct FieldVisitor;
+
+                impl<'de> Visitor<'de> for FieldVisitor {
+                    type Value = Field;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        formatter.write_str("`inputs`")
+                    }
+
+                    fn visit_str<E>(self, value: &str) -> Result<Field, E>
+                    where
+                        E: de::Error,
+                    {
+                        match value {
+                            "inputs" => Ok(Field::Inputs),
+                            _ => Err(de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+
+                deserializer.deserialize_identifier(FieldVisitor)
+            }
+        }
+
+        struct WorkflowEventVisitor;
+
+        impl<'de> Visitor<'de> for WorkflowEventVisitor {
+            type Value = WorkflowEvent;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("struct WorkflowEvent")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<WorkflowEvent, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut inputs = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Inputs => {
+                            if inputs.is_some() {
+                                return Err(de::Error::duplicate_field("inputs"));
+                            }
+                            inputs = Some(map.next_value()?);
+                        }
+                    }
+                }
+
+                let inputs = inputs.ok_or_else(|| de::Error::missing_field("inputs"))?;
+                Ok(WorkflowEvent { inputs })
+            }
+        }
+
+        const FIELDS: &[&str] = &["inputs"];
+        deserializer.deserialize_struct("WorkflowEvent", FIELDS, WorkflowEventVisitor)
+    }
 }
 
 impl WorkflowEvent {
@@ -66,23 +142,102 @@ impl WorkflowEvent {
 }
 
 /// Inputs for workflow_dispatch events.
-#[derive(Deserialize)]
 pub struct WorkflowInputs {
     pub channel: Channel,
-    #[serde(deserialize_with = "deserialize_bool_from_string")]
     pub publish: bool,
 }
 
-/// Deserialize a boolean from a string.
-fn deserialize_bool_from_string<'de, D>(deserializer: D) -> Result<bool, D::Error>
-where
-    D: serde::de::Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    match s.as_str() {
-        "true" => Ok(true),
-        "false" => Ok(false),
-        _ => Err(serde::de::Error::custom("Invalid boolean string: {s}")),
+impl<'de> Deserialize<'de> for WorkflowInputs {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        enum Field {
+            Channel,
+            Publish,
+        }
+
+        impl<'de> Deserialize<'de> for Field {
+            fn deserialize<D>(deserializer: D) -> Result<Field, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                struct FieldVisitor;
+
+                impl<'de> Visitor<'de> for FieldVisitor {
+                    type Value = Field;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        formatter.write_str("`channel` or `publish`")
+                    }
+
+                    fn visit_str<E>(self, value: &str) -> Result<Field, E>
+                    where
+                        E: de::Error,
+                    {
+                        match value {
+                            "channel" => Ok(Field::Channel),
+                            "publish" => Ok(Field::Publish),
+                            _ => Err(de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+
+                deserializer.deserialize_identifier(FieldVisitor)
+            }
+        }
+
+        struct WorkflowInputsVisitor;
+
+        impl<'de> Visitor<'de> for WorkflowInputsVisitor {
+            type Value = WorkflowInputs;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("struct WorkflowInputs")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<WorkflowInputs, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut channel = None;
+                let mut publish = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Channel => {
+                            if channel.is_some() {
+                                return Err(de::Error::duplicate_field("channel"));
+                            }
+                            let s: String = map.next_value()?;
+                            channel = Some(s.parse().map_err(de::Error::custom)?);
+                        }
+                        Field::Publish => {
+                            if publish.is_some() {
+                                return Err(de::Error::duplicate_field("publish"));
+                            }
+                            let s: String = map.next_value()?;
+                            publish = Some(match s.as_str() {
+                                "true" => true,
+                                "false" => false,
+                                _ => {
+                                    return Err(de::Error::custom(format!(
+                                        "Invalid boolean string: {s}"
+                                    )));
+                                }
+                            });
+                        }
+                    }
+                }
+
+                let channel = channel.ok_or_else(|| de::Error::missing_field("channel"))?;
+                let publish = publish.ok_or_else(|| de::Error::missing_field("publish"))?;
+                Ok(WorkflowInputs { channel, publish })
+            }
+        }
+
+        const FIELDS: &[&str] = &["channel", "publish"];
+        deserializer.deserialize_struct("WorkflowInputs", FIELDS, WorkflowInputsVisitor)
     }
 }
 

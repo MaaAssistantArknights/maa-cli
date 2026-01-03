@@ -9,7 +9,7 @@ license.workspace = true
 
 [dependencies]
 semver = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
+serde = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }

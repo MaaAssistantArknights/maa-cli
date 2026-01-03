@@ -1,16 +1,17 @@
 use std::str::FromStr;
 
 use anyhow::{Result, bail};
-use clap::Subcommand;
-use serde::Deserialize;
+use serde::{
+    Deserialize, Deserializer,
+    de::{self, Visitor},
+};
 
 pub mod archive;
-mod meta;
-mod package;
+pub(crate) mod meta;
+pub(crate) mod package;
 
 /// Release channel for maa-cli.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Clone, Copy)]
 pub enum Channel {
     /// Stable release
     Stable,
@@ -18,6 +19,39 @@ pub enum Channel {
     Beta,
     /// Alpha pre-release (nightly)
     Alpha,
+}
+
+impl<'de> Deserialize<'de> for Channel {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ChannelVisitor;
+
+        impl<'de> Visitor<'de> for ChannelVisitor {
+            type Value = Channel;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a channel name: stable, beta, or alpha")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Channel, E>
+            where
+                E: de::Error,
+            {
+                match value {
+                    "stable" => Ok(Channel::Stable),
+                    "beta" => Ok(Channel::Beta),
+                    "alpha" => Ok(Channel::Alpha),
+                    _ => Err(de::Error::unknown_variant(value, &[
+                        "stable", "beta", "alpha",
+                    ])),
+                }
+            }
+        }
+
+        deserializer.deserialize_str(ChannelVisitor)
+    }
 }
 
 impl FromStr for Channel {
@@ -64,20 +98,5 @@ impl Channel {
                 "version/stable.json",
             ],
         }
-    }
-}
-
-#[derive(Subcommand)]
-pub enum ReleaseCommands {
-    /// Parse version and determine release metadata
-    Meta,
-    /// Update version.json files with release information
-    Package,
-}
-
-pub fn run(command: ReleaseCommands) -> Result<()> {
-    match command {
-        ReleaseCommands::Meta => meta::run(),
-        ReleaseCommands::Package => package::run(),
     }
 }

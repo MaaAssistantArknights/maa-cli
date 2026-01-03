@@ -184,10 +184,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Setup Toolchains
-        uses: ./.github/actions/setup
       - name: Install MaaCore
-        uses: ./.github/actions/install-core
+        env:
+          MAA_CONFIG_DIR: ${{ github.workspace }}/crates/maa-cli/config_examples
+        run: |
+          cargo run --package maa-cli -- install beta
+          core_dir=$(cargo run -- dir library)
+          cache_dir=$(cargo run -- dir cache)
+          package_name=$(basename "$cache_dir"/MAA-v*)
+          version=$(echo "$package_name" | sed -E 's/^MAA-v(.+)-(linux|macos|win)-.*/\1/')
+          echo "Downloaded MaaCore version: $version"
+          {
+            echo "MAA_CORE_DIR=$core_dir"
+            echo "MAA_CORE_VERSION=v$version"
+          } >> "$GITHUB_ENV"
       - name: Build
         run: cargo build --package maa-sys --locked
       - name: Lint (clippy)

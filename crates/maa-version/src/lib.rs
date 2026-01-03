@@ -2,22 +2,119 @@
 //! A simple crate to provide serde struct of version api json for both maa-cli and MaaCore.
 
 use semver::Version;
-use serde::{Deserialize, Serialize};
+use serde::{
+    Deserialize, Deserializer, Serialize, Serializer,
+    de::{self, MapAccess, Visitor},
+};
 
 /// Common used version manifest struct for both CLI and MaaCore.
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct VersionManifest<D> {
-    #[serde(deserialize_with = "deserialize_version")]
     pub version: Version,
     pub details: D,
 }
 
-fn deserialize_version<'de, D: serde::Deserializer<'de>>(de: D) -> Result<Version, D::Error> {
-    use serde::de::Error;
-    let s = String::deserialize(de)?;
-    let s = s.as_str();
-    let s = s.strip_prefix('v').unwrap_or(s);
-    Version::parse(s).map_err(D::Error::custom)
+impl<D: Serialize> Serialize for VersionManifest<D> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("VersionManifest", 2)?;
+        state.serialize_field("version", &self.version.to_string())?;
+        state.serialize_field("details", &self.details)?;
+        state.end()
+    }
+}
+
+impl<'de, D: Deserialize<'de>> Deserialize<'de> for VersionManifest<D> {
+    fn deserialize<De>(deserializer: De) -> Result<Self, De::Error>
+    where
+        De: Deserializer<'de>,
+    {
+        enum Field {
+            Version,
+            Details,
+        }
+
+        impl<'de> Deserialize<'de> for Field {
+            fn deserialize<D>(deserializer: D) -> Result<Field, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                struct FieldVisitor;
+
+                impl<'de> Visitor<'de> for FieldVisitor {
+                    type Value = Field;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        formatter.write_str("`version` or `details`")
+                    }
+
+                    fn visit_str<E>(self, value: &str) -> Result<Field, E>
+                    where
+                        E: de::Error,
+                    {
+                        match value {
+                            "version" => Ok(Field::Version),
+                            "details" => Ok(Field::Details),
+                            _ => Err(de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+
+                deserializer.deserialize_identifier(FieldVisitor)
+            }
+        }
+
+        struct VersionManifestVisitor<D> {
+            marker: std::marker::PhantomData<D>,
+        }
+
+        impl<'de, D: Deserialize<'de>> Visitor<'de> for VersionManifestVisitor<D> {
+            type Value = VersionManifest<D>;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("struct VersionManifest")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<VersionManifest<D>, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut version = None;
+                let mut details = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Version => {
+                            if version.is_some() {
+                                return Err(de::Error::duplicate_field("version"));
+                            }
+                            let s: String = map.next_value()?;
+                            let s = s.strip_prefix('v').unwrap_or(&s);
+                            version = Some(Version::parse(s).map_err(de::Error::custom)?);
+                        }
+                        Field::Details => {
+                            if details.is_some() {
+                                return Err(de::Error::duplicate_field("details"));
+                            }
+                            details = Some(map.next_value()?);
+                        }
+                    }
+                }
+
+                let version = version.ok_or_else(|| de::Error::missing_field("version"))?;
+                let details = details.ok_or_else(|| de::Error::missing_field("details"))?;
+                Ok(VersionManifest { version, details })
+            }
+        }
+
+        const FIELDS: &[&str] = &["version", "details"];
+        deserializer.deserialize_struct("VersionManifest", FIELDS, VersionManifestVisitor {
+            marker: std::marker::PhantomData,
+        })
+    }
 }
 
 pub mod cli {
@@ -26,19 +123,250 @@ pub mod cli {
     use super::*;
 
     #[cfg_attr(test, derive(PartialEq, Eq))]
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[derive(Debug, Clone)]
     pub struct Details {
         pub tag: String,
         pub commit: String,
         pub assets: Map<String, Asset>,
     }
 
+    impl Serialize for Details {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            use serde::ser::SerializeStruct;
+            let mut state = serializer.serialize_struct("Details", 3)?;
+            state.serialize_field("tag", &self.tag)?;
+            state.serialize_field("commit", &self.commit)?;
+            state.serialize_field("assets", &self.assets)?;
+            state.end()
+        }
+    }
+
+    impl<'de> Deserialize<'de> for Details {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            enum Field {
+                Tag,
+                Commit,
+                Assets,
+            }
+
+            impl<'de> Deserialize<'de> for Field {
+                fn deserialize<D>(deserializer: D) -> Result<Field, D::Error>
+                where
+                    D: Deserializer<'de>,
+                {
+                    struct FieldVisitor;
+
+                    impl<'de> Visitor<'de> for FieldVisitor {
+                        type Value = Field;
+
+                        fn expecting(
+                            &self,
+                            formatter: &mut std::fmt::Formatter,
+                        ) -> std::fmt::Result {
+                            formatter.write_str("`tag`, `commit`, or `assets`")
+                        }
+
+                        fn visit_str<E>(self, value: &str) -> Result<Field, E>
+                        where
+                            E: de::Error,
+                        {
+                            match value {
+                                "tag" => Ok(Field::Tag),
+                                "commit" => Ok(Field::Commit),
+                                "assets" => Ok(Field::Assets),
+                                _ => Err(de::Error::unknown_field(value, FIELDS)),
+                            }
+                        }
+                    }
+
+                    deserializer.deserialize_identifier(FieldVisitor)
+                }
+            }
+
+            struct DetailsVisitor;
+
+            impl<'de> Visitor<'de> for DetailsVisitor {
+                type Value = Details;
+
+                fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    formatter.write_str("struct Details")
+                }
+
+                fn visit_map<V>(self, mut map: V) -> Result<Details, V::Error>
+                where
+                    V: MapAccess<'de>,
+                {
+                    let mut tag = None;
+                    let mut commit = None;
+                    let mut assets = None;
+
+                    while let Some(key) = map.next_key()? {
+                        match key {
+                            Field::Tag => {
+                                if tag.is_some() {
+                                    return Err(de::Error::duplicate_field("tag"));
+                                }
+                                tag = Some(map.next_value()?);
+                            }
+                            Field::Commit => {
+                                if commit.is_some() {
+                                    return Err(de::Error::duplicate_field("commit"));
+                                }
+                                commit = Some(map.next_value()?);
+                            }
+                            Field::Assets => {
+                                if assets.is_some() {
+                                    return Err(de::Error::duplicate_field("assets"));
+                                }
+                                assets = Some(map.next_value()?);
+                            }
+                        }
+                    }
+
+                    let tag = tag.ok_or_else(|| de::Error::missing_field("tag"))?;
+                    let commit = commit.ok_or_else(|| de::Error::missing_field("commit"))?;
+                    let assets = assets.ok_or_else(|| de::Error::missing_field("assets"))?;
+                    Ok(Details {
+                        tag,
+                        commit,
+                        assets,
+                    })
+                }
+            }
+
+            const FIELDS: &[&str] = &["tag", "commit", "assets"];
+            deserializer.deserialize_struct("Details", FIELDS, DetailsVisitor)
+        }
+    }
+
     #[cfg_attr(test, derive(PartialEq, Eq))]
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[derive(Debug, Clone)]
     pub struct Asset {
         pub name: String,
         pub size: u64,
         pub sha256sum: String,
+    }
+
+    impl Serialize for Asset {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            use serde::ser::SerializeStruct;
+            let mut state = serializer.serialize_struct("Asset", 3)?;
+            state.serialize_field("name", &self.name)?;
+            state.serialize_field("size", &self.size)?;
+            state.serialize_field("sha256sum", &self.sha256sum)?;
+            state.end()
+        }
+    }
+
+    impl<'de> Deserialize<'de> for Asset {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            enum Field {
+                Name,
+                Size,
+                Sha256sum,
+            }
+
+            impl<'de> Deserialize<'de> for Field {
+                fn deserialize<D>(deserializer: D) -> Result<Field, D::Error>
+                where
+                    D: Deserializer<'de>,
+                {
+                    struct FieldVisitor;
+
+                    impl<'de> Visitor<'de> for FieldVisitor {
+                        type Value = Field;
+
+                        fn expecting(
+                            &self,
+                            formatter: &mut std::fmt::Formatter,
+                        ) -> std::fmt::Result {
+                            formatter.write_str("`name`, `size`, or `sha256sum`")
+                        }
+
+                        fn visit_str<E>(self, value: &str) -> Result<Field, E>
+                        where
+                            E: de::Error,
+                        {
+                            match value {
+                                "name" => Ok(Field::Name),
+                                "size" => Ok(Field::Size),
+                                "sha256sum" => Ok(Field::Sha256sum),
+                                _ => Err(de::Error::unknown_field(value, FIELDS)),
+                            }
+                        }
+                    }
+
+                    deserializer.deserialize_identifier(FieldVisitor)
+                }
+            }
+
+            struct AssetVisitor;
+
+            impl<'de> Visitor<'de> for AssetVisitor {
+                type Value = Asset;
+
+                fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    formatter.write_str("struct Asset")
+                }
+
+                fn visit_map<V>(self, mut map: V) -> Result<Asset, V::Error>
+                where
+                    V: MapAccess<'de>,
+                {
+                    let mut name = None;
+                    let mut size = None;
+                    let mut sha256sum = None;
+
+                    while let Some(key) = map.next_key()? {
+                        match key {
+                            Field::Name => {
+                                if name.is_some() {
+                                    return Err(de::Error::duplicate_field("name"));
+                                }
+                                name = Some(map.next_value()?);
+                            }
+                            Field::Size => {
+                                if size.is_some() {
+                                    return Err(de::Error::duplicate_field("size"));
+                                }
+                                size = Some(map.next_value()?);
+                            }
+                            Field::Sha256sum => {
+                                if sha256sum.is_some() {
+                                    return Err(de::Error::duplicate_field("sha256sum"));
+                                }
+                                sha256sum = Some(map.next_value()?);
+                            }
+                        }
+                    }
+
+                    let name = name.ok_or_else(|| de::Error::missing_field("name"))?;
+                    let size = size.ok_or_else(|| de::Error::missing_field("size"))?;
+                    let sha256sum =
+                        sha256sum.ok_or_else(|| de::Error::missing_field("sha256sum"))?;
+                    Ok(Asset {
+                        name,
+                        size,
+                        sha256sum,
+                    })
+                }
+            }
+
+            const FIELDS: &[&str] = &["name", "size", "sha256sum"];
+            deserializer.deserialize_struct("Asset", FIELDS, AssetVisitor)
+        }
     }
 }
 
@@ -46,18 +374,236 @@ pub mod core {
     use super::*;
 
     #[cfg_attr(test, derive(PartialEq, Eq))]
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[derive(Debug, Clone)]
     pub struct Details {
         pub assets: Vec<Asset>,
     }
 
+    impl Serialize for Details {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            use serde::ser::SerializeStruct;
+            let mut state = serializer.serialize_struct("Details", 1)?;
+            state.serialize_field("assets", &self.assets)?;
+            state.end()
+        }
+    }
+
+    impl<'de> Deserialize<'de> for Details {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            enum Field {
+                Assets,
+            }
+
+            impl<'de> Deserialize<'de> for Field {
+                fn deserialize<D>(deserializer: D) -> Result<Field, D::Error>
+                where
+                    D: Deserializer<'de>,
+                {
+                    struct FieldVisitor;
+
+                    impl<'de> Visitor<'de> for FieldVisitor {
+                        type Value = Field;
+
+                        fn expecting(
+                            &self,
+                            formatter: &mut std::fmt::Formatter,
+                        ) -> std::fmt::Result {
+                            formatter.write_str("`assets`")
+                        }
+
+                        fn visit_str<E>(self, value: &str) -> Result<Field, E>
+                        where
+                            E: de::Error,
+                        {
+                            match value {
+                                "assets" => Ok(Field::Assets),
+                                _ => Err(de::Error::unknown_field(value, FIELDS)),
+                            }
+                        }
+                    }
+
+                    deserializer.deserialize_identifier(FieldVisitor)
+                }
+            }
+
+            struct DetailsVisitor;
+
+            impl<'de> Visitor<'de> for DetailsVisitor {
+                type Value = Details;
+
+                fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    formatter.write_str("struct Details")
+                }
+
+                fn visit_map<V>(self, mut map: V) -> Result<Details, V::Error>
+                where
+                    V: MapAccess<'de>,
+                {
+                    let mut assets = None;
+
+                    while let Some(key) = map.next_key()? {
+                        match key {
+                            Field::Assets => {
+                                if assets.is_some() {
+                                    return Err(de::Error::duplicate_field("assets"));
+                                }
+                                assets = Some(map.next_value()?);
+                            }
+                        }
+                    }
+
+                    let assets = assets.ok_or_else(|| de::Error::missing_field("assets"))?;
+                    Ok(Details { assets })
+                }
+            }
+
+            const FIELDS: &[&str] = &["assets"];
+            deserializer.deserialize_struct("Details", FIELDS, DetailsVisitor)
+        }
+    }
+
     #[cfg_attr(test, derive(PartialEq, Eq))]
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[derive(Debug, Clone)]
     pub struct Asset {
         pub name: String,
         pub size: u64,
         pub browser_download_url: String,
         pub mirrors: Vec<String>,
+    }
+
+    impl Serialize for Asset {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            use serde::ser::SerializeStruct;
+            let mut state = serializer.serialize_struct("Asset", 4)?;
+            state.serialize_field("name", &self.name)?;
+            state.serialize_field("size", &self.size)?;
+            state.serialize_field("browser_download_url", &self.browser_download_url)?;
+            state.serialize_field("mirrors", &self.mirrors)?;
+            state.end()
+        }
+    }
+
+    impl<'de> Deserialize<'de> for Asset {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            enum Field {
+                Name,
+                Size,
+                BrowserDownloadUrl,
+                Mirrors,
+            }
+
+            impl<'de> Deserialize<'de> for Field {
+                fn deserialize<D>(deserializer: D) -> Result<Field, D::Error>
+                where
+                    D: Deserializer<'de>,
+                {
+                    struct FieldVisitor;
+
+                    impl<'de> Visitor<'de> for FieldVisitor {
+                        type Value = Field;
+
+                        fn expecting(
+                            &self,
+                            formatter: &mut std::fmt::Formatter,
+                        ) -> std::fmt::Result {
+                            formatter
+                                .write_str("`name`, `size`, `browser_download_url`, or `mirrors`")
+                        }
+
+                        fn visit_str<E>(self, value: &str) -> Result<Field, E>
+                        where
+                            E: de::Error,
+                        {
+                            match value {
+                                "name" => Ok(Field::Name),
+                                "size" => Ok(Field::Size),
+                                "browser_download_url" => Ok(Field::BrowserDownloadUrl),
+                                "mirrors" => Ok(Field::Mirrors),
+                                _ => Err(de::Error::unknown_field(value, FIELDS)),
+                            }
+                        }
+                    }
+
+                    deserializer.deserialize_identifier(FieldVisitor)
+                }
+            }
+
+            struct AssetVisitor;
+
+            impl<'de> Visitor<'de> for AssetVisitor {
+                type Value = Asset;
+
+                fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    formatter.write_str("struct Asset")
+                }
+
+                fn visit_map<V>(self, mut map: V) -> Result<Asset, V::Error>
+                where
+                    V: MapAccess<'de>,
+                {
+                    let mut name = None;
+                    let mut size = None;
+                    let mut browser_download_url = None;
+                    let mut mirrors = None;
+
+                    while let Some(key) = map.next_key()? {
+                        match key {
+                            Field::Name => {
+                                if name.is_some() {
+                                    return Err(de::Error::duplicate_field("name"));
+                                }
+                                name = Some(map.next_value()?);
+                            }
+                            Field::Size => {
+                                if size.is_some() {
+                                    return Err(de::Error::duplicate_field("size"));
+                                }
+                                size = Some(map.next_value()?);
+                            }
+                            Field::BrowserDownloadUrl => {
+                                if browser_download_url.is_some() {
+                                    return Err(de::Error::duplicate_field("browser_download_url"));
+                                }
+                                browser_download_url = Some(map.next_value()?);
+                            }
+                            Field::Mirrors => {
+                                if mirrors.is_some() {
+                                    return Err(de::Error::duplicate_field("mirrors"));
+                                }
+                                mirrors = Some(map.next_value()?);
+                            }
+                        }
+                    }
+
+                    let name = name.ok_or_else(|| de::Error::missing_field("name"))?;
+                    let size = size.ok_or_else(|| de::Error::missing_field("size"))?;
+                    let browser_download_url = browser_download_url
+                        .ok_or_else(|| de::Error::missing_field("browser_download_url"))?;
+                    let mirrors = mirrors.ok_or_else(|| de::Error::missing_field("mirrors"))?;
+                    Ok(Asset {
+                        name,
+                        size,
+                        browser_download_url,
+                        mirrors,
+                    })
+                }
+            }
+
+            const FIELDS: &[&str] = &["name", "size", "browser_download_url", "mirrors"];
+            deserializer.deserialize_struct("Asset", FIELDS, AssetVisitor)
+        }
     }
 }
 
@@ -136,6 +682,79 @@ mod tests {
         fn deserialize_invalid_version() {
             let result: Result<VersionManifest<()>, _> =
                 serde_json::from_str(r#"{"version": "invalid", "details": null}"#);
+
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn deserialize_missing_version_field() {
+            let result: Result<VersionManifest<()>, _> =
+                serde_json::from_str(r#"{"details": null}"#);
+
+            assert!(result.is_err());
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("missing field `version`")
+            );
+        }
+
+        #[test]
+        fn deserialize_missing_details_field() {
+            let result: Result<VersionManifest<()>, _> =
+                serde_json::from_str(r#"{"version": "1.2.3"}"#);
+
+            assert!(result.is_err());
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("missing field `details`")
+            );
+        }
+
+        #[test]
+        fn deserialize_duplicate_version_field() {
+            let result: Result<VersionManifest<()>, _> = serde_json::from_str(
+                r#"{"version": "1.2.3", "version": "1.2.4", "details": null}"#,
+            );
+
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("duplicate field"));
+        }
+
+        #[test]
+        fn deserialize_duplicate_details_field() {
+            let result: Result<VersionManifest<()>, _> =
+                serde_json::from_str(r#"{"version": "1.2.3", "details": null, "details": null}"#);
+
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("duplicate field"));
+        }
+
+        #[test]
+        fn deserialize_unknown_field() {
+            let result: Result<VersionManifest<()>, _> = serde_json::from_str(
+                r#"{"version": "1.2.3", "details": null, "unknown": "field"}"#,
+            );
+
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("unknown field"));
+        }
+
+        #[test]
+        fn deserialize_wrong_version_type() {
+            let result: Result<VersionManifest<()>, _> =
+                serde_json::from_str(r#"{"version": 123, "details": null}"#);
+
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn deserialize_empty_version_string() {
+            let result: Result<VersionManifest<()>, _> =
+                serde_json::from_str(r#"{"version": "", "details": null}"#);
 
             assert!(result.is_err());
         }
@@ -230,6 +849,165 @@ mod tests {
             let deserialized: Details = serde_json::from_str(&json).unwrap();
 
             assert_eq!(details, deserialized);
+        }
+
+        #[test]
+        fn asset_deserialize_missing_name() {
+            let result: Result<Asset, _> =
+                serde_json::from_str(r#"{"size": 123, "sha256sum": "abc"}"#);
+
+            assert!(result.is_err());
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("missing field `name`")
+            );
+        }
+
+        #[test]
+        fn asset_deserialize_missing_size() {
+            let result: Result<Asset, _> =
+                serde_json::from_str(r#"{"name": "test.zip", "sha256sum": "abc"}"#);
+
+            assert!(result.is_err());
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("missing field `size`")
+            );
+        }
+
+        #[test]
+        fn asset_deserialize_missing_sha256sum() {
+            let result: Result<Asset, _> =
+                serde_json::from_str(r#"{"name": "test.zip", "size": 123}"#);
+
+            assert!(result.is_err());
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("missing field `sha256sum`")
+            );
+        }
+
+        #[test]
+        fn asset_deserialize_duplicate_field() {
+            let result: Result<Asset, _> = serde_json::from_str(
+                r#"{"name": "test.zip", "name": "other.zip", "size": 123, "sha256sum": "abc"}"#,
+            );
+
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("duplicate field"));
+        }
+
+        #[test]
+        fn asset_deserialize_unknown_field() {
+            let result: Result<Asset, _> = serde_json::from_str(
+                r#"{"name": "test.zip", "size": 123, "sha256sum": "abc", "unknown": "field"}"#,
+            );
+
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("unknown field"));
+        }
+
+        #[test]
+        fn asset_deserialize_wrong_size_type() {
+            let result: Result<Asset, _> = serde_json::from_str(
+                r#"{"name": "test.zip", "size": "not_a_number", "sha256sum": "abc"}"#,
+            );
+
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn asset_deserialize_negative_size() {
+            let result: Result<Asset, _> =
+                serde_json::from_str(r#"{"name": "test.zip", "size": -123, "sha256sum": "abc"}"#);
+
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn details_deserialize_missing_tag() {
+            let result: Result<Details, _> =
+                serde_json::from_str(r#"{"commit": "abc123", "assets": {}}"#);
+
+            assert!(result.is_err());
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("missing field `tag`")
+            );
+        }
+
+        #[test]
+        fn details_deserialize_missing_commit() {
+            let result: Result<Details, _> =
+                serde_json::from_str(r#"{"tag": "v1.0.0", "assets": {}}"#);
+
+            assert!(result.is_err());
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("missing field `commit`")
+            );
+        }
+
+        #[test]
+        fn details_deserialize_missing_assets() {
+            let result: Result<Details, _> =
+                serde_json::from_str(r#"{"tag": "v1.0.0", "commit": "abc123"}"#);
+
+            assert!(result.is_err());
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("missing field `assets`")
+            );
+        }
+
+        #[test]
+        fn details_deserialize_duplicate_field() {
+            let result: Result<Details, _> = serde_json::from_str(
+                r#"{"tag": "v1.0.0", "tag": "v2.0.0", "commit": "abc", "assets": {}}"#,
+            );
+
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("duplicate field"));
+        }
+
+        #[test]
+        fn details_deserialize_unknown_field() {
+            let result: Result<Details, _> = serde_json::from_str(
+                r#"{"tag": "v1.0.0", "commit": "abc", "assets": {}, "unknown": "field"}"#,
+            );
+
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("unknown field"));
+        }
+
+        #[test]
+        fn details_deserialize_wrong_assets_type() {
+            let result: Result<Details, _> = serde_json::from_str(
+                r#"{"tag": "v1.0.0", "commit": "abc", "assets": "not_a_map"}"#,
+            );
+
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn details_deserialize_invalid_asset_in_map() {
+            let result: Result<Details, _> = serde_json::from_str(
+                r#"{"tag": "v1.0.0", "commit": "abc", "assets": {"key": {"name": "test.zip"}}}"#,
+            );
+
+            assert!(result.is_err());
         }
     }
 
@@ -345,6 +1123,158 @@ mod tests {
             let deserialized: Details = serde_json::from_str(&json).unwrap();
 
             assert_eq!(details, deserialized);
+        }
+
+        #[test]
+        fn asset_deserialize_missing_name() {
+            let result: Result<Asset, _> = serde_json::from_str(
+                r#"{"size": 123, "browser_download_url": "https://example.com", "mirrors": []}"#,
+            );
+
+            assert!(result.is_err());
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("missing field `name`")
+            );
+        }
+
+        #[test]
+        fn asset_deserialize_missing_size() {
+            let result: Result<Asset, _> = serde_json::from_str(
+                r#"{"name": "test.zip", "browser_download_url": "https://example.com", "mirrors": []}"#,
+            );
+
+            assert!(result.is_err());
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("missing field `size`")
+            );
+        }
+
+        #[test]
+        fn asset_deserialize_missing_browser_download_url() {
+            let result: Result<Asset, _> =
+                serde_json::from_str(r#"{"name": "test.zip", "size": 123, "mirrors": []}"#);
+
+            assert!(result.is_err());
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("missing field `browser_download_url`")
+            );
+        }
+
+        #[test]
+        fn asset_deserialize_missing_mirrors() {
+            let result: Result<Asset, _> = serde_json::from_str(
+                r#"{"name": "test.zip", "size": 123, "browser_download_url": "https://example.com"}"#,
+            );
+
+            assert!(result.is_err());
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("missing field `mirrors`")
+            );
+        }
+
+        #[test]
+        fn asset_deserialize_duplicate_field() {
+            let result: Result<Asset, _> = serde_json::from_str(
+                r#"{"name": "test.zip", "name": "other.zip", "size": 123, "browser_download_url": "https://example.com", "mirrors": []}"#,
+            );
+
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("duplicate field"));
+        }
+
+        #[test]
+        fn asset_deserialize_unknown_field() {
+            let result: Result<Asset, _> = serde_json::from_str(
+                r#"{"name": "test.zip", "size": 123, "browser_download_url": "https://example.com", "mirrors": [], "unknown": "field"}"#,
+            );
+
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("unknown field"));
+        }
+
+        #[test]
+        fn asset_deserialize_wrong_size_type() {
+            let result: Result<Asset, _> = serde_json::from_str(
+                r#"{"name": "test.zip", "size": "not_a_number", "browser_download_url": "https://example.com", "mirrors": []}"#,
+            );
+
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn asset_deserialize_negative_size() {
+            let result: Result<Asset, _> = serde_json::from_str(
+                r#"{"name": "test.zip", "size": -123, "browser_download_url": "https://example.com", "mirrors": []}"#,
+            );
+
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn asset_deserialize_wrong_mirrors_type() {
+            let result: Result<Asset, _> = serde_json::from_str(
+                r#"{"name": "test.zip", "size": 123, "browser_download_url": "https://example.com", "mirrors": "not_an_array"}"#,
+            );
+
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn details_deserialize_missing_assets() {
+            let result: Result<Details, _> = serde_json::from_str(r#"{}"#);
+
+            assert!(result.is_err());
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("missing field `assets`")
+            );
+        }
+
+        #[test]
+        fn details_deserialize_duplicate_field() {
+            let result: Result<Details, _> =
+                serde_json::from_str(r#"{"assets": [], "assets": []}"#);
+
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("duplicate field"));
+        }
+
+        #[test]
+        fn details_deserialize_unknown_field() {
+            let result: Result<Details, _> =
+                serde_json::from_str(r#"{"assets": [], "unknown": "field"}"#);
+
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("unknown field"));
+        }
+
+        #[test]
+        fn details_deserialize_wrong_assets_type() {
+            let result: Result<Details, _> = serde_json::from_str(r#"{"assets": "not_an_array"}"#);
+
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn details_deserialize_invalid_asset_in_array() {
+            let result: Result<Details, _> =
+                serde_json::from_str(r#"{"assets": [{"name": "test.zip"}]}"#);
+
+            assert!(result.is_err());
         }
     }
 }

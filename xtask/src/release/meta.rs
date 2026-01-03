@@ -3,28 +3,174 @@ use std::{fs, num::NonZeroU16, path::Path, process::exit, str::FromStr};
 use anyhow::{Context, Result, ensure};
 use maa_version::{VersionManifest, cli::Details};
 use semver::{BuildMetadata, Prerelease, Version};
-use serde::Deserialize;
-use xshell::{Shell, cmd};
+use serde::{
+    Deserialize, Deserializer,
+    de::{self, MapAccess, Visitor},
+};
 
 use super::Channel;
-use crate::github;
+use crate::{cmd, github};
 
-#[derive(Deserialize)]
 struct CargoToml {
     package: Package,
 }
 
-#[derive(Deserialize)]
+impl<'de> Deserialize<'de> for CargoToml {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        enum Field {
+            Package,
+        }
+
+        impl<'de> Deserialize<'de> for Field {
+            fn deserialize<D>(deserializer: D) -> Result<Field, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                struct FieldVisitor;
+
+                impl<'de> Visitor<'de> for FieldVisitor {
+                    type Value = Field;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        formatter.write_str("`package`")
+                    }
+
+                    fn visit_str<E>(self, value: &str) -> Result<Field, E>
+                    where
+                        E: de::Error,
+                    {
+                        match value {
+                            "package" => Ok(Field::Package),
+                            _ => Err(de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+
+                deserializer.deserialize_identifier(FieldVisitor)
+            }
+        }
+
+        struct CargoTomlVisitor;
+
+        impl<'de> Visitor<'de> for CargoTomlVisitor {
+            type Value = CargoToml;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("struct CargoToml")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<CargoToml, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut package = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Package => {
+                            if package.is_some() {
+                                return Err(de::Error::duplicate_field("package"));
+                            }
+                            package = Some(map.next_value()?);
+                        }
+                    }
+                }
+
+                let package = package.ok_or_else(|| de::Error::missing_field("package"))?;
+                Ok(CargoToml { package })
+            }
+        }
+
+        const FIELDS: &[&str] = &["package"];
+        deserializer.deserialize_struct("CargoToml", FIELDS, CargoTomlVisitor)
+    }
+}
+
 struct Package {
     version: Version,
 }
 
-pub fn run() -> Result<()> {
-    let sh = Shell::new()?;
+impl<'de> Deserialize<'de> for Package {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        enum Field {
+            Version,
+        }
 
+        impl<'de> Deserialize<'de> for Field {
+            fn deserialize<D>(deserializer: D) -> Result<Field, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                struct FieldVisitor;
+
+                impl<'de> Visitor<'de> for FieldVisitor {
+                    type Value = Field;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        formatter.write_str("`version`")
+                    }
+
+                    fn visit_str<E>(self, value: &str) -> Result<Field, E>
+                    where
+                        E: de::Error,
+                    {
+                        match value {
+                            "version" => Ok(Field::Version),
+                            _ => Err(de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+
+                deserializer.deserialize_identifier(FieldVisitor)
+            }
+        }
+
+        struct PackageVisitor;
+
+        impl<'de> Visitor<'de> for PackageVisitor {
+            type Value = Package;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("struct Package")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<Package, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut version = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Version => {
+                            if version.is_some() {
+                                return Err(de::Error::duplicate_field("version"));
+                            }
+                            version = Some(map.next_value()?);
+                        }
+                    }
+                }
+
+                let version = version.ok_or_else(|| de::Error::missing_field("version"))?;
+                Ok(Package { version })
+            }
+        }
+
+        const FIELDS: &[&str] = &["version"];
+        deserializer.deserialize_struct("Package", FIELDS, PackageVisitor)
+    }
+}
+
+pub fn run() -> Result<()> {
     let cargo_pkg_version = get_cargo_version()?;
-    let commit_sha = get_commit_sha(&sh)?;
-    let commit_short_sha = get_commit_short_sha(&sh)?;
+    let commit_sha = get_commit_sha()?;
+    let commit_short_sha = get_commit_short_sha()?;
 
     let event_name = github::EventName::from_env()?;
 
@@ -89,12 +235,12 @@ fn get_cargo_version() -> Result<Version> {
     Ok(cargo_toml.package.version)
 }
 
-fn get_commit_sha(sh: &Shell) -> Result<String> {
-    Ok(cmd!(sh, "git rev-parse HEAD").read()?)
+fn get_commit_sha() -> Result<String> {
+    cmd::run("git", &["rev-parse", "HEAD"])
 }
 
-fn get_commit_short_sha(sh: &Shell) -> Result<String> {
-    Ok(cmd!(sh, "git rev-parse --short HEAD").read()?)
+fn get_commit_short_sha() -> Result<String> {
+    cmd::run("git", &["rev-parse", "--short", "HEAD"])
 }
 
 fn determine_channel_and_publish(event_name: github::EventName) -> Result<(Channel, bool)> {
