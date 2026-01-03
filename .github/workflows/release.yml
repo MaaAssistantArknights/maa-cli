@@ -211,6 +211,22 @@ jobs:
         run: cargo about generate about.hbs -o licenses.md
       - name: Package Release Artifacts and Update Version Files
         run: cargo run --package xtask -- release package
+      - name: Show Package Information
+        if: ${{ !fromJson(needs.meta.outputs.publish) }}
+        run: |
+          {
+            echo "## 📦 Package Information"
+            echo ""
+            echo "| Package | Size | SHA256 |"
+            echo "|---------|------|--------|"
+            for file in maa_cli-*.tar.gz maa_cli-*.zip; do
+              if [ -f "$file" ]; then
+                size=$(du -h "$file" | cut -f1)
+                sha256=$(sha256sum "$file" | cut -d' ' -f1)
+                echo "| \`$file\` | $size | \`${sha256:0:16}...\` |"
+              fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Check existing release
         if: ${{ fromJson(needs.meta.outputs.publish) }}
         run: |
