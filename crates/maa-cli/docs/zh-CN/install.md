@@ -46,9 +46,36 @@ Homebrew 用户可以通过非官方的 [tap](https://github.com/MaaAssistantArk
 
 - 对于在 Linux 上使用 Homebrew 的用户，参见上述 macOS 的安装方式。
 
+### Windows
+
+- 对于 Windows 用户，可以使用 [winget](https://github.com/microsoft/winget-pkgs/tree/master/manifests/m/MaaAssistantArknights/maa-cli/) 管理 maa-cli：
+  
+- 安装
+ 
+  ```bash
+  winget install maa-cli
+  ```
+
+- 升级
+  
+  ```bash
+  winget update maa-cli
+  ```
+
+- 卸载
+  
+  ```bash
+  winget uninstall maa-cli
+  ```
+  
+- 你可以使用参数 `--purge` 来删除所有配置文件和数据文件; 
+  若您使用过 `maa update` 来更新 maa-cli，请注意 winget 可能无法检测到通过该命令更新的版本，因此请使用 `--force` 参数以卸载 maa-cli 。
+
+**请注意**，使用 Windows 包管理器 ( winget ) 安装的 maa-cli 在与同时使用 Windows 包管理器 ( winget ) 安装的 MAA GUI 在shell的命令中 ~(因为两个均为maa.exe)~ 存在冲突, 建议将其中一个重命名以避免冲突。~下个版本应该就会改了吧~
+
 ## 预编译二进制文件
 
-如果你的系统不受支持或者不想使用包管理器，你可以点击以下链接下载对应平台的预编译二进制文件，解压后将可执行文件放入 `PATH` 中即可使用。
+如果你的系统不受支持或者不想使用包管理器，你可以点击以下链接下载对应平台的预编译二进制文件，解压后将可执行文件放入  中即可使用。
 
 - [macOS](https://github.com/MaaAssistantArknights/maa-cli/releases/latest/download/maa_cli-universal-apple-darwin.zip)
 - [Linux x86_64 (x64, amd64)](https://github.com/MaaAssistantArknights/maa-cli/releases/latest/download/maa_cli-x86_64-unknown-linux-gnu.tar.gz)
@@ -100,6 +127,7 @@ maa install
   ```
 
 对于使用包管理器安装的用户，可以通过包管理器安装 MaaCore：
+对于使用 winget ( Windows 包管理器 ) 安装的用户，请直接使用 `maa update` 命令更新 MaaCore 到最新版本 ~( 因为一般不是最新 )~ 而无需再次安装 MaaCore 。并且您不需要通过 winget 再次安装必要工具组，因为 `winget` 在安装时会自动处理这些依赖项。
 
 - Homebrew：
 

@@ -1,0 +1,46 @@
+name: Update MAA-Cli in Winget
+
+on:
+  workflow_dispatch: 
+  schedule:
+    - cron: '0 12 * * *'
+  release:
+    types: [published] 
+
+jobs:
+  update-winget:
+    name: Update MAA in Winget Repository
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install cargo binstall
+        uses: cargo-bins/cargo-binstall@268643a6b5ea099f5718ee5cd3ff7dc89a5eb49b
+
+      - name: Install komac
+        run: |
+          cargo binstall komac@2.11.2 -y
+
+      - name: Validate token
+        run: |
+          if [ -z "${{ secrets.WINGET_GITHUB_TOKEN }}" ]; then
+            echo "ERROR: WINGET_GITHUB_TOKEN secret is not set"
+            echo "Please create a Personal Access Token with 'repo' scope and add it to repository secrets"
+            exit 1
+          fi  
+      
+      - name: Determine latest version
+        id: version
+        run: |
+          LATEST_VERSION=$(curl -s "https://raw.githubusercontent.com/MaaAssistantArknights/maa-cli/version/stable.json" | jq -r '.[].version' | sed 's/^v//')
+          echo "Latest version: $LATEST_VERSION"
+          echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update Winget manifest
+        env:
+          KOMAC_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          komac update "MaaAssistantArknights.maa-cli" \
+            --version "$KOMAC_VERSION" \
+            --urls "https://github.com/MaaAssistantArknights/maa-cli/releases/download/v$KOMAC_VERSION/maa_cli-x86_64-pc-windows-msvc-winget.zip" "https://github.com/MaaAssistantArknights/MaaAssistantArknights/releases/download/v$KOMAC_VERSION/maa_cli-aarch64-pc-windows-msvc.zip" \
+            --submit \
+            --token "${{ secrets.WINGET_GITHUB_TOKEN }}"
