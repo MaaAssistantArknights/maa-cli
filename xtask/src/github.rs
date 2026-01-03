@@ -9,7 +9,7 @@ use std::{
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 
-use crate::env;
+use crate::{env, release::Channel};
 
 /// GitHub event types that trigger workflows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,15 +60,30 @@ impl WorkflowEvent {
         let content = fs::read_to_string(&event_path)
             .with_context(|| format!("Failed to read event file: {event_path}"))?;
 
-        serde_json::from_str(&content).context("Failed to parse workflow event JSON")
+        serde_json::from_str(&content)
+            .with_context(|| "Failed to parse workflow event JSON:\n{content}")
     }
 }
 
 /// Inputs for workflow_dispatch events.
 #[derive(Deserialize)]
 pub struct WorkflowInputs {
-    pub channel: String,
+    pub channel: Channel,
+    #[serde(deserialize_with = "deserialize_bool_from_string")]
     pub publish: bool,
+}
+
+/// Deserialize a boolean from a string.
+fn deserialize_bool_from_string<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    match s.as_str() {
+        "true" => Ok(true),
+        "false" => Ok(false),
+        _ => Err(serde::de::Error::custom("Invalid boolean string: {s}")),
+    }
 }
 
 /// Get the GitHub ref (e.g., refs/tags/v1.0.0) from environment.

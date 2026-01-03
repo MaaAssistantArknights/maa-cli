@@ -2,13 +2,15 @@ use std::str::FromStr;
 
 use anyhow::{Result, bail};
 use clap::Subcommand;
+use serde::Deserialize;
 
 pub mod archive;
 mod meta;
 mod package;
 
 /// Release channel for maa-cli.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Channel {
     /// Stable release
     Stable,

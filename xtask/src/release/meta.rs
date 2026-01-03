@@ -109,7 +109,7 @@ fn determine_channel_and_publish(event_name: github::EventName) -> Result<(Chann
         github::EventName::WorkflowDispatch => {
             println!("Workflow dispatch event detected");
             let event = github::WorkflowEvent::from_env()?;
-            let channel = event.inputs.channel.parse()?;
+            let channel = event.inputs.channel;
             Ok((channel, event.inputs.publish))
         }
         github::EventName::Push => {
