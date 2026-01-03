@@ -9,6 +9,7 @@ on:
       - main
     paths:
       - ".github/workflows/release.yml"
+      - "xtask/**"
   workflow_dispatch:
     inputs:
       channel:
