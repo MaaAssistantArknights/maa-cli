@@ -118,7 +118,7 @@ jobs:
           - windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Update Rust
         run: rustup update stable
       - name: Get Host Triplet
@@ -135,7 +135,7 @@ jobs:
           cargo build --profile release-lto --package maa-cli --locked --features git2/vendored-openssl
       - name: Tar Artifact
         run: |
-          target_dir="target/$CARGO_BUILD_TARGET/release"
+          target_dir="target/release-lto"
           if [[ "${{ matrix.runner }}" == "windows"* ]]; then
             exe="maa.exe"
           else
