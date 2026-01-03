@@ -132,7 +132,7 @@ jobs:
         env:
           MAA_VERSION: ${{ needs.meta.outputs.version }}
         run: |
-          cargo build --profile ${{ needs.meta.outputs.profile }} \
+          cargo build ${{ needs.meta.outputs.profile }} \
             --package maa-cli --locked --features git2/vendored-openssl
       - name: Tar Artifact
         run: |

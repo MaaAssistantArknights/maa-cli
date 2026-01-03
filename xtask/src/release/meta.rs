@@ -67,13 +67,15 @@ pub fn run() -> Result<()> {
         "Release version {version} with tag {tag} to channel {channel_str} (publish: {publish})"
     );
 
+    let profile = if publish { "--profile release-lto" } else { "" };
+
     github::set_outputs(&[
         ("commit", &commit_sha),
         ("channel", channel.as_str()),
         ("version", &version.to_string()),
         ("tag", &tag),
         ("publish", if publish { "true" } else { "false" }),
-        ("profile", if publish { "release-lto" } else { "debug" }),
+        ("profile", profile),
         ("skip", "false"),
     ])?;
 
