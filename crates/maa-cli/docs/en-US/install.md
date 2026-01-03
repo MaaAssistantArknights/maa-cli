@@ -48,15 +48,19 @@ Homebrew users can install maa-cli via the unofficial [tap](https://github.com/M
 
 ## Precompiled Binaries
 
-If package managers are not available on your system or you prefer not to use them, you can download the precompiled binaries for your platform from the following links. After decompressing, place the executable file in your `PATH` to use.
+If package managers are not available on your system or you prefer not to use them, you can use the installation scripts.
 
-- [macOS](https://github.com/MaaAssistantArknights/maa-cli/releases/latest/download/maa_cli-universal-apple-darwin.zip)
-- [Linux x86_64 (x64, amd64)](https://github.com/MaaAssistantArknights/maa-cli/releases/latest/download/maa_cli-x86_64-unknown-linux-gnu.tar.gz)
-- [Linux aarch64 (arm64)](https://github.com/MaaAssistantArknights/maa-cli/releases/latest/download/maa_cli-aarch64-unknown-linux-gnu.tar.gz)
-- [Windows x86_64 (x64, amd64)](https://github.com/MaaAssistantArknights/maa-cli/releases/latest/download/maa_cli-x86_64-pc-windows-msvc.zip)
-- [Windows aarch64 (arm64)](https://github.com/MaaAssistantArknights/maa-cli/releases/latest/download/maa_cli-aarch64-pc-windows-msvc.zip)
+**Linux and macOS:**
 
-If your platform is not listed above, you can try to compile and install it yourself (see below).
+```bash
+curl -fsSL https://raw.githubusercontent.com/MaaAssistantArknights/maa-cli/main/install.sh | bash
+```
+
+**Windows (PowerShell):**
+
+```powershell
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/MaaAssistantArknights/maa-cli/main/install.ps1" -OutFile install.ps1; .\install.ps1
+```
 
 ## Build from Source
 
