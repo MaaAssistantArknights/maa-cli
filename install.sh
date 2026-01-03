@@ -136,23 +136,21 @@ main() {
     local version_info
     version_info=$(fetch_version_info "$CHANNEL") || error "Failed to fetch version information"
 
-    # Source the version info (it's in shell variable format)
-    eval "$version_info"
+    # Parse the version info (KEY=VALUE format)
+    # Extract VERSION
+    version=$(echo "$version_info" | grep "^VERSION=" | cut -d'=' -f2)
 
     # Get asset info for the detected platform
     local target_var="${target//-/_}"
     target_var=$(echo "$target_var" | tr '[:lower:]' '[:upper:]')  # Convert to uppercase
 
     # Extract variables for this target
-    eval "archive_name=\$${target_var}_NAME"
-    eval "sha256sum=\$${target_var}_SHA256"
+    archive_name=$(echo "$version_info" | grep "^${target_var}_NAME=" | cut -d'=' -f2)
+    sha256sum=$(echo "$version_info" | grep "^${target_var}_SHA256=" | cut -d'=' -f2)
 
     if [ -z "$archive_name" ]; then
         error "No release found for platform: $target"
     fi
-
-    # shellcheck disable=SC2153
-    version="$VERSION"
 
     info "Version: $version"
     info "Archive: $archive_name"

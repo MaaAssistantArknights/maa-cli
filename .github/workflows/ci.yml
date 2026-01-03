@@ -92,9 +92,9 @@ jobs:
         run: rustup update stable
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
-      - name: Build (maa-cli)
+      - name: Build
         run: |
-          cargo build --locked
+          cargo build --locked --workspace --all-features
       - name: Lint (clippy)
         run: |
           cargo clippy -- -D warnings
@@ -116,7 +116,7 @@ jobs:
         env:
           SKIP_CORE_TEST: ${{ matrix.runner == 'windows-11-arm' }}
         run: |
-          cargo test -- --include-ignored
+          cargo test --workspace --all-features -- --include-ignored
 
   build-tier2:
     name: Build and Test (Tier 2, ${{ matrix.runner }})
@@ -136,17 +136,17 @@ jobs:
         run: rustup update stable
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
-      - name: Build (maa-cli)
+      - name: Build
         run: |
-          cargo build --locked
+          cargo build --locked --workspace --all-features
       - name: Lint (clippy)
         run: |
-          cargo clippy -- -D warnings
+          cargo clippy --workspace --all-features -- -D warnings
       - name: Test
         env:
           SKIP_CORE_TEST: true
         run: |
-          cargo test -- --include-ignored
+          cargo test --workspace --all-features -- --include-ignored
 
   build-no-default-features:
     name: Build and Test (feature=${{ matrix.feature }})
@@ -255,7 +255,7 @@ jobs:
             echo "MAA_CORE_VERSION=v$version"
           } >> "$GITHUB_ENV"
       - name: Run Tests
-        run: cargo llvm-cov --workspace --no-report -- --include-ignored
+        run: cargo llvm-cov --workspace --all-features --no-report -- --include-ignored
       - name: Generate Coverage Report
         run: |
           cargo llvm-cov report --codecov --output-path codecov.json
