@@ -1,6 +1,6 @@
-use std::{fs, num::NonZeroU16, path::Path, str::FromStr};
+use std::{fs, num::NonZeroU16, path::Path, process::exit, str::FromStr};
 
-use anyhow::{Context, Result, bail, ensure};
+use anyhow::{Context, Result, ensure};
 use maa_version::{VersionManifest, cli::Details};
 use semver::{BuildMetadata, Prerelease, Version};
 use serde::Deserialize;
@@ -73,6 +73,7 @@ pub fn run() -> Result<()> {
         ("version", &version.to_string()),
         ("tag", &tag),
         ("publish", if publish { "true" } else { "false" }),
+        ("profile", if publish { "release-lto" } else { "debug" }),
         ("skip", "false"),
     ])?;
 
@@ -272,7 +273,7 @@ fn check_version_bumped(cargo_pkg_version: &Version, published_version: &Version
         println!("The version in Cargo.toml is the same as the published version");
         println!("No pre-release is allowed for the same version");
         github::set_output("skip", "true")?;
-        bail!("Version not bumped");
+        exit(0)
     }
     Ok(())
 }

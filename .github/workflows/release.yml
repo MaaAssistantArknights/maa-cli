@@ -132,7 +132,8 @@ jobs:
         env:
           MAA_VERSION: ${{ needs.meta.outputs.version }}
         run: |
-          cargo build --profile release-lto --package maa-cli --locked --features git2/vendored-openssl
+          cargo build --profile ${{ needs.meta.outputs.version }} \
+            --package maa-cli --locked --features git2/vendored-openssl
       - name: Tar Artifact
         run: |
           target_dir="target/release-lto"
