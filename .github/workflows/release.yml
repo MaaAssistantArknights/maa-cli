@@ -41,13 +41,13 @@ jobs:
     name: Meta
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.version.outputs.version }}
-      tag: ${{ steps.version.outputs.tag }}
-      commit: ${{ steps.version.outputs.commit }}
-      channel: ${{ steps.version.outputs.channel }}
-      prerelease: ${{ steps.version.outputs.channel != 'stable' }}
-      publish: ${{ steps.version.outputs.publish }}
-      skip: ${{ steps.version.outputs.skip }}
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+      commit: ${{ steps.meta.outputs.commit }}
+      channel: ${{ steps.meta.outputs.channel }}
+      profile: ${{ steps.meta.outputs.profile }}
+      publish: ${{ steps.meta.outputs.publish }}
+      skip: ${{ steps.meta.outputs.skip }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -56,8 +56,8 @@ jobs:
         with:
           ref: version
           path: version
-      - name: Get Version
-        id: version
+      - name: Meta
+        id: meta
         run: |
           cargo run --package xtask -- release meta
 
