@@ -236,7 +236,7 @@ jobs:
           name: v${{ needs.meta.outputs.version }}
           tag_name: ${{ needs.meta.outputs.tag }}
           target_commitish: ${{ needs.meta.outputs.commit }}
-          prerelease: ${{ fromJson(needs.meta.outputs.prerelease) }}
+          prerelease: ${{ needs.meta.outputs.channel != 'stable' }}
           body: ${{ needs.release-note.outputs.content }}
           fail_on_unmatched_files: true
           files: |
@@ -282,17 +282,6 @@ jobs:
     with:
       version: ${{ needs.meta.outputs.version }}
       dryrun: false
-
-  sync:
-    name: Sync to MAA Main Repository
-    if: ${{ fromJson(needs.meta.outputs.publish) && !fromJson(needs.meta.outputs.prerelease) }}
-    needs: [meta, release]
-    uses: ./.github/workflows/publish-sync.yml
-    with:
-      version: ${{ needs.meta.outputs.version }}
-      dryrun: false
-    secrets:
-      MAA_HOMEBREW_BUMP_PR: ${{ secrets.MAA_HOMEBREW_BUMP_PR }}
 
   publish-homebrew:
     name: Publish Homebrew Formulae
