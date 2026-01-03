@@ -55,8 +55,6 @@ __installer = ["dep:maa-version"]
 cli_installer = ["__installer", "dep:sha2"]
 # Features used to install and update MAA Core
 core_installer = ["__installer"]
-# Vendor OpenSSL for cross-compilation (git2 -> libssh2-sys -> openssl-sys)
-vendored-openssl = ["git2?/vendored-openssl"]
 
 [lints]
 workspace = true
