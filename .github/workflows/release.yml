@@ -136,7 +136,11 @@ jobs:
             --package maa-cli --locked --features git2/vendored-openssl
       - name: Tar Artifact
         run: |
-          target_dir="target/${{ needs.meta.outputs.profile }}"
+          profile=${{ needs.meta.outputs.profile }}
+          if [[ "$profile" == "dev" ]]; then
+            profile="debug"
+          fi
+          target_dir="target/${profile}"
           if [[ "${{ matrix.runner }}" == "windows"* ]]; then
             exe="maa.exe"
           else
