@@ -215,6 +215,7 @@ jobs:
       - name: Show Package Information
         if: ${{ !fromJson(needs.meta.outputs.publish) }}
         run: |
+          ls -al
           {
             echo "## 📦 Package Information"
             echo ""
