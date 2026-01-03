@@ -41,13 +41,13 @@ jobs:
     name: Meta
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.version.outputs.version }}
-      tag: ${{ steps.version.outputs.tag }}
-      commit: ${{ steps.version.outputs.commit }}
-      channel: ${{ steps.version.outputs.channel }}
-      prerelease: ${{ steps.version.outputs.channel != 'stable' }}
-      publish: ${{ steps.version.outputs.publish }}
-      skip: ${{ steps.version.outputs.skip }}
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+      commit: ${{ steps.meta.outputs.commit }}
+      channel: ${{ steps.meta.outputs.channel }}
+      profile: ${{ steps.meta.outputs.profile }}
+      publish: ${{ steps.meta.outputs.publish }}
+      skip: ${{ steps.meta.outputs.skip }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -56,8 +56,8 @@ jobs:
         with:
           ref: version
           path: version
-      - name: Get Version
-        id: version
+      - name: Meta
+        id: meta
         run: |
           cargo run --package xtask -- release meta
 
@@ -132,10 +132,15 @@ jobs:
         env:
           MAA_VERSION: ${{ needs.meta.outputs.version }}
         run: |
-          cargo build --profile release-lto --package maa-cli --locked --features git2/vendored-openssl
+          cargo build --profile ${{ needs.meta.outputs.profile }} \
+            --package maa-cli --locked --features git2/vendored-openssl
       - name: Tar Artifact
         run: |
-          target_dir="target/release-lto"
+          profile=${{ needs.meta.outputs.profile }}
+          if [[ "$profile" == "dev" ]]; then
+            profile="debug"
+          fi
+          target_dir="target/${profile}"
           if [[ "${{ matrix.runner }}" == "windows"* ]]; then
             exe="maa.exe"
           else
@@ -158,10 +163,10 @@ jobs:
     runs-on: macos-latest
     needs: [meta, build]
     steps:
-      # download all artifacts, even if not all are used,
-      # because this action don't support wildcards
       - name: Download Artifacts
         uses: actions/download-artifact@v7
+        with:
+          pattern: "*-apple-darwin"
       - name: Create universal binaries
         run: |
           for arch in x86_64 aarch64; do
@@ -194,8 +199,6 @@ jobs:
       TAG: ${{ needs.meta.outputs.tag }}
       COMMIT: ${{ needs.meta.outputs.commit }}
     steps:
-      - name: Download Artifacts
-        uses: actions/download-artifact@v7
       - name: Checkout
         uses: actions/checkout@v6
       - name: Checkout version branch
@@ -203,6 +206,8 @@ jobs:
         with:
           ref: version
           path: version
+      - name: Download Artifacts
+        uses: actions/download-artifact@v7
       - name: Install cargo-about
         uses: taiki-e/install-action@v2
         with:
@@ -210,7 +215,7 @@ jobs:
       - name: Generate Third-Party Licenses Information
         run: cargo about generate about.hbs -o licenses.md
       - name: Package Release Artifacts and Update Version Files
-        run: cargo run --package xtask -- release package
+        run: cargo run --release --package xtask -- release package
       - name: Check existing release
         if: ${{ fromJson(needs.meta.outputs.publish) }}
         run: |
