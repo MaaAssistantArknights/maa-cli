@@ -163,10 +163,10 @@ jobs:
     runs-on: macos-latest
     needs: [meta, build]
     steps:
-      # download all artifacts, even if not all are used,
-      # because this action don't support wildcards
       - name: Download Artifacts
         uses: actions/download-artifact@v7
+        with:
+          pattern: "*-apple-darwin"
       - name: Create universal binaries
         run: |
           for arch in x86_64 aarch64; do
@@ -199,8 +199,6 @@ jobs:
       TAG: ${{ needs.meta.outputs.tag }}
       COMMIT: ${{ needs.meta.outputs.commit }}
     steps:
-      - name: Download Artifacts
-        uses: actions/download-artifact@v7
       - name: Checkout
         uses: actions/checkout@v6
       - name: Checkout version branch
@@ -208,6 +206,8 @@ jobs:
         with:
           ref: version
           path: version
+      - name: Download Artifacts
+        uses: actions/download-artifact@v7
       - name: Install cargo-about
         uses: taiki-e/install-action@v2
         with:
