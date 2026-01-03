@@ -7,16 +7,9 @@ use serde::{Deserialize, Serialize};
 /// Common used version manifest struct for both CLI and MaaCore.
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub struct VersionManifest<D> {
-    #[serde(
-        deserialize_with = "deserialize_version",
-        serialize_with = "serialize_version"
-    )]
+    #[serde(deserialize_with = "deserialize_version")]
     pub version: Version,
     pub details: D,
-}
-
-fn serialize_version<S: serde::Serializer>(v: &Version, ser: S) -> Result<S::Ok, S::Error> {
-    ser.collect_str(v)
 }
 
 fn deserialize_version<'de, D: serde::Deserializer<'de>>(de: D) -> Result<Version, D::Error> {
