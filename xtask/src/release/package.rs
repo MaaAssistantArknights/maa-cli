@@ -156,11 +156,11 @@ fn write_shell_format(file: &str, manifest: &VersionManifest<Details>) -> Result
 fn create_archive(target: &str, version: &str, dir: &str) -> Result<(String, String)> {
     // Determine archive format and binary name based on target
     // Use tar.gz for Unix-like systems (Linux, macOS) and zip for Windows
-    let (format, bin_name) = if target.contains("-windows-msvc") {
-        (ArchiveFormat::Zip, "maa.exe")
-    } else if target.contains("-windows-msvc-winget") {
+    let (format, bin_name) = if target.contains("-windows-msvc-winget") {
         (ArchiveFormat::Zip, "maa-cli.exe")
-    } else if target.contains("-linux-") || target.contains("-apple-darwin") {
+    } else if target.contains("-windows-msvc") {
+        (ArchiveFormat::Zip, "maa.exe")
+    } else if target.contains("-linux-") || target.ends_with("-apple-darwin") {
         (ArchiveFormat::TarGz, "maa")
     } else {
         anyhow::bail!("Unknown target: {target}")
