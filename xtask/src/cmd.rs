@@ -54,3 +54,13 @@ impl<'s> EnvVars<'s> {
         self.0.push((key, value));
     }
 }
+
+pub fn cargo() -> Command {
+    Command::new("cargo")
+}
+
+pub fn rustup_up(channel: &str) -> Command {
+    let mut cmd = Command::new("rustup");
+    cmd.args(["update", channel, "--no-self-update"]);
+    cmd
+}

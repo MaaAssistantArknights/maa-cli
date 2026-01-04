@@ -4,14 +4,10 @@ use anyhow::{Context, Result};
 
 use crate::{
     TestOptions,
-    cmd::{CommandExt, EnvVars},
+    cmd::{CommandExt, EnvVars, cargo, rustup_up},
     github::Group,
     workspace_root,
 };
-
-fn cargo() -> std::process::Command {
-    std::process::Command::new("cargo")
-}
 
 const LLVM_COV_ARGS: &[&str] = &["+nightly", "llvm-cov"];
 
@@ -30,18 +26,13 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
 
     let package_flags = opts.package_flags();
 
-    Group::new("Update Stable Toolchain").run(|| {
-        std::process::Command::new("rustup")
-            .args(["update", "stable"])
-            .run()
-            .context("Failed to update Rust")
-    })?;
+    Group::new("Update Stable Toolchain")
+        .run(|| rustup_up("stable").run().context("Failed to update Rust"))?;
 
     if opts.coverage.report() {
         Group::new("Install Nightly Toolchain").run(|| {
-            std::process::Command::new("rustup")
-                .args(["install", "nightly", "--profile=minimal", "-cllvm-tools"])
-                .arg("--no-self-update")
+            rustup_up("nightly")
+                .args(["--profile=minimal", "-cllvm-tools"])
                 .run()
                 .context("Failed to install nightly")
         })?;

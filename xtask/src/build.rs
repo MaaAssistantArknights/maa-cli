@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 
 use crate::{
     BuildOptions, HOST_TRIPLET,
-    cmd::CommandExt,
+    cmd::{CommandExt, cargo, rustup_up},
     github::{Group, set_output},
     workspace_root,
 };
@@ -16,15 +16,11 @@ pub fn run(opts: BuildOptions) -> Result<()> {
     // Set GitHub output for use in subsequent steps
     set_output("host_triplet", HOST_TRIPLET).ok();
 
-    Group::new("Update Stable Toolchain").run(|| {
-        std::process::Command::new("rustup")
-            .args(["update", "stable"])
-            .run()
-            .context("Failed to update Rust")
-    })?;
+    Group::new("Update Stable Toolchain")
+        .run(|| rustup_up("stable").run().context("Failed to update Rust"))?;
 
     Group::new("Build").run(|| {
-        let mut cmd = std::process::Command::new("cargo");
+        let mut cmd = cargo();
         cmd.args(["build", "--package", "maa-cli", "--locked"]);
         cmd.args(["--profile", &opts.profile]);
 

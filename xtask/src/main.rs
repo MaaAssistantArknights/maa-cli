@@ -12,7 +12,11 @@ const CARGO_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 const HOST_TRIPLET: &str = env!("TARGET");
 
 fn workspace_root() -> &'static str {
-    &CARGO_MANIFEST_DIR[..CARGO_MANIFEST_DIR.len() - 6]
+    std::path::Path::new(CARGO_MANIFEST_DIR)
+        .parent()
+        .expect("CARGO_MANIFEST_DIR should have a parent directory")
+        .to_str()
+        .expect("workspace rot path should be valid UTF-8")
 }
 
 #[derive(Parser)]
@@ -85,7 +89,7 @@ struct TestOptions {
 impl TestOptions {
     fn package_flags(&self) -> Vec<&str> {
         match self.package.as_str() {
-            "workspace" => vec!["--workspace", "--exclude", "xtask"],
+            "workspace" => vec!["--workspace", "--exclude", "xtask", "--exclude", "x"],
             _ => vec!["--package", &self.package],
         }
     }
