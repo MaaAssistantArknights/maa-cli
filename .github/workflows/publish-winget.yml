@@ -11,10 +11,6 @@ on:
         description: Tag of the release
         required: false
         type: string
-      dryrun:
-        description: Do not create PR
-        required: true
-        type: boolean
     secrets:
       MAABOT_WINGET_TOKEN:
         description: GitHub PAT for creating PR
@@ -29,11 +25,6 @@ on:
         description: Tag of the release
         required: false
         type: string
-      dryrun:
-        description: Do not create PR
-        default: true
-        required: true
-        type: boolean
 
 defaults:
   run:
@@ -47,21 +38,12 @@ jobs:
     name: Publish to Winget
     runs-on: ubuntu-latest
     steps:
-      - name: Install komac
-        uses: taiki-e/install-action@v2
-        with:
-          tool: komac
       - name: Update Winget Package
-        run: |
-          VERSION="${{ inputs.version }}"
-          TAG="${{ inputs.tag }}"
-          if [ -z "$TAG" ]; then
-            TAG="v${{ inputs.version }}"
-          fi
-          komac update MaaAssistantArknights.maa-cli \
-            --version '${{ inputs.version }}' \
-            --urls \
-              "https://github.com/MaaAssistantArknights/maa-cli/releases/download/$TAG/maa_cli-v${VERSION}-x86_64-pc-windows-msvc-winget.zip" \
-              "https://github.com/MaaAssistantArknights/maa-cli/releases/download/$TAG/maa_cli-v${VERSION}-aarch64-pc-windows-msvc-winget.zip" \
-            ${{ inputs.dryrun && '--dry-run' || '--submit' }} \
-            --token "${{ secrets.MAABOT_WINGET_TOKEN }}"
+        uses: vedantmgoyal9/winget-releaser@main
+        with:
+          identifier: MaaAssistantArknights.maa-cli
+          version: ${{ inputs.version }}
+          installers-regex: "*-winget"
+          release-tag: ${{ inputs.tag || format('v{0}', inputs.version) }}
+          fork-user: MaaAssistantArknights
+          token: ${{ secrets.MAABOT_WINGET_TOKEN }}

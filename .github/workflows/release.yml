@@ -322,6 +322,5 @@ jobs:
     with:
       version: ${{ needs.meta.outputs.version }}
       tag: ${{ needs.meta.outputs.tag }}
-      dryrun: false
     secrets:
       MAABOT_WINGET_TOKEN: ${{ secrets.MAABOT_WINGET_TOKEN }}
