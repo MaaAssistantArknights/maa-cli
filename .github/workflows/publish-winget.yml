@@ -37,12 +37,12 @@ permissions:
 jobs:
   publish:
     name: Publish to Winget
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
-      - name: Install Komac
-        run: |
-          winget install --id RussellBanks.Komac --exact --silent --accept-source-agreements
-
+      - name: Install komac
+        uses: taiki-e/install-action@v2
+        with:
+          tool: komac
       - name: Update Winget Package
         run: |
           komac update \
