@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fs};
+use std::{collections::BTreeMap, fs, path::PathBuf};
 
 use anyhow::{Context, Result};
 use maa_version::{
@@ -58,7 +58,10 @@ pub fn run() -> Result<()> {
         println!("Processing target: {target}");
 
         // Extract tar file
-        let tar_file = format!("{dir_str}/{target}.tar");
+        let tar_file = format!(
+            "{dir_str}/{}.tar",
+            target.strip_suffix("-winget").unwrap_or(target)
+        );
         archive::extract_tar(&tar_file, dir_str)?;
 
         // Copy licenses.md
@@ -132,25 +135,34 @@ fn write_manifest(file: &str, manifest: &VersionManifest<Details>) -> Result<()>
 
 fn write_shell_format(file: &str, manifest: &VersionManifest<Details>) -> Result<()> {
     // Write a shell-friendly .txt format alongside the JSON
-    let txt_file = file.replace(".json", ".txt");
+    let txt_path = PathBuf::from(file).with_extension("txt");
+    let txt_path_str = txt_path.to_str().unwrap();
 
-    let mut content = String::new();
-    content.push_str(&format!("VERSION={}\n", manifest.version));
-    content.push_str(&format!("TAG={}\n", manifest.details.tag));
-    content.push_str(&format!("COMMIT={}\n", manifest.details.commit));
-    content.push('\n');
+    use std::io::Write;
+
+    let mut txt_file = std::fs::File::create(&txt_path)
+        .with_context(|| format!("Failed to create {txt_path_str}"))?;
+
+    writeln!(txt_file, "VERSION={}", manifest.version)?;
+    writeln!(txt_file, "TAG={}", manifest.details.tag)?;
+    writeln!(txt_file, "COMMIT={}", manifest.details.commit)?;
+    writeln!(txt_file)?;
 
     // Write assets in a shell-friendly format
     for (target, asset) in &manifest.details.assets {
         let target_upper = target.to_uppercase().replace('-', "_");
-        content.push_str(&format!("# {target}\n"));
-        content.push_str(&format!("{target_upper}_NAME={}\n", asset.name));
-        content.push_str(&format!("{target_upper}_SIZE={}\n", asset.size));
-        content.push_str(&format!("{target_upper}_SHA256={}\n", asset.sha256sum));
-        content.push('\n');
+        writeln!(txt_file, "# {target}")?;
+        writeln!(txt_file, "{target_upper}_NAME={}", asset.name)?;
+        writeln!(txt_file, "{target_upper}_SIZE={}", asset.size)?;
+        writeln!(txt_file, "{target_upper}_SHA256={}", asset.sha256sum)?;
+        writeln!(txt_file)?;
     }
 
-    fs::write(&txt_file, content).with_context(|| format!("Failed to write {txt_file}"))
+    txt_file
+        .sync_all()
+        .with_context(|| format!("Failed to sync {txt_path_str}"))?;
+
+    Ok(())
 }
 
 fn create_archive(target: &str, version: &str, dir: &str) -> Result<(String, String)> {
