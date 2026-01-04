@@ -61,6 +61,6 @@ pub fn cargo() -> Command {
 
 pub fn rustup_up(channel: &str) -> Command {
     let mut cmd = Command::new("rustup");
-    cmd.args(["update", channel, "--no-self-update"]);
+    cmd.args(["install", channel, "--no-self-update"]);
     cmd
 }
