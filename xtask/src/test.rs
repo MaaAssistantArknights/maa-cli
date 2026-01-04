@@ -102,6 +102,7 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
             cmd.arg("--no-report");
         }
         cmd.args(["test", "--locked", "--no-fail-fast"]);
+        cmd.args(&package_flags);
         cmd.args(&opts.test_args);
         if !opts.no_ignored_tests {
             cmd.args(["--", "--include-ignored"]);
