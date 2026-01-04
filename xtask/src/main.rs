@@ -1,11 +1,19 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
+mod build;
 mod cmd;
 mod env;
 mod github;
 mod release;
 mod test;
+
+const CARGO_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
+const HOST_TRIPLET: &str = env!("TARGET");
+
+fn workspace_root() -> &'static str {
+    &CARGO_MANIFEST_DIR[..CARGO_MANIFEST_DIR.len() - 6]
+}
 
 #[derive(Parser)]
 #[command(name = "xtask")]
@@ -17,6 +25,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Build maa-cli binary
+    Build(BuildOptions),
     /// Release automation tasks
     Release {
         #[command(subcommand)]
@@ -24,6 +34,25 @@ enum Commands {
     },
     /// Run tests with optional core installation and coverage
     Test(TestOptions),
+}
+
+#[derive(Parser)]
+struct BuildOptions {
+    /// Build profile to use
+    #[arg(long, default_value = "dev")]
+    pub profile: String,
+
+    /// Use vendored dependencies instead of system dependencies
+    #[arg(long)]
+    pub vendored_deps: bool,
+
+    /// Create tar package after build
+    #[arg(long)]
+    pub tar: bool,
+
+    /// Additional arguments to pass to `cargo build`
+    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+    pub build_args: Vec<String>,
 }
 
 #[derive(Parser)]
@@ -89,6 +118,7 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
+        Commands::Build(options) => build::run(options),
         Commands::Release { command } => release::run(command),
         Commands::Test(options) => test::run_tests(options),
     }

@@ -6,13 +6,8 @@ use crate::{
     TestOptions,
     cmd::{CommandExt, EnvVars},
     github::Group,
+    workspace_root,
 };
-
-const CARGO_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
-
-fn workspace_root() -> &'static str {
-    &CARGO_MANIFEST_DIR[..CARGO_MANIFEST_DIR.len() - 6]
-}
 
 fn cargo() -> std::process::Command {
     std::process::Command::new("cargo")
