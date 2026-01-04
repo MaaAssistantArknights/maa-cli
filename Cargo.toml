@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/*", "xtask"]
+members = ["crates/*", "xtask", "xtask/x"]
 default-members = ["crates/maa-cli"]
 
 [workspace.package]

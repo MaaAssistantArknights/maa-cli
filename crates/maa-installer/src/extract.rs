@@ -236,6 +236,7 @@ mod tests {
     use super::*;
 
     /// Helper to create a test directory structure
+    #[allow(dead_code)]
     fn create_test_files(dir: &Path) -> Result<()> {
         fs::write(dir.join("file1.txt"), b"content1")?;
         fs::write(dir.join("file2.txt"), b"content2")?;

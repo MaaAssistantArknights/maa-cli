@@ -33,7 +33,7 @@ struct TestOptions {
     with_core: bool,
 
     /// Enable coverage
-    #[arg(long, default_value = "None")]
+    #[arg(long, default_value = "none")]
     coverage: CoverageMode,
 
     /// Disable cargo clippy
@@ -56,7 +56,7 @@ struct TestOptions {
 impl TestOptions {
     fn package_flags(&self) -> Vec<&str> {
         match self.package.as_str() {
-            "workspace" => vec!["--workspace"],
+            "workspace" => vec!["--workspace", "--exclude", "xtask"],
             _ => vec!["--package", &self.package],
         }
     }
@@ -84,6 +84,8 @@ impl CoverageMode {
 }
 
 fn main() -> Result<()> {
+    println!("::endgroup::");
+
     let cli = Cli::parse();
 
     match cli.command {

@@ -7,24 +7,22 @@ on:
       - "crates/*/src/**"
       - "crates/*/Cargo.toml"
       - "crates/*/build.rs"
+      - "xtask/**"
       - "Cargo.lock"
       - "codecov.yml"
       - ".cargo/config.toml"
       - ".github/workflows/ci.yml"
-      - ".github/actions/setup/**"
-      - ".github/actions/install-core/**"
   pull_request:
     branches: ["main"]
     paths:
       - "crates/*/src/**"
       - "crates/*/Cargo.toml"
       - "crates/*/build.rs"
+      - "xtask/**"
       - "Cargo.lock"
       - "codecov.yml"
       - ".cargo/config.toml"
       - ".github/workflows/ci.yml"
-      - ".github/actions/setup/**"
-      - ".github/actions/install-core/**"
 
 env:
   RUST_BACKTRACE: full
@@ -93,7 +91,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: Test
         run: |
-          cargo run -pxtask test --with-core \
+          cargo x test --with-core -- \
             -- --include-ignored
 
   build-tier2:
@@ -117,8 +115,8 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: Test
         run: |
-          cargo run -pxtask test  \
-            ${{ matrix.runner != 'windows-11-arm' && --with-core }} \
+          cargo x test  \
+            ${{ matrix.runner != 'windows-11-arm' && '--with-core' || '' }} -- \
             -- --include-ignored
 
   build-no-default-features:
@@ -138,8 +136,8 @@ jobs:
         run: rustup update stable
       - name: Test
         run: |
-          cargo run -pxtask test \
-            --no-clippy --no-all-features \
+          cargo x test \
+            --no-clippy --no-all-features -- \
             --no-default-features --features '${{ matrix.feature }}' \
             -- --include-ignored
 
@@ -161,8 +159,8 @@ jobs:
           tool: cargo-llvm-cov
       - name: Coverage
         run: |
-          cargo -pxtask run test --with-core \
-            --package maa-sys --coverage TestOnly \
+          cargo x test --with-core \
+            --package maa-sys --coverage test-only -- \
             -- --include-ignored
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
@@ -189,15 +187,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Use Nightly Toolchain
-        run: rustup default nightly
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-llvm-cov
       - name: Coverage
         run: |
-          cargo run -pxtask test --with-core --coverage \
+          cargo x test --with-core --no-clippy --coverage all -- \
             -- --include-ignored
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5

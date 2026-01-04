@@ -9,6 +9,7 @@ on:
       - main
     paths:
       - ".github/workflows/release.yml"
+      - "xtask/**"
   workflow_dispatch:
     inputs:
       channel:
@@ -59,7 +60,7 @@ jobs:
       - name: Meta
         id: meta
         run: |
-          cargo run --package xtask -- release meta
+          cargo x -- release meta
 
   release-note:
     name: Generate Release Notes
@@ -215,7 +216,7 @@ jobs:
       - name: Generate Third-Party Licenses Information
         run: cargo about generate about.hbs -o licenses.md
       - name: Package Release Artifacts and Update Version Files
-        run: cargo run --release --package xtask -- release package
+        run: cargo x --release -- release package
       - name: Check existing release
         if: ${{ fromJson(needs.meta.outputs.publish) }}
         run: |
@@ -241,7 +242,7 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             maa_cli-*-unknown-linux-gnu.tar.gz
-            maa_cli-*-apple-darwin.zip
+            maa_cli-*-apple-darwin.tar.gz
             maa_cli-*-pc-windows-msvc.zip
       - name: Commit version files and Push
         working-directory: version

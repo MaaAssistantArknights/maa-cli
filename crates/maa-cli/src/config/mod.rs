@@ -5,7 +5,7 @@ use std::{
 
 use serde_json::Value as JsonValue;
 
-use crate::dirs::{self, Ensure};
+use crate::dirs::Ensure;
 
 #[derive(Debug)]
 pub enum Error {
@@ -221,6 +221,10 @@ pub fn convert(file: &Path, out: Option<&Path>, ft: Option<Filetype>) -> Result<
 }
 
 pub fn import(src: &Path, force: bool, config_type: &str) -> std::io::Result<()> {
+    import_to(src, force, config_type, maa_dirs::config())
+}
+
+fn import_to(src: &Path, force: bool, config_type: &str, config_dir: &Path) -> std::io::Result<()> {
     use std::io::{Error as IOError, ErrorKind};
 
     if !src.is_file() {
@@ -243,7 +247,7 @@ pub fn import(src: &Path, force: bool, config_type: &str) -> std::io::Result<()>
             .is_some_and(|stem| stem.to_str() == Some("cli"))
             && Filetype::is_valid_file(file)
         {
-            let cli_path = dirs::config().join("cli");
+            let cli_path = config_dir.join("cli");
             if !force
                 && SUPPORTED_EXTENSION
                     .iter()
@@ -255,7 +259,7 @@ pub fn import(src: &Path, force: bool, config_type: &str) -> std::io::Result<()>
                 ));
             }
 
-            fs::copy(src, dirs::config().join(file))?;
+            fs::copy(src, config_dir.join(file))?;
         } else {
             return Err(IOError::new(
                 ErrorKind::InvalidInput,
@@ -264,7 +268,7 @@ pub fn import(src: &Path, force: bool, config_type: &str) -> std::io::Result<()>
         }
     }
 
-    let (read_by_cli, dir) = type_to_dir(config_type);
+    let (read_by_cli, dir) = type_to_dir(config_type, config_dir);
 
     // check if the configuration file read by CLI is valid
     if read_by_cli && !Filetype::is_valid_file(file) {
@@ -328,17 +332,17 @@ pub fn import(src: &Path, force: bool, config_type: &str) -> std::io::Result<()>
 }
 
 /// Convert configuration type to directory path and whether it is a configuration read by CLI.
-fn type_to_dir(config_type: &str) -> (bool, std::path::PathBuf) {
+fn type_to_dir(config_type: &str, config_dir: &Path) -> (bool, std::path::PathBuf) {
     match config_type {
         // No need to check config_type == "cli" here, it is handled in import function
-        "asst" | "profile" => (true, dirs::config().join("profiles")),
-        "task" => (true, dirs::config().join("tasks")),
-        "infrast" | "resource" | "copilot" | "ssscopilot" => {
-            (false, dirs::config().join(config_type))
-        }
+        "asst" | "profile" => (true, config_dir.join("profiles")),
+        "task" => (true, config_dir.join("tasks")),
+        "infrast" | "resource" | "copilot" | "ssscopilot" => (false, config_dir.join(config_type)),
+        #[cfg(test)]
+        "__test__" => (false, config_dir.join("__test__")),
         _ => {
             log::warn!("Unknown configuration type: {config_type}");
-            (false, dirs::config().join(config_type))
+            (false, config_dir.join(config_type))
         }
     }
 }
@@ -497,101 +501,258 @@ mod tests {
         );
     }
 
-    #[test]
-    #[ignore = "write file to user's config directory"]
-    fn test_import() {
+    mod import {
         use std::io::ErrorKind;
-        let tmp_dir = temp_dir().join("maa-test-import");
 
-        std::fs::create_dir_all(&tmp_dir).unwrap();
+        use super::*;
 
-        std::fs::create_dir_all(tmp_dir.join("test")).unwrap();
-        std::fs::write(tmp_dir.join("cli.json"), "{}").unwrap();
-        std::fs::write(tmp_dir.join("test.json"), "{}").unwrap();
-        std::fs::write(tmp_dir.join("test.yml"), "").unwrap();
-        std::fs::write(tmp_dir.join("test.ini"), "").unwrap();
+        fn setup() -> (tempfile::TempDir, std::path::PathBuf) {
+            let tmp_dir = tempfile::tempdir().unwrap();
+            let tmp_path = tmp_dir.path();
+            let config_dir = tmp_path.join("config");
 
-        // test cli configuration file
-        assert_eq!(
-            import(&tmp_dir.join("test"), false, "cli")
-                .unwrap_err()
-                .kind(),
-            ErrorKind::InvalidInput
-        );
-        assert_eq!(
-            import(&tmp_dir.join("test.json"), false, "cli")
-                .unwrap_err()
-                .kind(),
-            ErrorKind::InvalidInput
-        );
-        assert!(import(&tmp_dir.join("cli.json"), false, "cli").is_ok());
-        assert_eq!(
-            import(&tmp_dir.join("cli.json"), false, "cli")
-                .unwrap_err()
-                .kind(),
-            ErrorKind::AlreadyExists
-        );
-        import(&tmp_dir.join("cli.json"), true, "cli").unwrap();
+            std::fs::create_dir_all(&config_dir).unwrap();
 
-        // test file read by CLI
-        import(&tmp_dir.join("test.json"), false, "task").unwrap();
-        assert_eq!(
-            import(&tmp_dir.join("test.yml"), false, "task")
-                .unwrap_err()
-                .kind(),
-            ErrorKind::AlreadyExists
-        );
-        import(&tmp_dir.join("test.yml"), true, "task").unwrap();
-        assert_eq!(
-            import(&tmp_dir.join("test.ini"), false, "task")
-                .unwrap_err()
-                .kind(),
-            ErrorKind::InvalidInput
-        );
-        assert!(join!(dirs::config(), "tasks", "test.yml").exists());
-        assert!(!join!(dirs::config(), "tasks", "test.json").exists());
+            std::fs::create_dir_all(tmp_path.join("test")).unwrap();
+            std::fs::write(tmp_path.join("cli.json"), "{}").unwrap();
+            std::fs::write(tmp_path.join("test.json"), "{}").unwrap();
+            std::fs::write(tmp_path.join("test.yml"), "").unwrap();
+            std::fs::write(tmp_path.join("test.ini"), "").unwrap();
 
-        // test file not read by CLI
-        import(&tmp_dir.join("test.json"), false, "infrast").unwrap();
-        assert_eq!(
-            import(&tmp_dir.join("test.json"), false, "infrast")
-                .unwrap_err()
-                .kind(),
-            ErrorKind::AlreadyExists
-        );
-        import(&tmp_dir.join("test.json"), true, "infrast").unwrap();
+            (tmp_dir, config_dir)
+        }
+
+        #[test]
+        fn cli_config_must_be_named_cli() {
+            let (tmp_dir, config_dir) = setup();
+            let tmp_path = tmp_dir.path();
+
+            assert_eq!(
+                import_to(&tmp_path.join("test"), false, "cli", &config_dir)
+                    .unwrap_err()
+                    .kind(),
+                ErrorKind::InvalidInput
+            );
+        }
+
+        #[test]
+        fn cli_config_file_must_have_stem_cli() {
+            let (tmp_dir, config_dir) = setup();
+            let tmp_path = tmp_dir.path();
+
+            assert_eq!(
+                import_to(&tmp_path.join("test.json"), false, "cli", &config_dir)
+                    .unwrap_err()
+                    .kind(),
+                ErrorKind::InvalidInput
+            );
+        }
+
+        #[test]
+        fn cli_config_import_succeeds() {
+            let (tmp_dir, config_dir) = setup();
+            let tmp_path = tmp_dir.path();
+
+            assert!(import_to(&tmp_path.join("cli.json"), false, "cli", &config_dir).is_ok());
+        }
+
+        #[test]
+        fn cli_config_duplicate_fails_without_force() {
+            let (tmp_dir, config_dir) = setup();
+            let tmp_path = tmp_dir.path();
+
+            import_to(&tmp_path.join("cli.json"), false, "cli", &config_dir).unwrap();
+            assert_eq!(
+                import_to(&tmp_path.join("cli.json"), false, "cli", &config_dir)
+                    .unwrap_err()
+                    .kind(),
+                ErrorKind::AlreadyExists
+            );
+        }
+
+        #[test]
+        fn cli_config_duplicate_succeeds_with_force() {
+            let (tmp_dir, config_dir) = setup();
+            let tmp_path = tmp_dir.path();
+
+            import_to(&tmp_path.join("cli.json"), false, "cli", &config_dir).unwrap();
+            import_to(&tmp_path.join("cli.json"), true, "cli", &config_dir).unwrap();
+        }
+
+        #[test]
+        fn task_import_succeeds() {
+            let (tmp_dir, config_dir) = setup();
+            let tmp_path = tmp_dir.path();
+
+            import_to(&tmp_path.join("test.json"), false, "task", &config_dir).unwrap();
+        }
+
+        #[test]
+        fn task_duplicate_name_fails_without_force() {
+            let (tmp_dir, config_dir) = setup();
+            let tmp_path = tmp_dir.path();
+
+            import_to(&tmp_path.join("test.json"), false, "task", &config_dir).unwrap();
+            assert_eq!(
+                import_to(&tmp_path.join("test.yml"), false, "task", &config_dir)
+                    .unwrap_err()
+                    .kind(),
+                ErrorKind::AlreadyExists
+            );
+        }
+
+        #[test]
+        fn task_duplicate_name_succeeds_with_force_and_removes_old_extension() {
+            let (tmp_dir, config_dir) = setup();
+            let tmp_path = tmp_dir.path();
+
+            import_to(&tmp_path.join("test.json"), false, "task", &config_dir).unwrap();
+            import_to(&tmp_path.join("test.yml"), true, "task", &config_dir).unwrap();
+
+            assert!(config_dir.join("tasks").join("test.yml").exists());
+            assert!(!config_dir.join("tasks").join("test.json").exists());
+        }
+
+        #[test]
+        fn task_unsupported_extension_fails() {
+            let (tmp_dir, config_dir) = setup();
+            let tmp_path = tmp_dir.path();
+
+            assert_eq!(
+                import_to(&tmp_path.join("test.ini"), false, "task", &config_dir)
+                    .unwrap_err()
+                    .kind(),
+                ErrorKind::InvalidInput
+            );
+        }
+
+        #[test]
+        fn infrast_import_succeeds() {
+            let (tmp_dir, config_dir) = setup();
+            let tmp_path = tmp_dir.path();
+
+            import_to(&tmp_path.join("test.json"), false, "infrast", &config_dir).unwrap();
+        }
+
+        #[test]
+        fn infrast_duplicate_fails_without_force() {
+            let (tmp_dir, config_dir) = setup();
+            let tmp_path = tmp_dir.path();
+
+            import_to(&tmp_path.join("test.json"), false, "infrast", &config_dir).unwrap();
+            assert_eq!(
+                import_to(&tmp_path.join("test.json"), false, "infrast", &config_dir)
+                    .unwrap_err()
+                    .kind(),
+                ErrorKind::AlreadyExists
+            );
+        }
+
+        #[test]
+        fn infrast_duplicate_succeeds_with_force() {
+            let (tmp_dir, config_dir) = setup();
+            let tmp_path = tmp_dir.path();
+
+            import_to(&tmp_path.join("test.json"), false, "infrast", &config_dir).unwrap();
+            import_to(&tmp_path.join("test.json"), true, "infrast", &config_dir).unwrap();
+        }
+
+        #[test]
+        #[ignore = "writes to real user config directory"]
+        fn import_to_real_user_config_dir() {
+            let tmp_dir = tempfile::tempdir().unwrap();
+            let tmp_path = tmp_dir.path();
+
+            std::fs::write(tmp_path.join("test.json"), "{}").unwrap();
+
+            // Use __test__ type which maps to config_dir/__test__
+            let result = import(&tmp_path.join("test.json"), false, "__test__");
+
+            // Clean up if import succeeded
+            if result.is_ok() {
+                let test_dir = maa_dirs::config().join("__test__");
+                if test_dir.exists() {
+                    std::fs::remove_dir_all(&test_dir).unwrap();
+                }
+            }
+
+            assert!(result.is_ok());
+        }
     }
 
-    #[test]
-    fn test_type_to_dir() {
-        assert_eq!(type_to_dir("asst"), (true, dirs::config().join("profiles")));
-        assert_eq!(
-            type_to_dir("profile"),
-            (true, dirs::config().join("profiles"))
-        );
+    mod type_to_dir_tests {
+        use super::*;
 
-        assert_eq!(type_to_dir("task"), (true, dirs::config().join("tasks")));
+        #[test]
+        fn asst_maps_to_profiles() {
+            let config_dir = Path::new("/test/config");
+            assert_eq!(
+                type_to_dir("asst", config_dir),
+                (true, config_dir.join("profiles"))
+            );
+        }
 
-        assert_eq!(
-            type_to_dir("infrast"),
-            (false, dirs::config().join("infrast"))
-        );
-        assert_eq!(
-            type_to_dir("resource"),
-            (false, dirs::config().join("resource"))
-        );
-        assert_eq!(
-            type_to_dir("copilot"),
-            (false, dirs::config().join("copilot"))
-        );
-        assert_eq!(
-            type_to_dir("ssscopilot"),
-            (false, dirs::config().join("ssscopilot"))
-        );
+        #[test]
+        fn profile_maps_to_profiles() {
+            let config_dir = Path::new("/test/config");
+            assert_eq!(
+                type_to_dir("profile", config_dir),
+                (true, config_dir.join("profiles"))
+            );
+        }
 
-        assert_eq!(
-            type_to_dir("unknown"),
-            (false, dirs::config().join("unknown"))
-        );
+        #[test]
+        fn task_maps_to_tasks() {
+            let config_dir = Path::new("/test/config");
+            assert_eq!(
+                type_to_dir("task", config_dir),
+                (true, config_dir.join("tasks"))
+            );
+        }
+
+        #[test]
+        fn infrast_maps_to_infrast() {
+            let config_dir = Path::new("/test/config");
+            assert_eq!(
+                type_to_dir("infrast", config_dir),
+                (false, config_dir.join("infrast"))
+            );
+        }
+
+        #[test]
+        fn resource_maps_to_resource() {
+            let config_dir = Path::new("/test/config");
+            assert_eq!(
+                type_to_dir("resource", config_dir),
+                (false, config_dir.join("resource"))
+            );
+        }
+
+        #[test]
+        fn copilot_maps_to_copilot() {
+            let config_dir = Path::new("/test/config");
+            assert_eq!(
+                type_to_dir("copilot", config_dir),
+                (false, config_dir.join("copilot"))
+            );
+        }
+
+        #[test]
+        fn ssscopilot_maps_to_ssscopilot() {
+            let config_dir = Path::new("/test/config");
+            assert_eq!(
+                type_to_dir("ssscopilot", config_dir),
+                (false, config_dir.join("ssscopilot"))
+            );
+        }
+
+        #[test]
+        fn unknown_type_maps_to_itself() {
+            let config_dir = Path::new("/test/config");
+            assert_eq!(
+                type_to_dir("unknown", config_dir),
+                (false, config_dir.join("unknown"))
+            );
+        }
     }
 }
