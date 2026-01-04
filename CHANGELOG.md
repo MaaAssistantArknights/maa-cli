@@ -1,5 +1,39 @@
 # Release Notes
 
+## Release 0.6.0
+
+### Features
+
+- Better installer by [@wangl-cc](https://github.com/wangl-cc) in [#440](https://github.com/MaaAssistantArknights/maa-cli/pull/440)
+- Support report callback by [@wangl-cc](https://github.com/wangl-cc) in [#441](https://github.com/MaaAssistantArknights/maa-cli/pull/441)
+- Add ETag caching for manifest downloads by [@wangl-cc](https://github.com/wangl-cc) in [#451](https://github.com/MaaAssistantArknights/maa-cli/pull/451)
+- **BREAKING**: Add new formation options and improve performance by [@wangl-cc](https://github.com/wangl-cc) in [#460](https://github.com/MaaAssistantArknights/maa-cli/pull/460)
+
+### Bug Fixes
+
+- CLI arguments should have higher priority than overlays by [@wangl-cc](https://github.com/wangl-cc) in [#442](https://github.com/MaaAssistantArknights/maa-cli/pull/442)
+- Download tasks.json and activity from api by [@wangl-cc](https://github.com/wangl-cc) in [#452](https://github.com/MaaAssistantArknights/maa-cli/pull/452)
+- Add Waydroid connection preset to `maa init` by [@satgo1546](https://github.com/satgo1546) in [#455](https://github.com/MaaAssistantArknights/maa-cli/pull/455)
+- Make HTTP client read system certificate by [@lingdiansr](https://github.com/lingdiansr) in [#454](https://github.com/MaaAssistantArknights/maa-cli/pull/454)
+
+### Refactor
+
+- Extract ToCString trait into separate crate by [@wangl-cc](https://github.com/wangl-cc) in [#456](https://github.com/MaaAssistantArknights/maa-cli/pull/456)
+- Split MAAValue into a crate by [@wangl-cc](https://github.com/wangl-cc) in [#462](https://github.com/MaaAssistantArknights/maa-cli/pull/462)
+
+### Documentation
+
+- Add winget installation instructions by [@wangl-cc](https://github.com/wangl-cc) and [@JasonHuang79](https://github.com/JasonHuang79) in [#471](https://github.com/MaaAssistantArknights/maa-cli/pull/471)
+
+### Miscellaneous
+
+- Stop use lld on windows by [@wangl-cc](https://github.com/wangl-cc)
+- Update deps by [@wangl-cc](https://github.com/wangl-cc)
+- **BREAKING**: Remove vendored-openssl feature by [@wangl-cc](https://github.com/wangl-cc) in [#461](https://github.com/MaaAssistantArknights/maa-cli/pull/461)
+- **BREAKING**: Add xtask for release and installation script by [@wangl-cc](https://github.com/wangl-cc) in [#465](https://github.com/MaaAssistantArknights/maa-cli/pull/465)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.5.9...v0.6.0>
+
 ## Release 0.5.9
 
 ### Features
