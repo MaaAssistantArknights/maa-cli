@@ -53,6 +53,7 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
             let mut cmd = cargo();
             if opts.coverage.coverage_run() {
                 cmd.args(LLVM_COV_ARGS);
+                cmd.arg("--no-report");
             }
             cmd.args(["run", "--package", "maa-cli", "--"]);
             cmd.args(["install", "beta"]);
