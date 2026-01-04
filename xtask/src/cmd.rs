@@ -20,6 +20,7 @@ impl CommandExt for Command {
     }
 
     fn run(&mut self) -> Result<()> {
+        println!("Running command: {:?}", self);
         let status = self.status().context("Failed to execute command")?;
         if !status.success() {
             bail!("Failed to run: {self:?}");
@@ -28,6 +29,7 @@ impl CommandExt for Command {
     }
 
     fn read(&mut self) -> Result<String> {
+        println!("Running command: {:?}", self);
         let output = self.output().context("Failed to execute command")?;
 
         if !output.status.success() {

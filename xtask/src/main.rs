@@ -61,9 +61,17 @@ struct BuildOptions {
 
 #[derive(Parser)]
 struct TestOptions {
-    /// Install MaaCore before testing (if false, sets SKIP_CORE_TEST=true)
+    /// Install MaaCore before testing (if false, try to find it)
     #[arg(long)]
-    with_core: bool,
+    install_core: bool,
+
+    /// Disable tests that require MaaCore
+    #[arg(long)]
+    no_core_tests: bool,
+
+    /// Disable ignored tests
+    #[arg(long)]
+    no_ignored_tests: bool,
 
     /// Enable coverage
     #[arg(long, default_value = "none")]

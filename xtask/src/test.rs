@@ -1,6 +1,6 @@
 //! Test automation for CI.
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 
 use crate::{
     TestOptions,
@@ -38,11 +38,8 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
         })?;
     }
 
-    if opts.with_core {
+    if opts.install_core {
         Group::new("Install MaaCore").run(|| {
-            let core_dir = maa_dirs::library().to_str().unwrap();
-            env_vars.push("MAA_CORE_DIR", core_dir.to_owned());
-
             let mut cmd = cargo();
             if opts.coverage.coverage_run() {
                 cmd.args(LLVM_COV_ARGS);
@@ -53,9 +50,21 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
             cmd.env_vars(&env_vars);
             cmd.run().context("Failed to install MaaCore")
         })?;
-    } else {
+    }
+
+    if opts.no_core_tests {
         Group::new("Skip Core Test").run(|| {
             env_vars.push("SKIP_CORE_TEST", "true".to_owned());
+            Ok(())
+        })?;
+    } else {
+        Group::new("Find MaaCore").run(|| {
+            let core_dir = maa_dirs::find_library();
+            if let Some(core_dir) = core_dir {
+                env_vars.push("MAA_CORE_DIR", core_dir.to_str().unwrap().to_owned());
+            } else {
+                bail!("Failed to find MaaCore")
+            }
             Ok(())
         })?;
     }
@@ -92,8 +101,11 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
             cmd.args(LLVM_COV_ARGS);
             cmd.arg("--no-report");
         }
-        cmd.args(["test", "--locked"]);
+        cmd.args(["test", "--locked", "--no-fail-fast"]);
         cmd.args(&opts.test_args);
+        if !opts.no_ignored_tests {
+            cmd.args(["--", "--include-ignored"]);
+        }
         cmd.env_vars(&env_vars);
         cmd.run().context("Failed to run cargo test")
     })?;
