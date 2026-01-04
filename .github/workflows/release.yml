@@ -161,11 +161,42 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  build-winget:
+    name: Build for Winget
+    needs: meta
+    if: ${{ !fromJson(needs.meta.outputs.skip) }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - windows-11-arm
+          - windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Build
+        id: build
+        env:
+          MAA_VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          cargo x build --tar --vendored-deps \
+            --profile ${{ needs.meta.outputs.profile }} \
+            --rename maa-cli.exe -- \
+            --no-default-features --features core-installer,git2
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: maa_cli-${{ steps.build.outputs.host_triplet }}-winget
+          path: ${{ steps.build.outputs.host_triplet }}.tar
+          retention-days: 1
+          if-no-files-found: error
+
   release:
     name: Release
     if: ${{ !fromJson(needs.meta.outputs.skip) }}
     runs-on: ubuntu-latest
-    needs: [meta, build, build-universal, release-note]
+    needs: [meta, build, build-universal, build-winget, release-note]
     permissions:
       contents: write
     env:
@@ -281,3 +312,14 @@ jobs:
       dryrun: false
     secrets:
       AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+
+  publish-winget:
+    name: Publish Winget Package
+    needs: [meta, release]
+    if: ${{ fromJson(needs.meta.outputs.publish) && !fromJson(needs.meta.outputs.prerelease) }}
+    uses: ./.github/workflows/publish-winget.yml
+    with:
+      version: ${{ needs.meta.outputs.version }}
+      dryrun: false
+    secrets:
+      WINGET_GITHUB_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}

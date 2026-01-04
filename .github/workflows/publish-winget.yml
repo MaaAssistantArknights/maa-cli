@@ -1,0 +1,55 @@
+name: Publish Winget
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Package version
+        required: true
+        type: string
+      dryrun:
+        description: Do not create PR
+        required: true
+        type: boolean
+    secrets:
+      WINGET_GITHUB_TOKEN:
+        description: GitHub PAT for creating PR
+        required: true
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version
+        required: true
+        type: string
+      dryrun:
+        description: Do not create PR
+        default: true
+        required: true
+        type: boolean
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to Winget
+    runs-on: windows-latest
+    steps:
+      - name: Install Komac
+        run: |
+          winget install --id RussellBanks.Komac --exact --silent --accept-source-agreements
+
+      - name: Update Winget Package
+        run: |
+          komac update \
+            --id MaaAssistantArknights.maa-cli \
+            --version '${{ inputs.version }}' \
+            --urls \
+              'https://github.com/MaaAssistantArknights/maa-cli/releases/download/v${{ inputs.version }}/maa_cli-winget-v${{ inputs.version }}-x86_64-pc-windows-msvc.zip' \
+              'https://github.com/MaaAssistantArknights/maa-cli/releases/download/v${{ inputs.version }}/maa_cli-winget-v${{ inputs.version }}-aarch64-pc-windows-msvc.zip' \
+            ${{ inputs.dryrun && '--dry-run' || '--submit' }} \
+            --token "${{ secrets.WINGET_GITHUB_TOKEN }}"

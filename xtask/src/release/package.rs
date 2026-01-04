@@ -75,6 +75,11 @@ pub fn run() -> Result<()> {
         println!("  Size: {size} bytes");
         println!("  SHA256: {checksum_hash}");
 
+        // No need to update manifests for winget
+        if target.ends_with("winget") {
+            continue;
+        }
+
         // Update version files with target-specific info
         let asset = Asset {
             name: archive_name,
@@ -153,6 +158,8 @@ fn create_archive(target: &str, version: &str, dir: &str) -> Result<(String, Str
     // Use tar.gz for Unix-like systems (Linux, macOS) and zip for Windows
     let (format, bin_name) = if target.contains("-windows-msvc") {
         (ArchiveFormat::Zip, "maa.exe")
+    } else if target.contains("-windows-msvc-winget") {
+        (ArchiveFormat::Zip, "maa-cli.exe")
     } else if target.contains("-linux-") || target.contains("-apple-darwin") {
         (ArchiveFormat::TarGz, "maa")
     } else {
