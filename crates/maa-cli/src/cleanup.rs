@@ -287,10 +287,8 @@ mod tests {
 
             #[cfg(feature = "core_installer")]
             if var_os("SKIP_CORE_TEST").is_none() {
-                let version = var_os("MAA_CORE_VERSION")
-                    .expect("MAA_CORE_VERSION environment variable not set");
-                let version = version.to_str().unwrap()[1..].parse().unwrap();
-                let name = crate::installer::maa_core::this_asset_name(&version);
+                let version = crate::state::CORE_VERSION.as_ref().unwrap();
+                let name = crate::installer::maa_core::this_asset_name(version);
                 assert_should_keep!(CliCache, &name, true);
             }
 
@@ -421,10 +419,8 @@ mod tests {
             std::fs::File::create(cache().join(this_asset_name(&Version::new(5, 16, 1)))).unwrap();
 
             if var_os("SKIP_CORE_TEST").is_none() {
-                let version = var_os("MAA_CORE_VERSION")
-                    .expect("MAA_CORE_VERSION environment variable not set");
-                let version = version.to_str().unwrap()[1..].parse().unwrap();
-                let name = this_asset_name(&version);
+                let version = crate::state::CORE_VERSION.as_ref().unwrap();
+                let name = this_asset_name(version);
                 std::fs::File::create(join!(cache(), &name)).unwrap();
             }
         }

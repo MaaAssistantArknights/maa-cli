@@ -121,3 +121,32 @@ pub fn set_outputs(outputs: &[(&str, &str)]) -> Result<()> {
     }
     Ok(())
 }
+
+pub struct Group<'s> {
+    name: &'s str,
+}
+
+impl<'s> Group<'s> {
+    pub fn new(name: &'s str) -> Self {
+        Self { name }
+    }
+
+    pub fn start(&self) {
+        println!("::group::{}", self.name);
+    }
+
+    pub fn end(&self) {
+        println!("::endgroup::");
+    }
+
+    pub fn run<F>(&self, f: F) -> Result<()>
+    where
+        F: FnOnce() -> Result<()>,
+    {
+        self.start();
+        f()?;
+        self.end();
+
+        Ok(())
+    }
+}

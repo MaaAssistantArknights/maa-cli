@@ -11,6 +11,7 @@ license.workspace = true
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 flate2 = { workspace = true }
+maa-dirs.workspace = true
 maa-version = { workspace = true }
 semver = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -18,7 +19,6 @@ serde_json = { workspace = true }
 sha2 = { workspace = true }
 tar = { workspace = true }
 toml = { workspace = true }
-xshell = "0.2"
 zip = { workspace = true }
 
 [lints]

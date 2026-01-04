@@ -1,13 +1,18 @@
-use std::{fs, num::NonZeroU16, path::Path, process::exit, str::FromStr};
+use std::{
+    fs,
+    num::NonZeroU16,
+    path::Path,
+    process::{Command, exit},
+    str::FromStr,
+};
 
 use anyhow::{Context, Result, ensure};
 use maa_version::{VersionManifest, cli::Details};
 use semver::{BuildMetadata, Prerelease, Version};
 use serde::Deserialize;
-use xshell::{Shell, cmd};
 
 use super::Channel;
-use crate::github;
+use crate::{cmd::CommandExt, github};
 
 #[derive(Deserialize)]
 struct CargoToml {
@@ -20,11 +25,9 @@ struct Package {
 }
 
 pub fn run() -> Result<()> {
-    let sh = Shell::new()?;
-
     let cargo_pkg_version = get_cargo_version()?;
-    let commit_sha = get_commit_sha(&sh)?;
-    let commit_short_sha = get_commit_short_sha(&sh)?;
+    let commit_sha = get_commit_sha()?;
+    let commit_short_sha = get_commit_short_sha()?;
 
     let event_name = github::EventName::from_env()?;
 
@@ -89,12 +92,14 @@ fn get_cargo_version() -> Result<Version> {
     Ok(cargo_toml.package.version)
 }
 
-fn get_commit_sha(sh: &Shell) -> Result<String> {
-    Ok(cmd!(sh, "git rev-parse HEAD").read()?)
+fn get_commit_sha() -> Result<String> {
+    Command::new("git").args(["rev-parse", "HEAD"]).read()
 }
 
-fn get_commit_short_sha(sh: &Shell) -> Result<String> {
-    Ok(cmd!(sh, "git rev-parse --short HEAD").read()?)
+fn get_commit_short_sha() -> Result<String> {
+    Command::new("git")
+        .args(["rev-parse", "--short", "HEAD"])
+        .read()
 }
 
 fn determine_channel_and_publish(event_name: github::EventName) -> Result<(Channel, bool)> {

@@ -80,7 +80,6 @@ jobs:
         runner:
           - ubuntu-22.04
           - ubuntu-22.04-arm
-          - macos-15-intel
           - macos-latest
           - windows-latest
     env:
@@ -92,31 +91,10 @@ jobs:
         run: rustup update stable
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
-      - name: Build
-        run: |
-          cargo build --locked --workspace --all-features
-      - name: Lint (clippy)
-        run: |
-          cargo clippy -- -D warnings
-      - name: Install MaaCore
-        env:
-          MAA_CONFIG_DIR: ${{ github.workspace }}/crates/maa-cli/config_examples
-        run: |
-          cargo run --package maa-cli -- install beta
-          core_dir=$(cargo run -- dir library)
-          cache_dir=$(cargo run -- dir cache)
-          package_name=$(basename "$cache_dir"/MAA-v*)
-          version=$(echo "$package_name" | sed -E 's/^MAA-v(.+)-(linux|macos|win)-.*/\1/')
-          echo "Downloaded MaaCore version: $version"
-          {
-            echo "MAA_CORE_DIR=$core_dir"
-            echo "MAA_CORE_VERSION=v$version"
-          } >> "$GITHUB_ENV"
       - name: Test
-        env:
-          SKIP_CORE_TEST: ${{ matrix.runner == 'windows-11-arm' }}
         run: |
-          cargo test --workspace --all-features -- --include-ignored
+          cargo run -pxtask test --with-core \
+            -- --include-ignored
 
   build-tier2:
     name: Build and Test (Tier 2, ${{ matrix.runner }})
@@ -126,6 +104,7 @@ jobs:
       fail-fast: false
       matrix:
         runner:
+          - macos-15-intel
           - windows-11-arm
     env:
       MAA_EXTRA_SHARE_NAME: maa-test
@@ -136,17 +115,11 @@ jobs:
         run: rustup update stable
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
-      - name: Build
-        run: |
-          cargo build --locked --workspace --all-features
-      - name: Lint (clippy)
-        run: |
-          cargo clippy --workspace --all-features -- -D warnings
       - name: Test
-        env:
-          SKIP_CORE_TEST: true
         run: |
-          cargo test --workspace --all-features -- --include-ignored
+          cargo run -pxtask test  \
+            ${{ matrix.runner != 'windows-11-arm' && --with-core }} \
+            -- --include-ignored
 
   build-no-default-features:
     name: Build and Test (feature=${{ matrix.feature }})
@@ -163,11 +136,10 @@ jobs:
         uses: actions/checkout@v6
       - name: Update Rust
         run: rustup update stable
-      - name: Build and Test
-        env:
-          SKIP_CORE_TEST: true
+      - name: Test
         run: |
-          cargo test --package maa-cli --locked \
+          cargo run -pxtask test \
+            --no-clippy --no-all-features \
             --no-default-features --features '${{ matrix.feature }}' \
             -- --include-ignored
 
@@ -180,33 +152,17 @@ jobs:
         os:
           - ubuntu-22.04
           - macos-latest
-          - windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Setup Toolchains
-        uses: ./.github/actions/setup
-      - name: Install MaaCore
-        uses: ./.github/actions/install-core
-      - name: Build
-        run: cargo build --package maa-sys --locked
-      - name: Lint (clippy)
-        run: cargo clippy --package maa-sys -- -D warnings
-      - name: Test
-        # It seems rust needs a static library to check the linking.
-        # Without this, we can not link maa-sys to MaaCore on Windows.
-        # https://stackoverflow.com/questions/63394094/rust-linker-seeks-a-lib-rather-than-a-dll
-        if: ${{ !startsWith(matrix.os, 'windows') }}
-        run: cargo test --package maa-sys
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-llvm-cov
       - name: Coverage
-        if: ${{ !startsWith(matrix.os, 'windows') }}
         run: |
-          cargo +nightly llvm-cov --package maa-sys \
-            --codecov --output-path codecov.json \
+          cargo -pxtask run test --with-core \
+            --package maa-sys --coverage TestOnly \
             -- --include-ignored
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
@@ -225,6 +181,7 @@ jobs:
       matrix:
         os:
           - ubuntu-22.04
+          - ubuntu-22.04-arm
           - macos-latest
           - windows-latest
     env:
@@ -238,27 +195,10 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-llvm-cov
-      - name: Cleanup Coverage Artifacts
-        run: cargo llvm-cov clean --workspace
-      - name: Install MaaCore
-        env:
-          MAA_CONFIG_DIR: ${{ github.workspace }}/crates/maa-cli/config_examples
+      - name: Coverage
         run: |
-          cargo llvm-cov run --package maa-cli --no-report -- install beta
-          core_dir=$(cargo run -- dir library)
-          cache_dir=$(cargo run -- dir cache)
-          package_name=$(basename "$cache_dir"/MAA-v*)
-          version=$(echo "$package_name" | sed -E 's/^MAA-v(.+)-(linux|macos|win)-.*/\1/')
-          echo "Downloaded MaaCore version: $version"
-          {
-            echo "MAA_CORE_DIR=$core_dir"
-            echo "MAA_CORE_VERSION=v$version"
-          } >> "$GITHUB_ENV"
-      - name: Run Tests
-        run: cargo llvm-cov --workspace --all-features --no-report -- --include-ignored
-      - name: Generate Coverage Report
-        run: |
-          cargo llvm-cov report --codecov --output-path codecov.json
+          cargo run -pxtask test --with-core --coverage \
+            -- --include-ignored
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
         with:

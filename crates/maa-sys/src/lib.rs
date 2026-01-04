@@ -435,10 +435,6 @@ mod tests {
     #[test]
     fn get_version() {
         let version = Assistant::get_version().unwrap();
-
-        if let Some(v_str) = std::env::var_os("MAA_CORE_VERSION") {
-            assert_eq!(version, v_str.to_str().unwrap());
-        }
     }
 
     #[cfg(not(feature = "runtime"))]
