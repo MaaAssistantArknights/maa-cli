@@ -286,7 +286,7 @@ jobs:
   update-changelog:
     name: Update Changelog
     needs: [meta, release]
-    if: ${{ fromJson(needs.meta.outputs.publish) && !fromJson(needs.meta.outputs.prerelease) }}
+    if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'stable' }}
     uses: ./.github/workflows/publish-changelog.yml
     with:
       version: ${{ needs.meta.outputs.version }}
@@ -295,7 +295,7 @@ jobs:
   publish-homebrew:
     name: Publish Homebrew Formulae
     needs: [meta, release]
-    if: ${{ fromJson(needs.meta.outputs.publish) && !fromJson(needs.meta.outputs.prerelease) }}
+    if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'stable' }}
     uses: ./.github/workflows/publish-homebrew.yml
     with:
       version: ${{ needs.meta.outputs.version }}
@@ -306,7 +306,7 @@ jobs:
   publish-aur:
     name: Publish AUR Package
     needs: [meta, release]
-    if: ${{ fromJson(needs.meta.outputs.publish) && !fromJson(needs.meta.outputs.prerelease) }}
+    if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'stable' }}
     uses: ./.github/workflows/publish-aur.yml
     with:
       pkgver: ${{ needs.meta.outputs.version }}
@@ -317,7 +317,7 @@ jobs:
   publish-winget:
     name: Publish Winget Package
     needs: [meta, release]
-    if: ${{ fromJson(needs.meta.outputs.publish) && !fromJson(needs.meta.outputs.prerelease) }}
+    if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'stable' }}
     uses: ./.github/workflows/publish-winget.yml
     with:
       version: ${{ needs.meta.outputs.version }}
