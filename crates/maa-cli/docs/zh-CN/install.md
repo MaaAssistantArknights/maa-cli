@@ -46,7 +46,7 @@ Homebrew 用户可以通过非官方的 [tap](https://github.com/MaaAssistantArk
 
 - 对于在 Linux 上使用 Homebrew 的用户，参见上述 macOS 的安装方式。
 
-## Windows
+### Windows
 
 对于 Windows 用户，可以使用 [winget](https://github.com/microsoft/winget-pkgs/tree/master/manifests/m/MaaAssistantArknights/maa-cli/) 管理 maa-cli：
   
