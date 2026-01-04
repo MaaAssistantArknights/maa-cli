@@ -183,7 +183,7 @@ jobs:
           cargo x build --tar --vendored-deps \
             --profile ${{ needs.meta.outputs.profile }} \
             --rename maa-cli.exe -- \
-            --no-default-features --features core-installer,git2
+            --no-default-features --features core_installer,git2
       - name: Upload Artifact
         uses: actions/upload-artifact@v6
         with:
