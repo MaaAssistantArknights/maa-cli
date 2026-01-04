@@ -321,6 +321,7 @@ jobs:
     uses: ./.github/workflows/publish-winget.yml
     with:
       version: ${{ needs.meta.outputs.version }}
+      tag: ${{ needs.meta.outputs.tag }}
       dryrun: false
     secrets:
       WINGET_GITHUB_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
