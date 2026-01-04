@@ -62,7 +62,8 @@ pub fn run(opts: BuildOptions) -> Result<()> {
                 .with_context(|| format!("Failed to create tar file: {tar_name}"))?;
 
             let mut tar = tar::Builder::new(file);
-            tar.append_path_with_name(&binary, exe)
+            let archive_name = opts.rename.unwrap_or(exe);
+            tar.append_path_with_name(&binary, archive_name)
                 .with_context(|| format!("Failed to add {binary} to tar archive"))?;
 
             tar.finish().context("Failed to finalize tar archive")?;

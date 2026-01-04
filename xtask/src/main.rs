@@ -54,6 +54,10 @@ struct BuildOptions {
     #[arg(long)]
     pub tar: bool,
 
+    /// Rename the binary to a different name
+    #[arg(long)]
+    pub rename: Option<String>,
+
     /// Additional arguments to pass to `cargo build`
     #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
     pub build_args: Vec<String>,
