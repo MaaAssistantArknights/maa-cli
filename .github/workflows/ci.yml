@@ -185,9 +185,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Install Nightly Toolchain
-        run: |
-          rustup toolchain install nightly --profile minimal --component llvm-tools
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2
         with:

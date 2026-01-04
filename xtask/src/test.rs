@@ -31,6 +31,16 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
 
     let package_flags = opts.package_flags();
 
+    if opts.coverage.report() {
+        Group::new("Install Nightly Toolchain").run(|| {
+            std::process::Command::new("rustup")
+                .args(["install", "nightly", "--profile=minimal", "-cllvm-tools"])
+                .arg("--no-self-update")
+                .run()
+                .context("Failed to install nightly")
+        })?;
+    }
+
     if opts.with_core {
         // Install MaaCore using the appropriate cargo command
         Group::new("Install MaaCore").run(|| {
@@ -94,7 +104,7 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
         Group::new("Coverage").run(|| {
             cargo()
                 .args(LLVM_COV_ARGS)
-                .args(["--report", "--codecov", "--output-path", "codecov.json"])
+                .args(["report", "--codecov", "--output-path", "codecov.json"])
                 .run()
         })?;
     }
