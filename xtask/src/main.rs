@@ -56,7 +56,7 @@ struct TestOptions {
 impl TestOptions {
     fn package_flags(&self) -> Vec<&str> {
         match self.package.as_str() {
-            "workspace" => vec!["--workspace"],
+            "workspace" => vec!["--workspace", "--exclude", "xtask"],
             _ => vec!["--package", &self.package],
         }
     }
