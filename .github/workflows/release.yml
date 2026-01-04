@@ -251,6 +251,7 @@ jobs:
             maa_cli-*-unknown-linux-gnu.tar.gz
             maa_cli-*-apple-darwin.tar.gz
             maa_cli-*-pc-windows-msvc.zip
+            maa_cli-*-pc-windows-msvc-winget.zip
       - name: Commit version files and Push
         working-directory: version
         run: |

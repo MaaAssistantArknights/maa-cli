@@ -49,7 +49,7 @@ jobs:
             --id MaaAssistantArknights.maa-cli \
             --version '${{ inputs.version }}' \
             --urls \
-              'https://github.com/MaaAssistantArknights/maa-cli/releases/download/v${{ inputs.version }}/maa_cli-winget-v${{ inputs.version }}-x86_64-pc-windows-msvc.zip' \
-              'https://github.com/MaaAssistantArknights/maa-cli/releases/download/v${{ inputs.version }}/maa_cli-winget-v${{ inputs.version }}-aarch64-pc-windows-msvc.zip' \
+              'https://github.com/MaaAssistantArknights/maa-cli/releases/download/v${{ inputs.version }}/maa_cli-v${{ inputs.version }}-x86_64-pc-windows-msvc-winget.zip' \
+              'https://github.com/MaaAssistantArknights/maa-cli/releases/download/v${{ inputs.version }}/maa_cli-v${{ inputs.version }}-aarch64-pc-windows-msvc-winget.zip' \
             ${{ inputs.dryrun && '--dry-run' || '--submit' }} \
             --token "${{ secrets.WINGET_GITHUB_TOKEN }}"
