@@ -1,44 +1,44 @@
 {
-  "version": "0.6.0-beta.3.alpha.1+sha.d1f8e3f",
+  "version": "0.6.0-beta.4",
   "details": {
-    "tag": "nightly",
+    "tag": "v0.6.0-beta.4",
+    "commit": "b2a6107b988e88d916156a81740cd394b52e3254",
     "assets": {
-      "universal-apple-darwin": {
-        "name": "maa_cli-v0.6.0-beta.3.alpha.1+sha.d1f8e3f-universal-apple-darwin.zip",
-        "size": 9031402,
-        "sha256sum": "9b61d954fe6dadba14c0832e1bc1a45ff0d73228164a1ded402a53c676444687"
-      },
-      "x86_64-unknown-linux-gnu": {
-        "name": "maa_cli-v0.6.0-beta.3.alpha.1+sha.d1f8e3f-x86_64-unknown-linux-gnu.tar.gz",
-        "size": 5302698,
-        "sha256sum": "576fe837fe54974aa755167705709a09ec5006bcee4b2a2c4c802ebedc657ecf"
-      },
-      "aarch64-unknown-linux-gnu": {
-        "name": "maa_cli-v0.6.0-beta.3.alpha.1+sha.d1f8e3f-aarch64-unknown-linux-gnu.tar.gz",
-        "size": 5474088,
-        "sha256sum": "e5cef2abaf653a3bb4fe3f6e0b3776ce68b29a9b2064ff4924b3f3f458c409d0"
-      },
-      "x86_64-pc-windows-msvc": {
-        "name": "maa_cli-v0.6.0-beta.3.alpha.1+sha.d1f8e3f-x86_64-pc-windows-msvc.zip",
-        "size": 3321382,
-        "sha256sum": "2a8f26982c327cc94db3c7701356097082574f0590d151d15356178421a3d6f4"
-      },
-      "x86_64-apple-darwin": {
-        "name": "maa_cli-v0.6.0-beta.3.alpha.1+sha.d1f8e3f-x86_64-apple-darwin.zip",
-        "size": 4476732,
-        "sha256sum": "7cd982fd464aef5dd88e3792e9711a04cc2e3ab683a6ddbafe1378171181ad4b"
-      },
       "aarch64-apple-darwin": {
-        "name": "maa_cli-v0.6.0-beta.3.alpha.1+sha.d1f8e3f-aarch64-apple-darwin.zip",
-        "size": 4554421,
-        "sha256sum": "04e65eb85a5aba267db3e4c95a61e4eef005f6d5328b4381e7f76425b695ed2b"
+        "name": "maa_cli-v0.6.0-beta.4-aarch64-apple-darwin.tar.gz",
+        "size": 4630775,
+        "sha256sum": "985733cd052acbbe772387e91b9648ab4bc45fdca2c7108ab3bc3527ad22a2d1"
       },
       "aarch64-pc-windows-msvc": {
-        "name": "maa_cli-v0.6.0-beta.3.alpha.1+sha.d1f8e3f-aarch64-pc-windows-msvc.zip",
-        "size": 3106933,
-        "sha256sum": "b4821a1c883b82fc4f91df9030cd1d659f3729b4514d577fc5b615b1209b5600"
+        "name": "maa_cli-v0.6.0-beta.4-aarch64-pc-windows-msvc.zip",
+        "size": 3185701,
+        "sha256sum": "faa4494c81377402ef016ec9a788edf0a5a16a7f32788513b3a32857f1dcce1e"
+      },
+      "aarch64-unknown-linux-gnu": {
+        "name": "maa_cli-v0.6.0-beta.4-aarch64-unknown-linux-gnu.tar.gz",
+        "size": 5562413,
+        "sha256sum": "c8f113b751aef511b6a8ef46489b52819ea9ad889c7c3d2c65f0b3e8bcc34a40"
+      },
+      "universal-apple-darwin": {
+        "name": "maa_cli-v0.6.0-beta.4-universal-apple-darwin.tar.gz",
+        "size": 9177406,
+        "sha256sum": "086d36083f543f6f0ed2c3e17c9aef0dcb81081a844dddb382c00d40afa3cbd9"
+      },
+      "x86_64-apple-darwin": {
+        "name": "maa_cli-v0.6.0-beta.4-x86_64-apple-darwin.tar.gz",
+        "size": 4562161,
+        "sha256sum": "56570292f431218bf416bba9a8722ecb0a005cb4fa7de7070ecaed4a5eaa9f7c"
+      },
+      "x86_64-pc-windows-msvc": {
+        "name": "maa_cli-v0.6.0-beta.4-x86_64-pc-windows-msvc.zip",
+        "size": 3412193,
+        "sha256sum": "b979d357b0421e03add421c827a03c7e11d2cec0924503a98069cd2ba25b7668"
+      },
+      "x86_64-unknown-linux-gnu": {
+        "name": "maa_cli-v0.6.0-beta.4-x86_64-unknown-linux-gnu.tar.gz",
+        "size": 5393960,
+        "sha256sum": "7a5542281ddcbdd92961b14be750cf28ea71ff2b76fac8526b7800b6f51ecb65"
       }
-    },
-    "commit": "d1f8e3f9c29a77460cb8b2e0623f4a60de2f08c3"
+    }
   }
 }
