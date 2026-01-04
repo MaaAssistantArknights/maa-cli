@@ -194,7 +194,7 @@ jobs:
           tool: cargo-llvm-cov
       - name: Coverage
         run: |
-          cargo run -pxtask test --with-core --coverage all -- \
+          cargo run -pxtask test --with-core --no-clippy --coverage all -- \
             -- --include-ignored
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5

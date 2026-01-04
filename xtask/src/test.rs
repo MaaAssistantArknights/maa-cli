@@ -18,7 +18,7 @@ fn cargo() -> std::process::Command {
     std::process::Command::new("cargo")
 }
 
-const LLVM_COV_ARGS: &[&str] = &["+nightly", "llvm-cov", "--no-report"];
+const LLVM_COV_ARGS: &[&str] = &["+nightly", "llvm-cov"];
 
 /// Run tests with optional core installation and coverage.
 pub fn run_tests(opts: TestOptions) -> Result<()> {
@@ -81,6 +81,7 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
         let mut cmd = cargo();
         if opts.coverage.coverage_test() {
             cmd.args(LLVM_COV_ARGS);
+            cmd.arg("--no-report");
         }
         cmd.args(["test", "--locked"]);
         cmd.args(&opts.test_args);
@@ -92,8 +93,8 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
     if opts.coverage.report() {
         Group::new("Coverage").run(|| {
             cargo()
-                .args(["llvm-cov", "report"])
-                .args(["--codecov", "--output-path", "codecov.json"])
+                .args(LLVM_COV_ARGS)
+                .args(["--report", "--codecov", "--output-path", "codecov.json"])
                 .run()
         })?;
     }
