@@ -130,7 +130,9 @@ pub fn create_tar_gz<P: AsRef<Path>>(output_path: P, files: &[(&str, &str)]) -> 
 
     let gz = tar.into_inner().context("Failed to finalize tar archive")?;
     let hashing_writer = gz.finish().context("Failed to finalize gzip compression")?;
-    let (_file, hash) = hashing_writer.finalize();
+    let (file, hash) = hashing_writer.finalize();
+
+    file.sync_all().context("Failed to sync file")?;
 
     Ok(hash)
 }

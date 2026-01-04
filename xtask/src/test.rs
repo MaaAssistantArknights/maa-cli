@@ -25,9 +25,13 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
     // Build environment variables map
     let mut env_vars = EnvVars::new();
 
-    let config_dir = format!("{}/crates/maa-cli/config_examples", workspace_root());
-    env_vars.push("MAA_CONFIG_DIR", config_dir);
-    env_vars.push("MAA_EXTRA_SHARE_NAME", "maa-test".to_string());
+    Group::new("Setup Environment Variables").run(|| {
+        let config_dir = format!("{}/crates/maa-cli/config_examples", workspace_root());
+        env_vars.push("MAA_CONFIG_DIR", config_dir);
+        env_vars.push("MAA_EXTRA_SHARE_NAME", "maa-test".to_string());
+
+        Ok(())
+    })?;
 
     let package_flags = opts.package_flags();
 
@@ -42,8 +46,10 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
     }
 
     if opts.with_core {
-        // Install MaaCore using the appropriate cargo command
         Group::new("Install MaaCore").run(|| {
+            let core_dir = maa_dirs::library().to_str().unwrap();
+            env_vars.push("MAA_CORE_DIR", core_dir.to_owned());
+
             let mut cmd = cargo();
             if opts.coverage.coverage_run() {
                 cmd.args(LLVM_COV_ARGS);
@@ -53,12 +59,11 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
             cmd.env_vars(&env_vars);
             cmd.run().context("Failed to install MaaCore")
         })?;
-
-        // Add core-related env vars
-        let core_dir = maa_dirs::library().to_str().unwrap();
-        env_vars.push("MAA_CORE_DIR", core_dir.to_owned());
     } else {
-        env_vars.push("SKIP_CORE_TEST", "true".to_owned());
+        Group::new("Skip Core Test").run(|| {
+            env_vars.push("SKIP_CORE_TEST", "true".to_owned());
+            Ok(())
+        })?;
     }
 
     if !opts.no_clippy {

@@ -84,6 +84,8 @@ impl CoverageMode {
 }
 
 fn main() -> Result<()> {
+    println!("::endgroup::");
+
     let cli = Cli::parse();
 
     match cli.command {
