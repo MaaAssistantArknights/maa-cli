@@ -57,17 +57,17 @@ Homebrew 用户可以通过非官方的 [tap](https://github.com/MaaAssistantArk
   ```
 
 - 升级
-  
+
   ```bash
   winget update maa-cli
   ```
 
 - 卸载
-  
+
   ```bash
   winget uninstall maa-cli
   ```
-  
+
 你可以使用参数 `--purge` 来删除所有配置文件和数据文件。
 
 ## 预编译二进制文件
