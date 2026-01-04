@@ -107,8 +107,7 @@ jobs:
       - name: Test
         run: |
           cargo x test  \
-            ${{ matrix.runner != 'windows-11-arm' && '--install-core' || '--no-core-tests' }} \
-            -- --include-ignored
+            ${{ matrix.runner != 'windows-11-arm' && '--install-core' || '--no-core-tests' }}
 
   build-no-default-features:
     name: Build and Test (feature=${{ matrix.feature }})
