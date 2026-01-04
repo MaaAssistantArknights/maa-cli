@@ -11,8 +11,6 @@ on:
       - "codecov.yml"
       - ".cargo/config.toml"
       - ".github/workflows/ci.yml"
-      - ".github/actions/setup/**"
-      - ".github/actions/install-core/**"
   pull_request:
     branches: ["main"]
     paths:
@@ -23,8 +21,6 @@ on:
       - "codecov.yml"
       - ".cargo/config.toml"
       - ".github/workflows/ci.yml"
-      - ".github/actions/setup/**"
-      - ".github/actions/install-core/**"
 
 env:
   RUST_BACKTRACE: full
@@ -118,7 +114,7 @@ jobs:
       - name: Test
         run: |
           cargo run -pxtask test  \
-            ${{ matrix.runner != 'windows-11-arm' && --with-core }} \
+            ${{ matrix.runner != 'windows-11-arm' && '--with-core' }} \
             -- --include-ignored
 
   build-no-default-features:
