@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use anyhow::{Result, bail};
 use maa_value::{
@@ -133,8 +133,8 @@ fn asst_config_template() -> MAAValue {
     )
 }
 
-pub fn init(name: Option<PathBuf>, filetype: Option<super::Filetype>, force: bool) -> Result<()> {
-    let name = name.unwrap_or_else(|| PathBuf::from("default"));
+pub fn init(name: Option<&Path>, filetype: Option<super::Filetype>, force: bool) -> Result<()> {
+    let name = name.unwrap_or_else(|| Path::new("default"));
     let filetype = filetype.unwrap_or(super::Filetype::Json);
     let profile_dir = join!(crate::dirs::config(), "profiles");
     let dest = join!(&profile_dir, &name; filetype.to_str());
@@ -236,14 +236,21 @@ mod test {
     #[test]
     #[ignore = "write to user's config directory"]
     fn test_init() {
-        let profile_dir = join!(crate::dirs::config(), "profiles");
-        let name = PathBuf::from("test");
+        let profile_dir = maa_dirs::config().join("profiles");
+        let name = Path::new("__test__");
 
-        init(Some(name.clone()), None, false).expect("failed to init profile");
-        assert!(join!(&profile_dir, "test"; "json").exists());
+        // First time init
+        init(Some(name), None, false).expect("failed to init profile");
+        assert!(profile_dir.join("__test__.json").exists());
 
-        assert!(init(Some(name.clone()), None, false).is_err());
-        init(Some(name.clone()), Some(Filetype::Toml), true).expect("failed to init profile");
-        assert!(join!(&profile_dir, "test"; "toml").exists());
+        // Second time init, same name
+        assert!(init(Some(name), None, false).is_err());
+
+        // Third time init, same name, force write
+        init(Some(name), Some(Filetype::Toml), true).expect("failed to init profile");
+        assert!(profile_dir.join("__test__.toml").exists());
+
+        // cleanup
+        let _ = std::fs::remove_file(profile_dir.join("__test__.toml"));
     }
 }

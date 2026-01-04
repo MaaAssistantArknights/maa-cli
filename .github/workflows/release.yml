@@ -9,7 +9,6 @@ on:
       - main
     paths:
       - ".github/workflows/release.yml"
-      - "xtask/**"
   workflow_dispatch:
     inputs:
       channel:
@@ -120,41 +119,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Update Rust
-        run: rustup update stable
-      - name: Get Host Triplet
-        id: host-triplet
-        run: |
-          {
-            echo -n "triplet="
-            rustc -vV | grep '^host:' | awk '{print $2}'
-          } >> "$GITHUB_OUTPUT"
       - name: Build
+        id: build
         env:
           MAA_VERSION: ${{ needs.meta.outputs.version }}
         run: |
-          cargo build --profile ${{ needs.meta.outputs.profile }} \
-            --package maa-cli --locked --features git2/vendored-openssl
-      - name: Tar Artifact
-        run: |
-          profile=${{ needs.meta.outputs.profile }}
-          if [[ "$profile" == "dev" ]]; then
-            profile="debug"
-          fi
-          target_dir="target/${profile}"
-          if [[ "${{ matrix.runner }}" == "windows"* ]]; then
-            exe="maa.exe"
-          else
-            exe="maa"
-          fi
-          file "$target_dir/$exe" # check file status
-          "$target_dir/$exe" --version
-          tar -cvf "${{ steps.host-triplet.outputs.triplet }}.tar" -C "$target_dir" "$exe"
+          cargo x build --tar --vendored-deps \
+            --profile ${{ needs.meta.outputs.profile }}
       - name: Upload Artifact
         uses: actions/upload-artifact@v6
         with:
-          name: maa_cli-${{ steps.host-triplet.outputs.triplet }}
-          path: ${{ steps.host-triplet.outputs.triplet }}.tar
+          name: maa_cli-${{ steps.build.outputs.host_triplet }}
+          path: ${{ steps.build.outputs.host_triplet }}.tar
           retention-days: 1
           if-no-files-found: error
 

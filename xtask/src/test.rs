@@ -1,22 +1,13 @@
 //! Test automation for CI.
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 
 use crate::{
     TestOptions,
-    cmd::{CommandExt, EnvVars},
+    cmd::{CommandExt, EnvVars, cargo, rustup_up},
     github::Group,
+    workspace_root,
 };
-
-const CARGO_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
-
-fn workspace_root() -> &'static str {
-    &CARGO_MANIFEST_DIR[..CARGO_MANIFEST_DIR.len() - 6]
-}
-
-fn cargo() -> std::process::Command {
-    std::process::Command::new("cargo")
-}
 
 const LLVM_COV_ARGS: &[&str] = &["+nightly", "llvm-cov"];
 
@@ -35,21 +26,20 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
 
     let package_flags = opts.package_flags();
 
+    Group::new("Update Stable Toolchain")
+        .run(|| rustup_up("stable").run().context("Failed to update Rust"))?;
+
     if opts.coverage.report() {
         Group::new("Install Nightly Toolchain").run(|| {
-            std::process::Command::new("rustup")
-                .args(["install", "nightly", "--profile=minimal", "-cllvm-tools"])
-                .arg("--no-self-update")
+            rustup_up("nightly")
+                .args(["--profile=minimal", "-cllvm-tools"])
                 .run()
                 .context("Failed to install nightly")
         })?;
     }
 
-    if opts.with_core {
+    if opts.install_core {
         Group::new("Install MaaCore").run(|| {
-            let core_dir = maa_dirs::library().to_str().unwrap();
-            env_vars.push("MAA_CORE_DIR", core_dir.to_owned());
-
             let mut cmd = cargo();
             if opts.coverage.coverage_run() {
                 cmd.args(LLVM_COV_ARGS);
@@ -60,9 +50,21 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
             cmd.env_vars(&env_vars);
             cmd.run().context("Failed to install MaaCore")
         })?;
-    } else {
+    }
+
+    if opts.no_core_tests {
         Group::new("Skip Core Test").run(|| {
             env_vars.push("SKIP_CORE_TEST", "true".to_owned());
+            Ok(())
+        })?;
+    } else {
+        Group::new("Find MaaCore").run(|| {
+            let core_dir = maa_dirs::find_library();
+            if let Some(core_dir) = core_dir {
+                env_vars.push("MAA_CORE_DIR", core_dir.to_str().unwrap().to_owned());
+            } else {
+                bail!("Failed to find MaaCore")
+            }
             Ok(())
         })?;
     }
@@ -99,8 +101,12 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
             cmd.args(LLVM_COV_ARGS);
             cmd.arg("--no-report");
         }
-        cmd.args(["test", "--locked"]);
+        cmd.args(["test", "--locked", "--no-fail-fast"]);
+        cmd.args(&package_flags);
         cmd.args(&opts.test_args);
+        if !opts.no_ignored_tests {
+            cmd.args(["--", "--include-ignored"]);
+        }
         cmd.env_vars(&env_vars);
         cmd.run().context("Failed to run cargo test")
     })?;

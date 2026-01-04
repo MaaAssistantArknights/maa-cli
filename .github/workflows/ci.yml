@@ -80,19 +80,14 @@ jobs:
           - ubuntu-22.04-arm
           - macos-latest
           - windows-latest
-    env:
-      MAA_EXTRA_SHARE_NAME: maa-test
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Update Rust
-        run: rustup update stable
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
       - name: Test
         run: |
-          cargo x test --with-core -- \
-            -- --include-ignored
+          cargo x test --install-core
 
   build-tier2:
     name: Build and Test (Tier 2, ${{ matrix.runner }})
@@ -104,20 +99,15 @@ jobs:
         runner:
           - macos-15-intel
           - windows-11-arm
-    env:
-      MAA_EXTRA_SHARE_NAME: maa-test
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Update Rust
-        run: rustup update stable
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
       - name: Test
         run: |
           cargo x test  \
-            ${{ matrix.runner != 'windows-11-arm' && '--with-core' || '' }} -- \
-            -- --include-ignored
+            ${{ matrix.runner != 'windows-11-arm' && '--install-core' || '--no-core-tests' }}
 
   build-no-default-features:
     name: Build and Test (feature=${{ matrix.feature }})
@@ -132,14 +122,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-      - name: Update Rust
-        run: rustup update stable
       - name: Test
         run: |
-          cargo x test \
-            --no-clippy --no-all-features -- \
+          cargo x test --no-clippy --no-all-features --no-core-tests \
             --no-default-features --features '${{ matrix.feature }}' \
-            -- --include-ignored
 
   build-sys:
     name: Build and Test (maa-sys, static, ${{ matrix.os }})
@@ -159,9 +145,8 @@ jobs:
           tool: cargo-llvm-cov
       - name: Coverage
         run: |
-          cargo x test --with-core \
-            --package maa-sys --coverage test-only -- \
-            -- --include-ignored
+          cargo x test --install-core \
+            --package maa-sys --coverage test-only
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
         if: ${{ !startsWith(matrix.os, 'windows') }}
@@ -182,8 +167,6 @@ jobs:
           - ubuntu-22.04-arm
           - macos-latest
           - windows-latest
-    env:
-      MAA_EXTRA_SHARE_NAME: maa-test
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -193,8 +176,7 @@ jobs:
           tool: cargo-llvm-cov
       - name: Coverage
         run: |
-          cargo x test --with-core --no-clippy --coverage all -- \
-            -- --include-ignored
+          cargo x test --install-core --no-clippy --coverage all
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
         with:

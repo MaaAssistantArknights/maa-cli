@@ -139,7 +139,7 @@ fn main() -> Result<()> {
             name,
             format,
             force,
-        } => config::init::init(name, format, force)?,
+        } => config::init::init(name.as_deref(), format, force)?,
         Command::Mangen { path } => {
             clap_mangen::generate_to(Cli::command(), path)?;
         }
