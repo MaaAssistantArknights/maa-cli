@@ -43,7 +43,7 @@ jobs:
         with:
           identifier: MaaAssistantArknights.maa-cli
           version: ${{ inputs.version }}
-          installers-regex: "*-winget"
+          installers-regex: winget
           release-tag: ${{ inputs.tag || format('v{0}', inputs.version) }}
           fork-user: MaaAssistantArknights
           token: ${{ secrets.MAABOT_WINGET_TOKEN }}
