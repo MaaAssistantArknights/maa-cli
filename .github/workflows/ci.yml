@@ -89,7 +89,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: Test
         run: |
-          cargo run -pxtask test --with-core \
+          cargo run -pxtask test --with-core -- \
             -- --include-ignored
 
   build-tier2:
@@ -114,7 +114,7 @@ jobs:
       - name: Test
         run: |
           cargo run -pxtask test  \
-            ${{ matrix.runner != 'windows-11-arm' && '--with-core' || '' }} \
+            ${{ matrix.runner != 'windows-11-arm' && '--with-core' || '' }} -- \
             -- --include-ignored
 
   build-no-default-features:
@@ -135,7 +135,7 @@ jobs:
       - name: Test
         run: |
           cargo run -pxtask test \
-            --no-clippy --no-all-features \
+            --no-clippy --no-all-features -- \
             --no-default-features --features '${{ matrix.feature }}' \
             -- --include-ignored
 
@@ -157,8 +157,8 @@ jobs:
           tool: cargo-llvm-cov
       - name: Coverage
         run: |
-          cargo run -pxtask test --with-core -- \
-            --package maa-sys --coverage test-only \
+          cargo run -pxtask test --with-core \
+            --package maa-sys --coverage test-only -- \
             -- --include-ignored
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
@@ -193,7 +193,7 @@ jobs:
           tool: cargo-llvm-cov
       - name: Coverage
         run: |
-          cargo run -pxtask test --with-core --coverage \
+          cargo run -pxtask test --with-core --coverage -- \
             -- --include-ignored
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
