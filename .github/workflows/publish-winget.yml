@@ -16,7 +16,7 @@ on:
         required: true
         type: boolean
     secrets:
-      WINGET_GITHUB_TOKEN:
+      MAABOT_WINGET_TOKEN:
         description: GitHub PAT for creating PR
         required: true
   workflow_dispatch:
@@ -64,4 +64,4 @@ jobs:
               "https://github.com/MaaAssistantArknights/maa-cli/releases/download/$TAG/maa_cli-v${VERSION}-x86_64-pc-windows-msvc-winget.zip" \
               "https://github.com/MaaAssistantArknights/maa-cli/releases/download/$TAG/maa_cli-v${VERSION}-aarch64-pc-windows-msvc-winget.zip" \
             ${{ inputs.dryrun && '--dry-run' || '--submit' }} \
-            --token "${{ secrets.WINGET_GITHUB_TOKEN }}"
+            --token "${{ secrets.MAABOT_WINGET_TOKEN }}"

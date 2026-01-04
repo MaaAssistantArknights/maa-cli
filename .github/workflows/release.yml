@@ -324,4 +324,4 @@ jobs:
       tag: ${{ needs.meta.outputs.tag }}
       dryrun: false
     secrets:
-      WINGET_GITHUB_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
+      MAABOT_WINGET_TOKEN: ${{ secrets.MAABOT_WINGET_TOKEN }}
