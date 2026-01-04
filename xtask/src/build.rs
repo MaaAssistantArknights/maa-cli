@@ -16,6 +16,13 @@ pub fn run(opts: BuildOptions) -> Result<()> {
     // Set GitHub output for use in subsequent steps
     set_output("host_triplet", HOST_TRIPLET).ok();
 
+    Group::new("Update Stable Toolchain").run(|| {
+        std::process::Command::new("rustup")
+            .args(["update", "stable"])
+            .run()
+            .context("Failed to update Rust")
+    })?;
+
     Group::new("Build").run(|| {
         let mut cmd = std::process::Command::new("cargo");
         cmd.args(["build", "--package", "maa-cli", "--locked"]);

@@ -30,6 +30,13 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
 
     let package_flags = opts.package_flags();
 
+    Group::new("Update Stable Toolchain").run(|| {
+        std::process::Command::new("rustup")
+            .args(["update", "stable"])
+            .run()
+            .context("Failed to update Rust")
+    })?;
+
     if opts.coverage.report() {
         Group::new("Install Nightly Toolchain").run(|| {
             std::process::Command::new("rustup")

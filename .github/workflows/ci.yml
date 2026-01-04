@@ -85,8 +85,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Update Rust
-        run: rustup update stable
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
       - name: Test
@@ -109,8 +107,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Update Rust
-        run: rustup update stable
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
       - name: Test
@@ -132,8 +128,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-      - name: Update Rust
-        run: rustup update stable
       - name: Test
         run: |
           cargo x test \
