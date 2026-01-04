@@ -33,7 +33,7 @@ struct TestOptions {
     with_core: bool,
 
     /// Enable coverage
-    #[arg(long, default_value = "None")]
+    #[arg(long, default_value = "none")]
     coverage: CoverageMode,
 
     /// Disable cargo clippy
