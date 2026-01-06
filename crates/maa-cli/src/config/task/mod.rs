@@ -146,15 +146,6 @@ pub struct TaskConfig {
 }
 
 impl TaskConfig {
-    pub fn new() -> Self {
-        Self {
-            client_type: None,
-            startup: None,
-            closedown: None,
-            tasks: Vec::new(),
-        }
-    }
-
     pub fn new_with_tasks(tasks: Vec<Task>) -> Self {
         Self {
             client_type: None,
@@ -162,10 +153,6 @@ impl TaskConfig {
             closedown: None,
             tasks,
         }
-    }
-
-    pub fn push(&mut self, task: Task) {
-        self.tasks.push(task);
     }
 
     pub fn init(&self) -> anyhow::Result<InitializedTaskConfig> {
@@ -531,7 +518,7 @@ mod tests {
             fn example_task_config() -> TaskConfig {
                 use ClientType::*;
 
-                let mut task_list = TaskConfig::new();
+                let mut task_list = Vec::new();
 
                 task_list.push(Task::new(
                     StartUp,
@@ -629,7 +616,7 @@ mod tests {
 
                 task_list.push(Task::new(CloseDown, object!()));
 
-                task_list
+                TaskConfig::new_with_tasks(task_list)
             }
 
             #[test]
