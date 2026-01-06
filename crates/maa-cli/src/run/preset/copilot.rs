@@ -1126,6 +1126,16 @@ found"}"#,
                     ),
                 );
             }
+
+            #[test]
+            #[should_panic]
+            fn into_parameters_no_context_should_panic() {
+                let cmd = crate::command::parse_from(["maa", "copilot", "maa://40051"]).command;
+                let _ = match cmd {
+                    crate::Command::Copilot { params, .. } => params.into_parameters_no_context(),
+                    _ => panic!("Unexpected command"),
+                };
+            }
         }
 
         mod get_stage_info {
