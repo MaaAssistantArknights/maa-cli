@@ -4,7 +4,7 @@ maa-cli 主要功能是通过调用 MaaCore，自动化完成明日方舟的游�
 
 ::: tip
 
-在使用 Windows 包管理器 (winget) 安装 maa-cli 的用户，以下命令中的 `maa` 需要替换为 `maa-cli` 。
+对于使用 Windows 包管理器 (winget) 安装 maa-cli 的用户，以下命令中的 `maa` 需要替换为 `maa-cli` 。
 
 :::
  
