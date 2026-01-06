@@ -235,18 +235,19 @@ impl IntoParameters for CopilotParams {
             }
         }
 
-        let mut params = object!(
+        // We also want all other parameters from overlay
+        let mut params = default;
+        params.merge(object!(
             "formation" => formation,
             "use_sanity_potion" => use_sanity_potion,
             "add_trust" => add_trust,
             "ignore_requirements" => ignore_requirements,
             "copilot_list" => stage_list,
-        );
+        ));
         params.maybe_insert("formation_index", self.formation_index);
         params.maybe_insert("support_unit_usage", self.support_unit_usage);
         params.maybe_insert("support_unit_name", self.support_unit_name);
 
-        // TODO: insert unused parameters from default
         Ok(params)
     }
 }
@@ -1017,6 +1018,37 @@ found"}"#,
                         "use_sanity_potion" => false,
                         "add_trust" => true,
                         "ignore_requirements" => false,
+                    ),
+                );
+            }
+
+            #[test]
+            #[ignore = "requires installed resources"]
+            fn with_extra_default() {
+                ensure_test_server();
+
+                if std::env::var_os("SKIP_CORE_TEST").is_some() {
+                    return;
+                }
+
+                let default = object!("__extra_param___" => true);
+                let params =
+                    parse_with_default(["maa", "copilot", "maa://40051"], default).unwrap();
+
+                assert_eq!(
+                    params,
+                    object!(
+                        "copilot_list" => [object!(
+                            "filename" => path_from_cache_dir("40051.json"),
+                            "stage_name" => "AS-EX-1",
+                            "is_raid" => false,
+                            "is_paradox" => false,
+                        )],
+                        "formation" => false,
+                        "use_sanity_potion" => false,
+                        "add_trust" => false,
+                        "ignore_requirements" => false,
+                        "__extra_param___" => true,
                     ),
                 );
             }
