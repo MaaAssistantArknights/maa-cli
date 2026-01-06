@@ -15,7 +15,7 @@ use prettytable::{Table, format, row};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use ureq::http::StatusCode;
 
-use super::{FindFileOrDefault, IntoParameters, ToTaskType};
+use super::{IntoParameters, TaskContext, ToTaskType};
 use crate::{
     dirs::{self, Ensure},
     state::AGENT,
@@ -146,11 +146,14 @@ impl ToTaskType for CopilotParams {
 }
 
 impl IntoParameters for CopilotParams {
-    fn into_parameters(self, config: &crate::config::asst::AsstConfig) -> Result<MAAValue> {
+    fn into_parameters_no_context(self) -> Result<MAAValue> {
+        unreachable!("This method should not be called");
+    }
+
+    fn into_parameters(self, context: TaskContext<'_>) -> Result<MAAValue> {
         let copilot_dir = dirs::copilot().ensure()?;
-        let base_dirs = config.resource.base_dirs();
-        let default = MAAValue::find_file_or_default(super::default_file(TaskType::Copilot))
-            .context("Failed to load default copilot task config")?;
+        let base_dirs = context.config.resource.base_dirs();
+        let default = context.default;
 
         let mut copilot_files = self
             .uri_list
@@ -243,6 +246,7 @@ impl IntoParameters for CopilotParams {
         params.maybe_insert("support_unit_usage", self.support_unit_usage);
         params.maybe_insert("support_unit_name", self.support_unit_name);
 
+        // TODO: insert unused parameters from default
         Ok(params)
     }
 }
@@ -291,7 +295,7 @@ impl ToTaskType for SSSCopilotParams {
 }
 
 impl IntoParameters for SSSCopilotParams {
-    fn into_parameters(self, _: &crate::config::asst::AsstConfig) -> Result<MAAValue> {
+    fn into_parameters_no_context(self) -> Result<MAAValue> {
         let copilot_dir = dirs::copilot().ensure()?;
 
         let copilot_file = CopilotFile::from_uri(&self.uri)?;
@@ -649,10 +653,21 @@ found"}"#,
                 I: IntoIterator<Item = T>,
                 T: Into<std::ffi::OsString> + Clone,
             {
+                parse_with_default(args, MAAValue::default())
+            }
+
+            fn parse_with_default<I, T>(args: I, default: MAAValue) -> Result<MAAValue>
+            where
+                I: IntoIterator<Item = T>,
+                T: Into<std::ffi::OsString> + Clone,
+            {
                 let config = AsstConfig::default();
                 let command = crate::command::parse_from(args).command;
                 match command {
-                    crate::Command::Copilot { params, .. } => params.into_parameters(&config),
+                    crate::Command::Copilot { params, .. } => params.into_parameters(TaskContext {
+                        default,
+                        config: &config,
+                    }),
                     _ => panic!("Not a Copilot command"),
                 }
             }
@@ -915,6 +930,170 @@ found"}"#,
                 let result = parse(["maa", "copilot", "non_existent_file.json"]);
                 assert!(result.is_err());
             }
+
+            #[test]
+            #[ignore = "requires installed resources"]
+            fn with_default_formation() {
+                ensure_test_server();
+
+                if std::env::var_os("SKIP_CORE_TEST").is_some() {
+                    return;
+                }
+
+                let default = object!("formation" => true);
+                let params =
+                    parse_with_default(["maa", "copilot", "maa://40051"], default).unwrap();
+
+                assert_eq!(
+                    params,
+                    object!(
+                        "copilot_list" => [object!(
+                            "filename" => path_from_cache_dir("40051.json"),
+                            "stage_name" => "AS-EX-1",
+                            "is_raid" => false,
+                            "is_paradox" => false,
+                        )],
+                        "formation" => true,
+                        "use_sanity_potion" => false,
+                        "add_trust" => false,
+                        "ignore_requirements" => false,
+                    ),
+                );
+            }
+
+            #[test]
+            #[ignore = "requires installed resources"]
+            fn with_default_use_sanity_potion() {
+                ensure_test_server();
+
+                if std::env::var_os("SKIP_CORE_TEST").is_some() {
+                    return;
+                }
+
+                let default = object!("use_sanity_potion" => true);
+                let params =
+                    parse_with_default(["maa", "copilot", "maa://40051"], default).unwrap();
+
+                assert_eq!(
+                    params,
+                    object!(
+                        "copilot_list" => [object!(
+                            "filename" => path_from_cache_dir("40051.json"),
+                            "stage_name" => "AS-EX-1",
+                            "is_raid" => false,
+                            "is_paradox" => false,
+                        )],
+                        "formation" => false,
+                        "use_sanity_potion" => true,
+                        "add_trust" => false,
+                        "ignore_requirements" => false,
+                    ),
+                );
+            }
+
+            #[test]
+            #[ignore = "requires installed resources"]
+            fn with_default_add_trust() {
+                ensure_test_server();
+
+                if std::env::var_os("SKIP_CORE_TEST").is_some() {
+                    return;
+                }
+
+                let default = object!("add_trust" => true);
+                let params =
+                    parse_with_default(["maa", "copilot", "maa://40051"], default).unwrap();
+
+                assert_eq!(
+                    params,
+                    object!(
+                        "copilot_list" => [object!(
+                            "filename" => path_from_cache_dir("40051.json"),
+                            "stage_name" => "AS-EX-1",
+                            "is_raid" => false,
+                            "is_paradox" => false,
+                        )],
+                        "formation" => false,
+                        "use_sanity_potion" => false,
+                        "add_trust" => true,
+                        "ignore_requirements" => false,
+                    ),
+                );
+            }
+
+            #[test]
+            #[ignore = "requires installed resources"]
+            fn cli_overrides_default() {
+                ensure_test_server();
+
+                if std::env::var_os("SKIP_CORE_TEST").is_some() {
+                    return;
+                }
+
+                // Default says formation is true, but CLI explicitly sets it to false
+                // CLI should win
+                let default = object!(
+                    "formation" => true,
+                    "use_sanity_potion" => true,
+                );
+                let params =
+                    parse_with_default(["maa", "copilot", "maa://40051", "--formation"], default)
+                        .unwrap();
+
+                assert_eq!(
+                    params,
+                    object!(
+                        "copilot_list" => [object!(
+                            "filename" => path_from_cache_dir("40051.json"),
+                            "stage_name" => "AS-EX-1",
+                            "is_raid" => false,
+                            "is_paradox" => false,
+                        )],
+                        "formation" => true,
+                        "use_sanity_potion" => true,
+                        "add_trust" => false,
+                        "ignore_requirements" => false,
+                    ),
+                );
+            }
+
+            #[test]
+            #[ignore = "requires installed resources"]
+            fn multiple_tasks_overrides_default_formation() {
+                ensure_test_server();
+
+                if std::env::var_os("SKIP_CORE_TEST").is_some() {
+                    return;
+                }
+
+                // Default says formation is false, but multiple tasks force it to true
+                let default = object!("formation" => false);
+                let params =
+                    parse_with_default(["maa", "copilot", "maa://40051", "maa://40052"], default)
+                        .unwrap();
+
+                assert_eq!(
+                    params,
+                    object!(
+                        "copilot_list" => [object!(
+                            "filename" => path_from_cache_dir("40051.json"),
+                            "stage_name" => "AS-EX-1",
+                            "is_raid" => false,
+                            "is_paradox" => false,
+                        ),
+                        object!(
+                            "filename" => path_from_cache_dir("40052.json"),
+                            "stage_name" => "AS-EX-2",
+                            "is_raid" => false,
+                            "is_paradox" => false,
+                        )],
+                        "formation" => true,
+                        "use_sanity_potion" => false,
+                        "add_trust" => false,
+                        "ignore_requirements" => false,
+                    ),
+                );
+            }
         }
 
         mod get_stage_info {
@@ -968,10 +1147,11 @@ found"}"#,
                 I: IntoIterator<Item = T>,
                 T: Into<std::ffi::OsString> + Clone,
             {
-                let config = AsstConfig::default();
                 let command = crate::command::parse_from(args).command;
                 match command {
-                    crate::Command::SSSCopilot { params, .. } => params.into_parameters(&config),
+                    crate::Command::SSSCopilot { params, .. } => {
+                        params.into_parameters_no_context()
+                    }
                     _ => panic!("Not a SSSCopilot command"),
                 }
             }

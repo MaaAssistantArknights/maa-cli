@@ -155,6 +155,15 @@ impl TaskConfig {
         }
     }
 
+    pub fn new_with_tasks(tasks: Vec<Task>) -> Self {
+        Self {
+            client_type: None,
+            startup: None,
+            closedown: None,
+            tasks,
+        }
+    }
+
     pub fn push(&mut self, task: Task) {
         self.tasks.push(task);
     }

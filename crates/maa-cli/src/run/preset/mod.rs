@@ -20,8 +20,22 @@ trait ToTaskType {
     fn to_task_type(&self) -> TaskType;
 }
 
+struct TaskContext<'c> {
+    default: MAAValue,
+    config: &'c AsstConfig,
+}
+
 trait IntoParameters {
-    fn into_parameters(self, config: &AsstConfig) -> Result<MAAValue>;
+    #[allow(unused_variables)]
+    fn into_parameters(self, mut context: TaskContext<'_>) -> Result<MAAValue>
+    where
+        Self: Sized,
+    {
+        context.default.merge(self.into_parameters_no_context()?);
+        Ok(context.default)
+    }
+
+    fn into_parameters_no_context(self) -> Result<MAAValue>;
 }
 
 pub trait IntoTaskConfig {
@@ -34,18 +48,12 @@ where
 {
     fn into_task_config(self, config: &AsstConfig) -> Result<TaskConfig> {
         let task_type = self.to_task_type();
-        let params: MAAValue = self.into_parameters(config)?;
-
-        let mut default = MAAValue::find_file_or_default(default_file(task_type))
+        let default = MAAValue::find_file_or_default(default_file(task_type))
             .context("Failed to load default task config")?;
-
-        default.merge_from(&params);
-
-        let mut task_config = TaskConfig::new();
-
-        task_config.push(Task::new(task_type, default));
-
-        Ok(task_config)
+        let context = TaskContext { default, config };
+        let params: MAAValue = self.into_parameters(context)?;
+        let task = Task::new(task_type, params);
+        Ok(TaskConfig::new_with_tasks(vec![task]))
     }
 }
 
@@ -63,7 +71,7 @@ impl ToTaskType for StartUpParams {
 }
 
 impl IntoParameters for StartUpParams {
-    fn into_parameters(self, _: &AsstConfig) -> Result<MAAValue> {
+    fn into_parameters_no_context(self) -> Result<MAAValue> {
         let mut value = MAAValue::default();
 
         if let Some(client_type) = self.client_type {
@@ -90,7 +98,7 @@ impl ToTaskType for CloseDownParams {
 }
 
 impl IntoParameters for CloseDownParams {
-    fn into_parameters(self, _: &AsstConfig) -> Result<MAAValue> {
+    fn into_parameters_no_context(self) -> Result<MAAValue> {
         let mut value = MAAValue::default();
         value.insert("client_type", self.client.to_str());
         Ok(value)
@@ -108,6 +116,21 @@ pub use roguelike::RoguelikeParams;
 
 mod reclamation;
 pub use reclamation::ReclamationParams;
+
+mod recruit;
+pub use recruit::RecruitParams;
+
+#[cfg(test)]
+fn test_context() -> TaskContext<'static> {
+    use std::sync::LazyLock;
+
+    static TEST_ASST_CONFIG: LazyLock<AsstConfig> = LazyLock::new(AsstConfig::default);
+
+    TaskContext {
+        default: MAAValue::default(),
+        config: &TEST_ASST_CONFIG,
+    }
+}
 
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -132,7 +155,7 @@ mod tests {
         }
 
         impl IntoParameters for TestParams {
-            fn into_parameters(self, _: &AsstConfig) -> Result<MAAValue> {
+            fn into_parameters_no_context(self) -> Result<MAAValue> {
                 let mut value = MAAValue::default();
                 if let Some(bar) = self.bar {
                     value.insert("bar", bar);
@@ -209,7 +232,7 @@ mod tests {
             match command {
                 Command::StartUp { params, .. } => {
                     assert_eq!(params.to_task_type(), TaskType::StartUp);
-                    params.into_parameters(&AsstConfig::default()).unwrap()
+                    params.into_parameters(test_context()).unwrap()
                 }
                 _ => panic!("Not a StartUp command"),
             }
@@ -246,7 +269,7 @@ mod tests {
             match cmd {
                 Command::CloseDown { params, .. } => {
                     assert_eq!(params.to_task_type(), TaskType::CloseDown);
-                    params.into_parameters(&AsstConfig::default()).unwrap()
+                    params.into_parameters(test_context()).unwrap()
                 }
                 _ => panic!("Not a CloseDown command"),
             }

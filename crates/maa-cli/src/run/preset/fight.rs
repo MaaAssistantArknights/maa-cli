@@ -65,7 +65,7 @@ impl super::ToTaskType for FightParams {
 }
 
 impl super::IntoParameters for FightParams {
-    fn into_parameters(self, _: &crate::config::asst::AsstConfig) -> anyhow::Result<MAAValue> {
+    fn into_parameters_no_context(self) -> anyhow::Result<MAAValue> {
         let mut params = MAAValue::default();
 
         params.insert("stage", self.stage.unwrap_or_default());
@@ -145,7 +145,7 @@ mod tests {
                 Command::Fight { params, .. } => {
                     use super::super::{IntoParameters, TaskType, ToTaskType};
                     assert_eq!(params.to_task_type(), TaskType::Fight);
-                    params.into_parameters(&crate::config::asst::AsstConfig::default())
+                    params.into_parameters_no_context()
                 }
                 _ => panic!("Not a Fight command"),
             }

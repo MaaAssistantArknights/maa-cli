@@ -68,7 +68,7 @@ impl super::ToTaskType for ReclamationParams {
 }
 
 impl super::IntoParameters for ReclamationParams {
-    fn into_parameters(self, _: &super::AsstConfig) -> anyhow::Result<MAAValue> {
+    fn into_parameters_no_context(self) -> anyhow::Result<MAAValue> {
         let mut value = MAAValue::default();
         value.insert("theme", self.theme.to_str());
         value.insert("mode", self.mode);
@@ -123,9 +123,7 @@ mod tests {
                 crate::Command::Reclamation { params, .. } => {
                     use super::super::{IntoParameters, TaskType, ToTaskType};
                     assert_eq!(params.to_task_type(), TaskType::Reclamation);
-                    params
-                        .into_parameters(&crate::config::asst::AsstConfig::default())
-                        .unwrap()
+                    params.into_parameters_no_context().unwrap()
                 }
                 _ => panic!("Not a Reclamation command"),
             }
