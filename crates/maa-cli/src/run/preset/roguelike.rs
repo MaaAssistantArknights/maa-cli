@@ -149,7 +149,7 @@ impl super::ToTaskType for RoguelikeParams {
 }
 
 impl super::IntoParameters for RoguelikeParams {
-    fn into_parameters(self, _: &super::AsstConfig) -> anyhow::Result<MAAValue> {
+    fn into_parameters_no_context(self) -> anyhow::Result<MAAValue> {
         let mut value = MAAValue::default();
 
         let theme = self.theme;
@@ -323,7 +323,7 @@ mod tests {
                 Command::Roguelike { params, .. } => {
                     use super::super::{IntoParameters, TaskType, ToTaskType};
                     assert_eq!(params.to_task_type(), TaskType::Roguelike);
-                    params.into_parameters(&crate::config::asst::AsstConfig::default())
+                    params.into_parameters_no_context()
                 }
                 _ => panic!("Not a Roguelike command"),
             }
