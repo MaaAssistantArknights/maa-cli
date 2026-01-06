@@ -117,6 +117,9 @@ pub use roguelike::RoguelikeParams;
 mod reclamation;
 pub use reclamation::ReclamationParams;
 
+mod recruit;
+pub use recruit::RecruitParams;
+
 #[cfg(test)]
 fn test_context() -> TaskContext<'static> {
     use std::sync::LazyLock;

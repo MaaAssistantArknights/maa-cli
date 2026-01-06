@@ -160,6 +160,13 @@ pub(crate) enum Command {
         #[command(flatten)]
         common: run::CommonArgs,
     },
+    /// Run recruit task
+    Recruit {
+        #[command(flatten)]
+        params: run::preset::RecruitParams,
+        #[command(flatten)]
+        common: run::CommonArgs,
+    },
     /// Convert file format between TOML, YAML and JSON
     ///
     /// This command will convert a file from TOML, YAML or JSON format to another format.
