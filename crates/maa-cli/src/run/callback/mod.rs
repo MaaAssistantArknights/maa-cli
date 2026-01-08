@@ -328,7 +328,7 @@ fn process_subtask_start(message: &Map<String, Value>) -> Option<()> {
             }
             "StageTraderEnter" => info!("{}", "StageTraderEnter"),
             "StageSafeHouseEnter" => info!("{}", "StageSafeHouseEnter"),
-            "StageCambatOpsEnter" | "StageCambatDpsEnter" => info!("{}", "StageCambatOpsEnter"),
+            "StageCombatOpsEnter" | "StageCombatDpsEnter" => info!("{}", "StageCombatOpsEnter"),
             "StageEmergencyOps" | "StageEmergencyDps" => info!("{}", "EmergencyOpsEnter"),
             "StageDreadfulFoe" | "StageDreadfulFoe-5Enter" => info!("{}", "DreadfulFoe"),
             "StageTraderInvestSystemFull" => warn!("{}", "TraderInvestSystemFull"),
