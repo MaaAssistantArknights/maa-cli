@@ -139,17 +139,16 @@ impl ConfigType {
     }
 
     fn clear_duplicate(self, filename: &Path) -> std::io::Result<()> {
-        if filename.exists() {
+        if self.read_by_cli() {
+            for ext in SUPPORTED_EXTENSION {
+                let path = filename.with_extension(ext);
+                if path.exists() {
+                    fs::remove_file(path)?;
+                }
+            }
+        } else if filename.exists() {
             fs::remove_file(filename)?;
         }
-
-        for ext in SUPPORTED_EXTENSION {
-            let path = filename.with_extension(ext);
-            if path.exists() {
-                fs::remove_file(path)?;
-            }
-        }
-
         Ok(())
     }
 }
