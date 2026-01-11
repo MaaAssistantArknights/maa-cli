@@ -149,27 +149,10 @@ impl IntoParameters for CopilotParams {
     }
 
     fn into_parameters(self, context: TaskContext<'_>) -> Result<MAAValue> {
-        let copilot_dir = dirs::copilot().ensure()?;
         let base_dirs = context.config.resource.base_dirs();
         let default = context.default;
 
-        let mut copilot_files = self
-            .uri_list
-            .into_par_iter()
-            .enumerate()
-            .try_fold(Vec::new, |mut files, (index, uri)| {
-                CopilotFile::from_uri(&uri)?.push_path_into::<CopilotTask>(
-                    index,
-                    copilot_dir,
-                    &mut files,
-                )?;
-                Ok::<_, anyhow::Error>(files)
-            })
-            .try_reduce(Vec::new, |mut a, b| {
-                a.extend(b);
-                Ok(a)
-            })?;
-        copilot_files.sort_by(|(index_a, ..), (index_b, ..)| index_a.cmp(index_b));
+        let copilot_files = resolve_copilot_uris(self.uri_list)?;
 
         let is_task_list = copilot_files.len() > 1;
         let formation = self.formation || is_task_list || default.get_or("formation", false);
@@ -513,6 +496,36 @@ fn operator_table(task: &CopilotTask) -> Result<Table> {
     Ok(table)
 }
 
+/// Resolve a list of URIs into local copilot file paths.
+///
+/// This function handles downloading remote files, expanding task sets,
+/// and resolving local file paths. The returned list is sorted by the
+/// original URI index to preserve order.
+fn resolve_copilot_uris(
+    uri_list: Vec<String>,
+) -> Result<Vec<(usize, PathBuf, Option<CopilotTask>)>> {
+    let copilot_dir = dirs::copilot().ensure()?;
+
+    let mut copilot_files = uri_list
+        .into_par_iter()
+        .enumerate()
+        .try_fold(Vec::new, |mut files, (index, uri)| {
+            CopilotFile::from_uri(&uri)?.push_path_into::<CopilotTask>(
+                index,
+                copilot_dir,
+                &mut files,
+            )?;
+            Ok::<_, anyhow::Error>(files)
+        })
+        .try_reduce(Vec::new, |mut a, b| {
+            a.extend(b);
+            Ok(a)
+        })?;
+    copilot_files.sort_by(|(index_a, ..), (index_b, ..)| index_a.cmp(index_b));
+
+    Ok(copilot_files)
+}
+
 #[cfg_attr(test, derive(Default))]
 #[derive(clap::Args)]
 pub struct ParadoxCopilotParams {
@@ -533,25 +546,7 @@ impl ToTaskType for ParadoxCopilotParams {
 
 impl IntoParameters for ParadoxCopilotParams {
     fn into_parameters_no_context(self) -> Result<MAAValue> {
-        let copilot_dir = dirs::copilot().ensure()?;
-
-        let mut copilot_files = self
-            .uri_list
-            .into_par_iter()
-            .enumerate()
-            .try_fold(Vec::new, |mut files, (index, uri)| {
-                CopilotFile::from_uri(&uri)?.push_path_into::<CopilotTask>(
-                    index,
-                    copilot_dir,
-                    &mut files,
-                )?;
-                Ok::<_, anyhow::Error>(files)
-            })
-            .try_reduce(Vec::new, |mut a, b| {
-                a.extend(b);
-                Ok(a)
-            })?;
-        copilot_files.sort_by(|(index_a, ..), (index_b, ..)| index_a.cmp(index_b));
+        let copilot_files = resolve_copilot_uris(self.uri_list)?;
 
         let file_paths: Vec<String> = copilot_files
             .into_iter()
