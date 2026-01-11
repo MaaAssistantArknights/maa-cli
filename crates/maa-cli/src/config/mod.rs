@@ -90,7 +90,7 @@ pub trait FromFile: Sized + serde::de::DeserializeOwned {
         let path = path.as_ref();
         if path.exists() {
             Filetype::parse_filetype(path)
-                .context("Unsupported or unknown filetype")?
+                .with_context(|| format!("Unsupported or unknown filetype: {}", path.display()))?
                 .read(path)
         } else {
             Err(file_not_found(path).into())
