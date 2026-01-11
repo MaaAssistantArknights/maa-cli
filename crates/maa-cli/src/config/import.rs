@@ -10,8 +10,8 @@ use super::{Filetype, SUPPORTED_EXTENSION};
 use crate::state::AGENT;
 
 /// Represents the source of a configuration file to import
-#[derive(Debug, Clone, Copy)]
 #[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug, Clone, Copy)]
 enum ImportSource<'a> {
     /// A remote HTTP(S) URL
     Remote(&'a str),
@@ -948,7 +948,8 @@ user_resource = true"#
             }
 
             #[test]
-            fn parses_file_url() {
+            #[cfg(unix)]
+            fn parses_file_url_unix() {
                 let source = ImportSource::from_str("file:///path/to/file.json");
                 assert_eq!(source, ImportSource::Local(Path::new("/path/to/file.json")));
             }
