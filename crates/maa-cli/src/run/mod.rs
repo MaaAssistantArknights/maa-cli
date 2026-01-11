@@ -17,7 +17,7 @@ use anyhow::{Context, Result, bail};
 use clap::Args;
 use log::{debug, warn};
 use maa_dirs::{self as dirs, Ensure, MAA_CORE_LIB};
-use maa_sys::Assistant;
+use maa_sys::{Assistant, Error};
 use signal_hook::consts::TERM_SIGNALS;
 
 use crate::{
@@ -242,6 +242,16 @@ where
     let ret = run_core(f, args);
 
     summary::display();
+
+    if let Err(error) = &ret
+        && let Some(Error::MAAError) = error.downcast_ref()
+    {
+        // A friendlier message for this case
+        bail!(
+            "MaaCore returned an error, check its log ({}) for details",
+            dirs::log().join("asst.log").display()
+        );
+    }
 
     ret?;
 
