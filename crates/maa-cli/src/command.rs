@@ -146,6 +146,14 @@ pub(crate) enum Command {
         #[command(flatten)]
         common: run::CommonArgs,
     },
+    /// Run Paradox Simulation copilot task
+    #[command(name = "paradoxcopilot")]
+    ParadoxCopilot {
+        #[command(flatten)]
+        params: run::preset::ParadoxCopilotParams,
+        #[command(flatten)]
+        common: run::CommonArgs,
+    },
     /// Run rouge-like task
     Roguelike {
         #[command(flatten)]

@@ -90,7 +90,6 @@ struct StageOpts {
     filename: PathBuf,
     stage_name: String,
     is_raid: bool,
-    is_paradox: bool,
 }
 
 impl From<StageOpts> for MAAValue {
@@ -99,7 +98,6 @@ impl From<StageOpts> for MAAValue {
             "filename" => opts.filename.to_string_lossy().to_string(),
             "stage_name" => opts.stage_name,
             "is_raid" => opts.is_raid,
-            "is_paradox" => opts.is_paradox,
         )
     }
 }
@@ -186,12 +184,11 @@ impl IntoParameters for CopilotParams {
         for (_, file, value) in copilot_files {
             let copilot_task = value.map(Ok).unwrap_or_else(|| json_from_file(&file))?;
             let stage_id = &copilot_task.stage_name;
-            let is_paradox = stage_id.starts_with("mem_");
 
             let stage_info = get_stage_info(stage_id, base_dirs.iter().map(|dir| dir.as_path()))?;
             let stage_code = &stage_info.code;
 
-            if !(is_paradox || formation) {
+            if !formation {
                 println!("Operators:\n{}", operator_table(&copilot_task)?);
                 println!("Please set up your formation manually");
                 while !BoolInput::new(Some(true))
@@ -202,33 +199,22 @@ impl IntoParameters for CopilotParams {
                 }
             }
 
-            let mut raid = self.raid;
-            if is_paradox && raid != 0 {
-                log::warn!(
-                    "Paradox simulation is not supported in raid mode, force raid mode to 0"
-                );
-                raid = 0;
-            }
-
-            match raid {
+            match self.raid {
                 0 | 1 => stage_list.push(StageOpts {
                     filename: file.to_path_buf(),
                     stage_name: stage_code.to_owned(),
-                    is_raid: raid == 1,
-                    is_paradox,
+                    is_raid: self.raid == 1,
                 }),
                 2 => {
                     stage_list.push(StageOpts {
                         filename: file.to_path_buf(),
                         stage_name: stage_code.to_owned(),
                         is_raid: false,
-                        is_paradox,
                     });
                     stage_list.push(StageOpts {
                         filename: file.to_path_buf(),
                         stage_name: stage_code.to_owned(),
                         is_raid: true,
-                        is_paradox,
                     });
                 }
                 n => bail!("Invalid raid mode {n}, should be 0, 1 or 2"),
@@ -527,6 +513,62 @@ fn operator_table(task: &CopilotTask) -> Result<Table> {
     Ok(table)
 }
 
+#[cfg_attr(test, derive(Default))]
+#[derive(clap::Args)]
+pub struct ParadoxCopilotParams {
+    /// URI of the paradox copilot task file
+    ///
+    /// It can be a maa URI or a local file path. Multiple URIs can be provided.
+    /// For URI, it can be in the format of `maa://<code>`, `maa://<code>s`, `file://<path>`,
+    /// which represents a single copilot task, a copilot task set, and a local file respectively,
+    /// where `file://` prefix can be omitted.
+    uri_list: Vec<String>,
+}
+
+impl ToTaskType for ParadoxCopilotParams {
+    fn to_task_type(&self) -> TaskType {
+        TaskType::ParadoxCopilot
+    }
+}
+
+impl IntoParameters for ParadoxCopilotParams {
+    fn into_parameters_no_context(self) -> Result<MAAValue> {
+        let copilot_dir = dirs::copilot().ensure()?;
+
+        let mut copilot_files = self
+            .uri_list
+            .into_par_iter()
+            .enumerate()
+            .try_fold(Vec::new, |mut files, (index, uri)| {
+                CopilotFile::from_uri(&uri)?.push_path_into::<CopilotTask>(
+                    index,
+                    copilot_dir,
+                    &mut files,
+                )?;
+                Ok::<_, anyhow::Error>(files)
+            })
+            .try_reduce(Vec::new, |mut a, b| {
+                a.extend(b);
+                Ok(a)
+            })?;
+        copilot_files.sort_by(|(index_a, ..), (index_b, ..)| index_a.cmp(index_b));
+
+        let file_paths: Vec<String> = copilot_files
+            .into_iter()
+            .map(|(_, file, _)| {
+                file.to_str()
+                    .context("Invalid file path")
+                    .map(|s| s.to_string())
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        let mut value = MAAValue::default();
+        value.insert("list", file_paths);
+
+        Ok(value)
+    }
+}
+
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
@@ -691,7 +733,6 @@ found"}"#,
                             "filename" => path_from_cache_dir("40051.json"),
                             "stage_name" => "AS-EX-1",
                             "is_raid" => false,
-                            "is_paradox" => false,
                         )],
                         "formation" => false,
                         "use_sanity_potion" => false,
@@ -732,7 +773,6 @@ found"}"#,
                             "filename" => path_from_cache_dir("40051.json"),
                             "stage_name" => "AS-EX-1",
                             "is_raid" => true,
-                            "is_paradox" => false,
                         )],
                         "formation" => true,
                         "use_sanity_potion" => true,
@@ -763,7 +803,6 @@ found"}"#,
                             "filename" => path_from_cache_dir("40051.json"),
                             "stage_name" => "AS-EX-1",
                             "is_raid" => false,
-                            "is_paradox" => false,
                         )],
                         "formation" => false,
                         "use_sanity_potion" => false,
@@ -800,13 +839,11 @@ found"}"#,
                             "filename" => path_from_cache_dir("40051.json"),
                             "stage_name" => "AS-EX-1",
                             "is_raid" => false,
-                            "is_paradox" => false,
                         ),
                         object!(
                             "filename" => path_from_cache_dir("40051.json"),
                             "stage_name" => "AS-EX-1",
                             "is_raid" => true,
-                            "is_paradox" => false,
                         )],
                         "formation" => true,
                         "use_sanity_potion" => false,
@@ -834,71 +871,13 @@ found"}"#,
                             "filename" => path_from_cache_dir("40051.json"),
                             "stage_name" => "AS-EX-1",
                             "is_raid" => false,
-                            "is_paradox" => false,
                         ),
                         object!(
                             "filename" => path_from_cache_dir("40052.json"),
                             "stage_name" => "AS-EX-2",
                             "is_raid" => false,
-                            "is_paradox" => false,
                         )],
                         "formation" => true,
-                        "use_sanity_potion" => false,
-                        "add_trust" => false,
-                        "ignore_requirements" => false,
-                    ),
-                );
-            }
-
-            #[test]
-            #[ignore = "requires installed resources"]
-            fn paradox_simulation() {
-                ensure_test_server();
-
-                if std::env::var_os("SKIP_CORE_TEST").is_some() {
-                    return;
-                }
-
-                let params = parse(["maa", "copilot", "maa://63896"]).unwrap();
-
-                assert_eq!(
-                    params,
-                    object!(
-                        "copilot_list" => [object!(
-                            "filename" => path_from_cache_dir("63896.json"),
-                            "stage_name" => "mem_hsguma_1",
-                            "is_raid" => false,
-                            "is_paradox" => true,
-                        )],
-                        "formation" => false,
-                        "use_sanity_potion" => false,
-                        "add_trust" => false,
-                        "ignore_requirements" => false,
-                    ),
-                );
-            }
-
-            #[test]
-            #[ignore = "requires installed resources"]
-            fn paradox_forces_raid_zero() {
-                ensure_test_server();
-
-                if std::env::var_os("SKIP_CORE_TEST").is_some() {
-                    return;
-                }
-
-                let params = parse(["maa", "copilot", "maa://63896", "--raid", "2"]).unwrap();
-
-                assert_eq!(
-                    params,
-                    object!(
-                        "copilot_list" => [object!(
-                            "filename" => path_from_cache_dir("63896.json"),
-                            "stage_name" => "mem_hsguma_1",
-                            "is_raid" => false,
-                            "is_paradox" => true,
-                        )],
-                        "formation" => false,
                         "use_sanity_potion" => false,
                         "add_trust" => false,
                         "ignore_requirements" => false,
@@ -952,7 +931,6 @@ found"}"#,
                             "filename" => path_from_cache_dir("40051.json"),
                             "stage_name" => "AS-EX-1",
                             "is_raid" => false,
-                            "is_paradox" => false,
                         )],
                         "formation" => true,
                         "use_sanity_potion" => false,
@@ -982,7 +960,6 @@ found"}"#,
                             "filename" => path_from_cache_dir("40051.json"),
                             "stage_name" => "AS-EX-1",
                             "is_raid" => false,
-                            "is_paradox" => false,
                         )],
                         "formation" => false,
                         "use_sanity_potion" => true,
@@ -1012,7 +989,6 @@ found"}"#,
                             "filename" => path_from_cache_dir("40051.json"),
                             "stage_name" => "AS-EX-1",
                             "is_raid" => false,
-                            "is_paradox" => false,
                         )],
                         "formation" => false,
                         "use_sanity_potion" => false,
@@ -1042,7 +1018,6 @@ found"}"#,
                             "filename" => path_from_cache_dir("40051.json"),
                             "stage_name" => "AS-EX-1",
                             "is_raid" => false,
-                            "is_paradox" => false,
                         )],
                         "formation" => false,
                         "use_sanity_potion" => false,
@@ -1079,7 +1054,6 @@ found"}"#,
                             "filename" => path_from_cache_dir("40051.json"),
                             "stage_name" => "AS-EX-1",
                             "is_raid" => false,
-                            "is_paradox" => false,
                         )],
                         "formation" => true,
                         "use_sanity_potion" => true,
@@ -1111,13 +1085,11 @@ found"}"#,
                             "filename" => path_from_cache_dir("40051.json"),
                             "stage_name" => "AS-EX-1",
                             "is_raid" => false,
-                            "is_paradox" => false,
                         ),
                         object!(
                             "filename" => path_from_cache_dir("40052.json"),
                             "stage_name" => "AS-EX-2",
                             "is_raid" => false,
-                            "is_paradox" => false,
                         )],
                         "formation" => true,
                         "use_sanity_potion" => false,
@@ -1549,5 +1521,49 @@ found"}"#,
 
         let task: CopilotTask = serde_json::from_value(json).unwrap();
         assert_eq!(operator_table(&task).unwrap(), expected_table);
+    }
+
+    mod paradox_copilot_params {
+        use super::*;
+
+        mod to_task_type {
+            use super::*;
+
+            #[test]
+            fn returns_paradox_copilot() {
+                let params = ParadoxCopilotParams::default();
+                assert_eq!(params.to_task_type(), TaskType::ParadoxCopilot);
+            }
+        }
+
+        mod into_parameters {
+            use super::*;
+
+            fn parse<I, T>(args: I) -> Result<MAAValue>
+            where
+                I: IntoIterator<Item = T>,
+                T: Into<std::ffi::OsString> + Clone,
+            {
+                let command = crate::command::parse_from(args).command;
+                match command {
+                    crate::Command::ParadoxCopilot { params, .. } => {
+                        params.into_parameters_no_context()
+                    }
+                    _ => panic!("Not a ParadoxCopilot command"),
+                }
+            }
+
+            #[test]
+            fn single_file() {
+                ensure_test_server();
+
+                let params = parse(["maa", "paradoxcopilot", "maa://63896"]).unwrap();
+
+                assert_eq!(
+                    params,
+                    object!("list" => vec![path_from_cache_dir("63896.json")])
+                );
+            }
+        }
     }
 }

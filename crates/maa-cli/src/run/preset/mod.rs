@@ -109,7 +109,7 @@ mod fight;
 pub use fight::FightParams;
 
 mod copilot;
-pub use copilot::{CopilotParams, SSSCopilotParams};
+pub use copilot::{CopilotParams, ParadoxCopilotParams, SSSCopilotParams};
 
 mod roguelike;
 pub use roguelike::RoguelikeParams;

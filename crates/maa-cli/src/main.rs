@@ -95,6 +95,7 @@ fn main() -> Result<()> {
         Command::Roguelike { params, common } => run::run_preset(params, common)?,
         Command::Copilot { params, common } => run::run_preset(params, common)?,
         Command::SSSCopilot { params, common } => run::run_preset(params, common)?,
+        Command::ParadoxCopilot { params, common } => run::run_preset(params, common)?,
         Command::Reclamation { params, common } => run::run_preset(params, common)?,
         Command::Convert {
             input,

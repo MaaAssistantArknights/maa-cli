@@ -13,6 +13,7 @@ pub enum TaskType {
     Roguelike,
     Copilot,
     SSSCopilot,
+    ParadoxCopilot,
     Depot,
     OperBox,
     Reclamation,
@@ -22,7 +23,7 @@ pub enum TaskType {
 }
 
 impl TaskType {
-    impl_enum_utils!(TaskType, 16, Self::StartUp);
+    impl_enum_utils!(TaskType, 17, Self::StartUp);
 
     impl_from_str_opt!();
 
@@ -38,6 +39,7 @@ impl TaskType {
             Self::Roguelike => "Roguelike",
             Self::Copilot => "Copilot",
             Self::SSSCopilot => "SSSCopilot",
+            Self::ParadoxCopilot => "ParadoxCopilot",
             Self::Depot => "Depot",
             Self::OperBox => "OperBox",
             Self::Reclamation => "Reclamation",
@@ -83,6 +85,7 @@ mod tests {
         assert_eq!("Roguelike".parse(), Ok(TaskType::Roguelike));
         assert_eq!("Copilot".parse(), Ok(TaskType::Copilot));
         assert_eq!("SSSCopilot".parse(), Ok(TaskType::SSSCopilot));
+        assert_eq!("ParadoxCopilot".parse(), Ok(TaskType::ParadoxCopilot));
         assert_eq!("Depot".parse(), Ok(TaskType::Depot));
         assert_eq!("OperBox".parse(), Ok(TaskType::OperBox));
         assert_eq!("Reclamation".parse(), Ok(TaskType::Reclamation));
@@ -97,7 +100,7 @@ mod tests {
             UnknownTaskType("Unknown".to_owned()).to_string(),
             "unknown task type `Unknown`, expected one of `StartUp`, `CloseDown`, `Fight`, \
             `Recruit`, `Infrast`, `Mall`, `Award`, `Roguelike`, `Copilot`, `SSSCopilot`, \
-            `Depot`, `OperBox`, `Reclamation`, `Custom`, `SingleStep`, `VideoRecognition`",
+            `ParadoxCopilot`, `Depot`, `OperBox`, `Reclamation`, `Custom`, `SingleStep`, `VideoRecognition`",
         );
     }
 
@@ -125,12 +128,12 @@ mod tests {
                 &[Token::Str("Unknown")],
                 "unknown variant `Unknown`, expected one of `StartUp`, `CloseDown`, `Fight`, \
                 `Recruit`, `Infrast`, `Mall`, `Award`, `Roguelike`, `Copilot`, `SSSCopilot`, \
-                `Depot`, `OperBox`, `Reclamation`, `Custom`, `SingleStep`, `VideoRecognition`",
+                `ParadoxCopilot`, `Depot`, `OperBox`, `Reclamation`, `Custom`, `SingleStep`, `VideoRecognition`",
             );
 
             assert_de_tokens_error::<TaskType>(
-                &[Token::U64(16)],
-                "invalid type: integer `16`, expected a valid task type",
+                &[Token::U64(17)],
+                "invalid type: integer `17`, expected a valid task type",
             );
         }
 
@@ -146,6 +149,7 @@ mod tests {
             assert_ser_tokens(&TaskType::Roguelike, &[Token::Str("Roguelike")]);
             assert_ser_tokens(&TaskType::Copilot, &[Token::Str("Copilot")]);
             assert_ser_tokens(&TaskType::SSSCopilot, &[Token::Str("SSSCopilot")]);
+            assert_ser_tokens(&TaskType::ParadoxCopilot, &[Token::Str("ParadoxCopilot")]);
             assert_ser_tokens(&TaskType::Depot, &[Token::Str("Depot")]);
             assert_ser_tokens(&TaskType::OperBox, &[Token::Str("OperBox")]);
             assert_ser_tokens(&TaskType::Reclamation, &[Token::Str("Reclamation")]);
@@ -169,6 +173,7 @@ mod tests {
         assert_eq!(TaskType::Roguelike.to_str(), "Roguelike");
         assert_eq!(TaskType::Copilot.to_str(), "Copilot");
         assert_eq!(TaskType::SSSCopilot.to_str(), "SSSCopilot");
+        assert_eq!(TaskType::ParadoxCopilot.to_str(), "ParadoxCopilot");
         assert_eq!(TaskType::Depot.to_str(), "Depot");
         assert_eq!(TaskType::OperBox.to_str(), "OperBox");
         assert_eq!(TaskType::Reclamation.to_str(), "Reclamation",);
