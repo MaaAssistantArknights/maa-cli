@@ -60,6 +60,10 @@ impl<'a> ImportSource<'a> {
         match self {
             ImportSource::Remote(url) => {
                 let response = AGENT.get(url).call()?;
+                let status = response.status();
+                if !(200..300).contains(&status.as_u16()) {
+                    bail!("Failed to download from {url}: server returned status {status}");
+                }
                 let mut file = fs::File::create(target)?;
                 std::io::copy(&mut response.into_body().as_reader(), &mut file)?;
                 Ok(())
@@ -204,6 +208,19 @@ pub fn import(opts: ImportOptions) -> Result<()> {
     import_to(opts, maa_dirs::config())
 }
 
+fn validate_filename(filename: &str) -> Result<()> {
+    if matches!(filename, "." | "..") {
+        bail!("Invalid filename: '.' and '..' are not allowed.");
+    }
+    if filename.contains('/') || filename.contains('\\') {
+        bail!(
+            "Invalid filename: path components are not allowed in '{}'; use a plain filename.",
+            filename
+        );
+    }
+    Ok(())
+}
+
 fn import_to(opts: ImportOptions, dir: &Path) -> Result<()> {
     let ImportOptions {
         src,
@@ -220,6 +237,10 @@ fn import_to(opts: ImportOptions, dir: &Path) -> Result<()> {
         Some(ref n) => n.as_str(),
         None => source.filename()?,
     };
+
+    // Validate the filename
+    validate_filename(filename)?;
+
     let file = Path::new(filename);
 
     // Validate the file for this config type
@@ -1090,6 +1111,30 @@ user_resource = true"#
 
                 assert!(source.copy_to(&dest).is_err());
             }
+        }
+    }
+
+    mod validate_filename {
+        use super::*;
+
+        #[test]
+        fn valid_filenames() {
+            assert!(validate_filename("task.json").is_ok());
+            assert!(validate_filename("my-profile.toml").is_ok());
+            assert!(validate_filename("a").is_ok());
+        }
+
+        #[test]
+        fn rejects_dots() {
+            assert!(validate_filename(".").is_err());
+            assert!(validate_filename("..").is_err());
+        }
+
+        #[test]
+        fn rejects_path_separators() {
+            assert!(validate_filename("path/to/file.json").is_err());
+            assert!(validate_filename("/abs/path/file.json").is_err());
+            assert!(validate_filename("path\\to\\file.json").is_err());
         }
     }
 }
