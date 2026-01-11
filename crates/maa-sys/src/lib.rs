@@ -1,5 +1,7 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
+use std::sync::RwLock;
+
 pub use maa_ffi_string::ToCString;
 use maa_types::primitive::*;
 pub use maa_types::{InstanceOptionKey, StaticOptionKey, TaskType, TouchMode};
@@ -12,8 +14,8 @@ pub mod binding;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("MaaCore returned an error, check its log for details")]
-    MAAError,
+    #[error("MaaCore returned an error, check its log ({0}) for details")]
+    MAAError(std::path::PathBuf),
     #[error("Buffer too small")]
     BufferTooSmall,
     #[error("The content returned by MaaCore is too large (length > {0})")]
@@ -31,6 +33,17 @@ pub enum Error {
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
+
+/// The user directory of the assistant.
+static USER_DIR: RwLock<std::path::PathBuf> = RwLock::new(std::path::PathBuf::new());
+
+/// Get the path of MaaCore's log file.
+///
+/// For use with `Error::MAAError`.
+fn get_log_path() -> std::path::PathBuf {
+    // Unwrap: The RwLock only errors if it is poisoned, which should never happen.
+    USER_DIR.read().unwrap().join("debug").join("asst.log")
+}
 
 /// A safe and convenient wrapper of MaaCore Assistant API.
 pub struct Assistant {
@@ -121,7 +134,12 @@ impl Assistant {
     /// This function will raise an error if the path is not a valid UTF-8 string,
     /// or raise an error if set the user directory failed.
     pub fn set_user_dir(path: impl ToCString) -> Result<()> {
-        unsafe { binding::AsstSetUserDir(path.to_cstring()?.as_ptr()) }.to_result()
+        let cstring = path.to_cstring()?;
+        unsafe { binding::AsstSetUserDir(cstring.as_ptr()) }.to_result()?;
+        let path_buf = std::path::PathBuf::from(cstring.to_string_lossy().as_ref());
+        // Unwrap: The RwLock only errors if it is poisoned, which should never happen.
+        *USER_DIR.write().unwrap() = path_buf;
+        Ok(())
     }
 
     /// Set the static option of the assistant.
@@ -386,7 +404,7 @@ impl AsstResult for maa_types::primitive::AsstBool {
         if self == 1 {
             Ok(())
         } else {
-            Err(Error::MAAError)
+            Err(Error::MAAError(get_log_path()))
         }
     }
 }
@@ -419,7 +437,7 @@ impl AsstResult for maa_types::primitive::AsstId {
 
     fn to_result(self) -> Result<Self> {
         if self == INVALID_ID {
-            Err(Error::MAAError)
+            Err(Error::MAAError(get_log_path()))
         } else {
             Ok(self)
         }
@@ -450,7 +468,7 @@ mod tests {
 
     #[test]
     fn asst_bool() {
-        assert!(matches!(0u8.to_result(), Err(super::Error::MAAError)));
+        assert!(matches!(0u8.to_result(), Err(super::Error::MAAError(_))));
         assert!(matches!(1u8.to_result(), Ok(())));
     }
 
@@ -469,7 +487,7 @@ mod tests {
     fn asst_id() {
         assert!(matches!(
             INVALID_ID.to_result(),
-            Err(super::Error::MAAError)
+            Err(super::Error::MAAError(_))
         ));
         assert_eq!(1i32.to_result().unwrap(), 1i32);
     }
