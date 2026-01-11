@@ -25,6 +25,12 @@ impl<'a> ImportSource<'a> {
         if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
             ImportSource::Remote(trimmed)
         } else if let Some(path) = trimmed.strip_prefix("file://") {
+            // Handle file:// URLs properly on different platforms
+            // On Windows: file:///C:/path -> C:/path
+            // On Unix: file:///path -> /path
+            #[cfg(windows)]
+            let path = path.strip_prefix('/').unwrap_or(path);
+
             ImportSource::Local(Path::new(path))
         } else {
             ImportSource::Local(Path::new(trimmed))
@@ -156,17 +162,34 @@ impl ConfigType {
 
 #[derive(clap::Args)]
 pub struct ImportOptions {
-    /// Path or URL of the configuration file to be imported
-    pub src: String,
-    /// Name of the configuration file
+    /// The source of the configuration file to be imported
     ///
-    /// If not provided, the name of the source file will be used.
+    /// This can be a local file path or a remote HTTP(S) URL.
+    ///
+    /// When importing from a URL, be sure to only use trusted sources. The file will be
+    /// downloaded and placed in your configuration directory.
+    ///
+    /// If you are importing from a URL that does not have a clear filename in the path
+    /// (e.g., a URL with query parameters), you should use the `--name` option to specify a
+    /// filename for the imported configuration.
+    ///
+    /// When importing a local file that is a symbolic link, the contents of the target file
+    /// will be copied, not the link itself.
+    pub src: String,
+    /// The desired name for the imported configuration file.
+    ///
+    /// If not specified, the filename will be derived from the source path or URL.
+    /// This is particularly useful when importing from a URL that doesn't have a clear filename.
     #[arg(short, long)]
     pub name: Option<String>,
-    /// Force to import even if a file with the same name already exists
+    /// Force the import operation even if a file with the same name
+    ///
+    /// For CLI-read configurations, not only files with same name, but also files with same stem
+    /// but different extension already exists.
     #[arg(short, long)]
     pub force: bool,
-    /// Type of the configuration file
+    /// The category of the configuration file, which determines its storage location and
+    /// validation rules.
     #[arg(short = 't', long, default_value = "task")]
     pub config_type: ConfigType,
 }
@@ -915,6 +938,26 @@ user_resource = true"#
             fn trims_whitespace() {
                 let source = ImportSource::from_str("  https://example.com/file.json  ");
                 assert_matches!(source, ImportSource::Remote(url) if url == "https://example.com/file.json");
+            }
+
+            #[test]
+            fn parses_file_url() {
+                let source = ImportSource::from_str("file:///path/to/file.json");
+                assert_matches!(source, ImportSource::Local(path) if path == Path::new("/path/to/file.json"));
+            }
+
+            #[test]
+            #[cfg(windows)]
+            fn parses_file_url_windows() {
+                let source = ImportSource::from_str("file:///C:/path/to/file.json");
+                assert_matches!(source, ImportSource::Local(path) if path == Path::new("C:/path/to/file.json"));
+            }
+
+            #[test]
+            #[cfg(windows)]
+            fn parses_file_url_windows_unc() {
+                let source = ImportSource::from_str("file:///C:\\path\\to\\file.json");
+                assert_matches!(source, ImportSource::Local(path) if path == Path::new("C:\\path\\to\\file.json"));
             }
         }
 

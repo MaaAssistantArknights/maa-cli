@@ -211,7 +211,11 @@ pub(crate) enum Command {
     },
     /// List all available tasks
     List,
-    /// Import configuration files
+    /// Import configuration files from a local path or a remote URL
+    ///
+    /// This command allows you to import various types of configuration files into the `maa-cli`
+    /// config directory. It can be used to add new tasks, profiles, and other configurations.
+    #[command(verbatim_doc_comment)]
     Import(crate::config::import::ImportOptions),
     /// Initialize configurations for maa-cli
     Init {
