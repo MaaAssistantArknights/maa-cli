@@ -11,6 +11,7 @@ use crate::state::AGENT;
 
 /// Represents the source of a configuration file to import
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(test, derive(PartialEq))]
 enum ImportSource<'a> {
     /// A remote HTTP(S) URL
     Remote(&'a str),
@@ -160,7 +161,8 @@ impl ConfigType {
     }
 }
 
-#[derive(clap::Args)]
+#[derive(clap::Args, Debug)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct ImportOptions {
     /// The source of the configuration file to be imported
     ///
@@ -182,10 +184,10 @@ pub struct ImportOptions {
     /// This is particularly useful when importing from a URL that doesn't have a clear filename.
     #[arg(short, long)]
     pub name: Option<String>,
-    /// Force the import operation even if a file with the same name
+    /// Force the import operation even if a file with the same name already exists.
     ///
-    /// For CLI-read configurations, not only files with same name, but also files with same stem
-    /// but different extension already exists.
+    /// For CLI-read configurations, this also applies to files with the same stem but a
+    /// different extension.
     #[arg(short, long)]
     pub force: bool,
     /// The category of the configuration file, which determines its storage location and
@@ -256,7 +258,6 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::assert_matches;
 
     mod config_type {
         use super::*;
@@ -913,51 +914,63 @@ user_resource = true"#
             #[test]
             fn parses_http_url() {
                 let source = ImportSource::from_str("http://example.com/file.json");
-                assert_matches!(source, ImportSource::Remote(url) if url == "http://example.com/file.json");
+                assert_eq!(source, ImportSource::Remote("http://example.com/file.json"));
             }
 
             #[test]
             fn parses_https_url() {
                 let source = ImportSource::from_str("https://example.com/file.json");
-                assert_matches!(source, ImportSource::Remote(url) if url == "https://example.com/file.json");
+                assert_eq!(
+                    source,
+                    ImportSource::Remote("https://example.com/file.json")
+                );
             }
 
             #[test]
             fn parses_local_path() {
                 let source = ImportSource::from_str("/path/to/file.json");
-                assert_matches!(source, ImportSource::Local(path) if path == Path::new("/path/to/file.json"));
+                assert_eq!(source, ImportSource::Local(Path::new("/path/to/file.json")));
             }
 
             #[test]
             fn parses_relative_path() {
                 let source = ImportSource::from_str("./file.json");
-                assert_matches!(source, ImportSource::Local(path) if path == Path::new("./file.json"));
+                assert_eq!(source, ImportSource::Local(Path::new("./file.json")));
             }
 
             #[test]
             fn trims_whitespace() {
                 let source = ImportSource::from_str("  https://example.com/file.json  ");
-                assert_matches!(source, ImportSource::Remote(url) if url == "https://example.com/file.json");
+                assert_eq!(
+                    source,
+                    ImportSource::Remote("https://example.com/file.json")
+                );
             }
 
             #[test]
             fn parses_file_url() {
                 let source = ImportSource::from_str("file:///path/to/file.json");
-                assert_matches!(source, ImportSource::Local(path) if path == Path::new("/path/to/file.json"));
+                assert_eq!(source, ImportSource::Local(Path::new("/path/to/file.json")));
             }
 
             #[test]
             #[cfg(windows)]
             fn parses_file_url_windows() {
                 let source = ImportSource::from_str("file:///C:/path/to/file.json");
-                assert_matches!(source, ImportSource::Local(path) if path == Path::new("C:/path/to/file.json"));
+                assert_eq!(
+                    source,
+                    ImportSource::Local(Path::new("C:/path/to/file.json"))
+                );
             }
 
             #[test]
             #[cfg(windows)]
             fn parses_file_url_windows_unc() {
                 let source = ImportSource::from_str("file:///C:\\path\\to\\file.json");
-                assert_matches!(source, ImportSource::Local(path) if path == Path::new("C:\\path\\to\\file.json"));
+                assert_eq!(
+                    source,
+                    ImportSource::Local(Path::new("C:\\path\\to\\file.json"))
+                );
             }
         }
 
