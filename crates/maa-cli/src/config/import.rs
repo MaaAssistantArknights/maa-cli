@@ -21,20 +21,25 @@ enum ImportSource<'a> {
 
 impl<'a> ImportSource<'a> {
     /// Parse a source string into an ImportSource
-    fn from_str(src: &'a str) -> Self {
+    fn from_str(src: &'a str) -> Result<Self> {
         let trimmed = src.trim();
-        if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
-            ImportSource::Remote(trimmed)
-        } else if let Some(path) = trimmed.strip_prefix("file://") {
-            // Handle file:// URLs properly on different platforms
-            // On Windows: file:///C:/path -> C:/path
-            // On Unix: file:///path -> /path
-            #[cfg(windows)]
-            let path = path.strip_prefix('/').unwrap_or(path);
+        let parts = trimmed.split_once("://");
 
-            ImportSource::Local(Path::new(path))
-        } else {
-            ImportSource::Local(Path::new(trimmed))
+        match parts {
+            Some((scheme, path)) => match scheme {
+                "http" | "https" => Ok(ImportSource::Remote(trimmed)),
+                "file" => {
+                    // Handle file:// URLs properly on different platforms
+                    // On Windows: file:///C:/path -> C:/path
+                    // On Unix: file:///path -> /path
+                    #[cfg(windows)]
+                    let path = path.strip_prefix('/').unwrap_or(path);
+
+                    Ok(ImportSource::Local(Path::new(path)))
+                }
+                s => bail!("unsupported URL scheme: `{s}`"),
+            },
+            None => Ok(ImportSource::Local(Path::new(trimmed))),
         }
     }
 
@@ -230,7 +235,7 @@ fn import_to(opts: ImportOptions, dir: &Path) -> Result<()> {
     } = opts;
 
     // Parse the source
-    let source = ImportSource::from_str(&src);
+    let source = ImportSource::from_str(&src)?;
 
     // Determine the filename
     let filename = match name {
@@ -930,17 +935,19 @@ user_resource = true"#
         }
 
         mod from_str {
+            use ImportSource::*;
+
             use super::*;
 
             #[test]
             fn parses_http_url() {
-                let source = ImportSource::from_str("http://example.com/file.json");
-                assert_eq!(source, ImportSource::Remote("http://example.com/file.json"));
+                let source = ImportSource::from_str("http://example.com/file.json").unwrap();
+                assert_eq!(source, Remote("http://example.com/file.json"));
             }
 
             #[test]
             fn parses_https_url() {
-                let source = ImportSource::from_str("https://example.com/file.json");
+                let source = ImportSource::from_str("https://example.com/file.json").unwrap();
                 assert_eq!(
                     source,
                     ImportSource::Remote("https://example.com/file.json")
@@ -949,19 +956,19 @@ user_resource = true"#
 
             #[test]
             fn parses_local_path() {
-                let source = ImportSource::from_str("/path/to/file.json");
-                assert_eq!(source, ImportSource::Local(Path::new("/path/to/file.json")));
+                let source = ImportSource::from_str("/path/to/file.json").unwrap();
+                assert_eq!(source, Local(Path::new("/path/to/file.json")));
             }
 
             #[test]
             fn parses_relative_path() {
-                let source = ImportSource::from_str("./file.json");
-                assert_eq!(source, ImportSource::Local(Path::new("./file.json")));
+                let source = ImportSource::from_str("./file.json").unwrap();
+                assert_eq!(source, Local(Path::new("./file.json")));
             }
 
             #[test]
             fn trims_whitespace() {
-                let source = ImportSource::from_str("  https://example.com/file.json  ");
+                let source = ImportSource::from_str("  https://example.com/file.json  ").unwrap();
                 assert_eq!(
                     source,
                     ImportSource::Remote("https://example.com/file.json")
@@ -971,14 +978,14 @@ user_resource = true"#
             #[test]
             #[cfg(unix)]
             fn parses_file_url_unix() {
-                let source = ImportSource::from_str("file:///path/to/file.json");
+                let source = ImportSource::from_str("file:///path/to/file.json").unwrap();
                 assert_eq!(source, ImportSource::Local(Path::new("/path/to/file.json")));
             }
 
             #[test]
             #[cfg(windows)]
             fn parses_file_url_windows() {
-                let source = ImportSource::from_str("file:///C:/path/to/file.json");
+                let source = ImportSource::from_str("file:///C:/path/to/file.json").unwrap();
                 assert_eq!(
                     source,
                     ImportSource::Local(Path::new("C:/path/to/file.json"))
@@ -988,7 +995,7 @@ user_resource = true"#
             #[test]
             #[cfg(windows)]
             fn parses_file_url_windows_unc() {
-                let source = ImportSource::from_str("file:///C:\\path\\to\\file.json");
+                let source = ImportSource::from_str("file:///C:\\path\\to\\file.json").unwrap();
                 assert_eq!(
                     source,
                     ImportSource::Local(Path::new("C:\\path\\to\\file.json"))
