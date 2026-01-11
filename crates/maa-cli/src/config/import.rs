@@ -41,7 +41,7 @@ impl<'a> ImportSource<'a> {
     fn filename(self) -> Result<&'a str> {
         match self {
             ImportSource::Remote(url) => {
-                let url_path = url.split(|c| c == '?' || c == '#').next().unwrap_or(url);
+                let url_path = url.split(['?', '#']).next().unwrap_or(url);
                 url_path
                     .rsplit('/')
                     .next()
