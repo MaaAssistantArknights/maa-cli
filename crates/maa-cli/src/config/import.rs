@@ -119,7 +119,8 @@ impl ConfigType {
 
         if self.read_by_cli() && !Filetype::is_valid_file(filename) {
             bail!(
-                "File with unsupported extension: {}, supported extensions: {}",
+                "File {} with unsupported extension: {}, supported extensions: {}",
+                filename.display(),
                 filename.extension().unwrap_or_default().to_string_lossy(),
                 SUPPORTED_EXTENSION.join(", ")
             )
