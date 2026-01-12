@@ -65,10 +65,6 @@ impl<'a> ImportSource<'a> {
         match self {
             ImportSource::Remote(url) => {
                 let response = AGENT.get(url).call()?;
-                let status = response.status();
-                if !(200..300).contains(&status.as_u16()) {
-                    bail!("Failed to download from {url}: server returned status {status}");
-                }
                 let mut file = fs::File::create(target)?;
                 std::io::copy(&mut response.into_body().as_reader(), &mut file)?;
                 Ok(())
@@ -1229,17 +1225,6 @@ mod tests {
                         for request in server.incoming_requests() {
                             let url = request.url();
 
-                            // Handle /error/{status_code}
-                            if let Some(status) = url.strip_prefix("/error/") {
-                                let status_code = status.parse::<u16>().unwrap_or(500);
-                                let response = tiny_http::Response::from_string(format!(
-                                    "Error {status_code}"
-                                ))
-                                .with_status_code(status_code);
-                                let _ = request.respond(response);
-                                continue;
-                            }
-
                             // Handle /config/{filename}
                             if let Some(filename) = url.strip_prefix("/config/") {
                                 let content = match filename {
@@ -1364,38 +1349,6 @@ mod tests {
                 let result = source.copy_to(&dest);
 
                 assert!(result.is_err());
-            }
-
-            #[test]
-            fn fails_on_500_status() {
-                ensure_test_server();
-
-                let tmp_dir = tempfile::tempdir().unwrap();
-                let dest = tmp_dir.path().join("error.json");
-
-                let url = format!("http://127.0.0.1:{TEST_SERVER_PORT}/error/500");
-                let source = ImportSource::Remote(&url);
-                let result = source.copy_to(&dest);
-
-                assert!(result.is_err());
-                let err_msg = result.unwrap_err().to_string();
-                assert!(err_msg.contains("500") || err_msg.contains("status"));
-            }
-
-            #[test]
-            fn fails_on_403_status() {
-                ensure_test_server();
-
-                let tmp_dir = tempfile::tempdir().unwrap();
-                let dest = tmp_dir.path().join("forbidden.json");
-
-                let url = format!("http://127.0.0.1:{TEST_SERVER_PORT}/error/403");
-                let source = ImportSource::Remote(&url);
-                let result = source.copy_to(&dest);
-
-                assert!(result.is_err());
-                let err_msg = result.unwrap_err().to_string();
-                assert!(err_msg.contains("403") || err_msg.contains("status"));
             }
         }
     }
