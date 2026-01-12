@@ -98,6 +98,8 @@ pub enum ConfigType {
     Copilot,
     /// SSSCopilot configuration
     SSSCopilot,
+    /// ParadoxCopilot configuration
+    ParadoxCopilot,
     #[cfg(test)]
     /// Test configuration
     Test,
@@ -119,6 +121,7 @@ impl ConfigType {
             Resource => root.join("resource"),
             Copilot => root.join("copilot"),
             SSSCopilot => root.join("ssscopilot"),
+            ParadoxCopilot => root.join("paradoxcopilot"),
             #[cfg(test)]
             Test => root.join("__test__"),
         }
@@ -325,6 +328,11 @@ mod tests {
             fn ssscopilot_is_not_read_by_cli() {
                 assert!(!ConfigType::SSSCopilot.read_by_cli());
             }
+
+            #[test]
+            fn paradoxcopilot_is_not_read_by_cli() {
+                assert!(!ConfigType::ParadoxCopilot.read_by_cli());
+            }
         }
 
         mod config_dir {
@@ -372,6 +380,14 @@ mod tests {
                 assert_eq!(
                     ConfigType::SSSCopilot.config_dir(&ROOT),
                     ROOT.join("ssscopilot")
+                );
+            }
+
+            #[test]
+            fn paradoxcopilot_returns_paradoxcopilot_subdir() {
+                assert_eq!(
+                    ConfigType::ParadoxCopilot.config_dir(&ROOT),
+                    ROOT.join("paradoxcopilot")
                 );
             }
 
@@ -492,7 +508,7 @@ mod tests {
             use super::*;
 
             #[test]
-            fn removes_file_and_all_extensions() {
+            fn removes_file_and_all_extensions_for_cli_read_types() {
                 let tmp_dir = tempfile::tempdir().unwrap();
                 let json_file = tmp_dir.path().join("test.json");
                 let toml_file = tmp_dir.path().join("test.toml");
@@ -507,6 +523,21 @@ mod tests {
                 assert!(!json_file.exists());
                 assert!(!toml_file.exists());
                 assert!(!yml_file.exists());
+            }
+
+            #[test]
+            fn removes_only_exact_file_for_non_cli_read_types() {
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let json_file = tmp_dir.path().join("plan.json");
+                let toml_file = tmp_dir.path().join("plan.toml");
+
+                fs::write(&json_file, "{}").unwrap();
+                fs::write(&toml_file, "").unwrap();
+
+                ConfigType::Infrast.clear_duplicate(&json_file).unwrap();
+
+                assert!(!json_file.exists());
+                assert!(toml_file.exists()); // Should not be deleted
             }
         }
     }
@@ -887,53 +918,6 @@ mod tests {
 
         use super::*;
 
-        const TEST_SERVER_PORT: u16 = 18081;
-        static INIT_SERVER: Once = Once::new();
-
-        /// Ensures the test HTTP server is started.
-        fn ensure_test_server() {
-            INIT_SERVER.call_once(|| {
-                thread::spawn(|| {
-                    let server = tiny_http::Server::http(("127.0.0.1", TEST_SERVER_PORT))
-                        .expect("Failed to bind test server");
-
-                    for request in server.incoming_requests() {
-                        let url = request.url();
-
-                        // Handle /config/{filename}
-                        if let Some(filename) = url.strip_prefix("/config/") {
-                            let content = match filename {
-                                "task.json" => r#"{"tasks": ["task1", "task2"]}"#,
-                                "cli.toml" => {
-                                    r#"[maa]
-user_resource = true"#
-                                }
-                                "test.yml" => r#"key: value"#,
-                                _ => {
-                                    let response = tiny_http::Response::from_string("Not found")
-                                        .with_status_code(404);
-                                    let _ = request.respond(response);
-                                    continue;
-                                }
-                            };
-
-                            let response = tiny_http::Response::from_string(content);
-                            let _ = request.respond(response);
-                            continue;
-                        }
-
-                        // 404 for other paths
-                        let response =
-                            tiny_http::Response::from_string("Not found").with_status_code(404);
-                        let _ = request.respond(response);
-                    }
-                });
-
-                // Wait for server to start
-                thread::sleep(std::time::Duration::from_millis(100));
-            });
-        }
-
         mod from_str {
             use ImportSource::*;
 
@@ -948,27 +932,6 @@ user_resource = true"#
             #[test]
             fn parses_https_url() {
                 let source = ImportSource::from_str("https://example.com/file.json").unwrap();
-                assert_eq!(
-                    source,
-                    ImportSource::Remote("https://example.com/file.json")
-                );
-            }
-
-            #[test]
-            fn parses_local_path() {
-                let source = ImportSource::from_str("/path/to/file.json").unwrap();
-                assert_eq!(source, Local(Path::new("/path/to/file.json")));
-            }
-
-            #[test]
-            fn parses_relative_path() {
-                let source = ImportSource::from_str("./file.json").unwrap();
-                assert_eq!(source, Local(Path::new("./file.json")));
-            }
-
-            #[test]
-            fn trims_whitespace() {
-                let source = ImportSource::from_str("  https://example.com/file.json  ").unwrap();
                 assert_eq!(
                     source,
                     ImportSource::Remote("https://example.com/file.json")
@@ -1000,6 +963,33 @@ user_resource = true"#
                     source,
                     ImportSource::Local(Path::new("C:\\path\\to\\file.json"))
                 );
+            }
+
+            #[test]
+            fn parses_local_path() {
+                let source = ImportSource::from_str("/path/to/file.json").unwrap();
+                assert_eq!(source, Local(Path::new("/path/to/file.json")));
+            }
+
+            #[test]
+            fn parses_relative_path() {
+                let source = ImportSource::from_str("./file.json").unwrap();
+                assert_eq!(source, Local(Path::new("./file.json")));
+            }
+
+            #[test]
+            fn trims_whitespace() {
+                let source = ImportSource::from_str("  https://example.com/file.json  ").unwrap();
+                assert_eq!(
+                    source,
+                    ImportSource::Remote("https://example.com/file.json")
+                );
+            }
+
+            #[test]
+            fn parses_unknown_source() {
+                let source = ImportSource::from_str("unknown://example.com/file.json");
+                assert!(source.is_err());
             }
         }
 
@@ -1052,6 +1042,54 @@ user_resource = true"#
 
         mod copy_to {
             use super::*;
+
+            const TEST_SERVER_PORT: u16 = 18081;
+            static INIT_SERVER: Once = Once::new();
+
+            /// Ensures the test HTTP server is started.
+            fn ensure_test_server() {
+                INIT_SERVER.call_once(|| {
+                    thread::spawn(|| {
+                        let server = tiny_http::Server::http(("127.0.0.1", TEST_SERVER_PORT))
+                            .expect("Failed to bind test server");
+
+                        for request in server.incoming_requests() {
+                            let url = request.url();
+
+                            // Handle /config/{filename}
+                            if let Some(filename) = url.strip_prefix("/config/") {
+                                let content = match filename {
+                                    "task.json" => r#"{"tasks": ["task1", "task2"]}"#,
+                                    "cli.toml" => {
+                                        r#"[maa]
+            user_resource = true"#
+                                    }
+                                    "test.yml" => r#"key: value"#,
+                                    _ => {
+                                        let response =
+                                            tiny_http::Response::from_string("Not found")
+                                                .with_status_code(404);
+                                        let _ = request.respond(response);
+                                        continue;
+                                    }
+                                };
+
+                                let response = tiny_http::Response::from_string(content);
+                                let _ = request.respond(response);
+                                continue;
+                            }
+
+                            // 404 for other paths
+                            let response =
+                                tiny_http::Response::from_string("Not found").with_status_code(404);
+                            let _ = request.respond(response);
+                        }
+                    });
+
+                    // Wait for server to start
+                    thread::sleep(std::time::Duration::from_millis(100));
+                });
+            }
 
             #[test]
             fn copies_local_file() {
