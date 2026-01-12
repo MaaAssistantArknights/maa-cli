@@ -3,7 +3,11 @@
 #[derive(Debug)]
 pub struct Error(Option<std::str::Utf8Error>);
 
-impl std::error::Error for Error {}
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.0.as_ref().map(|e| e as &dyn std::error::Error)
+    }
+}
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -302,6 +306,8 @@ mod tests {
     }
 
     mod error_handling {
+        use std::error::Error;
+
         use super::*;
 
         #[test]
@@ -311,12 +317,15 @@ mod tests {
             let invalid = OsString::from_vec(vec![0xFF]);
             let err = invalid.to_utf8_string().unwrap_err();
             assert_eq!(err.to_string(), err.0.unwrap().to_string());
+
+            assert!(err.source().is_some());
         }
 
         #[test]
         fn invalid_utf8_error_display_non_info() {
             let err = Error(None);
             assert!(err.to_string().contains("Invalid UTF-8"));
+            assert!(err.source().is_none());
         }
     }
 }
