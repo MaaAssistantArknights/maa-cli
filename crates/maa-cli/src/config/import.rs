@@ -74,7 +74,13 @@ impl<'a> ImportSource<'a> {
                 Ok(())
             }
             ImportSource::Local(path) => {
-                fs::copy(path, target)?;
+                fs::copy(path, target).with_context(|| {
+                    format!(
+                        "Failed to copy file from {} to {}",
+                        path.display(),
+                        target.display()
+                    )
+                })?;
                 Ok(())
             }
         }
@@ -208,14 +214,6 @@ pub struct ImportOptions {
     pub config_type: ConfigType,
 }
 
-/// A thin shim over `import_to` that binds the default config directory.
-///
-/// This exists to keep the core import logic testable and free of
-/// environment-specific concerns.
-pub fn import(opts: ImportOptions) -> Result<()> {
-    import_to(opts, maa_dirs::config())
-}
-
 fn validate_filename(filename: &str) -> Result<()> {
     if matches!(filename, "." | "..") {
         bail!("Invalid filename: '.' and '..' are not allowed.");
@@ -227,6 +225,14 @@ fn validate_filename(filename: &str) -> Result<()> {
         );
     }
     Ok(())
+}
+
+/// A thin shim over `import_to` that binds the default config directory.
+///
+/// This exists to keep the core import logic testable and free of
+/// environment-specific concerns.
+pub fn import(opts: ImportOptions) -> Result<()> {
+    import_to(opts, maa_dirs::config())
 }
 
 fn import_to(opts: ImportOptions, dir: &Path) -> Result<()> {
@@ -883,6 +889,7 @@ mod tests {
         }
 
         #[test]
+        #[ignore = "write to user directory"]
         fn import_uses_default_config_dir() {
             let tmp_dir = tempfile::tempdir().unwrap();
             fs::write(tmp_dir.path().join("test.json"), "{}").unwrap();
@@ -910,6 +917,172 @@ mod tests {
             }
 
             assert!(result.is_ok());
+        }
+
+        mod errors {
+            use super::*;
+
+            #[test]
+            fn fails_on_invalid_filename_with_path_separator() {
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let config_dir = tmp_dir.path().join("config");
+                fs::create_dir_all(&config_dir).unwrap();
+
+                let opts = ImportOptions {
+                    src: "http://example.com/file.json".to_string(),
+                    name: Some("../evil.json".to_string()),
+                    force: false,
+                    config_type: ConfigType::Task,
+                };
+
+                let result = import_to(opts, &config_dir);
+                assert!(result.is_err());
+                assert!(result.unwrap_err().to_string().contains("path components"));
+            }
+
+            #[test]
+            fn fails_on_invalid_filename_with_dots() {
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let config_dir = tmp_dir.path().join("config");
+                fs::create_dir_all(&config_dir).unwrap();
+
+                let opts = ImportOptions {
+                    src: "http://example.com/file.json".to_string(),
+                    name: Some("..".to_string()),
+                    force: false,
+                    config_type: ConfigType::Task,
+                };
+
+                let result = import_to(opts, &config_dir);
+                assert!(result.is_err());
+                assert!(result.unwrap_err().to_string().contains("not allowed"));
+            }
+
+            #[test]
+            fn fails_on_non_existent_source_file() {
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let config_dir = tmp_dir.path().join("config");
+                fs::create_dir_all(&config_dir).unwrap();
+
+                let opts = ImportOptions {
+                    src: tmp_dir
+                        .path()
+                        .join("nonexistent.json")
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Task,
+                };
+
+                let result = import_to(opts, &config_dir);
+                assert!(result.is_err());
+            }
+
+            #[test]
+            fn fails_on_unsupported_url_scheme() {
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let config_dir = tmp_dir.path().join("config");
+                fs::create_dir_all(&config_dir).unwrap();
+
+                let opts = ImportOptions {
+                    src: "ftp://example.com/file.json".to_string(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Task,
+                };
+
+                let result = import_to(opts, &config_dir);
+                assert!(result.is_err());
+                assert!(
+                    result
+                        .unwrap_err()
+                        .to_string()
+                        .contains("unsupported URL scheme")
+                );
+            }
+
+            #[test]
+            fn fails_on_url_without_filename() {
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let config_dir = tmp_dir.path().join("config");
+                fs::create_dir_all(&config_dir).unwrap();
+
+                let opts = ImportOptions {
+                    src: "http://example.com/".to_string(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Task,
+                };
+
+                let result = import_to(opts, &config_dir);
+                assert!(result.is_err());
+                assert!(
+                    result
+                        .unwrap_err()
+                        .to_string()
+                        .contains("Cannot extract filename")
+                );
+            }
+
+            #[test]
+            fn fails_when_cli_file_has_wrong_stem() {
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let config_dir = tmp_dir.path().join("config");
+                fs::create_dir_all(&config_dir).unwrap();
+                fs::write(tmp_dir.path().join("wrong.json"), "{}").unwrap();
+
+                let opts = ImportOptions {
+                    src: tmp_dir
+                        .path()
+                        .join("wrong.json")
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Cli,
+                };
+
+                let result = import_to(opts, &config_dir);
+                assert!(result.is_err());
+                assert!(
+                    result
+                        .unwrap_err()
+                        .to_string()
+                        .contains("should be named as `cli`")
+                );
+            }
+
+            #[test]
+            fn fails_when_task_has_invalid_extension() {
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let config_dir = tmp_dir.path().join("config");
+                fs::create_dir_all(&config_dir).unwrap();
+                fs::write(tmp_dir.path().join("test.txt"), "content").unwrap();
+
+                let opts = ImportOptions {
+                    src: tmp_dir
+                        .path()
+                        .join("test.txt")
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Task,
+                };
+
+                let result = import_to(opts, &config_dir);
+                assert!(result.is_err());
+                assert!(
+                    result
+                        .unwrap_err()
+                        .to_string()
+                        .contains("unsupported extension")
+                );
+            }
         }
     }
 
@@ -1056,6 +1229,17 @@ mod tests {
                         for request in server.incoming_requests() {
                             let url = request.url();
 
+                            // Handle /error/{status_code}
+                            if let Some(status) = url.strip_prefix("/error/") {
+                                let status_code = status.parse::<u16>().unwrap_or(500);
+                                let response = tiny_http::Response::from_string(format!(
+                                    "Error {status_code}"
+                                ))
+                                .with_status_code(status_code);
+                                let _ = request.respond(response);
+                                continue;
+                            }
+
                             // Handle /config/{filename}
                             if let Some(filename) = url.strip_prefix("/config/") {
                                 let content = match filename {
@@ -1168,6 +1352,50 @@ mod tests {
                 );
 
                 assert!(source.copy_to(&dest).is_err());
+            }
+
+            #[test]
+            fn fails_on_non_existent_local_file() {
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let src = tmp_dir.path().join("nonexistent.json");
+                let dest = tmp_dir.path().join("dest.json");
+
+                let source = ImportSource::Local(&src);
+                let result = source.copy_to(&dest);
+
+                assert!(result.is_err());
+            }
+
+            #[test]
+            fn fails_on_500_status() {
+                ensure_test_server();
+
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let dest = tmp_dir.path().join("error.json");
+
+                let url = format!("http://127.0.0.1:{TEST_SERVER_PORT}/error/500");
+                let source = ImportSource::Remote(&url);
+                let result = source.copy_to(&dest);
+
+                assert!(result.is_err());
+                let err_msg = result.unwrap_err().to_string();
+                assert!(err_msg.contains("500") || err_msg.contains("status"));
+            }
+
+            #[test]
+            fn fails_on_403_status() {
+                ensure_test_server();
+
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let dest = tmp_dir.path().join("forbidden.json");
+
+                let url = format!("http://127.0.0.1:{TEST_SERVER_PORT}/error/403");
+                let source = ImportSource::Remote(&url);
+                let result = source.copy_to(&dest);
+
+                assert!(result.is_err());
+                let err_msg = result.unwrap_err().to_string();
+                assert!(err_msg.contains("403") || err_msg.contains("status"));
             }
         }
     }
