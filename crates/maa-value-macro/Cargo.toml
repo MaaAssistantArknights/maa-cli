@@ -1,0 +1,23 @@
+[package]
+name = "maa-value-macro"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Procedural macros for maa-value"
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true, features = ["full", "parsing"] }
+
+[dev-dependencies]
+maa-value = { workspace = true }
+
+[lints]
+workspace = true

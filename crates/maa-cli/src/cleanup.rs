@@ -300,6 +300,8 @@ mod tests {
     fn test_cleanup() {
         struct All;
 
+        use maa_str_ext::ToUtf8String;
+
         impl PathProvider for All {
             fn target_dir(&self) -> Cow<'_, Path> {
                 join!(temp_dir(), "maa-cli-test-cleanup").into()
@@ -357,7 +359,7 @@ mod tests {
             test_root
                 .read_dir()
                 .unwrap()
-                .map(|x| x.unwrap().file_name().to_str().unwrap().to_string())
+                .map(|x| x.unwrap().file_name().to_utf8_string().unwrap())
                 .collect::<Vec<_>>(),
             vec!["test3"]
         );
@@ -369,7 +371,7 @@ mod tests {
             test_root
                 .read_dir()
                 .unwrap()
-                .map(|x| x.unwrap().file_name().to_str().unwrap().to_string())
+                .map(|x| x.unwrap().file_name().to_utf8_string().unwrap())
                 .collect::<BTreeSet<_>>(),
             ["test1", "test2"]
                 .iter()

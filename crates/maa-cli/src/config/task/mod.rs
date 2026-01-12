@@ -217,7 +217,7 @@ impl TaskConfig {
                         let file = PathBuf::from(v.as_str().context("filename must be a string")?);
                         let sub_dir = task_type.to_str().to_lowercase();
                         if let Some(path) = dirs::abs_config(file, Some(sub_dir)) {
-                            *v = path.to_str().context("Invilid UTF-8")?.into();
+                            *v = path.try_into()?;
                         }
                     }
                 }
@@ -1027,6 +1027,8 @@ mod tests {
                 }
             );
 
+            #[cfg(unix)]
+            use maa_str_ext::ToUtf8String;
             // Filename will be converted to absolute path
             #[cfg(unix)]
             assert_eq!(
@@ -1048,11 +1050,7 @@ mod tests {
                     tasks: vec![
                         InitializedTask::new(
                             Infrast,
-                            object!("filename" => dirs::abs_config("daily.json", Some("infrast"))
-                        .unwrap()
-                        .to_str()
-                        .unwrap()
-                        .to_string())
+                            object!("filename" => dirs::abs_config("daily.json", Some("infrast")).unwrap().to_utf8_string().unwrap())
                         ),
                         InitializedTask::new(Infrast, object!("filename" => "/tmp/daily.json"))
                     ]

@@ -13,6 +13,10 @@ pub enum Error {
     IndexOutOfRange { index: usize, len: usize },
     /// No default value available in batch mode
     NoDefaultInBatchMode,
+    /// Infallible
+    Infallible,
+    /// Invalid UTF-8 encoding
+    InvalidUtf8(maa_str_ext::Error),
     /// IO error occurred
     Io(io::Error),
 }
@@ -27,7 +31,9 @@ impl fmt::Display for Error {
                 write!(f, "index out of range expected 1 - {len}, got {index}")
             }
             Self::NoDefaultInBatchMode => write!(f, "can not get default value in batch mode"),
-            Self::Io(err) => write!(f, "I/O error: {}", err),
+            Self::Infallible => unreachable!("An infallible error should never occur"),
+            Self::InvalidUtf8(err) => write!(f, "{err}"),
+            Self::Io(err) => write!(f, "I/O error: {err}"),
         }
     }
 }
@@ -36,14 +42,27 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Io(err) => Some(err),
+            Self::InvalidUtf8(err) => Some(err),
             _ => None,
         }
+    }
+}
+
+impl From<std::convert::Infallible> for Error {
+    fn from(_: std::convert::Infallible) -> Self {
+        Self::Infallible
     }
 }
 
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Self {
         Self::Io(err)
+    }
+}
+
+impl From<maa_str_ext::Error> for Error {
+    fn from(err: maa_str_ext::Error) -> Self {
+        Self::InvalidUtf8(err)
     }
 }
 

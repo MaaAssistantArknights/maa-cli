@@ -74,8 +74,8 @@ impl super::IntoParameters for ReclamationParams {
         value.insert("mode", self.mode);
 
         if self.mode == 1 {
-            value.insert("tools_to_craft", self.tools_to_craft);
-            value.insert("increase_mode", self.increase_mode);
+            value.try_insert("tools_to_craft", self.tools_to_craft)?;
+            value.try_insert("increase_mode", self.increase_mode)?;
             value.insert("num_craft_batches", self.num_craft_batches);
         }
         Ok(value)
