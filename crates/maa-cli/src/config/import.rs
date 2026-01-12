@@ -1,0 +1,1379 @@
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
+
+use anyhow::{Context, Result, bail};
+use maa_dirs::Ensure;
+
+use super::{Filetype, SUPPORTED_EXTENSION};
+use crate::state::AGENT;
+
+/// Represents the source of a configuration file to import
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug, Clone, Copy)]
+enum ImportSource<'a> {
+    /// A remote HTTP(S) URL
+    Remote(&'a str),
+    /// A local file path
+    Local(&'a Path),
+}
+
+impl<'a> ImportSource<'a> {
+    /// Parse a source string into an ImportSource
+    fn from_str(src: &'a str) -> Result<Self> {
+        let trimmed = src.trim();
+        let parts = trimmed.split_once("://");
+
+        match parts {
+            Some((scheme, path)) => match scheme {
+                "http" | "https" => Ok(ImportSource::Remote(trimmed)),
+                "file" => {
+                    // Handle file:// URLs properly on different platforms
+                    // On Windows: file:///C:/path -> C:/path
+                    // On Unix: file:///path -> /path
+                    #[cfg(windows)]
+                    let path = path.strip_prefix('/').unwrap_or(path);
+
+                    Ok(ImportSource::Local(Path::new(path)))
+                }
+                s => bail!("unsupported URL scheme: `{s}`"),
+            },
+            None => Ok(ImportSource::Local(Path::new(trimmed))),
+        }
+    }
+
+    fn filename(self) -> Result<&'a str> {
+        match self {
+            ImportSource::Remote(url) => {
+                let url_path = url.split(['?', '#']).next().unwrap_or(url);
+                url_path
+                    .rsplit('/')
+                    .next()
+                    .filter(|s| !s.is_empty())
+                    .context("Cannot extract filename from URL")
+            }
+            ImportSource::Local(path) => path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .context("Cannot extract filename from local path"),
+        }
+    }
+
+    /// Copy the source to the target path
+    fn copy_to(self, target: &Path) -> Result<()> {
+        match self {
+            ImportSource::Remote(url) => {
+                let response = AGENT.get(url).call()?;
+                let mut file = fs::File::create(target)?;
+                std::io::copy(&mut response.into_body().as_reader(), &mut file)?;
+                Ok(())
+            }
+            ImportSource::Local(path) => {
+                fs::copy(path, target).with_context(|| {
+                    format!(
+                        "Failed to copy file from {} to {}",
+                        path.display(),
+                        target.display()
+                    )
+                })?;
+                Ok(())
+            }
+        }
+    }
+}
+
+/// Configuration type for import operations
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum ConfigType {
+    /// CLI configuration file
+    Cli,
+    /// Assistant/Profile configuration
+    Profile,
+    /// Task configuration
+    Task,
+    /// Infrastructure configuration
+    Infrast,
+    /// Resource configuration
+    Resource,
+    /// Copilot configuration
+    Copilot,
+    /// SSSCopilot configuration
+    SSSCopilot,
+    /// ParadoxCopilot configuration
+    ParadoxCopilot,
+    #[cfg(test)]
+    /// Test configuration
+    Test,
+}
+
+impl ConfigType {
+    fn read_by_cli(self) -> bool {
+        use ConfigType::*;
+        matches!(self, Cli | Profile | Task)
+    }
+
+    fn config_dir(self, root: &Path) -> PathBuf {
+        use ConfigType::*;
+        match self {
+            Cli => root.to_path_buf(),
+            Profile => root.join("profiles"),
+            Task => root.join("tasks"),
+            Infrast => root.join("infrast"),
+            Resource => root.join("resource"),
+            Copilot => root.join("copilot"),
+            SSSCopilot => root.join("ssscopilot"),
+            ParadoxCopilot => root.join("paradoxcopilot"),
+            #[cfg(test)]
+            Test => root.join("__test__"),
+        }
+    }
+
+    fn validate_file(self, filename: &Path) -> Result<()> {
+        if matches!(self, ConfigType::Cli)
+            && filename
+                .file_stem()
+                .is_none_or(|s| s.to_str() != Some("cli"))
+        {
+            bail!("A CLI configuration file should be named as `cli`.")
+        }
+
+        if self.read_by_cli() && !Filetype::is_valid_file(filename) {
+            bail!(
+                "File {} with unsupported extension: {}, supported extensions: {}",
+                filename.display(),
+                filename.extension().unwrap_or_default().to_string_lossy(),
+                SUPPORTED_EXTENSION.join(", ")
+            )
+        }
+
+        Ok(())
+    }
+
+    fn check_duplication(self, filename: &Path) -> bool {
+        if self.read_by_cli() {
+            SUPPORTED_EXTENSION
+                .iter()
+                .any(|ext| filename.with_extension(ext).exists())
+        } else {
+            filename.exists()
+        }
+    }
+
+    fn clear_duplicate(self, filename: &Path) -> std::io::Result<()> {
+        if self.read_by_cli() {
+            for ext in SUPPORTED_EXTENSION {
+                let path = filename.with_extension(ext);
+                if path.exists() {
+                    fs::remove_file(path)?;
+                }
+            }
+        } else if filename.exists() {
+            fs::remove_file(filename)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(clap::Args, Debug)]
+#[cfg_attr(test, derive(PartialEq))]
+pub struct ImportOptions {
+    /// The source of the configuration file to be imported
+    ///
+    /// This can be a local file path or a remote HTTP(S) URL.
+    ///
+    /// When importing from a URL, be sure to only use trusted sources. The file will be
+    /// downloaded and placed in your configuration directory.
+    ///
+    /// If you are importing from a URL that does not have a clear filename in the path
+    /// (e.g., a URL with query parameters), you should use the `--name` option to specify a
+    /// filename for the imported configuration.
+    ///
+    /// When importing a local file that is a symbolic link, the contents of the target file
+    /// will be copied, not the link itself.
+    pub src: String,
+    /// The desired name for the imported configuration file.
+    ///
+    /// If not specified, the filename will be derived from the source path or URL.
+    /// This is particularly useful when importing from a URL that doesn't have a clear filename.
+    #[arg(short, long)]
+    pub name: Option<String>,
+    /// Force the import operation even if a file with the same name already exists.
+    ///
+    /// For CLI-read configurations, this also applies to files with the same stem but a
+    /// different extension.
+    #[arg(short, long)]
+    pub force: bool,
+    /// The category of the configuration file, which determines its storage location and
+    /// validation rules.
+    #[arg(short = 't', long, default_value = "task")]
+    pub config_type: ConfigType,
+}
+
+fn validate_filename(filename: &str) -> Result<()> {
+    if matches!(filename, "." | "..") {
+        bail!("Invalid filename: '.' and '..' are not allowed.");
+    }
+    if filename.contains('/') || filename.contains('\\') {
+        bail!(
+            "Invalid filename: path components are not allowed in '{}'; use a plain filename.",
+            filename
+        );
+    }
+    Ok(())
+}
+
+/// A thin shim over `import_to` that binds the default config directory.
+///
+/// This exists to keep the core import logic testable and free of
+/// environment-specific concerns.
+pub fn import(opts: ImportOptions) -> Result<()> {
+    import_to(opts, maa_dirs::config())
+}
+
+fn import_to(opts: ImportOptions, dir: &Path) -> Result<()> {
+    let ImportOptions {
+        src,
+        name,
+        force,
+        config_type,
+    } = opts;
+
+    // Parse the source
+    let source = ImportSource::from_str(&src)?;
+
+    // Determine the filename
+    let filename = match name {
+        Some(ref n) => n.as_str(),
+        None => source.filename()?,
+    };
+
+    // Validate the filename
+    validate_filename(filename)?;
+
+    let file = Path::new(filename);
+
+    // Validate the file for this config type
+    config_type.validate_file(file)?;
+
+    // Determine the target directory
+    let target_dir = config_type.config_dir(dir);
+
+    // Ensure directory exists
+    target_dir.ensure()?;
+
+    let dest = target_dir.join(file);
+
+    // Check for duplicates
+    if !force && config_type.check_duplication(&dest) {
+        bail!(
+            "Configuration file {} already exists, use --force to overwrite",
+            dest.display()
+        );
+    }
+
+    // Clear duplicates if force is enabled
+    if force {
+        config_type.clear_duplicate(&dest)?;
+    }
+
+    // Copy the file
+    source.copy_to(&dest)?;
+
+    Ok(())
+}
+
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::*;
+
+    mod config_type {
+        use super::*;
+
+        mod read_by_cli {
+            use super::*;
+
+            #[test]
+            fn cli_is_read_by_cli() {
+                assert!(ConfigType::Cli.read_by_cli());
+            }
+
+            #[test]
+            fn profile_is_read_by_cli() {
+                assert!(ConfigType::Profile.read_by_cli());
+            }
+
+            #[test]
+            fn task_is_read_by_cli() {
+                assert!(ConfigType::Task.read_by_cli());
+            }
+
+            #[test]
+            fn infrast_is_not_read_by_cli() {
+                assert!(!ConfigType::Infrast.read_by_cli());
+            }
+
+            #[test]
+            fn resource_is_not_read_by_cli() {
+                assert!(!ConfigType::Resource.read_by_cli());
+            }
+
+            #[test]
+            fn copilot_is_not_read_by_cli() {
+                assert!(!ConfigType::Copilot.read_by_cli());
+            }
+
+            #[test]
+            fn ssscopilot_is_not_read_by_cli() {
+                assert!(!ConfigType::SSSCopilot.read_by_cli());
+            }
+
+            #[test]
+            fn paradoxcopilot_is_not_read_by_cli() {
+                assert!(!ConfigType::ParadoxCopilot.read_by_cli());
+            }
+        }
+
+        mod config_dir {
+            use std::sync::LazyLock;
+
+            use super::*;
+
+            static ROOT: LazyLock<PathBuf> = LazyLock::new(|| PathBuf::from("/config"));
+
+            #[test]
+            fn cli_returns_root() {
+                assert_eq!(ConfigType::Cli.config_dir(&ROOT), ROOT.to_path_buf());
+            }
+
+            #[test]
+            fn profile_returns_profiles_subdir() {
+                assert_eq!(ConfigType::Profile.config_dir(&ROOT), ROOT.join("profiles"));
+            }
+
+            #[test]
+            fn task_returns_tasks_subdir() {
+                assert_eq!(ConfigType::Task.config_dir(&ROOT), ROOT.join("tasks"));
+            }
+
+            #[test]
+            fn infrast_returns_infrast_subdir() {
+                assert_eq!(ConfigType::Infrast.config_dir(&ROOT), ROOT.join("infrast"));
+            }
+
+            #[test]
+            fn resource_returns_resource_subdir() {
+                assert_eq!(
+                    ConfigType::Resource.config_dir(&ROOT),
+                    ROOT.join("resource")
+                );
+            }
+
+            #[test]
+            fn copilot_returns_copilot_subdir() {
+                assert_eq!(ConfigType::Copilot.config_dir(&ROOT), ROOT.join("copilot"));
+            }
+
+            #[test]
+            fn ssscopilot_returns_ssscopilot_subdir() {
+                assert_eq!(
+                    ConfigType::SSSCopilot.config_dir(&ROOT),
+                    ROOT.join("ssscopilot")
+                );
+            }
+
+            #[test]
+            fn paradoxcopilot_returns_paradoxcopilot_subdir() {
+                assert_eq!(
+                    ConfigType::ParadoxCopilot.config_dir(&ROOT),
+                    ROOT.join("paradoxcopilot")
+                );
+            }
+
+            #[test]
+            fn test_returns_test_subdir() {
+                assert_eq!(ConfigType::Test.config_dir(&ROOT), ROOT.join("__test__"));
+            }
+        }
+
+        mod validate_file {
+            use super::*;
+
+            #[test]
+            fn cli_accepts_cli_stem() {
+                assert!(ConfigType::Cli.validate_file(Path::new("cli.json")).is_ok());
+                assert!(ConfigType::Cli.validate_file(Path::new("cli.toml")).is_ok());
+                assert!(ConfigType::Cli.validate_file(Path::new("cli.yml")).is_ok());
+            }
+
+            #[test]
+            fn cli_rejects_non_cli_stem() {
+                assert!(
+                    ConfigType::Cli
+                        .validate_file(Path::new("config.json"))
+                        .is_err()
+                );
+                assert!(
+                    ConfigType::Cli
+                        .validate_file(Path::new("test.json"))
+                        .is_err()
+                );
+            }
+
+            #[test]
+            fn task_accepts_valid_extensions() {
+                assert!(
+                    ConfigType::Task
+                        .validate_file(Path::new("task.json"))
+                        .is_ok()
+                );
+                assert!(
+                    ConfigType::Task
+                        .validate_file(Path::new("task.toml"))
+                        .is_ok()
+                );
+                assert!(
+                    ConfigType::Task
+                        .validate_file(Path::new("task.yml"))
+                        .is_ok()
+                );
+                assert!(
+                    ConfigType::Task
+                        .validate_file(Path::new("task.yaml"))
+                        .is_ok()
+                );
+            }
+
+            #[test]
+            fn task_rejects_invalid_extensions() {
+                assert!(
+                    ConfigType::Task
+                        .validate_file(Path::new("task.ini"))
+                        .is_err()
+                );
+                assert!(
+                    ConfigType::Task
+                        .validate_file(Path::new("task.txt"))
+                        .is_err()
+                );
+            }
+
+            #[test]
+            fn infrast_accepts_any_extension() {
+                assert!(
+                    ConfigType::Infrast
+                        .validate_file(Path::new("plan.json"))
+                        .is_ok()
+                );
+                assert!(
+                    ConfigType::Infrast
+                        .validate_file(Path::new("plan.ini"))
+                        .is_ok()
+                );
+                assert!(
+                    ConfigType::Infrast
+                        .validate_file(Path::new("plan.txt"))
+                        .is_ok()
+                );
+            }
+        }
+
+        mod check_duplication {
+            use super::*;
+
+            #[test]
+            fn cli_checks_all_extensions() {
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let file = tmp_dir.path().join("cli.json");
+                fs::write(&file, "{}").unwrap();
+
+                // Check with .toml extension but .json exists
+                let check_path = tmp_dir.path().join("cli.toml");
+                assert!(ConfigType::Cli.check_duplication(&check_path));
+            }
+
+            #[test]
+            fn infrast_checks_exact_file() {
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let file = tmp_dir.path().join("plan.json");
+                fs::write(&file, "{}").unwrap();
+
+                assert!(ConfigType::Infrast.check_duplication(&file));
+                assert!(!ConfigType::Infrast.check_duplication(&tmp_dir.path().join("plan.toml")));
+            }
+        }
+
+        mod clear_duplicate {
+            use super::*;
+
+            #[test]
+            fn removes_file_and_all_extensions_for_cli_read_types() {
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let json_file = tmp_dir.path().join("test.json");
+                let toml_file = tmp_dir.path().join("test.toml");
+                let yml_file = tmp_dir.path().join("test.yml");
+
+                fs::write(&json_file, "{}").unwrap();
+                fs::write(&toml_file, "").unwrap();
+                fs::write(&yml_file, "").unwrap();
+
+                ConfigType::Task.clear_duplicate(&json_file).unwrap();
+
+                assert!(!json_file.exists());
+                assert!(!toml_file.exists());
+                assert!(!yml_file.exists());
+            }
+
+            #[test]
+            fn removes_only_exact_file_for_non_cli_read_types() {
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let json_file = tmp_dir.path().join("plan.json");
+                let toml_file = tmp_dir.path().join("plan.toml");
+
+                fs::write(&json_file, "{}").unwrap();
+                fs::write(&toml_file, "").unwrap();
+
+                ConfigType::Infrast.clear_duplicate(&json_file).unwrap();
+
+                assert!(!json_file.exists());
+                assert!(toml_file.exists()); // Should not be deleted
+            }
+        }
+    }
+
+    mod import_to {
+        use super::*;
+
+        fn setup() -> (tempfile::TempDir, PathBuf) {
+            let tmp_dir = tempfile::tempdir().unwrap();
+            let tmp_path = tmp_dir.path();
+            let config_dir = tmp_path.join("config");
+
+            fs::create_dir_all(&config_dir).unwrap();
+            fs::create_dir_all(tmp_path.join("test")).unwrap();
+            fs::write(tmp_path.join("cli.json"), "{}").unwrap();
+            fs::write(tmp_path.join("test.json"), "{}").unwrap();
+            fs::write(tmp_path.join("test.yml"), "").unwrap();
+            fs::write(tmp_path.join("test.ini"), "").unwrap();
+
+            (tmp_dir, config_dir)
+        }
+
+        mod cli {
+            use super::*;
+
+            #[test]
+            fn rejects_non_cli_name() {
+                let (tmp_dir, config_dir) = setup();
+                let opts = ImportOptions {
+                    src: tmp_dir.path().join("test").to_str().unwrap().to_string(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Cli,
+                };
+                assert!(import_to(opts, &config_dir).is_err());
+            }
+
+            #[test]
+            fn rejects_wrong_stem() {
+                let (tmp_dir, config_dir) = setup();
+                let opts = ImportOptions {
+                    src: tmp_dir
+                        .path()
+                        .join("test.json")
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Cli,
+                };
+                assert!(import_to(opts, &config_dir).is_err());
+            }
+
+            #[test]
+            fn imports_valid_cli_config() {
+                let (tmp_dir, config_dir) = setup();
+                let opts = ImportOptions {
+                    src: tmp_dir
+                        .path()
+                        .join("cli.json")
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Cli,
+                };
+                import_to(opts, &config_dir).unwrap();
+                assert!(config_dir.join("cli.json").exists());
+            }
+
+            #[test]
+            fn duplicate_fails_without_force() {
+                let (tmp_dir, config_dir) = setup();
+                let src = tmp_dir
+                    .path()
+                    .join("cli.json")
+                    .to_str()
+                    .unwrap()
+                    .to_string();
+
+                let opts1 = ImportOptions {
+                    src: src.clone(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Cli,
+                };
+                import_to(opts1, &config_dir).unwrap();
+
+                let opts2 = ImportOptions {
+                    src,
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Cli,
+                };
+                assert!(import_to(opts2, &config_dir).is_err());
+            }
+
+            #[test]
+            fn duplicate_succeeds_with_force() {
+                let (tmp_dir, config_dir) = setup();
+                let src = tmp_dir
+                    .path()
+                    .join("cli.json")
+                    .to_str()
+                    .unwrap()
+                    .to_string();
+
+                let opts1 = ImportOptions {
+                    src: src.clone(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Cli,
+                };
+                import_to(opts1, &config_dir).unwrap();
+
+                let opts2 = ImportOptions {
+                    src,
+                    name: None,
+                    force: true,
+                    config_type: ConfigType::Cli,
+                };
+                import_to(opts2, &config_dir).unwrap();
+            }
+        }
+
+        mod task {
+            use super::*;
+
+            #[test]
+            fn imports_to_tasks_subdir() {
+                let (tmp_dir, config_dir) = setup();
+                let opts = ImportOptions {
+                    src: tmp_dir
+                        .path()
+                        .join("test.json")
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Task,
+                };
+                import_to(opts, &config_dir).unwrap();
+                assert!(config_dir.join("tasks").join("test.json").exists());
+            }
+
+            #[test]
+            fn duplicate_stem_fails_without_force() {
+                let (tmp_dir, config_dir) = setup();
+
+                let opts1 = ImportOptions {
+                    src: tmp_dir
+                        .path()
+                        .join("test.json")
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Task,
+                };
+                import_to(opts1, &config_dir).unwrap();
+
+                let opts2 = ImportOptions {
+                    src: tmp_dir
+                        .path()
+                        .join("test.yml")
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Task,
+                };
+                assert!(import_to(opts2, &config_dir).is_err());
+            }
+
+            #[test]
+            fn force_removes_old_extension() {
+                let (tmp_dir, config_dir) = setup();
+
+                let opts1 = ImportOptions {
+                    src: tmp_dir
+                        .path()
+                        .join("test.json")
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Task,
+                };
+                import_to(opts1, &config_dir).unwrap();
+
+                let opts2 = ImportOptions {
+                    src: tmp_dir
+                        .path()
+                        .join("test.yml")
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                    name: None,
+                    force: true,
+                    config_type: ConfigType::Task,
+                };
+                import_to(opts2, &config_dir).unwrap();
+
+                assert!(config_dir.join("tasks").join("test.yml").exists());
+                assert!(!config_dir.join("tasks").join("test.json").exists());
+            }
+
+            #[test]
+            fn rejects_unsupported_extension() {
+                let (tmp_dir, config_dir) = setup();
+                let opts = ImportOptions {
+                    src: tmp_dir
+                        .path()
+                        .join("test.ini")
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Task,
+                };
+                assert!(import_to(opts, &config_dir).is_err());
+            }
+
+            #[test]
+            fn custom_name_overrides_filename() {
+                let (tmp_dir, config_dir) = setup();
+                let opts = ImportOptions {
+                    src: tmp_dir
+                        .path()
+                        .join("test.json")
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                    name: Some("custom.json".to_string()),
+                    force: false,
+                    config_type: ConfigType::Task,
+                };
+                import_to(opts, &config_dir).unwrap();
+                assert!(config_dir.join("tasks").join("custom.json").exists());
+                assert!(!config_dir.join("tasks").join("test.json").exists());
+            }
+        }
+
+        mod infrast {
+            use super::*;
+
+            #[test]
+            fn imports_to_infrast_subdir() {
+                let (tmp_dir, config_dir) = setup();
+                let opts = ImportOptions {
+                    src: tmp_dir
+                        .path()
+                        .join("test.json")
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Infrast,
+                };
+                import_to(opts, &config_dir).unwrap();
+                assert!(config_dir.join("infrast").join("test.json").exists());
+            }
+
+            #[test]
+            fn accepts_any_extension() {
+                let (tmp_dir, config_dir) = setup();
+                let opts = ImportOptions {
+                    src: tmp_dir
+                        .path()
+                        .join("test.ini")
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Infrast,
+                };
+                import_to(opts, &config_dir).unwrap();
+                assert!(config_dir.join("infrast").join("test.ini").exists());
+            }
+
+            #[test]
+            fn duplicate_fails_without_force() {
+                let (tmp_dir, config_dir) = setup();
+                let src = tmp_dir
+                    .path()
+                    .join("test.json")
+                    .to_str()
+                    .unwrap()
+                    .to_string();
+
+                let opts1 = ImportOptions {
+                    src: src.clone(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Infrast,
+                };
+                import_to(opts1, &config_dir).unwrap();
+
+                let opts2 = ImportOptions {
+                    src,
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Infrast,
+                };
+                assert!(import_to(opts2, &config_dir).is_err());
+            }
+
+            #[test]
+            fn duplicate_succeeds_with_force() {
+                let (tmp_dir, config_dir) = setup();
+                let src = tmp_dir
+                    .path()
+                    .join("test.json")
+                    .to_str()
+                    .unwrap()
+                    .to_string();
+
+                let opts1 = ImportOptions {
+                    src: src.clone(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Infrast,
+                };
+                import_to(opts1, &config_dir).unwrap();
+
+                let opts2 = ImportOptions {
+                    src,
+                    name: None,
+                    force: true,
+                    config_type: ConfigType::Infrast,
+                };
+                import_to(opts2, &config_dir).unwrap();
+            }
+        }
+
+        #[test]
+        #[ignore = "write to user directory"]
+        fn import_uses_default_config_dir() {
+            let tmp_dir = tempfile::tempdir().unwrap();
+            fs::write(tmp_dir.path().join("test.json"), "{}").unwrap();
+
+            let opts = ImportOptions {
+                src: tmp_dir
+                    .path()
+                    .join("test.json")
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+                name: None,
+                force: false,
+                config_type: ConfigType::Test,
+            };
+
+            let result = import(opts);
+
+            // Clean up
+            if result.is_ok() {
+                let test_dir = maa_dirs::config().join("__test__");
+                if test_dir.exists() {
+                    fs::remove_dir_all(&test_dir).unwrap();
+                }
+            }
+
+            assert!(result.is_ok());
+        }
+
+        mod errors {
+            use super::*;
+
+            #[test]
+            fn fails_on_invalid_filename_with_path_separator() {
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let config_dir = tmp_dir.path().join("config");
+                fs::create_dir_all(&config_dir).unwrap();
+
+                let opts = ImportOptions {
+                    src: "http://example.com/file.json".to_string(),
+                    name: Some("../evil.json".to_string()),
+                    force: false,
+                    config_type: ConfigType::Task,
+                };
+
+                let result = import_to(opts, &config_dir);
+                assert!(result.is_err());
+                assert!(result.unwrap_err().to_string().contains("path components"));
+            }
+
+            #[test]
+            fn fails_on_invalid_filename_with_dots() {
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let config_dir = tmp_dir.path().join("config");
+                fs::create_dir_all(&config_dir).unwrap();
+
+                let opts = ImportOptions {
+                    src: "http://example.com/file.json".to_string(),
+                    name: Some("..".to_string()),
+                    force: false,
+                    config_type: ConfigType::Task,
+                };
+
+                let result = import_to(opts, &config_dir);
+                assert!(result.is_err());
+                assert!(result.unwrap_err().to_string().contains("not allowed"));
+            }
+
+            #[test]
+            fn fails_on_non_existent_source_file() {
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let config_dir = tmp_dir.path().join("config");
+                fs::create_dir_all(&config_dir).unwrap();
+
+                let opts = ImportOptions {
+                    src: tmp_dir
+                        .path()
+                        .join("nonexistent.json")
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Task,
+                };
+
+                let result = import_to(opts, &config_dir);
+                assert!(result.is_err());
+            }
+
+            #[test]
+            fn fails_on_unsupported_url_scheme() {
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let config_dir = tmp_dir.path().join("config");
+                fs::create_dir_all(&config_dir).unwrap();
+
+                let opts = ImportOptions {
+                    src: "ftp://example.com/file.json".to_string(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Task,
+                };
+
+                let result = import_to(opts, &config_dir);
+                assert!(result.is_err());
+                assert!(
+                    result
+                        .unwrap_err()
+                        .to_string()
+                        .contains("unsupported URL scheme")
+                );
+            }
+
+            #[test]
+            fn fails_on_url_without_filename() {
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let config_dir = tmp_dir.path().join("config");
+                fs::create_dir_all(&config_dir).unwrap();
+
+                let opts = ImportOptions {
+                    src: "http://example.com/".to_string(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Task,
+                };
+
+                let result = import_to(opts, &config_dir);
+                assert!(result.is_err());
+                assert!(
+                    result
+                        .unwrap_err()
+                        .to_string()
+                        .contains("Cannot extract filename")
+                );
+            }
+
+            #[test]
+            fn fails_when_cli_file_has_wrong_stem() {
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let config_dir = tmp_dir.path().join("config");
+                fs::create_dir_all(&config_dir).unwrap();
+                fs::write(tmp_dir.path().join("wrong.json"), "{}").unwrap();
+
+                let opts = ImportOptions {
+                    src: tmp_dir
+                        .path()
+                        .join("wrong.json")
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Cli,
+                };
+
+                let result = import_to(opts, &config_dir);
+                assert!(result.is_err());
+                assert!(
+                    result
+                        .unwrap_err()
+                        .to_string()
+                        .contains("should be named as `cli`")
+                );
+            }
+
+            #[test]
+            fn fails_when_task_has_invalid_extension() {
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let config_dir = tmp_dir.path().join("config");
+                fs::create_dir_all(&config_dir).unwrap();
+                fs::write(tmp_dir.path().join("test.txt"), "content").unwrap();
+
+                let opts = ImportOptions {
+                    src: tmp_dir
+                        .path()
+                        .join("test.txt")
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Task,
+                };
+
+                let result = import_to(opts, &config_dir);
+                assert!(result.is_err());
+                assert!(
+                    result
+                        .unwrap_err()
+                        .to_string()
+                        .contains("unsupported extension")
+                );
+            }
+        }
+    }
+
+    mod import_source {
+        use std::{sync::Once, thread};
+
+        use super::*;
+
+        mod from_str {
+            use ImportSource::*;
+
+            use super::*;
+
+            #[test]
+            fn parses_http_url() {
+                let source = ImportSource::from_str("http://example.com/file.json").unwrap();
+                assert_eq!(source, Remote("http://example.com/file.json"));
+            }
+
+            #[test]
+            fn parses_https_url() {
+                let source = ImportSource::from_str("https://example.com/file.json").unwrap();
+                assert_eq!(
+                    source,
+                    ImportSource::Remote("https://example.com/file.json")
+                );
+            }
+
+            #[test]
+            #[cfg(unix)]
+            fn parses_file_url_unix() {
+                let source = ImportSource::from_str("file:///path/to/file.json").unwrap();
+                assert_eq!(source, ImportSource::Local(Path::new("/path/to/file.json")));
+            }
+
+            #[test]
+            #[cfg(windows)]
+            fn parses_file_url_windows() {
+                let source = ImportSource::from_str("file:///C:/path/to/file.json").unwrap();
+                assert_eq!(
+                    source,
+                    ImportSource::Local(Path::new("C:/path/to/file.json"))
+                );
+            }
+
+            #[test]
+            #[cfg(windows)]
+            fn parses_file_url_windows_unc() {
+                let source = ImportSource::from_str("file:///C:\\path\\to\\file.json").unwrap();
+                assert_eq!(
+                    source,
+                    ImportSource::Local(Path::new("C:\\path\\to\\file.json"))
+                );
+            }
+
+            #[test]
+            fn parses_local_path() {
+                let source = ImportSource::from_str("/path/to/file.json").unwrap();
+                assert_eq!(source, Local(Path::new("/path/to/file.json")));
+            }
+
+            #[test]
+            fn parses_relative_path() {
+                let source = ImportSource::from_str("./file.json").unwrap();
+                assert_eq!(source, Local(Path::new("./file.json")));
+            }
+
+            #[test]
+            fn trims_whitespace() {
+                let source = ImportSource::from_str("  https://example.com/file.json  ").unwrap();
+                assert_eq!(
+                    source,
+                    ImportSource::Remote("https://example.com/file.json")
+                );
+            }
+
+            #[test]
+            fn parses_unknown_source() {
+                let source = ImportSource::from_str("unknown://example.com/file.json");
+                assert!(source.is_err());
+            }
+        }
+
+        mod filename {
+            use super::*;
+
+            #[test]
+            fn extracts_from_url() {
+                let source = ImportSource::Remote("https://example.com/path/to/file.json");
+                assert_eq!(source.filename().unwrap(), "file.json");
+            }
+
+            #[test]
+            fn extracts_from_url_with_query() {
+                let source = ImportSource::Remote("https://example.com/file.json?version=1.0");
+                assert_eq!(source.filename().unwrap(), "file.json");
+            }
+
+            #[test]
+            fn extracts_from_url_with_fragment() {
+                let source = ImportSource::Remote("https://example.com/file.json#version=1.0");
+                assert_eq!(source.filename().unwrap(), "file.json");
+            }
+
+            #[test]
+            fn extracts_from_url_with_query_and_fragment() {
+                let source =
+                    ImportSource::Remote("https://example.com/file.json?query=1#version=1.0");
+                assert_eq!(source.filename().unwrap(), "file.json");
+            }
+
+            #[test]
+            fn extracts_from_local_path() {
+                let source = ImportSource::Local(Path::new("/path/to/file.json"));
+                assert_eq!(source.filename().unwrap(), "file.json");
+            }
+
+            #[test]
+            fn fails_on_empty_url() {
+                let source = ImportSource::Remote("https://example.com/");
+                assert!(source.filename().is_err());
+            }
+
+            #[test]
+            fn fails_on_invalid_local_path() {
+                let source = ImportSource::Local(Path::new("/"));
+                assert!(source.filename().is_err());
+            }
+        }
+
+        mod copy_to {
+            use super::*;
+
+            const TEST_SERVER_PORT: u16 = 18081;
+            static INIT_SERVER: Once = Once::new();
+
+            /// Ensures the test HTTP server is started.
+            fn ensure_test_server() {
+                INIT_SERVER.call_once(|| {
+                    thread::spawn(|| {
+                        let server = tiny_http::Server::http(("127.0.0.1", TEST_SERVER_PORT))
+                            .expect("Failed to bind test server");
+
+                        for request in server.incoming_requests() {
+                            let url = request.url();
+
+                            // Handle /config/{filename}
+                            if let Some(filename) = url.strip_prefix("/config/") {
+                                let content = match filename {
+                                    "task.json" => r#"{"tasks": ["task1", "task2"]}"#,
+                                    "cli.toml" => {
+                                        r#"[maa]
+            user_resource = true"#
+                                    }
+                                    "test.yml" => r#"key: value"#,
+                                    _ => {
+                                        let response =
+                                            tiny_http::Response::from_string("Not found")
+                                                .with_status_code(404);
+                                        let _ = request.respond(response);
+                                        continue;
+                                    }
+                                };
+
+                                let response = tiny_http::Response::from_string(content);
+                                let _ = request.respond(response);
+                                continue;
+                            }
+
+                            // 404 for other paths
+                            let response =
+                                tiny_http::Response::from_string("Not found").with_status_code(404);
+                            let _ = request.respond(response);
+                        }
+                    });
+
+                    // Wait for server to start
+                    thread::sleep(std::time::Duration::from_millis(100));
+                });
+            }
+
+            #[test]
+            fn copies_local_file() {
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let src = tmp_dir.path().join("source.json");
+                let dest = tmp_dir.path().join("dest.json");
+
+                fs::write(&src, r#"{"test": "data"}"#).unwrap();
+
+                let source = ImportSource::Local(&src);
+                source.copy_to(&dest).unwrap();
+
+                assert_eq!(fs::read_to_string(&dest).unwrap(), r#"{"test": "data"}"#);
+            }
+
+            #[test]
+            fn downloads_remote_file() {
+                ensure_test_server();
+
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let dest = tmp_dir.path().join("downloaded.json");
+
+                let url = format!("http://127.0.0.1:{TEST_SERVER_PORT}/config/task.json");
+                let source = ImportSource::Remote(&url);
+                source.copy_to(&dest).unwrap();
+
+                assert_eq!(
+                    fs::read_to_string(&dest).unwrap(),
+                    r#"{"tasks": ["task1", "task2"]}"#
+                );
+            }
+
+            #[test]
+            fn downloads_different_file_types() {
+                ensure_test_server();
+
+                let tmp_dir = tempfile::tempdir().unwrap();
+
+                // Test TOML
+                let toml_dest = tmp_dir.path().join("cli.toml");
+                let toml_url = format!("http://127.0.0.1:{TEST_SERVER_PORT}/config/cli.toml");
+                ImportSource::Remote(&toml_url).copy_to(&toml_dest).unwrap();
+                assert!(
+                    fs::read_to_string(&toml_dest)
+                        .unwrap()
+                        .contains("user_resource")
+                );
+
+                // Test YAML
+                let yaml_dest = tmp_dir.path().join("test.yml");
+                let yaml_url = format!("http://127.0.0.1:{TEST_SERVER_PORT}/config/test.yml");
+                ImportSource::Remote(&yaml_url).copy_to(&yaml_dest).unwrap();
+                assert_eq!(fs::read_to_string(&yaml_dest).unwrap(), "key: value");
+            }
+
+            #[test]
+            fn fails_on_404() {
+                ensure_test_server();
+
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let dest = tmp_dir.path().join("notfound.json");
+
+                let url = format!("http://127.0.0.1:{TEST_SERVER_PORT}/config/notfound.json");
+                let source = ImportSource::Remote(&url);
+
+                assert!(source.copy_to(&dest).is_err());
+            }
+
+            #[test]
+            fn fails_on_invalid_url() {
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let dest = tmp_dir.path().join("file.json");
+
+                let source = ImportSource::Remote(
+                    "http://invalid.test.domain.that.does.not.exist/file.json",
+                );
+
+                assert!(source.copy_to(&dest).is_err());
+            }
+
+            #[test]
+            fn fails_on_non_existent_local_file() {
+                let tmp_dir = tempfile::tempdir().unwrap();
+                let src = tmp_dir.path().join("nonexistent.json");
+                let dest = tmp_dir.path().join("dest.json");
+
+                let source = ImportSource::Local(&src);
+                let result = source.copy_to(&dest);
+
+                assert!(result.is_err());
+            }
+        }
+    }
+
+    mod validate_filename {
+        use super::*;
+
+        #[test]
+        fn valid_filenames() {
+            assert!(validate_filename("task.json").is_ok());
+            assert!(validate_filename("my-profile.toml").is_ok());
+            assert!(validate_filename("a").is_ok());
+        }
+
+        #[test]
+        fn rejects_dots() {
+            assert!(validate_filename(".").is_err());
+            assert!(validate_filename("..").is_err());
+        }
+
+        #[test]
+        fn rejects_path_separators() {
+            assert!(validate_filename("path/to/file.json").is_err());
+            assert!(validate_filename("/abs/path/file.json").is_err());
+            assert!(validate_filename("path\\to\\file.json").is_err());
+        }
+    }
+}

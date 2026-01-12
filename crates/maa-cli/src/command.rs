@@ -211,30 +211,12 @@ pub(crate) enum Command {
     },
     /// List all available tasks
     List,
-    /// Import configuration files
-    Import {
-        /// Path of the configuration file
-        path: PathBuf,
-        /// Force to import even if a file with the same name already exists
-        #[arg(short, long)]
-        force: bool,
-        /// Type of the configuration file
-        ///
-        /// All possible values are listed below:
-        ///
-        /// - `task`: Task configuration file (default), used to define custom tasks;
-        /// - `cli`: CLI configuration file, CLI related configuration;
-        /// - `asst` or `profile`: MaaCore configuration file;
-        /// - `infrast`: Infrastructure plan file;
-        /// - `copilot` or `ssscopilot`: Copilot or SSSCopilot task file;
-        /// - `resource`: user resource files.
-        ///
-        /// Other values are supported, but not recommended.
-        /// It will be treated as a subdirectory of the config directory and show a warning
-        /// message. If you think it is correct, please open an issue to let us know.
-        #[arg(short = 't', long, default_value = "task", verbatim_doc_comment)]
-        config_type: String,
-    },
+    /// Import configuration files from a local path or a remote URL
+    ///
+    /// This command allows you to import various types of configuration files into the `maa-cli`
+    /// config directory. It can be used to add new tasks, profiles, and other configurations.
+    #[command(verbatim_doc_comment)]
+    Import(crate::config::import::ImportOptions),
     /// Initialize configurations for maa-cli
     Init {
         /// Name of the profile
@@ -659,24 +641,42 @@ mod test {
     fn import() {
         assert_matches!(
             parse_from(["maa", "import", "path"]).command,
-            Command::Import {
-                path,
+            Command::Import(config::import::ImportOptions {
+                ref src,
+                name: None,
                 force: false,
-                config_type,
-            } if path == Path::new("path") && config_type == "task"
+                config_type: config::import::ConfigType::Task,
+            }) if src == "path"
         );
 
         assert_matches!(
             parse_from(["maa", "import", "path", "--force"]).command,
-            Command::Import { force: true, .. }
+            Command::Import(config::import::ImportOptions {
+                ref src,
+                name: None,
+                force: true,
+                config_type: config::import::ConfigType::Task,
+            }) if src == "path"
         );
 
         assert_matches!(
             parse_from(["maa", "import", "path", "-t", "cli"]).command,
-            Command::Import {
-                config_type,
-                ..
-            } if config_type == "cli"
+            Command::Import(config::import::ImportOptions {
+                ref src,
+                name: None,
+                force: false,
+                config_type: config::import::ConfigType::Cli,
+            }) if src == "path"
+        );
+
+        assert_matches!(
+            parse_from(["maa", "import", "path", "-n", "custom", "-f", "-t", "profile"]).command,
+            Command::Import(config::import::ImportOptions {
+                ref src,
+                name: Some(ref name),
+                force: true,
+                config_type: config::import::ConfigType::Profile,
+            }) if src == "path" && name == "custom"
         );
     }
 
