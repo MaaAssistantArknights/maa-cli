@@ -73,14 +73,12 @@ impl ToCString for &[u8] {
 
 impl ToCString for std::ffi::OsString {
     fn to_cstring(self) -> Result<CString> {
-        use maa_str_ext::ToUtf8String;
         self.to_utf8_string()?.to_cstring()
     }
 }
 
 impl ToCString for &std::ffi::OsStr {
     fn to_cstring(self) -> Result<CString> {
-        use maa_str_ext::ToUtf8String;
         self.to_utf8_string()?.to_cstring()
     }
 }
