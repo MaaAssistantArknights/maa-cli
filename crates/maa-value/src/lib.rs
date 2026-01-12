@@ -2,8 +2,8 @@
 
 pub mod userinput;
 
-mod primate;
-pub use primate::MAAPrimate;
+mod primitive;
+pub use primitive::MAAPrimitive;
 
 mod input;
 use std::borrow::Cow;
@@ -36,15 +36,15 @@ pub enum MAAValue {
         ///
         /// Keys are the keys of the dependencies in the sam object and values are the expected
         #[serde(alias = "deps")]
-        conditions: Map<String, MAAPrimate>,
+        conditions: Map<String, MAAPrimitive>,
         /// Input value query from user when all the dependencies are satisfied
         #[serde(alias = "input", flatten)]
         value: BoxedMAAValue,
     },
     /// Object is a map of key-value pair
     Object(Map<String, MAAValue>),
-    /// Primate json types: bool, int, float, string
-    Primate(MAAPrimate),
+    /// Primitive json types: bool, int, float, string
+    Primitive(MAAPrimitive),
 }
 
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -83,7 +83,7 @@ impl Serialize for MAAValue {
 
         match self {
             // Serialize the value directly
-            Primate(v) => v.serialize(serializer),
+            Primitive(v) => v.serialize(serializer),
             // Serialize as a sequence of values and filter out all the missing values
             Array(v) => v.serialize(serializer),
             // Serialize as a map of key-value pairs and filter all the missing values
@@ -103,7 +103,7 @@ impl Default for MAAValue {
 impl MAAValue {
     /// Initialize the value
     ///
-    /// If the value is an primate value, do nothing.
+    /// If the value is a primitive value, do nothing.
     /// If the value is an input value, try to get the value from user input and set it to the
     /// value. If the value is an array or an object, initialize all the values in it
     /// recursively. If the value is an optional value, initialize it only if all the
@@ -122,7 +122,7 @@ impl MAAValue {
     pub fn init(self) -> Result<Self> {
         use MAAValue::*;
         match self {
-            Input(v) => Ok(v.into_primate()?.into()),
+            Input(v) => Ok(v.into_primitive()?.into()),
             Array(array) => {
                 let mut ret = Vec::with_capacity(array.len());
                 for value in array {
@@ -209,18 +209,102 @@ impl MAAValue {
         }
     }
 
-    /// Get inner value if the value is an object
-    pub fn as_object(&self) -> Option<&Map<String, MAAValue>> {
+    /// Get inner map if the value is an object.
+    ///
+    /// Returns a reference to the underlying `Map<String, MAAValue>` if this value is an
+    /// `Object` variant. Returns `None` for all other variants.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use maa_value::{MAAValue, object};
+    ///
+    /// let obj = object!("key" => "value");
+    /// let map = obj.as_map().unwrap();
+    /// assert_eq!(map.len(), 1);
+    ///
+    /// let not_obj = MAAValue::from(42);
+    /// assert!(not_obj.as_map().is_none());
+    /// ```
+    pub fn as_map(&self) -> Option<&Map<String, MAAValue>> {
         match self {
             Self::Object(v) => Some(v),
             _ => None,
         }
     }
 
-    /// Get mutable inner value if the value is an object
-    pub fn as_object_mut(&mut self) -> Option<&mut Map<String, MAAValue>> {
+    /// Get mutable inner map if the value is an object.
+    ///
+    /// Returns a mutable reference to the underlying `Map<String, MAAValue>` if this value
+    /// is an `Object` variant. Returns `None` for all other variants.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use maa_value::{MAAValue, object};
+    ///
+    /// let mut obj = object!("key" => "value");
+    /// let map = obj.as_mut_map().unwrap();
+    /// map.insert("new_key".to_string(), "new_value".into());
+    /// assert_eq!(obj.get("new_key").unwrap().as_str(), Some("new_value"));
+    ///
+    /// let mut not_obj = MAAValue::from(42);
+    /// assert!(not_obj.as_mut_map().is_none());
+    /// ```
+    pub fn as_mut_map(&mut self) -> Option<&mut Map<String, MAAValue>> {
         match self {
             Self::Object(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    /// Get inner slice if the value is an array.
+    ///
+    /// Returns a reference to the array elements as a slice if this value is an `Array`
+    /// variant. Returns `None` for all other variants.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use maa_value::MAAValue;
+    ///
+    /// let array = MAAValue::from([1, 2, 3]);
+    /// let slice = array.as_slice().unwrap();
+    /// assert_eq!(slice.len(), 3);
+    /// assert_eq!(slice[0].as_int(), Some(1));
+    ///
+    /// let not_array = MAAValue::from(42);
+    /// assert!(not_array.as_slice().is_none());
+    /// ```
+    pub fn as_slice(&self) -> Option<&[MAAValue]> {
+        match self {
+            Self::Array(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    /// Get mutable inner vector if the value is an array.
+    ///
+    /// Returns a mutable reference to the underlying `Vec<MAAValue>` if this value is an
+    /// `Array` variant. Returns `None` for all other variants. This allows modifying the
+    /// array in place, including pushing, popping, and changing elements.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use maa_value::MAAValue;
+    ///
+    /// let mut array = MAAValue::from([1, 2, 3]);
+    /// let vec = array.as_mut_vec().unwrap();
+    /// vec.push(4.into());
+    /// assert_eq!(array.as_slice().unwrap().len(), 4);
+    ///
+    /// let mut not_array = MAAValue::from(42);
+    /// assert!(not_array.as_mut_vec().is_none());
+    /// ```
+    pub fn as_mut_vec(&mut self) -> Option<&mut Vec<MAAValue>> {
+        match self {
+            Self::Array(v) => Some(v),
             _ => None,
         }
     }
@@ -230,14 +314,14 @@ impl MAAValue {
     /// If the value is an object and the key exists, the value will be returned.
     /// Otherwise, return `None`.
     pub fn get(&self, key: &str) -> Option<&Self> {
-        self.as_object().and_then(|map| map.get(key))
+        self.as_map().and_then(|map| map.get(key))
     }
 
     /// Get mutable value of given key
     ///
     /// Same as `get`, but return mutable reference.
     pub fn get_mut(&mut self, key: &str) -> Option<&mut Self> {
-        self.as_object_mut().and_then(|map| map.get_mut(key))
+        self.as_mut_map().and_then(|map| map.get_mut(key))
     }
 
     /// Get value of given key with given type
@@ -285,35 +369,113 @@ impl MAAValue {
         }
     }
 
-    /// Get the value if the value is primate
-    ///
-    /// A primate value can be a bool, int, float or string.
-    /// It can not be an array, object or input value.
-    fn as_primate(&self) -> Option<&MAAPrimate> {
+    /// Get inner Primitive value if the value is Primitive.
+    fn as_primitive(&self) -> Option<&MAAPrimitive> {
         match self {
-            Self::Primate(v) => Some(v),
+            Self::Primitive(v) => Some(v),
             _ => None,
         }
     }
 
-    /// Convert the value to bool if the value is primate bool
+    /// Extract boolean value if this is a Primitive bool.
+    ///
+    /// Returns `Some(bool)` if this value is a `Primitive(Bool)` variant.
+    /// Returns `None` for all other value types, including input values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use maa_value::MAAValue;
+    ///
+    /// let bool_val = MAAValue::from(true);
+    /// assert_eq!(bool_val.as_bool(), Some(true));
+    ///
+    /// let int_val = MAAValue::from(42);
+    /// assert_eq!(int_val.as_bool(), None);
+    ///
+    /// let string_val = MAAValue::from("true");
+    /// assert_eq!(string_val.as_bool(), None);
+    /// ```
     pub fn as_bool(&self) -> Option<bool> {
-        self.as_primate().and_then(MAAPrimate::as_bool)
+        self.as_primitive().and_then(MAAPrimitive::as_bool)
     }
 
-    /// Convert the value to int if the value is primate int
+    /// Extract integer value if this is a Primitive int.
+    ///
+    /// Returns `Some(i32)` if this value is a `Primitive(Int)` variant.
+    /// Returns `None` for all other value types, including input values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use maa_value::MAAValue;
+    ///
+    /// let int_val = MAAValue::from(42);
+    /// assert_eq!(int_val.as_int(), Some(42));
+    ///
+    /// let negative_val = MAAValue::from(-10);
+    /// assert_eq!(negative_val.as_int(), Some(-10));
+    ///
+    /// let float_val = MAAValue::from(3.14);
+    /// assert_eq!(float_val.as_int(), None);
+    ///
+    /// let string_val = MAAValue::from("42");
+    /// assert_eq!(string_val.as_int(), None);
+    /// ```
     pub fn as_int(&self) -> Option<i32> {
-        self.as_primate().and_then(MAAPrimate::as_int)
+        self.as_primitive().and_then(MAAPrimitive::as_int)
     }
 
-    /// Convert the value to float if the value is primate float
+    /// Extract float value if this is a Primitive float.
+    ///
+    /// Returns `Some(f32)` if this value is a `Primitive(Float)` variant.
+    /// Returns `None` for all other value types, including input values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use maa_value::MAAValue;
+    ///
+    /// let float_val = MAAValue::from(3.14);
+    /// assert_eq!(float_val.as_float(), Some(3.14));
+    ///
+    /// let negative_val = MAAValue::from(-2.5);
+    /// assert_eq!(negative_val.as_float(), Some(-2.5));
+    ///
+    /// let int_val = MAAValue::from(42);
+    /// assert_eq!(int_val.as_float(), None);
+    ///
+    /// let string_val = MAAValue::from("3.14");
+    /// assert_eq!(string_val.as_float(), None);
+    /// ```
     pub fn as_float(&self) -> Option<f32> {
-        self.as_primate().and_then(MAAPrimate::as_float)
+        self.as_primitive().and_then(MAAPrimitive::as_float)
     }
 
-    /// Convert the value to string if the value is primate string
+    /// Extract string reference if this is a Primitive string.
+    ///
+    /// Returns `Some(&str)` if this value is a `Primitive(String)` variant.
+    /// Returns `None` for all other value types, including input values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use maa_value::MAAValue;
+    ///
+    /// let string_val = MAAValue::from("hello");
+    /// assert_eq!(string_val.as_str(), Some("hello"));
+    ///
+    /// let owned_string = MAAValue::from(String::from("world"));
+    /// assert_eq!(owned_string.as_str(), Some("world"));
+    ///
+    /// let int_val = MAAValue::from(42);
+    /// assert_eq!(int_val.as_str(), None);
+    ///
+    /// let bool_val = MAAValue::from(true);
+    /// assert_eq!(bool_val.as_str(), None);
+    /// ```
     pub fn as_str(&self) -> Option<&str> {
-        self.as_primate().and_then(MAAPrimate::as_str)
+        self.as_primitive().and_then(MAAPrimitive::as_str)
     }
 
     /// Merge another owned value into self, taking ownership of `other`.
@@ -777,7 +939,7 @@ mod tests {
         let value = object!(
             "input" => input.clone(),
             "array" => [1],
-            "primate" => 1,
+            "primitive" => 1,
             "optional" if "input" == true => input.clone(),
             "optional_no_satisfied" if "input" == false => input.clone(),
             "optional_no_exist" if "no_exist" == true => input.clone(),
@@ -798,7 +960,7 @@ mod tests {
             value.get("array").unwrap(),
             &MAAValue::Array(vec![1.into()])
         );
-        assert_eq!(value.get("primate").unwrap(), &MAAValue::from(1));
+        assert_eq!(value.get("primitive").unwrap(), &MAAValue::from(1));
         assert!(matches!(
             value.get("optional").unwrap(),
             MAAValue::Optional { .. }
@@ -827,7 +989,7 @@ mod tests {
             value.get("array").unwrap(),
             &MAAValue::Array(vec![1.into()])
         );
-        assert_eq!(value.get("primate").unwrap(), &MAAValue::from(1));
+        assert_eq!(value.get("primitive").unwrap(), &MAAValue::from(1));
         assert_eq!(value.get("optional").unwrap(), &MAAValue::from(true));
         assert_eq!(value.get("optional_no_satisfied"), None);
         assert_eq!(value.get("optional_no_exist"), None);
@@ -936,6 +1098,260 @@ mod tests {
         // String
         assert_eq!(<&str>::try_from_value(&"string".into()), Some("string"));
         assert_eq!(bool::try_from_value(&"string".into()), None);
+    }
+
+    mod as_methods {
+        use super::*;
+
+        #[test]
+        fn as_bool() {
+            // Test with bool value
+            let true_value = MAAValue::from(true);
+            assert_eq!(true_value.as_bool(), Some(true));
+
+            let false_value = MAAValue::from(false);
+            assert_eq!(false_value.as_bool(), Some(false));
+
+            // Test with non-bool values (should return None)
+            assert_eq!(MAAValue::from(1).as_bool(), None);
+            assert_eq!(MAAValue::from(1.0).as_bool(), None);
+            assert_eq!(MAAValue::from("string").as_bool(), None);
+            assert_eq!(MAAValue::from([1, 2]).as_bool(), None);
+            assert_eq!(MAAValue::default().as_bool(), None);
+
+            // Test with input values (should return None)
+            assert_eq!(MAAValue::from(BoolInput::new(Some(true))).as_bool(), None);
+        }
+
+        #[test]
+        fn as_int() {
+            // Test with int value
+            let int_value = MAAValue::from(42);
+            assert_eq!(int_value.as_int(), Some(42));
+
+            let negative_value = MAAValue::from(-10);
+            assert_eq!(negative_value.as_int(), Some(-10));
+
+            let zero_value = MAAValue::from(0);
+            assert_eq!(zero_value.as_int(), Some(0));
+
+            // Test with non-int values (should return None)
+            assert_eq!(MAAValue::from(true).as_int(), None);
+            assert_eq!(MAAValue::from(1.0).as_int(), None);
+            assert_eq!(MAAValue::from("42").as_int(), None);
+            assert_eq!(MAAValue::from([1, 2]).as_int(), None);
+            assert_eq!(MAAValue::default().as_int(), None);
+
+            // Test with input values (should return None)
+            assert_eq!(MAAValue::from(Input::new(Some(42))).as_int(), None);
+        }
+
+        #[test]
+        fn as_float() {
+            // Test with float value
+            let float_value = MAAValue::from(2.14);
+            assert_eq!(float_value.as_float(), Some(2.14));
+
+            let negative_value = MAAValue::from(-2.5);
+            assert_eq!(negative_value.as_float(), Some(-2.5));
+
+            let zero_value = MAAValue::from(0.0);
+            assert_eq!(zero_value.as_float(), Some(0.0));
+
+            // Test with non-float values (should return None)
+            assert_eq!(MAAValue::from(true).as_float(), None);
+            assert_eq!(MAAValue::from(42).as_float(), None);
+            assert_eq!(MAAValue::from("3.14").as_float(), None);
+            assert_eq!(MAAValue::from([1.0, 2.0]).as_float(), None);
+            assert_eq!(MAAValue::default().as_float(), None);
+
+            // Test with input values (should return None)
+            assert_eq!(MAAValue::from(Input::new(Some(2.14))).as_float(), None);
+        }
+
+        #[test]
+        fn as_str() {
+            // Test with string value
+            let string_value = MAAValue::from("hello");
+            assert_eq!(string_value.as_str(), Some("hello"));
+
+            let empty_string = MAAValue::from("");
+            assert_eq!(empty_string.as_str(), Some(""));
+
+            let owned_string = MAAValue::from(String::from("world"));
+            assert_eq!(owned_string.as_str(), Some("world"));
+
+            // Test with non-string values (should return None)
+            assert_eq!(MAAValue::from(true).as_str(), None);
+            assert_eq!(MAAValue::from(42).as_str(), None);
+            assert_eq!(MAAValue::from(2.14).as_str(), None);
+            assert_eq!(MAAValue::from([1, 2]).as_str(), None);
+            assert_eq!(MAAValue::default().as_str(), None);
+
+            // Test with input values (should return None)
+            assert_eq!(
+                MAAValue::from(Input::new(Some(String::from("hello")))).as_str(),
+                None
+            );
+        }
+
+        #[test]
+        fn as_map() {
+            // Test with object value
+            let obj = MAAValue::from([("key1", "value1"), ("key2", "value2")]);
+            let map = obj.as_map().unwrap();
+            assert_eq!(map.len(), 2);
+            assert!(map.contains_key("key1"));
+            assert!(map.contains_key("key2"));
+
+            // Test with empty object
+            let empty_obj = MAAValue::default();
+            let empty_map = empty_obj.as_map().unwrap();
+            assert_eq!(empty_map.len(), 0);
+
+            // Test with non-object values (should return None)
+            assert_eq!(MAAValue::from(true).as_map(), None);
+            assert_eq!(MAAValue::from(42).as_map(), None);
+            assert_eq!(MAAValue::from(2.14).as_map(), None);
+            assert_eq!(MAAValue::from("string").as_map(), None);
+            assert_eq!(MAAValue::from([1, 2]).as_map(), None);
+        }
+
+        #[test]
+        fn as_mut_map() {
+            // Test with object value - read access
+            let mut obj = MAAValue::from([("key", "value")]);
+            let map = obj.as_mut_map().unwrap();
+            assert_eq!(map.len(), 1);
+            assert!(map.contains_key("key"));
+
+            // Test with object value - modify existing entry
+            let map = obj.as_mut_map().unwrap();
+            map.insert("key".to_string(), "new_value".into());
+            assert_eq!(obj.get("key").unwrap().as_str(), Some("new_value"));
+
+            // Test with object value - insert new entry
+            let map = obj.as_mut_map().unwrap();
+            map.insert("key2".to_string(), 42.into());
+            assert_eq!(obj.get("key2").unwrap().as_int(), Some(42));
+
+            // Test with object value - remove entry
+            let map = obj.as_mut_map().unwrap();
+            map.remove("key");
+            assert!(obj.get("key").is_none());
+
+            // Test with empty object
+            let mut empty_obj = MAAValue::default();
+            let map = empty_obj.as_mut_map().unwrap();
+            map.insert("new_key".to_string(), "value".into());
+            assert_eq!(empty_obj.get("new_key").unwrap().as_str(), Some("value"));
+
+            // Test with non-object values (should return None)
+            assert_eq!(MAAValue::from(true).as_mut_map(), None);
+            assert_eq!(MAAValue::from(42).as_mut_map(), None);
+            assert_eq!(MAAValue::from("string").as_mut_map(), None);
+            assert_eq!(MAAValue::from([1, 2]).as_mut_map(), None);
+        }
+
+        #[test]
+        fn as_slice() {
+            // Test with array
+            let array_value = MAAValue::from([1, 2, 3]);
+            let slice = array_value.as_slice().unwrap();
+            assert_eq!(slice.len(), 3);
+            assert_eq!(slice[0].as_int(), Some(1));
+            assert_eq!(slice[1].as_int(), Some(2));
+            assert_eq!(slice[2].as_int(), Some(3));
+
+            // Test with empty array
+            let empty_array: [i32; 0] = [];
+            let empty_value = MAAValue::from(empty_array);
+            let empty_slice = empty_value.as_slice().unwrap();
+            assert_eq!(empty_slice.len(), 0);
+
+            // Test with non-array values (should return None)
+            assert_eq!(MAAValue::from(1).as_slice(), None);
+            assert_eq!(MAAValue::from(true).as_slice(), None);
+            assert_eq!(MAAValue::from("string").as_slice(), None);
+            assert_eq!(MAAValue::default().as_slice(), None);
+        }
+
+        #[test]
+        fn as_mut_vec() {
+            // Test with array - read access
+            let mut array_value = MAAValue::from([1, 2, 3]);
+            let vec = array_value.as_mut_vec().unwrap();
+            assert_eq!(vec.len(), 3);
+            assert_eq!(vec[0].as_int(), Some(1));
+
+            // Test with array - modify existing elements
+            let vec = array_value.as_mut_vec().unwrap();
+            vec[0] = 10.into();
+            vec[1] = 20.into();
+            let slice = array_value.as_slice().unwrap();
+            assert_eq!(slice[0].as_int(), Some(10));
+            assert_eq!(slice[1].as_int(), Some(20));
+            assert_eq!(slice[2].as_int(), Some(3));
+
+            // Test with array - push new element
+            let vec = array_value.as_mut_vec().unwrap();
+            vec.push(4.into());
+            let slice = array_value.as_slice().unwrap();
+            assert_eq!(slice.len(), 4);
+            assert_eq!(slice[3].as_int(), Some(4));
+
+            // Test with array - pop element
+            let vec = array_value.as_mut_vec().unwrap();
+            let popped = vec.pop();
+            assert_eq!(popped.unwrap().as_int(), Some(4));
+            let slice = array_value.as_slice().unwrap();
+            assert_eq!(slice.len(), 3);
+
+            // Test with empty array
+            let empty_array: [i32; 0] = [];
+            let mut empty_value = MAAValue::from(empty_array);
+            let vec = empty_value.as_mut_vec().unwrap();
+            assert_eq!(vec.len(), 0);
+            vec.push(1.into());
+            assert_eq!(empty_value.as_slice().unwrap().len(), 1);
+
+            // Test with non-array values (should return None)
+            assert_eq!(MAAValue::from(1).as_mut_vec(), None);
+            assert_eq!(MAAValue::from(true).as_mut_vec(), None);
+            assert_eq!(MAAValue::from("string").as_mut_vec(), None);
+            assert_eq!(MAAValue::default().as_mut_vec(), None);
+        }
+
+        #[test]
+        fn as_primitive() {
+            // Test with Primitive bool
+            let bool_value = MAAValue::from(true);
+            let primitive = bool_value.as_primitive().unwrap();
+            assert_eq!(primitive.as_bool(), Some(true));
+
+            // Test with Primitive int
+            let int_value = MAAValue::from(42);
+            let primitive = int_value.as_primitive().unwrap();
+            assert_eq!(primitive.as_int(), Some(42));
+
+            // Test with Primitive float
+            let float_value = MAAValue::from(2.14);
+            let primitive = float_value.as_primitive().unwrap();
+            assert_eq!(primitive.as_float(), Some(2.14));
+
+            // Test with Primitive string
+            let string_value = MAAValue::from("hello");
+            let primitive = string_value.as_primitive().unwrap();
+            assert_eq!(primitive.as_str(), Some("hello"));
+
+            // Test with non-Primitive values (should return None)
+            assert_eq!(MAAValue::from([1, 2]).as_primitive(), None);
+            assert_eq!(MAAValue::default().as_primitive(), None);
+            assert_eq!(
+                MAAValue::from(BoolInput::new(Some(true))).as_primitive(),
+                None
+            );
+        }
     }
 
     mod merge {
