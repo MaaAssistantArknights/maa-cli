@@ -146,12 +146,8 @@ mod git {
     ) -> Result<()> {
         let mut cmd = std::process::Command::new("git");
 
-        cmd.args([
-            "clone",
-            url,
-            dest.to_str().context("Invalid path")?,
-            "--depth=1",
-        ]);
+        cmd.args(["clone", "--depth=1", url]);
+        cmd.arg(dest);
 
         if let Some(branch) = branch {
             cmd.args(["--branch", branch]);
