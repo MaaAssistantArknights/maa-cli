@@ -209,23 +209,73 @@ impl MAAValue {
         }
     }
 
-    /// Get inner value if the value is an object
-    pub fn as_object(&self) -> Option<&Map<String, MAAValue>> {
+    /// Get inner map if the value is an object.
+    ///
+    /// Returns a reference to the underlying `Map<String, MAAValue>` if this value is an
+    /// `Object` variant. Returns `None` for all other variants.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use maa_value::{MAAValue, object};
+    ///
+    /// let obj = object!("key" => "value");
+    /// let map = obj.as_map().unwrap();
+    /// assert_eq!(map.len(), 1);
+    ///
+    /// let not_obj = MAAValue::from(42);
+    /// assert!(not_obj.as_map().is_none());
+    /// ```
+    pub fn as_map(&self) -> Option<&Map<String, MAAValue>> {
         match self {
             Self::Object(v) => Some(v),
             _ => None,
         }
     }
 
-    /// Get mutable inner value if the value is an object
-    pub fn as_object_mut(&mut self) -> Option<&mut Map<String, MAAValue>> {
+    /// Get mutable inner map if the value is an object.
+    ///
+    /// Returns a mutable reference to the underlying `Map<String, MAAValue>` if this value
+    /// is an `Object` variant. Returns `None` for all other variants.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use maa_value::{MAAValue, object};
+    ///
+    /// let mut obj = object!("key" => "value");
+    /// let map = obj.as_mut_map().unwrap();
+    /// map.insert("new_key".to_string(), "new_value".into());
+    /// assert_eq!(obj.get("new_key").unwrap().as_str(), Some("new_value"));
+    ///
+    /// let mut not_obj = MAAValue::from(42);
+    /// assert!(not_obj.as_mut_map().is_none());
+    /// ```
+    pub fn as_mut_map(&mut self) -> Option<&mut Map<String, MAAValue>> {
         match self {
             Self::Object(v) => Some(v),
             _ => None,
         }
     }
 
-    /// Get inner value if the value is an array
+    /// Get inner slice if the value is an array.
+    ///
+    /// Returns a reference to the array elements as a slice if this value is an `Array`
+    /// variant. Returns `None` for all other variants.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use maa_value::MAAValue;
+    ///
+    /// let array = MAAValue::from([1, 2, 3]);
+    /// let slice = array.as_slice().unwrap();
+    /// assert_eq!(slice.len(), 3);
+    /// assert_eq!(slice[0].as_int(), Some(1));
+    ///
+    /// let not_array = MAAValue::from(42);
+    /// assert!(not_array.as_slice().is_none());
+    /// ```
     pub fn as_slice(&self) -> Option<&[MAAValue]> {
         match self {
             Self::Array(v) => Some(v),
@@ -233,7 +283,25 @@ impl MAAValue {
         }
     }
 
-    /// Get mutable inner value if the value is an array
+    /// Get mutable inner vector if the value is an array.
+    ///
+    /// Returns a mutable reference to the underlying `Vec<MAAValue>` if this value is an
+    /// `Array` variant. Returns `None` for all other variants. This allows modifying the
+    /// array in place, including pushing, popping, and changing elements.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use maa_value::MAAValue;
+    ///
+    /// let mut array = MAAValue::from([1, 2, 3]);
+    /// let vec = array.as_mut_vec().unwrap();
+    /// vec.push(4.into());
+    /// assert_eq!(array.as_slice().unwrap().len(), 4);
+    ///
+    /// let mut not_array = MAAValue::from(42);
+    /// assert!(not_array.as_mut_vec().is_none());
+    /// ```
     pub fn as_mut_vec(&mut self) -> Option<&mut Vec<MAAValue>> {
         match self {
             Self::Array(v) => Some(v),
@@ -246,14 +314,14 @@ impl MAAValue {
     /// If the value is an object and the key exists, the value will be returned.
     /// Otherwise, return `None`.
     pub fn get(&self, key: &str) -> Option<&Self> {
-        self.as_object().and_then(|map| map.get(key))
+        self.as_map().and_then(|map| map.get(key))
     }
 
     /// Get mutable value of given key
     ///
     /// Same as `get`, but return mutable reference.
     pub fn get_mut(&mut self, key: &str) -> Option<&mut Self> {
-        self.as_object_mut().and_then(|map| map.get_mut(key))
+        self.as_mut_map().and_then(|map| map.get_mut(key))
     }
 
     /// Get value of given key with given type
@@ -301,10 +369,7 @@ impl MAAValue {
         }
     }
 
-    /// Get the value if the value is primate
-    ///
-    /// A primate value can be a bool, int, float or string.
-    /// It can not be an array, object or input value.
+    /// Get inner primate value if the value is primate.
     fn as_primative(&self) -> Option<&MAAPrimate> {
         match self {
             Self::Primate(v) => Some(v),
@@ -312,22 +377,103 @@ impl MAAValue {
         }
     }
 
-    /// Convert the value to bool if the value is primate bool
+    /// Extract boolean value if this is a primate bool.
+    ///
+    /// Returns `Some(bool)` if this value is a `Primate(Bool)` variant.
+    /// Returns `None` for all other value types, including input values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use maa_value::MAAValue;
+    ///
+    /// let bool_val = MAAValue::from(true);
+    /// assert_eq!(bool_val.as_bool(), Some(true));
+    ///
+    /// let int_val = MAAValue::from(42);
+    /// assert_eq!(int_val.as_bool(), None);
+    ///
+    /// let string_val = MAAValue::from("true");
+    /// assert_eq!(string_val.as_bool(), None);
+    /// ```
     pub fn as_bool(&self) -> Option<bool> {
         self.as_primative().and_then(MAAPrimate::as_bool)
     }
 
-    /// Convert the value to int if the value is primate int
+    /// Extract integer value if this is a primate int.
+    ///
+    /// Returns `Some(i32)` if this value is a `Primate(Int)` variant.
+    /// Returns `None` for all other value types, including input values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use maa_value::MAAValue;
+    ///
+    /// let int_val = MAAValue::from(42);
+    /// assert_eq!(int_val.as_int(), Some(42));
+    ///
+    /// let negative_val = MAAValue::from(-10);
+    /// assert_eq!(negative_val.as_int(), Some(-10));
+    ///
+    /// let float_val = MAAValue::from(3.14);
+    /// assert_eq!(float_val.as_int(), None);
+    ///
+    /// let string_val = MAAValue::from("42");
+    /// assert_eq!(string_val.as_int(), None);
+    /// ```
     pub fn as_int(&self) -> Option<i32> {
         self.as_primative().and_then(MAAPrimate::as_int)
     }
 
-    /// Convert the value to float if the value is primate float
+    /// Extract float value if this is a primate float.
+    ///
+    /// Returns `Some(f32)` if this value is a `Primate(Float)` variant.
+    /// Returns `None` for all other value types, including input values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use maa_value::MAAValue;
+    ///
+    /// let float_val = MAAValue::from(3.14);
+    /// assert_eq!(float_val.as_float(), Some(3.14));
+    ///
+    /// let negative_val = MAAValue::from(-2.5);
+    /// assert_eq!(negative_val.as_float(), Some(-2.5));
+    ///
+    /// let int_val = MAAValue::from(42);
+    /// assert_eq!(int_val.as_float(), None);
+    ///
+    /// let string_val = MAAValue::from("3.14");
+    /// assert_eq!(string_val.as_float(), None);
+    /// ```
     pub fn as_float(&self) -> Option<f32> {
         self.as_primative().and_then(MAAPrimate::as_float)
     }
 
-    /// Convert the value to string if the value is primate string
+    /// Extract string reference if this is a primate string.
+    ///
+    /// Returns `Some(&str)` if this value is a `Primate(String)` variant.
+    /// Returns `None` for all other value types, including input values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use maa_value::MAAValue;
+    ///
+    /// let string_val = MAAValue::from("hello");
+    /// assert_eq!(string_val.as_str(), Some("hello"));
+    ///
+    /// let owned_string = MAAValue::from(String::from("world"));
+    /// assert_eq!(owned_string.as_str(), Some("world"));
+    ///
+    /// let int_val = MAAValue::from(42);
+    /// assert_eq!(int_val.as_str(), None);
+    ///
+    /// let bool_val = MAAValue::from(true);
+    /// assert_eq!(bool_val.as_str(), None);
+    /// ```
     pub fn as_str(&self) -> Option<&str> {
         self.as_primative().and_then(MAAPrimate::as_str)
     }
@@ -1050,61 +1196,61 @@ mod tests {
         }
 
         #[test]
-        fn as_object() {
+        fn as_map() {
             // Test with object value
             let obj = MAAValue::from([("key1", "value1"), ("key2", "value2")]);
-            let map = obj.as_object().unwrap();
+            let map = obj.as_map().unwrap();
             assert_eq!(map.len(), 2);
             assert!(map.contains_key("key1"));
             assert!(map.contains_key("key2"));
 
             // Test with empty object
             let empty_obj = MAAValue::default();
-            let empty_map = empty_obj.as_object().unwrap();
+            let empty_map = empty_obj.as_map().unwrap();
             assert_eq!(empty_map.len(), 0);
 
             // Test with non-object values (should return None)
-            assert_eq!(MAAValue::from(true).as_object(), None);
-            assert_eq!(MAAValue::from(42).as_object(), None);
-            assert_eq!(MAAValue::from(2.14).as_object(), None);
-            assert_eq!(MAAValue::from("string").as_object(), None);
-            assert_eq!(MAAValue::from([1, 2]).as_object(), None);
+            assert_eq!(MAAValue::from(true).as_map(), None);
+            assert_eq!(MAAValue::from(42).as_map(), None);
+            assert_eq!(MAAValue::from(2.14).as_map(), None);
+            assert_eq!(MAAValue::from("string").as_map(), None);
+            assert_eq!(MAAValue::from([1, 2]).as_map(), None);
         }
 
         #[test]
-        fn as_object_mut() {
+        fn as_mut_map() {
             // Test with object value - read access
             let mut obj = MAAValue::from([("key", "value")]);
-            let map = obj.as_object_mut().unwrap();
+            let map = obj.as_mut_map().unwrap();
             assert_eq!(map.len(), 1);
             assert!(map.contains_key("key"));
 
             // Test with object value - modify existing entry
-            let map = obj.as_object_mut().unwrap();
+            let map = obj.as_mut_map().unwrap();
             map.insert("key".to_string(), "new_value".into());
             assert_eq!(obj.get("key").unwrap().as_str(), Some("new_value"));
 
             // Test with object value - insert new entry
-            let map = obj.as_object_mut().unwrap();
+            let map = obj.as_mut_map().unwrap();
             map.insert("key2".to_string(), 42.into());
             assert_eq!(obj.get("key2").unwrap().as_int(), Some(42));
 
             // Test with object value - remove entry
-            let map = obj.as_object_mut().unwrap();
+            let map = obj.as_mut_map().unwrap();
             map.remove("key");
             assert!(obj.get("key").is_none());
 
             // Test with empty object
             let mut empty_obj = MAAValue::default();
-            let map = empty_obj.as_object_mut().unwrap();
+            let map = empty_obj.as_mut_map().unwrap();
             map.insert("new_key".to_string(), "value".into());
             assert_eq!(empty_obj.get("new_key").unwrap().as_str(), Some("value"));
 
             // Test with non-object values (should return None)
-            assert_eq!(MAAValue::from(true).as_object_mut(), None);
-            assert_eq!(MAAValue::from(42).as_object_mut(), None);
-            assert_eq!(MAAValue::from("string").as_object_mut(), None);
-            assert_eq!(MAAValue::from([1, 2]).as_object_mut(), None);
+            assert_eq!(MAAValue::from(true).as_mut_map(), None);
+            assert_eq!(MAAValue::from(42).as_mut_map(), None);
+            assert_eq!(MAAValue::from("string").as_mut_map(), None);
+            assert_eq!(MAAValue::from([1, 2]).as_mut_map(), None);
         }
 
         #[test]
