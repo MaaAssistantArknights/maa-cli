@@ -2,8 +2,8 @@
 
 pub mod userinput;
 
-mod primate;
-pub use primate::MAAPrimate;
+mod primitve;
+pub use primitve::MAAPrimitive;
 
 mod input;
 use std::borrow::Cow;
@@ -36,15 +36,15 @@ pub enum MAAValue {
         ///
         /// Keys are the keys of the dependencies in the sam object and values are the expected
         #[serde(alias = "deps")]
-        conditions: Map<String, MAAPrimate>,
+        conditions: Map<String, MAAPrimitive>,
         /// Input value query from user when all the dependencies are satisfied
         #[serde(alias = "input", flatten)]
         value: BoxedMAAValue,
     },
     /// Object is a map of key-value pair
     Object(Map<String, MAAValue>),
-    /// Primate json types: bool, int, float, string
-    Primate(MAAPrimate),
+    /// Primitive json types: bool, int, float, string
+    Primitive(MAAPrimitive),
 }
 
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -83,7 +83,7 @@ impl Serialize for MAAValue {
 
         match self {
             // Serialize the value directly
-            Primate(v) => v.serialize(serializer),
+            Primitive(v) => v.serialize(serializer),
             // Serialize as a sequence of values and filter out all the missing values
             Array(v) => v.serialize(serializer),
             // Serialize as a map of key-value pairs and filter all the missing values
@@ -103,7 +103,7 @@ impl Default for MAAValue {
 impl MAAValue {
     /// Initialize the value
     ///
-    /// If the value is an primate value, do nothing.
+    /// If the value is an Primitive value, do nothing.
     /// If the value is an input value, try to get the value from user input and set it to the
     /// value. If the value is an array or an object, initialize all the values in it
     /// recursively. If the value is an optional value, initialize it only if all the
@@ -122,7 +122,7 @@ impl MAAValue {
     pub fn init(self) -> Result<Self> {
         use MAAValue::*;
         match self {
-            Input(v) => Ok(v.into_primate()?.into()),
+            Input(v) => Ok(v.into_primitive()?.into()),
             Array(array) => {
                 let mut ret = Vec::with_capacity(array.len());
                 for value in array {
@@ -369,17 +369,17 @@ impl MAAValue {
         }
     }
 
-    /// Get inner primate value if the value is primate.
-    fn as_primative(&self) -> Option<&MAAPrimate> {
+    /// Get inner Primitive value if the value is Primitive.
+    fn as_primitive(&self) -> Option<&MAAPrimitive> {
         match self {
-            Self::Primate(v) => Some(v),
+            Self::Primitive(v) => Some(v),
             _ => None,
         }
     }
 
-    /// Extract boolean value if this is a primate bool.
+    /// Extract boolean value if this is a Primitive bool.
     ///
-    /// Returns `Some(bool)` if this value is a `Primate(Bool)` variant.
+    /// Returns `Some(bool)` if this value is a `Primitive(Bool)` variant.
     /// Returns `None` for all other value types, including input values.
     ///
     /// # Examples
@@ -397,12 +397,12 @@ impl MAAValue {
     /// assert_eq!(string_val.as_bool(), None);
     /// ```
     pub fn as_bool(&self) -> Option<bool> {
-        self.as_primative().and_then(MAAPrimate::as_bool)
+        self.as_primitive().and_then(MAAPrimitive::as_bool)
     }
 
-    /// Extract integer value if this is a primate int.
+    /// Extract integer value if this is a Primitive int.
     ///
-    /// Returns `Some(i32)` if this value is a `Primate(Int)` variant.
+    /// Returns `Some(i32)` if this value is a `Primitive(Int)` variant.
     /// Returns `None` for all other value types, including input values.
     ///
     /// # Examples
@@ -423,12 +423,12 @@ impl MAAValue {
     /// assert_eq!(string_val.as_int(), None);
     /// ```
     pub fn as_int(&self) -> Option<i32> {
-        self.as_primative().and_then(MAAPrimate::as_int)
+        self.as_primitive().and_then(MAAPrimitive::as_int)
     }
 
-    /// Extract float value if this is a primate float.
+    /// Extract float value if this is a Primitive float.
     ///
-    /// Returns `Some(f32)` if this value is a `Primate(Float)` variant.
+    /// Returns `Some(f32)` if this value is a `Primitive(Float)` variant.
     /// Returns `None` for all other value types, including input values.
     ///
     /// # Examples
@@ -449,12 +449,12 @@ impl MAAValue {
     /// assert_eq!(string_val.as_float(), None);
     /// ```
     pub fn as_float(&self) -> Option<f32> {
-        self.as_primative().and_then(MAAPrimate::as_float)
+        self.as_primitive().and_then(MAAPrimitive::as_float)
     }
 
-    /// Extract string reference if this is a primate string.
+    /// Extract string reference if this is a Primitive string.
     ///
-    /// Returns `Some(&str)` if this value is a `Primate(String)` variant.
+    /// Returns `Some(&str)` if this value is a `Primitive(String)` variant.
     /// Returns `None` for all other value types, including input values.
     ///
     /// # Examples
@@ -475,7 +475,7 @@ impl MAAValue {
     /// assert_eq!(bool_val.as_str(), None);
     /// ```
     pub fn as_str(&self) -> Option<&str> {
-        self.as_primative().and_then(MAAPrimate::as_str)
+        self.as_primitive().and_then(MAAPrimitive::as_str)
     }
 
     /// Merge another owned value into self, taking ownership of `other`.
@@ -939,7 +939,7 @@ mod tests {
         let value = object!(
             "input" => input.clone(),
             "array" => [1],
-            "primate" => 1,
+            "primitive" => 1,
             "optional" if "input" == true => input.clone(),
             "optional_no_satisfied" if "input" == false => input.clone(),
             "optional_no_exist" if "no_exist" == true => input.clone(),
@@ -960,7 +960,7 @@ mod tests {
             value.get("array").unwrap(),
             &MAAValue::Array(vec![1.into()])
         );
-        assert_eq!(value.get("primate").unwrap(), &MAAValue::from(1));
+        assert_eq!(value.get("primitive").unwrap(), &MAAValue::from(1));
         assert!(matches!(
             value.get("optional").unwrap(),
             MAAValue::Optional { .. }
@@ -989,7 +989,7 @@ mod tests {
             value.get("array").unwrap(),
             &MAAValue::Array(vec![1.into()])
         );
-        assert_eq!(value.get("primate").unwrap(), &MAAValue::from(1));
+        assert_eq!(value.get("primitive").unwrap(), &MAAValue::from(1));
         assert_eq!(value.get("optional").unwrap(), &MAAValue::from(true));
         assert_eq!(value.get("optional_no_satisfied"), None);
         assert_eq!(value.get("optional_no_exist"), None);
@@ -1323,32 +1323,32 @@ mod tests {
         }
 
         #[test]
-        fn as_primative() {
-            // Test with primate bool
+        fn as_primitive() {
+            // Test with Primitive bool
             let bool_value = MAAValue::from(true);
-            let primate = bool_value.as_primative().unwrap();
-            assert_eq!(primate.as_bool(), Some(true));
+            let primitive = bool_value.as_primitive().unwrap();
+            assert_eq!(primitive.as_bool(), Some(true));
 
-            // Test with primate int
+            // Test with Primitive int
             let int_value = MAAValue::from(42);
-            let primate = int_value.as_primative().unwrap();
-            assert_eq!(primate.as_int(), Some(42));
+            let primitive = int_value.as_primitive().unwrap();
+            assert_eq!(primitive.as_int(), Some(42));
 
-            // Test with primate float
+            // Test with Primitive float
             let float_value = MAAValue::from(2.14);
-            let primate = float_value.as_primative().unwrap();
-            assert_eq!(primate.as_float(), Some(2.14));
+            let primitive = float_value.as_primitive().unwrap();
+            assert_eq!(primitive.as_float(), Some(2.14));
 
-            // Test with primate string
+            // Test with Primitive string
             let string_value = MAAValue::from("hello");
-            let primate = string_value.as_primative().unwrap();
-            assert_eq!(primate.as_str(), Some("hello"));
+            let primitive = string_value.as_primitive().unwrap();
+            assert_eq!(primitive.as_str(), Some("hello"));
 
-            // Test with non-primate values (should return None)
-            assert_eq!(MAAValue::from([1, 2]).as_primative(), None);
-            assert_eq!(MAAValue::default().as_primative(), None);
+            // Test with non-Primitive values (should return None)
+            assert_eq!(MAAValue::from([1, 2]).as_primitive(), None);
+            assert_eq!(MAAValue::default().as_primitive(), None);
             assert_eq!(
-                MAAValue::from(BoolInput::new(Some(true))).as_primative(),
+                MAAValue::from(BoolInput::new(Some(true))).as_primitive(),
                 None
             );
         }

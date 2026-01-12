@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 use super::{
     MAAValue,
-    primate::MAAPrimate,
+    primitve::MAAPrimitive,
     userinput::{BoolInput, Input, SelectD, UserInput},
 };
 
@@ -20,9 +20,9 @@ pub enum MAAInput {
 }
 
 impl MAAInput {
-    pub(super) fn into_primate(self) -> crate::Result<MAAPrimate> {
+    pub(super) fn into_primitive(self) -> crate::Result<MAAPrimitive> {
         use MAAInput::*;
-        use MAAPrimate::*;
+        use MAAPrimitive::*;
         match self {
             InputBool(v) => Ok(Bool(v.value()?)),
             InputInt(v) => Ok(Int(v.value()?)),
@@ -179,49 +179,49 @@ mod tests {
     }
 
     #[test]
-    fn to_primate() {
+    fn to_primitive() {
         use std::num::NonZero;
 
         assert_eq!(
             MAAInput::from(BoolInput::new(Some(true)))
-                .into_primate()
+                .into_primitive()
                 .unwrap(),
             true.into()
         );
         assert_eq!(
             MAAInput::InputInt(Input::new(Some(1)))
-                .into_primate()
+                .into_primitive()
                 .unwrap(),
             1.into()
         );
         assert_eq!(
             MAAInput::InputFloat(Input::new(Some(1.0)))
-                .into_primate()
+                .into_primitive()
                 .unwrap(),
             1.0.into()
         );
         assert_eq!(
             MAAInput::InputString(Input::new(sstr("1")))
-                .into_primate()
+                .into_primitive()
                 .unwrap(),
             "1".into()
         );
         assert_eq!(
             MAAInput::SelectInt(SelectD::from_iter([1, 2], NonZero::new(2)).unwrap())
-                .into_primate()
+                .into_primitive()
                 .unwrap(),
             2.into()
         );
         assert_eq!(
             MAAInput::SelectFloat(SelectD::from_iter([1.0, 2.0], NonZero::new(2)).unwrap())
-                .into_primate()
+                .into_primitive()
                 .unwrap(),
             2.0.into()
         );
 
         assert_eq!(
             MAAInput::from(SelectD::<String>::from_iter(["1", "2"], NonZero::new(2)).unwrap())
-                .into_primate()
+                .into_primitive()
                 .unwrap(),
             "2".into()
         );
@@ -260,48 +260,48 @@ mod tests {
     }
 
     #[test]
-    fn to_primate_all_variants() {
+    fn to_primitive_all_variants() {
         use std::num::NonZero;
 
         // Test each variant type once to cover all branches
         assert_eq!(
             MAAInput::InputBool(BoolInput::new(Some(false)))
-                .into_primate()
+                .into_primitive()
                 .unwrap(),
             false.into()
         );
 
         assert_eq!(
             MAAInput::InputInt(Input::new(Some(-100)))
-                .into_primate()
+                .into_primitive()
                 .unwrap(),
             (-100).into()
         );
 
         assert_eq!(
             MAAInput::InputFloat(Input::new(Some(-2.5)))
-                .into_primate()
+                .into_primitive()
                 .unwrap(),
             (-2.5).into()
         );
 
         assert_eq!(
             MAAInput::InputString(Input::new(sstr("hello")))
-                .into_primate()
+                .into_primitive()
                 .unwrap(),
             "hello".into()
         );
 
         assert_eq!(
             MAAInput::SelectInt(SelectD::from_iter([10, 20], NonZero::new(1)).unwrap())
-                .into_primate()
+                .into_primitive()
                 .unwrap(),
             10.into()
         );
 
         assert_eq!(
             MAAInput::SelectFloat(SelectD::from_iter([1.1, 2.2], NonZero::new(2)).unwrap())
-                .into_primate()
+                .into_primitive()
                 .unwrap(),
             2.2.into()
         );
@@ -310,7 +310,7 @@ mod tests {
             MAAInput::SelectString(
                 SelectD::<String>::from_iter(["first", "second"], NonZero::new(1)).unwrap()
             )
-            .into_primate()
+            .into_primitive()
             .unwrap(),
             "first".into()
         );
