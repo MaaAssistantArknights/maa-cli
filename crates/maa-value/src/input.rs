@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 use super::{
     MAAValue,
-    primitve::MAAPrimitive,
+    primitive::MAAPrimitive,
     userinput::{BoolInput, Input, SelectD, UserInput},
 };
 

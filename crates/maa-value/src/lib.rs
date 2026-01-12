@@ -2,8 +2,8 @@
 
 pub mod userinput;
 
-mod primitve;
-pub use primitve::MAAPrimitive;
+mod primitive;
+pub use primitive::MAAPrimitive;
 
 mod input;
 use std::borrow::Cow;
