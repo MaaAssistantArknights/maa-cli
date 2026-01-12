@@ -305,7 +305,7 @@ impl MAAValue {
     ///
     /// A primate value can be a bool, int, float or string.
     /// It can not be an array, object or input value.
-    fn as_primate(&self) -> Option<&MAAPrimate> {
+    fn as_primative(&self) -> Option<&MAAPrimate> {
         match self {
             Self::Primate(v) => Some(v),
             _ => None,
@@ -314,22 +314,22 @@ impl MAAValue {
 
     /// Convert the value to bool if the value is primate bool
     pub fn as_bool(&self) -> Option<bool> {
-        self.as_primate().and_then(MAAPrimate::as_bool)
+        self.as_primative().and_then(MAAPrimate::as_bool)
     }
 
     /// Convert the value to int if the value is primate int
     pub fn as_int(&self) -> Option<i32> {
-        self.as_primate().and_then(MAAPrimate::as_int)
+        self.as_primative().and_then(MAAPrimate::as_int)
     }
 
     /// Convert the value to float if the value is primate float
     pub fn as_float(&self) -> Option<f32> {
-        self.as_primate().and_then(MAAPrimate::as_float)
+        self.as_primative().and_then(MAAPrimate::as_float)
     }
 
     /// Convert the value to string if the value is primate string
     pub fn as_str(&self) -> Option<&str> {
-        self.as_primate().and_then(MAAPrimate::as_str)
+        self.as_primative().and_then(MAAPrimate::as_str)
     }
 
     /// Merge another owned value into self, taking ownership of `other`.
@@ -1177,32 +1177,32 @@ mod tests {
         }
 
         #[test]
-        fn as_primate() {
+        fn as_primative() {
             // Test with primate bool
             let bool_value = MAAValue::from(true);
-            let primate = bool_value.as_primate().unwrap();
+            let primate = bool_value.as_primative().unwrap();
             assert_eq!(primate.as_bool(), Some(true));
 
             // Test with primate int
             let int_value = MAAValue::from(42);
-            let primate = int_value.as_primate().unwrap();
+            let primate = int_value.as_primative().unwrap();
             assert_eq!(primate.as_int(), Some(42));
 
             // Test with primate float
             let float_value = MAAValue::from(2.14);
-            let primate = float_value.as_primate().unwrap();
+            let primate = float_value.as_primative().unwrap();
             assert_eq!(primate.as_float(), Some(2.14));
 
             // Test with primate string
             let string_value = MAAValue::from("hello");
-            let primate = string_value.as_primate().unwrap();
+            let primate = string_value.as_primative().unwrap();
             assert_eq!(primate.as_str(), Some("hello"));
 
             // Test with non-primate values (should return None)
-            assert_eq!(MAAValue::from([1, 2]).as_primate(), None);
-            assert_eq!(MAAValue::default().as_primate(), None);
+            assert_eq!(MAAValue::from([1, 2]).as_primative(), None);
+            assert_eq!(MAAValue::default().as_primative(), None);
             assert_eq!(
-                MAAValue::from(BoolInput::new(Some(true))).as_primate(),
+                MAAValue::from(BoolInput::new(Some(true))).as_primative(),
                 None
             );
         }
