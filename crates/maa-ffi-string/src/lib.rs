@@ -2,12 +2,14 @@
 
 use std::ffi::CString;
 
+use maa_str_ext::ToUtf8String;
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("Interior null byte")]
     InteriorNull(#[from] std::ffi::NulError),
     #[error("Invalid UTF-8")]
-    InvalidUtf8(Option<std::str::Utf8Error>),
+    InvalidUtf8(#[from] maa_str_ext::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -59,67 +61,25 @@ impl ToCString for &str {
 
 impl ToCString for Vec<u8> {
     fn to_cstring(self) -> Result<CString> {
-        // We should make sure they are valid UTF-8.
-        match std::str::from_utf8(&self) {
-            Ok(_) => Ok(CString::new(self)?),
-            Err(e) => Err(Error::InvalidUtf8(Some(e))),
-        }
+        Ok(CString::new(self.to_utf8_string()?)?)
     }
 }
 
 impl ToCString for &[u8] {
     fn to_cstring(self) -> Result<CString> {
-        // We should make sure they are valid UTF-8.
-        match std::str::from_utf8(self) {
-            Ok(_) => Ok(CString::new(self)?),
-            Err(e) => Err(Error::InvalidUtf8(Some(e))),
-        }
+        Ok(CString::new(self.to_utf8_string()?)?)
     }
 }
 
-/// Convert OsStr/OsString to CString on Unix
-///
-/// Note: We can not pass the inner bytes directly, as we should make sure they are valid UTF-8.
-#[cfg(unix)]
-mod os_str_unix {
-
-    use super::*;
-
-    impl ToCString for std::ffi::OsString {
-        fn to_cstring(self) -> Result<CString> {
-            use std::os::unix::ffi::OsStringExt;
-            String::from_utf8(self.into_vec())?.to_cstring()
-        }
-    }
-
-    impl From<std::string::FromUtf8Error> for Error {
-        fn from(err: std::string::FromUtf8Error) -> Self {
-            Error::InvalidUtf8(Some(err.utf8_error()))
-        }
-    }
-
-    impl ToCString for &std::ffi::OsStr {
-        fn to_cstring(self) -> Result<CString> {
-            use std::os::unix::ffi::OsStrExt;
-            std::str::from_utf8(self.as_bytes())?.to_cstring()
-        }
-    }
-
-    impl From<std::str::Utf8Error> for Error {
-        fn from(err: std::str::Utf8Error) -> Self {
-            Error::InvalidUtf8(Some(err))
-        }
+impl ToCString for std::ffi::OsString {
+    fn to_cstring(self) -> Result<CString> {
+        self.to_utf8_string()?.to_cstring()
     }
 }
 
-// On non-Unix platforms, the `as_bytes` / `into_vec` method is not available for `OsStr`.
-// Therefore, we directly use the `to_str` method, which provides less detailed error information.
-#[cfg(not(unix))]
 impl ToCString for &std::ffi::OsStr {
     fn to_cstring(self) -> Result<CString> {
-        self.to_str()
-            .ok_or(crate::Error::InvalidUtf8(None))?
-            .to_cstring()
+        self.to_utf8_string()?.to_cstring()
     }
 }
 
