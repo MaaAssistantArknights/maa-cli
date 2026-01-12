@@ -422,9 +422,9 @@ impl MAAValue {
         }
     }
 
-    /// Get the value if the value is primative
+    /// Get the value if the value is primitive
     ///
-    /// A primative value can be a bool, int, float or string.
+    /// A primitive value can be a bool, int, float or string.
     /// It can not be an array, object or input value.
     fn as_primitive(&self) -> Option<&MAAPrimitive> {
         match self {
