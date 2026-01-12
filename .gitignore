@@ -1,6 +1,6 @@
 /target
 /version
 /cobertura.xml
+/.scratch
 /tarpaulin-report.html
-.vscode/ltex*
 .lycheecache
