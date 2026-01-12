@@ -122,8 +122,11 @@ fn main() -> Result<()> {
                 for entry in task_dir.read_dir()? {
                     let entry = entry?;
                     let path = entry.path();
-                    if path.is_file() {
-                        println!("{}", path.file_stem().unwrap().to_str().unwrap());
+                    if path.is_file()
+                        && let Some(stem) = path.file_stem()
+                        && let Some(name) = stem.to_str()
+                    {
+                        println!("{name}");
                     }
                 }
             }

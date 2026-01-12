@@ -8,7 +8,7 @@ use anyhow::Context;
 use condition::Condition;
 pub use condition::{TimeOffset, remainder_of_day_mod};
 use maa_sys::TaskType;
-use maa_value::{MAAValue, object};
+use maa_value::{MAAValue, insert, object};
 use serde::Deserialize;
 
 use crate::dirs;
@@ -185,8 +185,7 @@ impl TaskConfig {
                             startup = Some(true);
                         }
                         (false, Some(true)) => {
-                            params.insert("enable", true);
-                            params.insert("start_game_enabled", true);
+                            insert!(params, "enable" => true, "start_game_enabled" => true);
                         }
                         _ => {}
                     }
@@ -201,7 +200,7 @@ impl TaskConfig {
                         }
                         // If closedown is enabled manually, enable closedown task automatically
                         (false, Some(true)) => {
-                            params.insert("enable", true);
+                            insert!(params, "enable" => true);
                         }
                         _ => {}
                     }
@@ -217,7 +216,7 @@ impl TaskConfig {
                         let file = PathBuf::from(v.as_str().context("filename must be a string")?);
                         let sub_dir = task_type.to_str().to_lowercase();
                         if let Some(path) = dirs::abs_config(file, Some(sub_dir)) {
-                            *v = path.to_str().context("Invilid UTF-8")?.into();
+                            *v = path.try_into()?;
                         }
                     }
                 }
@@ -263,7 +262,7 @@ impl TaskConfig {
 
             // Set client type in task automatically
             if matches!(task_type, StartUp | Fight | CloseDown) {
-                params.insert("client_type", client_type.to_str());
+                insert!(*params, "client_type" => client_type.to_str());
             }
         }
 
@@ -1048,11 +1047,7 @@ mod tests {
                     tasks: vec![
                         InitializedTask::new(
                             Infrast,
-                            object!("filename" => dirs::abs_config("daily.json", Some("infrast"))
-                        .unwrap()
-                        .to_str()
-                        .unwrap()
-                        .to_string())
+                            object!("filename" => dirs::abs_config("daily.json", Some("infrast")).unwrap()??),
                         ),
                         InitializedTask::new(Infrast, object!("filename" => "/tmp/daily.json"))
                     ]
