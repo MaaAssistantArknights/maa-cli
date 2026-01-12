@@ -1,0 +1,12 @@
+[package]
+name = "maa-str-ext"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "String extension trait for converting various string-like types to UTF-8 String"
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true

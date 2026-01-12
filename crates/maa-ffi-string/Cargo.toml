@@ -8,6 +8,7 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
+maa-str-ext.workspace = true
 thiserror.workspace = true
 
 [lints]
