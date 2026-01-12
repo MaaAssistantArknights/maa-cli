@@ -103,7 +103,7 @@ impl Default for MAAValue {
 impl MAAValue {
     /// Initialize the value
     ///
-    /// If the value is an Primitive value, do nothing.
+    /// If the value is a primitive value, do nothing.
     /// If the value is an input value, try to get the value from user input and set it to the
     /// value. If the value is an array or an object, initialize all the values in it
     /// recursively. If the value is an optional value, initialize it only if all the
