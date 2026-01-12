@@ -13,8 +13,6 @@ pub enum Error {
     IndexOutOfRange { index: usize, len: usize },
     /// No default value available in batch mode
     NoDefaultInBatchMode,
-    /// Infallible
-    Infallible,
     /// Invalid UTF-8 encoding
     InvalidUtf8(maa_str_ext::Error),
     /// IO error occurred
@@ -31,7 +29,6 @@ impl fmt::Display for Error {
                 write!(f, "index out of range expected 1 - {len}, got {index}")
             }
             Self::NoDefaultInBatchMode => write!(f, "can not get default value in batch mode"),
-            Self::Infallible => unreachable!("An infallible error should never occur"),
             Self::InvalidUtf8(err) => write!(f, "{err}"),
             Self::Io(err) => write!(f, "I/O error: {err}"),
         }
@@ -45,12 +42,6 @@ impl std::error::Error for Error {
             Self::InvalidUtf8(err) => Some(err),
             _ => None,
         }
-    }
-}
-
-impl From<std::convert::Infallible> for Error {
-    fn from(_: std::convert::Infallible) -> Self {
-        Self::Infallible
     }
 }
 
@@ -73,6 +64,8 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use std::error::Error as StdError;
+
+    use maa_str_ext::ToUtf8String;
 
     use super::*;
 
@@ -106,6 +99,11 @@ mod tests {
             Error::Io(io::Error::other("test")).to_string(),
             "I/O error: test"
         );
+
+        let invalid_bytes = vec![0xFF];
+        let utf8_err = invalid_bytes.to_utf8_string().unwrap_err();
+        let utf8_err_str = utf8_err.to_string();
+        assert_eq!(Error::InvalidUtf8(utf8_err).to_string(), utf8_err_str);
     }
 
     #[test]
@@ -131,6 +129,10 @@ mod tests {
             format!("{:?}", Error::NoDefaultInBatchMode),
             "NoDefaultInBatchMode"
         );
+
+        let invalid_bytes = vec![0xFF];
+        let utf8_err = invalid_bytes.to_utf8_string().unwrap_err();
+        assert!(format!("{:?}", Error::InvalidUtf8(utf8_err)).starts_with("InvalidUtf8"));
     }
 
     #[test]
@@ -150,6 +152,14 @@ mod tests {
         let io_err = io::Error::other("test error");
         let err = Error::Io(io_err);
         assert!(err.source().is_some());
+
+        // Test that InvalidUtf8 error has a source
+        use maa_str_ext::ToUtf8String;
+        let invalid_bytes = vec![0xFF];
+        let utf8_err = invalid_bytes.to_utf8_string().unwrap_err();
+        let err = Error::InvalidUtf8(utf8_err);
+        assert!(err.source().is_some());
+        assert!(err.source().unwrap().is::<maa_str_ext::Error>());
     }
 
     #[test]
@@ -177,6 +187,14 @@ mod tests {
             assert!(matches!(err, Error::Io(_)));
             assert_eq!(err.to_string(), format!("I/O error: {}", msg));
         }
+    }
+
+    #[test]
+    fn from_maa_str_ext_error() {
+        let invalid_bytes = vec![0xFF];
+        let utf8_err = invalid_bytes.to_utf8_string().unwrap_err();
+        let err: Error = utf8_err.into();
+        assert!(matches!(err, Error::InvalidUtf8(_)));
     }
 
     #[test]

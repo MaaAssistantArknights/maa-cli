@@ -1378,10 +1378,7 @@ found"}"#,
                     .unwrap();
 
                 assert_push_path_into(
-                    &{
-                        use maa_str_ext::ToUtf8String;
-                        test_file.as_path().to_utf8_string().unwrap()
-                    },
+                    test_file.to_str().unwrap(),
                     0,
                     &test_root,
                     std::slice::from_ref(&test_file),

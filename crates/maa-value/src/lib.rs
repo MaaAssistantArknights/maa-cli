@@ -363,10 +363,6 @@ impl MAAValue {
     ///
     /// If the key already exists, the value will be replaced.
     ///
-    /// This method requires the value to implement `Into<MAAValue>`.
-    /// For types that only implement `TryInto<MAAValue>` (like `PathBuf` or `OsString`),
-    /// use [`Self::try_insert`] instead.
-    ///
     /// # Panics
     ///
     /// Panics if `self` is not an object variant.
