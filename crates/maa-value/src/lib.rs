@@ -694,12 +694,7 @@ impl<const N: usize, T: Into<MAAValue>> From<[T; N]> for MAAValue {
     }
 }
 
-// impl<T: Into<MAAValue>> From<Vec<T>> for MAAValue {
-//     fn from(value: Vec<T>) -> Self {
-//         Self::Array(value.into_iter().map(Into::into).collect())
-//     }
-// }
-
+// We can only implement TryFrom, not From, even for types whose conversions never fail.
 impl<T: TryInto<MAAValue>> TryFrom<Vec<T>> for MAAValue {
     type Error = T::Error;
 
