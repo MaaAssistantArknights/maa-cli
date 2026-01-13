@@ -2,7 +2,9 @@
 
 use std::path::PathBuf;
 
-use maa_value::{MAAValue, Result, insert, object};
+#[cfg(unix)]
+use maa_value::{MAAValue, Result};
+use maa_value::{insert, object};
 
 #[cfg(unix)]
 pub fn invalid_utf8_path() -> PathBuf {
