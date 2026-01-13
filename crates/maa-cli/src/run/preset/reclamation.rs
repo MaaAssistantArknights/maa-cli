@@ -1,4 +1,5 @@
 use color_print::cstr;
+use maa_value::{insert, object};
 
 use super::MAAValue;
 
@@ -69,15 +70,20 @@ impl super::ToTaskType for ReclamationParams {
 
 impl super::IntoParameters for ReclamationParams {
     fn into_parameters_no_context(self) -> anyhow::Result<MAAValue> {
-        let mut value = MAAValue::default();
-        value.insert("theme", self.theme.to_str());
-        value.insert("mode", self.mode);
+        let mut value = object! {
+            "theme" => self.theme.to_str(),
+            "mode" => self.mode,
+        };
 
         if self.mode == 1 {
-            value.insert("tools_to_craft", self.tools_to_craft);
-            value.insert("increase_mode", self.increase_mode);
-            value.insert("num_craft_batches", self.num_craft_batches);
+            insert!(
+                value,
+                "tools_to_craft" => self.tools_to_craft?,
+                "increase_mode" => self.increase_mode,
+                "num_craft_batches" => self.num_craft_batches,
+            );
         }
+
         Ok(value)
     }
 }

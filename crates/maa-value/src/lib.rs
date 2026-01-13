@@ -1,5 +1,8 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
+// Allow the proc-macro to reference types via `maa_value::` path even inside this crate
+extern crate self as maa_value;
+
 pub mod userinput;
 
 mod primitive;
@@ -12,6 +15,7 @@ pub use std::collections::BTreeMap as Map;
 mod error;
 pub use error::{Error, Result};
 pub use input::MAAInput;
+pub use maa_value_macro::{insert, object};
 use serde::{Deserialize, Serialize};
 
 // TODO: Zero-copy deserialization and reduce clone in init
@@ -101,24 +105,33 @@ impl Default for MAAValue {
 }
 
 impl MAAValue {
-    /// Initialize the value
+    /// Initializes the value by resolving all inputs and conditional fields.
     ///
-    /// If the value is a primitive value, do nothing.
-    /// If the value is an input value, try to get the value from user input and set it to the
-    /// value. If the value is an array or an object, initialize all the values in it
-    /// recursively. If the value is an optional value, initialize it only if all the
-    /// dependencies are satisfied.
+    /// This method recursively processes the value structure and performs the following
+    /// operations based on the variant:
+    ///
+    /// - **Primitive**: Returns the value unchanged.
+    /// - **Input**: Resolves the input by querying for user input and converts it to a primitive
+    ///   value.
+    /// - **Array**: Recursively initializes each element in the array.
+    /// - **Object**: Initializes all values in the object, handling optional fields based on their
+    ///   conditions. Uses topological sorting (depth-first search) to process fields in dependency
+    ///   order, ensuring that conditional dependencies are evaluated before the fields that depend
+    ///   on them.
+    /// - **Optional**: Must be contained within an object. The optional field is only initialized
+    ///   if all its condition dependencies are satisfied (i.e., the required fields exist in the
+    ///   object and match their expected values).
     ///
     /// # Errors
     ///
-    /// ## InvalidData
+    /// Returns an error in the following cases:
     ///
-    /// 1. If an optional value is not in an object, the error will be returned.
-    /// 2. If a circular dependencies are found, the error will be returned.
-    ///
-    /// ## Other
-    ///
-    /// Otherwise, if some value failed to initialize, forward the error.
+    /// - [`Error::OptionalNotInObject`]: An `Optional` variant is encountered outside of an object
+    ///   context.
+    /// - [`Error::CircularDependency`]: Circular dependencies are detected among optional fields in
+    ///   an object (e.g., field A depends on B, and B depends on A).
+    /// - Other errors: Any errors encountered during initialization of nested values are propagated
+    ///   upward.
     pub fn init(self) -> Result<Self> {
         use MAAValue::*;
         match self {
@@ -346,30 +359,69 @@ impl MAAValue {
         self.get_typed(key).unwrap_or(default)
     }
 
-    /// Insert a key-value pair into the object
+    /// Inserts a key-value pair into the object.
     ///
-    /// If the value is an object, the key-value pair will be inserted into the object.
-    /// If the key is already exist, the value will be replaced,
-    /// otherwise the key-value pair will be inserted.
+    /// If the key already exists, the value will be replaced.
     ///
     /// # Panics
     ///
-    /// If the value is not an object, the panic will be raised.
-    pub fn insert(&mut self, key: impl Into<String>, value: impl Into<Self>) {
+    /// Panics if `self` is not an object variant.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use maa_value::MAAValue;
+    ///
+    /// let mut obj = MAAValue::default();
+    /// obj.insert("key", "value".into());
+    /// obj.insert("count", 42.into());
+    ///
+    /// assert_eq!(obj.get("key").unwrap().as_str().unwrap(), "value");
+    /// assert_eq!(obj.get("count").unwrap().as_int().unwrap(), 42);
+    /// ```
+    pub fn insert(&mut self, key: impl Into<String>, value: Self) {
         if let Self::Object(map) = self {
-            map.insert(key.into(), value.into());
+            map.insert(key.into(), value);
         } else {
             panic!("value is not an object");
         }
     }
 
-    pub fn maybe_insert(&mut self, key: impl Into<String>, value: Option<impl Into<Self>>) {
+    /// Inserts a key-value pair into the object if the value is `Some`.
+    ///
+    /// If `value` is `None`, this method does nothing.
+    /// If the key already exists and `value` is `Some`, the value will be replaced.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `self` is not an object variant and `value` is `Some`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use maa_value::MAAValue;
+    ///
+    /// let mut obj = MAAValue::default();
+    /// obj.maybe_insert("present", Some("value".into()));
+    /// obj.maybe_insert("absent", None::<MAAValue>);
+    ///
+    /// assert_eq!(obj.get("present").unwrap().as_str().unwrap(), "value");
+    /// assert!(obj.get("absent").is_none());
+    /// ```
+    ///
+    /// # See also
+    ///
+    /// - [`Self::insert`] for unconditional insertion.
+    pub fn maybe_insert(&mut self, key: impl Into<String>, value: Option<Self>) {
         if let Some(value) = value {
             self.insert(key, value);
         }
     }
 
-    /// Get inner Primitive value if the value is Primitive.
+    /// Get the value if the value is primitive
+    ///
+    /// A primitive value can be a bool, int, float or string.
+    /// It can not be an array, object or input value.
     fn as_primitive(&self) -> Option<&MAAPrimitive> {
         match self {
             Self::Primitive(v) => Some(v),
@@ -506,7 +558,7 @@ impl MAAValue {
     /// assert_eq!(base, object!("a" => 1, "b" => 3, "c" => 4));
     /// ```
     ///
-    /// See also: [`merge_from`](Self::merge_from) for borrowing variant, [`join`](Self::join) for
+    /// See also: [`Self::merge_from`] for borrowing variant, [`join`](Self::join) for
     /// non-mutating variant
     pub fn merge(&mut self, other: Self) {
         match (self, other) {
@@ -537,8 +589,8 @@ impl MAAValue {
     ///
     /// # Performance
     ///
-    /// This variant clones values from `other`, making it less efficient than
-    /// [`merge`](Self::merge). Use this when you need to keep `other` after the merge.
+    /// This variant clones values from `other`, making it less efficient than [`Self::merge`].
+    /// Use this when you need to keep `other` after the merge.
     ///
     /// # Examples
     ///
@@ -554,8 +606,7 @@ impl MAAValue {
     /// assert_eq!(update, object!("b" => 3, "c" => 4));
     /// ```
     ///
-    /// See also: [`merge`](Self::merge) for owned variant, [`join`](Self::join) for non-mutating
-    /// variant
+    /// See also: [`Self::merge`] for owned variant, [`Self::join`] for non-mutating variant.
     pub fn merge_from(&mut self, other: &Self) {
         match (self, other) {
             (Self::Object(self_map), Self::Object(other_map)) => {
@@ -579,15 +630,16 @@ impl MAAValue {
     /// # Behavior
     ///
     /// - **Objects**: Recursively merges key-value pairs. If a key exists in both objects:
-    ///   - If both values are objects, they are recursively merged
-    ///   - Otherwise, the value from `other` replaces the value from `self` in the result
-    /// - **Non-objects**: Returns a copy/clone of `other`
+    ///   - If both values are objects, they are recursively merged.
+    ///   - Otherwise, the value from `other` replaces the value from `self` in the result.
+    /// - **Non-objects**: Returns a copy/clone of `other`.
     ///
     /// # Generic Parameter
     ///
     /// Accepts either `MAAValue` or `&MAAValue` for convenience:
-    /// - Passing an owned value uses [`merge`](Self::merge) internally (more efficient)
-    /// - Passing a reference uses [`merge_from`](Self::merge_from) internally
+    ///
+    /// - Passing an owned value uses [`Self::merge`] internally (more efficient).
+    /// - Passing a reference uses [`Self::merge_from`] internally.
     ///
     /// # Examples
     ///
@@ -606,7 +658,7 @@ impl MAAValue {
     /// // base and update are unchanged
     /// ```
     ///
-    /// See also: [`merge`](Self::merge), [`merge_from`](Self::merge_from) for mutating variants
+    /// See also: [`merge`](Self::merge), [`merge_from`](Self::merge_from) for mutating variants.
     pub fn join<'a, O: Into<Cow<'a, Self>>>(&self, other: O) -> Self {
         let mut ret = self.clone();
         let other = other.into();
@@ -630,50 +682,6 @@ impl<'a> From<&'a MAAValue> for Cow<'a, MAAValue> {
     }
 }
 
-#[macro_export]
-/// A convenient macro to create a MAAValue::Object
-///
-/// # Examples
-/// ```
-/// use maa_value::{MAAValue, object};
-///
-/// let object = object!(
-///     "bool" => true,
-///     "int" => 1,
-///     "float" => 1.0,
-///     "string" => "string",
-///     "array" => [1, 2],
-///     "object" => object!(
-///         "key1" => "value1",
-///         "key2" => "value2",
-///     ),
-///     "optional" if "bool" == true => 1,
-///     "optional_no_satisfied" if "bool" == false => 1,
-///     "optional_no_exist" if "no_exist" == true => 1,
-///     "optional_chian" if "optional" == true => 1,
-/// );
-/// ```
-macro_rules! object {
-    () => {
-        $crate::MAAValue::default()
-    };
-    ($($key:literal $(if $($cond_key:literal == $expected:expr),*)? => $value:expr),* $(,)?) => {{
-        let mut object = $crate::MAAValue::default();
-        $(
-            let value = $value;
-            $(
-                let mut conditions = $crate::Map::new();
-                $(
-                    conditions.insert($cond_key.into(), $expected.into());
-                )*
-                let value = $crate::MAAValue::Optional { conditions, value: value.into() };
-            )?
-            object.insert($key, value);
-        )*
-        object
-    }};
-}
-
 impl<const N: usize, S: Into<String>, V: Into<MAAValue>> From<[(S, V); N]> for MAAValue {
     fn from(value: [(S, V); N]) -> Self {
         Self::Object(Map::from(value.map(|(k, v)| (k.into(), v.into()))))
@@ -686,9 +694,17 @@ impl<const N: usize, T: Into<MAAValue>> From<[T; N]> for MAAValue {
     }
 }
 
-impl<T: Into<MAAValue>> From<Vec<T>> for MAAValue {
-    fn from(value: Vec<T>) -> Self {
-        Self::Array(value.into_iter().map(Into::into).collect())
+// We can only implement TryFrom, not From, even for types whose conversions never fail.
+impl<T: TryInto<MAAValue>> TryFrom<Vec<T>> for MAAValue {
+    type Error = T::Error;
+
+    fn try_from(value: Vec<T>) -> Result<Self, Self::Error> {
+        Ok(Self::Array(
+            value
+                .into_iter()
+                .map(TryInto::try_into)
+                .collect::<Result<Vec<_>, _>>()?,
+        ))
     }
 }
 
@@ -1041,7 +1057,7 @@ mod tests {
     fn insert() {
         let mut value = MAAValue::default();
         assert_eq!(value.get("int"), None);
-        value.insert("int", 1);
+        value.insert("int", 1.into());
         assert_eq!(value.get("int").unwrap().as_int().unwrap(), 1);
     }
 
@@ -1049,16 +1065,16 @@ mod tests {
     #[should_panic(expected = "value is not an object")]
     fn insert_panics() {
         let mut value = MAAValue::from(1);
-        value.insert("int", 1);
+        value.insert("int", 1.into());
     }
 
     #[test]
     fn maybe_insert() {
         let mut value = MAAValue::default();
         assert_eq!(value.get("int"), None);
-        value.maybe_insert("int", Some(1));
+        value.maybe_insert("int", Some(1.into()));
         assert_eq!(value.get("int").unwrap().as_int().unwrap(), 1);
-        value.maybe_insert("float", None::<f32>);
+        value.maybe_insert("float", None::<MAAValue>);
         assert_eq!(value.get("float"), None);
     }
 
@@ -1070,7 +1086,7 @@ mod tests {
             MAAValue::Array(vec![1.into(), 2.into()])
         );
         assert_eq!(
-            MAAValue::from(vec![1, 2]),
+            MAAValue::try_from(vec![1, 2]).unwrap(),
             MAAValue::Array(vec![1.into(), 2.into()])
         );
     }

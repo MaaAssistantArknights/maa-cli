@@ -8,7 +8,7 @@ use anyhow::{Context, Result, bail};
 use log::{debug, trace};
 use maa_sys::TaskType;
 use maa_value::{
-    MAAValue, object,
+    MAAValue, insert, object,
     userinput::{BoolInput, UserInput},
 };
 use prettytable::{Table, format, row};
@@ -92,13 +92,15 @@ struct StageOpts {
     is_raid: bool,
 }
 
-impl From<StageOpts> for MAAValue {
-    fn from(opts: StageOpts) -> Self {
-        object!(
-            "filename" => opts.filename.to_string_lossy().to_string(),
+impl TryFrom<StageOpts> for MAAValue {
+    type Error = maa_value::Error;
+
+    fn try_from(opts: StageOpts) -> Result<Self, Self::Error> {
+        Ok(object!(
+            "filename" => opts.filename?,
             "stage_name" => opts.stage_name,
             "is_raid" => opts.is_raid,
-        )
+        ))
     }
 }
 
@@ -206,16 +208,16 @@ impl IntoParameters for CopilotParams {
 
         // We also want all other parameters from overlay
         let mut params = default;
-        params.merge(object!(
+        insert!(params,
             "formation" => formation,
             "use_sanity_potion" => use_sanity_potion,
             "add_trust" => add_trust,
             "ignore_requirements" => ignore_requirements,
-            "copilot_list" => stage_list,
-        ));
-        params.maybe_insert("formation_index", self.formation_index);
-        params.maybe_insert("support_unit_usage", self.support_unit_usage);
-        params.maybe_insert("support_unit_name", self.support_unit_name);
+            "copilot_list" => stage_list?,
+            "formation_index" =>? self.formation_index,
+            "support_unit_usage" =>? self.support_unit_usage,
+            "support_unit_name" =>? self.support_unit_name
+        );
 
         Ok(params)
     }
@@ -310,7 +312,7 @@ impl IntoParameters for SSSCopilotParams {
         }
 
         let value = object!(
-            "filename" => file.to_str().context("Invalid file path")?,
+            "filename" => file?,
             "loop_times" => self.loop_times,
         );
 
@@ -548,19 +550,9 @@ impl IntoParameters for ParadoxCopilotParams {
     fn into_parameters_no_context(self) -> Result<MAAValue> {
         let copilot_files = resolve_copilot_uris(self.uri_list)?;
 
-        let file_paths: Vec<String> = copilot_files
-            .into_iter()
-            .map(|(_, file, _)| {
-                file.to_str()
-                    .context("Invalid file path")
-                    .map(|s| s.to_string())
-            })
-            .collect::<Result<Vec<_>>>()?;
+        let file_paths: Vec<PathBuf> = copilot_files.into_iter().map(|(_, file, _)| file).collect();
 
-        let mut value = MAAValue::default();
-        value.insert("list", file_paths);
-
-        Ok(value)
+        Ok(object!("list" => file_paths?))
     }
 }
 
@@ -665,9 +657,10 @@ found"}"#,
     }
 
     fn path_from_cache_dir(path: &str) -> String {
+        use maa_str_ext::ToUtf8String;
         join!(maa_dirs::cache(), "copilot", path)
-            .to_string_lossy()
-            .to_string()
+            .to_utf8_string()
+            .expect("Cache directory path contains invalid UTF-8")
     }
 
     mod copilot_params {
@@ -1556,7 +1549,7 @@ found"}"#,
 
                 assert_eq!(
                     params,
-                    object!("list" => vec![path_from_cache_dir("63896.json")])
+                    object!("list" => [path_from_cache_dir("63896.json")])
                 );
             }
         }

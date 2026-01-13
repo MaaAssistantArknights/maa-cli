@@ -2,7 +2,7 @@ use std::path::Path;
 
 use anyhow::{Result, bail};
 use maa_value::{
-    MAAValue, object,
+    MAAValue, insert, object,
     userinput::{BoolInput, Input, SelectD, ValueWithDesc},
 };
 
@@ -173,17 +173,17 @@ pub fn init(name: Option<&Path>, filetype: Option<super::Filetype>, force: bool)
             let adb_path = adb_path.as_str().unwrap();
             match adb_path {
                 "adb" => {} // default value
-                x => config.insert("adb_path", x),
+                x => insert!(config, "adb_path" => x),
             };
         }
 
         match obj.get("address").unwrap().as_str().unwrap() {
             "auto" => {}
-            x => config.insert("address", x),
+            x => insert!(config, "address" => x),
         };
         match obj.get("config").unwrap().as_str().unwrap() {
             "auto" => {}
-            x => config.insert("config", x),
+            x => insert!(config, "config" => x),
         };
         asst_config_out.insert("connection", config);
     }
@@ -199,11 +199,11 @@ pub fn init(name: Option<&Path>, filetype: Option<super::Filetype>, force: bool)
         );
         match obj.get("global_resource").unwrap().as_str().unwrap() {
             "None" => {}
-            x => config.insert("global_resource", x),
+            x => insert!(config, "global_resource" => x),
         };
         match obj.get("platform_diff_resource").unwrap().as_str().unwrap() {
             "None" => {}
-            x => config.insert("platform_diff_resource", x),
+            x => insert!(config, "platform_diff_resource" => x),
         };
         asst_config_out.insert("resource", config);
     }

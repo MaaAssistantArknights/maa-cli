@@ -1,6 +1,6 @@
 use anyhow::{Context, bail};
+use maa_value::{MAAValue, insert, object};
 
-use super::MAAValue;
 use crate::config::task::ClientType;
 
 #[derive(clap::Args)]
@@ -66,16 +66,21 @@ impl super::ToTaskType for FightParams {
 
 impl super::IntoParameters for FightParams {
     fn into_parameters_no_context(self) -> anyhow::Result<MAAValue> {
-        let mut params = MAAValue::default();
+        let mut params = object!(
+            "stage" => self.stage.unwrap_or_default(),
+            "DrGrandet" => self.dr_grandet
+        );
 
-        params.insert("stage", self.stage.unwrap_or_default());
+        // Fight conditions - optional parameters
+        insert!(params,
+            "medicine" =>? self.medicine,
+            "expiring_medicine" =>? self.expiring_medicine,
+            "stone" =>? self.stone,
+            "times" =>? self.times,
+            "series" =>? self.series
+        );
 
-        // Fight conditions
-        params.maybe_insert("medicine", self.medicine);
-        params.maybe_insert("expiring_medicine", self.expiring_medicine);
-        params.maybe_insert("stone", self.stone);
-        params.maybe_insert("times", self.times);
-
+        // Drops handling
         let drops = self.drops;
         if !drops.is_empty() {
             let mut drop_map = std::collections::BTreeMap::new();
@@ -99,27 +104,32 @@ impl super::IntoParameters for FightParams {
                 }
             }
 
-            params.insert("drops", MAAValue::Object(drop_map));
+            insert!(params, "drops" => MAAValue::Object(drop_map));
         }
 
-        params.maybe_insert("series", self.series);
-
+        // Penguin Statistics reporting
         if self.report_to_penguin {
-            params.insert("report_to_penguin", true);
-            params.maybe_insert("penguin_id", self.penguin_id);
+            insert!(params,
+                "report_to_penguin" => true,
+                "penguin_id" =>? self.penguin_id
+            );
         }
 
+        // Yituliu reporting
         if self.report_to_yituliu {
-            params.insert("report_to_yituliu", true);
-            params.maybe_insert("yituliu_id", self.yituliu_id);
+            insert!(params,
+                "report_to_yituliu" => true,
+                "yituliu_id" =>? self.yituliu_id
+            );
         }
 
+        // Client type
         if let Some(client_type) = self.client_type {
-            params.insert("client_type", client_type.to_str());
-            params.maybe_insert("server", client_type.server_report());
+            insert!(params,
+                "client_type" => client_type.to_str(),
+                "server" =>? client_type.server_report()
+            );
         }
-
-        params.insert("DrGrandet", self.dr_grandet);
 
         Ok(params)
     }

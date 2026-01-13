@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use maa_sys::TaskType;
-use maa_value::MAAValue;
+use maa_value::{MAAValue, insert, object};
 
 use crate::config::{
     FindFileOrDefault,
@@ -75,11 +75,10 @@ impl IntoParameters for StartUpParams {
         let mut value = MAAValue::default();
 
         if let Some(client_type) = self.client_type {
-            value.insert("start_game_enabled", true);
-            value.insert("client_type", client_type.to_str());
+            insert!(value, "start_game_enabled" => true, "client_type" => client_type.to_str());
         }
 
-        value.maybe_insert("account_name", self.account_name);
+        insert!(value, "account_name" =>? self.account_name);
 
         Ok(value)
     }
@@ -99,9 +98,7 @@ impl ToTaskType for CloseDownParams {
 
 impl IntoParameters for CloseDownParams {
     fn into_parameters_no_context(self) -> Result<MAAValue> {
-        let mut value = MAAValue::default();
-        value.insert("client_type", self.client.to_str());
-        Ok(value)
+        Ok(object! { "client_type" => self.client.to_str() })
     }
 }
 
@@ -155,7 +152,7 @@ mod tests {
             fn into_parameters_no_context(self) -> Result<MAAValue> {
                 let mut value = MAAValue::default();
                 if let Some(bar) = self.bar {
-                    value.insert("bar", bar);
+                    insert!(value, "bar" => bar);
                 }
                 Ok(value)
             }

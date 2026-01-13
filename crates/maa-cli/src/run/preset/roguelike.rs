@@ -1,7 +1,6 @@
 use anyhow::bail;
 use clap::ValueEnum;
-
-use super::MAAValue;
+use maa_value::{MAAValue, insert, object};
 
 #[repr(i8)]
 #[cfg_attr(test, derive(PartialEq, Debug))]
@@ -150,8 +149,6 @@ impl super::ToTaskType for RoguelikeParams {
 
 impl super::IntoParameters for RoguelikeParams {
     fn into_parameters_no_context(self) -> anyhow::Result<MAAValue> {
-        let mut value = MAAValue::default();
-
         let theme = self.theme;
         let mode = self.mode;
 
@@ -163,90 +160,83 @@ impl super::IntoParameters for RoguelikeParams {
             _ => bail!("Mode must be in range between 0 and 5"),
         }
 
-        value.insert("theme", self.theme.to_str());
-        value.insert("mode", self.mode);
+        let mut value = object!(
+            "theme" => self.theme.to_str(),
+            "mode" => self.mode,
+            "squad" =>? self.squad,
+            "roles" =>? self.roles,
+            "core_char" =>? self.core_char,
+            "start_count" =>? self.start_count,
+            "stop_at_final_boss" => self.stop_at_final_boss,
+        );
 
-        value.maybe_insert("squad", self.squad);
-        value.maybe_insert("roles", self.roles);
-        value.maybe_insert("core_char", self.core_char);
-
-        value.maybe_insert("start_count", self.start_count);
-
+        // Difficulty setting (not valid for Phantom theme)
         if matches!(theme, Theme::Phantom) {
             if self.difficulty.is_some() {
                 log::warn!("Difficulty is not valid for Phantom theme, ignored");
             }
         } else {
-            value.maybe_insert("difficulty", self.difficulty);
+            insert!(value, "difficulty" =>? self.difficulty);
         }
 
+        // Investment mode settings
         if self.disable_investment {
-            value.insert("investment_enabled", false);
+            value.insert("investment_enabled", false.into());
         } else {
-            value.insert("investment_enabled", true);
-            value.maybe_insert("investments_count", self.investments_count);
-            value.insert(
-                "investment_with_more_score",
-                self.investment_with_more_score,
-            );
-            value.insert(
-                "stop_when_investment_full",
-                !self.no_stop_when_investment_full,
+            insert!(value,
+                "investment_enabled" => true,
+                "investments_count" =>? self.investments_count,
+                "investment_with_more_score" => self.investment_with_more_score,
+                "stop_when_investment_full" => !self.no_stop_when_investment_full,
             );
         }
 
+        // Support unit settings
         if self.use_support {
-            value.insert("use_support", true);
-            value.insert("use_nonfriend_support", self.use_nonfriend_support);
+            insert!(value,
+                "use_support" => true,
+                "use_nonfriend_support" => self.use_nonfriend_support
+            );
         }
 
+        // Elite settings
         if self.start_with_elite_two {
-            value.insert("start_with_elite_two", true);
-            value.insert("only_start_with_elite_two", self.only_start_with_elite_two);
+            insert!(value,
+                "start_with_elite_two" => true,
+                "only_start_with_elite_two" => self.only_start_with_elite_two
+            );
         }
-
-        value.insert("stop_at_final_boss", self.stop_at_final_boss);
 
         // Theme specific parameters
         match theme {
             Theme::Mizuki => {
-                value.insert("refresh_trader_with_dice", self.refresh_trader_with_dice);
+                value.insert(
+                    "refresh_trader_with_dice",
+                    self.refresh_trader_with_dice.into(),
+                );
             }
             Theme::Sami => {
-                value.insert("use_foldartal", self.use_foldartal);
+                value.insert("use_foldartal", self.use_foldartal.into());
                 if !self.start_foldartals.is_empty() {
-                    value.insert(
-                        "start_foldartal_list",
-                        MAAValue::Array(
-                            self.start_foldartals
-                                .into_iter()
-                                .map(MAAValue::from)
-                                .collect(),
-                        ),
-                    );
+                    insert!(value, "start_foldartal_list" => self.start_foldartals?);
                 }
 
                 if mode == 5 {
-                    value.insert("check_collapsal_paradigms", true);
-                    value.insert("double_check_collapsal_paradigms", true);
                     if self.expected_collapsal_paradigms.is_empty() {
                         bail!(
                             "At least one expected collapsal paradigm is required when mode 5 is enabled"
                         );
                     }
-                    value.insert(
-                        "expected_collapsal_paradigms",
-                        MAAValue::Array(
-                            self.expected_collapsal_paradigms
-                                .into_iter()
-                                .map(MAAValue::from)
-                                .collect(),
-                        ),
+                    insert!(value,
+                        "check_collapsal_paradigms" => true,
+                        "double_check_collapsal_paradigms" => true,
+                        "expected_collapsal_paradigms" => self.expected_collapsal_paradigms?,
+
                     );
                 }
             }
             Theme::Sarkaz if mode == 1 => {
-                value.insert("start_with_seed", self.start_with_seed);
+                insert!(value, "start_with_seed" => self.start_with_seed);
             }
             _ => {}
         }

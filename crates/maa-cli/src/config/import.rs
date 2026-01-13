@@ -545,6 +545,8 @@ mod tests {
     }
 
     mod import_to {
+        use maa_str_ext::ToUtf8String;
+
         use super::*;
 
         fn setup() -> (tempfile::TempDir, PathBuf) {
@@ -563,13 +565,14 @@ mod tests {
         }
 
         mod cli {
+
             use super::*;
 
             #[test]
             fn rejects_non_cli_name() {
                 let (tmp_dir, config_dir) = setup();
                 let opts = ImportOptions {
-                    src: tmp_dir.path().join("test").to_str().unwrap().to_string(),
+                    src: tmp_dir.path().join("test").to_utf8_string().unwrap(),
                     name: None,
                     force: false,
                     config_type: ConfigType::Cli,
@@ -581,12 +584,7 @@ mod tests {
             fn rejects_wrong_stem() {
                 let (tmp_dir, config_dir) = setup();
                 let opts = ImportOptions {
-                    src: tmp_dir
-                        .path()
-                        .join("test.json")
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
+                    src: tmp_dir.path().join("test.json").to_utf8_string().unwrap(),
                     name: None,
                     force: false,
                     config_type: ConfigType::Cli,
@@ -598,12 +596,7 @@ mod tests {
             fn imports_valid_cli_config() {
                 let (tmp_dir, config_dir) = setup();
                 let opts = ImportOptions {
-                    src: tmp_dir
-                        .path()
-                        .join("cli.json")
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
+                    src: tmp_dir.path().join("cli.json").to_utf8_string().unwrap(),
                     name: None,
                     force: false,
                     config_type: ConfigType::Cli,
@@ -615,12 +608,7 @@ mod tests {
             #[test]
             fn duplicate_fails_without_force() {
                 let (tmp_dir, config_dir) = setup();
-                let src = tmp_dir
-                    .path()
-                    .join("cli.json")
-                    .to_str()
-                    .unwrap()
-                    .to_string();
+                let src = tmp_dir.path().join("cli.json").to_utf8_string().unwrap();
 
                 let opts1 = ImportOptions {
                     src: src.clone(),
@@ -642,12 +630,7 @@ mod tests {
             #[test]
             fn duplicate_succeeds_with_force() {
                 let (tmp_dir, config_dir) = setup();
-                let src = tmp_dir
-                    .path()
-                    .join("cli.json")
-                    .to_str()
-                    .unwrap()
-                    .to_string();
+                let src = tmp_dir.path().join("cli.json").to_utf8_string().unwrap();
 
                 let opts1 = ImportOptions {
                     src: src.clone(),
@@ -674,12 +657,7 @@ mod tests {
             fn imports_to_tasks_subdir() {
                 let (tmp_dir, config_dir) = setup();
                 let opts = ImportOptions {
-                    src: tmp_dir
-                        .path()
-                        .join("test.json")
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
+                    src: tmp_dir.path().join("test.json").to_utf8_string().unwrap(),
                     name: None,
                     force: false,
                     config_type: ConfigType::Task,
@@ -693,12 +671,7 @@ mod tests {
                 let (tmp_dir, config_dir) = setup();
 
                 let opts1 = ImportOptions {
-                    src: tmp_dir
-                        .path()
-                        .join("test.json")
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
+                    src: tmp_dir.path().join("test.json").to_utf8_string().unwrap(),
                     name: None,
                     force: false,
                     config_type: ConfigType::Task,
@@ -706,12 +679,7 @@ mod tests {
                 import_to(opts1, &config_dir).unwrap();
 
                 let opts2 = ImportOptions {
-                    src: tmp_dir
-                        .path()
-                        .join("test.yml")
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
+                    src: tmp_dir.path().join("test.yml").to_utf8_string().unwrap(),
                     name: None,
                     force: false,
                     config_type: ConfigType::Task,
@@ -724,12 +692,7 @@ mod tests {
                 let (tmp_dir, config_dir) = setup();
 
                 let opts1 = ImportOptions {
-                    src: tmp_dir
-                        .path()
-                        .join("test.json")
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
+                    src: tmp_dir.path().join("test.json").to_utf8_string().unwrap(),
                     name: None,
                     force: false,
                     config_type: ConfigType::Task,
@@ -737,12 +700,7 @@ mod tests {
                 import_to(opts1, &config_dir).unwrap();
 
                 let opts2 = ImportOptions {
-                    src: tmp_dir
-                        .path()
-                        .join("test.yml")
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
+                    src: tmp_dir.path().join("test.yml").to_utf8_string().unwrap(),
                     name: None,
                     force: true,
                     config_type: ConfigType::Task,
@@ -757,12 +715,7 @@ mod tests {
             fn rejects_unsupported_extension() {
                 let (tmp_dir, config_dir) = setup();
                 let opts = ImportOptions {
-                    src: tmp_dir
-                        .path()
-                        .join("test.ini")
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
+                    src: tmp_dir.path().join("test.ini").to_utf8_string().unwrap(),
                     name: None,
                     force: false,
                     config_type: ConfigType::Task,
@@ -774,12 +727,7 @@ mod tests {
             fn custom_name_overrides_filename() {
                 let (tmp_dir, config_dir) = setup();
                 let opts = ImportOptions {
-                    src: tmp_dir
-                        .path()
-                        .join("test.json")
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
+                    src: tmp_dir.path().join("test.json").to_utf8_string().unwrap(),
                     name: Some("custom.json".to_string()),
                     force: false,
                     config_type: ConfigType::Task,
@@ -797,12 +745,7 @@ mod tests {
             fn imports_to_infrast_subdir() {
                 let (tmp_dir, config_dir) = setup();
                 let opts = ImportOptions {
-                    src: tmp_dir
-                        .path()
-                        .join("test.json")
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
+                    src: tmp_dir.path().join("test.json").to_utf8_string().unwrap(),
                     name: None,
                     force: false,
                     config_type: ConfigType::Infrast,
@@ -815,12 +758,7 @@ mod tests {
             fn accepts_any_extension() {
                 let (tmp_dir, config_dir) = setup();
                 let opts = ImportOptions {
-                    src: tmp_dir
-                        .path()
-                        .join("test.ini")
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
+                    src: tmp_dir.path().join("test.ini").to_utf8_string().unwrap(),
                     name: None,
                     force: false,
                     config_type: ConfigType::Infrast,
@@ -832,12 +770,7 @@ mod tests {
             #[test]
             fn duplicate_fails_without_force() {
                 let (tmp_dir, config_dir) = setup();
-                let src = tmp_dir
-                    .path()
-                    .join("test.json")
-                    .to_str()
-                    .unwrap()
-                    .to_string();
+                let src = tmp_dir.path().join("test.json").to_utf8_string().unwrap();
 
                 let opts1 = ImportOptions {
                     src: src.clone(),
@@ -859,12 +792,7 @@ mod tests {
             #[test]
             fn duplicate_succeeds_with_force() {
                 let (tmp_dir, config_dir) = setup();
-                let src = tmp_dir
-                    .path()
-                    .join("test.json")
-                    .to_str()
-                    .unwrap()
-                    .to_string();
+                let src = tmp_dir.path().join("test.json").to_utf8_string().unwrap();
 
                 let opts1 = ImportOptions {
                     src: src.clone(),
@@ -891,12 +819,7 @@ mod tests {
             fs::write(tmp_dir.path().join("test.json"), "{}").unwrap();
 
             let opts = ImportOptions {
-                src: tmp_dir
-                    .path()
-                    .join("test.json")
-                    .to_str()
-                    .unwrap()
-                    .to_string(),
+                src: tmp_dir.path().join("test.json").to_utf8_string().unwrap(),
                 name: None,
                 force: false,
                 config_type: ConfigType::Test,
@@ -964,9 +887,8 @@ mod tests {
                     src: tmp_dir
                         .path()
                         .join("nonexistent.json")
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
+                        .to_utf8_string()
+                        .unwrap(),
                     name: None,
                     force: false,
                     config_type: ConfigType::Task,
@@ -1030,12 +952,7 @@ mod tests {
                 fs::write(tmp_dir.path().join("wrong.json"), "{}").unwrap();
 
                 let opts = ImportOptions {
-                    src: tmp_dir
-                        .path()
-                        .join("wrong.json")
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
+                    src: tmp_dir.path().join("wrong.json").to_utf8_string().unwrap(),
                     name: None,
                     force: false,
                     config_type: ConfigType::Cli,
@@ -1059,12 +976,7 @@ mod tests {
                 fs::write(tmp_dir.path().join("test.txt"), "content").unwrap();
 
                 let opts = ImportOptions {
-                    src: tmp_dir
-                        .path()
-                        .join("test.txt")
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
+                    src: tmp_dir.path().join("test.txt").to_utf8_string().unwrap(),
                     name: None,
                     force: false,
                     config_type: ConfigType::Task,

@@ -1,3 +1,8 @@
+use std::{
+    ffi::{OsStr, OsString},
+    path::{Path, PathBuf},
+};
+
 use serde::{Deserialize, Serialize};
 
 use super::MAAValue;
@@ -92,6 +97,42 @@ impl From<&str> for MAAPrimitive {
     }
 }
 
+impl TryFrom<&OsStr> for MAAPrimitive {
+    type Error = crate::Error;
+
+    fn try_from(v: &OsStr) -> Result<Self, Self::Error> {
+        use maa_str_ext::ToUtf8String;
+        Ok(Self::String(v.to_utf8_string()?))
+    }
+}
+
+impl TryFrom<OsString> for MAAPrimitive {
+    type Error = crate::Error;
+
+    fn try_from(v: OsString) -> Result<Self, Self::Error> {
+        use maa_str_ext::ToUtf8String;
+        Ok(Self::String(v.to_utf8_string()?))
+    }
+}
+
+impl TryFrom<&Path> for MAAPrimitive {
+    type Error = crate::Error;
+
+    fn try_from(v: &Path) -> Result<Self, Self::Error> {
+        use maa_str_ext::ToUtf8String;
+        Ok(Self::String(v.to_utf8_string()?))
+    }
+}
+
+impl TryFrom<PathBuf> for MAAPrimitive {
+    type Error = crate::Error;
+
+    fn try_from(v: PathBuf) -> Result<Self, Self::Error> {
+        use maa_str_ext::ToUtf8String;
+        Ok(Self::String(v.to_utf8_string()?))
+    }
+}
+
 impl From<MAAPrimitive> for MAAValue {
     fn from(v: MAAPrimitive) -> Self {
         Self::Primitive(v)
@@ -111,6 +152,22 @@ macro_rules! impl_from {
 }
 
 impl_from!(bool, i32, f32, String, &str);
+
+macro_rules! impl_try_from {
+    ($($t:ty),*) => {
+        $(
+            impl TryFrom<$t> for MAAValue {
+                type Error = crate::Error;
+
+                fn try_from(v: $t) -> Result<Self, Self::Error> {
+                    Ok(Self::Primitive(v.try_into()?))
+                }
+            }
+        )*
+    };
+}
+
+impl_try_from!(&OsStr, OsString, &Path, PathBuf);
 
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -265,5 +322,82 @@ mod tests {
         let long_string = "a".repeat(10000);
         let primitive: MAAPrimitive = long_string.as_str().into();
         assert_eq!(primitive.as_str(), Some(long_string.as_str()));
+    }
+
+    #[test]
+    fn try_from_os_str() {
+        use OsStr;
+
+        // Test valid UTF-8 OsStr
+        let os_str = OsStr::new("hello");
+        let primitive = MAAPrimitive::try_from(os_str).unwrap();
+        assert_eq!(primitive, MAAPrimitive::String("hello".to_string()));
+
+        // Test with path-like strings
+        let os_str = OsStr::new("/usr/local/bin");
+        let primitive = MAAPrimitive::try_from(os_str).unwrap();
+        assert_eq!(
+            primitive,
+            MAAPrimitive::String("/usr/local/bin".to_string())
+        );
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::ffi::OsStrExt;
+            // Test invalid UTF-8 OsStr
+            let invalid = OsStr::from_bytes(&[0xFF, 0xFE, 0xFD]);
+            let result = MAAPrimitive::try_from(invalid);
+            assert!(result.is_err());
+        }
+    }
+
+    #[test]
+    fn try_from_os_string() {
+        use OsString;
+
+        // Test valid UTF-8 OsString
+        let os_string = OsString::from("world");
+        let primitive = MAAPrimitive::try_from(os_string).unwrap();
+        assert_eq!(primitive, MAAPrimitive::String("world".to_string()));
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::ffi::OsStringExt;
+            // Test invalid UTF-8 OsString
+            let invalid = OsString::from_vec(vec![0xFF, 0xFE, 0xFD]);
+            let result = MAAPrimitive::try_from(invalid);
+            assert!(result.is_err());
+        }
+    }
+
+    #[test]
+    fn try_from_path() {
+        // Test valid UTF-8 Path
+        let path = Path::new("/etc/config");
+        let primitive = MAAPrimitive::try_from(path).unwrap();
+        assert_eq!(primitive, MAAPrimitive::String("/etc/config".to_string()));
+
+        // Test relative path
+        let path = Path::new("./relative/path");
+        let primitive = MAAPrimitive::try_from(path).unwrap();
+        assert_eq!(
+            primitive,
+            MAAPrimitive::String("./relative/path".to_string())
+        );
+    }
+
+    #[test]
+    fn try_from_pathbuf() {
+        // Test valid UTF-8 PathBuf
+        let pathbuf = PathBuf::from("/usr/local");
+        let primitive = MAAPrimitive::try_from(pathbuf).unwrap();
+        assert_eq!(primitive, MAAPrimitive::String("/usr/local".to_string()));
+
+        // Test with multiple components
+        let mut pathbuf = PathBuf::from("/home");
+        pathbuf.push("user");
+        pathbuf.push("documents");
+        let primitive = MAAPrimitive::try_from(pathbuf.clone()).unwrap();
+        assert_eq!(primitive.as_str(), Some(pathbuf.to_str().unwrap()));
     }
 }

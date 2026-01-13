@@ -10,6 +10,8 @@ license.workspace = true
 
 [dependencies]
 log = { workspace = true }
+maa-str-ext = { workspace = true }
+maa-value-macro = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 
