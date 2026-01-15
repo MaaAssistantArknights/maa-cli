@@ -268,9 +268,10 @@ impl MapOps for ResolvedMAAValue {
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
+    use maa_value_macro::object;
+
     use super::*;
     use crate::convert::AsPrimitive;
-    use maa_value_macro::object;
 
     #[test]
     fn get() {
@@ -355,13 +356,13 @@ mod tests {
 
         let value = object!(
             "int" => 42,
-            "float" => 3.14,
+            "float" => 2.14,
             "string" => "hello"
         );
 
         // Test successful type conversions
         assert_eq!(value.get_typed::<Int>("int"), Some(42));
-        assert_eq!(value.get_typed::<Float>("float"), Some(3.14));
+        assert_eq!(value.get_typed::<Float>("float"), Some(2.14));
         assert_eq!(value.get_typed::<&str>("string"), Some("hello"));
 
         // Test type mismatch returns None
