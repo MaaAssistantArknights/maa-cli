@@ -291,14 +291,14 @@ impl<'a> From<&'a ResolvedMAAValue> for Cow<'a, ResolvedMAAValue> {
 mod tests {
     use std::num::NonZero;
 
+    use maa_value_macro::object;
+
+    use super::*;
     use crate::{
         error::Error,
         map::MapOps,
         userinput::{BoolInput, Input, SelectD},
     };
-    use maa_value_macro::object;
-
-    use super::*;
 
     fn sstr(s: &str) -> Option<String> {
         Some(s.to_string())

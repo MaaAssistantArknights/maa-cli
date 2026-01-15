@@ -65,8 +65,9 @@ mod tests {
 
     #[test]
     fn into_vec() {
-        use crate::Outcome;
         use maa_value_macro::object;
+
+        use crate::Outcome;
 
         // Test with array - extracts owned Vec
         let array_value = MAAValue::from([1, 2, 3]);
@@ -160,7 +161,6 @@ mod tests {
         // Test modifications persist through the reference
         vec[0] = 10.into();
         vec.push(4.into());
-        drop(vec); // Drop the reference
 
         // Verify modifications persisted
         let slice = array_value.as_slice().unwrap();
@@ -174,7 +174,6 @@ mod tests {
         let vec = empty_value.as_mut_vec().unwrap();
         assert_eq!(vec.len(), 0);
         vec.push(1.into());
-        drop(vec);
         assert_eq!(empty_value.as_slice().unwrap().len(), 1);
 
         // Test with non-array values (should return None)
