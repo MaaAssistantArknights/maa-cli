@@ -1,6 +1,6 @@
 use anyhow::bail;
 use clap::ValueEnum;
-use maa_value::{MAAValue, insert, object};
+use maa_value::prelude::*;
 
 #[repr(i8)]
 #[cfg_attr(test, derive(PartialEq, Debug))]
@@ -248,7 +248,6 @@ impl super::IntoParameters for RoguelikeParams {
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
-    use maa_value::object;
 
     use super::*;
     use crate::command::{Command, parse_from};

@@ -25,7 +25,7 @@ use parsing::{InsertMacroInput, ObjectMacroInput};
 ///
 /// # Examples
 /// ```
-/// use maa_value::{MAAValue, object};
+/// use maa_value::prelude::*;
 ///
 /// let object = object!(
 ///     "bool" => true,
@@ -47,7 +47,7 @@ use parsing::{InsertMacroInput, ObjectMacroInput};
 /// With optional values (uses `maybe_insert`, skips if `None`):
 ///
 /// ```
-/// use maa_value::{MAAValue, object};
+/// use maa_value::prelude::*;
 ///
 /// let optional_value: Option<i32> = Some(10);
 /// let obj = object!(
@@ -59,7 +59,7 @@ use parsing::{InsertMacroInput, ObjectMacroInput};
 /// With fallible conversion (propagates error with `?`):
 ///
 /// ```
-/// use maa_value::{MAAValue, object, Result};
+/// use maa_value::{error::Result, prelude::*};
 ///
 /// fn example(some_path: &std::path::Path) -> Result<MAAValue> {
 ///     Ok(object!(
@@ -71,7 +71,7 @@ use parsing::{InsertMacroInput, ObjectMacroInput};
 /// With fallible conversion outside Result context (panics on error with `??`):
 ///
 /// ```
-/// use maa_value::{MAAValue, object};
+/// use maa_value::prelude::*;
 /// use std::path::Path;
 ///
 /// let some_path = Path::new("/tmp/test");
@@ -83,7 +83,7 @@ use parsing::{InsertMacroInput, ObjectMacroInput};
 /// Combining optional and fallible conversion:
 ///
 /// ```
-/// use maa_value::{MAAValue, object, Result};
+/// use maa_value::{error::Result, prelude::*};
 /// use std::path::PathBuf;
 ///
 /// fn example(opt_path: Option<PathBuf>) -> Result<MAAValue> {
@@ -122,7 +122,7 @@ pub fn object(input: TokenStream) -> TokenStream {
 /// # Examples
 ///
 /// ```
-/// use maa_value::{MAAValue, object, insert};
+/// use maa_value::prelude::*;
 ///
 /// let mut obj = object!("existing" => "value");
 /// insert!(obj,
@@ -138,7 +138,7 @@ pub fn object(input: TokenStream) -> TokenStream {
 /// With optional values:
 ///
 /// ```
-/// use maa_value::{MAAValue, object, insert};
+/// use maa_value::prelude::*;
 ///
 /// let mut obj = object!("base" => "value");
 /// let optional: Option<i32> = Some(10);
