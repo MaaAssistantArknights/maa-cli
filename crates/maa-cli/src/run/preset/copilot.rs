@@ -6,10 +6,7 @@ use std::{
 use anyhow::{Context, Result, bail};
 use log::{debug, trace, warn};
 use maa_types::TaskType;
-use maa_value::{
-    MAAValue, insert, object,
-    userinput::{BoolInput, UserInput},
-};
+use maa_value::prelude::*;
 use prettytable::{Table, format, row};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use ureq::http::StatusCode;
@@ -140,7 +137,7 @@ struct StageOpts {
 }
 
 impl TryFrom<StageOpts> for MAAValue {
-    type Error = maa_value::Error;
+    type Error = maa_value::error::Error;
 
     fn try_from(opts: StageOpts) -> Result<Self, Self::Error> {
         Ok(object!(

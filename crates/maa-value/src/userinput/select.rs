@@ -10,7 +10,7 @@ use std::{
 use serde::Deserialize;
 
 use super::{Outcome, UserInput};
-use crate::{Error, Result};
+use crate::error::{Error, Result};
 
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -30,7 +30,6 @@ pub struct Select<S> {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawSelect<S> {
-    #[serde(default = "Vec::<S>::new")]
     alternatives: Vec<S>,
     #[serde(default)]
     default_index: Option<NonZero<usize>>,
@@ -432,7 +431,7 @@ mod tests {
             SelectD::<String>::from_iter::<&str, [_; 0]>([], None)
                 .unwrap_err()
                 .to_string(),
-            "alternatives is empty"
+            "Selection input has an empty alternatives list"
         );
 
         assert!(matches!(
