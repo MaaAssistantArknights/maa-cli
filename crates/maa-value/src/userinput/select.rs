@@ -10,7 +10,7 @@ use std::{
 use serde::Deserialize;
 
 use super::{Outcome, UserInput};
-use crate::{Error, Result};
+use crate::error::{Error, Result};
 
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, PartialEq, Deserialize)]

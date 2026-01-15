@@ -1,9 +1,9 @@
 use serde::Deserialize;
 
-use super::{
-    MAAValue,
+use crate::{
     primitive::MAAPrimitive,
     userinput::{BoolInput, Input, SelectD, UserInput},
+    value::MAAValue,
 };
 
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -20,7 +20,7 @@ pub enum MAAInput {
 }
 
 impl MAAInput {
-    pub(super) fn into_primitive(self) -> crate::Result<MAAPrimitive> {
+    pub(super) fn into_primitive(self) -> crate::error::Result<MAAPrimitive> {
         use MAAInput::*;
         use MAAPrimitive::*;
         match self {

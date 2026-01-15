@@ -2,9 +2,7 @@
 
 use std::path::PathBuf;
 
-#[cfg(unix)]
-use maa_value::{MAAValue, Result};
-use maa_value::{insert, object};
+use maa_value::{error::Result, prelude::*};
 
 #[cfg(unix)]
 pub fn invalid_utf8_path() -> PathBuf {
@@ -253,7 +251,7 @@ fn object_conditional_maybe_try_unwrap_success() {
         "conditional" if "flag" == true =>? some_valid??
     );
 
-    let initialized = obj.init().unwrap();
+    let initialized = obj.resolve().unwrap();
     assert_eq!(
         initialized.get("conditional").unwrap().as_str(),
         Some("/valid/path")
@@ -269,7 +267,7 @@ fn object_conditional_maybe_try_unwrap_none() {
         "conditional" if "flag" == true =>? none_value??
     );
 
-    let initialized = obj.init().unwrap();
+    let initialized = obj.resolve().unwrap();
     assert!(initialized.get("conditional").is_none());
 }
 
@@ -300,7 +298,7 @@ fn insert_conditional_maybe_try_unwrap_success() {
         "conditional" if "flag" == true =>? some_valid??
     );
 
-    let initialized = obj.init().unwrap();
+    let initialized = obj.resolve().unwrap();
     assert_eq!(
         initialized.get("conditional").unwrap().as_str(),
         Some("/test")

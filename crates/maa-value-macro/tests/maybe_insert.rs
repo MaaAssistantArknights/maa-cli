@@ -1,6 +1,6 @@
 //! Maybe insert tests (=>? operator)
 
-use maa_value::object;
+use maa_value::prelude::*;
 
 #[test]
 fn maybe_insert_some() {
