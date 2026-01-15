@@ -40,7 +40,7 @@ use parsing::{InsertMacroInput, ObjectMacroInput};
 ///     "optional" if "bool" == true => 1,
 ///     "optional_no_satisfied" if "bool" == false => 1,
 ///     "optional_no_exist" if "no_exist" == true => 1,
-///     "optional_chian" if "optional" == true => 1,
+///     "optional_chain" if "optional" == true => 1,
 /// );
 /// ```
 ///

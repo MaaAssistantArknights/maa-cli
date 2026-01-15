@@ -27,7 +27,7 @@ pub enum MAAValue {
     Optional {
         /// A map of dependencies
         ///
-        /// Keys are the keys of the dependencies in the sam object and values are the expected
+        /// Keys are the keys of the dependencies in the same object and values are the expected
         #[serde(alias = "deps")]
         conditions: Map<MAAPrimitive>,
         /// Input value query from user when all the dependencies are satisfied
@@ -493,7 +493,7 @@ mod tests {
             "optional" if "input" == true => input.clone(),
             "optional_no_satisfied" if "input" == false => input.clone(),
             "optional_no_exist" if "no_exist" == true => input.clone(),
-            "optional_chian" if "optional" == true => input.clone(),
+            "optional_chain" if "optional" == true => input.clone(),
             "optional_nested" if "optional" == true => object!(
                 "nested" if "optional" == true => input.clone(),
             ),
@@ -524,7 +524,7 @@ mod tests {
             MAAValue::Optional { .. }
         ));
         assert!(matches!(
-            value.get("optional_chian").unwrap(),
+            value.get("optional_chain").unwrap(),
             MAAValue::Optional { .. }
         ));
         assert!(matches!(
@@ -547,7 +547,7 @@ mod tests {
         assert_eq!(value.get("optional_no_satisfied"), None);
         assert_eq!(value.get("optional_no_exist"), None);
         assert_eq!(
-            value.get("optional_chian").unwrap(),
+            value.get("optional_chain").unwrap(),
             &ResolvedMAAValue::from(true)
         );
         assert_eq!(
