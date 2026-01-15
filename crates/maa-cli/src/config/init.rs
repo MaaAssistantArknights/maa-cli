@@ -159,6 +159,7 @@ pub fn init(name: Option<&Path>, filetype: Option<super::Filetype>, force: bool)
         std::fs::create_dir_all(&profile_dir)?;
     }
 
+    // TODO: better logic to handle the template
     let asst_config = asst_config_template().resolve()?;
     let mut asst_config_out = ResolvedMAAValue::default();
     if let Some(obj) = asst_config.get("connection_config") {

@@ -200,9 +200,7 @@ impl MAAValue {
                             // If the dependency is not exist or the value is not equal to the
                             // expected values break the loop and mark
                             // status as unsatisfied
-                            if !initialized.get(&cond_key).is_some_and(
-                                |v| matches!(v, ResolvedMAAValue::Primitive(p) if p == &expected),
-                            ) {
+                            if !initialized.get(&cond_key).is_some_and(|v| v == &expected) {
                                 satisfied = false;
                                 break;
                             }
@@ -291,18 +289,8 @@ impl<'a> From<&'a ResolvedMAAValue> for Cow<'a, ResolvedMAAValue> {
 mod tests {
     use std::num::NonZero;
 
-    use maa_value_macro::object;
-
     use super::*;
-    use crate::{
-        error::Error,
-        map::MapOps,
-        userinput::{BoolInput, Input, SelectD},
-    };
-
-    fn sstr(s: &str) -> Option<String> {
-        Some(s.to_string())
-    }
+    use crate::prelude::*;
 
     #[test]
     fn serde() {
@@ -318,7 +306,7 @@ mod tests {
             "input_bool" => BoolInput::new(Some(true)),
             "input_float" => Input::new(Some(1.0)),
             "input_int" => Input::new(Some(1)),
-            "input_string" => Input::new(sstr("string")),
+            "input_string" => Input::new(Some("string".to_string())),
             "select_int" => SelectD::from_iter([1, 2], NonZero::new(2)).unwrap(),
             "select_float" => SelectD::from_iter([1.0, 2.0], NonZero::new(2)).unwrap(),
             "select_string" => SelectD::<String>::from_iter(["string1", "string2"], NonZero::new(2)).unwrap(),

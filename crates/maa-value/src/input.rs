@@ -105,10 +105,6 @@ impl_into_maa_value!(
 mod tests {
     use super::*;
 
-    fn sstr(s: &str) -> Option<String> {
-        Some(s.to_string())
-    }
-
     #[test]
     fn deserialize() {
         use std::num::NonZero;
@@ -119,7 +115,7 @@ mod tests {
             BoolInput::new(Some(true)).into(),
             Input::new(Some(1)).into(),
             Input::new(Some(1.0)).into(),
-            Input::new(sstr("1")).into(),
+            Input::new(Some("1".to_owned())).into(),
             SelectD::from_iter([1, 2], NonZero::new(2)).unwrap().into(),
             SelectD::from_iter([1.0, 2.0], NonZero::new(2))
                 .unwrap()
@@ -201,7 +197,7 @@ mod tests {
             1.0.into()
         );
         assert_eq!(
-            MAAInput::InputString(Input::new(sstr("1")))
+            MAAInput::InputString(Input::new(Some("1".to_owned())))
                 .into_primitive()
                 .unwrap(),
             "1".into()
@@ -286,7 +282,7 @@ mod tests {
         );
 
         assert_eq!(
-            MAAInput::InputString(Input::new(sstr("hello")))
+            MAAInput::InputString(Input::new(Some("hello".to_owned())))
                 .into_primitive()
                 .unwrap(),
             "hello".into()
