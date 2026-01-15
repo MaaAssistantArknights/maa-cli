@@ -562,4 +562,375 @@ mod tests {
             Error::CircularDependency,
         ));
     }
+
+    #[test]
+    fn resolved_value_creation() {
+        // Test From<primitive> for ResolvedMAAValue
+        let bool_val = ResolvedMAAValue::from(true);
+        assert_eq!(bool_val.as_bool(), Some(true));
+
+        let int_val = ResolvedMAAValue::from(42);
+        assert_eq!(int_val.as_int(), Some(42));
+
+        let float_val = ResolvedMAAValue::from(2.14);
+        assert_eq!(float_val.as_float(), Some(2.14));
+
+        let str_val = ResolvedMAAValue::from("hello");
+        assert_eq!(str_val.as_str(), Some("hello"));
+
+        // Test From<[T; N]> for ResolvedMAAValue
+        let array_val = ResolvedMAAValue::from([1, 2, 3]);
+        match array_val {
+            ResolvedMAAValue::Array(vec) => {
+                assert_eq!(vec.len(), 3);
+                assert_eq!(vec[0].as_int(), Some(1));
+            }
+            _ => panic!("Expected Array variant"),
+        }
+
+        // Test TryFrom<Vec<T>> for ResolvedMAAValue
+        let vec_val = ResolvedMAAValue::try_from(vec![1, 2, 3]).unwrap();
+        match vec_val {
+            ResolvedMAAValue::Array(vec) => {
+                assert_eq!(vec.len(), 3);
+            }
+            _ => panic!("Expected Array variant"),
+        }
+
+        // Test Default
+        let default_val = ResolvedMAAValue::default();
+        assert!(matches!(default_val, ResolvedMAAValue::Object(_)));
+        assert_eq!(default_val.as_map().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn resolved_value_equality() {
+        // Test primitive equality
+        assert_eq!(ResolvedMAAValue::from(42), ResolvedMAAValue::from(42));
+        assert_ne!(ResolvedMAAValue::from(42), ResolvedMAAValue::from(43));
+
+        assert_eq!(
+            ResolvedMAAValue::from("hello"),
+            ResolvedMAAValue::from("hello")
+        );
+        assert_ne!(
+            ResolvedMAAValue::from("hello"),
+            ResolvedMAAValue::from("world")
+        );
+
+        // Test array equality
+        assert_eq!(
+            ResolvedMAAValue::from([1, 2, 3]),
+            ResolvedMAAValue::from([1, 2, 3])
+        );
+        assert_ne!(
+            ResolvedMAAValue::from([1, 2, 3]),
+            ResolvedMAAValue::from([1, 2, 4])
+        );
+
+        // Test empty arrays
+        let empty1: [i32; 0] = [];
+        let empty2: [i32; 0] = [];
+        assert_eq!(
+            ResolvedMAAValue::from(empty1),
+            ResolvedMAAValue::from(empty2)
+        );
+
+        // Test resolved object equality
+        let obj1 = object!("key" => 1).resolve().unwrap();
+        let obj2 = object!("key" => 1).resolve().unwrap();
+        let obj3 = object!("key" => 2).resolve().unwrap();
+
+        assert_eq!(obj1, obj2);
+        assert_ne!(obj1, obj3);
+
+        // Test cross-type inequality
+        assert_ne!(ResolvedMAAValue::from(1), ResolvedMAAValue::from("1"));
+        assert_ne!(ResolvedMAAValue::from(1), ResolvedMAAValue::from([1]));
+    }
+
+    #[test]
+    fn resolved_value_nested_structures() {
+        // Test nested arrays
+        let nested_array = MAAValue::from([MAAValue::from([1, 2]), MAAValue::from([3, 4])])
+            .resolve()
+            .unwrap();
+
+        let outer = nested_array.as_slice().unwrap();
+        assert_eq!(outer.len(), 2);
+        assert_eq!(outer[0].as_slice().unwrap().len(), 2);
+        assert_eq!(outer[0].as_slice().unwrap()[0].as_int(), Some(1));
+
+        // Test nested objects
+        let nested_obj = object!(
+            "outer" => object!(
+                "inner" => object!(
+                    "value" => 42
+                )
+            )
+        )
+        .resolve()
+        .unwrap();
+
+        let outer = nested_obj.get("outer").unwrap();
+        let inner = outer.get("inner").unwrap();
+        assert_eq!(inner.get("value").unwrap().as_int(), Some(42));
+
+        // Test mixed nesting (array in object in array)
+        let mixed = MAAValue::from([object!("key" => [1, 2])])
+            .resolve()
+            .unwrap();
+
+        let arr = mixed.as_slice().unwrap();
+        let obj = &arr[0];
+        let inner_arr = obj.get("key").unwrap().as_slice().unwrap();
+        assert_eq!(inner_arr.len(), 2);
+        assert_eq!(inner_arr[0].as_int(), Some(1));
+    }
+
+    #[test]
+    fn resolved_value_cloning() {
+        // Test that cloning works correctly
+        let original = ResolvedMAAValue::from([1, 2, 3]);
+        let cloned = original.clone();
+
+        assert_eq!(original, cloned);
+
+        // Test cloning with nested structures
+        let nested = object!(
+            "array" => [1, 2],
+            "obj" => object!("key" => "value")
+        )
+        .resolve()
+        .unwrap();
+
+        let cloned_nested = nested.clone();
+        assert_eq!(nested, cloned_nested);
+
+        // Verify they're independent
+        assert_eq!(
+            nested.get("array").unwrap().as_slice().unwrap().len(),
+            cloned_nested
+                .get("array")
+                .unwrap()
+                .as_slice()
+                .unwrap()
+                .len()
+        );
+    }
+
+    #[test]
+    fn resolve_primitives() {
+        // Test resolving primitive values directly
+        assert_eq!(
+            MAAValue::from(42).resolve().unwrap(),
+            ResolvedMAAValue::from(42)
+        );
+
+        assert_eq!(
+            MAAValue::from(true).resolve().unwrap(),
+            ResolvedMAAValue::from(true)
+        );
+
+        assert_eq!(
+            MAAValue::from("hello").resolve().unwrap(),
+            ResolvedMAAValue::from("hello")
+        );
+
+        assert_eq!(
+            MAAValue::from(2.14).resolve().unwrap(),
+            ResolvedMAAValue::from(2.14)
+        );
+    }
+
+    #[test]
+    fn resolve_arrays() {
+        // Test resolving simple array
+        let array = MAAValue::from([1, 2, 3]);
+        let resolved = array.resolve().unwrap();
+        assert_eq!(resolved, ResolvedMAAValue::from([1, 2, 3]));
+
+        // Test resolving empty array
+        let empty: [i32; 0] = [];
+        let empty_resolved = MAAValue::from(empty).resolve().unwrap();
+        assert_eq!(empty_resolved, ResolvedMAAValue::from(empty));
+
+        // Test resolving array with inputs
+        let with_inputs = MAAValue::from([
+            MAAValue::from(1),
+            MAAValue::from(Input::new(Some(2))),
+            MAAValue::from(3),
+        ]);
+        let resolved = with_inputs.resolve().unwrap();
+        let slice = resolved.as_slice().unwrap();
+        assert_eq!(slice.len(), 3);
+        assert_eq!(slice[0].as_int(), Some(1));
+        assert_eq!(slice[1].as_int(), Some(2));
+        assert_eq!(slice[2].as_int(), Some(3));
+    }
+
+    #[test]
+    fn resolve_objects() {
+        // Test resolving simple object
+        let obj = object!("key1" => 1, "key2" => "value");
+        let resolved = obj.resolve().unwrap();
+
+        assert_eq!(resolved.get("key1").unwrap().as_int(), Some(1));
+        assert_eq!(resolved.get("key2").unwrap().as_str(), Some("value"));
+
+        // Test resolving empty object
+        let empty = object!();
+        let resolved_empty = empty.resolve().unwrap();
+        assert_eq!(resolved_empty.as_map().unwrap().len(), 0);
+
+        // Test resolving object with inputs
+        let with_inputs = object!(
+            "direct" => 1,
+            "input" => Input::new(Some(2))
+        );
+        let resolved = with_inputs.resolve().unwrap();
+        assert_eq!(resolved.get("direct").unwrap().as_int(), Some(1));
+        assert_eq!(resolved.get("input").unwrap().as_int(), Some(2));
+    }
+
+    mod serde_tests {
+        use serde_json::{self, json};
+
+        use super::*;
+
+        mod deserialize {
+            use super::*;
+
+            #[test]
+            fn input_variant() {
+                // Test Input variant with default value
+                let json = json!({"default": 42});
+                let value: MAAValue = serde_json::from_value(json).unwrap();
+                assert!(matches!(value, MAAValue::Input(_)));
+
+                // Test Input variant with description
+                let json = json!({
+                    "default": "hello",
+                    "description": "Enter a greeting"
+                });
+                let value: MAAValue = serde_json::from_value(json).unwrap();
+                assert!(matches!(value, MAAValue::Input(_)));
+            }
+
+            #[test]
+            fn optional_variant() {
+                // Test Optional variant with "conditions" key
+                let json = json!({
+                    "conditions": {"enabled": true},
+                    "default": 42
+                });
+                let value: MAAValue = serde_json::from_value(json).unwrap();
+                assert!(matches!(value, MAAValue::Optional { .. }));
+
+                // Test Optional variant with "deps" alias
+                let json = json!({
+                    "deps": {"flag": false},
+                    "default": "value"
+                });
+                let value: MAAValue = serde_json::from_value(json).unwrap();
+                assert!(matches!(value, MAAValue::Optional { .. }));
+
+                // Test Optional with flatten (object value)
+                let json = json!({
+                    "conditions": {"mode": "advanced"},
+                    "key1": "value1",
+                    "key2": "value2"
+                });
+                let value: MAAValue = serde_json::from_value(json).unwrap();
+                assert!(matches!(value, MAAValue::Optional { .. }));
+            }
+        }
+
+        mod serialize {
+            use super::*;
+
+            #[test]
+            fn resolved_value() {
+                // Test that ResolvedMAAValue serializes correctly
+                let value = object!(
+                    "primitive" => 42,
+                    "array" => [1, 2, 3],
+                    "nested" => object!("key" => "value")
+                )
+                .resolve()
+                .unwrap();
+
+                let json = serde_json::to_value(&value).unwrap();
+
+                assert_eq!(json["primitive"], 42);
+                assert_eq!(json["array"], json!([1, 2, 3]));
+                assert_eq!(json["nested"]["key"], "value");
+            }
+        }
+
+        mod integration {
+            use super::*;
+
+            #[test]
+            fn resolve_inputs_then_serialize() {
+                // Test that Input variants resolve to their default values
+                let value = object!(
+                    "direct" => 42,
+                    "from_input" => Input::new(Some(100)),
+                    "array_with_input" => [
+                        MAAValue::from(1),
+                        MAAValue::from(Input::new(Some(2)))
+                    ]
+                );
+
+                let resolved = value.resolve().unwrap();
+                let json = serde_json::to_value(&resolved).unwrap();
+
+                // Inputs should be resolved to their default values
+                assert_eq!(json["direct"], 42);
+                assert_eq!(json["from_input"], 100);
+                assert_eq!(json["array_with_input"][0], 1);
+                assert_eq!(json["array_with_input"][1], 2);
+            }
+
+            #[test]
+            fn resolve_optionals_then_serialize() {
+                // Test that Optional variants are evaluated based on conditions
+                let value = object!(
+                    "flag" => true,
+                    "conditional" if "flag" == true => 42,
+                    "not_included" if "flag" == false => 99
+                );
+
+                let resolved = value.resolve().unwrap();
+                let json = serde_json::to_value(&resolved).unwrap();
+
+                // Satisfied optional should be included
+                assert_eq!(json["conditional"], 42);
+
+                // Unsatisfied optional should not be included
+                assert!(json.get("not_included").is_none());
+            }
+
+            #[test]
+            fn roundtrip_through_json() {
+                // Test that we can serialize ResolvedMAAValue and deserialize back to MAAValue
+                let original = object!(
+                    "array" => [1, 2, 3],
+                    "nested" => object!("key" => "value")
+                )
+                .resolve()
+                .unwrap();
+
+                // Serialize to JSON
+                let json = serde_json::to_value(&original).unwrap();
+
+                // Deserialize back (ResolvedMAAValue doesn't impl Deserialize, so use MAAValue)
+                let deserialized: MAAValue = serde_json::from_value(json).unwrap();
+                let resolved_again = deserialized.resolve().unwrap();
+
+                assert_eq!(original, resolved_again);
+            }
+        }
+    }
 }

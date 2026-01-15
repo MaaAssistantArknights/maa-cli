@@ -1100,6 +1100,7 @@ dependencies = [
  "maa-value-macro",
  "schemars",
  "serde",
+ "serde_json",
  "serde_test",
 ]
 
