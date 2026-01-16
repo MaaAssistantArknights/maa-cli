@@ -5,6 +5,7 @@ mod build;
 mod cmd;
 mod env;
 mod github;
+mod group;
 mod release;
 mod test;
 
@@ -129,7 +130,7 @@ impl CoverageMode {
 }
 
 fn main() -> Result<()> {
-    println!("::endgroup::");
+    println!("{}", *group::GROUP_END_LINE);
 
     let cli = Cli::parse();
 

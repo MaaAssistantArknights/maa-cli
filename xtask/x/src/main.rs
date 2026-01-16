@@ -1,7 +1,9 @@
 use std::process::{Command, ExitCode};
 
 fn main() -> ExitCode {
-    println!("::group::Prepare xtask");
+    if std::env::var_os("GITHUB_ACTIONS").is_some() {
+        println!("::group::Prepare xtask");
+    }
 
     let status = Command::new("cargo")
         .args(["run", "-pxtask"])

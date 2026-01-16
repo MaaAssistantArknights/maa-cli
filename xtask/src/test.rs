@@ -1,11 +1,13 @@
 //! Test automation for CI.
 
+use std::env;
+
 use anyhow::{Context, Result, bail};
 
 use crate::{
     TestOptions,
     cmd::{CommandExt, EnvVars, cargo, rustup_up},
-    github::Group,
+    group::Group,
     workspace_root,
 };
 
@@ -26,10 +28,12 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
 
     let package_flags = opts.package_flags();
 
-    Group::new("Update Stable Toolchain")
-        .run(|| rustup_up("stable").run().context("Failed to update Rust"))?;
+    if env::var_os("CI").is_some() {
+        Group::new("Update Stable Toolchain")
+            .run(|| rustup_up("stable").run().context("Failed to update Rust"))?;
+    }
 
-    if opts.coverage.report() {
+    if opts.coverage.report() && env::var_os("CI").is_some() {
         Group::new("Install Nightly Toolchain").run(|| {
             rustup_up("nightly")
                 .args(["--profile=minimal", "-cllvm-tools"])

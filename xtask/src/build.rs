@@ -1,13 +1,15 @@
 //! Build automation for maa-cli.
 
 use std::fs::File;
+use std::env;
 
 use anyhow::{Context, Result};
 
 use crate::{
     BuildOptions, HOST_TRIPLET,
     cmd::{CommandExt, cargo, rustup_up},
-    github::{Group, set_output},
+    github::set_output,
+    group::Group,
     workspace_root,
 };
 
@@ -16,8 +18,10 @@ pub fn run(opts: BuildOptions) -> Result<()> {
     // Set GitHub output for use in subsequent steps
     set_output("host_triplet", HOST_TRIPLET).ok();
 
-    Group::new("Update Stable Toolchain")
-        .run(|| rustup_up("stable").run().context("Failed to update Rust"))?;
+    if env::var_os("CI").is_some() {
+        Group::new("Update Stable Toolchain")
+            .run(|| rustup_up("stable").run().context("Failed to update Rust"))?;
+    }
 
     Group::new("Build").run(|| {
         let mut cmd = cargo();
