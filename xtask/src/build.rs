@@ -1,7 +1,6 @@
 //! Build automation for maa-cli.
 
-use std::fs::File;
-use std::env;
+use std::{env, fs::File};
 
 use anyhow::{Context, Result};
 
