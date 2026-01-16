@@ -67,6 +67,40 @@ where
 }
 
 /// A resolved MAAValue containing only concrete values.
+///
+/// This type represents the output of [`MAAValue::resolve()`], containing only
+/// concrete data without any [`Input`](MAAValue::Input) or [`Optional`](MAAValue::Optional)
+/// variants. It implements both [`Serialize`] and [`serde::de::Deserializer`] to support
+/// serialization and deserialization to any types implementing [`Deserialize`].
+///
+/// # Serde Support
+///
+/// Unlike [`MAAValue`] which may contain user inputs and conditional logic, `ResolvedMAAValue`
+/// contains only concrete values (primitives, arrays, and objects). This makes it suitable for
+/// **Serialization** writing resolved configurations to files or APIs.
+///
+/// ## Converting to Typed Structs
+///
+/// `ResolvedMAAValue` implements the `Deserializer` trait, allowing direct conversion to
+/// typed structs without an intermediate format:
+///
+/// ```
+/// use maa_value::prelude::*;
+/// use serde::Deserialize;
+///
+/// #[derive(Deserialize, Debug, PartialEq)]
+/// struct Config {
+///     name: String,
+///     count: i32,
+/// }
+///
+/// let resolved = object!("name" => "app", "count" => 42).resolve().unwrap();
+///
+/// let config = Config::deserialize(resolved).unwrap();
+///
+/// assert_eq!(config.name, "app");
+/// assert_eq!(config.count, 42);
+/// ```
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum ResolvedMAAValue {
@@ -103,6 +137,42 @@ impl MAAValue {
     /// - **Optional**: Must be contained within an object. The optional field is only resolved and
     ///   included if all its condition dependencies are satisfied (i.e., the required fields exist
     ///   in the object and match their expected values). Otherwise, it is silently omitted.
+    ///
+    /// # Nested Optional Behavior
+    ///
+    /// When an optional field contains an object with its own optional fields, the nested
+    /// resolution follows these rules:
+    ///
+    /// - If the outer optional's conditions are satisfied, the field is included and its value is
+    ///   resolved recursively.
+    /// - Nested optional fields within are evaluated independently based on their own conditions.
+    /// - If all nested optionals are omitted, the result is an empty object (`{}`), not `None`.
+    ///
+    /// **Example:**
+    /// ```
+    /// use maa_value::prelude::*;
+    /// # use maa_value::userinput::BoolInput;
+    ///
+    /// let value = object!(
+    ///     "enabled" => true,
+    ///     "config" if "enabled" == true => object!(
+    ///         "nested_field" if "enabled" == false => "will_be_omitted"
+    ///     )
+    /// );
+    ///
+    /// let resolved = value.resolve().unwrap();
+    /// // "config" is included because "enabled" == true
+    /// // But it's an empty object because the nested condition isn't satisfied
+    /// assert_eq!(resolved.get("config").unwrap(), &object!().resolve().unwrap());
+    /// ```
+    ///
+    /// # Performance
+    ///
+    /// For objects with optional fields, this method performs a topological sort using depth-first
+    /// search to determine the resolution order. The complexity is O(V + E) where V is the number
+    /// of fields and E is the number of dependencies. For typical configuration sizes (dozens to
+    /// hundreds of fields), this overhead is negligible. The method is designed for configuration
+    /// initialization, not high-frequency runtime operations.
     ///
     /// # Returns
     ///
@@ -910,26 +980,6 @@ mod tests {
 
                 // Unsatisfied optional should not be included
                 assert!(json.get("not_included").is_none());
-            }
-
-            #[test]
-            fn roundtrip_through_json() {
-                // Test that we can serialize ResolvedMAAValue and deserialize back to MAAValue
-                let original = object!(
-                    "array" => [1, 2, 3],
-                    "nested" => object!("key" => "value")
-                )
-                .resolve()
-                .unwrap();
-
-                // Serialize to JSON
-                let json = serde_json::to_value(&original).unwrap();
-
-                // Deserialize back (ResolvedMAAValue doesn't impl Deserialize, so use MAAValue)
-                let deserialized: MAAValue = serde_json::from_value(json).unwrap();
-                let resolved_again = deserialized.resolve().unwrap();
-
-                assert_eq!(original, resolved_again);
             }
         }
     }

@@ -14,6 +14,7 @@ maa-str-ext = { workspace = true }
 maa-value-macro = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }

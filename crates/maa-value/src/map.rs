@@ -8,7 +8,18 @@ use crate::{
 
 /// Type alias for the underlying map structure.
 ///
-/// Uses `BTreeMap` to maintain key ordering for consistent serialization.
+/// Uses [`BTreeMap`](std::collections::BTreeMap) to maintain deterministic key ordering.
+///
+/// This ensures:
+/// - **Consistent serialization**: Same data always serializes to the same output, which is
+///   important for config files and diffs.
+/// - **Reproducible behavior**: Iteration order is stable across runs, making debugging easier.
+/// - **Sorted output**: Keys appear in alphabetical order in serialized output, improving
+///   readability.
+///
+/// While [`HashMap`](std::collections::HashMap) would be slightly faster for lookups,
+/// configuration data is typically small enough that the performance difference is negligible,
+/// and the benefits of ordering outweigh the minor performance cost.
 pub type Map<T, K = String> = std::collections::BTreeMap<K, T>;
 
 /// Trait for map-like operations on values.

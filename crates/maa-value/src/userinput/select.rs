@@ -30,7 +30,6 @@ pub struct Select<S> {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawSelect<S> {
-    #[serde(default = "Vec::<S>::new")]
     alternatives: Vec<S>,
     #[serde(default)]
     default_index: Option<NonZero<usize>>,
