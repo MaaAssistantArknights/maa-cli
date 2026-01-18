@@ -3,7 +3,10 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-use crate::{Error, Result};
+use crate::{
+    Outcome,
+    error::{Error, Result},
+};
 
 // Use batch mode in tests by default to avoid blocking tests.
 // This variable can also be change at runtime by cli argument
@@ -15,12 +18,6 @@ pub fn enable_batch_mode() {
 
 fn is_batch_mode() -> bool {
     BATCH_MODE.load(Ordering::Relaxed)
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Outcome<V, O> {
-    Value(V),
-    Original(O),
 }
 
 use Outcome::*;
@@ -127,7 +124,7 @@ mod input;
 pub use input::Input;
 
 mod select;
-pub use select::{SelectD, Selectable, ValueWithDesc};
+pub use select::{Select, SelectD, Selectable, ValueWithDesc};
 
 #[cfg(test)]
 #[track_caller]
@@ -180,7 +177,7 @@ mod tests {
             fn without_default() {
                 assert!(matches!(
                     BoolInput::new(None).value().unwrap_err(),
-                    crate::Error::NoDefaultInBatchMode
+                    crate::error::Error::NoDefaultInBatchMode
                 ));
             }
         }
@@ -204,7 +201,7 @@ mod tests {
             fn without_default() {
                 assert!(matches!(
                     Input::<i64>::new(None).value().unwrap_err(),
-                    crate::Error::NoDefaultInBatchMode
+                    crate::error::Error::NoDefaultInBatchMode
                 ));
             }
         }

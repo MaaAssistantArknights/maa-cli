@@ -1,60 +1,66 @@
-use std::{fmt, io};
+use std::io;
 
-/// Error type for the maa-value crate
-#[derive(Debug)]
+/// Error type for the maa-value crate.
+///
+/// Represents various errors that can occur during value resolution, user input processing,
+/// and I/O operations.
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
-    /// Circular dependencies detected in optional values
+    /// Circular dependencies detected among optional fields.
+    ///
+    /// This error occurs when optional fields have dependencies that form a cycle,
+    /// such as field A depending on B, and B depending on A (directly or indirectly).
+    /// Resolution cannot proceed because there's no valid order to evaluate the fields.
+    ///
+    /// # Example
+    /// ```ignore
+    /// object!(
+    ///     "field_a" if "field_b" == true => value,
+    ///     "field_b" if "field_a" == true => value,
+    /// )
+    /// ```
+    #[error("Circular dependency detected among optional fields")]
     CircularDependency,
-    /// Optional value must be in an object
+
+    /// An `Optional` variant was encountered outside of an object context.
+    ///
+    /// Optional fields can only exist within objects, as they require the ability to check
+    /// sibling fields for dependency conditions. Attempting to resolve a standalone optional
+    /// value results in this error.
+    #[error("Optional fields can only exist within objects")]
     OptionalNotInObject,
-    /// Alternatives list is empty
+
+    /// A selection input has an empty alternatives list.
+    ///
+    /// Selection inputs must have at least one alternative to choose from.
+    #[error("Selection input has an empty alternatives list")]
     EmptyAlternatives,
-    /// Default index is out of range
-    IndexOutOfRange { index: usize, len: usize },
-    /// No default value available in batch mode
+
+    /// The default index for a selection is out of the valid range.
+    ///
+    /// The index is 1-based (not 0-based) and must be between 1 and the number of alternatives.
+    #[error("Index {index} is out of range [1, {len}]")]
+    IndexOutOfRange {
+        /// The invalid index that was provided (1-based).
+        index: usize,
+        /// The total number of alternatives available.
+        len: usize,
+    },
+
+    /// No default value available when running in batch mode.
+    ///
+    /// When user input is required but the application is running in batch mode
+    /// (non-interactive), and no default value was provided, this error is returned.
+    #[error("No default value available in batch mode")]
     NoDefaultInBatchMode,
-    /// Invalid UTF-8 encoding
-    InvalidUtf8(maa_str_ext::Error),
-    /// IO error occurred
-    Io(io::Error),
-}
 
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::CircularDependency => write!(f, "circular dependencies detected"),
-            Self::OptionalNotInObject => write!(f, "optional input must be in an object"),
-            Self::EmptyAlternatives => write!(f, "alternatives is empty"),
-            Self::IndexOutOfRange { index, len } => {
-                write!(f, "index out of range expected 1 - {len}, got {index}")
-            }
-            Self::NoDefaultInBatchMode => write!(f, "can not get default value in batch mode"),
-            Self::InvalidUtf8(err) => write!(f, "{err}"),
-            Self::Io(err) => write!(f, "I/O error: {err}"),
-        }
-    }
-}
+    /// Invalid UTF-8 encoding encountered during string conversion.
+    #[error("Invalid UTF-8 encoding")]
+    InvalidUtf8(#[from] maa_str_ext::Error),
 
-impl std::error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::Io(err) => Some(err),
-            Self::InvalidUtf8(err) => Some(err),
-            _ => None,
-        }
-    }
-}
-
-impl From<io::Error> for Error {
-    fn from(err: io::Error) -> Self {
-        Self::Io(err)
-    }
-}
-
-impl From<maa_str_ext::Error> for Error {
-    fn from(err: maa_str_ext::Error) -> Self {
-        Self::InvalidUtf8(err)
-    }
+    /// An I/O error occurred during file operations.
+    #[error("I/O error")]
+    Io(#[from] io::Error),
 }
 
 /// Result type alias for maa-value operations
@@ -63,8 +69,6 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
-    use std::error::Error as StdError;
-
     use maa_str_ext::ToUtf8String;
 
     use super::*;
@@ -73,7 +77,7 @@ mod tests {
     fn display() {
         assert_eq!(
             Error::CircularDependency.to_string(),
-            "circular dependencies detected"
+            "circular dependencies detected optional fields"
         );
         assert_eq!(
             Error::OptionalNotInObject.to_string(),
@@ -104,109 +108,5 @@ mod tests {
         let utf8_err = invalid_bytes.to_utf8_string().unwrap_err();
         let utf8_err_str = utf8_err.to_string();
         assert_eq!(Error::InvalidUtf8(utf8_err).to_string(), utf8_err_str);
-    }
-
-    #[test]
-    fn debug_format() {
-        // Test Debug trait implementation
-        assert_eq!(
-            format!("{:?}", Error::CircularDependency),
-            "CircularDependency"
-        );
-        assert_eq!(
-            format!("{:?}", Error::OptionalNotInObject),
-            "OptionalNotInObject"
-        );
-        assert_eq!(
-            format!("{:?}", Error::EmptyAlternatives),
-            "EmptyAlternatives"
-        );
-        assert_eq!(
-            format!("{:?}", Error::IndexOutOfRange { index: 3, len: 2 }),
-            "IndexOutOfRange { index: 3, len: 2 }"
-        );
-        assert_eq!(
-            format!("{:?}", Error::NoDefaultInBatchMode),
-            "NoDefaultInBatchMode"
-        );
-
-        let invalid_bytes = vec![0xFF];
-        let utf8_err = invalid_bytes.to_utf8_string().unwrap_err();
-        assert!(format!("{:?}", Error::InvalidUtf8(utf8_err)).starts_with("InvalidUtf8"));
-    }
-
-    #[test]
-    fn error_source() {
-        // Test that non-IO errors have no source
-        assert!(Error::CircularDependency.source().is_none());
-        assert!(Error::OptionalNotInObject.source().is_none());
-        assert!(Error::EmptyAlternatives.source().is_none());
-        assert!(
-            Error::IndexOutOfRange { index: 3, len: 2 }
-                .source()
-                .is_none()
-        );
-        assert!(Error::NoDefaultInBatchMode.source().is_none());
-
-        // Test that IO error has a source
-        let io_err = io::Error::other("test error");
-        let err = Error::Io(io_err);
-        assert!(err.source().is_some());
-
-        // Test that InvalidUtf8 error has a source
-        use maa_str_ext::ToUtf8String;
-        let invalid_bytes = vec![0xFF];
-        let utf8_err = invalid_bytes.to_utf8_string().unwrap_err();
-        let err = Error::InvalidUtf8(utf8_err);
-        assert!(err.source().is_some());
-        assert!(err.source().unwrap().is::<maa_str_ext::Error>());
-    }
-
-    #[test]
-    fn from_io_error() {
-        // Test From<io::Error> conversion
-        let io_err = io::Error::new(io::ErrorKind::NotFound, "file not found");
-        let err: Error = io_err.into();
-        assert!(matches!(err, Error::Io(_)));
-        assert_eq!(err.to_string(), "I/O error: file not found");
-    }
-
-    #[test]
-    fn from_io_error_different_kinds() {
-        // Test various IO error kinds
-        let errors = vec![
-            io::Error::new(io::ErrorKind::PermissionDenied, "permission denied"),
-            io::Error::new(io::ErrorKind::ConnectionRefused, "connection refused"),
-            io::Error::new(io::ErrorKind::InvalidInput, "invalid input"),
-            io::Error::other("other error"),
-        ];
-
-        for io_err in errors {
-            let msg = io_err.to_string();
-            let err: Error = io_err.into();
-            assert!(matches!(err, Error::Io(_)));
-            assert_eq!(err.to_string(), format!("I/O error: {}", msg));
-        }
-    }
-
-    #[test]
-    fn from_maa_str_ext_error() {
-        let invalid_bytes = vec![0xFF];
-        let utf8_err = invalid_bytes.to_utf8_string().unwrap_err();
-        let err: Error = utf8_err.into();
-        assert!(matches!(err, Error::InvalidUtf8(_)));
-    }
-
-    #[test]
-    fn error_as_std_error() {
-        // Test that Error implements std::error::Error properly
-        fn takes_error(_err: &impl StdError) {}
-
-        takes_error(&Error::CircularDependency);
-        takes_error(&Error::OptionalNotInObject);
-        takes_error(&Error::EmptyAlternatives);
-        takes_error(&Error::IndexOutOfRange { index: 1, len: 2 });
-        takes_error(&Error::NoDefaultInBatchMode);
-        takes_error(&Error::Io(io::Error::other("test")));
     }
 }

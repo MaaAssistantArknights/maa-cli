@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use maa_value::{MAAValue, Result, object};
+use maa_value::{error::Result, prelude::*};
 
 #[test]
 fn single_condition() {
@@ -17,7 +17,7 @@ fn single_condition() {
         Some(MAAValue::Optional { .. })
     ));
 
-    let initialized = obj.init().unwrap();
+    let initialized = obj.resolve().unwrap();
     assert_eq!(
         initialized.get("conditional").unwrap().as_str(),
         Some("included")
@@ -31,7 +31,7 @@ fn condition_not_satisfied() {
         "conditional" if "flag" == true => "excluded"
     );
 
-    let initialized = obj.init().unwrap();
+    let initialized = obj.resolve().unwrap();
     assert!(initialized.get("conditional").is_none());
 }
 
@@ -41,7 +41,7 @@ fn condition_key_not_exist() {
         "conditional" if "nonexistent" == true => "excluded"
     );
 
-    let initialized = obj.init().unwrap();
+    let initialized = obj.resolve().unwrap();
     assert!(initialized.get("conditional").is_none());
 }
 
@@ -53,7 +53,7 @@ fn multiple_conditions() {
         "conditional" if "flag1" == true && "flag2" == "yes" => "both satisfied"
     );
 
-    let initialized = obj.init().unwrap();
+    let initialized = obj.resolve().unwrap();
     assert_eq!(
         initialized.get("conditional").unwrap().as_str(),
         Some("both satisfied")
@@ -68,7 +68,7 @@ fn multiple_conditions_one_fails() {
         "conditional" if "flag1" == true && "flag2" == "yes" => "excluded"
     );
 
-    let initialized = obj.init().unwrap();
+    let initialized = obj.resolve().unwrap();
     assert!(initialized.get("conditional").is_none());
 }
 
@@ -81,7 +81,7 @@ fn chained_conditions() {
         "level3" if "level2" == 2 => 3
     );
 
-    let initialized = obj.init().unwrap();
+    let initialized = obj.resolve().unwrap();
     assert_eq!(initialized.get("base").unwrap().as_bool(), Some(true));
     assert_eq!(initialized.get("level1").unwrap().as_int(), Some(1));
     assert_eq!(initialized.get("level2").unwrap().as_int(), Some(2));
@@ -97,7 +97,7 @@ fn chained_conditions_break() {
         "level3" if "level2" == 2 => 3
     );
 
-    let initialized = obj.init().unwrap();
+    let initialized = obj.resolve().unwrap();
     assert_eq!(initialized.get("base").unwrap().as_bool(), Some(false));
     assert!(initialized.get("level1").is_none());
     assert!(initialized.get("level2").is_none());
@@ -114,7 +114,7 @@ fn conditional_with_nested_object() {
         )
     );
 
-    let initialized = obj.init().unwrap();
+    let initialized = obj.resolve().unwrap();
     let nested = initialized.get("nested_obj").unwrap();
     assert_eq!(nested.get("key1").unwrap().as_str(), Some("value1"));
     assert_eq!(nested.get("key2").unwrap().as_str(), Some("value2"));
@@ -131,7 +131,7 @@ fn conditional_maybe_insert() {
         "cond_none" if "flag" == true =>? none_value
     );
 
-    let initialized = obj.init().unwrap();
+    let initialized = obj.resolve().unwrap();
     assert_eq!(initialized.get("cond_some").unwrap().as_int(), Some(42));
     assert!(initialized.get("cond_none").is_none());
 }
@@ -145,7 +145,7 @@ fn conditional_try_insert() -> Result<()> {
         "cond_path" if "flag" == true => path?
     );
 
-    let initialized = obj.init()?;
+    let initialized = obj.resolve()?;
     assert_eq!(
         initialized.get("cond_path").unwrap().as_str(),
         Some("/test/path")
@@ -165,7 +165,7 @@ fn conditional_try_insert_multiple() -> Result<()> {
         "cond_path2" if "flag2" == true => path2?
     );
 
-    let initialized = obj.init()?;
+    let initialized = obj.resolve()?;
     // cond_path1 should be present (condition satisfied)
     assert_eq!(
         initialized.get("cond_path1").unwrap().as_str(),
@@ -187,7 +187,7 @@ fn condition_with_different_types() {
         "cond_bool" if "bool_key" == true => "bool matched"
     );
 
-    let initialized = obj.init().unwrap();
+    let initialized = obj.resolve().unwrap();
     assert_eq!(
         initialized.get("cond_string").unwrap().as_str(),
         Some("string matched")
@@ -210,7 +210,7 @@ fn conditional_order_independence() {
         "flag" => true
     );
 
-    let initialized = obj.init().unwrap();
+    let initialized = obj.resolve().unwrap();
     assert_eq!(
         initialized.get("depends_on_flag").unwrap().as_str(),
         Some("yes")
