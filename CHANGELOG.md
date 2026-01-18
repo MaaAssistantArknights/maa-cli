@@ -1,5 +1,31 @@
 # Release Notes
 
+## Release 0.7.0
+
+### Features
+
+- **BREAKING**: Split Paradox Simulation copilot command by [@wangl-cc](https://github.com/wangl-cc) in [#478](https://github.com/MaaAssistantArknights/maa-cli/pull/478)
+- Print log dir on MAAError by [@satgo1546](https://github.com/satgo1546) in [#477](https://github.com/MaaAssistantArknights/maa-cli/pull/477)
+- Import command support remote file (via HTTP(s)) by [@wangl-cc](https://github.com/wangl-cc) in [#479](https://github.com/MaaAssistantArknights/maa-cli/pull/479)
+
+### Bug Fixes
+
+- Adapt to callback changes by [@wangl-cc](https://github.com/wangl-cc) in [#476](https://github.com/MaaAssistantArknights/maa-cli/pull/476)
+
+### Refactor
+
+- Simplify git clone command construction by [@wangl-cc](https://github.com/wangl-cc) in [#483](https://github.com/MaaAssistantArknights/maa-cli/pull/483)
+- Make IntoParameters trait more test friendly by [@wangl-cc](https://github.com/wangl-cc) in [#473](https://github.com/MaaAssistantArknights/maa-cli/pull/473)
+- Improve MAAValue ergonomics by [@wangl-cc](https://github.com/wangl-cc) in [#484](https://github.com/MaaAssistantArknights/maa-cli/pull/484)
+- Add `as_slice` and `as_mut_vec` methods for MAAValue by [@wangl-cc](https://github.com/wangl-cc) in [#481](https://github.com/MaaAssistantArknights/maa-cli/pull/481)
+- Add maa-str-ext crate for UTF-8 validation by [@wangl-cc](https://github.com/wangl-cc) in [#480](https://github.com/MaaAssistantArknights/maa-cli/pull/480)
+
+### Documentation
+
+- Add docs tip for winget users to use maa-cli command name by [@JasonHuang79](https://github.com/JasonHuang79) in [#475](https://github.com/MaaAssistantArknights/maa-cli/pull/475)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.6.0...v0.7.0>
+
 ## Release 0.6.0
 
 ### Features
