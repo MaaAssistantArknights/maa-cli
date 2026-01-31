@@ -6,6 +6,8 @@ use maa_types::primitive::{AsstMsgId, AsstTaskId};
 use serde_json::{Map, Value};
 use summary::{edit_current_task_detail, end_current_task, start_task};
 
+use crate::state::AGENT;
+
 pub static MAA_CORE_ERRORED: AtomicBool = AtomicBool::new(false);
 
 pub unsafe extern "C" fn default_callback(
@@ -610,7 +612,7 @@ fn process_report(message: &Map<String, Value>) -> Option<()> {
 
     info!("{subtask}: {url}");
 
-    let mut request = ureq::post(url).content_type("application/json");
+    let mut request = AGENT.post(url).content_type("application/json");
 
     for (key, value) in headers {
         if let Some(value_str) = value.as_str() {

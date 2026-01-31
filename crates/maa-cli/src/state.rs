@@ -1,9 +1,6 @@
 //! Module for managing the global state of the maa-cli.
 
-use std::{
-    env::consts::{ARCH, OS},
-    sync::LazyLock,
-};
+use std::sync::LazyLock;
 
 use semver::Version;
 use ureq::{
@@ -27,16 +24,13 @@ pub static CORE_VERSION: LazyLock<Option<Version>> = LazyLock::new(|| {
 });
 
 pub static AGENT: LazyLock<Agent> = LazyLock::new(|| {
-    let core_version_str = CORE_VERSION_STR.as_deref().unwrap_or("Unknown");
     Agent::config_builder()
         .tls_config(
             TlsConfig::builder()
                 .root_certs(RootCerts::PlatformVerifier)
                 .build(),
         )
-        .user_agent(format!(
-            "maa-cli/{CLI_VERSION_STR} ({OS}; {ARCH}) libMaaCore/{core_version_str}"
-        ))
+        .user_agent(format!("maa-cli/{CLI_VERSION_STR}"))
         .build()
         .into()
 });
