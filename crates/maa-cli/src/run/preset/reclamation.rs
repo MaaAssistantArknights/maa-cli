@@ -1,5 +1,5 @@
 use color_print::cstr;
-use maa_value::{insert, object};
+use maa_value::prelude::*;
 
 use super::MAAValue;
 
@@ -134,8 +134,6 @@ mod tests {
                 _ => panic!("Not a Reclamation command"),
             }
         }
-
-        use maa_value::object;
 
         let base_params = object!("theme" => "Tales", "mode" => 1);
 

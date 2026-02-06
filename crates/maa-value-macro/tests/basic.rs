@@ -1,6 +1,6 @@
 //! Basic object! macro functionality tests
 
-use maa_value::{MAAValue, object};
+use maa_value::{prelude::*, primitive::Int};
 
 #[test]
 fn empty_object() {
@@ -40,7 +40,7 @@ fn nested_objects() {
 
 #[test]
 fn arrays() {
-    let empty_array: [i32; 0] = [];
+    let empty_array: [Int; 0] = [];
     let obj = object!(
         "empty" => empty_array,
         "numbers" => [1, 2, 3],
