@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use maa_value::{Result, object};
+use maa_value::{error::Result, prelude::*};
 
 #[test]
 fn mixed_insert_types() -> Result<()> {
@@ -19,7 +19,7 @@ fn mixed_insert_types() -> Result<()> {
         "conditional" if "flag" == true => "depends on flag"
     );
 
-    let initialized = obj.init()?;
+    let initialized = obj.resolve()?;
     assert_eq!(initialized.get("regular").unwrap().as_str(), Some("normal"));
     assert_eq!(
         initialized.get("optional_present").unwrap().as_int(),
@@ -59,7 +59,7 @@ fn complex_nested_structure() -> Result<()> {
         )
     );
 
-    let initialized = obj.init()?;
+    let initialized = obj.resolve()?;
 
     // Check metadata
     let metadata = initialized.get("metadata").unwrap();
@@ -99,7 +99,7 @@ fn all_insert_kinds_together() -> Result<()> {
         "e_conditional" if "d_flag" == true => "conditional"
     );
 
-    let initialized = obj.init()?;
+    let initialized = obj.resolve()?;
     assert_eq!(
         initialized.get("a_regular").unwrap().as_str(),
         Some("regular")

@@ -9,19 +9,21 @@ use crate::parsing::{ConversionKind, InsertKind, InsertMacroInput, ObjectEntry, 
 impl ObjectMacroInput {
     pub fn generate(self) -> TokenStream2 {
         if self.entries.is_empty() {
-            return quote! { ::maa_value::MAAValue::default() };
+            return quote! { ::maa_value::value::MAAValue::default() };
         }
 
         let object_var = Ident::new("object", Span::mixed_site());
+        let object_ref_var = Ident::new("object_ref", Span::mixed_site());
         let inserts: Vec<_> = self
             .entries
             .into_iter()
-            .map(|entry| entry.generate(&object_var))
+            .map(|entry| entry.generate(&object_ref_var))
             .collect();
 
         quote! {
             {
-                let mut #object_var = ::maa_value::MAAValue::default();
+                let mut #object_var = ::maa_value::value::MAAValue::default();
+                let #object_ref_var = &mut #object_var;
                 #(#inserts)*
                 #object_var
             }
@@ -31,18 +33,18 @@ impl ObjectMacroInput {
 
 impl InsertMacroInput {
     pub fn generate(self) -> TokenStream2 {
-        let object = &self.object;
+        let object_var = &self.object;
 
-        let object_var = Ident::new("object", Span::mixed_site());
+        let object_ref_var = Ident::new("object", Span::mixed_site());
         let inserts: Vec<_> = self
             .entries
             .into_iter()
-            .map(|entry| entry.generate(&object_var))
+            .map(|entry| entry.generate(&object_ref_var))
             .collect();
 
         quote! {
             {
-                let #object_var = &mut (#object);
+                let #object_ref_var = &mut (#object_var);
                 #(#inserts)*
             }
         }
@@ -66,15 +68,11 @@ impl ObjectEntry {
         match self.insert_kind {
             InsertKind::Insert => {
                 let converted = self.conversion_kind.generate_conversion(value);
-                quote! {
-                    #object_var.insert(#key, #converted);
-                }
+                quote! { ::maa_value::map::MapOps::insert(#object_var, #key, #converted); }
             }
             InsertKind::Maybe => {
                 let converted = self.conversion_kind.generate_option_conversion(value);
-                quote! {
-                    #object_var.maybe_insert(#key, #converted);
-                }
+                quote! { ::maa_value::map::MapOps::maybe_insert(#object_var, #key, #converted); }
             }
         }
     }
@@ -97,20 +95,18 @@ impl ObjectEntry {
             InsertKind::Insert => {
                 // Regular insert with conditions: directly convert and wrap
                 let converted_value = self.conversion_kind.generate_conversion(value);
-                quote! {
-                    {
-                        let #value_var: ::maa_value::MAAValue = #converted_value;
-                        #object.insert(#key, #optional);
-                    }
-                }
+                quote! {{
+                    let #value_var: ::maa_value::value::MAAValue = #converted_value;
+                    ::maa_value::map::MapOps::insert(#object, #key, #optional);
+                }}
             }
             InsertKind::Maybe => {
                 // Maybe insert with conditions: extract Option first, then convert and wrap
                 let converted_value = self.conversion_kind.generate_conversion(&value_var);
                 quote! {
                     if let ::core::option::Option::Some(#value_var) = #value {
-                        let #value_var: ::maa_value::MAAValue = #converted_value;
-                        #object.insert(#key, #optional);
+                        let #value_var: ::maa_value::value::MAAValue = #converted_value;
+                        ::maa_value::map::MapOps::insert(#object, #key, #optional);
                     }
                 }
             }
@@ -126,7 +122,8 @@ fn generate_optional_value(value_var: &Ident, conditions: &[(LitStr, Expr)]) -> 
         .iter()
         .map(|(cond_key, expected)| {
             quote! {
-                #conditions_var.insert(
+                ::maa_value::map::Map::insert(
+                    &mut #conditions_var,
                     ::core::convert::Into::into(#cond_key),
                     ::core::convert::Into::into(#expected)
                 );
@@ -135,9 +132,9 @@ fn generate_optional_value(value_var: &Ident, conditions: &[(LitStr, Expr)]) -> 
         .collect();
 
     quote! {{
-        let mut #conditions_var = ::maa_value::Map::new();
+        let mut #conditions_var = ::maa_value::map::Map::new();
         #(#cond_inserts)*
-        ::maa_value::MAAValue::Optional {
+        ::maa_value::value::MAAValue::Optional {
             conditions: #conditions_var,
             value: ::core::convert::Into::into(#value_var),
         }

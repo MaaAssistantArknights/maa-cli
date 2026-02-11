@@ -8,7 +8,7 @@ use anyhow::Context;
 use condition::Condition;
 pub use condition::{TimeOffset, remainder_of_day_mod};
 use maa_sys::TaskType;
-use maa_value::{MAAValue, insert, object};
+use maa_value::prelude::*;
 use serde::Deserialize;
 
 use crate::dirs;
@@ -172,7 +172,7 @@ impl TaskConfig {
             }
 
             let task_type = task.task_type();
-            let mut params = task.params().init()?;
+            let mut params = task.params().resolve()?;
 
             // If startup task is not enabled, enable it automatically
             match task_type {
@@ -274,7 +274,8 @@ impl TaskConfig {
                     object!(
                         "start_game_enabled" => true,
                         "client_type" => client_type.to_string(),
-                    ),
+                    )
+                    .resolve()?,
                 ),
             );
         }
@@ -284,7 +285,8 @@ impl TaskConfig {
                 TaskType::CloseDown,
                 object!(
                     "client_type" => client_type.to_string(),
-                ),
+                )
+                .resolve()?,
             ));
         }
 
@@ -309,11 +311,11 @@ pub struct InitializedTaskConfig {
 pub struct InitializedTask {
     pub name: Option<String>,
     pub task_type: TaskType,
-    pub params: MAAValue,
+    pub params: ResolvedMAAValue,
 }
 
 impl InitializedTask {
-    const fn new(task_type: TaskType, params: MAAValue) -> Self {
+    const fn new(task_type: TaskType, params: ResolvedMAAValue) -> Self {
         Self {
             name: None,
             task_type,
@@ -336,8 +338,6 @@ impl InitializedTask {
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
-    use maa_value::object;
-
     use super::*;
 
     mod task {
@@ -724,6 +724,8 @@ mod tests {
                                 "start_game_enabled" => true,
                                 "client_type" => "YoStarEN",
                             )
+                            .resolve()
+                            .unwrap()
                         )
                         .with_name(String::from("StartUp"))
                     ]
@@ -755,6 +757,8 @@ mod tests {
                             "start_game_enabled" => false,
                             "client_type" => "YoStarEN",
                         )
+                        .resolve()
+                        .unwrap()
                     )]
                 }
             );
@@ -775,7 +779,7 @@ mod tests {
                     close_app: true,
                     tasks: vec![InitializedTask::new(
                         CloseDown,
-                        object!("client_type" => "YoStarEN")
+                        object!("client_type" => "YoStarEN").resolve().unwrap()
                     )]
                 }
             );
@@ -805,6 +809,8 @@ mod tests {
                             "enable" => false,
                             "client_type" => "YoStarEN",
                         )
+                        .resolve()
+                        .unwrap()
                     )]
                 }
             );
@@ -824,7 +830,7 @@ mod tests {
                     close_app: true,
                     tasks: vec![InitializedTask::new(
                         CloseDown,
-                        object!("client_type" => "Official")
+                        object!("client_type" => "Official").resolve().unwrap()
                     )]
                 }
             );
@@ -844,7 +850,7 @@ mod tests {
                     close_app: false,
                     tasks: vec![InitializedTask::new(
                         Fight,
-                        object!("client_type" => "YoStarEN")
+                        object!("client_type" => "YoStarEN").resolve().unwrap()
                     )]
                 }
             );
@@ -879,6 +885,8 @@ mod tests {
                                 "client_type" => "Official",
                                 "start_game_enabled" => true,
                             )
+                            .resolve()
+                            .unwrap()
                         ),
                         InitializedTask::new(
                             Fight,
@@ -886,8 +894,13 @@ mod tests {
                                 "stage" => "1-7",
                                 "client_type" => "Official",
                             )
+                            .resolve()
+                            .unwrap()
                         ),
-                        InitializedTask::new(CloseDown, object!("client_type" => "Official")),
+                        InitializedTask::new(
+                            CloseDown,
+                            object!("client_type" => "Official").resolve().unwrap()
+                        ),
                     ]
                 }
             );
@@ -917,6 +930,8 @@ mod tests {
                                 "client_type" => "Official",
                                 "start_game_enabled" => true,
                             )
+                            .resolve()
+                            .unwrap()
                         ),
                         InitializedTask::new(
                             Fight,
@@ -924,6 +939,8 @@ mod tests {
                                 "stage" => "1-7",
                                 "client_type" => "Official",
                             )
+                            .resolve()
+                            .unwrap()
                         ),
                         InitializedTask::new(
                             CloseDown,
@@ -931,6 +948,8 @@ mod tests {
                                 "enable" => true,
                                 "client_type" => "Official",
                             )
+                            .resolve()
+                            .unwrap()
                         ),
                     ]
                 },
@@ -956,6 +975,8 @@ mod tests {
                                 "client_type" => "Official",
                                 "start_game_enabled" => true,
                             )
+                            .resolve()
+                            .unwrap()
                         ),
                         InitializedTask::new(
                             Fight,
@@ -963,8 +984,13 @@ mod tests {
                                 "stage" => "1-7",
                                 "client_type" => "Official",
                             )
+                            .resolve()
+                            .unwrap()
                         ),
-                        InitializedTask::new(CloseDown, object!("client_type" => "Official"),),
+                        InitializedTask::new(
+                            CloseDown,
+                            object!("client_type" => "Official").resolve().unwrap(),
+                        ),
                     ]
                 },
             );
@@ -989,6 +1015,8 @@ mod tests {
                                 "start_game_enabled" => true,
                                 "client_type" => "YoStarEN",
                             )
+                            .resolve()
+                            .unwrap()
                         ),
                         InitializedTask::new(
                             Fight,
@@ -996,8 +1024,13 @@ mod tests {
                                 "stage" => "1-7",
                                 "client_type" => "YoStarEN",
                             )
+                            .resolve()
+                            .unwrap()
                         ),
-                        InitializedTask::new(CloseDown, object!("client_type" => "YoStarEN"),),
+                        InitializedTask::new(
+                            CloseDown,
+                            object!("client_type" => "YoStarEN").resolve().unwrap(),
+                        ),
                     ]
                 }
             );
@@ -1020,8 +1053,14 @@ mod tests {
                     start_app: false,
                     close_app: true,
                     tasks: vec![
-                        InitializedTask::new(StartUp, object!("client_type" => "Official")),
-                        InitializedTask::new(CloseDown, object!("client_type" => "Official")),
+                        InitializedTask::new(
+                            StartUp,
+                            object!("client_type" => "Official").resolve().unwrap()
+                        ),
+                        InitializedTask::new(
+                            CloseDown,
+                            object!("client_type" => "Official").resolve().unwrap()
+                        ),
                     ]
                 }
             );
@@ -1047,9 +1086,9 @@ mod tests {
                     tasks: vec![
                         InitializedTask::new(
                             Infrast,
-                            object!("filename" => dirs::abs_config("daily.json", Some("infrast")).unwrap()??),
+                            object!("filename" => dirs::abs_config("daily.json", Some("infrast")).unwrap()??).resolve().unwrap(),
                         ),
-                        InitializedTask::new(Infrast, object!("filename" => "/tmp/daily.json"))
+                        InitializedTask::new(Infrast, object!("filename" => "/tmp/daily.json").resolve().unwrap())
                     ]
                 }
             );
@@ -1057,17 +1096,17 @@ mod tests {
 
         #[test]
         fn initialized_task() {
-            let task = InitializedTask::new(Fight, object!("stage" => "1-7"))
+            let task = InitializedTask::new(Fight, object!("stage" => "1-7").resolve().unwrap())
                 .with_name("Fight Daily".to_string());
             assert_eq!(task.name_or_default(), "Fight Daily");
             assert_eq!(task.task_type, Fight);
-            assert_eq!(&task.params, &object!("stage" => "1-7"));
+            assert_eq!(&task.params, &object!("stage" => "1-7").resolve().unwrap());
             assert_eq!(task.name, Some(String::from("Fight Daily")));
 
-            let task = InitializedTask::new(Fight, object!("stage" => "1-7"));
+            let task = InitializedTask::new(Fight, object!("stage" => "1-7").resolve().unwrap());
             assert_eq!(task.name_or_default(), "Fight");
             assert_eq!(task.task_type, Fight);
-            assert_eq!(&task.params, &object!("stage" => "1-7"));
+            assert_eq!(&task.params, &object!("stage" => "1-7").resolve().unwrap());
             assert_eq!(task.name, None);
         }
     }
