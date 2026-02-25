@@ -31,6 +31,11 @@ const COPILOT_API: &str = "http://127.0.0.1:18080/copilot/get/";
 #[cfg(test)]
 const COPILOT_SET_API: &str = "http://127.0.0.1:18080/set/get?id=";
 
+// Raid mode constants
+const RAID_MODE_NORMAL: u8 = 0;
+const RAID_MODE_RAID: u8 = 1;
+const RAID_MODE_BOTH: u8 = 2;
+
 #[cfg_attr(test, derive(Default))]
 #[derive(clap::Args)]
 pub struct CopilotParams {
@@ -185,12 +190,12 @@ impl IntoParameters for CopilotParams {
             }
 
             match self.raid {
-                0 | 1 => stage_list.push(StageOpts {
+                RAID_MODE_NORMAL | RAID_MODE_RAID => stage_list.push(StageOpts {
                     filename: file.to_path_buf(),
                     stage_name: stage_code.to_owned(),
-                    is_raid: self.raid == 1,
+                    is_raid: self.raid == RAID_MODE_RAID,
                 }),
-                2 => {
+                RAID_MODE_BOTH => {
                     stage_list.push(StageOpts {
                         filename: file.to_path_buf(),
                         stage_name: stage_code.to_owned(),
@@ -213,11 +218,25 @@ impl IntoParameters for CopilotParams {
             "use_sanity_potion" => use_sanity_potion,
             "add_trust" => add_trust,
             "ignore_requirements" => ignore_requirements,
-            "copilot_list" => stage_list?,
             "formation_index" =>? self.formation_index,
             "support_unit_usage" =>? self.support_unit_usage,
             "support_unit_name" =>? self.support_unit_name
         );
+
+        // Use single file mode when there's only one stage in the list
+        if stage_list.len() == 1 {
+            let stage_opt = stage_list
+                .into_iter()
+                .next()
+                .expect("single-file mode requires exactly one copilot stage");
+            insert!(params,
+                "filename" => stage_opt.filename?
+            );
+        } else {
+            insert!(params,
+                "copilot_list" => stage_list?
+            );
+        }
 
         Ok(params)
     }
@@ -717,11 +736,7 @@ found"}"#,
                 assert_eq!(
                     params,
                     object!(
-                        "copilot_list" => [object!(
-                            "filename" => path_from_cache_dir("40051.json"),
-                            "stage_name" => "AS-EX-1",
-                            "is_raid" => false,
-                        )],
+                        "filename" => path_from_cache_dir("40051.json"),
                         "formation" => false,
                         "use_sanity_potion" => false,
                         "add_trust" => false,
@@ -757,11 +772,7 @@ found"}"#,
                 assert_eq!(
                     params,
                     object!(
-                        "copilot_list" => [object!(
-                            "filename" => path_from_cache_dir("40051.json"),
-                            "stage_name" => "AS-EX-1",
-                            "is_raid" => true,
-                        )],
+                        "filename" => path_from_cache_dir("40051.json"),
                         "formation" => true,
                         "use_sanity_potion" => true,
                         "add_trust" => true,
@@ -787,11 +798,7 @@ found"}"#,
                 assert_eq!(
                     params,
                     object!(
-                        "copilot_list" => [object!(
-                            "filename" => path_from_cache_dir("40051.json"),
-                            "stage_name" => "AS-EX-1",
-                            "is_raid" => false,
-                        )],
+                        "filename" => path_from_cache_dir("40051.json"),
                         "formation" => false,
                         "use_sanity_potion" => false,
                         "add_trust" => false,
@@ -915,11 +922,7 @@ found"}"#,
                 assert_eq!(
                     params,
                     object!(
-                        "copilot_list" => [object!(
-                            "filename" => path_from_cache_dir("40051.json"),
-                            "stage_name" => "AS-EX-1",
-                            "is_raid" => false,
-                        )],
+                        "filename" => path_from_cache_dir("40051.json"),
                         "formation" => true,
                         "use_sanity_potion" => false,
                         "add_trust" => false,
@@ -944,11 +947,7 @@ found"}"#,
                 assert_eq!(
                     params,
                     object!(
-                        "copilot_list" => [object!(
-                            "filename" => path_from_cache_dir("40051.json"),
-                            "stage_name" => "AS-EX-1",
-                            "is_raid" => false,
-                        )],
+                        "filename" => path_from_cache_dir("40051.json"),
                         "formation" => false,
                         "use_sanity_potion" => true,
                         "add_trust" => false,
@@ -973,11 +972,7 @@ found"}"#,
                 assert_eq!(
                     params,
                     object!(
-                        "copilot_list" => [object!(
-                            "filename" => path_from_cache_dir("40051.json"),
-                            "stage_name" => "AS-EX-1",
-                            "is_raid" => false,
-                        )],
+                        "filename" => path_from_cache_dir("40051.json"),
                         "formation" => false,
                         "use_sanity_potion" => false,
                         "add_trust" => true,
@@ -1002,11 +997,7 @@ found"}"#,
                 assert_eq!(
                     params,
                     object!(
-                        "copilot_list" => [object!(
-                            "filename" => path_from_cache_dir("40051.json"),
-                            "stage_name" => "AS-EX-1",
-                            "is_raid" => false,
-                        )],
+                        "filename" => path_from_cache_dir("40051.json"),
                         "formation" => false,
                         "use_sanity_potion" => false,
                         "add_trust" => false,
@@ -1038,11 +1029,7 @@ found"}"#,
                 assert_eq!(
                     params,
                     object!(
-                        "copilot_list" => [object!(
-                            "filename" => path_from_cache_dir("40051.json"),
-                            "stage_name" => "AS-EX-1",
-                            "is_raid" => false,
-                        )],
+                        "filename" => path_from_cache_dir("40051.json"),
                         "formation" => true,
                         "use_sanity_potion" => true,
                         "add_trust" => false,
