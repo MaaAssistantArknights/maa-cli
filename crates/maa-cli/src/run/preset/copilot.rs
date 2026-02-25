@@ -230,7 +230,7 @@ impl IntoParameters for CopilotParams {
                 .next()
                 .expect("single-file mode requires exactly one copilot stage");
             insert!(params,
-                "filename" => stage_opt.filename.to_string_lossy().to_string()
+                "filename" => stage_opt.filename?
             );
         } else {
             insert!(params,
