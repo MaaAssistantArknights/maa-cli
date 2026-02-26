@@ -1,5 +1,5 @@
 use anyhow::{Context, bail};
-use maa_value::{MAAValue, insert, object};
+use maa_value::prelude::*;
 
 use crate::config::task::ClientType;
 
@@ -138,8 +138,6 @@ impl super::IntoParameters for FightParams {
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
-    use maa_value::object;
-
     use super::*;
     use crate::command::{Command, parse_from};
 

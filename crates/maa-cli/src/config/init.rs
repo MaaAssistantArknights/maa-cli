@@ -1,10 +1,7 @@
 use std::path::Path;
 
 use anyhow::{Result, bail};
-use maa_value::{
-    MAAValue, insert, object,
-    userinput::{BoolInput, Input, SelectD, ValueWithDesc},
-};
+use maa_value::prelude::*;
 
 fn asst_config_template() -> MAAValue {
     object!(
@@ -162,12 +159,12 @@ pub fn init(name: Option<&Path>, filetype: Option<super::Filetype>, force: bool)
         std::fs::create_dir_all(&profile_dir)?;
     }
 
-    let asst_config = asst_config_template().init()?;
-    let mut asst_config_out = object!();
+    // TODO: better logic to handle the template
+    let asst_config = asst_config_template().resolve()?;
+    let mut asst_config_out = ResolvedMAAValue::default();
     if let Some(obj) = asst_config.get("connection_config") {
-        let mut config = object!(
-            "preset" => obj.get("preset").unwrap().to_owned(),
-        );
+        let mut config = ResolvedMAAValue::default();
+        insert!(config, "preset" => obj.get("preset").unwrap().to_owned());
 
         if let Some(adb_path) = obj.get("adb_path") {
             let adb_path = adb_path.as_str().unwrap();
@@ -185,7 +182,7 @@ pub fn init(name: Option<&Path>, filetype: Option<super::Filetype>, force: bool)
             "auto" => {}
             x => insert!(config, "config" => x),
         };
-        asst_config_out.insert("connection", config);
+        insert!(asst_config_out, "connection" => config);
     }
 
     // no additional processing needed
@@ -194,9 +191,8 @@ pub fn init(name: Option<&Path>, filetype: Option<super::Filetype>, force: bool)
     }
 
     if let Some(obj) = asst_config.get("resource_config") {
-        let mut config = object!(
-            "user_resource" => obj.get("user_resource").unwrap().to_owned(),
-        );
+        let mut config = ResolvedMAAValue::default();
+        insert!(config, "user_resource" => obj.get("user_resource").unwrap().to_owned());
         match obj.get("global_resource").unwrap().as_str().unwrap() {
             "None" => {}
             x => insert!(config, "global_resource" => x),
@@ -209,9 +205,8 @@ pub fn init(name: Option<&Path>, filetype: Option<super::Filetype>, force: bool)
     }
 
     if let Some(obj) = asst_config.get("static_options") {
-        let mut config = object!(
-            "cpu_ocr" => obj.get("cpu_ocr").unwrap().to_owned(),
-        );
+        let mut config = ResolvedMAAValue::default();
+        insert!(config, "cpu_ocr" => obj.get("cpu_ocr").unwrap().to_owned());
         if let Some(gpu_ocr) = obj.get("gpu_ocr") {
             config.insert("gpu_ocr", gpu_ocr.to_owned());
         }
