@@ -180,13 +180,16 @@ impl IntoParameters for CopilotParams {
         let default = context.default;
 
         let copilot_files = resolve_copilot_uris(self.uri_list)?;
-        let skill_support_map = match load_skill_support_map(base_dirs.iter().map(|dir| dir.as_path())) {
-            Ok(map) => Some(map),
-            Err(err) => {
-                warn!("Failed to load copilot skill support data, skip skill normalization: {err}");
-                None
-            }
-        };
+        let skill_support_map =
+            match load_skill_support_map(base_dirs.iter().map(|dir| dir.as_path())) {
+                Ok(map) => Some(map),
+                Err(err) => {
+                    warn!(
+                        "Failed to load copilot skill support data, skip skill normalization: {err}"
+                    );
+                    None
+                }
+            };
 
         let is_task_list = copilot_files.len() > 1;
         let formation = self.formation || is_task_list || default.get_or("formation", false);
@@ -565,7 +568,10 @@ fn is_skill_supported(skill: i64, rarity: i32) -> bool {
     }
 }
 
-fn normalize_copilot_skill(copilot_json: &mut serde_json::Value, skill_support_map: &HashMap<String, i32>) -> usize {
+fn normalize_copilot_skill(
+    copilot_json: &mut serde_json::Value,
+    skill_support_map: &HashMap<String, i32>,
+) -> usize {
     fn normalize_one_oper(
         oper: &mut serde_json::Value,
         skill_support_map: &HashMap<String, i32>,
