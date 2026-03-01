@@ -1707,6 +1707,128 @@ found"}"#,
             assert_eq!(json["opers"][2]["skill"], 0);
             assert_eq!(json["groups"][0]["opers"][0]["skill"], 0);
         }
+
+        #[test]
+        fn normalize_copilot_skill_ignores_invalid_oper_entries() {
+            let mut json = serde_json::json!({
+                "stage_name": "test_stage",
+                "opers": [
+                    null,
+                    { "skill": 2 },
+                    { "name": "夜莺", "skill": 4 },
+                    { "name": "夜莺", "skill": "x" }
+                ]
+            });
+
+            let skill_support_map = HashMap::from([("夜莺".to_string(), 6)]);
+
+            let changed = normalize_copilot_skill(&mut json, &skill_support_map);
+
+            assert_eq!(changed, 0);
+            assert_eq!(json["opers"][2]["skill"], 4);
+            assert_eq!(json["opers"][3]["skill"], "x");
+        }
+
+        #[test]
+        fn load_skill_support_map_reads_name_and_alias() {
+            let root = temp_dir().join(format!(
+                "maa-test-skill-map-alias-{}",
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
+            ));
+            fs::create_dir_all(&root).unwrap();
+
+            let battle_data = serde_json::json!({
+                "chars": {
+                    "char_1": {
+                        "name": "阿米娅",
+                        "appellation": "兔兔",
+                        "rarity": 5
+                    },
+                    "char_2": {
+                        "name": "能天使",
+                        "rarity": 6
+                    }
+                }
+            });
+            serde_json::to_writer(
+                fs::File::create(root.join("battle_data.json")).unwrap(),
+                &battle_data,
+            )
+            .unwrap();
+
+            let map = load_skill_support_map(std::slice::from_ref(&root)).unwrap();
+            assert_eq!(map.get("阿米娅"), Some(&5));
+            assert_eq!(map.get("兔兔"), Some(&5));
+            assert_eq!(map.get("能天使"), Some(&6));
+
+            fs::remove_dir_all(root).unwrap();
+        }
+
+        #[test]
+        fn load_skill_support_map_uses_last_matching_base_dir() {
+            let suffix = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let root_a = temp_dir().join(format!("maa-test-skill-map-a-{suffix}"));
+            let root_b = temp_dir().join(format!("maa-test-skill-map-b-{suffix}"));
+            fs::create_dir_all(&root_a).unwrap();
+            fs::create_dir_all(&root_b).unwrap();
+
+            let data_a = serde_json::json!({
+                "chars": {
+                    "char_1": {
+                        "name": "阿米娅",
+                        "rarity": 4
+                    }
+                }
+            });
+            let data_b = serde_json::json!({
+                "chars": {
+                    "char_1": {
+                        "name": "阿米娅",
+                        "rarity": 5
+                    }
+                }
+            });
+
+            serde_json::to_writer(
+                fs::File::create(root_a.join("battle_data.json")).unwrap(),
+                &data_a,
+            )
+            .unwrap();
+            serde_json::to_writer(
+                fs::File::create(root_b.join("battle_data.json")).unwrap(),
+                &data_b,
+            )
+            .unwrap();
+
+            let map = load_skill_support_map([root_a.as_path(), root_b.as_path()]).unwrap();
+            assert_eq!(map.get("阿米娅"), Some(&5));
+
+            fs::remove_dir_all(root_a).unwrap();
+            fs::remove_dir_all(root_b).unwrap();
+        }
+
+        #[test]
+        fn load_skill_support_map_returns_error_when_missing() {
+            let root = temp_dir().join(format!(
+                "maa-test-skill-map-missing-{}",
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
+            ));
+            fs::create_dir_all(&root).unwrap();
+
+            let result = load_skill_support_map(std::slice::from_ref(&root));
+            assert!(result.is_err());
+
+            fs::remove_dir_all(root).unwrap();
+        }
     }
 
     mod paradox_copilot_params {
