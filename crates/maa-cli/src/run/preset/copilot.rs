@@ -1829,6 +1829,36 @@ found"}"#,
 
             fs::remove_dir_all(root).unwrap();
         }
+
+        #[test]
+        fn write_normalized_copilot_file_writes_expected_file() {
+            let suffix = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let source_file = PathBuf::from(format!("test-source-{suffix}.json"));
+            let index = 42;
+            let payload = serde_json::json!({
+                "stage_name": "test_stage",
+                "opers": [{ "name": "夜莺", "skill": 3 }]
+            });
+
+            let normalized_file =
+                write_normalized_copilot_file(index, &source_file, &payload).unwrap();
+
+            assert!(normalized_file.exists());
+            assert!(
+                normalized_file
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name == format!("{index}_test-source-{suffix}.json"))
+            );
+
+            let written: serde_json::Value = json_from_file(&normalized_file).unwrap();
+            assert_eq!(written, payload);
+
+            fs::remove_file(normalized_file).unwrap();
+        }
     }
 
     mod paradox_copilot_params {
