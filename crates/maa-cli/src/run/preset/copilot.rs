@@ -201,8 +201,9 @@ impl IntoParameters for CopilotParams {
             self.ignore_requirements || default.get_or("ignore_requirements", false);
 
         let mut stage_list = Vec::new();
-        for (index, file, _) in copilot_files {
-            let mut copilot_json: serde_json::Value = json_from_file(&file)?;
+        for (index, file, value) in copilot_files {
+            let mut copilot_json: serde_json::Value =
+                value.map(Ok).unwrap_or_else(|| json_from_file(&file))?;
             let mut runtime_file = file.to_path_buf();
 
             if let Some(skill_support_map) = skill_support_map.as_ref()
@@ -686,14 +687,14 @@ fn operator_table(task: &CopilotTask) -> Result<Table> {
 /// original URI index to preserve order.
 fn resolve_copilot_uris(
     uri_list: Vec<String>,
-) -> Result<Vec<(usize, PathBuf, Option<CopilotTask>)>> {
+) -> Result<Vec<(usize, PathBuf, Option<serde_json::Value>)>> {
     let copilot_dir = dirs::copilot().ensure()?;
 
     let mut copilot_files = uri_list
         .into_par_iter()
         .enumerate()
         .try_fold(Vec::new, |mut files, (index, uri)| {
-            CopilotFile::from_uri(&uri)?.push_path_into::<CopilotTask>(
+            CopilotFile::from_uri(&uri)?.push_path_into::<serde_json::Value>(
                 index,
                 copilot_dir,
                 &mut files,
