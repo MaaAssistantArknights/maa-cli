@@ -1,11 +1,12 @@
 use std::{
+    collections::HashMap,
     fs,
     io::Write,
     path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result, bail};
-use log::{debug, trace};
+use log::{debug, trace, warn};
 use maa_sys::TaskType;
 use maa_value::{
     MAAValue, insert, object,
@@ -112,7 +113,12 @@ impl TryFrom<StageOpts> for MAAValue {
 #[derive(Debug, serde::Deserialize)]
 struct CopilotOperator {
     name: String,
+    #[serde(default = "default_skill")]
     skill: i32,
+}
+
+fn default_skill() -> i32 {
+    1
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -144,6 +150,20 @@ struct StageInfo {
     code: String,
 }
 
+#[derive(Debug, serde::Deserialize)]
+struct BattleData {
+    #[serde(default)]
+    chars: HashMap<String, BattleCharacter>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct BattleCharacter {
+    name: String,
+    #[serde(default)]
+    appellation: Option<String>,
+    rarity: i32,
+}
+
 impl ToTaskType for CopilotParams {
     fn to_task_type(&self) -> TaskType {
         TaskType::Copilot
@@ -160,6 +180,16 @@ impl IntoParameters for CopilotParams {
         let default = context.default;
 
         let copilot_files = resolve_copilot_uris(self.uri_list)?;
+        let skill_support_map =
+            match load_skill_support_map(base_dirs.iter().map(|dir| dir.as_path())) {
+                Ok(map) => Some(map),
+                Err(err) => {
+                    warn!(
+                        "Failed to load copilot skill support data, skip skill normalization: {err}"
+                    );
+                    None
+                }
+            };
 
         let is_task_list = copilot_files.len() > 1;
         let formation = self.formation || is_task_list || default.get_or("formation", false);
@@ -171,8 +201,18 @@ impl IntoParameters for CopilotParams {
             self.ignore_requirements || default.get_or("ignore_requirements", false);
 
         let mut stage_list = Vec::new();
-        for (_, file, value) in copilot_files {
-            let copilot_task = value.map(Ok).unwrap_or_else(|| json_from_file(&file))?;
+        for (index, file, value) in copilot_files {
+            let mut copilot_json: serde_json::Value =
+                value.map(Ok).unwrap_or_else(|| json_from_file(&file))?;
+            let mut runtime_file = file.to_path_buf();
+
+            if let Some(skill_support_map) = skill_support_map.as_ref()
+                && normalize_copilot_skill(&mut copilot_json, skill_support_map) > 0
+            {
+                runtime_file = write_normalized_copilot_file(index, &file, &copilot_json)?;
+            }
+
+            let copilot_task: CopilotTask = serde_json::from_value(copilot_json)?;
             let stage_id = &copilot_task.stage_name;
 
             let stage_info = get_stage_info(stage_id, base_dirs.iter().map(|dir| dir.as_path()))?;
@@ -191,18 +231,18 @@ impl IntoParameters for CopilotParams {
 
             match self.raid {
                 RAID_MODE_NORMAL | RAID_MODE_RAID => stage_list.push(StageOpts {
-                    filename: file.to_path_buf(),
+                    filename: runtime_file.clone(),
                     stage_name: stage_code.to_owned(),
                     is_raid: self.raid == RAID_MODE_RAID,
                 }),
                 RAID_MODE_BOTH => {
                     stage_list.push(StageOpts {
-                        filename: file.to_path_buf(),
+                        filename: runtime_file.clone(),
                         stage_name: stage_code.to_owned(),
                         is_raid: false,
                     });
                     stage_list.push(StageOpts {
-                        filename: file.to_path_buf(),
+                        filename: runtime_file,
                         stage_name: stage_code.to_owned(),
                         is_raid: true,
                     });
@@ -490,6 +530,129 @@ fn json_from_file<V: serde::de::DeserializeOwned>(path: impl AsRef<Path>) -> Res
     Ok(serde_json::from_reader(fs::File::open(path)?)?)
 }
 
+fn load_skill_support_map<P, D>(base_dirs: D) -> Result<HashMap<String, i32>>
+where
+    P: AsRef<Path>,
+    D: IntoIterator<Item = P>,
+{
+    let battle_data_files = dirs::global_find(base_dirs, |dir| {
+        let file = dir.join("battle_data.json");
+        trace!("Searching battle data in {}", file.display());
+        file.is_file().then_some(file)
+    });
+
+    let battle_data_file = battle_data_files
+        .last()
+        .context("Failed to find battle_data.json, your resources may be outdated")?;
+
+    let battle_data: BattleData = json_from_file(battle_data_file)?;
+    let mut map = HashMap::new();
+
+    for oper in battle_data.chars.into_values() {
+        map.insert(oper.name.clone(), oper.rarity);
+        if let Some(alias) = oper.appellation
+            && !alias.is_empty()
+        {
+            map.entry(alias).or_insert(oper.rarity);
+        }
+    }
+
+    Ok(map)
+}
+
+fn is_skill_supported(skill: i64, rarity: i32) -> bool {
+    match skill {
+        1 => rarity >= 3,
+        2 => rarity >= 4,
+        3 => rarity >= 6,
+        _ => true,
+    }
+}
+
+fn normalize_copilot_skill(
+    copilot_json: &mut serde_json::Value,
+    skill_support_map: &HashMap<String, i32>,
+) -> usize {
+    fn normalize_one_oper(
+        oper: &mut serde_json::Value,
+        skill_support_map: &HashMap<String, i32>,
+    ) -> bool {
+        let Some(oper) = oper.as_object_mut() else {
+            return false;
+        };
+
+        let Some(name) = oper.get("name").and_then(serde_json::Value::as_str) else {
+            return false;
+        };
+        let skill = oper
+            .get("skill")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(default_skill() as i64);
+
+        if !matches!(skill, 1..=3) {
+            return false;
+        }
+
+        let rarity = skill_support_map.get(name).copied().unwrap_or(-1);
+
+        if is_skill_supported(skill, rarity) {
+            return false;
+        }
+
+        warn!("Copilot operator `{name}` does not support skill {skill}, fallback to 0");
+        oper.insert("skill".to_string(), serde_json::json!(0));
+        true
+    }
+
+    let mut changed = 0;
+
+    if let Some(opers) = copilot_json
+        .get_mut("opers")
+        .and_then(serde_json::Value::as_array_mut)
+    {
+        for oper in opers {
+            changed += usize::from(normalize_one_oper(oper, skill_support_map));
+        }
+    }
+
+    if let Some(groups) = copilot_json
+        .get_mut("groups")
+        .and_then(serde_json::Value::as_array_mut)
+    {
+        for group in groups {
+            if let Some(opers) = group
+                .get_mut("opers")
+                .and_then(serde_json::Value::as_array_mut)
+            {
+                for oper in opers {
+                    changed += usize::from(normalize_one_oper(oper, skill_support_map));
+                }
+            }
+        }
+    }
+
+    changed
+}
+
+fn write_normalized_copilot_file(
+    index: usize,
+    source_file: &Path,
+    copilot_json: &serde_json::Value,
+) -> Result<PathBuf> {
+    let normalized_dir = dirs::copilot().ensure()?.join("normalized");
+    normalized_dir.ensure()?;
+
+    let source_stem = source_file
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or("copilot");
+    let normalized_file = normalized_dir.join(format!("{index}_{source_stem}.json"));
+
+    serde_json::to_writer(fs::File::create(&normalized_file)?, copilot_json)?;
+
+    Ok(normalized_file)
+}
+
 fn operator_table(task: &CopilotTask) -> Result<Table> {
     let mut table = Table::new();
     table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
@@ -524,14 +687,14 @@ fn operator_table(task: &CopilotTask) -> Result<Table> {
 /// original URI index to preserve order.
 fn resolve_copilot_uris(
     uri_list: Vec<String>,
-) -> Result<Vec<(usize, PathBuf, Option<CopilotTask>)>> {
+) -> Result<Vec<(usize, PathBuf, Option<serde_json::Value>)>> {
     let copilot_dir = dirs::copilot().ensure()?;
 
     let mut copilot_files = uri_list
         .into_par_iter()
         .enumerate()
         .try_fold(Vec::new, |mut files, (index, uri)| {
-            CopilotFile::from_uri(&uri)?.push_path_into::<CopilotTask>(
+            CopilotFile::from_uri(&uri)?.push_path_into::<serde_json::Value>(
                 index,
                 copilot_dir,
                 &mut files,
@@ -1496,6 +1659,207 @@ found"}"#,
 
         let task: CopilotTask = serde_json::from_value(json).unwrap();
         assert_eq!(operator_table(&task).unwrap(), expected_table);
+    }
+
+    mod skill_normalization {
+        use super::*;
+
+        #[test]
+        fn skill_defaults_to_one_when_missing() {
+            let json = serde_json::json!({
+                "stage_name": "test_stage",
+                "opers": [{ "name": "夜莺" }],
+            });
+
+            let task: CopilotTask = serde_json::from_value(json).unwrap();
+            assert_eq!(task.opers[0].skill, 1);
+        }
+
+        #[test]
+        fn normalize_copilot_skill_for_opers_and_groups() {
+            let mut json = serde_json::json!({
+                "stage_name": "test_stage",
+                "opers": [
+                    { "name": "黑角", "skill": 1 },
+                    { "name": "夜莺", "skill": 3 },
+                    { "name": "未知干员111", "skill": 2 }
+                ],
+                "groups": [
+                    {
+                        "name": "小组",
+                        "opers": [
+                            { "name": "斑点", "skill": 2 }
+                        ]
+                    }
+                ]
+            });
+
+            let skill_support_map = HashMap::from([
+                ("黑角".to_string(), 2),
+                ("夜莺".to_string(), 6),
+                ("斑点".to_string(), 3),
+            ]);
+
+            let changed = normalize_copilot_skill(&mut json, &skill_support_map);
+
+            assert_eq!(changed, 3);
+            assert_eq!(json["opers"][0]["skill"], 0);
+            assert_eq!(json["opers"][1]["skill"], 3);
+            assert_eq!(json["opers"][2]["skill"], 0);
+            assert_eq!(json["groups"][0]["opers"][0]["skill"], 0);
+        }
+
+        #[test]
+        fn normalize_copilot_skill_ignores_invalid_oper_entries() {
+            let mut json = serde_json::json!({
+                "stage_name": "test_stage",
+                "opers": [
+                    null,
+                    { "skill": 2 },
+                    { "name": "夜莺", "skill": 4 },
+                    { "name": "夜莺", "skill": "x" }
+                ]
+            });
+
+            let skill_support_map = HashMap::from([("夜莺".to_string(), 6)]);
+
+            let changed = normalize_copilot_skill(&mut json, &skill_support_map);
+
+            assert_eq!(changed, 0);
+            assert_eq!(json["opers"][2]["skill"], 4);
+            assert_eq!(json["opers"][3]["skill"], "x");
+        }
+
+        #[test]
+        fn load_skill_support_map_reads_name_and_alias() {
+            let root = temp_dir().join(format!(
+                "maa-test-skill-map-alias-{}",
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
+            ));
+            fs::create_dir_all(&root).unwrap();
+
+            let battle_data = serde_json::json!({
+                "chars": {
+                    "char_1": {
+                        "name": "阿米娅",
+                        "appellation": "兔兔",
+                        "rarity": 5
+                    },
+                    "char_2": {
+                        "name": "能天使",
+                        "rarity": 6
+                    }
+                }
+            });
+            serde_json::to_writer(
+                fs::File::create(root.join("battle_data.json")).unwrap(),
+                &battle_data,
+            )
+            .unwrap();
+
+            let map = load_skill_support_map(std::slice::from_ref(&root)).unwrap();
+            assert_eq!(map.get("阿米娅"), Some(&5));
+            assert_eq!(map.get("兔兔"), Some(&5));
+            assert_eq!(map.get("能天使"), Some(&6));
+
+            fs::remove_dir_all(root).unwrap();
+        }
+
+        #[test]
+        fn load_skill_support_map_uses_last_matching_base_dir() {
+            let suffix = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let root_a = temp_dir().join(format!("maa-test-skill-map-a-{suffix}"));
+            let root_b = temp_dir().join(format!("maa-test-skill-map-b-{suffix}"));
+            fs::create_dir_all(&root_a).unwrap();
+            fs::create_dir_all(&root_b).unwrap();
+
+            let data_a = serde_json::json!({
+                "chars": {
+                    "char_1": {
+                        "name": "阿米娅",
+                        "rarity": 4
+                    }
+                }
+            });
+            let data_b = serde_json::json!({
+                "chars": {
+                    "char_1": {
+                        "name": "阿米娅",
+                        "rarity": 5
+                    }
+                }
+            });
+
+            serde_json::to_writer(
+                fs::File::create(root_a.join("battle_data.json")).unwrap(),
+                &data_a,
+            )
+            .unwrap();
+            serde_json::to_writer(
+                fs::File::create(root_b.join("battle_data.json")).unwrap(),
+                &data_b,
+            )
+            .unwrap();
+
+            let map = load_skill_support_map([root_a.as_path(), root_b.as_path()]).unwrap();
+            assert_eq!(map.get("阿米娅"), Some(&5));
+
+            fs::remove_dir_all(root_a).unwrap();
+            fs::remove_dir_all(root_b).unwrap();
+        }
+
+        #[test]
+        fn load_skill_support_map_returns_error_when_missing() {
+            let root = temp_dir().join(format!(
+                "maa-test-skill-map-missing-{}",
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
+            ));
+            fs::create_dir_all(&root).unwrap();
+
+            let result = load_skill_support_map(std::slice::from_ref(&root));
+            assert!(result.is_err());
+
+            fs::remove_dir_all(root).unwrap();
+        }
+
+        #[test]
+        fn write_normalized_copilot_file_writes_expected_file() {
+            let suffix = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let source_file = PathBuf::from(format!("test-source-{suffix}.json"));
+            let index = 42;
+            let payload = serde_json::json!({
+                "stage_name": "test_stage",
+                "opers": [{ "name": "夜莺", "skill": 3 }]
+            });
+
+            let normalized_file =
+                write_normalized_copilot_file(index, &source_file, &payload).unwrap();
+
+            assert!(normalized_file.exists());
+            assert!(
+                normalized_file
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name == format!("{index}_test-source-{suffix}.json"))
+            );
+
+            let written: serde_json::Value = json_from_file(&normalized_file).unwrap();
+            assert_eq!(written, payload);
+
+            fs::remove_file(normalized_file).unwrap();
+        }
     }
 
     mod paradox_copilot_params {
