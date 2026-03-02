@@ -127,7 +127,7 @@ jobs:
           cargo x build --tar --vendored-deps \
             --profile ${{ needs.meta.outputs.profile }}
       - name: Upload Artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: maa_cli-${{ steps.build.outputs.host_triplet }}
           path: ${{ steps.build.outputs.host_triplet }}.tar
@@ -154,7 +154,7 @@ jobs:
           lipo -create -output maa maa_cli-x86_64-apple-darwin/maa maa_cli-aarch64-apple-darwin/maa
           tar -cvf "universal-apple-darwin.tar" maa
       - name: Upload Artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: maa_cli-universal-apple-darwin
           path: universal-apple-darwin.tar
@@ -185,7 +185,7 @@ jobs:
             --rename maa-cli.exe -- \
             --no-default-features --features core_installer,git2
       - name: Upload Artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: maa_cli-${{ steps.build.outputs.host_triplet }}-winget
           path: ${{ steps.build.outputs.host_triplet }}.tar
