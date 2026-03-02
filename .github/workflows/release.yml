@@ -141,7 +141,7 @@ jobs:
     needs: [meta, build]
     steps:
       - name: Download Artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: "*-apple-darwin"
       - name: Create universal binaries
@@ -215,7 +215,7 @@ jobs:
           ref: version
           path: version
       - name: Download Artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
       - name: Install cargo-about
         uses: taiki-e/install-action@v2
         with:
