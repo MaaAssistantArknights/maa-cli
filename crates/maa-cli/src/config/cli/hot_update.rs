@@ -33,21 +33,13 @@ fn default_check_interval() -> u64 {
 }
 
 impl Config {
-    const LOCAL_RESOURCE_FILES: [&[&str]; 6] = [
-        &["tasks", "tasks.json"],
-        &["platform_diff", "iOS", "resource", "tasks", "tasks.json"],
-        &["global", "YoStarEN", "resource", "tasks", "tasks.json"],
-        &["global", "YoStarJP", "resource", "tasks", "tasks.json"],
-        &["global", "YoStarKR", "resource", "tasks", "tasks.json"],
-        &["global", "txwy", "resource", "tasks", "tasks.json"],
-    ];
-    const REMOTE_RESOURCE_FILES: [&[&str]; 6] = [
-        &["tasks.json"],
-        &["platform_diff", "iOS", "resource", "tasks.json"],
-        &["global", "YoStarEN", "resource", "tasks.json"],
-        &["global", "YoStarJP", "resource", "tasks.json"],
-        &["global", "YoStarKR", "resource", "tasks.json"],
-        &["global", "txwy", "resource", "tasks.json"],
+    const RESOURCE_TARGETS: [&[&str]; 6] = [
+        &[],
+        &["platform_diff", "iOS", "resource"],
+        &["global", "YoStarEN", "resource"],
+        &["global", "YoStarJP", "resource"],
+        &["global", "YoStarKR", "resource"],
+        &["global", "txwy", "resource"],
     ];
 
     pub fn api_url(&self) -> &str {
@@ -64,9 +56,12 @@ impl Config {
 
     pub fn resource_files(&self) -> impl IndexedParallelIterator<Item = PathBuf> {
         let resource_dir = maa_dirs::hot_update_resource().to_path_buf();
-        Self::LOCAL_RESOURCE_FILES
-            .par_iter()
-            .map(move |path| resource_dir.clone().join_iter(path.iter()))
+        Self::RESOURCE_TARGETS.par_iter().map(move |target| {
+            resource_dir
+                .clone()
+                .join_iter(target.iter())
+                .join_iter(["tasks", "tasks.json"].iter())
+        })
     }
 
     pub fn activity_url(&self) -> String {
@@ -77,18 +72,21 @@ impl Config {
 
     pub fn resource_urls(&self) -> impl IndexedParallelIterator<Item = String> {
         let resource_url = format!("{}/resource", self.api_url());
-        Self::REMOTE_RESOURCE_FILES
-            .par_iter()
-            .map(move |path| Url(resource_url.clone()).join_iter(path.iter()).0)
+        Self::RESOURCE_TARGETS.par_iter().map(move |target| {
+            Url(resource_url.clone())
+                .join_iter(target.iter())
+                .join_iter(["tasks.json"])
+                .0
+        })
     }
 }
 
 trait JoinIter<C> {
-    fn join_iter(self, iter: impl Iterator<Item = C>) -> Self;
+    fn join_iter(self, iter: impl IntoIterator<Item = C>) -> Self;
 }
 
 impl<P: AsRef<Path>> JoinIter<P> for PathBuf {
-    fn join_iter(mut self, iter: impl Iterator<Item = P>) -> PathBuf {
+    fn join_iter(mut self, iter: impl IntoIterator<Item = P>) -> PathBuf {
         for path in iter {
             self.push(path);
         }
@@ -99,7 +97,7 @@ impl<P: AsRef<Path>> JoinIter<P> for PathBuf {
 struct Url(String);
 
 impl<P: AsRef<str>> JoinIter<P> for Url {
-    fn join_iter(self, iter: impl Iterator<Item = P>) -> Url {
+    fn join_iter(self, iter: impl IntoIterator<Item = P>) -> Url {
         let mut s = self.0;
         for comp in iter {
             s.push('/');

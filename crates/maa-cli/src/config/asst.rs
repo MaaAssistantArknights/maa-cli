@@ -415,6 +415,10 @@ fn migrate_legacy_tasks_json(resource_dir: &Path, hot_update_root: &Path) -> Res
 
     let new_tasks_dir = resource_dir.join("tasks");
     let new_tasks_json = new_tasks_dir.join("tasks.json");
+    if new_tasks_json.exists() {
+        return Ok(());
+    }
+
     if !new_tasks_dir.exists() {
         fs::create_dir_all(&new_tasks_dir)?;
     }
@@ -1194,6 +1198,29 @@ mod tests {
             assert_eq!(
                 fs::read_to_string(&new_tasks_json).unwrap(),
                 r#"{"Fight":{}}"#
+            );
+
+            fs::remove_dir_all(test_root).unwrap();
+        }
+
+        #[test]
+        fn migrate_legacy_tasks_json_preserves_existing_new_file() {
+            let test_root =
+                temp_dir().join("migrate_legacy_tasks_json_preserves_existing_new_file");
+            let hot_update_root = test_root.join("hot_update");
+            let resource_dir = hot_update_root.join("resource");
+            let old_tasks_json = resource_dir.join("tasks.json");
+            let new_tasks_json = resource_dir.join("tasks").join("tasks.json");
+
+            resource_dir.join("tasks").ensure().unwrap();
+            fs::write(&old_tasks_json, r#"{"Fight":"old"}"#).unwrap();
+            fs::write(&new_tasks_json, r#"{"Fight":"new"}"#).unwrap();
+
+            super::migrate_legacy_tasks_json(&resource_dir, &hot_update_root).unwrap();
+
+            assert_eq!(
+                fs::read_to_string(&new_tasks_json).unwrap(),
+                r#"{"Fight":"new"}"#
             );
 
             fs::remove_dir_all(test_root).unwrap();
