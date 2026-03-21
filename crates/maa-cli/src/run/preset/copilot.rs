@@ -121,6 +121,7 @@ impl TryFrom<StageOpts> for MAAValue {
 #[derive(Debug, serde::Deserialize)]
 struct CopilotOperator {
     name: String,
+    #[serde(default)]
     skill: i32,
 }
 
@@ -1693,6 +1694,27 @@ found"}"#,
         sub_table.add_row(row!["纯烬艾雅法拉", 1]);
         sub_table.add_row(row!["蜜莓", 1]);
         expected_table.add_row(row!["\n[行医]", sub_table]);
+
+        let task: CopilotTask = serde_json::from_value(json).unwrap();
+        assert_eq!(operator_table(&task).unwrap(), expected_table);
+    }
+
+    #[test]
+    fn gen_operator_table_defaults_missing_skill() {
+        let json = serde_json::json!({
+                "stage_name": "test_stage",
+                "groups": [],
+                "opers": [
+                    {
+                        "name": "U-Official"
+                    }
+                ]
+        });
+
+        let mut expected_table = Table::new();
+        expected_table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
+        expected_table.set_titles(row!["NAME", "SKILL"]);
+        expected_table.add_row(row!["U-Official", 0]);
 
         let task: CopilotTask = serde_json::from_value(json).unwrap();
         assert_eq!(operator_table(&task).unwrap(), expected_table);
