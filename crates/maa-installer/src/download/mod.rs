@@ -44,10 +44,10 @@ pub fn download<'a, V: Verifier>(
     agent: &ureq::Agent,
     opts: DownloadOptions<'a, impl Iterator<Item = Cow<'a, str>>>,
     dest: &Path,
-    ui: MultiProgress,
     style: &InstallerStyle,
     mut verifier: V,
 ) -> Result<()> {
+    let ui = MultiProgress::new();
     let download_main_ui = style.init_spinner();
     ui.add(download_main_ui.clone());
 
@@ -74,6 +74,7 @@ pub fn download<'a, V: Verifier>(
     download_main_ui.set_message(format!("Downloading: {chosen_url}"));
 
     let download_progress_ui = style.init_bar();
+    ui.add(download_progress_ui.clone());
     download_impl::download(
         agent,
         chosen_url.as_ref(),
@@ -81,7 +82,7 @@ pub fn download<'a, V: Verifier>(
         download_progress_ui.clone(),
         verifier,
     )?;
-    download_progress_ui.finish();
+    download_progress_ui.finish_and_clear();
     download_main_ui.finish_with_message("Download complete");
 
     Ok(())
