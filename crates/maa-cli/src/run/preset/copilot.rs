@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
-use log::{debug, trace};
+use log::{debug, trace, warn};
 use maa_sys::TaskType;
 use maa_value::{
     MAAValue, insert, object,
@@ -35,6 +35,14 @@ const COPILOT_SET_API: &str = "http://127.0.0.1:18080/set/get?id=";
 const RAID_MODE_NORMAL: u8 = 0;
 const RAID_MODE_RAID: u8 = 1;
 const RAID_MODE_BOTH: u8 = 2;
+
+fn validate_loop_times(loop_times: i32) -> Result<i32> {
+    if loop_times > 0 {
+        Ok(loop_times)
+    } else {
+        bail!("loop_times must be greater than 0")
+    }
+}
 
 #[cfg_attr(test, derive(Default))]
 #[derive(clap::Args)]
@@ -88,6 +96,10 @@ pub struct CopilotParams {
     /// Use given support unit name, don't use support unit if not provided
     #[arg(long)]
     support_unit_name: Option<String>,
+
+    /// Loop times
+    #[arg(long)]
+    loop_times: Option<i32>,
 }
 
 #[derive(Debug)]
@@ -156,8 +168,12 @@ impl IntoParameters for CopilotParams {
     }
 
     fn into_parameters(self, context: TaskContext<'_>) -> Result<MAAValue> {
-        let base_dirs = context.config.resource.base_dirs();
         let default = context.default;
+        let loop_times = self
+            .loop_times
+            .unwrap_or_else(|| default.get_or("loop_times", 1));
+        let loop_times = validate_loop_times(loop_times)?;
+        let base_dirs = context.config.resource.base_dirs();
 
         let copilot_files = resolve_copilot_uris(self.uri_list)?;
 
@@ -229,13 +245,15 @@ impl IntoParameters for CopilotParams {
                 .into_iter()
                 .next()
                 .expect("single-file mode requires exactly one copilot stage");
-            insert!(params,
-                "filename" => stage_opt.filename?
-            );
+            insert!(params, "filename" => stage_opt.filename?, "loop_times" => loop_times);
         } else {
-            insert!(params,
-                "copilot_list" => stage_list?
-            );
+            if let Some(map) = params.as_mut_map() {
+                if loop_times != 1 {
+                    warn!("loop_times is ignored when using copilot_list mode");
+                }
+                map.remove("loop_times");
+            }
+            insert!(params, "copilot_list" => stage_list?);
         }
 
         Ok(params)
@@ -288,6 +306,7 @@ impl ToTaskType for SSSCopilotParams {
 impl IntoParameters for SSSCopilotParams {
     fn into_parameters_no_context(self) -> Result<MAAValue> {
         let copilot_dir = dirs::copilot().ensure()?;
+        let loop_times = validate_loop_times(self.loop_times)?;
 
         let copilot_file = CopilotFile::from_uri(&self.uri)?;
         let mut files = Vec::new();
@@ -332,7 +351,7 @@ impl IntoParameters for SSSCopilotParams {
 
         let value = object!(
             "filename" => file?,
-            "loop_times" => self.loop_times,
+            "loop_times" => loop_times,
         );
 
         Ok(value)
@@ -737,6 +756,7 @@ found"}"#,
                     params,
                     object!(
                         "filename" => path_from_cache_dir("40051.json"),
+                        "loop_times" => 1,
                         "formation" => false,
                         "use_sanity_potion" => false,
                         "add_trust" => false,
@@ -762,6 +782,8 @@ found"}"#,
                     "--formation",
                     "--use-sanity-potion",
                     "--add-trust",
+                    "--loop-times",
+                    "3",
                     "--formation-index",
                     "4",
                     "--support-unit-name",
@@ -773,6 +795,7 @@ found"}"#,
                     params,
                     object!(
                         "filename" => path_from_cache_dir("40051.json"),
+                        "loop_times" => 3,
                         "formation" => true,
                         "use_sanity_potion" => true,
                         "add_trust" => true,
@@ -799,6 +822,7 @@ found"}"#,
                     params,
                     object!(
                         "filename" => path_from_cache_dir("40051.json"),
+                        "loop_times" => 1,
                         "formation" => false,
                         "use_sanity_potion" => false,
                         "add_trust" => false,
@@ -901,6 +925,35 @@ found"}"#,
             }
 
             #[test]
+            fn invalid_loop_times() {
+                let result = parse(["maa", "copilot", "maa://40051", "--loop-times", "0"]);
+
+                assert!(result.is_err());
+                assert!(
+                    result
+                        .unwrap_err()
+                        .to_string()
+                        .contains("loop_times must be greater than 0")
+                );
+            }
+
+            #[test]
+            fn invalid_default_loop_times() {
+                let result = parse_with_default(
+                    ["maa", "copilot", "maa://40051"],
+                    object!("loop_times" => 0),
+                );
+
+                assert!(result.is_err());
+                assert!(
+                    result
+                        .unwrap_err()
+                        .to_string()
+                        .contains("loop_times must be greater than 0")
+                );
+            }
+
+            #[test]
             fn non_existent_local_file() {
                 let result = parse(["maa", "copilot", "non_existent_file.json"]);
                 assert!(result.is_err());
@@ -923,6 +976,7 @@ found"}"#,
                     params,
                     object!(
                         "filename" => path_from_cache_dir("40051.json"),
+                        "loop_times" => 1,
                         "formation" => true,
                         "use_sanity_potion" => false,
                         "add_trust" => false,
@@ -948,6 +1002,7 @@ found"}"#,
                     params,
                     object!(
                         "filename" => path_from_cache_dir("40051.json"),
+                        "loop_times" => 1,
                         "formation" => false,
                         "use_sanity_potion" => true,
                         "add_trust" => false,
@@ -973,6 +1028,7 @@ found"}"#,
                     params,
                     object!(
                         "filename" => path_from_cache_dir("40051.json"),
+                        "loop_times" => 1,
                         "formation" => false,
                         "use_sanity_potion" => false,
                         "add_trust" => true,
@@ -998,6 +1054,7 @@ found"}"#,
                     params,
                     object!(
                         "filename" => path_from_cache_dir("40051.json"),
+                        "loop_times" => 1,
                         "formation" => false,
                         "use_sanity_potion" => false,
                         "add_trust" => false,
@@ -1030,8 +1087,64 @@ found"}"#,
                     params,
                     object!(
                         "filename" => path_from_cache_dir("40051.json"),
+                        "loop_times" => 1,
                         "formation" => true,
                         "use_sanity_potion" => true,
+                        "add_trust" => false,
+                        "ignore_requirements" => false,
+                    ),
+                );
+            }
+
+            #[test]
+            #[ignore = "requires installed resources"]
+            fn with_default_loop_times() {
+                ensure_test_server();
+
+                if std::env::var_os("SKIP_CORE_TEST").is_some() {
+                    return;
+                }
+
+                let default = object!("loop_times" => 3);
+                let params =
+                    parse_with_default(["maa", "copilot", "maa://40051"], default).unwrap();
+
+                assert_eq!(
+                    params,
+                    object!(
+                        "filename" => path_from_cache_dir("40051.json"),
+                        "loop_times" => 3,
+                        "formation" => false,
+                        "use_sanity_potion" => false,
+                        "add_trust" => false,
+                        "ignore_requirements" => false,
+                    ),
+                );
+            }
+
+            #[test]
+            #[ignore = "requires installed resources"]
+            fn cli_loop_times_overrides_default() {
+                ensure_test_server();
+
+                if std::env::var_os("SKIP_CORE_TEST").is_some() {
+                    return;
+                }
+
+                let default = object!("loop_times" => 3);
+                let params = parse_with_default(
+                    ["maa", "copilot", "maa://40051", "--loop-times", "2"],
+                    default,
+                )
+                .unwrap();
+
+                assert_eq!(
+                    params,
+                    object!(
+                        "filename" => path_from_cache_dir("40051.json"),
+                        "loop_times" => 2,
+                        "formation" => false,
+                        "use_sanity_potion" => false,
                         "add_trust" => false,
                         "ignore_requirements" => false,
                     ),
@@ -1052,6 +1165,81 @@ found"}"#,
                 let params =
                     parse_with_default(["maa", "copilot", "maa://40051", "maa://40052"], default)
                         .unwrap();
+
+                assert_eq!(
+                    params,
+                    object!(
+                        "copilot_list" => [object!(
+                            "filename" => path_from_cache_dir("40051.json"),
+                            "stage_name" => "AS-EX-1",
+                            "is_raid" => false,
+                        ),
+                        object!(
+                            "filename" => path_from_cache_dir("40052.json"),
+                            "stage_name" => "AS-EX-2",
+                            "is_raid" => false,
+                        )],
+                        "formation" => true,
+                        "use_sanity_potion" => false,
+                        "add_trust" => false,
+                        "ignore_requirements" => false,
+                    ),
+                );
+            }
+
+            #[test]
+            #[ignore = "requires installed resources"]
+            fn multiple_tasks_ignore_default_loop_times() {
+                ensure_test_server();
+
+                if std::env::var_os("SKIP_CORE_TEST").is_some() {
+                    return;
+                }
+
+                let default = object!("loop_times" => 3);
+                let params =
+                    parse_with_default(["maa", "copilot", "maa://40051", "maa://40052"], default)
+                        .unwrap();
+
+                assert_eq!(
+                    params,
+                    object!(
+                        "copilot_list" => [object!(
+                            "filename" => path_from_cache_dir("40051.json"),
+                            "stage_name" => "AS-EX-1",
+                            "is_raid" => false,
+                        ),
+                        object!(
+                            "filename" => path_from_cache_dir("40052.json"),
+                            "stage_name" => "AS-EX-2",
+                            "is_raid" => false,
+                        )],
+                        "formation" => true,
+                        "use_sanity_potion" => false,
+                        "add_trust" => false,
+                        "ignore_requirements" => false,
+                    ),
+                );
+            }
+
+            #[test]
+            #[ignore = "requires installed resources"]
+            fn multiple_tasks_ignore_cli_loop_times() {
+                ensure_test_server();
+
+                if std::env::var_os("SKIP_CORE_TEST").is_some() {
+                    return;
+                }
+
+                let params = parse([
+                    "maa",
+                    "copilot",
+                    "maa://40051",
+                    "maa://40052",
+                    "--loop-times",
+                    "2",
+                ])
+                .unwrap();
 
                 assert_eq!(
                     params,
@@ -1192,6 +1380,21 @@ found"}"#,
                         .unwrap_err()
                         .to_string()
                         .contains("don't support task set")
+                );
+            }
+
+            #[test]
+            fn rejects_invalid_loop_times() {
+                ensure_test_server();
+
+                let result = parse(["maa", "ssscopilot", "maa://40451", "--loop-times", "0"]);
+
+                assert!(result.is_err());
+                assert!(
+                    result
+                        .unwrap_err()
+                        .to_string()
+                        .contains("loop_times must be greater than 0")
                 );
             }
         }
