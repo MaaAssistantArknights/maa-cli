@@ -10,7 +10,7 @@ use std::{
     time::Duration,
 };
 
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use indicatif::{ProgressBar, ProgressStyle};
 use semver::Version;
 use ureq::Agent;
 
@@ -131,10 +131,7 @@ where
     }
 
     pub fn exec(self, cache_dir: &Path, manifest_name: &str) -> Result<()> {
-        let ui = MultiProgress::new();
-
         let fetching_ui = self.progress_style.init_spinner();
-        ui.add(fetching_ui.clone());
 
         // Fetch and process manifest
         fetching_ui.set_message("Fetching version manifest...");
@@ -152,27 +149,20 @@ where
         let manifest = (self.manifest_processor)(manifest_file)?;
 
         // Check if we need update
-        if let Some(current_version) = self.current_version {
-            if current_version == manifest.version() {
-                fetching_ui.finish_with_message("Fetched version manifest, already up-to-date!");
-                return Ok(());
-            } else {
-                fetching_ui.set_message(format!(
-                    "Fetched version manifest, update from v{current_version} to v{}",
-                    manifest.version()
-                ));
-            }
-        } else {
-            fetching_ui.set_message(format!(
-                "Fetched version manifest, found v{}",
-                manifest.version()
-            ));
+        if let Some(current_version) = self.current_version
+            && current_version == manifest.version()
+        {
+            fetching_ui.finish_with_message("Fetched version manifest, already up-to-date!");
+            return Ok(());
         }
 
         // Check if asset exists
         let asset = manifest.asset();
         let asset = if let Some(asset) = asset {
-            fetching_ui.finish();
+            fetching_ui.finish_with_message(format_fetched_message(
+                self.current_version,
+                manifest.version(),
+            ));
             asset
         } else {
             fetching_ui.finish_with_message("No asset found for current platform");
@@ -187,7 +177,6 @@ where
             &self.agent,
             download_opts,
             &dest,
-            ui.clone(),
             &self.progress_style,
             asset.verifier()?,
         )?;
@@ -206,6 +195,15 @@ where
         extract_ui.finish_with_message("Installation completed successfully!");
 
         Ok(())
+    }
+}
+
+fn format_fetched_message(current_version: Option<&Version>, latest_version: &Version) -> String {
+    match current_version {
+        Some(current_version) => {
+            format!("Fetched version manifest, update from v{current_version} to v{latest_version}")
+        }
+        None => format!("Fetched version manifest, found v{latest_version}"),
     }
 }
 
@@ -229,6 +227,21 @@ mod tests {
         let _ = InstallerStyle::new(custom_spinner, custom_bar);
         let _ = style.init_spinner();
         let _ = style.init_bar();
+    }
+
+    #[test]
+    fn test_fetched_manifest_message() {
+        let current_version = Version::new(1, 2, 3);
+        let latest_version = Version::new(2, 0, 0);
+
+        assert_eq!(
+            format_fetched_message(Some(&current_version), &latest_version),
+            "Fetched version manifest, update from v1.2.3 to v2.0.0"
+        );
+        assert_eq!(
+            format_fetched_message(None, &latest_version),
+            "Fetched version manifest, found v2.0.0"
+        );
     }
 
     // Test helper types
