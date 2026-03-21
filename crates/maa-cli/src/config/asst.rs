@@ -1,6 +1,10 @@
-use std::{borrow::Cow, path::PathBuf};
+use std::{
+    borrow::Cow,
+    fs,
+    path::{Path, PathBuf},
+};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use log::{debug, info, warn};
 use maa_sys::Assistant;
 use maa_types::{InstanceOptionKey, StaticOptionKey, TouchMode};
@@ -292,8 +296,8 @@ fn default_resource_base_dirs() -> Vec<PathBuf> {
         warn!("Resource directory not found!")
     }
 
-    resource_dirs.push_if_exists(maa_dirs::hot_update_resource().to_path_buf());
     resource_dirs.push_if_exists(join!(maa_dirs::maa_resource(), "resource"));
+    resource_dirs.push_if_exists(maa_dirs::hot_update_resource().to_path_buf());
 
     resource_dirs
 }
@@ -381,7 +385,12 @@ impl ResourceConfig {
 
     pub fn load(&self) -> Result<()> {
         let resource_dirs = self.resource_dirs();
+        if resource_dirs.is_empty() {
+            anyhow::bail!("No valid resource directory found");
+        }
+
         for resource_dir in resource_dirs {
+            migrate_legacy_hot_update_tasks_json(&resource_dir)?;
             debug!("Loading resource from {}", resource_dir.display());
             Assistant::load_resource(resource_dir.parent().unwrap())?;
         }
@@ -390,6 +399,37 @@ impl ResourceConfig {
     }
 }
 
+fn migrate_legacy_hot_update_tasks_json(resource_dir: &Path) -> Result<()> {
+    migrate_legacy_tasks_json(resource_dir, maa_dirs::hot_update_resource())
+}
+
+fn migrate_legacy_tasks_json(resource_dir: &Path, hot_update_root: &Path) -> Result<()> {
+    if !resource_dir.starts_with(hot_update_root) {
+        return Ok(());
+    }
+
+    let old = resource_dir.join("tasks.json");
+    if !old.is_file() {
+        return Ok(());
+    }
+
+    let new_dir = resource_dir.join("tasks");
+    let new = new_dir.join("tasks.json");
+    if new.exists() {
+        return Ok(());
+    }
+
+    if !new_dir.exists() {
+        fs::create_dir_all(&new_dir)?;
+    } else if !new_dir.is_dir() {
+        bail!("Expected {} to be a directory", new_dir.display());
+    }
+
+    fs::copy(&old, &new)
+        .with_context(|| format!("Failed to copy {} to {}", old.display(), new.display()))?;
+
+    Ok(())
+}
 fn push_user_resource(resource_dirs: &mut Vec<PathBuf>) -> &mut Vec<PathBuf> {
     push_resource(resource_dirs, maa_dirs::config().join("resource"))
 }
@@ -1135,6 +1175,134 @@ mod tests {
                 .resource_dirs(),
                 std::slice::from_ref(&resource_dir)
             );
+
+            fs::remove_dir_all(test_root).unwrap();
+        }
+
+        #[test]
+        fn migrate_legacy_tasks_json_for_hot_update_resource() {
+            let test_root = temp_dir().join("migrate_legacy_tasks_json_for_hot_update_resource");
+            let hot_update_root = test_root.join("hot_update");
+            let resource_dir = hot_update_root.join("resource");
+            let old_tasks_json = resource_dir.join("tasks.json");
+            let new_tasks_json = resource_dir.join("tasks").join("tasks.json");
+
+            resource_dir.ensure().unwrap();
+            fs::write(&old_tasks_json, r#"{"foo":"bar"}"#).unwrap();
+
+            super::migrate_legacy_tasks_json(&resource_dir, &hot_update_root).unwrap();
+
+            assert_eq!(
+                fs::read_to_string(&new_tasks_json).unwrap(),
+                r#"{"foo":"bar"}"#
+            );
+
+            fs::remove_dir_all(test_root).unwrap();
+        }
+
+        #[test]
+        fn migrate_legacy_tasks_json_is_noop_without_legacy_file() {
+            let test_root =
+                temp_dir().join("migrate_legacy_tasks_json_is_noop_without_legacy_file");
+            let hot_update_root = test_root.join("hot_update");
+            let resource_dir = hot_update_root.join("resource");
+            let new_tasks_json = resource_dir.join("tasks").join("tasks.json");
+
+            resource_dir.ensure().unwrap();
+
+            super::migrate_legacy_tasks_json(&resource_dir, &hot_update_root).unwrap();
+
+            assert!(!new_tasks_json.exists());
+
+            fs::remove_dir_all(test_root).unwrap();
+        }
+
+        #[test]
+        fn migrate_legacy_tasks_json_preserves_existing_new_file() {
+            let test_root =
+                temp_dir().join("migrate_legacy_tasks_json_preserves_existing_new_file");
+            let hot_update_root = test_root.join("hot_update");
+            let resource_dir = hot_update_root.join("resource");
+            let old_tasks_json = resource_dir.join("tasks.json");
+            let new_tasks_json = resource_dir.join("tasks").join("tasks.json");
+
+            resource_dir.join("tasks").ensure().unwrap();
+            fs::write(&old_tasks_json, r#"{"foo":"old"}"#).unwrap();
+            fs::write(&new_tasks_json, r#"{"foo":"new"}"#).unwrap();
+
+            super::migrate_legacy_tasks_json(&resource_dir, &hot_update_root).unwrap();
+
+            assert_eq!(
+                fs::read_to_string(&new_tasks_json).unwrap(),
+                r#"{"foo":"new"}"#
+            );
+
+            fs::remove_dir_all(test_root).unwrap();
+        }
+
+        #[test]
+        fn migrate_legacy_tasks_json_for_nested_hot_update_resource() {
+            let test_root =
+                temp_dir().join("migrate_legacy_tasks_json_for_nested_hot_update_resource");
+            let hot_update_root = test_root.join("hot_update");
+            let resource_dir = hot_update_root
+                .join("resource")
+                .join("global")
+                .join("YoStarJP")
+                .join("resource");
+            let old_tasks_json = resource_dir.join("tasks.json");
+            let new_tasks_json = resource_dir.join("tasks").join("tasks.json");
+
+            resource_dir.ensure().unwrap();
+            fs::write(&old_tasks_json, r#"{"foo":{"bar":1}}"#).unwrap();
+
+            super::migrate_legacy_tasks_json(&resource_dir, &hot_update_root).unwrap();
+
+            assert_eq!(
+                fs::read_to_string(&new_tasks_json).unwrap(),
+                r#"{"foo":{"bar":1}}"#
+            );
+
+            fs::remove_dir_all(test_root).unwrap();
+        }
+
+        #[test]
+        fn migrate_legacy_tasks_json_reports_invalid_target_dir() {
+            let test_root = temp_dir().join("migrate_legacy_tasks_json_reports_invalid_target_dir");
+            let hot_update_root = test_root.join("hot_update");
+            let resource_dir = hot_update_root.join("resource");
+            let old_tasks_json = resource_dir.join("tasks.json");
+            let new_tasks_dir = resource_dir.join("tasks");
+
+            resource_dir.ensure().unwrap();
+            fs::write(&old_tasks_json, r#"{"foo":"bar"}"#).unwrap();
+            fs::write(&new_tasks_dir, "not a directory").unwrap();
+
+            let err = super::migrate_legacy_tasks_json(&resource_dir, &hot_update_root)
+                .expect_err("migration should fail when target parent is a file");
+
+            assert_eq!(
+                err.to_string(),
+                format!("Expected {} to be a directory", new_tasks_dir.display())
+            );
+
+            fs::remove_dir_all(test_root).unwrap();
+        }
+
+        #[test]
+        fn migrate_legacy_tasks_json_ignores_non_hot_update_resource() {
+            let test_root = temp_dir().join("migrate_legacy_tasks_json_ignores_non_hot_update");
+            let hot_update_root = test_root.join("hot_update");
+            let resource_dir = test_root.join("resource");
+            let old_tasks_json = resource_dir.join("tasks.json");
+            let new_tasks_json = resource_dir.join("tasks").join("tasks.json");
+
+            resource_dir.ensure().unwrap();
+            fs::write(&old_tasks_json, r#"{"foo":"bar"}"#).unwrap();
+
+            super::migrate_legacy_tasks_json(&resource_dir, &hot_update_root).unwrap();
+
+            assert!(!new_tasks_json.exists());
 
             fs::remove_dir_all(test_root).unwrap();
         }
