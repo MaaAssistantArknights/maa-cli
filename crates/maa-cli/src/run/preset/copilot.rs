@@ -1,5 +1,5 @@
 use std::{
-    fs,
+    any, fs,
     io::Write,
     path::{Path, PathBuf},
 };
@@ -37,11 +37,8 @@ const RAID_MODE_RAID: u8 = 1;
 const RAID_MODE_BOTH: u8 = 2;
 
 fn validate_loop_times(loop_times: i32) -> Result<i32> {
-    if loop_times > 0 {
-        Ok(loop_times)
-    } else {
-        bail!("loop_times must be greater than 0")
-    }
+    anyhow::ensure!(loop_times > 0, "loop_times must be greater than 0");
+    Ok(loop_times)
 }
 
 #[cfg_attr(test, derive(Default))]
