@@ -33,7 +33,15 @@ fn default_check_interval() -> u64 {
 }
 
 impl Config {
-    const RESOURCE_FILES: [&[&str]; 6] = [
+    const LOCAL_RESOURCE_FILES: [&[&str]; 6] = [
+        &["tasks", "tasks.json"],
+        &["platform_diff", "iOS", "resource", "tasks", "tasks.json"],
+        &["global", "YoStarEN", "resource", "tasks", "tasks.json"],
+        &["global", "YoStarJP", "resource", "tasks", "tasks.json"],
+        &["global", "YoStarKR", "resource", "tasks", "tasks.json"],
+        &["global", "txwy", "resource", "tasks", "tasks.json"],
+    ];
+    const REMOTE_RESOURCE_FILES: [&[&str]; 6] = [
         &["tasks.json"],
         &["platform_diff", "iOS", "resource", "tasks.json"],
         &["global", "YoStarEN", "resource", "tasks.json"],
@@ -56,7 +64,7 @@ impl Config {
 
     pub fn resource_files(&self) -> impl IndexedParallelIterator<Item = PathBuf> {
         let resource_dir = maa_dirs::hot_update_resource().to_path_buf();
-        Self::RESOURCE_FILES
+        Self::LOCAL_RESOURCE_FILES
             .par_iter()
             .map(move |path| resource_dir.clone().join_iter(path.iter()))
     }
@@ -69,7 +77,7 @@ impl Config {
 
     pub fn resource_urls(&self) -> impl IndexedParallelIterator<Item = String> {
         let resource_url = format!("{}/resource", self.api_url());
-        Self::RESOURCE_FILES
+        Self::REMOTE_RESOURCE_FILES
             .par_iter()
             .map(move |path| Url(resource_url.clone()).join_iter(path.iter()).0)
     }
@@ -192,13 +200,14 @@ pub mod tests {
             assert_eq!(files.len(), 6);
 
             let resource_dir = maa_dirs::cache().join("resource");
-            assert_eq!(files[0], resource_dir.join("tasks.json"));
+            assert_eq!(files[0], resource_dir.join("tasks").join("tasks.json"));
             assert_eq!(
                 files[1],
                 resource_dir
                     .join("platform_diff")
                     .join("iOS")
                     .join("resource")
+                    .join("tasks")
                     .join("tasks.json")
             );
             assert_eq!(
@@ -207,6 +216,7 @@ pub mod tests {
                     .join("global")
                     .join("YoStarEN")
                     .join("resource")
+                    .join("tasks")
                     .join("tasks.json")
             );
             assert_eq!(
@@ -215,6 +225,7 @@ pub mod tests {
                     .join("global")
                     .join("YoStarJP")
                     .join("resource")
+                    .join("tasks")
                     .join("tasks.json")
             );
             assert_eq!(
@@ -223,6 +234,7 @@ pub mod tests {
                     .join("global")
                     .join("YoStarKR")
                     .join("resource")
+                    .join("tasks")
                     .join("tasks.json")
             );
             assert_eq!(
@@ -231,6 +243,7 @@ pub mod tests {
                     .join("global")
                     .join("txwy")
                     .join("resource")
+                    .join("tasks")
                     .join("tasks.json")
             );
         }
