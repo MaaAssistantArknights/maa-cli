@@ -1,0 +1,11 @@
+[package]
+name = "maa-ffi-types"
+version = "1.0.0"
+edition.workspace = true
+description = "Primitive FFI types for MaaCore"
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true

@@ -29,6 +29,7 @@ libloading = "0.9"
 log = "0.4.20"
 maa-dirs = { path = "crates/maa-dirs", version = "0.3" }
 maa-ffi-string = { path = "crates/maa-ffi-string", version = "0.1" }
+maa-ffi-types = { path = "crates/maa-ffi-types", version = "1" }
 maa-installer = { path = "crates/maa-installer", version = "0.2" }
 maa-str-ext = { path = "crates/maa-str-ext", version = "0.1" }
 maa-sys = { path = "crates/maa-sys", version = "0.9" }

@@ -1,6 +1,6 @@
 [package]
 name = "maa-types"
-version = "0.3.1"
+version = "0.3.2"
 edition.workspace = true
 homepage.workspace = true
 repository.workspace = true
@@ -9,6 +9,7 @@ license.workspace = true
 [dependencies]
 clap = { workspace = true, optional = true }
 maa-ffi-string = { workspace = true, optional = true }
+maa-ffi-types = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 
