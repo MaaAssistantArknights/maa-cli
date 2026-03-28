@@ -83,6 +83,34 @@ impl<C: Callback> Callback for Arc<C> {
     }
 }
 
+/// The `extern "C"` trampoline monomorphized for each concrete `C: Callback`.
+///
+/// # Safety
+///
+/// The `userdata` pointer must be the address of a `C` (inside a `Box`), and the pointer
+/// must remain valid during the MaaCore instance's lifetime.
+pub(crate) unsafe extern "C" fn trampoline<C: Callback>(
+    msg_kind: AsstMsgId,
+    msg: *const std::ffi::c_char,
+    userdata: *mut std::os::raw::c_void,
+) {
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        // Safety: see function-level safety contract above.
+        let cb = unsafe { &*(userdata as *const C) };
+
+        let msg_str = if msg.is_null() {
+            None
+        } else {
+            unsafe { std::ffi::CStr::from_ptr(msg) }.to_str().ok()
+        };
+
+        cb.on_message(msg_kind.into(), msg_str);
+    }));
+    if result.is_err() {
+        std::process::abort();
+    }
+}
+
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
@@ -113,7 +141,9 @@ mod tests {
 
     #[test]
     fn fn_blanket_impl() {
-        let log: Arc<Mutex<Vec<(MessageKind, Option<String>)>>> = Default::default();
+        type Log = Arc<Mutex<Vec<(MessageKind, Option<String>)>>>;
+
+        let log = Log::default();
         let log2 = log.clone();
         let cb = move |kind: MessageKind, msg: Option<&str>| {
             log2.lock().unwrap().push((kind, msg.map(String::from)));
@@ -158,38 +188,8 @@ mod tests {
     fn trampoline_invalid_utf8_yields_none() {
         let rec = Recorder::new();
         // b"\xff" is not valid UTF-8; CStr needs a trailing null.
-        let cstr = std::ffi::CStr::from_bytes_with_nul(b"\xff\x00").unwrap();
-        unsafe {
-            trampoline::<Recorder>(0, cstr.as_ptr(), &rec as *const Recorder as *mut _)
-        };
+        let cstr = c"\xff";
+        unsafe { trampoline::<Recorder>(0, cstr.as_ptr(), &rec as *const Recorder as *mut _) };
         assert_eq!(rec.entries()[0].1, None);
-    }
-}
-
-/// The `extern "C"` trampoline monomorphized for each concrete `C: Callback`.
-///
-/// # Safety
-///
-/// The `userdata` pointer must be the address of a `C` (inside a `Box`), and the pointer
-/// must remain valid during the MaaCore instance's lifetime.
-pub(crate) unsafe extern "C" fn trampoline<C: Callback>(
-    msg_kind: AsstMsgId,
-    msg: *const std::ffi::c_char,
-    userdata: *mut std::os::raw::c_void,
-) {
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        // Safety: see function-level safety contract above.
-        let cb = unsafe { &*(userdata as *const C) };
-
-        let msg_str = if msg.is_null() {
-            None
-        } else {
-            unsafe { std::ffi::CStr::from_ptr(msg) }.to_str().ok()
-        };
-
-        cb.on_message(msg_kind.into(), msg_str);
-    }));
-    if result.is_err() {
-        std::process::abort();
     }
 }
