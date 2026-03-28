@@ -101,6 +101,8 @@ pub(crate) unsafe extern "C" fn trampoline<C: Callback>(
         let msg_str = if msg.is_null() {
             None
         } else {
+            // Safety: we have checked that the pointer is non-null above and MaaCore should
+            // guarantee that the pointer is valid and points to a null-terminated string.
             unsafe { std::ffi::CStr::from_ptr(msg) }.to_str().ok()
         };
 
@@ -120,8 +122,10 @@ mod tests {
 
     use super::*;
 
+    type Record = Mutex<Vec<(MessageKind, Option<String>)>>;
+
     // Concrete Callback impl shared by all tests.
-    struct Recorder(Mutex<Vec<(MessageKind, Option<String>)>>);
+    struct Recorder(Record);
 
     impl Callback for Recorder {
         fn on_message(&self, kind: MessageKind, msg: Option<&str>) {
@@ -141,9 +145,7 @@ mod tests {
 
     #[test]
     fn fn_blanket_impl() {
-        type Log = Arc<Mutex<Vec<(MessageKind, Option<String>)>>>;
-
-        let log = Log::default();
+        let log: Arc<Record> = Default::default();
         let log2 = log.clone();
         let cb = move |kind: MessageKind, msg: Option<&str>| {
             log2.lock().unwrap().push((kind, msg.map(String::from)));
