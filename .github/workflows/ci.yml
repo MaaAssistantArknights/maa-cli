@@ -145,7 +145,7 @@ jobs:
           tool: cargo-llvm-cov
       - name: Coverage
         run: |
-          cargo x test --install-core --no-clippy \
+          cargo x test --install-core --runtime-library-path --no-clippy \
             --package maa-core --coverage test-only \
             -- --no-default-features
       - name: Upload to Codecov

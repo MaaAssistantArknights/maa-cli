@@ -90,6 +90,10 @@ struct TestOptions {
     #[arg(long)]
     no_all_features: bool,
 
+    /// Add MaaCore's directory to the runtime library search path for tests
+    #[arg(long)]
+    runtime_library_path: bool,
+
     /// Package name to test, `workspace` means `--workspace`
     #[arg(short, long, default_value = "workspace")]
     package: String,

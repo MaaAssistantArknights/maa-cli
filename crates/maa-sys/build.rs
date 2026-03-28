@@ -4,9 +4,7 @@ fn dynamic_link() {
 
     println!("cargo:rerun-if-env-changed=MAA_CORE_DIR");
     if let Some(core_dir) = var_os("MAA_CORE_DIR").map(PathBuf::from) {
-        let dir = core_dir.display();
-        println!("cargo:rustc-link-search=native={dir}");
-        println!("cargo:rustc-link-arg=-Wl,-rpath,{dir}");
+        println!("cargo:rustc-link-search=native={}", core_dir.display());
     }
 }
 
