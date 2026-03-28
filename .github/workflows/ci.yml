@@ -127,8 +127,8 @@ jobs:
           cargo x test --no-clippy --no-all-features --no-core-tests \
             --no-default-features --features '${{ matrix.feature }}' \
 
-  build-sys:
-    name: Build and Test (maa-sys, static, ${{ matrix.os }})
+  build-core:
+    name: Build and Test (maa-core, static, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -146,7 +146,7 @@ jobs:
       - name: Coverage
         run: |
           cargo x test --install-core \
-            --package maa-sys --coverage test-only
+            --package maa-core --coverage test-only
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
         if: ${{ !startsWith(matrix.os, 'windows') }}
