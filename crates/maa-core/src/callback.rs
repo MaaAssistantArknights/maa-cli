@@ -83,6 +83,89 @@ impl<C: Callback> Callback for Arc<C> {
     }
 }
 
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+mod tests {
+    use std::sync::{Arc, Mutex};
+
+    use maa_types::MessageKind;
+
+    use super::*;
+
+    // Concrete Callback impl shared by all tests.
+    struct Recorder(Mutex<Vec<(MessageKind, Option<String>)>>);
+
+    impl Callback for Recorder {
+        fn on_message(&self, kind: MessageKind, msg: Option<&str>) {
+            self.0.lock().unwrap().push((kind, msg.map(String::from)));
+        }
+    }
+
+    impl Recorder {
+        fn new() -> Self {
+            Self(Mutex::new(Vec::new()))
+        }
+
+        fn entries(&self) -> Vec<(MessageKind, Option<String>)> {
+            self.0.lock().unwrap().clone()
+        }
+    }
+
+    #[test]
+    fn fn_blanket_impl() {
+        let log: Arc<Mutex<Vec<(MessageKind, Option<String>)>>> = Default::default();
+        let log2 = log.clone();
+        let cb = move |kind: MessageKind, msg: Option<&str>| {
+            log2.lock().unwrap().push((kind, msg.map(String::from)));
+        };
+        cb.on_message(MessageKind::InternalError, Some("a"));
+        cb.on_message(MessageKind::AllTasksCompleted, None);
+        let entries = log.lock().unwrap();
+        assert_eq!(entries[0], (MessageKind::InternalError, Some("a".into())));
+        assert_eq!(entries[1], (MessageKind::AllTasksCompleted, None));
+    }
+
+    #[test]
+    fn arc_delegates() {
+        let rec = Arc::new(Recorder::new());
+        let cb: Arc<dyn Callback> = rec.clone();
+        cb.on_message(MessageKind::ConnectionInfo, None);
+        cb.on_message(MessageKind::InitFailed, None);
+        let entries = rec.entries();
+        assert_eq!(entries[0].0, MessageKind::ConnectionInfo);
+        assert_eq!(entries[1].0, MessageKind::InitFailed);
+    }
+
+    #[test]
+    fn trampoline_valid_msg() {
+        use std::ffi::CString;
+        let rec = Recorder::new();
+        let msg = CString::new("payload").unwrap();
+        unsafe { trampoline::<Recorder>(1, msg.as_ptr(), &rec as *const Recorder as *mut _) };
+        let entries = rec.entries();
+        assert_eq!(entries[0].0, MessageKind::InitFailed);
+        assert_eq!(entries[0].1.as_deref(), Some("payload"));
+    }
+
+    #[test]
+    fn trampoline_null_msg() {
+        let rec = Recorder::new();
+        unsafe { trampoline::<Recorder>(0, std::ptr::null(), &rec as *const Recorder as *mut _) };
+        assert_eq!(rec.entries()[0].1, None);
+    }
+
+    #[test]
+    fn trampoline_invalid_utf8_yields_none() {
+        let rec = Recorder::new();
+        // b"\xff" is not valid UTF-8; CStr needs a trailing null.
+        let cstr = std::ffi::CStr::from_bytes_with_nul(b"\xff\x00").unwrap();
+        unsafe {
+            trampoline::<Recorder>(0, cstr.as_ptr(), &rec as *const Recorder as *mut _)
+        };
+        assert_eq!(rec.entries()[0].1, None);
+    }
+}
+
 /// The `extern "C"` trampoline monomorphized for each concrete `C: Callback`.
 ///
 /// # Safety
