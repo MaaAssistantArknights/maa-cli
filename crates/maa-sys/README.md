@@ -1,17 +1,42 @@
 # maa-sys
 
-[MaaAssistantArknights](https://github.com/MaaAssistantArknights/MaaAssistantArknights) raw binding and safe wrapper for Rust.
+Raw FFI bindings for [MaaAssistantArknights](https://github.com/MaaAssistantArknights/MaaAssistantArknights) (MaaCore).
 
-## Load MaaCore
+This crate exposes the C API of MaaCore as-is, with no safety guarantees.
+All functions in `maa_sys::binding` are `unsafe`. If you want a safe,
+idiomatic Rust API, use [`maa-core`](../maa-core) instead.
 
-This crate depends on the shared library MaaCore, which can be linked at compile time or loaded at runtime.
+## Loading MaaCore
 
-### Compile time Linking
+### Linking (default)
 
-`maa-sys` will link to `libMaaCore` at compile time by default. To find the shared library, you need to set the environment variable `MAA_CORE_DIR` to the directory containing the shared library.
+`maa-sys` links against `libMaaCore` at link time. If MaaCore is installed
+in a non-standard location, set `MAA_CORE_DIR` to the directory containing the
+shared library:
+
+```sh
+MAA_CORE_DIR=/path/to/maa cargo build
+```
+
+If `MAA_CORE_DIR` is not set, the linker searches its default library paths,
+which is sufficient for system-wide or package-manager installations.
 
 ### Runtime loading
 
-You can also load the shared library at runtime by enabling the `runtime` feature. In this case, you need to call `maa_sys::binding::load(path)` to load the shared library at runtime. The `path` can be the library name `MaaCore` or an absolute path to the shared library. If the `path` is a name, the shared library will be searched in the system library paths.
+Enable the `runtime` feature to load MaaCore dynamically at startup:
+
+```toml
+maa-sys = { version = "...", features = ["runtime"] }
+```
+
+Then call `maa_sys::binding::load(path)` before using any other API:
+
+```rust
+// Load by absolute path
+maa_sys::binding::load("/path/to/libMaaCore.so").unwrap();
+
+// Or by name, searched in system library paths
+maa_sys::binding::load("MaaCore").unwrap();
+```
 
 <!-- markdownlint-disable-file MD013 -->

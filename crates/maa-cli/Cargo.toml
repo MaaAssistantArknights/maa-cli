@@ -25,7 +25,7 @@ log = { workspace = true }
 maa-dirs = { workspace = true }
 maa-installer = { workspace = true }
 maa-str-ext = { workspace = true }
-maa-sys = { workspace = true, features = ["runtime"] }
+maa-core = { workspace = true, features = ["runtime"] }
 maa-types = { workspace = true, features = ["serde"] }
 maa-value = { workspace = true }
 maa-version = { workspace = true, optional = true }

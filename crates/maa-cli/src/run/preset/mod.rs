@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use maa_sys::TaskType;
+use maa_types::TaskType;
 use maa_value::{MAAValue, insert, object};
 
 use crate::config::{

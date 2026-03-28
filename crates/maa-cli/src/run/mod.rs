@@ -1,6 +1,3 @@
-// mod message;
-// use message::callback;
-//
 mod callback;
 use callback::summary;
 
@@ -16,8 +13,8 @@ use std::{
 use anyhow::{Context, Result, bail};
 use clap::Args;
 use log::{debug, warn};
+use maa_core::Assistant;
 use maa_dirs::{self as dirs, Ensure, MAA_CORE_LIB};
-use maa_sys::Assistant;
 use signal_hook::consts::TERM_SIGNALS;
 
 use crate::{
@@ -146,7 +143,8 @@ where
     }
 
     // Create and setup Assistant
-    let asst = Assistant::new(Some(callback::default_callback), None);
+    let asst = Assistant::new_with_callback(callback::default_callback)
+        .context("Failed to create Assistant: resources may not be loaded")?;
     asst_config.instance_options.apply_to(&asst)?;
 
     // Register tasks to Assistant and prepare summary

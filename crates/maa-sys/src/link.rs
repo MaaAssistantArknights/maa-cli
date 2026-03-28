@@ -2,6 +2,7 @@
 macro_rules! link {
     (
         $(
+            $(#[$attr:meta])*
             pub fn $name:ident($($pname:ident: $pty:ty), * $(,)?)$(-> $ret:ty)*;
         )+
     ) => (
@@ -11,6 +12,7 @@ macro_rules! link {
         struct SharedLibrary {
             _handle: Library,
             $(
+                $(#[$attr])*
                 $name: extern "C" fn($($pname: $pty), *) $(-> $ret)*,
             )+
         }
@@ -21,6 +23,7 @@ macro_rules! link {
                 let handle = unsafe { libloading::Library::new(path)? };
                 let lib = Self {
                     $(
+                        $(#[$attr])*
                         $name: unsafe {
                             let symbol: Symbol<extern "C" fn($($pname: $pty), *) $(-> $ret)*> = handle.get(stringify!($name).as_bytes())?;
                             *symbol
@@ -33,6 +36,7 @@ macro_rules! link {
             }
 
             $(
+                $(#[$attr])*
                 #[allow(non_snake_case, reason = "FFI functions are named in PascalCase")]
                 pub fn $name(&self, $($pname: $pty), *) $(-> $ret)* {
                     (self.$name)($($pname), *)
@@ -76,6 +80,7 @@ macro_rules! link {
             /// # Panics
             ///
             /// This function will panic if the shared library is not loaded in this thread.
+            $(#[$attr])*
             #[allow(non_snake_case, reason = "FFI functions are named in PascalCase")]
             pub unsafe fn $name($($pname: $pty), *) $(-> $ret)* {
                 match SHARED_LIBRARY.read().expect("Failed to lock shared library").as_ref() {
@@ -92,12 +97,14 @@ macro_rules! link {
 macro_rules! link {
     (
         $(
+            $(#[$attr:meta])*
             pub fn $name:ident($($pname:ident: $pty:ty), * $(,)?)$(-> $ret:ty)*;
         )+
     ) => (
         #[link(name = "MaaCore")]
         unsafe extern "C" {
             $(
+                $(#[$attr])*
                 pub unsafe fn $name($($pname: $pty), *) $(-> $ret)*;
             )+
         }

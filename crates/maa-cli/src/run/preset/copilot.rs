@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use log::{debug, trace, warn};
-use maa_sys::TaskType;
+use maa_types::TaskType;
 use maa_value::{
     MAAValue, insert, object,
     userinput::{BoolInput, UserInput},
