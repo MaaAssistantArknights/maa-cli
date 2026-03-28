@@ -147,7 +147,7 @@ jobs:
         run: |
           cargo x test --install-core --no-clippy \
             --package maa-core --coverage test-only \
-            --no-default-features
+            -- --no-default-features
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
         if: ${{ !startsWith(matrix.os, 'windows') }}
