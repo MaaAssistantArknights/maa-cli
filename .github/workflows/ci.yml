@@ -128,7 +128,7 @@ jobs:
             --no-default-features --features '${{ matrix.feature }}' \
 
   build-core:
-    name: Build and Test (core binding, static, ${{ matrix.os }})
+    name: Build and Test (core binding, dynamic, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -145,8 +145,9 @@ jobs:
           tool: cargo-llvm-cov
       - name: Coverage
         run: |
-          cargo x test --install-core \
-            --package maa-core --coverage test-only
+          cargo x test --install-core --no-clippy \
+            --package maa-core --coverage test-only \
+            --no-default-features
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
         if: ${{ !startsWith(matrix.os, 'windows') }}

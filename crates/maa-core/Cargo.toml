@@ -23,6 +23,7 @@ windows-sys = { workspace = true, features = [
 ], optional = true }
 
 [features]
+default = ["runtime"]
 runtime = [
   "dep:libloading",
   "maa-sys/runtime",

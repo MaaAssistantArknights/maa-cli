@@ -12,6 +12,7 @@ libloading = { workspace = true, optional = true }
 maa-ffi-types = { workspace = true }
 
 [features]
+default = ["runtime"]
 runtime = ["dep:libloading"]
 
 [lints]

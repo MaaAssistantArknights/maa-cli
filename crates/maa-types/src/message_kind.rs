@@ -32,6 +32,37 @@ pub enum MessageKind {
     Unknown(AsstMsgId),
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn from_known_ids() {
+        assert_eq!(MessageKind::from(0), MessageKind::InternalError);
+        assert_eq!(MessageKind::from(1), MessageKind::InitFailed);
+        assert_eq!(MessageKind::from(2), MessageKind::ConnectionInfo);
+        assert_eq!(MessageKind::from(3), MessageKind::AllTasksCompleted);
+        assert_eq!(MessageKind::from(4), MessageKind::AsyncCallInfo);
+        assert_eq!(MessageKind::from(5), MessageKind::Destroyed);
+        assert_eq!(MessageKind::from(10000), MessageKind::TaskChainError);
+        assert_eq!(MessageKind::from(10001), MessageKind::TaskChainStart);
+        assert_eq!(MessageKind::from(10002), MessageKind::TaskChainCompleted);
+        assert_eq!(MessageKind::from(10003), MessageKind::TaskChainExtraInfo);
+        assert_eq!(MessageKind::from(10004), MessageKind::TaskChainStopped);
+        assert_eq!(MessageKind::from(20000), MessageKind::SubTaskError);
+        assert_eq!(MessageKind::from(20001), MessageKind::SubTaskStart);
+        assert_eq!(MessageKind::from(20002), MessageKind::SubTaskCompleted);
+        assert_eq!(MessageKind::from(20003), MessageKind::SubTaskExtraInfo);
+        assert_eq!(MessageKind::from(20004), MessageKind::SubTaskStopped);
+        assert_eq!(MessageKind::from(30000), MessageKind::ReportRequest);
+    }
+
+    #[test]
+    fn unknown_id_preserved() {
+        assert_eq!(MessageKind::from(9999), MessageKind::Unknown(9999));
+    }
+}
+
 impl From<AsstMsgId> for MessageKind {
     fn from(id: AsstMsgId) -> Self {
         match id {

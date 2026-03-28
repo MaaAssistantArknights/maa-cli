@@ -8,18 +8,16 @@ idiomatic Rust API, use [`maa-core`](../maa-core) instead.
 
 ## Loading MaaCore
 
-### Linking (default)
+### Dynamic linking (default)
 
-`maa-sys` links against `libMaaCore` at link time. If MaaCore is installed
-in a non-standard location, set `MAA_CORE_DIR` to the directory containing the
-shared library:
+`maa-sys` dynamically links against `libMaaCore` at build time. The linker
+searches its default library paths, which is sufficient for system-wide or
+package-manager installations. If MaaCore is in a non-standard location, pass
+the path via `RUSTFLAGS`:
 
 ```sh
-MAA_CORE_DIR=/path/to/maa cargo build
+RUSTFLAGS="-L /path/to/maa" cargo build
 ```
-
-If `MAA_CORE_DIR` is not set, the linker searches its default library paths,
-which is sufficient for system-wide or package-manager installations.
 
 ### Runtime loading
 

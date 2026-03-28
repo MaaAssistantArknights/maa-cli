@@ -2,7 +2,7 @@
 
 use std::env;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 
 use crate::{
     TestOptions,
@@ -63,12 +63,29 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
         })?;
     } else {
         Group::new("Find MaaCore").run(|| {
-            let core_dir = maa_dirs::find_library();
-            if let Some(core_dir) = core_dir {
-                env_vars.push("MAA_CORE_DIR", core_dir.to_str().unwrap().to_owned());
-            } else {
-                bail!("Failed to find MaaCore")
+            let core_dir = maa_dirs::find_library()
+                .ok_or_else(|| anyhow::anyhow!("Failed to find MaaCore"))?;
+
+            // For link-time dynamic linking (no `runtime` feature): tell the
+            // linker where to find libMaaCore.
+            let rustflags = std::env::var("RUSTFLAGS").unwrap_or_default();
+            let rustflags = format!("{rustflags} -L {}", core_dir.display());
+            env_vars.push("RUSTFLAGS", rustflags.trim().to_owned());
+
+            // For running test binaries that use link-time dynamic linking.
+            #[cfg(target_os = "macos")]
+            {
+                let dyld = std::env::var("DYLD_LIBRARY_PATH").unwrap_or_default();
+                let dyld = format!("{}:{}", core_dir.display(), dyld);
+                env_vars.push("DYLD_LIBRARY_PATH", dyld.trim_end_matches(':').to_owned());
             }
+            #[cfg(not(target_os = "macos"))]
+            {
+                let ld = std::env::var("LD_LIBRARY_PATH").unwrap_or_default();
+                let ld = format!("{}:{}", core_dir.display(), ld);
+                env_vars.push("LD_LIBRARY_PATH", ld.trim_end_matches(':').to_owned());
+            }
+
             Ok(())
         })?;
     }
