@@ -44,6 +44,7 @@ impl CommandExt for Command {
     }
 }
 
+#[derive(Clone)]
 pub struct EnvVars<'s>(Vec<(&'s str, String)>);
 
 impl<'s> EnvVars<'s> {

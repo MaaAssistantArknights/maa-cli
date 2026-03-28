@@ -30,7 +30,7 @@ pub(crate) fn get_log_path() -> std::path::PathBuf {
 
 /// A safe and convenient wrapper of MaaCore Assistant API.
 ///
-/// The optional callback is heap-allocated (`Box<dyn AsstCallback>`) and its
+/// The optional callback is heap-allocated (`Box<dyn Callback>`) and its
 /// raw pointer is passed to MaaCore. `AsstDestroy` is called in `Drop` before
 /// the `Box` is released, guaranteeing the pointee outlives every callback
 /// invocation.
@@ -41,7 +41,7 @@ pub struct Assistant {
 
 // Safety: MaaCore's Assistant API is designed to be called from any thread.
 // The raw pointer handle is not aliased (owned exclusively by this struct).
-// The callback is `Send + Sync` (enforced by the `AsstCallback` bound).
+// The callback is `Send + Sync` (enforced by the `Callback` bound).
 unsafe impl Send for Assistant {}
 
 impl Drop for Assistant {
@@ -187,7 +187,7 @@ impl Assistant {
 
     /// Create a new assistant instance with a callback.
     ///
-    /// Accepts any `C: AsstCallback + 'static`, including plain functions, closures, or `Arc<C>`
+    /// Accepts any `C: Callback + 'static`, including plain functions, closures, or `Arc<C>`
     /// for sharing state with the caller (via the blanket impl on `Arc`).
     pub fn new_with_callback<C: Callback + 'static>(callback: C) -> Result<Self> {
         let boxed = Box::new(callback);

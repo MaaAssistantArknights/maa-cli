@@ -8,7 +8,8 @@ Built on top of [`maa-sys`](../maa-sys), which provides the raw FFI bindings.
 
 ### Loading MaaCore
 
-Before calling any API, load MaaCore and set up its resources:
+By default, `maa-core` enables the `runtime` feature, so load MaaCore before
+calling any API and set up its resources:
 
 ```rust
 use maa_core::Assistant;
@@ -23,8 +24,8 @@ Assistant::set_user_dir("/path/to/user/dir")?;
 Assistant::load_resource("/path/to/maa")?;
 ```
 
-Without the `runtime` feature, `load()` is a no-op — MaaCore is linked at
-link time and always available.
+Without the `runtime` feature, `load()` is a no-op and MaaCore is linked at
+link time instead.
 
 ### Creating an Assistant
 

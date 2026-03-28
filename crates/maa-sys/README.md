@@ -8,26 +8,16 @@ idiomatic Rust API, use [`maa-core`](../maa-core) instead.
 
 ## Loading MaaCore
 
-### Dynamic linking (default)
+### Runtime loading (default)
 
-`maa-sys` dynamically links against `libMaaCore` at build time. The linker
-searches its default library paths, which is sufficient for system-wide or
-package-manager installations. If MaaCore is in a non-standard location, pass
-the path via `RUSTFLAGS`:
-
-```sh
-RUSTFLAGS="-L /path/to/maa" cargo build
-```
-
-### Runtime loading
-
-Enable the `runtime` feature to load MaaCore dynamically at startup:
+By default, `maa-sys` enables the `runtime` feature and loads MaaCore
+dynamically at startup:
 
 ```toml
 maa-sys = { version = "...", features = ["runtime"] }
 ```
 
-Then call `maa_sys::binding::load(path)` before using any other API:
+Call `maa_sys::binding::load(path)` before using any other API:
 
 ```rust
 // Load by absolute path
@@ -35,6 +25,17 @@ maa_sys::binding::load("/path/to/libMaaCore.so").unwrap();
 
 // Or by name, searched in system library paths
 maa_sys::binding::load("MaaCore").unwrap();
+```
+
+### Link-time linking
+
+Without the `runtime` feature, `maa-sys` links against `libMaaCore` at link
+time. The linker searches its default library paths, which is sufficient for
+system-wide or package-manager installations. If MaaCore is in a non-standard
+location, set `MAA_CORE_DIR` to the directory containing the shared library:
+
+```sh
+MAA_CORE_DIR=/path/to/maa cargo build --no-default-features
 ```
 
 <!-- markdownlint-disable-file MD013 -->

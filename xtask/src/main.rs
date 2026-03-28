@@ -90,7 +90,7 @@ struct TestOptions {
     #[arg(long)]
     no_all_features: bool,
 
-    /// Add MaaCore's directory to the runtime library search path for tests
+    /// Add MaaCore's directory to the runtime library search path for test processes
     #[arg(long)]
     runtime_library_path: bool,
 
