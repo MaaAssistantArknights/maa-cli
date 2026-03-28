@@ -58,7 +58,7 @@ impl From<BufferTooSmall> for Error {
 ///
 /// ```text
 /// AsstBool  → Ok(()) | Err(MaaCoreError)    (sentinel: 0)
-/// AsstSize  → Ok(n)  | Err(FfiBufferTooSmall) (sentinel: u64::MAX)
+/// AsstSize  → Ok(n)  | Err(BufferTooSmall) (sentinel: u64::MAX)
 /// AsstId    → Ok(id) | Err(MaaCoreError)    (sentinel: 0)
 /// ```
 ///

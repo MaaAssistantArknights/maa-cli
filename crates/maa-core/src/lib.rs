@@ -298,14 +298,15 @@ impl Assistant {
     /// # Safety
     ///
     /// `buf` must point to at least `size` bytes of writable memory.
-    unsafe fn get_image_with_buf(
-        &self,
-        buf: *mut u8,
-        size: usize,
-    ) -> Result<AsstSize, BufferTooSmall> {
+    unsafe fn get_image_raw(&self, buf: *mut u8, size: usize) -> Result<AsstSize, BufferTooSmall> {
         // Safety: caller guarantees buf points to at least `size` writable bytes.
         unsafe { maa_sys::binding::AsstGetImage(self.handle, buf as *mut c_void, size as AsstSize) }
             .to_result()
+    }
+
+    /// Get the most recent screenshot into a caller-provided buffer.
+    pub fn get_image_with_buf(&self, buf: &mut [u8]) -> Result<AsstSize> {
+        Ok(unsafe { self.get_image_raw(buf.as_mut_ptr(), buf.len())? })
     }
 
     /// Get the most recent screenshot as a PNG-encoded `Vec<u8>`.
@@ -323,7 +324,7 @@ impl Assistant {
 
         loop {
             // Safety: buf has capacity buf_size bytes
-            match unsafe { self.get_image_with_buf(buf.as_mut_ptr(), buf_size) } {
+            match unsafe { self.get_image_raw(buf.as_mut_ptr(), buf_size) } {
                 Ok(0) => return Ok(None),
                 Ok(size) => {
                     // Safety: AsstGetImage wrote exactly `size` bytes into buf.
