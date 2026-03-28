@@ -151,7 +151,10 @@ mod tests {
         assert!(matches!(NULL_SIZE.to_result(), Err(BufferTooSmall)));
         assert!(matches!(1u64.to_result(), Ok(1u64)));
         // to_maa_result: Err path exercises From<BufferTooSmall>
-        assert!(matches!(NULL_SIZE.to_maa_result(), Err(Error::BufferTooSmall)));
+        assert!(matches!(
+            NULL_SIZE.to_maa_result(),
+            Err(Error::BufferTooSmall)
+        ));
         assert!(matches!(1u64.to_maa_result(), Ok(1u64)));
         #[cfg(not(feature = "runtime"))]
         assert_eq!(unsafe { maa_sys::binding::AsstGetNullSize() }, NULL_SIZE);
@@ -162,7 +165,10 @@ mod tests {
         assert!(matches!(INVALID_ID.to_result(), Err(MaaCoreError(_))));
         assert_eq!(1i32.to_result().unwrap(), 1i32);
         // to_maa_result: Err path
-        assert!(matches!(INVALID_ID.to_maa_result(), Err(Error::MAAError(_))));
+        assert!(matches!(
+            INVALID_ID.to_maa_result(),
+            Err(Error::MAAError(_))
+        ));
         assert_eq!(1i32.to_maa_result().unwrap(), 1i32);
     }
 }
