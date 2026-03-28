@@ -128,7 +128,7 @@ jobs:
             --no-default-features --features '${{ matrix.feature }}' \
 
   build-core:
-    name: Build and Test (maa-core, static, ${{ matrix.os }})
+    name: Build and Test (core binding, static, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
