@@ -217,12 +217,12 @@ where
         // Connect to game or emulator
         asst.async_connect(adb_path, address.as_ref(), config, true)?;
 
+        debug!("Starting MAA...");
         asst.start()?;
 
         while asst.running() {
             if stop_bool.load(atomic::Ordering::Relaxed) {
-                log::warn!("Interrupted by user!");
-                break;
+                bail!("Interrupted by user!");
             }
             if offline_stop.load(atomic::Ordering::Relaxed) {
                 break;
@@ -230,10 +230,12 @@ where
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
 
+        debug!("Stopping MAA...");
         asst.stop()?;
 
         // Close external app
         if let (Some(app), true) = (app.as_deref(), task_config.close_app) {
+            debug!("Closing external app...");
             app.close().context("Failed to close external app")?;
         }
     }
