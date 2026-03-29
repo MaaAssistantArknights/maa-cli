@@ -39,11 +39,6 @@ pub struct Assistant {
     _callback: Option<Box<dyn Callback>>,
 }
 
-// Safety: MaaCore's Assistant API is designed to be called from any thread.
-// The raw pointer handle is not aliased (owned exclusively by this struct).
-// The callback is `Send + Sync` (enforced by the `Callback` bound).
-unsafe impl Send for Assistant {}
-
 impl Drop for Assistant {
     fn drop(&mut self) {
         // Destroy the handle before the callback is dropped to make sure the callback is not used
@@ -96,17 +91,17 @@ impl Assistant {
 
 #[cfg(not(feature = "runtime"))]
 impl Assistant {
-    /// Do nothing, as MaaCore is linked dynamically at compile time
+    /// Do nothing, as MaaCore is dynamically linked
     pub fn load(_: impl AsRef<std::path::Path>) -> Result<()> {
         Ok(())
     }
 
-    /// Do nothing, as MaaCore is linked dynamically at compile time
+    /// Do nothing, as MaaCore is dynamically linked
     pub fn unload() -> Result<()> {
         Ok(())
     }
 
-    /// Always returns true, as MaaCore is linked dynamically at compile time
+    /// Always returns true, as MaaCore is dynamically linked.
     pub fn loaded() -> bool {
         true
     }
@@ -353,6 +348,7 @@ impl Assistant {
     /// Get the UUID of the connected device.
     ///
     /// Returns `None` if the device is not yet connected.
+    ///
     /// The returned string looks like `12345678-1234-1234-1234-1234567890ab`,
     /// but may not be a valid UUID on all platforms.
     pub fn get_uuid(&self) -> Result<Option<String>> {
