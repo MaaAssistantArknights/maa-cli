@@ -20,8 +20,8 @@ graph TD
 
     subgraph Domain
         DIRS["maa-dirs"]
-        INSTALLER["maa-installer"]
         VERSION["maa-version"]
+        INSTALLER["maa-installer"]
         VALUE["maa-value"]
         VALMACRO["maa-value-macro"]
     end
