@@ -78,6 +78,13 @@ pub struct CommonArgs {
     /// If you want to disable this behavior, you can use this option.
     #[arg(long, verbatim_doc_comment)]
     pub no_summary: bool,
+    /// Do not reconnect when game loses connection to server
+    ///
+    /// By default, maa will automatically reconnect when the game client
+    /// loses connection to the game server. Use this option to
+    /// disable this behavior for this run.
+    #[arg(long, verbatim_doc_comment)]
+    pub no_auto_reconnect: bool,
 }
 
 impl CommonArgs {
@@ -143,7 +150,9 @@ where
     }
 
     // Create and setup Assistant
-    let asst = Assistant::new_with_callback(callback::default_callback)
+    let auto_reconnect = asst_config.behavior.auto_reconnect && !args.no_auto_reconnect;
+    let (maa_callback, offline_stop) = callback::MaaCallback::new(auto_reconnect);
+    let asst = Assistant::new_with_callback(maa_callback)
         .context("Failed to create Assistant: resources may not be loaded")?;
     asst_config.instance_options.apply_to(&asst)?;
 
@@ -213,6 +222,9 @@ where
         while asst.running() {
             if stop_bool.load(atomic::Ordering::Relaxed) {
                 bail!("Interrupted by user!");
+            }
+            if offline_stop.load(atomic::Ordering::Relaxed) {
+                break;
             }
             std::thread::sleep(std::time::Duration::from_millis(500));
         }

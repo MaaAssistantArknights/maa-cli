@@ -17,6 +17,7 @@ pub struct AsstConfig {
     pub resource: ResourceConfig,
     pub static_options: StaticOptions,
     pub instance_options: InstanceOptions,
+    pub behavior: BehaviorConfig,
 }
 
 impl AsstConfig {
@@ -25,6 +26,7 @@ impl AsstConfig {
         mut resource: ResourceConfig,
         static_options: StaticOptions,
         mut instance_options: InstanceOptions,
+        behavior: BehaviorConfig,
     ) -> Self {
         if matches!(connection.preset, Preset::PlayCover) {
             info!("Detected connection with PlayTools");
@@ -37,6 +39,7 @@ impl AsstConfig {
             resource,
             static_options,
             instance_options,
+            behavior,
         }
     }
 }
@@ -56,6 +59,8 @@ impl<'de> Deserialize<'de> for AsstConfig {
             static_options: StaticOptions,
             #[serde(default)]
             instance_options: InstanceOptions,
+            #[serde(default)]
+            behavior: BehaviorConfig,
         }
 
         let config = AsstConfigHelper::deserialize(deserializer)?;
@@ -65,6 +70,7 @@ impl<'de> Deserialize<'de> for AsstConfig {
             config.resource,
             config.static_options,
             config.instance_options,
+            config.behavior,
         ))
     }
 }
@@ -546,6 +552,25 @@ impl InstanceOptions {
     }
 }
 
+fn default_true() -> bool {
+    true
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Deserialize, Clone)]
+pub struct BehaviorConfig {
+    #[serde(default = "default_true")]
+    pub auto_reconnect: bool,
+}
+
+impl Default for BehaviorConfig {
+    fn default() -> Self {
+        Self {
+            auto_reconnect: true,
+        }
+    }
+}
+
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
@@ -604,6 +629,7 @@ mod tests {
                     adb_lite_enabled: Some(false),
                     kill_adb_on_exit: Some(false),
                 },
+                behavior: BehaviorConfig::default(),
             });
         }
 
@@ -820,6 +846,7 @@ mod tests {
                         adb_lite_enabled: None,
                         kill_adb_on_exit: None,
                     },
+                    behavior: BehaviorConfig::default(),
                 },
                 &[Token::Map { len: Some(0) }, Token::MapEnd],
             );
@@ -840,6 +867,7 @@ mod tests {
                         touch_mode: Some(TouchMode::MacPlayTools),
                         ..Default::default()
                     },
+                    behavior: BehaviorConfig::default(),
                 },
                 &[
                     Token::Map { len: Some(1) },
@@ -1333,5 +1361,40 @@ mod tests {
                 ..
             }
         );
+    }
+
+    mod behavior_config {
+        use serde_test::{Token, assert_de_tokens};
+
+        use super::*;
+
+        #[test]
+        fn default() {
+            assert_eq!(BehaviorConfig::default(), BehaviorConfig {
+                auto_reconnect: true,
+            });
+        }
+
+        #[test]
+        fn deserialize() {
+            // Empty map uses default (auto_reconnect = true)
+            assert_de_tokens(&BehaviorConfig::default(), &[
+                Token::Map { len: Some(0) },
+                Token::MapEnd,
+            ]);
+
+            // Explicit false
+            assert_de_tokens(
+                &BehaviorConfig {
+                    auto_reconnect: false,
+                },
+                &[
+                    Token::Map { len: Some(1) },
+                    Token::Str("auto_reconnect"),
+                    Token::Bool(false),
+                    Token::MapEnd,
+                ],
+            );
+        }
     }
 }
