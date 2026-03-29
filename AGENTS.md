@@ -84,7 +84,7 @@ graph TD
 **Domain Layer:**
 
 - `maa-dirs`: OS-specific path resolution with XDG support. **Use when**: Accessing config/cache/state/resource directories or finding the MaaCore library.
-- `maa-installer`: Download/extract/verify/manifest utilities. **Use when**: Adding update sources or improving download reliability.
+- `maa-installer`: Download/extract/verify with manifest suppoort. **Use when**: Adding update sources or improving download reliability.
 - `maa-version`: Version manifest parsing and comparison. **Use when**: Handling version checks or update logic.
 - `maa-value-macro`: Proc macros for `MAAValue` construction. **Use when**: Building complex config objects in code.
 
@@ -124,7 +124,7 @@ graph TD
 
 - Update docs when commands or config behavior changes.
 - Primary language is Simplified Chinese; add English when practical.
-- One paragraph per line; use `<br>` for line breaks; no trailing spaces.
+- One paragraph per line; use `<br>` for line breaks only when needed; no trailing spaces.
 - Markdown is linted by `markdownlint-cli2`.
 
 ## MISC
