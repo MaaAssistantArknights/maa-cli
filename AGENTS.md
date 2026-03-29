@@ -12,43 +12,97 @@
 
 ## Architecture Overview (Understand This)
 
-### Core Flow
+### Crate Map (Pick The Right Crate First)
 
-```text
-User Command → CLI Parser (clap) → Task Config → MaaCore FFI → Game Automation
-                ↓                      ↓              ↓
-            maa-cli              maa-value       maa-sys
+```mermaid
+graph TD
+    CLI["maa-cli"]
+
+    subgraph Domain
+        DIRS["maa-dirs"]
+        VERSION["maa-version"]
+        INSTALLER["maa-installer"]
+        VALUE["maa-value"]
+        VALMACRO["maa-value-macro"]
+    end
+
+    subgraph Core["Core / FFI"]
+        CORE["maa-core"]
+        SYS["maa-sys"]
+        FFISTR["maa-ffi-string"]
+        TYPES["maa-types"]
+        FFITYPES["maa-ffi-types"]
+    end
+
+    subgraph Utils
+        STREXT["maa-str-ext"]
+    end
+    
+    subgraph Xtask
+        XTASK["xtask"]
+        X["x"]
+    end
+
+    CLI --> CORE
+    CLI --> DIRS
+    CLI --> INSTALLER
+    CLI --> TYPES
+    CLI --> VALUE
+    CLI --> VALMACRO
+    CLI --> VERSION
+
+    CORE --> SYS
+    CORE --> TYPES
+    CORE --> FFISTR
+    CORE --> FFITYPES
+
+    SYS --> FFITYPES
+    TYPES --> FFISTR
+
+    FFISTR --> STREXT
+    VALUE --> STREXT
+    VALUE --> VALMACRO
+    
+    XTASK --> DIRS
+    XTASK --> VERSION
+    X -.shells out to.-> XTASK
 ```
-
-**Key principle**: CLI orchestrates, libraries provide building blocks, FFI stays contained in `maa-sys`.
-
-### Crate Map (What Each Crate Does)
 
 **Application Layer:**
 
 - `maa-cli`: CLI entry point, command routing, task orchestration, config handling, and installers. **Use when**: Adding commands, task presets, or installer logic.
 
-**Core Abstractions:**
+**Core / FFI Layer:**
 
-- `maa-sys`: MaaCore FFI bindings and safe `Assistant` wrapper. **Use when**: Adding new MaaCore API calls or fixing FFI issues. Keep `unsafe` here.
+- `maa-core`: Safe wrapper over MaaCore. **Use when**: Changing `Assistant`, callback handling, MaaCore-facing error conversion, or other Rust-friendly MaaCore APIs.
+- `maa-sys`: Raw MaaCore FFI bindings only. **Use when**: Adding new MaaCore API calls, updating signatures, or fixing linker / loader behavior. Keep `unsafe` here.
 - `maa-types`: Shared enums/primitives (TaskType, ClientType, TouchMode, etc.). **Use when**: Adding new task types or MaaCore options.
-- `maa-dirs`: OS-specific path resolution with XDG support. **Use when**: Accessing config/cache/state/resource directories or finding the MaaCore library.
 - `maa-value`: Dynamic config values with conditional parameters and user input prompts. **Use when**: Handling task parameters, merging configs, or prompting users.
+- `maa-ffi-types`: Primitive FFI aliases (`AsstBool`, `AsstId`, `AsstSize`, ...). **Use when**: Adjusting low-level MaaCore ABI-facing types.
+- `maa-ffi-string`: UTF-8 `CString` helpers for FFI. **Use when**: Passing Rust strings to MaaCore C API.
 
-**Utilities:**
+**Domain Layer:**
 
-- `maa-installer`: Download/extract/verify/manifest utilities. **Use when**: Adding update sources or improving download reliability.
+- `maa-dirs`: OS-specific path resolution with XDG support. **Use when**: Accessing config/cache/state/resource directories or finding the MaaCore library.
+- `maa-installer`: Download/extract/verify with manifest support. **Use when**: Adding update sources or improving download reliability.
 - `maa-version`: Version manifest parsing and comparison. **Use when**: Handling version checks or update logic.
 - `maa-value-macro`: Proc macros for `MAAValue` construction. **Use when**: Building complex config objects in code.
-- `maa-str-ext`: UTF-8 conversion for `OsStr`/`Path`/bytes. **Use when**: Dealing with strings that might not be UTF-8.
-- `maa-ffi-string`: UTF-8 `CString` for FFI. **Use when**: Passing Rust strings to MaaCore C API.
+
+**Utils Layer:**
+
+- `maa-str-ext`: UTF-8 conversion for `OsStr`/`Path`/bytes. **Use when**: Dealing with strings that might not be UTF-8. This is a generic utility crate, not a MaaCore-specific abstraction.
+
+**Tooling Layer:**
+
+- `xtask`: Build/test/release automation. **Use when**: Changing CI/local automation, release scripting, or workspace test orchestration.
+- `x`: Thin launcher for `xtask`. **Use when**: Adjusting `cargo x ...` forwarding behavior.
 
 ## Critical Patterns
 
 - **Paths**: Always use `maa-dirs` for directory resolution. Never hardcode paths like `/usr/local/share` or `C:\Program Files`. The crate handles platform differences and environment overrides (`MAA_CONFIG_DIR`, etc.).
-- **FFI Boundary**: Keep `unsafe` confined to `maa-sys`. The `Assistant` struct provides safe wrappers. Other crates should never call MaaCore directly.
+- **FFI Boundary**: Keep `unsafe` confined to `maa-sys`. `maa-core` is the safe wrapper layer. Other crates should never call MaaCore directly.
 - **Error Handling**: `maa-cli` uses `anyhow::Result` for application errors. Libraries use `thiserror` for structured errors. Never use `unwrap()` without a safety comment.
-- **String Conversions**: Use `maa-str-ext` for `OsStr`/`Path` ↔ UTF-8, and `maa-ffi-string` for FFI `CString` conversion. Handle non-UTF-8 gracefully.
+- **String Conversions**: Use `maa-str-ext` for `OsStr`/`Path` ↔ UTF-8, and `maa-ffi-string` for MaaCore FFI `CString` conversion. Handle non-UTF-8 gracefully.
 - **String Formatting**: When using `format!` and related macros (`write!`, `log::info!`, `bail!`, etc.), always inline variables into `{}` placeholders. Example: use `format!("Error: {error}")` instead of `format!("Error: {}", error)`.
 
 ## Code Quality & Safety
@@ -70,7 +124,7 @@ User Command → CLI Parser (clap) → Task Config → MaaCore FFI → Game Auto
 
 - Update docs when commands or config behavior changes.
 - Primary language is Simplified Chinese; add English when practical.
-- One paragraph per line; use `<br>` for line breaks; no trailing spaces.
+- One paragraph per line; use `<br>` for line breaks only when needed; no trailing spaces.
 - Markdown is linted by `markdownlint-cli2`.
 
 ## MISC
