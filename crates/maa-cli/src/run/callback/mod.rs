@@ -2,7 +2,7 @@ pub mod summary;
 use std::{fmt::Write, sync::atomic::AtomicBool};
 
 use log::{debug, error, info, trace, warn};
-use maa_types::primitive::{AsstMsgId, AsstTaskId};
+use maa_types::{MessageKind, primitive::AsstTaskId};
 use serde_json::{Map, Value};
 use summary::{edit_current_task_detail, end_current_task, start_task};
 
@@ -10,86 +10,26 @@ use crate::state::AGENT;
 
 pub static MAA_CORE_ERRORED: AtomicBool = AtomicBool::new(false);
 
-pub unsafe extern "C" fn default_callback(
-    code: AsstMsgId,
-    json_raw: *const ::std::os::raw::c_char,
-    _: *mut ::std::os::raw::c_void,
-) {
-    let json_str = unsafe { std::ffi::CStr::from_ptr(json_raw).to_str().unwrap() };
-    let json: serde_json::Value = serde_json::from_str(json_str).unwrap();
-    process_message(code, json);
-}
-
-#[repr(i32)]
-enum AsstMsg {
-    /* Global Info */
-    InternalError = 0,
-    InitFailed = 1,
-    ConnectionInfo = 2,
-    AllTasksCompleted = 3,
-    AsyncCallInfo = 4,
-    Destroyed = 5,
-
-    /* TaskChain Info */
-    TaskChainError = 10000,
-    TaskChainStart = 10001,
-    TaskChainCompleted = 10002,
-    TaskChainExtraInfo = 10003,
-    TaskChainStopped = 10004,
-
-    /* SubTask Info */
-    SubTaskError = 20000,
-    SubTaskStart = 20001,
-    SubTaskCompleted = 20002,
-    SubTaskExtraInfo = 20003,
-    SubTaskStopped = 20004,
-
-    /* External Callback */
-    ReportRequest = 30000,
-
-    /* Unknown */
-    Unknown = -1,
-}
-
-impl From<AsstMsgId> for AsstMsg {
-    fn from(msg: AsstMsgId) -> Self {
-        match msg {
-            0 => AsstMsg::InternalError,
-            1 => AsstMsg::InitFailed,
-            2 => AsstMsg::ConnectionInfo,
-            3 => AsstMsg::AllTasksCompleted,
-            4 => AsstMsg::AsyncCallInfo,
-            5 => AsstMsg::Destroyed,
-
-            10000 => AsstMsg::TaskChainError,
-            10001 => AsstMsg::TaskChainStart,
-            10002 => AsstMsg::TaskChainCompleted,
-            10003 => AsstMsg::TaskChainExtraInfo,
-            10004 => AsstMsg::TaskChainStopped,
-
-            20000 => AsstMsg::SubTaskError,
-            20001 => AsstMsg::SubTaskStart,
-            20002 => AsstMsg::SubTaskCompleted,
-            20003 => AsstMsg::SubTaskExtraInfo,
-            20004 => AsstMsg::SubTaskStopped,
-
-            30000 => AsstMsg::ReportRequest,
-
-            _ => AsstMsg::Unknown,
-        }
-    }
-}
-
-fn process_message(code: AsstMsgId, json: Value) {
-    if !json.is_object() {
+pub fn default_callback(kind: MessageKind, msg: Option<&str>) {
+    let Some(message) = msg else {
+        log::warn!("Failed to retrieve message for kind {kind:?}");
         return;
-    }
+    };
+    let Some(message) = serde_json::from_str(message).ok() else {
+        log::warn!("Failed to parse message for {kind:?}: {message}");
+        return;
+    };
+    process_message(kind, message);
+}
 
-    let message = json.as_object().unwrap();
+fn process_message(kind: MessageKind, message: Value) {
+    let Some(message) = message.as_object() else {
+        return;
+    };
 
-    use AsstMsg::*;
+    use MessageKind::*;
 
-    let ret = match code.into() {
+    let ret = match kind {
         InternalError => Some(()),
         InitFailed => {
             error!("InitializationError");
@@ -107,7 +47,7 @@ fn process_message(code: AsstMsgId, json: Value) {
         }
 
         TaskChainError | TaskChainStart | TaskChainCompleted | TaskChainExtraInfo
-        | TaskChainStopped => process_taskchain(code.into(), message),
+        | TaskChainStopped => process_taskchain(kind, message),
 
         SubTaskError => process_subtask_error(message),
         SubTaskStart => process_subtask_start(message),
@@ -117,15 +57,14 @@ fn process_message(code: AsstMsgId, json: Value) {
 
         ReportRequest => process_report(message),
 
-        Unknown => None,
+        Unknown(_) => None,
     };
 
     // if ret is None, which means the message is not processed well
     // we should print the message to trace the error
     if ret.is_none() {
         debug!(
-            "FailedToProcessMessage, code: {}, message: {}",
-            code,
+            "FailedToProcessMessage, kind {kind:?}, message: {}",
             serde_json::to_string_pretty(message).unwrap()
         )
     }
@@ -193,12 +132,12 @@ fn process_connection_info(message: &Map<String, Value>) -> Option<()> {
     Some(())
 }
 
-fn process_taskchain(code: AsstMsg, message: &Map<String, Value>) -> Option<()> {
+fn process_taskchain(kind: MessageKind, message: &Map<String, Value>) -> Option<()> {
     let taskchain = message.get("taskchain")?.as_str()?;
 
-    use AsstMsg::*;
+    use MessageKind::*;
 
-    match code {
+    match kind {
         TaskChainStart => {
             info!("{} {}", taskchain, "Start");
             start_task(message.get("taskid")?.as_i64()? as AsstTaskId);

@@ -1024,10 +1024,10 @@ dependencies = [
  "git2",
  "indicatif",
  "log",
+ "maa-core",
  "maa-dirs",
  "maa-installer",
  "maa-str-ext",
- "maa-sys",
  "maa-types",
  "maa-value",
  "maa-version",
@@ -1049,6 +1049,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "maa-core"
+version = "0.1.0"
+dependencies = [
+ "libloading",
+ "maa-ffi-string",
+ "maa-ffi-types",
+ "maa-sys",
+ "maa-types",
+ "thiserror 2.0.18",
+ "windows-result",
+ "windows-strings",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "maa-dirs"
 version = "0.3.0"
 dependencies = [
@@ -1066,6 +1081,10 @@ dependencies = [
  "maa-str-ext",
  "thiserror 2.0.18",
 ]
+
+[[package]]
+name = "maa-ffi-types"
+version = "1.0.0"
 
 [[package]]
 name = "maa-installer"
@@ -1090,23 +1109,19 @@ version = "0.1.0"
 
 [[package]]
 name = "maa-sys"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "libloading",
- "maa-ffi-string",
- "maa-types",
- "thiserror 2.0.18",
- "windows-result",
- "windows-strings",
- "windows-sys 0.61.2",
+ "maa-ffi-types",
 ]
 
 [[package]]
 name = "maa-types"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "clap",
  "maa-ffi-string",
+ "maa-ffi-types",
  "schemars",
  "serde",
  "serde_test",

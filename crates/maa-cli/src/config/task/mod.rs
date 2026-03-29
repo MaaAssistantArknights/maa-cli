@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use anyhow::Context;
 use condition::Condition;
 pub use condition::{TimeOffset, remainder_of_day_mod};
-use maa_sys::TaskType;
+use maa_types::TaskType;
 use maa_value::{MAAValue, insert, object};
 use serde::Deserialize;
 

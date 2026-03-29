@@ -1,8 +1,8 @@
 //! Test automation for CI.
 
-use std::env;
+use std::{env, ffi::OsString, path::Path};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 
 use crate::{
     TestOptions,
@@ -63,14 +63,21 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
         })?;
     } else {
         Group::new("Find MaaCore").run(|| {
-            let core_dir = maa_dirs::find_library();
-            if let Some(core_dir) = core_dir {
-                env_vars.push("MAA_CORE_DIR", core_dir.to_str().unwrap().to_owned());
-            } else {
-                bail!("Failed to find MaaCore")
+            let core_dir = maa_dirs::find_library()
+                .ok_or_else(|| anyhow::anyhow!("Failed to find MaaCore"))?;
+            env_vars.push("MAA_CORE_DIR", core_dir.display().to_string());
+            if opts.runtime_library_path {
+                push_runtime_library_path(&mut env_vars, &core_dir)?;
             }
             Ok(())
         })?;
+    }
+
+    let mut test_env_vars = env_vars.clone();
+    if opts.runtime_library_path && !opts.no_core_tests {
+        let core_dir =
+            maa_dirs::find_library().ok_or_else(|| anyhow::anyhow!("Failed to find MaaCore"))?;
+        push_runtime_library_path(&mut test_env_vars, &core_dir)?;
     }
 
     if !opts.no_clippy {
@@ -94,6 +101,7 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
                 cmd.arg("--all-features");
             }
             cmd.args(["--", "-D", "warnings"]);
+            cmd.env_vars(&env_vars);
             cmd.run()
         })?;
     }
@@ -111,7 +119,7 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
         if !opts.no_ignored_tests {
             cmd.args(["--", "--include-ignored"]);
         }
-        cmd.env_vars(&env_vars);
+        cmd.env_vars(&test_env_vars);
         cmd.run().context("Failed to run cargo test")
     })?;
 
@@ -125,4 +133,35 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
         })?;
     }
     Ok(())
+}
+
+fn push_runtime_library_path(env_vars: &mut EnvVars<'_>, core_dir: &Path) -> Result<()> {
+    let value = join_runtime_library_path(
+        core_dir,
+        #[cfg(target_os = "windows")]
+        env::var_os("PATH"),
+        #[cfg(target_os = "linux")]
+        env::var_os("LD_LIBRARY_PATH"),
+        #[cfg(target_os = "macos")]
+        env::var_os("DYLD_LIBRARY_PATH"),
+    )?;
+
+    #[cfg(target_os = "windows")]
+    env_vars.push("PATH", value);
+    #[cfg(target_os = "linux")]
+    env_vars.push("LD_LIBRARY_PATH", value);
+    #[cfg(target_os = "macos")]
+    env_vars.push("DYLD_LIBRARY_PATH", value);
+
+    Ok(())
+}
+
+fn join_runtime_library_path(core_dir: &Path, current: Option<OsString>) -> Result<String> {
+    let mut paths = vec![core_dir.to_path_buf()];
+    if let Some(current) = current {
+        paths.extend(env::split_paths(&current));
+    }
+
+    let joined = env::join_paths(paths).context("Failed to join runtime library path")?;
+    Ok(joined.to_string_lossy().into_owned())
 }

@@ -2,8 +2,7 @@ pub use std::collections::BTreeMap as Map;
 use std::sync::Mutex;
 
 use chrono;
-use maa_sys::TaskType;
-use maa_types::primitive::AsstTaskId;
+use maa_types::{TaskType, primitive::AsstTaskId};
 
 use super::IterJoin;
 

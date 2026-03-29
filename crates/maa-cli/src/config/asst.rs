@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use log::{debug, info, warn};
-use maa_sys::Assistant;
+use maa_core::Assistant;
 use maa_types::{InstanceOptionKey, StaticOptionKey, TouchMode};
 use serde::Deserialize;
 
