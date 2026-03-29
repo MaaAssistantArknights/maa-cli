@@ -62,6 +62,81 @@ cargo test -p maa-cli
 cargo test <测试名称>
 ```
 
+## Workspace 架构
+
+### 分层概览
+
+```mermaid
+graph TD
+    CLI["maa-cli"]
+
+    subgraph Domain
+        DIRS["maa-dirs"]
+        INSTALLER["maa-installer"]
+        VERSION["maa-version"]
+        VALUE["maa-value"]
+        VALMACRO["maa-value-macro"]
+    end
+
+    subgraph Core["Core / FFI"]
+        CORE["maa-core"]
+        SYS["maa-sys"]
+        FFISTR["maa-ffi-string"]
+        TYPES["maa-types"]
+        FFITYPES["maa-ffi-types"]
+    end
+
+    subgraph Utils
+        STREXT["maa-str-ext"]
+    end
+    
+    subgraph Xtask
+        XTASK["xtask"]
+        X["x"]
+    end
+
+    CLI --> CORE
+    CLI --> DIRS
+    CLI --> INSTALLER
+    CLI --> TYPES
+    CLI --> VALUE
+    CLI --> VALMACRO
+    CLI --> VERSION
+
+    CORE --> SYS
+    CORE --> TYPES
+    CORE --> FFISTR
+    CORE --> FFITYPES
+
+    SYS --> FFITYPES
+    TYPES --> FFISTR
+
+    FFISTR --> STREXT
+    VALUE --> STREXT
+    VALUE --> VALMACRO
+    
+    XTASK --> DIRS
+    XTASK --> VERSION
+    X -.shells out to.-> XTASK
+```
+
+### 各 crate 的职责
+
+- `maa-cli`：最终的 CLI 应用，负责命令解析、任务编排、配置加载、安装更新入口，以及把各个库拼装成面向用户的行为。
+- `maa-core`：MaaCore 的安全 Rust 封装，提供 `Assistant`、错误类型和 callback 抽象。
+- `maa-sys`：MaaCore 的原始 FFI bindings，只负责暴露 C API 和链接行为，不提供高层接口。
+- `maa-types`：共享类型定义层，包含任务类型、客户端类型、消息类型、Option key 等可被 CLI 和封装层共同使用的枚举与基础类型。
+- `maa-ffi-types`：最底层的 FFI primitive aliases，如 `AsstBool`、`AsstId`、`AsstSize` 等。
+- `maa-ffi-string`：面向 MaaCore FFI 的字符串转换层，把 Rust 字符串安全地转成 `CString`。
+- `maa-str-ext`：通用 UTF-8 / `OsStr` / `Path` 字符串工具 crate，属于基础工具层。
+- `maa-value`：配置值模型，支持条件参数、用户输入和动态合并，主要服务于任务参数与配置系统。
+- `maa-value-macro`：`maa-value` 的 proc-macro 辅助 crate，用于更方便地在代码中构造复杂值。
+- `maa-dirs`：路径定位层，负责配置目录、缓存目录、资源目录、MaaCore 库目录等平台相关路径逻辑。
+- `maa-installer`：下载、解压、校验、安装等通用能力，主要服务于 CLI 的安装与更新流程。
+- `maa-version`：版本号与 manifest 解析、比较逻辑。
+- `xtask`：仓库内部自动化工具，负责 build/test/release/CI 辅助流程。
+- `x`：极薄的启动器，用来把 `cargo x ...` 转发到 `cargo run -p xtask -- ...`。
+
 ## 代码规范
 
 - **格式化**：使用 nightly 版 `rustfmt` 格式化代码。提交前请运行 `cargo +nightly fmt` 保证格式一致。
