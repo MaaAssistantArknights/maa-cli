@@ -221,12 +221,13 @@ where
 
         while asst.running() {
             if stop_bool.load(atomic::Ordering::Relaxed) {
-                bail!("Interrupted by user!");
+                log::warn!("Interrupted by user!");
+                break;
             }
             if offline_stop.load(atomic::Ordering::Relaxed) {
                 break;
             }
-            std::thread::sleep(std::time::Duration::from_millis(500));
+            std::thread::sleep(std::time::Duration::from_millis(100));
         }
 
         asst.stop()?;
