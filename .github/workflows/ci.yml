@@ -149,7 +149,7 @@ jobs:
             --package maa-core --coverage test-only \
             -- --no-default-features
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         if: ${{ !startsWith(matrix.os, 'windows') }}
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -179,7 +179,7 @@ jobs:
         run: |
           cargo x test --install-core --no-clippy --coverage all
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: codecov.json
