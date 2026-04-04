@@ -87,7 +87,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: Test
         run: |
-          cargo x test --install-core
+          # TODO: Re-enable macOS Core-backed tests once beta releases ship macOS MaaCore assets again.
+          cargo x test \
+            ${{ matrix.runner != 'macos-latest' && '--install-core' || '--no-core-tests' }}
 
   build-tier2:
     name: Build and Test (Tier 2, ${{ matrix.runner }})
@@ -106,8 +108,8 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: Test
         run: |
-          cargo x test  \
-            ${{ matrix.runner != 'windows-11-arm' && '--install-core' || '--no-core-tests' }}
+          # TODO: Re-enable macOS Core-backed tests once beta releases ship macOS MaaCore assets again.
+          cargo x test --no-core-tests
 
   build-no-default-features:
     name: Build and Test (feature=${{ matrix.feature }})
@@ -135,7 +137,6 @@ jobs:
       matrix:
         os:
           - ubuntu-22.04
-          - macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -177,7 +178,9 @@ jobs:
           tool: cargo-llvm-cov
       - name: Coverage
         run: |
-          cargo x test --install-core --no-clippy --coverage all
+          # TODO: Re-enable macOS Core-backed tests once beta releases ship macOS MaaCore assets again.
+          cargo x test --no-clippy --coverage all \
+            ${{ matrix.os != 'macos-latest' && '--install-core' || '--no-core-tests' }}
       - name: Upload to Codecov
         uses: codecov/codecov-action@v6
         with:
