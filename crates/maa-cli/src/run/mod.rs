@@ -85,6 +85,13 @@ pub struct CommonArgs {
     /// disable this behavior for this run.
     #[arg(long, verbatim_doc_comment)]
     pub no_auto_reconnect: bool,
+    /// Do not run closedown task when game loses connection to server
+    ///
+    /// By default, maa will run the closedown task when the game client
+    /// loses connection to the game server and auto reconnect is disabled.
+    /// Use this option to disable this behavior for this run.
+    #[arg(long, verbatim_doc_comment)]
+    pub no_closedown_on_offline: bool,
 }
 
 impl CommonArgs {
@@ -157,8 +164,14 @@ where
     asst_config.instance_options.apply_to(&asst)?;
 
     // Register tasks to Assistant and prepare summary
+    // startup_task is prepended; the rest follow in order
+    let has_startup = task_config.startup_task.is_some();
+    let all_tasks = task_config
+        .startup_task
+        .into_iter()
+        .chain(task_config.tasks);
     let mut task_summary = (!args.no_summary).then(summary::Summary::new);
-    for task in task_config.tasks {
+    for task in all_tasks {
         let task_type = task.task_type;
         let params = serde_json::to_string_pretty(&task.params)?;
         debug!(
@@ -201,7 +214,7 @@ where
         };
 
         // Startup external app
-        let need_reconfigure = if let (Some(app), true) = (app.as_deref(), task_config.start_app) {
+        let need_reconfigure = if let (Some(app), true) = (app.as_deref(), has_startup) {
             !app.open().context("Failed to open external app")?
         } else {
             false
@@ -220,23 +233,53 @@ where
         debug!("Starting MAA...");
         asst.start()?;
 
-        while asst.running() {
+        enum StopReason {
+            Completed,
+            Offline,
+            Interrupted,
+        }
+
+        let stop_reason = loop {
+            if !asst.running() {
+                break StopReason::Completed;
+            }
             if stop_bool.load(atomic::Ordering::Relaxed) {
-                bail!("Interrupted by user!");
+                log::error!("Interrupted by user!");
+                break StopReason::Interrupted;
             }
             if offline_stop.load(atomic::Ordering::Relaxed) {
-                break;
+                break StopReason::Offline;
             }
             std::thread::sleep(std::time::Duration::from_millis(100));
-        }
+        };
 
         debug!("Stopping MAA...");
         asst.stop()?;
 
-        // Close external app
-        if let (Some(app), true) = (app.as_deref(), task_config.close_app) {
-            debug!("Closing external app...");
-            app.close().context("Failed to close external app")?;
+        let has_closedown = task_config.closedown_task.is_some();
+
+        let run_closedown = match stop_reason {
+            StopReason::Completed => true,
+            StopReason::Offline => !args.no_closedown_on_offline,
+            StopReason::Interrupted => false,
+        };
+
+        if run_closedown && let Some(closedown) = task_config.closedown_task {
+            let params = serde_json::to_string_pretty(&closedown.params)?;
+            debug!("Running closedown task [{}]", closedown.name_or_default(),);
+            asst.append_task(closedown.task_type, params.as_str())
+                .context("Failed to add CloseDown task")?;
+            asst.start()?;
+            while asst.running() {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+            asst.stop()?;
+
+            // Close external app (e.g. stop Waydroid session)
+            if let (Some(app), true) = (app.as_deref(), has_closedown) {
+                debug!("Closing external app...");
+                app.close().context("Failed to close external app")?;
+            }
         }
     }
 
