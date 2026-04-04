@@ -86,6 +86,10 @@ pub struct ConnectionConfig {
     pub(super) address: Option<String>,
     #[serde(default)]
     pub(super) config: Option<String>,
+    #[serde(default)]
+    pub(super) emulator_path: Option<String>,
+    #[serde(default)]
+    pub(super) emulator_index: Option<i32>,
 }
 
 impl ConnectionConfig {
@@ -123,6 +127,10 @@ impl ConnectionConfig {
 
         (adb_path, address, config)
     }
+
+    pub fn extra_args(&self) -> (&Option<String>, &Option<i32>) {
+        (&self.emulator_path, &self.emulator_index)
+    }
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -131,6 +139,8 @@ pub enum Preset {
     MuMuPro,
     PlayCover,
     Waydroid,
+    MuMuEmulator12,
+    LDPlayer,
     #[default]
     Adb,
 }
@@ -158,6 +168,8 @@ impl<'de> Deserialize<'de> for Preset {
                     "PlayCover" | "PlayTools" => Ok(Preset::PlayCover),
                     "ADB" | "Adb" | "adb" => Ok(Preset::Adb),
                     "Waydroid" | "waydroid" => Ok(Preset::Waydroid),
+                    "MuMuEmulator12" | "MuMuEmulator" => Ok(Preset::MuMuEmulator12),
+                    "LDPlayer" => Ok(Preset::LDPlayer),
                     _ => {
                         warn!("Unknown connection preset: {value}, ignoring");
                         Ok(Preset::Adb)
@@ -177,7 +189,7 @@ impl Preset {
                 "/Applications/MuMuPlayer.app/Contents/MacOS/MuMuEmulator.app/Contents/MacOS/tools/adb"
             }
             Preset::PlayCover => "",
-            Preset::Waydroid | Preset::Adb => "adb",
+            Preset::Waydroid | Preset::Adb | Preset::MuMuEmulator12 | Preset::LDPlayer => "adb",
         }
     }
 
@@ -185,23 +197,27 @@ impl Preset {
         match self {
             Preset::MuMuPro => "127.0.0.1:16384".into(),
             Preset::PlayCover => "127.0.0.1:1717".into(),
-            Preset::Waydroid | Preset::Adb => std::process::Command::new(adb_path)
-                .arg("devices")
-                .output()
-                .ok()
-                .and_then(|output| String::from_utf8(output.stdout).ok())
-                .and_then(parse_adb_devices)
-                .map(Cow::Owned)
-                .unwrap_or_else(|| {
-                    warn!("Failed to detect device address, using emulator-5554");
-                    "emulator-5554".into()
-                }),
+            Preset::Waydroid | Preset::Adb | Preset::MuMuEmulator12 | Preset::LDPlayer => {
+                std::process::Command::new(adb_path)
+                    .arg("devices")
+                    .output()
+                    .ok()
+                    .and_then(|output| String::from_utf8(output.stdout).ok())
+                    .and_then(parse_adb_devices)
+                    .map(Cow::Owned)
+                    .unwrap_or_else(|| {
+                        warn!("Failed to detect device address, using emulator-5554");
+                        "emulator-5554".into()
+                    })
+            }
         }
     }
 
     fn default_config(self) -> &'static str {
         match self {
             Preset::Waydroid => "Waydroid",
+            Preset::MuMuEmulator12 => "MuMuEmulator12",
+            Preset::LDPlayer => "LDPlayer",
             // May be preset specific in the future
             Preset::MuMuPro | Preset::PlayCover | Preset::Adb => config_based_on_os(),
         }
@@ -608,6 +624,8 @@ mod tests {
                     adb_path: Some(String::from("adb")),
                     address: Some(String::from("emulator-5554")),
                     config: Some(String::from("CompatMac")),
+                    emulator_path: None,
+                    emulator_index: None,
                 },
                 resource: ResourceConfig {
                     resource_base_dirs: {
@@ -685,6 +703,8 @@ mod tests {
                     adb_path: Some(String::from("/path/to/adb")),
                     address: Some(String::from("127.0.0.1:5555")),
                     config: Some(String::from("SomeConfig")),
+                    emulator_path: None,
+                    emulator_index: None,
                 },
                 &[
                     Token::Map { len: Some(4) },
@@ -892,6 +912,8 @@ mod tests {
                 adb_path: None,
                 address: None,
                 config: None,
+                emulator_path: None,
+                emulator_index: None,
             });
         }
 
@@ -951,6 +973,8 @@ mod tests {
                     adb_path: None,
                     address: None,
                     config: None,
+                    emulator_path: None,
+                    emulator_index: None,
                 }
                 .connect_args(),
                 (
@@ -966,6 +990,8 @@ mod tests {
                     adb_path: None,
                     address: None,
                     config: None,
+                    emulator_path: None,
+                    emulator_index: None,
                 }
                 .connect_args(),
                 ("", "127.0.0.1:1717", config_based_on_os()),
@@ -977,6 +1003,8 @@ mod tests {
                     adb_path: None,
                     address: None,
                     config: None,
+                    emulator_path: None,
+                    emulator_index: None,
                 }
                 .connect_args(),
                 ("adb", &device, "Waydroid"),
@@ -988,6 +1016,8 @@ mod tests {
                     adb_path: Some("/path/to/adb".to_owned()),
                     address: Some("127.0.0.1:11111".to_owned()),
                     config: Some("SomeConfig".to_owned()),
+                    emulator_path: None,
+                    emulator_index: None,
                 }
                 .connect_args(),
                 ("/path/to/adb", "127.0.0.1:11111", "SomeConfig"),

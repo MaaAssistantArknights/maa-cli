@@ -2,8 +2,12 @@ mod callback;
 use callback::summary;
 
 mod external;
+mod extra;
 
 pub mod preset;
+
+#[cfg(all(target_os = "linux", feature = "wayland-screencap"))]
+pub mod screencap;
 
 use std::{
     path::Path,
@@ -185,6 +189,7 @@ where
     if !args.dry_run {
         // Prepare connection
         let (adb_path, address, config) = asst_config.connection.connect_args();
+        let (emulator_path, emulator_index) = asst_config.connection.extra_args();
 
         // Launch external apps
         let app: Option<Box<dyn external::ExternalApp>> = match asst_config.connection.preset() {
@@ -199,6 +204,24 @@ where
             }
             _ => None,
         };
+
+        match asst_config.connection.preset() {
+            #[cfg(target_os = "windows")]
+            crate::config::asst::Preset::MuMuEmulator12 => {
+                Assistant::set_connection_extras(
+                    "MuMuEmulator12",
+                    extra::mumu_extra(emulator_path, emulator_index)?.as_str(),
+                )?;
+            }
+            #[cfg(target_os = "windows")]
+            crate::config::asst::Preset::LDPlayer => {
+                Assistant::set_connection_extras(
+                    "LDPlayer",
+                    extra::ld_extra(emulator_path, emulator_index)?.as_str(),
+                )?;
+            }
+            _ => {}
+        }
 
         // Startup external app
         let need_reconfigure = if let (Some(app), true) = (app.as_deref(), task_config.start_app) {

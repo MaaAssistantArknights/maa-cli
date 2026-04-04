@@ -11,66 +11,79 @@ impl<'a> WaydroidApp<'a> {
         Self { address }
     }
 
-    fn check_adb_devices(&self) -> Result<bool> {
-        let ret = String::from_utf8(
-            std::process::Command::new("adb")
-                .arg("devices")
+    fn adb_connect(&self) -> Result<bool> {
+        std::process::Command::new("adb")
+            .args(["disconnect", self.address])
+            .output()?;
+
+        let output = String::from_utf8(
+            std::process::Command::new("waydroid")
+                .args(["adb", "connect"])
                 .output()?
                 .stdout,
         )?;
-
-        Ok(ret
-            .lines()
-            .filter(|line| line.contains(self.address))
-            .filter(|line| line.contains("device"))
-            .count()
-            != 0)
+        trace!("{}", output.trim());
+        Ok(output.contains("Established ADB connection"))
     }
 }
 
+fn waydroid_session_running() -> Result<bool> {
+    let output = String::from_utf8(
+        std::process::Command::new("waydroid")
+            .arg("status")
+            .output()?
+            .stdout,
+    )?;
+    Ok(output
+        .lines()
+        .any(|l| l.starts_with("Session:") && l.contains("RUNNING")))
+}
+
+fn start_waydroid_session() -> Result<()> {
+    let mut task = std::process::Command::new("cage")
+        .args(["-d", "waydroid", "session", "start"])
+        .env("WAYLAND_DISPLAY", "wayland-0")
+        .env("WLR_BACKENDS", "wayland")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .context("Failed to start Waydroid!")?;
+
+    let mut rdr = std::io::BufReader::new(task.stderr.take().expect("stderr is piped"));
+    let mut line = String::new();
+
+    loop {
+        use std::io::BufRead;
+
+        line.clear();
+        if rdr.read_line(&mut line)? == 0 {
+            break;
+        }
+        trace!("{}", line.trim_end());
+        if line.contains("Android with user 0 is ready")
+            || line.contains("Established ADB connection")
+        {
+            break;
+        }
+    }
+
+    Ok(())
+}
+
 impl super::ExternalApp for WaydroidApp<'_> {
-    /// Return true on success and address match
-    ///
-    /// Return false if given address not in `adb devices``
     fn open(&self) -> Result<bool> {
-        if self.check_adb_devices().is_ok_and(|b| b) {
-            info!("Waydroid is already running!");
-            return Ok(true);
+        if !waydroid_session_running()? {
+            info!("Starting Waydroid session");
+            start_waydroid_session()?;
         }
 
-        info!("Starting waydroid");
-        let mut task = std::process::Command::new("waydroid")
-            .arg("session")
-            .arg("start")
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::piped())
-            .spawn()
-            .context("Failed to start Waydroid!")?;
-
-        let mut rdr = std::io::BufReader::new(task.stderr.take().unwrap());
-        let mut buf = String::new();
-
-        // Wait for game ready
-        loop {
-            use std::io::BufRead;
-
-            rdr.read_line(&mut buf)?;
-            trace!("{buf}");
-            if buf.contains("ADB") {
-                info!("Waydroid ready!");
-                break;
-            }
-            trace!("Waiting for game ready...");
-        }
-
-        self.check_adb_devices()
+        self.adb_connect()
     }
 
     fn close(&self) -> Result<()> {
-        info!("Closing waydroid");
+        info!("Closing Waydroid");
         std::process::Command::new("waydroid")
-            .arg("session")
-            .arg("stop")
+            .args(["session", "stop"])
             .spawn()
             .context("Failed to stop Waydroid!")?;
 
@@ -87,6 +100,6 @@ mod tests {
     fn from() {
         assert_eq!(WaydroidApp::new("localhost:1717"), WaydroidApp {
             address: "localhost:1717",
-        },);
+        });
     }
 }

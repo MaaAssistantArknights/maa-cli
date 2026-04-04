@@ -25,6 +25,7 @@ env_logger = { version = "0.11", default-features = false }
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 git2 = "0.20"
 indicatif = "0.18"
+libc = "0.2"
 libloading = "0.9"
 log = "0.4.20"
 maa-core = { path = "crates/maa-core", version = "0.1", default-features = false }
@@ -59,6 +60,8 @@ thiserror = "2"
 tiny_http = "0.12"
 toml = "1"
 ureq = { version = "3" }
+wayland-client = "0.31"
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
 windows-result = "0.4.0"
 windows-strings = "0.5.0"
 windows-sys = "0.61.0"
