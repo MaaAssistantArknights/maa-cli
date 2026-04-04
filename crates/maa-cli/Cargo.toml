@@ -1,6 +1,6 @@
 [package]
 name = "maa-cli"
-version = "0.7.2"
+version = "0.0.0"
 edition.workspace = true
 description = "A simple CLI for MAA (MaaAssistantArknights)"
 repository.workspace = true
@@ -42,6 +42,11 @@ tempfile = { workspace = true }
 toml = { workspace = true }
 ureq = { workspace = true, features = ["json", "platform-verifier"] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = { workspace = true, optional = true }
+wayland-client = { workspace = true, optional = true }
+wayland-protocols-wlr = { workspace = true, optional = true }
+
 [dev-dependencies]
 maa-value = { workspace = true, features = ["default_batch_mode"] }
 regex = { workspace = true }
@@ -58,6 +63,11 @@ cli_installer = ["__installer", "dep:sha2"]
 core_installer = ["__installer"]
 # Backend used to update resources
 git2 = ["dep:git2"]
+# Wayland-based screen capture (Linux only); enables zwlr-screencopy backend
+wayland-screencap = ["dep:libc", "dep:wayland-client", "dep:wayland-protocols-wlr"]
+# DMA-BUF path for zero-copy Wayland capture (requires gbm); implies wayland-screencap
+# NOTE: DMA-BUF capture is scaffolded but not yet fully implemented.
+wayland-dmabuf = ["wayland-screencap"]
 
 [lints]
 workspace = true

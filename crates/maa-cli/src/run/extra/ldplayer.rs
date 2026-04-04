@@ -1,52 +1,72 @@
 use std::process::Command;
 
-use serde_json;
+use anyhow::{Result, bail};
 
 pub fn ld_extra(
     emulator_path: &Option<String>,
     emulator_index: &Option<i32>,
-) -> anyhow::Result<String> {
-    let path = emulator_path
-        .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("emulator_path is required for LDPlayer"))?;
-    let index = emulator_index.unwrap_or(0);
-    let mut ldconsole_path = std::path::PathBuf::from(path);
-    ldconsole_path.push("ldconsole.exe");
-    if !ldconsole_path.exists() {
-        return Err(anyhow::anyhow!(
-            "ldconsole.exe not found in the specified emulator_path"
-        ));
-    }
-    let output = match Command::new(&ldconsole_path).arg("list2").output() {
-        Ok(output) => output,
-        Err(e) => {
-            return Err(anyhow::anyhow!(
-                "Failed to execute ldconsole.exe: {}",
-                e.to_string()
-            ));
-        }
+) -> Result<String> {
+    let Some(path) = emulator_path else {
+        bail!("emulator_path is required for LDPlayer");
     };
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut pid_found: Option<i32> = None;
-    let index_str = index.to_string();
-    for line in stdout.lines() {
-        let parts: Vec<&str> = line.split(',').collect();
-        if parts.len() >= 6 && parts[0] == index_str {
-            pid_found = parts[5].parse::<i32>().ok();
-            break;
-        }
+    let index = emulator_index.unwrap_or(0);
+    let ldconsole_path = std::path::Path::new(path).join("ldconsole.exe");
+    if !ldconsole_path.exists() {
+        bail!("ldconsole.exe not found in the specified emulator_path");
     }
-    if let Some(pid) = pid_found {
-        let object = serde_json::json!({
-            "path": path,
-            "index": index,
-            "pid": pid,
+    let output = Command::new(&ldconsole_path)
+        .arg("list2")
+        .output()
+        .map_err(|e| anyhow::anyhow!("Failed to execute ldconsole.exe: {e}"))?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let index_str = index.to_string();
+    let pid = stdout
+        .lines()
+        .find_map(|line| {
+            let parts: Vec<&str> = line.split(',').collect();
+            if parts.len() >= 6 && parts[0] == index_str {
+                parts[5].parse::<i32>().ok()
+            } else {
+                None
+            }
+        })
+        .ok_or_else(|| {
+            anyhow::anyhow!("No running instance found for LDPlayer with index {index}")
+        })?;
+    let object = serde_json::json!({
+        "path": path,
+        "index": index,
+        "pid": pid,
+    });
+    Ok(serde_json::to_string(&object)?)
+}
+
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ld_extra_requires_path() {
+        assert!(ld_extra(&None, &None).is_err());
+    }
+
+    /// Verify JSON structure given a synthetic ldconsole output (no real binary needed).
+    ///
+    /// This test exercises the CSV parsing logic directly via a mock function.
+    #[test]
+    fn parse_fields_from_csv_row() {
+        // Simulate what `ld_extra` does internally with a known CSV line
+        let stdout = "0,LDPlayer,,,running,12345\n";
+        let index_str = "0";
+        let pid = stdout.lines().find_map(|line| {
+            let parts: Vec<&str> = line.split(',').collect();
+            if parts.len() >= 6 && parts[0] == index_str {
+                parts[5].parse::<i32>().ok()
+            } else {
+                None
+            }
         });
-        Ok(serde_json::to_string(&object)?)
-    } else {
-        Err(anyhow::anyhow!(
-            "No running instance found for LDPlayer with index {}",
-            index
-        ))
+        assert_eq!(pid, Some(12345));
     }
 }

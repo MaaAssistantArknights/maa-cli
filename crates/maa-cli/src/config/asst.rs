@@ -86,9 +86,13 @@ pub struct ConnectionConfig {
     pub(super) address: Option<String>,
     #[serde(default)]
     pub(super) config: Option<String>,
+    /// Path to the emulator installation directory (Windows only; used by MuMu 12 and LDPlayer).
     #[serde(default)]
+    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
     pub(super) emulator_path: Option<String>,
+    /// Zero-based emulator instance index (Windows only; used by MuMu 12 and LDPlayer).
     #[serde(default)]
+    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
     pub(super) emulator_index: Option<i32>,
 }
 
@@ -128,6 +132,7 @@ impl ConnectionConfig {
         (adb_path, address, config)
     }
 
+    #[cfg(target_os = "windows")]
     pub fn extra_args(&self) -> (&Option<String>, &Option<i32>) {
         (&self.emulator_path, &self.emulator_index)
     }
@@ -624,8 +629,7 @@ mod tests {
                     adb_path: Some(String::from("adb")),
                     address: Some(String::from("emulator-5554")),
                     config: Some(String::from("CompatMac")),
-                    emulator_path: None,
-                    emulator_index: None,
+                    ..Default::default()
                 },
                 resource: ResourceConfig {
                     resource_base_dirs: {
@@ -970,11 +974,7 @@ mod tests {
             args_eq(
                 ConnectionConfig {
                     preset: Preset::MuMuPro,
-                    adb_path: None,
-                    address: None,
-                    config: None,
-                    emulator_path: None,
-                    emulator_index: None,
+                    ..Default::default()
                 }
                 .connect_args(),
                 (
@@ -987,11 +987,7 @@ mod tests {
             args_eq(
                 ConnectionConfig {
                     preset: Preset::PlayCover,
-                    adb_path: None,
-                    address: None,
-                    config: None,
-                    emulator_path: None,
-                    emulator_index: None,
+                    ..Default::default()
                 }
                 .connect_args(),
                 ("", "127.0.0.1:1717", config_based_on_os()),
@@ -1000,11 +996,7 @@ mod tests {
             args_eq(
                 ConnectionConfig {
                     preset: Preset::Waydroid,
-                    adb_path: None,
-                    address: None,
-                    config: None,
-                    emulator_path: None,
-                    emulator_index: None,
+                    ..Default::default()
                 }
                 .connect_args(),
                 ("adb", &device, "Waydroid"),
@@ -1016,8 +1008,7 @@ mod tests {
                     adb_path: Some("/path/to/adb".to_owned()),
                     address: Some("127.0.0.1:11111".to_owned()),
                     config: Some("SomeConfig".to_owned()),
-                    emulator_path: None,
-                    emulator_index: None,
+                    ..Default::default()
                 }
                 .connect_args(),
                 ("/path/to/adb", "127.0.0.1:11111", "SomeConfig"),
