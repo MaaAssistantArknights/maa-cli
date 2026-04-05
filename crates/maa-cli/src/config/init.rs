@@ -6,6 +6,8 @@ use maa_value::{
     userinput::{BoolInput, Input, SelectD, ValueWithDesc},
 };
 
+use crate::atomic_fs::write;
+
 fn asst_config_template() -> MAAValue {
     object!(
         "setup_connection" => BoolInput::new(Some(true)).with_description("setup connection"),
@@ -218,7 +220,8 @@ pub fn init(name: Option<&Path>, filetype: Option<super::Filetype>, force: bool)
         asst_config_out.insert("static_options", config);
     }
 
-    filetype.write(std::fs::File::create(dest)?, &asst_config_out)?;
+    let content = filetype.serialize(&asst_config_out)?;
+    write(&dest, content)?;
 
     // remove same name profiles
     for path in tobe_removed {

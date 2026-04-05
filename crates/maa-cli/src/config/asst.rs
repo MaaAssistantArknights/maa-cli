@@ -10,6 +10,8 @@ use maa_core::Assistant;
 use maa_types::{InstanceOptionKey, StaticOptionKey, TouchMode};
 use serde::Deserialize;
 
+use crate::atomic_fs::copy;
+
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Default, Clone)]
 pub struct AsstConfig {
@@ -431,7 +433,7 @@ fn migrate_legacy_tasks_json(resource_dir: &Path, hot_update_root: &Path) -> Res
         bail!("Expected {} to be a directory", new_dir.display());
     }
 
-    fs::copy(&old, &new)
+    copy(&old, &new)
         .with_context(|| format!("Failed to copy {} to {}", old.display(), new.display()))?;
 
     Ok(())

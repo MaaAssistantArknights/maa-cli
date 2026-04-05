@@ -6,6 +6,8 @@ use std::{
 use anyhow::{Context, Result, bail};
 use serde_json::Value as JsonValue;
 
+use crate::atomic_fs::write;
+
 fn file_not_found(path: impl AsRef<Path>) -> std::io::Error {
     std::io::Error::new(
         std::io::ErrorKind::NotFound,
@@ -62,16 +64,23 @@ impl Filetype {
         })
     }
 
-    fn write<T>(&self, mut writer: impl std::io::Write, value: &T) -> Result<()>
+    fn serialize<T>(&self, value: &T) -> Result<Vec<u8>>
     where
         T: serde::Serialize,
     {
         use Filetype::*;
-        match self {
-            Json => serde_json::to_writer_pretty(writer, value)?,
-            Yaml => serde_yaml::to_writer(writer, value)?,
-            Toml => writer.write_all(toml::to_string_pretty(value)?.as_bytes())?,
-        };
+        Ok(match self {
+            Json => serde_json::to_vec_pretty(value)?,
+            Yaml => serde_yaml::to_string(value)?.into_bytes(),
+            Toml => toml::to_string_pretty(value)?.into_bytes(),
+        })
+    }
+
+    fn write<T>(&self, mut writer: impl std::io::Write, value: &T) -> Result<()>
+    where
+        T: serde::Serialize,
+    {
+        writer.write_all(&self.serialize(value)?)?;
         Ok(())
     }
 
@@ -152,7 +161,9 @@ pub fn convert(file: &Path, out: Option<&Path>, ft: Option<Filetype>) -> Result<
             if let Some(dir) = file.parent() {
                 dir.ensure()?;
             }
-            format.write(File::create(file)?, &value)
+            let content = format.serialize(&value)?;
+            write(&file, content)
+                .with_context(|| format!("Failed to write converted file {}", file.display()))
         } else {
             format.write(std::io::stdout().lock(), &value)
         }

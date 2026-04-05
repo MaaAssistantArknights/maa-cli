@@ -1,6 +1,5 @@
 use std::{
     fs,
-    io::Write,
     path::{Path, PathBuf},
 };
 
@@ -17,6 +16,7 @@ use ureq::http::StatusCode;
 
 use super::{IntoParameters, TaskContext, ToTaskType};
 use crate::{
+    atomic_fs::write,
     dirs::{self, Ensure},
     state::AGENT,
 };
@@ -417,7 +417,13 @@ impl CopilotFile {
 
                 if json_file.is_file() {
                     debug!("Cache hit, using cached json file {}", json_file.display());
-                    files.push((index, json_file, None));
+                    let task = json_from_file(&json_file).with_context(|| {
+                        format!(
+                            "Failed to parse cached copilot file {}",
+                            json_file.display()
+                        )
+                    })?;
+                    files.push((index, json_file, Some(task)));
                     return Ok(());
                 }
 
@@ -437,13 +443,16 @@ impl CopilotFile {
 
                 if resp.status_code == StatusCode::OK {
                     let content = resp.data.content;
+                    let task = serde_json::from_str(&content)?;
 
-                    fs::File::create(&json_file)
-                        .context("Failed to create json file")?
-                        .write_all(content.as_bytes())
-                        .context("Failed to write json file")?;
+                    write(&json_file, &content).with_context(|| {
+                        format!(
+                            "Failed to persist downloaded copilot cache file to {}",
+                            json_file.display()
+                        )
+                    })?;
 
-                    files.push((index, json_file, Some(serde_json::from_str(&content)?)));
+                    files.push((index, json_file, Some(task)));
 
                     Ok(())
                 } else {
@@ -1519,6 +1528,27 @@ found"}"#,
                     &test_root,
                     &[test_root.join("40051.json")],
                 );
+
+                fs::remove_dir_all(&test_root).unwrap();
+            }
+
+            #[test]
+            fn remote_propagates_invalid_cache_error() {
+                ensure_test_server();
+
+                let test_root = temp_dir().join("maa-test-push-path-into-invalid-cache");
+                fs::create_dir_all(&test_root).unwrap();
+
+                let cached_file = test_root.join("40051.json");
+                fs::write(&cached_file, "{\"stage_name\":\"unterminated").unwrap();
+
+                let mut files = Vec::new();
+                let result = CopilotFile::from_uri("maa://40051")
+                    .unwrap()
+                    .push_path_into::<CopilotTask>(0, &test_root, &mut files);
+
+                assert!(result.is_err());
+                assert!(files.is_empty());
 
                 fs::remove_dir_all(&test_root).unwrap();
             }
