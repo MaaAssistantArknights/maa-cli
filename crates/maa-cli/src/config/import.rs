@@ -65,11 +65,9 @@ impl<'a> ImportSource<'a> {
         match self {
             ImportSource::Remote(url) => {
                 let response = AGENT.get(url).call()?;
-                let mut body = response.into_body();
-                let mut reader = body.as_reader();
-                atomic_fs::write_from(target, &mut reader).with_context(|| {
-                    format!("Failed to write imported file to {}", target.display())
-                })
+                atomic_fs::write_from(target, &mut response.into_body().as_reader()).with_context(
+                    || format!("Failed to write imported file to {}", target.display()),
+                )
             }
             ImportSource::Local(path) => atomic_fs::copy(path, target).with_context(|| {
                 format!(
