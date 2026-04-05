@@ -2,6 +2,10 @@ pub(super) trait ExternalApp {
     fn open(&self) -> anyhow::Result<bool>;
 
     fn close(&self) -> anyhow::Result<()>;
+
+    fn actual_address(&self) -> anyhow::Result<Option<String>> {
+        Ok(None)
+    }
 }
 
 #[cfg(target_os = "macos")]

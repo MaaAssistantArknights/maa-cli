@@ -103,23 +103,34 @@ impl ConnectionConfig {
             .adb_path
             .as_deref()
             .unwrap_or_else(|| self.preset.default_adb_path());
-        let address = self
-            .address
-            .as_deref()
-            .map(Cow::Borrowed)
-            .unwrap_or_else(|| self.preset.default_address(adb_path));
+        let address = if matches!(self.preset, Preset::Waydroid) {
+            if let Some(config_address) = self.address.as_deref() {
+                warn!(
+                    "Ignoring configured address {config_address}. Using Waydroid runtime-managed address instead."
+                );
+            }
+            Cow::Borrowed("waydroid")
+        } else {
+            self.address
+                .as_deref()
+                .map(Cow::Borrowed)
+                .unwrap_or_else(|| self.preset.default_address(adb_path))
+        };
         let config = self
             .config
             .as_deref()
             .unwrap_or_else(|| self.preset.default_config());
-        debug!(
-            "Connecting to {address} with config {config} via {}",
-            if matches!(self.preset, Preset::PlayCover) {
-                "PlayTools"
-            } else {
+
+        if matches!(self.preset, Preset::Waydroid) {
+            debug!(
+                "Waydroid preset: using runtime-managed ADB address; user-configured address will be ignored. config={config} via {adb_path}"
+            );
+        } else {
+            debug!(
+                "Connecting to {address} with config {config} via {}",
                 adb_path
-            }
-        );
+            );
+        }
 
         (adb_path, address, config)
     }
@@ -185,7 +196,8 @@ impl Preset {
         match self {
             Preset::MuMuPro => "127.0.0.1:16384".into(),
             Preset::PlayCover => "127.0.0.1:1717".into(),
-            Preset::Waydroid | Preset::Adb => std::process::Command::new(adb_path)
+            Preset::Waydroid => "waydroid".into(),
+            Preset::Adb => std::process::Command::new(adb_path)
                 .arg("devices")
                 .output()
                 .ok()
@@ -979,7 +991,18 @@ mod tests {
                     config: None,
                 }
                 .connect_args(),
-                ("adb", &device, "Waydroid"),
+                ("adb", "waydroid", "Waydroid"),
+            );
+
+            args_eq(
+                ConnectionConfig {
+                    preset: Preset::Waydroid,
+                    adb_path: None,
+                    address: Some("127.0.0.1:11111".to_owned()),
+                    config: None,
+                }
+                .connect_args(),
+                ("adb", "waydroid", "Waydroid"),
             );
 
             args_eq(

@@ -194,9 +194,7 @@ where
                 address.as_ref(),
             ))),
             #[cfg(target_os = "linux")]
-            crate::config::asst::Preset::Waydroid => {
-                Some(Box::new(external::WaydroidApp::new(address.as_ref())))
-            }
+            crate::config::asst::Preset::Waydroid => Some(Box::new(external::WaydroidApp::new())),
             _ => None,
         };
 
@@ -208,14 +206,21 @@ where
         };
 
         let address = if need_reconfigure {
-            debug!("Resetting address");
-            asst_config.connection.connect_args().1
+            debug!("Using Waydroid runtime address");
+            app.as_deref()
+                .and_then(|app| app.actual_address().ok().flatten())
+                .ok_or_else(|| anyhow::anyhow!("Waydroid failed to provide a device address"))?
+        } else if let Some(runtime_address) = app
+            .as_deref()
+            .and_then(|app| app.actual_address().ok().flatten())
+        {
+            runtime_address
         } else {
-            address.clone()
+            address.into_owned()
         };
 
         // Connect to game or emulator
-        asst.async_connect(adb_path, address.as_ref(), config, true)?;
+        asst.async_connect(adb_path, address.as_str(), config, true)?;
 
         debug!("Starting MAA...");
         asst.start()?;
