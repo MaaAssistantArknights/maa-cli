@@ -30,10 +30,42 @@ const COPILOT_API: &str = "http://127.0.0.1:18080/copilot/get/";
 #[cfg(test)]
 const COPILOT_SET_API: &str = "http://127.0.0.1:18080/set/get?id=";
 
-// Raid mode constants
-const RAID_MODE_NORMAL: u8 = 0;
-const RAID_MODE_RAID: u8 = 1;
-const RAID_MODE_BOTH: u8 = 2;
+/// Raid mode for copilot stages.
+#[cfg_attr(test, derive(Debug, PartialEq, Eq))]
+#[derive(Clone, Copy, Default, clap::ValueEnum)]
+enum RaidMode {
+    /// Run the stage in normal mode only.
+    #[default]
+    #[value(alias = "0")]
+    Normal,
+    /// Run the stage in raid mode only.
+    #[value(alias = "1")]
+    Raid,
+    /// Run the stage twice, once in each mode.
+    #[value(alias = "2")]
+    Both,
+}
+
+impl RaidMode {
+    fn extend_stage_list(self, stage_list: &mut Vec<StageOpts>, filename: &Path, stage_name: &str) {
+        let mut push_stage = |is_raid| {
+            stage_list.push(StageOpts {
+                filename: filename.to_path_buf(),
+                stage_name: stage_name.to_owned(),
+                is_raid,
+            });
+        };
+
+        match self {
+            Self::Normal => push_stage(false),
+            Self::Raid => push_stage(true),
+            Self::Both => {
+                push_stage(false);
+                push_stage(true);
+            }
+        }
+    }
+}
 
 fn validate_loop_times(loop_times: i32) -> Result<i32> {
     anyhow::ensure!(loop_times > 0, "loop_times must be greater than 0");
@@ -52,9 +84,11 @@ pub struct CopilotParams {
     uri_list: Vec<String>,
     /// Whether to fight stage in raid mode
     ///
-    /// `0` for normal, `1` for raid, `2` run twice for both normal and raid
-    #[arg(long, default_value = "0")]
-    raid: u8,
+    /// `normal` for normal, `raid` for raid, `both` to run twice for both modes.
+    ///
+    /// Also accepts legacy values `0`, `1`, and `2`.
+    #[arg(long, default_value = "normal")]
+    raid: RaidMode,
     /// Enable auto formation
     ///
     /// When multiple uri are provided or a copilot task set contains multiple stages, force to
@@ -201,26 +235,8 @@ impl IntoParameters for CopilotParams {
                 }
             }
 
-            match self.raid {
-                RAID_MODE_NORMAL | RAID_MODE_RAID => stage_list.push(StageOpts {
-                    filename: file.to_path_buf(),
-                    stage_name: stage_code.to_owned(),
-                    is_raid: self.raid == RAID_MODE_RAID,
-                }),
-                RAID_MODE_BOTH => {
-                    stage_list.push(StageOpts {
-                        filename: file.to_path_buf(),
-                        stage_name: stage_code.to_owned(),
-                        is_raid: false,
-                    });
-                    stage_list.push(StageOpts {
-                        filename: file.to_path_buf(),
-                        stage_name: stage_code.to_owned(),
-                        is_raid: true,
-                    });
-                }
-                n => bail!("Invalid raid mode {n}, should be 0, 1 or 2"),
-            }
+            self.raid
+                .extend_stage_list(&mut stage_list, file.as_path(), stage_code);
         }
 
         // We also want all other parameters from overlay
@@ -815,7 +831,7 @@ found"}"#,
                     "maa",
                     "copilot",
                     "maa://40051",
-                    "--raid=1",
+                    "--raid=raid",
                     "--formation",
                     "--use-sanity-potion",
                     "--add-trust",
@@ -883,7 +899,7 @@ found"}"#,
                     "copilot",
                     "maa://40051",
                     "--raid",
-                    "2",
+                    "both",
                     "--formation",
                 ])
                 .unwrap();
@@ -907,6 +923,37 @@ found"}"#,
                         "ignore_requirements" => false,
                     ),
                 );
+            }
+
+            fn parse_raid_mode<I, T>(args: I) -> Result<RaidMode>
+            where
+                I: IntoIterator<Item = T>,
+                T: Into<std::ffi::OsString> + Clone,
+            {
+                let command = crate::command::parse_from(args).command;
+                match command {
+                    crate::Command::Copilot { params, .. } => Ok(params.raid),
+                    _ => panic!("Not a Copilot command"),
+                }
+            }
+
+            #[test]
+            fn parse_named_raid_mode() {
+                for (mode, name, num) in [
+                    (RaidMode::Normal, "normal", "0"),
+                    (RaidMode::Raid, "raid", "1"),
+                    (RaidMode::Both, "both", "2"),
+                ] {
+                    let raid_mode =
+                        parse_raid_mode(["maa", "copilot", "maa://40051", "--raid", name]).unwrap();
+
+                    assert_eq!(raid_mode, mode);
+
+                    let num_mode =
+                        parse_raid_mode(["maa", "copilot", "maa://40051", "--raid", num]).unwrap();
+
+                    assert_eq!(num_mode, mode);
+                }
             }
 
             #[test]
@@ -942,22 +989,24 @@ found"}"#,
             }
 
             #[test]
-            #[ignore = "requires installed resources"]
             fn invalid_raid_mode() {
-                ensure_test_server();
+                use clap::Parser;
 
-                if std::env::var_os("SKIP_CORE_TEST").is_some() {
-                    return;
-                }
-
-                let result = parse(["maa", "copilot", "maa://40051", "--raid", "3"]);
+                let result = crate::command::Cli::try_parse_from([
+                    "maa",
+                    "copilot",
+                    "maa://40051",
+                    "--raid",
+                    "3",
+                ]);
 
                 assert!(result.is_err());
                 assert!(
                     result
-                        .unwrap_err()
+                        .err()
+                        .expect("invalid raid mode should fail in clap")
                         .to_string()
-                        .contains("Invalid raid mode")
+                        .contains("invalid value '3'")
                 );
             }
 
