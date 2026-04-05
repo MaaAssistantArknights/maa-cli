@@ -57,7 +57,7 @@ fn start_waydroid_session() -> Result<()> {
         if rdr.read_line(&mut line)? == 0 {
             break;
         }
-        trace!("{}", line.trim_end());
+        trace!("[Waydroid] {}", line.trim_end());
         if line.contains("Android with user 0 is ready")
             || line.contains("Established ADB connection")
         {
