@@ -925,12 +925,14 @@ found"}"#,
                 );
             }
 
-            fn parse_raid_mode<I, T>(args: I) -> Result<RaidMode>
+            fn parse_raid_mode<I, T>(args: I) -> std::result::Result<RaidMode, clap::Error>
             where
                 I: IntoIterator<Item = T>,
                 T: Into<std::ffi::OsString> + Clone,
             {
-                let command = crate::command::parse_from(args).command;
+                use clap::Parser;
+
+                let command = crate::command::Cli::try_parse_from(args)?.command;
                 match command {
                     crate::Command::Copilot { params, .. } => Ok(params.raid),
                     _ => panic!("Not a Copilot command"),
@@ -938,7 +940,7 @@ found"}"#,
             }
 
             #[test]
-            fn parse_named_raid_mode() {
+            fn parse_raid_mode_accepts_named_and_legacy_values() {
                 for (mode, name, num) in [
                     (RaidMode::Normal, "normal", "0"),
                     (RaidMode::Raid, "raid", "1"),
@@ -989,22 +991,13 @@ found"}"#,
             }
 
             #[test]
-            fn invalid_raid_mode() {
-                use clap::Parser;
-
-                let result = crate::command::Cli::try_parse_from([
-                    "maa",
-                    "copilot",
-                    "maa://40051",
-                    "--raid",
-                    "3",
-                ]);
+            fn parse_raid_mode_rejects_invalid_value() {
+                let result = parse_raid_mode(["maa", "copilot", "maa://40051", "--raid", "3"]);
 
                 assert!(result.is_err());
                 assert!(
                     result
-                        .err()
-                        .expect("invalid raid mode should fail in clap")
+                        .expect_err("invalid raid mode should fail in clap")
                         .to_string()
                         .contains("invalid value '3'")
                 );
