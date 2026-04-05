@@ -218,8 +218,7 @@ pub fn init(name: Option<&Path>, filetype: Option<super::Filetype>, force: bool)
         asst_config_out.insert("static_options", config);
     }
 
-    let content = filetype.serialize(&asst_config_out)?;
-    crate::atomic_fs::write(&dest, content)?;
+    filetype.write(&dest, &asst_config_out)?;
 
     // remove same name profiles
     for path in tobe_removed {

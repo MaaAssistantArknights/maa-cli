@@ -7,28 +7,33 @@ use std::{
 use tempfile::NamedTempFile;
 
 pub fn write(path: impl AsRef<Path>, content: impl AsRef<[u8]>) -> io::Result<()> {
-    atomic(path, |temp| temp.write_all(content.as_ref()))
+    write_with(path, |temp| temp.write_all(content.as_ref()))
 }
 
 pub fn write_from(path: impl AsRef<Path>, reader: &mut impl Read) -> io::Result<()> {
-    atomic(path, |temp| io::copy(reader, temp).map(|_| ()))
+    write_with(path, |temp| io::copy(reader, temp).map(|_| ()))
 }
 
 pub fn copy(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<()> {
     let from = from.as_ref();
-    atomic(to, |temp| fs::copy(from, temp.path()).map(|_| ()))
+    write_with(to, |temp| fs::copy(from, temp.path()).map(|_| ()))
 }
 
-fn atomic<P, F>(path: P, fill: F) -> io::Result<()>
+/// Atomically write to `path` by letting `fill` populate a staging temp file,
+/// then fsync + rename. The closure can fail with any error type that
+/// absorbs `io::Error`, so callers may return e.g. `serde_json::Error`.
+pub fn write_with<P, F, E>(path: P, fill: F) -> Result<(), E>
 where
     P: AsRef<Path>,
-    F: FnOnce(&mut NamedTempFile) -> io::Result<()>,
+    F: FnOnce(&mut NamedTempFile) -> Result<(), E>,
+    E: From<io::Error>,
 {
     let path = path.as_ref();
     let mut temp = NamedTempFile::new_in(parent_dir(path)?)?;
     fill(&mut temp)?;
     temp.as_file_mut().sync_all()?;
-    persist(temp.into_temp_path(), path)
+    persist(temp.into_temp_path(), path)?;
+    Ok(())
 }
 
 fn persist(temp_path: tempfile::TempPath, path: &Path) -> io::Result<()> {
