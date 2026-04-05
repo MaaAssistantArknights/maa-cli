@@ -96,7 +96,10 @@ mod tests {
 
     #[test]
     fn bare_filename_uses_current_directory() {
-        assert_eq!(parent_dir(Path::new("output.json")).unwrap(), Path::new("."));
+        assert_eq!(
+            parent_dir(Path::new("output.json")).unwrap(),
+            Path::new(".")
+        );
     }
 
     #[test]
