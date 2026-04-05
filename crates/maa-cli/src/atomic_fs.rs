@@ -41,14 +41,14 @@ fn persist(temp_path: tempfile::TempPath, path: &Path) -> io::Result<()> {
 }
 
 fn parent_dir(path: &Path) -> io::Result<&Path> {
-    path.parent()
-        .filter(|path| !path.as_os_str().is_empty())
-        .ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Path {} has no parent directory", path.display()),
-            )
-        })
+    match path.parent() {
+        None => Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("Path {} has no parent directory", path.display()),
+        )),
+        Some(p) if p.as_os_str().is_empty() => Ok(Path::new(".")),
+        Some(p) => Ok(p),
+    }
 }
 
 #[cfg(test)]
@@ -95,8 +95,13 @@ mod tests {
     }
 
     #[test]
-    fn rejects_path_without_parent_directory() {
-        let error = write("config.json", "new").unwrap_err();
+    fn bare_filename_uses_current_directory() {
+        assert_eq!(parent_dir(Path::new("output.json")).unwrap(), Path::new("."));
+    }
+
+    #[test]
+    fn rejects_root_path() {
+        let error = write("/", "new").unwrap_err();
 
         assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
     }
