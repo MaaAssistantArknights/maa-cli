@@ -6,8 +6,6 @@ use std::{
 use anyhow::{Context, Result, bail};
 use serde_json::Value as JsonValue;
 
-use crate::atomic_fs::write;
-
 fn file_not_found(path: impl AsRef<Path>) -> std::io::Error {
     std::io::Error::new(
         std::io::ErrorKind::NotFound,
@@ -162,7 +160,7 @@ pub fn convert(file: &Path, out: Option<&Path>, ft: Option<Filetype>) -> Result<
                 dir.ensure()?;
             }
             let content = format.serialize(&value)?;
-            write(&file, content)
+            crate::atomic_fs::write(&file, content)
                 .with_context(|| format!("Failed to write converted file {}", file.display()))
         } else {
             format.write(std::io::stdout().lock(), &value)

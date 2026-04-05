@@ -16,7 +16,6 @@ use ureq::http::StatusCode;
 
 use super::{IntoParameters, TaskContext, ToTaskType};
 use crate::{
-    atomic_fs::write,
     dirs::{self, Ensure},
     state::AGENT,
 };
@@ -445,7 +444,7 @@ impl CopilotFile {
                     let content = resp.data.content;
                     let task = serde_json::from_str(&content)?;
 
-                    write(&json_file, &content).with_context(|| {
+                    crate::atomic_fs::write(&json_file, &content).with_context(|| {
                         format!(
                             "Failed to persist downloaded copilot cache file to {}",
                             json_file.display()
