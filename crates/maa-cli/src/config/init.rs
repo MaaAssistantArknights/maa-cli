@@ -218,7 +218,7 @@ pub fn init(name: Option<&Path>, filetype: Option<super::Filetype>, force: bool)
         asst_config_out.insert("static_options", config);
     }
 
-    filetype.write(std::fs::File::create(dest)?, &asst_config_out)?;
+    filetype.write(&dest, &asst_config_out)?;
 
     // remove same name profiles
     for path in tobe_removed {

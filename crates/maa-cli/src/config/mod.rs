@@ -62,8 +62,16 @@ impl Filetype {
         })
     }
 
-    fn write<T>(&self, mut writer: impl std::io::Write, value: &T) -> Result<()>
+    fn write<T>(&self, path: &Path, value: &T) -> Result<()>
     where
+        T: serde::Serialize,
+    {
+        crate::atomic_fs::write_with(path, |temp| self.write_to(temp, value))
+    }
+
+    fn write_to<W, T>(&self, mut writer: W, value: &T) -> Result<()>
+    where
+        W: std::io::Write,
         T: serde::Serialize,
     {
         use Filetype::*;
@@ -71,7 +79,7 @@ impl Filetype {
             Json => serde_json::to_writer_pretty(writer, value)?,
             Yaml => serde_yaml::to_writer(writer, value)?,
             Toml => writer.write_all(toml::to_string_pretty(value)?.as_bytes())?,
-        };
+        }
         Ok(())
     }
 
@@ -146,18 +154,20 @@ pub fn convert(file: &Path, out: Option<&Path>, ft: Option<Filetype>) -> Result<
 
     let value = JsonValue::from_file(file)?;
 
-    if let Some(format) = ft {
-        if let Some(file) = out {
-            let file = file.with_extension(format.to_str());
-            if let Some(dir) = file.parent() {
-                dir.ensure()?;
-            }
-            format.write(File::create(file)?, &value)
-        } else {
-            format.write(std::io::stdout().lock(), &value)
-        }
-    } else {
+    let Some(format) = ft else {
         bail!("Format not given")
+    };
+
+    if let Some(file) = out {
+        let file = file.with_extension(format.to_str());
+        if let Some(dir) = file.parent() {
+            dir.ensure()?;
+        }
+        format
+            .write(&file, &value)
+            .with_context(|| format!("Failed to write converted file {}", file.display()))
+    } else {
+        format.write_to(std::io::stdout().lock(), &value)
     }
 }
 
@@ -208,18 +218,15 @@ mod tests {
 
         let test_file = test_root.join("test");
         let test_json = test_file.with_extension("json");
-        Json.write(File::create(&test_json).unwrap(), &value)
-            .unwrap();
+        Json.write(&test_json, &value).unwrap();
         assert_eq!(Json.read::<JsonValue>(&test_json).unwrap(), value);
 
         let test_yaml = test_file.with_extension("yaml");
-        Yaml.write(File::create(&test_yaml).unwrap(), &value)
-            .unwrap();
+        Yaml.write(&test_yaml, &value).unwrap();
         assert_eq!(Yaml.read::<JsonValue>(&test_yaml).unwrap(), value);
 
         let test_toml = test_file.with_extension("toml");
-        Toml.write(File::create(&test_toml).unwrap(), &value)
-            .unwrap();
+        Toml.write(&test_toml, &value).unwrap();
         assert_eq!(Toml.read::<JsonValue>(&test_toml).unwrap(), value);
         std::fs::remove_dir_all(&test_root).unwrap();
     }
@@ -302,7 +309,7 @@ mod tests {
             "b": "test"
         });
 
-        Json.write(File::create(&input).unwrap(), &value).unwrap();
+        Json.write(&input, &value).unwrap();
 
         convert(&input, None, Some(Json)).unwrap();
         convert(&input, Some(&toml), None).unwrap();

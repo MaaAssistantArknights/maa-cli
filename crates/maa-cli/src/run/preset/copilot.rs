@@ -1,6 +1,5 @@
 use std::{
     fs,
-    io::Write,
     path::{Path, PathBuf},
 };
 
@@ -185,8 +184,7 @@ impl IntoParameters for CopilotParams {
             self.ignore_requirements || default.get_or("ignore_requirements", false);
 
         let mut stage_list = Vec::new();
-        for (_, file, value) in copilot_files {
-            let copilot_task = value.map(Ok).unwrap_or_else(|| json_from_file(&file))?;
+        for (_, file, copilot_task) in copilot_files {
             let stage_id = &copilot_task.stage_name;
 
             let stage_info = get_stage_info(stage_id, base_dirs.iter().map(|dir| dir.as_path()))?;
@@ -314,8 +312,7 @@ impl IntoParameters for SSSCopilotParams {
             bail!("SSS Copilot don't support task set");
         }
 
-        let (_, file, value) = files.pop().expect("files have length 1");
-        let task = value.map(Ok).unwrap_or_else(|| json_from_file(&file))?;
+        let (_, file, task) = files.pop().expect("files have length 1");
 
         if task.task_type.as_deref() != Some("SSS") {
             bail!("The given copilot file is not a SSS copilot file");
@@ -387,7 +384,7 @@ impl CopilotFile {
         self,
         index: usize,
         base_dir: impl AsRef<Path>,
-        files: &mut Vec<(usize, PathBuf, Option<T>)>,
+        files: &mut Vec<(usize, PathBuf, T)>,
     ) -> Result<()>
     where
         T: serde::de::DeserializeOwned + Send,
@@ -417,8 +414,24 @@ impl CopilotFile {
 
                 if json_file.is_file() {
                     debug!("Cache hit, using cached json file {}", json_file.display());
-                    files.push((index, json_file, None));
-                    return Ok(());
+                    match json_from_file(&json_file) {
+                        Ok(task) => {
+                            files.push((index, json_file, task));
+                            return Ok(());
+                        }
+                        Err(e) => {
+                            warn!(
+                                "Cached copilot file {} is corrupted ({e}), re-downloading",
+                                json_file.display()
+                            );
+                            fs::remove_file(&json_file).with_context(|| {
+                                format!(
+                                    "Failed to remove corrupted cache file {}",
+                                    json_file.display()
+                                )
+                            })?;
+                        }
+                    }
                 }
 
                 let url = format!("{COPILOT_API}{code}");
@@ -437,13 +450,16 @@ impl CopilotFile {
 
                 if resp.status_code == StatusCode::OK {
                     let content = resp.data.content;
+                    let task = serde_json::from_str(&content)?;
 
-                    fs::File::create(&json_file)
-                        .context("Failed to create json file")?
-                        .write_all(content.as_bytes())
-                        .context("Failed to write json file")?;
+                    crate::atomic_fs::write(&json_file, &content).with_context(|| {
+                        format!(
+                            "Failed to persist downloaded copilot cache file to {}",
+                            json_file.display()
+                        )
+                    })?;
 
-                    files.push((index, json_file, Some(serde_json::from_str(&content)?)));
+                    files.push((index, json_file, task));
 
                     Ok(())
                 } else {
@@ -495,7 +511,10 @@ impl CopilotFile {
                     base_dir.join(file)
                 };
 
-                files.push((index, file, None));
+                let task = json_from_file(&file).with_context(|| {
+                    format!("Failed to parse local copilot file {}", file.display())
+                })?;
+                files.push((index, file, task));
 
                 Ok(())
             }
@@ -539,9 +558,7 @@ fn operator_table(task: &CopilotTask) -> Result<Table> {
 /// This function handles downloading remote files, expanding task sets,
 /// and resolving local file paths. The returned list is sorted by the
 /// original URI index to preserve order.
-fn resolve_copilot_uris(
-    uri_list: Vec<String>,
-) -> Result<Vec<(usize, PathBuf, Option<CopilotTask>)>> {
+fn resolve_copilot_uris(uri_list: Vec<String>) -> Result<Vec<(usize, PathBuf, CopilotTask)>> {
     let copilot_dir = dirs::copilot().ensure()?;
 
     let mut copilot_files = uri_list
@@ -1524,6 +1541,31 @@ found"}"#,
             }
 
             #[test]
+            fn remote_recovers_from_corrupted_cache() {
+                ensure_test_server();
+
+                let test_root = temp_dir().join("maa-test-push-path-into-invalid-cache");
+                fs::create_dir_all(&test_root).unwrap();
+
+                let cached_file = test_root.join("40051.json");
+                fs::write(&cached_file, "{\"stage_name\":\"unterminated").unwrap();
+
+                // Should transparently re-download and succeed despite the corrupt cache
+                assert_push_path_into(
+                    "maa://40051",
+                    0,
+                    &test_root,
+                    &[test_root.join("40051.json")],
+                );
+
+                // The re-downloaded cache must be valid JSON now
+                let task: CopilotTask = json_from_file(&cached_file).unwrap();
+                assert!(!task.stage_name.is_empty());
+
+                fs::remove_dir_all(&test_root).unwrap();
+            }
+
+            #[test]
             fn remote_set() {
                 ensure_test_server();
 
@@ -1577,12 +1619,57 @@ found"}"#,
 
             #[test]
             fn local_relative() {
-                ensure_test_server();
-
                 let test_root = temp_dir().join("maa-test-push-path-into-local-rel");
                 fs::create_dir_all(&test_root).unwrap();
 
-                assert_push_path_into("file.json", 0, &test_root, &[test_root.join("file.json")]);
+                let test_file = test_root.join("file.json");
+                let test_content = serde_json::json!({
+                    "minimum_required": "v4.0.0",
+                    "stage_name": "act25side_01",
+                    "actions": [{ "type": "SpeedUp" }],
+                    "groups": [],
+                    "opers": [],
+                });
+                serde_json::to_writer(fs::File::create(&test_file).unwrap(), &test_content)
+                    .unwrap();
+
+                assert_push_path_into("file.json", 0, &test_root, &[test_file]);
+
+                fs::remove_dir_all(&test_root).unwrap();
+            }
+
+            #[test]
+            fn local_nonexistent_file_returns_error() {
+                let test_root = temp_dir().join("maa-test-push-path-into-local-nonexistent");
+                fs::create_dir_all(&test_root).unwrap();
+
+                let mut files = Vec::new();
+                let result =
+                    CopilotFile::from_uri(test_root.join("nonexistent.json").to_str().unwrap())
+                        .unwrap()
+                        .push_path_into::<CopilotTask>(0, &test_root, &mut files);
+
+                assert!(result.is_err());
+                assert!(files.is_empty());
+
+                fs::remove_dir_all(&test_root).unwrap();
+            }
+
+            #[test]
+            fn local_invalid_json_returns_error() {
+                let test_root = temp_dir().join("maa-test-push-path-into-local-invalid");
+                fs::create_dir_all(&test_root).unwrap();
+
+                let bad_file = test_root.join("bad.json");
+                fs::write(&bad_file, "{\"stage_name\":\"unterminated").unwrap();
+
+                let mut files = Vec::new();
+                let result = CopilotFile::from_uri(bad_file.to_str().unwrap())
+                    .unwrap()
+                    .push_path_into::<CopilotTask>(0, &test_root, &mut files);
+
+                assert!(result.is_err());
+                assert!(files.is_empty());
 
                 fs::remove_dir_all(&test_root).unwrap();
             }

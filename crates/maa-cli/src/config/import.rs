@@ -7,7 +7,7 @@ use anyhow::{Context, Result, bail};
 use maa_dirs::Ensure;
 
 use super::{Filetype, SUPPORTED_EXTENSION};
-use crate::state::AGENT;
+use crate::{atomic_fs, state::AGENT};
 
 /// Represents the source of a configuration file to import
 #[cfg_attr(test, derive(PartialEq))]
@@ -61,24 +61,21 @@ impl<'a> ImportSource<'a> {
     }
 
     /// Copy the source to the target path
-    fn copy_to(self, target: &Path) -> Result<()> {
+    fn copy_to(self, target: &Path) -> Result<u64> {
         match self {
             ImportSource::Remote(url) => {
                 let response = AGENT.get(url).call()?;
-                let mut file = fs::File::create(target)?;
-                std::io::copy(&mut response.into_body().as_reader(), &mut file)?;
-                Ok(())
+                atomic_fs::write_from(target, &mut response.into_body().as_reader()).with_context(
+                    || format!("Failed to write imported file to {}", target.display()),
+                )
             }
-            ImportSource::Local(path) => {
-                fs::copy(path, target).with_context(|| {
-                    format!(
-                        "Failed to copy file from {} to {}",
-                        path.display(),
-                        target.display()
-                    )
-                })?;
-                Ok(())
-            }
+            ImportSource::Local(path) => atomic_fs::copy(path, target).with_context(|| {
+                format!(
+                    "Failed to copy file from {} to {}",
+                    path.display(),
+                    target.display()
+                )
+            }),
         }
     }
 }
