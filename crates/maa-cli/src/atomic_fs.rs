@@ -108,4 +108,19 @@ mod tests {
 
         assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
     }
+
+    #[test]
+    fn failed_fill_leaves_original_intact() {
+        let temp_dir = tempdir().unwrap();
+        let path = temp_dir.path().join("config.json");
+
+        fs::write(&path, "original").unwrap();
+
+        let result = write_with::<_, _, io::Error>(&path, |_temp| {
+            Err(io::Error::other("simulated failure"))
+        });
+
+        assert!(result.is_err());
+        assert_eq!(fs::read_to_string(&path).unwrap(), "original");
+    }
 }

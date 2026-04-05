@@ -69,15 +69,15 @@ impl Filetype {
         crate::atomic_fs::write_with(path, |temp| self.write_to(temp, value))
     }
 
-    fn write_to<W, T>(&self, mut writer: W, value: &T) -> Result<()>
+    fn write_to<W, T>(&self, writer: &mut W, value: &T) -> Result<()>
     where
         W: std::io::Write,
         T: serde::Serialize,
     {
         use Filetype::*;
         match self {
-            Json => serde_json::to_writer_pretty(&mut writer, value)?,
-            Yaml => serde_yaml::to_writer(&mut writer, value)?,
+            Json => serde_json::to_writer_pretty(writer, value)?,
+            Yaml => serde_yaml::to_writer(writer, value)?,
             Toml => writer.write_all(toml::to_string_pretty(value)?.as_bytes())?,
         }
         Ok(())
@@ -167,7 +167,7 @@ pub fn convert(file: &Path, out: Option<&Path>, ft: Option<Filetype>) -> Result<
             .write(&file, &value)
             .with_context(|| format!("Failed to write converted file {}", file.display()))
     } else {
-        format.write_to(std::io::stdout().lock(), &value)
+        format.write_to(&mut std::io::stdout().lock(), &value)
     }
 }
 
