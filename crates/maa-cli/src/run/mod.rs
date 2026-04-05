@@ -207,12 +207,18 @@ where
 
         let address = if need_reconfigure {
             debug!("Using Waydroid runtime address");
-            app.as_deref()
-                .and_then(|app| app.actual_address().ok().flatten())
+            let runtime_address = app
+                .as_deref()
+                .map(|app| app.actual_address())
+                .transpose()?
+                .flatten();
+            runtime_address
                 .ok_or_else(|| anyhow::anyhow!("Waydroid failed to provide a device address"))?
         } else if let Some(runtime_address) = app
             .as_deref()
-            .and_then(|app| app.actual_address().ok().flatten())
+            .map(|app| app.actual_address())
+            .transpose()?
+            .flatten()
         {
             runtime_address
         } else {
