@@ -61,7 +61,7 @@ impl<'a> ImportSource<'a> {
     }
 
     /// Copy the source to the target path
-    fn copy_to(self, target: &Path) -> Result<()> {
+    fn copy_to(self, target: &Path) -> Result<u64> {
         match self {
             ImportSource::Remote(url) => {
                 let response = AGENT.get(url).call()?;

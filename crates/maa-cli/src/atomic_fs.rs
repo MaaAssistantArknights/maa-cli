@@ -10,30 +10,30 @@ pub fn write(path: impl AsRef<Path>, content: impl AsRef<[u8]>) -> io::Result<()
     write_with(path, |temp| temp.write_all(content.as_ref()))
 }
 
-pub fn write_from(path: impl AsRef<Path>, reader: &mut impl Read) -> io::Result<()> {
-    write_with(path, |temp| io::copy(reader, temp).map(|_| ()))
+pub fn write_from(path: impl AsRef<Path>, reader: &mut impl Read) -> io::Result<u64> {
+    write_with(path, |temp| io::copy(reader, temp))
 }
 
-pub fn copy(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<()> {
+pub fn copy(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<u64> {
     let from = from.as_ref();
-    write_with(to, |temp| fs::copy(from, temp.path()).map(|_| ()))
+    write_with(to, |temp| fs::copy(from, temp.path()))
 }
 
 /// Atomically write to `path` by letting `fill` populate a staging temp file,
 /// then fsync + rename. The closure can fail with any error type that
 /// absorbs `io::Error`, so callers may return e.g. `serde_json::Error`.
-pub fn write_with<P, F, E>(path: P, fill: F) -> Result<(), E>
+pub fn write_with<P, F, T, E>(path: P, fill: F) -> Result<T, E>
 where
     P: AsRef<Path>,
-    F: FnOnce(&mut NamedTempFile) -> Result<(), E>,
+    F: FnOnce(&mut NamedTempFile) -> Result<T, E>,
     E: From<io::Error>,
 {
     let path = path.as_ref();
     let mut temp = NamedTempFile::new_in(parent_dir(path)?)?;
-    fill(&mut temp)?;
+    let result = fill(&mut temp)?;
     temp.as_file_mut().sync_all()?;
     persist(temp.into_temp_path(), path)?;
-    Ok(())
+    Ok(result)
 }
 
 fn persist(temp_path: tempfile::TempPath, path: &Path) -> io::Result<()> {
@@ -116,7 +116,7 @@ mod tests {
 
         fs::write(&path, "original").unwrap();
 
-        let result = write_with::<_, _, io::Error>(&path, |_temp| {
+        let result = write_with::<_, _, (), io::Error>(&path, |_temp| {
             Err(io::Error::other("simulated failure"))
         });
 
