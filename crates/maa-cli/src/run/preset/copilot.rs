@@ -452,21 +452,34 @@ impl CopilotFile {
                     let content = resp.data.content;
                     let task = serde_json::from_str(&content)?;
 
+                    // On Windows, concurrent rename to the same target fails with PermissionDenied
+                    // (os error 5) when the file is locked by another process.  If another
+                    // thread/process already wrote the cache file we can safely move on.
+                    #[cfg(windows)]
                     if let Err(e) = crate::atomic_fs::write(&json_file, &content) {
-                        if e.kind() == std::io::ErrorKind::PermissionDenied && json_file.is_file() {
+                        if e.kind() == std::io::ErrorKind::PermissionDenied
+                            && let Ok(m) = fs::metadata(&json_file)
+                            && m.is_file()
+                        {
                             debug!(
                                 "Cache file {} already written by another process: {e}",
                                 json_file.display()
                             );
                         } else {
-                            return Err(e).with_context(|| {
-                                format!(
-                                    "Failed to persist downloaded copilot cache file to {}",
-                                    json_file.display()
-                                )
-                            });
+                            return Err(e).context(format!(
+                                "Failed to write downloaded copilot cache file to {}",
+                                json_file.display()
+                            ));
                         }
                     }
+
+                    #[cfg(not(windows))]
+                    crate::atomic_fs::write(&json_file, &content).with_context(|| {
+                        format!(
+                            "Failed to write downloaded copilot cache file to {}",
+                            json_file.display()
+                        )
+                    })?;
 
                     files.push((index, json_file, task));
 
