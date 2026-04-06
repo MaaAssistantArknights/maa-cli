@@ -1,18 +1,14 @@
-use std::{cell::RefCell, io::BufRead as _, sync::mpsc, thread, time::{Duration, Instant}};
+use std::io::BufRead as _;
 
 use anyhow::{bail, Context, Result};
 use log::{info, trace};
 
 #[cfg_attr(test, derive(PartialEq, Debug))]
-pub struct WaydroidApp {
-    address: RefCell<Option<String>>,
-}
+pub struct WaydroidApp;
 
 impl WaydroidApp {
     pub fn new() -> Self {
-        Self {
-            address: RefCell::new(None),
-        }
+        Self
     }
 }
 
@@ -68,43 +64,18 @@ fn start_waydroid_session() -> Result<()> {
         .stderr
         .take()
         .context("Failed to capture waydroid stderr")?;
-    let (tx, rx) = mpsc::channel();
-
-    thread::spawn(move || {
-        let mut rdr = std::io::BufReader::new(stderr);
-        let mut line = String::new();
-
-        loop {
-            line.clear();
-            match rdr.read_line(&mut line) {
-                Ok(0) | Err(_) => break,
-                Ok(_) => {
-                    let _ = tx.send(line.clone());
-                }
-            }
-        }
-    });
-
-    let deadline = Instant::now() + Duration::from_secs(30);
-    let mut last_line = String::new();
+    let mut rdr = std::io::BufReader::new(stderr);
+    let mut line = String::new();
 
     loop {
-        if Instant::now() >= deadline {
-            bail!(
-                "Timed out waiting for `waydroid session start` to establish ADB connection"
-            );
+        line.clear();
+        if rdr.read_line(&mut line).context("Failed to read waydroid stderr")? == 0 {
+            bail!("waydroid session start exited without establishing ADB");
         }
 
-        match rx.recv_timeout(Duration::from_millis(200)) {
-            Ok(line) => {
-                last_line = line.clone();
-                trace!("[waydroid] {}", line.trim_end());
-                if line.contains("Established ADB connection") {
-                    return Ok(());
-                }
-            }
-            Err(mpsc::RecvTimeoutError::Timeout) => {}
-            Err(mpsc::RecvTimeoutError::Disconnected) => {}
+        trace!("[waydroid] {}", line.trim_end());
+        if line.contains("Established ADB connection") {
+            return Ok(());
         }
 
         if let Some(status) = child.try_wait().context("Failed to query Waydroid process status")? {
@@ -124,9 +95,7 @@ fn start_waydroid_session() -> Result<()> {
 
     let (running, _) = parse_status(&run_waydroid(&["status"])?);
     if !running {
-        bail!(
-            "Waydroid session did not become ready. Last read line: {last_line}"
-        );
+        bail!("Waydroid session did not become ready. Last read line: {line}");
     }
     Ok(())
 }
@@ -163,29 +132,25 @@ fn waydroid_adb_connect() -> Result<()> {
 }
 
 impl super::ExternalApp for WaydroidApp {
-    fn open(&self) -> Result<bool> {
-        let (running, _) = parse_status(&run_waydroid(&["status"])?);
-        if !running {
-            info!("Starting Waydroid session");
-            start_waydroid_session()?;
-        } else {
-            waydroid_adb_connect()?;
+    fn open(&self, start_if_needed: bool) -> Result<Option<String>> {
+        if start_if_needed {
+            let (running, _) = parse_status(&run_waydroid(&["status"])?);
+            if !running {
+                info!("Starting Waydroid session");
+                start_waydroid_session()?;
+            } else {
+                waydroid_adb_connect()?;
+            }
         }
 
         let (_, address) = parse_status(&run_waydroid(&["status"])?);
-        let address = address
-            .ok_or_else(|| anyhow::anyhow!("Waydroid failed to provide a device address"))?;
-        *self.address.borrow_mut() = Some(format!("{address}:5555"));
+        let address = address.map(|address| format!("{address}:5555"));
 
-        Ok(false)
-    }
-
-    fn actual_address(&self) -> Result<Option<String>> {
-        if let Some(addr) = self.address.borrow().clone() {
-            return Ok(Some(addr));
+        if start_if_needed && address.is_none() {
+            Err(anyhow::anyhow!("Waydroid failed to provide a device address"))
+        } else {
+            Ok(address)
         }
-        let (_, ip) = parse_status(&run_waydroid(&["status"])?);
-        Ok(ip.map(|s| format!("{s}:5555")))
     }
 
     fn close(&self) -> Result<()> {
@@ -208,9 +173,7 @@ mod tests {
 
     #[test]
     fn from() {
-        assert_eq!(WaydroidApp::new(), WaydroidApp {
-            address: RefCell::new(None),
-        });
+        assert_eq!(WaydroidApp::new(), WaydroidApp);
     }
 
     #[test]

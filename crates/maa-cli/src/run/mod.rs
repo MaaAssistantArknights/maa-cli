@@ -198,32 +198,14 @@ where
             _ => None,
         };
 
-        // Startup external app
-        let need_reconfigure = if let (Some(app), true) = (app.as_deref(), task_config.start_app) {
-            !app.open().context("Failed to open external app")?
-        } else {
-            false
-        };
-
-        let address = if need_reconfigure {
-            debug!("Using Waydroid runtime address");
-            let runtime_address = app
-                .as_deref()
-                .map(|app| app.actual_address())
-                .transpose()?
-                .flatten();
-            runtime_address
-                .ok_or_else(|| anyhow::anyhow!("Waydroid failed to provide a device address"))?
-        } else if let Some(runtime_address) = app
+        // Startup external app or query its runtime address if available
+        let runtime_address = app
             .as_deref()
-            .map(|app| app.actual_address())
+            .map(|app| app.open(task_config.start_app))
             .transpose()?
-            .flatten()
-        {
-            runtime_address
-        } else {
-            address.into_owned()
-        };
+            .flatten();
+
+        let address = runtime_address.unwrap_or_else(|| address.into_owned());
 
         // Connect to game or emulator
         asst.async_connect(adb_path, address.as_str(), config, true)?;

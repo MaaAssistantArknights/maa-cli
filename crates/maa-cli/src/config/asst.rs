@@ -103,12 +103,20 @@ impl ConnectionConfig {
             .adb_path
             .as_deref()
             .unwrap_or_else(|| self.preset.default_adb_path());
+        let config = self
+            .config
+            .as_deref()
+            .unwrap_or_else(|| self.preset.default_config());
+
         let address = if matches!(self.preset, Preset::Waydroid) {
             if let Some(config_address) = self.address.as_deref() {
                 warn!(
                     "Ignoring configured address {config_address}. Using Waydroid runtime-managed address instead."
                 );
             }
+            debug!(
+                "Waydroid preset: using runtime-managed ADB address; user-configured address will be ignored. config={config} via {adb_path}"
+            );
             Cow::Borrowed("waydroid")
         } else {
             self.address
@@ -116,16 +124,8 @@ impl ConnectionConfig {
                 .map(Cow::Borrowed)
                 .unwrap_or_else(|| self.preset.default_address(adb_path))
         };
-        let config = self
-            .config
-            .as_deref()
-            .unwrap_or_else(|| self.preset.default_config());
 
-        if matches!(self.preset, Preset::Waydroid) {
-            debug!(
-                "Waydroid preset: using runtime-managed ADB address; user-configured address will be ignored. config={config} via {adb_path}"
-            );
-        } else {
+        if !matches!(self.preset, Preset::Waydroid) {
             debug!(
                 "Connecting to {address} with config {config} via {}",
                 adb_path
