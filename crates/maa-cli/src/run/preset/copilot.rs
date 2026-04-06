@@ -452,12 +452,21 @@ impl CopilotFile {
                     let content = resp.data.content;
                     let task = serde_json::from_str(&content)?;
 
-                    crate::atomic_fs::write(&json_file, &content).with_context(|| {
-                        format!(
-                            "Failed to persist downloaded copilot cache file to {}",
-                            json_file.display()
-                        )
-                    })?;
+                    if let Err(e) = crate::atomic_fs::write(&json_file, &content) {
+                        if e.kind() == std::io::ErrorKind::PermissionDenied && json_file.is_file() {
+                            debug!(
+                                "Cache file {} already written by another process: {e}",
+                                json_file.display()
+                            );
+                        } else {
+                            return Err(e).with_context(|| {
+                                format!(
+                                    "Failed to persist downloaded copilot cache file to {}",
+                                    json_file.display()
+                                )
+                            });
+                        }
+                    }
 
                     files.push((index, json_file, task));
 
