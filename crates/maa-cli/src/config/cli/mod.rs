@@ -4,6 +4,7 @@ pub mod maa_cli;
 pub mod maa_core;
 
 pub mod resource;
+pub mod secret;
 
 pub mod hot_update;
 
