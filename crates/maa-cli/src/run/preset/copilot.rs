@@ -260,7 +260,7 @@ impl IntoParameters for CopilotParams {
                 if loop_times != 1 {
                     warn!("loop_times is ignored when using copilot_list mode");
                 }
-                map.remove("loop_times");
+                map.swap_remove("loop_times");
             }
             insert!(params, "copilot_list" => stage_list?);
         }

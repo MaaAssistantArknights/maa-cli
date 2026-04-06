@@ -140,7 +140,7 @@ impl<'de> SeqAccess<'de> for SeqDeserializer {
 }
 
 struct MapDeserializer {
-    iter: std::collections::btree_map::IntoIter<String, ResolvedMAAValue>,
+    iter: indexmap::map::IntoIter<String, ResolvedMAAValue>,
     value: Option<ResolvedMAAValue>,
 }
 

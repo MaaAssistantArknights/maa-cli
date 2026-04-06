@@ -20,7 +20,7 @@ use crate::{
 /// While [`HashMap`](std::collections::HashMap) would be slightly faster for lookups,
 /// configuration data is typically small enough that the performance difference is negligible,
 /// and the benefits of ordering outweigh the minor performance cost.
-pub type Map<T, K = String> = std::collections::BTreeMap<K, T>;
+pub type Map<T, K = String> = indexmap::IndexMap<K, T>;
 
 /// Trait for map-like operations on values.
 ///
@@ -486,7 +486,7 @@ mod tests {
 
         // Test with object value - remove entry
         let map = obj.as_mut_map().unwrap();
-        map.remove("key");
+        map.swap_remove("key");
         assert!(obj.get("key").is_none());
 
         // Test with empty object

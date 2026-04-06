@@ -253,7 +253,7 @@ impl MAAValue {
                 }
 
                 let mut sorted_keys: Vec<String> = Vec::with_capacity(map.len());
-                let mut marks = std::collections::BTreeMap::<&str, Mark>::new();
+                let mut marks = Map::<Mark, &str>::new();
 
                 for key in map.keys() {
                     visit(&mut sorted_keys, key, &map, &mut marks)?;
@@ -262,7 +262,7 @@ impl MAAValue {
                 // Initialize all the values with given order and put them into a new map
                 let mut initialized: Map<ResolvedMAAValue> = Map::new();
                 for key in sorted_keys {
-                    let value = map.remove(&key).unwrap();
+                    let value = map.swap_remove(&key).unwrap();
                     if let Optional { conditions, value } = value {
                         let mut satisfied = true;
                         // Check if all the dependencies are satisfied
