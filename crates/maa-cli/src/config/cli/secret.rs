@@ -116,24 +116,34 @@ impl<'de> Deserialize<'de> for Secret {
 impl Secret {
     pub fn get_with_description(
         &self,
-        description: &'static str,
+        description: impl Into<Cow<'static, str>>,
     ) -> anyhow::Result<Option<Cow<'_, str>>> {
+        let description = description.into();
+
         match self {
             Secret::None => Ok(None),
             Secret::Prompt => Input::<String>::new(None)
-                .with_description(description)
+                .with_description(description.clone())
                 .value()
                 .map(Cow::Owned)
                 .map(Some)
-                .with_context(|| format!("Failed to get {description} from user input")),
+                .with_context(|| format!("Failed to get {} from user input", description.as_ref())),
             Secret::Plain(value) => Ok(Some(Cow::Borrowed(value))),
             Secret::Env(name) => std::env::var(name)
                 .map(Cow::Owned)
                 .map(Some)
-                .with_context(|| format!("Failed to get {description} from environment variable")),
+                .with_context(|| {
+                    format!(
+                        "Failed to get {} from environment variable",
+                        description.as_ref()
+                    )
+                }),
             Secret::Command(cmd) => {
                 let Some(program) = cmd.first() else {
-                    anyhow::bail!("Failed to get {description} from command: command is empty");
+                    anyhow::bail!(
+                        "Failed to get {} from command: command is empty",
+                        description.as_ref()
+                    );
                 };
 
                 let output = std::process::Command::new(program)
