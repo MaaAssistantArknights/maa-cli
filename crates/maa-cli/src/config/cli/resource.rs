@@ -210,7 +210,7 @@ pub mod tests {
     }
 
     mod serde {
-        use serde_test::{Token, assert_de_tokens, assert_de_tokens_error};
+        use serde_test::{Token, assert_de_tokens};
 
         use super::*;
 
@@ -339,66 +339,6 @@ pub mod tests {
         }
 
         #[test]
-        fn passphrase() {
-            assert_de_tokens(&Secret::Prompt, &[Token::Bool(true)]);
-
-            assert_de_tokens(&Secret::None, &[Token::Bool(false)]);
-
-            assert_de_tokens(&Secret::Plain(String::from("password")), &[Token::Str(
-                "password",
-            )]);
-
-            assert_de_tokens(&Secret::Env(String::from("SSH_PASSPHRASE")), &[
-                Token::Map { len: Some(1) },
-                Token::Str("env"),
-                Token::Str("SSH_PASSPHRASE"),
-                Token::MapEnd,
-            ]);
-
-            assert_de_tokens(
-                &Secret::Command(vec![String::from("get"), String::from("passphrase")]),
-                &[
-                    Token::Map { len: Some(1) },
-                    Token::Str("cmd"),
-                    Token::Seq { len: Some(2) },
-                    Token::Str("get"),
-                    Token::Str("passphrase"),
-                    Token::SeqEnd,
-                    Token::MapEnd,
-                ],
-            );
-
-            assert_de_tokens_error::<Secret>(
-                &[Token::Map { len: Some(1) }, Token::Str("foo")],
-                "unknown field `foo`, expected `cmd` or `env`",
-            );
-
-            assert_de_tokens_error::<Secret>(
-                &[
-                    Token::Map { len: Some(2) },
-                    Token::Str("cmd"),
-                    Token::Seq { len: Some(2) },
-                    Token::Str("get"),
-                    Token::Str("passphrase"),
-                    Token::SeqEnd,
-                    Token::Str("env"),
-                ],
-                "expected a map with a single key-value pair",
-            );
-
-            assert_de_tokens_error::<Secret>(
-                &[Token::Map { len: Some(0) }, Token::MapEnd],
-                "empty map",
-            );
-
-            assert_de_tokens_error::<Secret>(
-                &[Token::I64(0)],
-                "invalid type: integer `0`, \
-                expected a valid secret, which must be a bool, string, or map",
-            );
-        }
-
-        #[test]
         fn config() {
             assert_de_tokens(&Config::default(), &[
                 Token::Map { len: Some(0) },
@@ -486,45 +426,6 @@ pub mod tests {
             }
             .certificate(),
             Some(&Certificate::SshAgent)
-        );
-    }
-
-    #[test]
-    fn passphrase() {
-        assert_eq!(
-            Secret::None.get_with_description("passphrase").unwrap(),
-            None
-        );
-
-        assert_eq!(
-            Secret::Plain(String::from("password"))
-                .get_with_description("passphrase")
-                .unwrap(),
-            Some(std::borrow::Cow::Borrowed("password"))
-        );
-
-        assert!(
-            Secret::Env(String::from("MMA_TEST_SSH_PASSPHRASE"))
-                .get_with_description("passphrase")
-                .is_err()
-        );
-
-        unsafe { std::env::set_var("MMA_TEST_SSH_PASSPHRASE", "password") };
-        assert_eq!(
-            Secret::Env(String::from("MMA_TEST_SSH_PASSPHRASE"))
-                .get_with_description("passphrase")
-                .unwrap()
-                .unwrap(),
-            "password"
-        );
-        unsafe { std::env::remove_var("MMA_TEST_SSH_PASSPHRASE") };
-
-        assert_eq!(
-            Secret::Command(vec![String::from("echo"), String::from("password")])
-                .get_with_description("passphrase")
-                .unwrap()
-                .unwrap(),
-            "password"
         );
     }
 }

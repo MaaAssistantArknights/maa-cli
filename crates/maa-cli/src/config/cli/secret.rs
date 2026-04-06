@@ -200,6 +200,23 @@ mod tests {
             &[Token::Map { len: Some(1) }, Token::Str("foo")],
             "unknown field `foo`, expected `cmd` or `env`",
         );
+        assert_de_tokens_error::<Secret>(
+            &[
+                Token::Map { len: Some(2) },
+                Token::Str("cmd"),
+                Token::Seq { len: Some(2) },
+                Token::Str("get"),
+                Token::Str("secret"),
+                Token::SeqEnd,
+                Token::Str("env"),
+            ],
+            "expected a map with a single key-value pair",
+        );
+        assert_de_tokens_error::<Secret>(
+            &[Token::I64(0)],
+            "invalid type: integer `0`, \
+            expected a valid secret, which must be a bool, string, or map",
+        );
     }
 
     #[test]
@@ -210,6 +227,42 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "Failed to get token from command: command is empty"
+        );
+    }
+
+    #[test]
+    fn resolve_secret() {
+        assert_eq!(Secret::None.get_with_description("token").unwrap(), None);
+
+        assert_eq!(
+            Secret::Plain(String::from("secret"))
+                .get_with_description("token")
+                .unwrap(),
+            Some(Cow::Borrowed("secret"))
+        );
+
+        assert!(
+            Secret::Env(String::from("MMA_TEST_SECRET"))
+                .get_with_description("token")
+                .is_err()
+        );
+
+        unsafe { std::env::set_var("MMA_TEST_SECRET", "secret") };
+        assert_eq!(
+            Secret::Env(String::from("MMA_TEST_SECRET"))
+                .get_with_description("token")
+                .unwrap()
+                .unwrap(),
+            "secret"
+        );
+        unsafe { std::env::remove_var("MMA_TEST_SECRET") };
+
+        assert_eq!(
+            Secret::Command(vec![String::from("echo"), String::from("secret")])
+                .get_with_description("token")
+                .unwrap()
+                .unwrap(),
+            "secret"
         );
     }
 }
