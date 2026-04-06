@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use anyhow::Context;
+use anyhow::{Context, anyhow};
 use maa_value::userinput::{Input, UserInput};
 use serde::Deserialize;
 
@@ -114,36 +114,23 @@ impl<'de> Deserialize<'de> for Secret {
 }
 
 impl Secret {
-    pub fn get_with_description(
-        &self,
-        description: impl Into<Cow<'static, str>>,
-    ) -> anyhow::Result<Option<Cow<'_, str>>> {
-        let description = description.into();
-
+    pub fn get_with_desc(&self, description: &'static str) -> anyhow::Result<Option<Cow<'_, str>>> {
         match self {
             Secret::None => Ok(None),
             Secret::Prompt => Input::<String>::new(None)
-                .with_description(description.clone())
+                .with_description(description)
                 .value()
                 .map(Cow::Owned)
                 .map(Some)
-                .with_context(|| format!("Failed to get {} from user input", description.as_ref())),
+                .with_context(|| format!("Failed to get {description} from user input")),
             Secret::Plain(value) => Ok(Some(Cow::Borrowed(value))),
             Secret::Env(name) => std::env::var(name)
                 .map(Cow::Owned)
                 .map(Some)
-                .with_context(|| {
-                    format!(
-                        "Failed to get {} from environment variable",
-                        description.as_ref()
-                    )
-                }),
+                .with_context(|| format!("Failed to get {description} from environment variable")),
             Secret::Command(cmd) => {
                 let Some(program) = cmd.first() else {
-                    anyhow::bail!(
-                        "Failed to get {} from command: command is empty",
-                        description.as_ref()
-                    );
+                    anyhow::bail!("Failed to get {description} from command: command is empty");
                 };
 
                 let output = std::process::Command::new(program)
@@ -155,11 +142,7 @@ impl Secret {
                     Ok(Some(Cow::Owned(secret.trim().to_owned())))
                 } else {
                     let stderr = String::from_utf8(output.stderr).unwrap_or_default();
-                    Err(anyhow::anyhow!(
-                        "Failed to execute command {:?}: {}",
-                        cmd,
-                        stderr
-                    ))
+                    Err(anyhow!("Failed to execute command {cmd:?}: {stderr}"))
                 }
             }
         }
@@ -173,31 +156,37 @@ mod tests {
 
     use super::*;
 
+    macro_rules! s {
+        ($x:literal) => {
+            ::std::string::String::from($x)
+        };
+    }
+    macro_rules! svec {
+        ([$($x:literal),*]) => {
+            vec![$(s!($x)),*]
+        };
+    }
+
     #[test]
     fn deserialize_secret() {
         assert_de_tokens(&Secret::Prompt, &[Token::Bool(true)]);
         assert_de_tokens(&Secret::None, &[Token::Bool(false)]);
-        assert_de_tokens(&Secret::Plain(String::from("secret")), &[Token::Str(
-            "secret",
-        )]);
-        assert_de_tokens(&Secret::Env(String::from("TOKEN")), &[
+        assert_de_tokens(&Secret::Plain(s!("secret")), &[Token::Str("secret")]);
+        assert_de_tokens(&Secret::Env(s!("TOKEN")), &[
             Token::Map { len: Some(1) },
             Token::Str("env"),
             Token::Str("TOKEN"),
             Token::MapEnd,
         ]);
-        assert_de_tokens(
-            &Secret::Command(vec![String::from("pass"), String::from("show")]),
-            &[
-                Token::Map { len: Some(1) },
-                Token::Str("cmd"),
-                Token::Seq { len: Some(2) },
-                Token::Str("pass"),
-                Token::Str("show"),
-                Token::SeqEnd,
-                Token::MapEnd,
-            ],
-        );
+        assert_de_tokens(&Secret::Command(svec!(["pass", "show"])), &[
+            Token::Map { len: Some(1) },
+            Token::Str("cmd"),
+            Token::Seq { len: Some(2) },
+            Token::Str("pass"),
+            Token::Str("show"),
+            Token::SeqEnd,
+            Token::MapEnd,
+        ]);
     }
 
     #[test]
@@ -232,7 +221,7 @@ mod tests {
     #[test]
     fn empty_command_returns_error() {
         let error = Secret::Command(Vec::new())
-            .get_with_description("token")
+            .get_with_desc("token")
             .unwrap_err();
         assert_eq!(
             error.to_string(),
@@ -242,25 +231,25 @@ mod tests {
 
     #[test]
     fn resolve_secret() {
-        assert_eq!(Secret::None.get_with_description("token").unwrap(), None);
+        assert_eq!(Secret::None.get_with_desc("token").unwrap(), None);
 
         assert_eq!(
             Secret::Plain(String::from("secret"))
-                .get_with_description("token")
+                .get_with_desc("token")
                 .unwrap(),
             Some(Cow::Borrowed("secret"))
         );
 
         assert!(
             Secret::Env(String::from("MMA_TEST_SECRET"))
-                .get_with_description("token")
+                .get_with_desc("token")
                 .is_err()
         );
 
         unsafe { std::env::set_var("MMA_TEST_SECRET", "secret") };
         assert_eq!(
             Secret::Env(String::from("MMA_TEST_SECRET"))
-                .get_with_description("token")
+                .get_with_desc("token")
                 .unwrap()
                 .unwrap(),
             "secret"
@@ -269,7 +258,7 @@ mod tests {
 
         assert_eq!(
             Secret::Command(vec![String::from("echo"), String::from("secret")])
-                .get_with_description("token")
+                .get_with_desc("token")
                 .unwrap()
                 .unwrap(),
             "secret"

@@ -140,7 +140,7 @@ impl Certificate {
                 None,
                 expand_tilde(path).as_ref(),
                 passphrase
-                    .get_with_description("passphrase")
+                    .get_with_desc("passphrase")
                     .map_err(|e| git2::Error::from_str(&format!("Failed to get passphrase {e}")))?
                     .as_deref(),
             ),
