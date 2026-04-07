@@ -72,12 +72,14 @@ impl ClientType {
     }
 
     #[cfg(target_os = "macos")]
-    pub const fn app(self) -> &'static str {
+    pub const fn bundle_id(self) -> Option<&'static str> {
         match self {
-            Official | Bilibili | Txwy => "明日方舟",
-            YoStarEN => "Arknights",
-            YoStarJP => "アークナイツ",
-            YoStarKR => "명일방주",
+            Official => Some("com.hypergryph.arknights"),
+            Bilibili => None, // Bilibili edition is not available on the App Store
+            Txwy => Some("tw.txwy.ios.arknights"),
+            YoStarEN => Some("com.YoStarEN.Arknights"),
+            YoStarJP => Some("com.YoStarJP.Arknights"),
+            YoStarKR => Some("com.YoStarKR.Arknights"),
         }
     }
 
@@ -212,13 +214,13 @@ mod tests {
 
     #[test]
     #[cfg(target_os = "macos")]
-    fn to_app() {
-        assert_eq!(Official.app(), "明日方舟");
-        assert_eq!(Bilibili.app(), "明日方舟");
-        assert_eq!(Txwy.app(), "明日方舟");
-        assert_eq!(YoStarEN.app(), "Arknights");
-        assert_eq!(YoStarJP.app(), "アークナイツ");
-        assert_eq!(YoStarKR.app(), "명일방주");
+    fn to_bundle_id() {
+        assert_eq!(Official.bundle_id(), Some("com.hypergryph.arknights"));
+        assert_eq!(Bilibili.bundle_id(), None);
+        assert_eq!(Txwy.bundle_id(), Some("tw.txwy.ios.arknights"));
+        assert_eq!(YoStarEN.bundle_id(), Some("com.YoStarEN.Arknights"));
+        assert_eq!(YoStarJP.bundle_id(), Some("com.YoStarJP.Arknights"));
+        assert_eq!(YoStarKR.bundle_id(), Some("com.YoStarKR.Arknights"));
     }
 
     #[test]
