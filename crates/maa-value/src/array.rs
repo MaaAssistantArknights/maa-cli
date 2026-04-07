@@ -109,8 +109,8 @@ mod tests {
         }
 
         // Test with MAAValueTemplate
-        let tamplate = MAAValueTemplate::from([1, 2, 3]);
-        match tamplate.into_vec() {
+        let template = MAAValueTemplate::from([1, 2, 3]);
+        match template.into_vec() {
             Outcome::Value(vec) => {
                 assert_eq!(vec.len(), 3);
             }
@@ -144,8 +144,8 @@ mod tests {
         assert_eq!(object!("key" => "value").as_slice(), None);
 
         // Test with MAAValueTemplate
-        let teamplate = MAAValueTemplate::from([1, 2, 3]);
-        assert!(teamplate.as_slice().is_some());
+        let template = MAAValueTemplate::from([1, 2, 3]);
+        assert!(template.as_slice().is_some());
     }
 
     #[test]

@@ -51,7 +51,7 @@ pub enum Strategy {
 #[cfg_attr(test, derive(PartialEq, Debug))]
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct TaskTemaplte {
+pub struct TaskTemplate {
     #[serde(default)]
     name: Option<String>,
     #[serde(rename = "type")]
@@ -65,7 +65,7 @@ pub struct TaskTemaplte {
 }
 
 // Constructor for Task
-impl TaskTemaplte {
+impl TaskTemplate {
     #[cfg(test)]
     fn new(task_type: TaskType, params: MAAValueTemplate) -> Self {
         Self {
@@ -132,14 +132,14 @@ impl TaskTemaplte {
 }
 
 #[derive(Deserialize)]
-pub struct TaskConfigTamplate {
+pub struct TaskConfigTemplate {
     client_type: Option<ClientType>,
     startup: Option<bool>,
     closedown: Option<bool>,
-    tasks: Vec<TaskTemaplte>,
+    tasks: Vec<TaskTemplate>,
 }
 
-impl TaskConfigTamplate {
+impl TaskConfigTemplate {
     pub fn init(&self) -> anyhow::Result<TaskConfig> {
         let mut startup = self.startup;
         let mut closedown = self.closedown;
@@ -339,7 +339,7 @@ mod tests {
         fn is_active() {
             fn test_with_veriants(variants: Vec<TaskVariant>, expected: bool) {
                 assert_eq!(
-                    TaskTemaplte::new(TaskType::StartUp, template!())
+                    TaskTemplate::new(TaskType::StartUp, template!())
                         .with_variants(variants)
                         .is_active(),
                     expected
@@ -372,7 +372,7 @@ mod tests {
         #[test]
         fn get_type() {
             assert_eq!(
-                TaskTemaplte::new(TaskType::StartUp, template!()).task_type(),
+                TaskTemplate::new(TaskType::StartUp, template!()).task_type(),
                 TaskType::StartUp,
             );
         }
@@ -385,7 +385,7 @@ mod tests {
                 variants: impl IntoIterator<Item = MAAValueTemplate>,
                 expected: MAAValueTemplate,
             ) {
-                let mut task = TaskTemaplte::new(TaskType::StartUp, base).with_strategy(strategy);
+                let mut task = TaskTemplate::new(TaskType::StartUp, base).with_strategy(strategy);
                 for v in variants {
                     task.push_variant(TaskVariant {
                         condition: Condition::Always,
@@ -462,7 +462,7 @@ mod tests {
             assert_eq!(
                 {
                     let mut task =
-                        TaskTemaplte::new(TaskType::StartUp, template!("a" => 1, "c" => 5))
+                        TaskTemplate::new(TaskType::StartUp, template!("a" => 1, "c" => 5))
                             .with_strategy(Strategy::First);
                     task.push_variant(TaskVariant {
                         condition: Condition::Not {
@@ -507,12 +507,12 @@ mod tests {
                     .naive_local()
             }
 
-            fn example_task_config() -> TaskConfigTamplate {
+            fn example_task_config() -> TaskConfigTemplate {
                 use ClientType::*;
 
                 let mut task_list = Vec::new();
 
-                task_list.push(TaskTemaplte::new(
+                task_list.push(TaskTemplate::new(
                     StartUp,
                     template!(
                         "start_game_enabled" => BoolInput::new(
@@ -531,7 +531,7 @@ mod tests {
                 ));
 
                 task_list.push(
-                    TaskTemaplte::new(Fight, template!())
+                    TaskTemplate::new(Fight, template!())
                         .with_name("Fight Daily".to_string())
                         .with_strategy(Strategy::Merge)
                         .with_variants(vec![
@@ -580,7 +580,7 @@ mod tests {
                 );
 
                 task_list.push(
-                    TaskTemaplte::new(
+                    TaskTemplate::new(
                         Mall,
                         template!(
                             "shopping" => true,
@@ -606,9 +606,9 @@ mod tests {
                     }]),
                 );
 
-                task_list.push(TaskTemaplte::new(CloseDown, template!()));
+                task_list.push(TaskTemplate::new(CloseDown, template!()));
 
-                TaskConfigTamplate {
+                TaskConfigTemplate {
                     client_type: None,
                     startup: None,
                     closedown: None,
@@ -618,7 +618,7 @@ mod tests {
 
             #[test]
             fn json() {
-                let task_config: TaskConfigTamplate = serde_json::from_reader(
+                let task_config: TaskConfigTemplate = serde_json::from_reader(
                     std::fs::File::open("./config_examples/tasks/daily.json").unwrap(),
                 )
                 .unwrap();
@@ -627,7 +627,7 @@ mod tests {
 
             #[test]
             fn toml() {
-                let task_config: TaskConfigTamplate = toml::from_str(
+                let task_config: TaskConfigTemplate = toml::from_str(
                     &std::fs::read_to_string("./config_examples/tasks/daily.toml").unwrap(),
                 )
                 .unwrap();
@@ -636,7 +636,7 @@ mod tests {
 
             #[test]
             fn yaml() {
-                let task_config: TaskConfigTamplate = serde_yaml::from_reader(
+                let task_config: TaskConfigTemplate = serde_yaml::from_reader(
                     std::fs::File::open("./config_examples/tasks/daily.yml").unwrap(),
                 )
                 .unwrap();
@@ -650,7 +650,7 @@ mod tests {
 
             // Default client type is Official
             assert_eq!(
-                TaskConfigTamplate {
+                TaskConfigTemplate {
                     client_type: None,
                     startup: None,
                     closedown: None,
@@ -668,12 +668,12 @@ mod tests {
 
             // No active tasks will be skipped
             assert_eq!(
-                TaskConfigTamplate {
+                TaskConfigTemplate {
                     client_type: None,
                     startup: None,
                     closedown: None,
                     tasks: vec![
-                        TaskTemaplte::new(StartUp, template!("start_game_enabled" => true))
+                        TaskTemplate::new(StartUp, template!("start_game_enabled" => true))
                             .with_variants(vec![TaskVariant {
                                 condition: Condition::Not {
                                     condition: Box::new(Condition::Always),
@@ -693,12 +693,12 @@ mod tests {
             );
 
             assert_eq!(
-                TaskConfigTamplate {
+                TaskConfigTemplate {
                     client_type: None,
                     startup: None,
                     closedown: None,
                     tasks: vec![
-                        TaskTemaplte::new(
+                        TaskTemplate::new(
                             StartUp,
                             template!(
                                 "start_game_enabled" => true,
@@ -730,11 +730,11 @@ mod tests {
             );
 
             assert_eq!(
-                TaskConfigTamplate {
+                TaskConfigTemplate {
                     client_type: None,
                     startup: None,
                     closedown: None,
-                    tasks: vec![TaskTemaplte::new(
+                    tasks: vec![TaskTemplate::new(
                         StartUp,
                         template!(
                             "start_game_enabled" => false,
@@ -762,11 +762,11 @@ mod tests {
 
             // Process CloseDown task
             assert_eq!(
-                TaskConfigTamplate {
+                TaskConfigTemplate {
                     client_type: None,
                     startup: None,
                     closedown: None,
-                    tasks: vec![TaskTemaplte::new(
+                    tasks: vec![TaskTemplate::new(
                         CloseDown,
                         template!("client_type" => "YoStarEN")
                     )],
@@ -785,11 +785,11 @@ mod tests {
             );
 
             assert_eq!(
-                TaskConfigTamplate {
+                TaskConfigTemplate {
                     client_type: None,
                     startup: None,
                     closedown: None,
-                    tasks: vec![TaskTemaplte::new(
+                    tasks: vec![TaskTemplate::new(
                         CloseDown,
                         template!(
                             "enable" => false,
@@ -816,11 +816,11 @@ mod tests {
             );
 
             assert_eq!(
-                TaskConfigTamplate {
+                TaskConfigTemplate {
                     client_type: None,
                     startup: None,
                     closedown: None,
-                    tasks: vec![TaskTemaplte::new(CloseDown, template!())],
+                    tasks: vec![TaskTemplate::new(CloseDown, template!())],
                 }
                 .init()
                 .unwrap(),
@@ -836,11 +836,11 @@ mod tests {
             );
 
             assert_eq!(
-                TaskConfigTamplate {
+                TaskConfigTemplate {
                     client_type: None,
                     startup: None,
                     closedown: None,
-                    tasks: vec![TaskTemaplte::new(
+                    tasks: vec![TaskTemplate::new(
                         Fight,
                         template!("client_type" => "YoStarEN")
                     )],
@@ -859,20 +859,20 @@ mod tests {
             );
 
             assert_eq!(
-                TaskConfigTamplate {
+                TaskConfigTemplate {
                     client_type: None,
                     startup: None,
                     closedown: None,
                     tasks: vec![
-                        TaskTemaplte::new(
+                        TaskTemplate::new(
                             StartUp,
                             template!(
                                 "start_game_enabled" => true,
                                 "client_type" => "Official",
                             ),
                         ),
-                        TaskTemaplte::new(Fight, template!("stage" => "1-7")),
-                        TaskTemaplte::new(CloseDown, template!()),
+                        TaskTemplate::new(Fight, template!("stage" => "1-7")),
+                        TaskTemplate::new(CloseDown, template!()),
                     ],
                 }
                 .init()
@@ -909,14 +909,14 @@ mod tests {
             );
 
             assert_eq!(
-                TaskConfigTamplate {
+                TaskConfigTemplate {
                     client_type: Some(Official),
                     startup: Some(true),
                     closedown: Some(true),
                     tasks: vec![
-                        TaskTemaplte::new(StartUp, template!( "start_game_enabled" => false)),
-                        TaskTemaplte::new(Fight, template!("stage" => "1-7")),
-                        TaskTemaplte::new(CloseDown, template!("enable" => false)),
+                        TaskTemplate::new(StartUp, template!( "start_game_enabled" => false)),
+                        TaskTemplate::new(Fight, template!("stage" => "1-7")),
+                        TaskTemplate::new(CloseDown, template!("enable" => false)),
                     ],
                 }
                 .init()
@@ -959,11 +959,11 @@ mod tests {
             );
 
             assert_eq!(
-                TaskConfigTamplate {
+                TaskConfigTemplate {
                     client_type: None,
                     startup: Some(true),
                     closedown: Some(true),
-                    tasks: vec![TaskTemaplte::new(Fight, template!("stage" => "1-7"))],
+                    tasks: vec![TaskTemplate::new(Fight, template!("stage" => "1-7"))],
                 }
                 .init()
                 .unwrap(),
@@ -999,11 +999,11 @@ mod tests {
             );
 
             assert_eq!(
-                TaskConfigTamplate {
+                TaskConfigTemplate {
                     client_type: Some(YoStarEN),
                     startup: Some(true),
                     closedown: Some(true),
-                    tasks: vec![TaskTemaplte::new(Fight, template!("stage" => "1-7"))],
+                    tasks: vec![TaskTemplate::new(Fight, template!("stage" => "1-7"))],
                 }
                 .init()
                 .unwrap(),
@@ -1040,13 +1040,13 @@ mod tests {
 
             // Conflicting client type
             assert_eq!(
-                TaskConfigTamplate {
+                TaskConfigTemplate {
                     client_type: Some(Official),
                     startup: None,
                     closedown: None,
                     tasks: vec![
-                        TaskTemaplte::new(StartUp, template!("client_type" => "YoStarEN")),
-                        TaskTemaplte::new(CloseDown, template!("client_type" => "YoStarJP")),
+                        TaskTemplate::new(StartUp, template!("client_type" => "YoStarEN")),
+                        TaskTemplate::new(CloseDown, template!("client_type" => "YoStarJP")),
                     ],
                 }
                 .init()
@@ -1071,13 +1071,13 @@ mod tests {
             // Filename will be converted to absolute path
             #[cfg(unix)]
             assert_eq!(
-                TaskConfigTamplate {
+                TaskConfigTemplate {
                     client_type: None,
                     startup: None,
                     closedown: None,
                     tasks: vec![
-                        TaskTemaplte::new(Infrast, template!("filename" => "daily.json")),
-                        TaskTemaplte::new(Infrast, template!("filename" => "/tmp/daily.json")),
+                        TaskTemplate::new(Infrast, template!("filename" => "daily.json")),
+                        TaskTemplate::new(Infrast, template!("filename" => "/tmp/daily.json")),
                     ],
                 }
                 .init()

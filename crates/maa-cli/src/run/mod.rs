@@ -21,7 +21,7 @@ use crate::{
     config::{
         FindFile,
         asst::AsstConfig,
-        task::{TaskConfig, TaskConfigTamplate},
+        task::{TaskConfig, TaskConfigTemplate},
     },
     installer,
 };
@@ -277,9 +277,9 @@ pub fn run_custom(path: impl AsRef<Path>, args: CommonArgs) -> Result<()> {
         |_| {
             let path = path.as_ref();
             let config = if let Some(abs_path) = dirs::abs_config(path, Some("tasks")) {
-                TaskConfigTamplate::find_file(abs_path)
+                TaskConfigTemplate::find_file(abs_path)
             } else {
-                TaskConfigTamplate::find_file(path)
+                TaskConfigTemplate::find_file(path)
             }
             .context("Failed to find task file!")?;
 
