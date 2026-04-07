@@ -190,20 +190,10 @@ impl TaskConfigTemplate {
 
                     append_closedown = false;
                 }
-                _ => {
-                    // For any task that has a filename parameter
-                    // and the filename parameter is not an absolute path,
-                    // it will be treated as a relative path to the config directory
-                    // and will be converted to an absolute path.
-                    if let Some(v) = params.get_mut("filename") {
-                        let file = PathBuf::from(v.as_str().context("filename must be a string")?);
-                        let sub_dir = task_type.to_str().to_lowercase();
-                        if let Some(path) = dirs::abs_config(file, Some(sub_dir)) {
-                            *v = path.try_into()?;
-                        }
-                    }
-                }
+                _ => {}
             }
+
+            normalize_task_params(task_type, &mut params)?;
 
             let client_type_str = params.get("client_type").and_then(|v| v.as_str());
 
@@ -288,29 +278,30 @@ pub struct TaskConfig {
 
 impl TaskConfig {
     pub fn new_with_task(task: Task) -> Result<Self> {
-        fn parse_client_type(params: &MAAValue) -> Result<ClientType> {
-            Ok(params
-                .get_typed::<&str>("client_type")
-                .map(|v| v.parse())
-                .transpose()?
-                .unwrap_or(ClientType::Official))
-        }
+        let mut task = task;
+        let client_type = task
+            .params
+            .get_typed::<&str>("client_type")
+            .map(|v| v.parse())
+            .transpose()?
+            .unwrap_or(ClientType::Official);
+        normalize_task_params(task.task_type, &mut task.params)?;
 
         match task.task_type {
             TaskType::StartUp => Ok(Self {
-                client_type: parse_client_type(&task.params)?,
+                client_type,
                 start_app: determine_start_app(&task.params),
                 close_app: false,
                 tasks: vec![task],
             }),
             TaskType::CloseDown => Ok(Self {
-                client_type: parse_client_type(&task.params)?,
+                client_type,
                 start_app: false,
                 close_app: determine_close_app(&task.params),
                 tasks: vec![task],
             }),
             _ => Ok(Self {
-                client_type: parse_client_type(&task.params)?,
+                client_type,
                 start_app: false,
                 close_app: false,
                 tasks: vec![task],
@@ -325,6 +316,20 @@ fn determine_start_app(params: &MAAValue) -> bool {
 
 fn determine_close_app(params: &MAAValue) -> bool {
     params.get_or("enable", true)
+}
+
+fn normalize_task_params(task_type: TaskType, params: &mut MAAValue) -> Result<()> {
+    // For any task that has a filename parameter and the filename parameter is
+    // not an absolute path, treat it as relative to the config directory.
+    if let Some(value) = params.get_mut("filename") {
+        let file = PathBuf::from(value.as_str().context("filename must be a string")?);
+        let sub_dir = task_type.to_str().to_lowercase();
+        if let Some(path) = dirs::abs_config(file, Some(sub_dir)) {
+            *value = path.try_into()?;
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg_attr(test, derive(PartialEq, Debug))]
@@ -1225,6 +1230,33 @@ mod tests {
                 ClientType::Official,
                 false,
                 false,
+            );
+
+            #[cfg(unix)]
+            assert_eq!(
+                TaskConfig::new_with_task(Task::new(Infrast, object!("filename" => "daily.json")))
+                    .unwrap()
+                    .tasks[0]
+                    .params,
+                template!(
+                    "filename" => dirs::abs_config("daily.json", Some("infrast")).unwrap()??
+                )
+                .resolve()
+                .unwrap()
+            );
+
+            #[cfg(unix)]
+            assert_eq!(
+                TaskConfig::new_with_task(Task::new(
+                    Infrast,
+                    object!("filename" => "/tmp/daily.json")
+                ))
+                .unwrap()
+                .tasks[0]
+                    .params,
+                template!("filename" => "/tmp/daily.json")
+                    .resolve()
+                    .unwrap()
             );
 
             assert!(
