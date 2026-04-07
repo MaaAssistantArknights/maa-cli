@@ -334,7 +334,8 @@ address = "127.0.0.1:7777" # 如果你需要的话，你可以覆盖预设的地
 
 - `PlayCover`用于在 macOS 上连接直接通过 `PlayCover` 原生运行的游戏客户端。这种情况下不需要指定 `adb_path` 且 `address` 不是 `adb` 连接的地址而是 `PlayTools` 的地址，具体使用参见 [PlayCover 支持文档][playcover-doc].
 
-- `Waydroid`用于在 Linux 上连接直接通过 `Waydroid` 原生运行的游戏客户端。这种情况下仍需要指定 `adb_path`，具体使用参见 [Waydroid 支持文档][waydroid-doc].
+- `Waydroid`用于在 Linux 上连接直接通过 `Waydroid` 原生运行的游戏客户端。这种情况下仍需要指定 `adb_path` 供 MaaCore 连接设备使用。maa-cli 会自动管理会话：通过 `waydroid status` 检测会话是否已在运行，必要时启动会话，然后通过 `waydroid adb connect` 建立 ADB 连接。
+  具体使用参见 [Waydroid 支持文档][waydroid-doc].
 
 ### 资源配置
 
