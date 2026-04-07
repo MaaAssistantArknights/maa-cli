@@ -13,11 +13,14 @@ pub enum Error {
     /// Resolution cannot proceed because there's no valid order to evaluate the fields.
     ///
     /// # Example
-    /// ```ignore
-    /// object!(
-    ///     "field_a" if "field_b" == true => value,
-    ///     "field_b" if "field_a" == true => value,
-    /// )
+    ///
+    /// ```
+    /// use maa_value::prelude::*;
+    ///
+    /// template!(
+    ///     "field_a" if "field_b" == 1 => 1,
+    ///     "field_b" if "field_a" == 1 => 1,
+    /// );
     /// ```
     #[error("Circular dependency detected among optional fields")]
     CircularDependency,

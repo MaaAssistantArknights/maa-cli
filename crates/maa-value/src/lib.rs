@@ -176,8 +176,7 @@ pub mod value;
 ///     "enabled" => true
 /// );
 ///
-/// let resolved = config.resolve().unwrap();
-/// assert_eq!(resolved.get("name").unwrap().as_str(), Some("example"));
+/// assert_eq!(config.get("name").unwrap().as_str(), Some("example"));
 /// ```
 ///
 /// # Exports

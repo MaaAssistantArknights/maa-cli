@@ -288,31 +288,29 @@ pub struct TaskConfig {
 
 impl TaskConfig {
     pub fn new_with_task(task: Task) -> Result<Self> {
+        fn parse_client_type(params: &MAAValue) -> Result<ClientType> {
+            Ok(params
+                .get_typed::<&str>("client_type")
+                .map(|v| v.parse())
+                .transpose()?
+                .unwrap_or(ClientType::Official))
+        }
+
         match task.task_type {
             TaskType::StartUp => Ok(Self {
-                client_type: task
-                    .params
-                    .get_typed::<&str>("client_type")
-                    .map(|v| v.parse())
-                    .transpose()?
-                    .unwrap_or(ClientType::Official),
+                client_type: parse_client_type(&task.params)?,
                 start_app: determine_start_app(&task.params),
                 close_app: false,
                 tasks: vec![task],
             }),
             TaskType::CloseDown => Ok(Self {
-                client_type: task
-                    .params
-                    .get_typed::<&str>("client_type")
-                    .map(|v| v.parse())
-                    .transpose()?
-                    .unwrap_or(ClientType::Official),
+                client_type: parse_client_type(&task.params)?,
                 start_app: false,
                 close_app: determine_close_app(&task.params),
                 tasks: vec![task],
             }),
             _ => Ok(Self {
-                client_type: ClientType::Official,
+                client_type: parse_client_type(&task.params)?,
                 start_app: false,
                 close_app: false,
                 tasks: vec![task],
@@ -1212,6 +1210,17 @@ mod tests {
 
             assert_new_task_config(
                 Fight,
+                object!(
+                    "stage" => "1-7",
+                    "client_type" => "YoStarEN",
+                ),
+                ClientType::YoStarEN,
+                false,
+                false,
+            );
+
+            assert_new_task_config(
+                Fight,
                 object!("stage" => "1-7"),
                 ClientType::Official,
                 false,
@@ -1230,6 +1239,17 @@ mod tests {
                 TaskConfig::new_with_task(Task::new(
                     CloseDown,
                     object!("client_type" => "NotAClientType"),
+                ))
+                .is_err()
+            );
+
+            assert!(
+                TaskConfig::new_with_task(Task::new(
+                    Fight,
+                    object!(
+                        "stage" => "1-7",
+                        "client_type" => "NotAClientType",
+                    ),
                 ))
                 .is_err()
             );
