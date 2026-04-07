@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
-use serde_json::Value as JsonValue;
+use maa_value::value::MAAValue;
 
 fn file_not_found(path: impl AsRef<Path>) -> std::io::Error {
     std::io::Error::new(
@@ -152,7 +152,7 @@ pub fn convert(file: &Path, out: Option<&Path>, ft: Option<Filetype>) -> Result<
             .and_then(Filetype::parse_extension)
     });
 
-    let value = JsonValue::from_file(file)?;
+    let value = MAAValue::from_file(file)?;
 
     let Some(format) = ft else {
         bail!("Format not given")
@@ -184,141 +184,191 @@ pub mod init;
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
-    use std::env::temp_dir;
+    mod filetype {
+        use maa_value::prelude::*;
 
-    use serde::Deserialize;
-    use serde_json::{Value as JsonValue, json};
+        use super::super::*;
+        use crate::assert_matches;
 
-    use super::*;
-    use crate::assert_matches;
+        #[test]
+        fn parse() {
+            use Filetype::*;
+            assert_matches!(Filetype::parse_filetype("test.toml"), Some(Toml));
+            assert!(Filetype::parse_filetype("test").is_none());
 
-    #[test]
-    fn filetype() {
-        use Filetype::*;
-        assert_matches!(Filetype::parse_filetype("test.toml"), Some(Toml));
-        assert!(Filetype::parse_filetype("test").is_none());
+            assert_matches!(Filetype::parse_extension("toml"), Some(Toml));
+            assert_matches!(Filetype::parse_extension("yml"), Some(Yaml));
+            assert_matches!(Filetype::parse_extension("yaml"), Some(Yaml));
+            assert_matches!(Filetype::parse_extension("json"), Some(Json));
+            assert!(Filetype::parse_extension("txt").is_none());
 
-        assert_matches!(Filetype::parse_extension("toml"), Some(Toml));
-        assert_matches!(Filetype::parse_extension("yml"), Some(Yaml));
-        assert_matches!(Filetype::parse_extension("yaml"), Some(Yaml));
-        assert_matches!(Filetype::parse_extension("json"), Some(Json));
-        assert!(Filetype::parse_extension("txt").is_none());
+            assert_eq!(Toml.to_str(), "toml");
+            assert_eq!(Yaml.to_str(), "yaml");
+            assert_eq!(Json.to_str(), "json");
+        }
 
-        assert_eq!(Toml.to_str(), "toml");
-        assert_eq!(Yaml.to_str(), "yaml");
-        assert_eq!(Json.to_str(), "json");
+        #[test]
+        fn write() {
+            use Filetype::*;
 
-        let test_root = temp_dir().join("maa-test-filetype");
-        std::fs::create_dir_all(&test_root).unwrap();
+            let dir = tempfile::tempdir().unwrap();
+            let test_file = dir.path().join("test");
 
-        let value = json!({
-            "a": 1,
-            "b": "test"
-        });
+            let value = object!("z" => 1, "a" => "test", "m" => false);
 
-        let test_file = test_root.join("test");
-        let test_json = test_file.with_extension("json");
-        Json.write(&test_json, &value).unwrap();
-        assert_eq!(Json.read::<JsonValue>(&test_json).unwrap(), value);
+            let test_json = test_file.with_extension("json");
+            Json.write(&test_json, &value).unwrap();
+            assert_eq!(
+                std::fs::read_to_string(&test_json).unwrap(),
+                "{\n  \"z\": 1,\n  \"a\": \"test\",\n  \"m\": false\n}"
+            );
 
-        let test_yaml = test_file.with_extension("yaml");
-        Yaml.write(&test_yaml, &value).unwrap();
-        assert_eq!(Yaml.read::<JsonValue>(&test_yaml).unwrap(), value);
+            let test_yaml = test_file.with_extension("yaml");
+            Yaml.write(&test_yaml, &value).unwrap();
 
-        let test_toml = test_file.with_extension("toml");
-        Toml.write(&test_toml, &value).unwrap();
-        assert_eq!(Toml.read::<JsonValue>(&test_toml).unwrap(), value);
-        std::fs::remove_dir_all(&test_root).unwrap();
+            let test_toml = test_file.with_extension("toml");
+            Toml.write(&test_toml, &value).unwrap();
+            assert_eq!(
+                std::fs::read_to_string(&test_toml).unwrap(),
+                "z = 1\na = \"test\"\nm = false\n"
+            );
+        }
     }
 
-    #[test]
-    fn find_file() {
+    mod find_file {
+        use serde::Deserialize;
+
+        use super::super::*;
+
         #[derive(Deserialize, PartialEq, Debug, Default)]
         struct TestConfig {
             a: i32,
             b: String,
         }
 
-        let test_root = temp_dir().join("find_file");
-        std::fs::create_dir_all(&test_root).unwrap();
+        #[test]
+        fn not_found() {
+            let dir = tempfile::tempdir().unwrap();
+            let non_exist = dir.path().join("not_exist");
+            assert!(TestConfig::find_file_or_none(&non_exist).unwrap().is_none());
+            let err = TestConfig::find_file(&non_exist).unwrap_err();
+            let io_err = err.downcast_ref::<std::io::Error>().unwrap();
+            assert_eq!(io_err.kind(), std::io::ErrorKind::NotFound);
+        }
 
-        let test_file = test_root.join("test");
-        let non_exist_file = test_root.join("not_exist");
+        #[test]
+        fn found() {
+            let dir = tempfile::tempdir().unwrap();
+            let test_file = dir.path().join("test");
+            std::fs::write(test_file.with_extension("json"), r#"{"a": 1, "b": "test"}"#).unwrap();
 
-        std::fs::write(
-            test_file.with_extension("json"),
-            r#"{
-                "a": 1,
-                "b": "test"
-            }"#,
-        )
-        .unwrap();
-
-        assert!(
-            TestConfig::find_file_or_none(&non_exist_file)
-                .unwrap()
-                .is_none()
-        );
-        assert_eq!(
-            TestConfig::find_file_or_none(&test_file).unwrap().unwrap(),
-            TestConfig {
+            assert_eq!(TestConfig::find_file(&test_file).unwrap(), TestConfig {
                 a: 1,
-                b: "test".to_string()
-            }
-        );
+                b: "test".into()
+            });
+        }
 
-        assert_eq!(TestConfig::find_file(&test_file).unwrap(), TestConfig {
-            a: 1,
-            b: "test".to_string()
-        });
+        #[test]
+        fn or_default() {
+            let dir = tempfile::tempdir().unwrap();
+            let test_file = dir.path().join("test");
+            let non_exist = dir.path().join("not_exist");
 
-        // Test that find_file fails when file doesn't exist
-        let err = TestConfig::find_file(&non_exist_file).unwrap_err();
-        let io_err = err.downcast_ref::<std::io::Error>().unwrap();
-        assert_eq!(io_err.kind(), std::io::ErrorKind::NotFound);
+            std::fs::write(test_file.with_extension("json"), r#"{"a": 1, "b": "test"}"#).unwrap();
 
-        assert_eq!(
-            TestConfig::find_file_or_default(&test_file).unwrap(),
-            TestConfig {
-                a: 1,
-                b: "test".to_string()
-            }
-        );
-
-        assert_eq!(
-            TestConfig::find_file_or_default(&non_exist_file).unwrap(),
-            TestConfig::default()
-        );
-
-        std::fs::remove_dir_all(&test_root).unwrap();
+            assert_eq!(
+                TestConfig::find_file_or_default(&test_file).unwrap(),
+                TestConfig {
+                    a: 1,
+                    b: "test".into()
+                }
+            );
+            assert_eq!(
+                TestConfig::find_file_or_default(&non_exist).unwrap(),
+                TestConfig::default()
+            );
+        }
     }
 
-    #[test]
-    fn test_convert() {
-        use Filetype::*;
+    mod convert {
+        use maa_value::prelude::*;
 
-        let test_root = temp_dir().join("maa-test-convert");
-        std::fs::create_dir_all(&test_root).unwrap();
+        use super::super::*;
 
-        let input = test_root.join("test.json");
-        let toml = test_root.join("test.toml");
-        let yaml = test_root.join("test.yaml");
+        #[test]
+        fn basic() {
+            use Filetype::*;
 
-        let value = json!({
-            "a": 1,
-            "b": "test"
-        });
+            let dir = tempfile::tempdir().unwrap();
+            let input = dir.path().join("test.json");
+            let toml = dir.path().join("test.toml");
+            let yaml = dir.path().join("test.yaml");
 
-        Json.write(&input, &value).unwrap();
+            let value = object!("z" => 1, "a" => "test", "m" => false);
+            Json.write(&input, &value).unwrap();
 
-        convert(&input, None, Some(Json)).unwrap();
-        convert(&input, Some(&toml), None).unwrap();
-        convert(&input, Some(&toml), Some(Yaml)).unwrap();
+            super::super::convert(&input, None, Some(Json)).unwrap();
+            super::super::convert(&input, Some(&toml), None).unwrap();
+            super::super::convert(&input, Some(&toml), Some(Yaml)).unwrap();
 
-        assert_eq!(Toml.read::<JsonValue>(&toml).unwrap(), value);
-        assert_eq!(Yaml.read::<JsonValue>(&yaml).unwrap(), value);
+            assert_eq!(
+                std::fs::read_to_string(&toml).unwrap(),
+                "z = 1\na = \"test\"\nm = false\n"
+            );
+            assert_eq!(
+                std::fs::read_to_string(&yaml).unwrap(),
+                "z: 1\na: test\nm: false\n"
+            );
+        }
 
-        // Test that convert fails when format is not given
-        assert!(convert(&input, None, None).is_err());
+        #[test]
+        fn no_format_is_error() {
+            let dir = tempfile::tempdir().unwrap();
+            let input = dir.path().join("test.json");
+
+            let value = object!("z" => 1);
+            Filetype::Json.write(&input, &value).unwrap();
+
+            assert!(super::super::convert(&input, None, None).is_err());
+        }
+
+        #[test]
+        fn preserves_key_order() {
+            let dir = tempfile::tempdir().unwrap();
+            let input = dir.path().join("ordered.json");
+            let yaml = dir.path().join("ordered.yaml");
+
+            let value = object!(
+                "z" => 1,
+                "a" => object!("k2" => 2, "k1" => 1),
+                "m" => 3,
+            );
+            Filetype::Json.write(&input, &value).unwrap();
+
+            let input_value = MAAValue::from_file(&input).unwrap();
+            let keys: Vec<_> = input_value
+                .as_map()
+                .unwrap()
+                .keys()
+                .map(String::as_str)
+                .collect();
+            assert_eq!(keys, ["z", "a", "m"]);
+            let inner_keys: Vec<_> = input_value
+                .get("a")
+                .unwrap()
+                .as_map()
+                .unwrap()
+                .keys()
+                .map(String::as_str)
+                .collect();
+            assert_eq!(inner_keys, ["k2", "k1"]);
+
+            super::super::convert(&input, Some(&yaml), None).unwrap();
+
+            assert_eq!(
+                std::fs::read_to_string(&yaml).unwrap(),
+                "z: 1\na:\n  k2: 2\n  k1: 1\nm: 3\n"
+            );
+        }
     }
 }
