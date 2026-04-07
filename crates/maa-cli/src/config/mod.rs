@@ -218,20 +218,15 @@ mod tests {
 
             let test_json = test_file.with_extension("json");
             Json.write(&test_json, &value).unwrap();
-            assert_eq!(
-                std::fs::read_to_string(&test_json).unwrap(),
-                "{\n  \"z\": 1,\n  \"a\": \"test\",\n  \"m\": false\n}"
-            );
+            assert_eq!(MAAValue::from_file(&test_json).unwrap(), value);
 
             let test_yaml = test_file.with_extension("yaml");
             Yaml.write(&test_yaml, &value).unwrap();
+            assert_eq!(MAAValue::from_file(&test_yaml).unwrap(), value);
 
             let test_toml = test_file.with_extension("toml");
             Toml.write(&test_toml, &value).unwrap();
-            assert_eq!(
-                std::fs::read_to_string(&test_toml).unwrap(),
-                "z = 1\na = \"test\"\nm = false\n"
-            );
+            assert_eq!(MAAValue::from_file(&test_toml).unwrap(), value);
         }
     }
 
@@ -311,14 +306,8 @@ mod tests {
             super::super::convert(&input, Some(&toml), None).unwrap();
             super::super::convert(&input, Some(&toml), Some(Yaml)).unwrap();
 
-            assert_eq!(
-                std::fs::read_to_string(&toml).unwrap(),
-                "z = 1\na = \"test\"\nm = false\n"
-            );
-            assert_eq!(
-                std::fs::read_to_string(&yaml).unwrap(),
-                "z: 1\na: test\nm: false\n"
-            );
+            assert_eq!(MAAValue::from_file(&toml).unwrap(), value);
+            assert_eq!(MAAValue::from_file(&yaml).unwrap(), value);
         }
 
         #[test]
