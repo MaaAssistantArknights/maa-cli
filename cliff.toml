@@ -125,7 +125,7 @@ commit_parsers = [
   { message = "^ci", skip = true },
 
   # skip xtask related commits
-  { message = "^chore\\(xtask\\)", skip = true ,
+  { message = "^chore\\(xtask\\)", skip = true },
 
   # skip changelog commits
   { message = "^chore\\(changelog\\)", skip = true },
