@@ -75,7 +75,7 @@ impl ClientType {
     pub const fn bundle_id(self) -> Option<&'static str> {
         match self {
             Official => Some("com.hypergryph.arknights"),
-            Bilibili => None,
+            Bilibili => None, // Bilibili edition is not available on the App Store
             Txwy => Some("tw.txwy.ios.arknights"),
             YoStarEN => Some("com.YoStarEN.Arknights"),
             YoStarJP => Some("com.YoStarJP.Arknights"),

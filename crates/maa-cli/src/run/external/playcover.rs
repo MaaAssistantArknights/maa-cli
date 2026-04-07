@@ -30,12 +30,10 @@ impl super::ExternalApp for PlayCoverApp<'_> {
             return Ok(true);
         }
 
-        let bundle_id = self.client.bundle_id().with_context(|| {
-            format!(
-                "Client {} does not provide an iOS bundle identifier for PlayCover",
-                self.client
-            )
-        })?;
+        let bundle_id = self
+            .client
+            .bundle_id()
+            .with_context(|| format!("Client {} is not available on the App Store", self.client))?;
 
         info!("Starting app: {bundle_id}");
         let status = std::process::Command::new("open")
