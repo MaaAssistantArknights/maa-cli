@@ -274,10 +274,21 @@ impl MAAValueTemplate {
                         let mut satisfied = true;
                         // Check if all the dependencies are satisfied
                         for (cond_key, expected) in conditions {
-                            // If the dependency is not exist or the value is not equal to the
-                            // expected values break the loop and mark
-                            // status as unsatisfied
-                            if !initialized.get(&cond_key).is_some_and(|v| v == &expected) {
+                            if let Some(v) = initialized.get(&cond_key) {
+                                if v != &expected {
+                                    // Value does not match expected, mark as unsatisfied
+                                    satisfied = false;
+                                    break;
+                                } // else satisfied
+                            } else {
+                                // Dependency key is missing completely.
+                                // TODO: Return an Error instead of silently failing.
+                                log::warn!(
+                                    "Optional field '{}' depends on a missing key '{}'. \
+                                         This condition is considered unmet and the field will be ignored.",
+                                    key,
+                                    cond_key
+                                );
                                 satisfied = false;
                                 break;
                             }
