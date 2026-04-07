@@ -43,7 +43,8 @@
 //! assert!(resolved.get("log_level").is_none());  // Not included (debug is false)
 //! ```
 //!
-//! For simple concrete objects without user inputs or conditionals, use [`object!`] directly:
+//! For simple concrete objects without user inputs or conditionals, use
+//! [`object!`](`maa_value_macro::object`) directly:
 //!
 //! ```
 //! use maa_value::prelude::*;
@@ -92,8 +93,9 @@
 //! The type system ensures you can't accidentally use an unresolved template where a
 //! resolved value is expected:
 //!
-//! - **[`value::MAAValueTemplate`]**: Implements `Deserialize` (load from config files)
-//! - **[`value::MAAValue`]**: Implements `Serialize` (write resolved configs)
+//! - **[`value::MAAValueTemplate`]**: Implements `Deserialize` (load from config files),
+//! - **[`value::MAAValue`]**: Implements `Serialize` and `Deserialize` (load and write a generic
+//!   value).
 //!
 //! This prevents bugs where templates might be used directly without resolution.
 //!
@@ -108,7 +110,6 @@
 //!          ▼
 //! ┌──────────────────┐
 //! │ MAAValueTemplate │  ◄── Contains Input, Optional variants
-//! │   (Template)     │
 //! └────────┬─────────┘
 //!          │ resolve()
 //!          │ • Query user inputs
@@ -117,7 +118,6 @@
 //!          ▼
 //! ┌──────────────┐
 //! │   MAAValue   │  ◄── Contains only concrete data
-//! │  (Concrete)  │
 //! └──────┬───────┘
 //!        │ Serialize / De-Deserialize
 //!        ▼
@@ -132,7 +132,7 @@
 //! - [`value`]: Core [`value::MAAValueTemplate`] and [`value::MAAValue`] types
 //! - [`de`]: Deserializer implementation for direct struct conversion
 //! - [`map`]: Map operations trait ([`MapOps`](map::MapOps))
-//! - [`array`]: Array operations trait ([`ArrayOps`](array::ArrayOps))
+//! - [`mod@array`]: Array operations trait ([`ArrayOps`](array::ArrayOps))
 //! - [`convert`]: Type conversion traits ([`AsPrimitive`](convert::AsPrimitive),
 //!   [`TryAs`](convert::TryAs))
 //! - [`input`]: Input value definitions
@@ -183,18 +183,17 @@ pub mod value;
 ///
 /// ## Macros
 ///
-/// - [`object!`](maa_value_macro::object): Create a concrete [`MAAValue`](crate::value::MAAValue)
-///   object (no user inputs or conditional fields)
-/// - [`template!`](maa_value_macro::template): Create a
-///   [`MAAValueTemplate`](crate::value::MAAValueTemplate) that may contain user inputs and
-///   conditional fields
+/// - [`object!`](maa_value_macro::object): Create a concrete [`MAAValue`] object (no user inputs or
+///   conditional fields)
+/// - [`template!`](maa_value_macro::template): Create a [`MAAValueTemplate`] that may contain user
+///   inputs and conditional fields
 /// - [`insert!`](maa_value_macro::insert): Insert entries into an existing object
 ///
 /// ## Core Types
 ///
-/// - [`MAAValueTemplate`](crate::value::MAAValueTemplate): Configuration templates that may contain
-///   user inputs and conditional fields
-/// - [`MAAValue`](crate::value::MAAValue): Fully resolved values containing only concrete data
+/// - [`MAAValueTemplate`]: Configuration templates that may contain user inputs and conditional
+///   fields
+/// - [`MAAValue`]: Fully resolved values containing only concrete data
 /// - [`MAAPrimitive`](crate::primitive::MAAPrimitive): Primitive value types (bool, int, float,
 ///   string)
 /// - [`MAAInput`](crate::input::MAAInput): Input value definitions
@@ -215,6 +214,9 @@ pub mod value;
 /// - [`MapOps`](crate::map::MapOps): Operations on map-like values (get, insert, merge, etc.)
 /// - [`AsPrimitive`](crate::convert::AsPrimitive): Convert to primitive types
 /// - [`TryAs`](crate::convert::TryAs): Try to convert to a specific type
+///
+/// [`MAAValue`]: crate::value::MAAValue
+/// [`MAAValueTemplate`]: crate::value::MAAValueTemplate
 pub mod prelude {
     pub use maa_value_macro::{insert, object, template};
 

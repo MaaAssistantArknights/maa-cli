@@ -17,9 +17,9 @@ pub enum MAAValueTemplate {
     Array(Vec<MAAValueTemplate>),
     /// A value that should be queried from user input
     Input(MAAInput),
-    /// A optional value
+    /// An optional value
     ///
-    /// A optional value will be initialized only if all the dependencies are satisfied.
+    /// An optional value will be initialized only if all the dependencies are satisfied.
     /// If one of the dependencies is not exist or the value is not equal to the expected value,
     /// the optional value will be dropped after initialization.
     ///
@@ -131,7 +131,7 @@ impl MAAValueTemplate {
     /// Resolves the value by evaluating all user inputs and conditional fields.
     ///
     /// This method transforms a [`MAAValueTemplate`] (which may contain unresolved
-    /// [`Input`](MAAValue::Input) and [`Optional`](MAAValue::Optional) variants) into a
+    /// [`Input`](Self::Input) and [`Optional`](Self::Optional) variants) into a
     /// [`MAAValue`] (which contains only concrete values). The resolution process
     /// recursively processes the value structure:
     ///
