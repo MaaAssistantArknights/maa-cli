@@ -3,8 +3,8 @@
 use std::path::PathBuf;
 
 #[cfg(unix)]
-use maa_value::{MAAValue, Result};
-use maa_value::{insert, object};
+use maa_value::error::Result;
+use maa_value::prelude::*;
 
 #[cfg(unix)]
 pub fn invalid_utf8_path() -> PathBuf {
@@ -76,10 +76,10 @@ fn object_maybe_try_conversion_failure_early_return() {
 #[test]
 #[cfg(unix)]
 fn object_conditional_try_conversion_failure() {
-    fn create_object() -> Result<MAAValue> {
+    fn create_object() -> Result<MAAValueTemplate> {
         let invalid_path = invalid_utf8_path();
 
-        Ok(object!(
+        Ok(template!(
             "flag" => true,
             "before" => "should not be present",
             "conditional" if "flag" == true => invalid_path?,
@@ -97,10 +97,10 @@ fn object_conditional_try_conversion_failure() {
 #[test]
 #[cfg(unix)]
 fn object_conditional_maybe_try_conversion_failure() {
-    fn create_object() -> Result<MAAValue> {
+    fn create_object() -> Result<MAAValueTemplate> {
         let some_invalid: Option<PathBuf> = Some(invalid_utf8_path());
 
-        Ok(object!(
+        Ok(template!(
             "flag" => true,
             "before" => "should not be present",
             "conditional" if "flag" == true =>? some_invalid?,
@@ -118,8 +118,8 @@ fn object_conditional_maybe_try_conversion_failure() {
 #[test]
 #[cfg(unix)]
 fn insert_try_conversion_failure_early_return() {
-    fn modify_object() -> Result<MAAValue> {
-        let mut obj = object!("existing" => "value");
+    fn modify_object() -> Result<MAAValueTemplate> {
+        let mut obj = template!("existing" => "value");
         let invalid_path = invalid_utf8_path();
 
         insert!(obj,
@@ -141,8 +141,8 @@ fn insert_try_conversion_failure_early_return() {
 #[test]
 #[cfg(unix)]
 fn insert_maybe_try_conversion_failure() {
-    fn modify_object() -> Result<MAAValue> {
-        let mut obj = object!("existing" => "value");
+    fn modify_object() -> Result<MAAValueTemplate> {
+        let mut obj = template!("existing" => "value");
         let some_invalid: Option<PathBuf> = Some(invalid_utf8_path());
 
         insert!(obj,
@@ -164,8 +164,8 @@ fn insert_maybe_try_conversion_failure() {
 #[test]
 #[cfg(unix)]
 fn insert_conditional_try_conversion_failure() {
-    fn modify_object() -> Result<MAAValue> {
-        let mut obj = object!(
+    fn modify_object() -> Result<MAAValueTemplate> {
+        let mut obj = template!(
             "flag" => true,
             "existing" => "value"
         );
@@ -238,7 +238,7 @@ fn error_propagation_through_nested_objects() {
 fn object_conditional_maybe_try_unwrap_conversion_failure() {
     let some_invalid: Option<PathBuf> = Some(invalid_utf8_path());
 
-    let _obj = object!(
+    let _obj = template!(
         "flag" => true,
         "conditional" if "flag" == true =>? some_invalid??
     );
@@ -248,12 +248,12 @@ fn object_conditional_maybe_try_unwrap_conversion_failure() {
 fn object_conditional_maybe_try_unwrap_success() {
     let some_valid: Option<PathBuf> = Some(PathBuf::from("/valid/path"));
 
-    let obj = object!(
+    let obj = template!(
         "flag" => true,
         "conditional" if "flag" == true =>? some_valid??
     );
 
-    let initialized = obj.init().unwrap();
+    let initialized = obj.resolve().unwrap();
     assert_eq!(
         initialized.get("conditional").unwrap().as_str(),
         Some("/valid/path")
@@ -264,12 +264,12 @@ fn object_conditional_maybe_try_unwrap_success() {
 fn object_conditional_maybe_try_unwrap_none() {
     let none_value: Option<PathBuf> = None;
 
-    let obj = object!(
+    let obj = template!(
         "flag" => true,
         "conditional" if "flag" == true =>? none_value??
     );
 
-    let initialized = obj.init().unwrap();
+    let initialized = obj.resolve().unwrap();
     assert!(initialized.get("conditional").is_none());
 }
 
@@ -277,7 +277,7 @@ fn object_conditional_maybe_try_unwrap_none() {
 #[cfg(unix)]
 #[should_panic(expected = "called `Result::unwrap()` on an `Err` value")]
 fn insert_conditional_maybe_try_unwrap_conversion_failure() {
-    let mut obj = object!(
+    let mut obj = template!(
         "flag" => true,
         "base" => "value"
     );
@@ -290,7 +290,7 @@ fn insert_conditional_maybe_try_unwrap_conversion_failure() {
 
 #[test]
 fn insert_conditional_maybe_try_unwrap_success() {
-    let mut obj = object!(
+    let mut obj = template!(
         "flag" => true,
         "base" => "value"
     );
@@ -300,7 +300,7 @@ fn insert_conditional_maybe_try_unwrap_success() {
         "conditional" if "flag" == true =>? some_valid??
     );
 
-    let initialized = obj.init().unwrap();
+    let initialized = obj.resolve().unwrap();
     assert_eq!(
         initialized.get("conditional").unwrap().as_str(),
         Some("/test")

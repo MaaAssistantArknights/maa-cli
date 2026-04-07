@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use maa_value::{Result, insert, object};
+use maa_value::{error::Result, prelude::*};
 
 #[test]
 fn insert_basic() {
@@ -80,16 +80,14 @@ fn insert_maybe_with_try() -> Result<()> {
 
 #[test]
 fn insert_conditional() {
-    let mut obj = object!(
+    let mut obj = template!(
         "flag" => true,
         "base" => "value"
     );
 
-    insert!(obj,
-        "conditional" if "flag" == true => "inserted"
-    );
+    insert!(obj, "conditional" if "flag" == true => "inserted");
 
-    let initialized = obj.init().unwrap();
+    let initialized = obj.resolve().unwrap();
     assert_eq!(
         initialized.get("conditional").unwrap().as_str(),
         Some("inserted")
@@ -98,17 +96,15 @@ fn insert_conditional() {
 
 #[test]
 fn insert_conditional_multiple_conditions() {
-    let mut obj = object!(
+    let mut obj = template!(
         "flag1" => true,
         "flag2" => "yes",
         "base" => "value"
     );
 
-    insert!(obj,
-        "conditional" if "flag1" == true && "flag2" == "yes" => "both satisfied"
-    );
+    insert!(obj, "conditional" if "flag1" == true && "flag2" == "yes" => "both satisfied");
 
-    let initialized = obj.init().unwrap();
+    let initialized = obj.resolve().unwrap();
     assert_eq!(
         initialized.get("conditional").unwrap().as_str(),
         Some("both satisfied")

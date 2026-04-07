@@ -443,7 +443,7 @@ fn migrate_legacy_tasks_json(resource_dir: &Path, hot_update_root: &Path) -> Res
         bail!("Expected {} to be a directory", new_dir.display());
     }
 
-    fs::copy(&old, &new)
+    crate::atomic_fs::copy(&old, &new)
         .with_context(|| format!("Failed to copy {} to {}", old.display(), new.display()))?;
 
     Ok(())

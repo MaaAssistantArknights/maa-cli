@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use maa_value::{Result, object};
+use maa_value::{error::Result, prelude::*};
 
 #[test]
 fn try_insert_success() -> Result<()> {

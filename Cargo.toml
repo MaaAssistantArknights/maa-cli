@@ -24,6 +24,7 @@ dunce = "1.0.4"
 env_logger = { version = "0.11", default-features = false }
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 git2 = "0.20"
+indexmap = "2.13.1"
 indicatif = "0.18"
 libloading = "0.9"
 log = "0.4.20"
@@ -35,7 +36,7 @@ maa-installer = { path = "crates/maa-installer", version = "0.2" }
 maa-str-ext = { path = "crates/maa-str-ext", version = "0.1" }
 maa-sys = { path = "crates/maa-sys", version = "0.10", default-features = false }
 maa-types = { path = "crates/maa-types", version = "0.3" }
-maa-value = { path = "crates/maa-value", version = "0.1" }
+maa-value = { path = "crates/maa-value", version = "0.2" }
 maa-value-macro = { path = "crates/maa-value-macro", version = "0.1" }
 maa-version = { path = "crates/maa-version", version = "0.1" }
 prettytable = { version = "0.10.0", default-features = false }

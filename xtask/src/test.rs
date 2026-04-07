@@ -3,6 +3,7 @@
 use std::{env, ffi::OsString, path::Path};
 
 use anyhow::{Context, Result};
+use tempfile::TempDir;
 
 use crate::{
     TestOptions,
@@ -17,10 +18,19 @@ const LLVM_COV_ARGS: &[&str] = &["+nightly", "llvm-cov"];
 pub fn run_tests(opts: TestOptions) -> Result<()> {
     // Build environment variables map
     let mut env_vars = EnvVars::new();
+    let test_root = TempDir::new().context("Failed to create isolated test directory")?;
 
     Group::new("Setup Environment Variables").run(|| {
         let config_dir = format!("{}/crates/maa-cli/config_examples", workspace_root());
         env_vars.push("MAA_CONFIG_DIR", config_dir);
+        env_vars.push(
+            "MAA_CACHE_DIR",
+            test_root.path().join("cache").display().to_string(),
+        );
+        env_vars.push(
+            "MAA_STATE_DIR",
+            test_root.path().join("state").display().to_string(),
+        );
         env_vars.push("MAA_EXTRA_SHARE_NAME", "maa-test".to_string());
 
         Ok(())

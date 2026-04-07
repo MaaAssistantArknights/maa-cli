@@ -1,5 +1,5 @@
 use anyhow::{Context, bail};
-use maa_value::{MAAValue, insert, object};
+use maa_value::prelude::*;
 
 use crate::config::task::ClientType;
 
@@ -83,7 +83,7 @@ impl super::IntoParameters for FightParams {
         // Drops handling
         let drops = self.drops;
         if !drops.is_empty() {
-            let mut drop_map = std::collections::BTreeMap::new();
+            let mut drop_map = maa_value::map::StringMap::new();
 
             for drop in drops {
                 let mut parts = drop.split('=');
@@ -138,8 +138,6 @@ impl super::IntoParameters for FightParams {
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
-    use maa_value::object;
-
     use super::*;
     use crate::command::{Command, parse_from};
 

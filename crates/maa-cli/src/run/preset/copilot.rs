@@ -1,16 +1,12 @@
 use std::{
     fs,
-    io::Write,
     path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result, bail};
 use log::{debug, trace, warn};
 use maa_types::TaskType;
-use maa_value::{
-    MAAValue, insert, object,
-    userinput::{BoolInput, UserInput},
-};
+use maa_value::prelude::*;
 use prettytable::{Table, format, row};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use ureq::http::StatusCode;
@@ -31,10 +27,42 @@ const COPILOT_API: &str = "http://127.0.0.1:18080/copilot/get/";
 #[cfg(test)]
 const COPILOT_SET_API: &str = "http://127.0.0.1:18080/set/get?id=";
 
-// Raid mode constants
-const RAID_MODE_NORMAL: u8 = 0;
-const RAID_MODE_RAID: u8 = 1;
-const RAID_MODE_BOTH: u8 = 2;
+/// Raid mode for copilot stages.
+#[cfg_attr(test, derive(Debug, PartialEq, Eq))]
+#[derive(Clone, Copy, Default, clap::ValueEnum)]
+enum RaidMode {
+    /// Run the stage in normal mode only.
+    #[default]
+    #[value(alias = "0")]
+    Normal,
+    /// Run the stage in raid mode only.
+    #[value(alias = "1")]
+    Raid,
+    /// Run the stage twice, once in each mode.
+    #[value(alias = "2")]
+    Both,
+}
+
+impl RaidMode {
+    fn extend_stage_list(self, stage_list: &mut Vec<StageOpts>, filename: &Path, stage_name: &str) {
+        let mut push_stage = |is_raid| {
+            stage_list.push(StageOpts {
+                filename: filename.to_path_buf(),
+                stage_name: stage_name.to_owned(),
+                is_raid,
+            });
+        };
+
+        match self {
+            Self::Normal => push_stage(false),
+            Self::Raid => push_stage(true),
+            Self::Both => {
+                push_stage(false);
+                push_stage(true);
+            }
+        }
+    }
+}
 
 fn validate_loop_times(loop_times: i32) -> Result<i32> {
     anyhow::ensure!(loop_times > 0, "loop_times must be greater than 0");
@@ -53,9 +81,11 @@ pub struct CopilotParams {
     uri_list: Vec<String>,
     /// Whether to fight stage in raid mode
     ///
-    /// `0` for normal, `1` for raid, `2` run twice for both normal and raid
-    #[arg(long, default_value = "0")]
-    raid: u8,
+    /// `normal` for normal, `raid` for raid, `both` to run twice for both modes.
+    ///
+    /// Also accepts legacy values `0`, `1`, and `2`.
+    #[arg(long, default_value = "normal")]
+    raid: RaidMode,
     /// Enable auto formation
     ///
     /// When multiple uri are provided or a copilot task set contains multiple stages, force to
@@ -107,7 +137,7 @@ struct StageOpts {
 }
 
 impl TryFrom<StageOpts> for MAAValue {
-    type Error = maa_value::Error;
+    type Error = maa_value::error::Error;
 
     fn try_from(opts: StageOpts) -> Result<Self, Self::Error> {
         Ok(object!(
@@ -185,8 +215,7 @@ impl IntoParameters for CopilotParams {
             self.ignore_requirements || default.get_or("ignore_requirements", false);
 
         let mut stage_list = Vec::new();
-        for (_, file, value) in copilot_files {
-            let copilot_task = value.map(Ok).unwrap_or_else(|| json_from_file(&file))?;
+        for (_, file, copilot_task) in copilot_files {
             let stage_id = &copilot_task.stage_name;
 
             let stage_info = get_stage_info(stage_id, base_dirs.iter().map(|dir| dir.as_path()))?;
@@ -203,26 +232,8 @@ impl IntoParameters for CopilotParams {
                 }
             }
 
-            match self.raid {
-                RAID_MODE_NORMAL | RAID_MODE_RAID => stage_list.push(StageOpts {
-                    filename: file.to_path_buf(),
-                    stage_name: stage_code.to_owned(),
-                    is_raid: self.raid == RAID_MODE_RAID,
-                }),
-                RAID_MODE_BOTH => {
-                    stage_list.push(StageOpts {
-                        filename: file.to_path_buf(),
-                        stage_name: stage_code.to_owned(),
-                        is_raid: false,
-                    });
-                    stage_list.push(StageOpts {
-                        filename: file.to_path_buf(),
-                        stage_name: stage_code.to_owned(),
-                        is_raid: true,
-                    });
-                }
-                n => bail!("Invalid raid mode {n}, should be 0, 1 or 2"),
-            }
+            self.raid
+                .extend_stage_list(&mut stage_list, file.as_path(), stage_code);
         }
 
         // We also want all other parameters from overlay
@@ -249,7 +260,7 @@ impl IntoParameters for CopilotParams {
                 if loop_times != 1 {
                     warn!("loop_times is ignored when using copilot_list mode");
                 }
-                map.remove("loop_times");
+                map.swap_remove("loop_times");
             }
             insert!(params, "copilot_list" => stage_list?);
         }
@@ -314,8 +325,7 @@ impl IntoParameters for SSSCopilotParams {
             bail!("SSS Copilot don't support task set");
         }
 
-        let (_, file, value) = files.pop().expect("files have length 1");
-        let task = value.map(Ok).unwrap_or_else(|| json_from_file(&file))?;
+        let (_, file, task) = files.pop().expect("files have length 1");
 
         if task.task_type.as_deref() != Some("SSS") {
             bail!("The given copilot file is not a SSS copilot file");
@@ -387,7 +397,7 @@ impl CopilotFile {
         self,
         index: usize,
         base_dir: impl AsRef<Path>,
-        files: &mut Vec<(usize, PathBuf, Option<T>)>,
+        files: &mut Vec<(usize, PathBuf, T)>,
     ) -> Result<()>
     where
         T: serde::de::DeserializeOwned + Send,
@@ -417,8 +427,24 @@ impl CopilotFile {
 
                 if json_file.is_file() {
                     debug!("Cache hit, using cached json file {}", json_file.display());
-                    files.push((index, json_file, None));
-                    return Ok(());
+                    match json_from_file(&json_file) {
+                        Ok(task) => {
+                            files.push((index, json_file, task));
+                            return Ok(());
+                        }
+                        Err(e) => {
+                            warn!(
+                                "Cached copilot file {} is corrupted ({e}), re-downloading",
+                                json_file.display()
+                            );
+                            fs::remove_file(&json_file).with_context(|| {
+                                format!(
+                                    "Failed to remove corrupted cache file {}",
+                                    json_file.display()
+                                )
+                            })?;
+                        }
+                    }
                 }
 
                 let url = format!("{COPILOT_API}{code}");
@@ -437,13 +463,38 @@ impl CopilotFile {
 
                 if resp.status_code == StatusCode::OK {
                     let content = resp.data.content;
+                    let task = serde_json::from_str(&content)?;
 
-                    fs::File::create(&json_file)
-                        .context("Failed to create json file")?
-                        .write_all(content.as_bytes())
-                        .context("Failed to write json file")?;
+                    // On Windows, concurrent rename to the same target fails with PermissionDenied
+                    // (os error 5) when the file is locked by another process.  If another
+                    // thread/process already wrote the cache file we can safely move on.
+                    #[cfg(windows)]
+                    if let Err(e) = crate::atomic_fs::write(&json_file, &content) {
+                        if e.kind() == std::io::ErrorKind::PermissionDenied
+                            && let Ok(m) = fs::metadata(&json_file)
+                            && m.is_file()
+                        {
+                            debug!(
+                                "Cache file {} already written by another process: {e}",
+                                json_file.display()
+                            );
+                        } else {
+                            return Err(e).context(format!(
+                                "Failed to write downloaded copilot cache file to {}",
+                                json_file.display()
+                            ));
+                        }
+                    }
 
-                    files.push((index, json_file, Some(serde_json::from_str(&content)?)));
+                    #[cfg(not(windows))]
+                    crate::atomic_fs::write(&json_file, &content).with_context(|| {
+                        format!(
+                            "Failed to write downloaded copilot cache file to {}",
+                            json_file.display()
+                        )
+                    })?;
+
+                    files.push((index, json_file, task));
 
                     Ok(())
                 } else {
@@ -495,7 +546,10 @@ impl CopilotFile {
                     base_dir.join(file)
                 };
 
-                files.push((index, file, None));
+                let task = json_from_file(&file).with_context(|| {
+                    format!("Failed to parse local copilot file {}", file.display())
+                })?;
+                files.push((index, file, task));
 
                 Ok(())
             }
@@ -539,9 +593,7 @@ fn operator_table(task: &CopilotTask) -> Result<Table> {
 /// This function handles downloading remote files, expanding task sets,
 /// and resolving local file paths. The returned list is sorted by the
 /// original URI index to preserve order.
-fn resolve_copilot_uris(
-    uri_list: Vec<String>,
-) -> Result<Vec<(usize, PathBuf, Option<CopilotTask>)>> {
+fn resolve_copilot_uris(uri_list: Vec<String>) -> Result<Vec<(usize, PathBuf, CopilotTask)>> {
     let copilot_dir = dirs::copilot().ensure()?;
 
     let mut copilot_files = uri_list
@@ -776,7 +828,7 @@ found"}"#,
                     "maa",
                     "copilot",
                     "maa://40051",
-                    "--raid=1",
+                    "--raid=raid",
                     "--formation",
                     "--use-sanity-potion",
                     "--add-trust",
@@ -844,7 +896,7 @@ found"}"#,
                     "copilot",
                     "maa://40051",
                     "--raid",
-                    "2",
+                    "both",
                     "--formation",
                 ])
                 .unwrap();
@@ -868,6 +920,39 @@ found"}"#,
                         "ignore_requirements" => false,
                     ),
                 );
+            }
+
+            fn parse_raid_mode<I, T>(args: I) -> std::result::Result<RaidMode, clap::Error>
+            where
+                I: IntoIterator<Item = T>,
+                T: Into<std::ffi::OsString> + Clone,
+            {
+                use clap::Parser;
+
+                let command = crate::command::Cli::try_parse_from(args)?.command;
+                match command {
+                    crate::Command::Copilot { params, .. } => Ok(params.raid),
+                    _ => panic!("Not a Copilot command"),
+                }
+            }
+
+            #[test]
+            fn parse_raid_mode_accepts_named_and_legacy_values() {
+                for (mode, name, num) in [
+                    (RaidMode::Normal, "normal", "0"),
+                    (RaidMode::Raid, "raid", "1"),
+                    (RaidMode::Both, "both", "2"),
+                ] {
+                    let raid_mode =
+                        parse_raid_mode(["maa", "copilot", "maa://40051", "--raid", name]).unwrap();
+
+                    assert_eq!(raid_mode, mode);
+
+                    let num_mode =
+                        parse_raid_mode(["maa", "copilot", "maa://40051", "--raid", num]).unwrap();
+
+                    assert_eq!(num_mode, mode);
+                }
             }
 
             #[test]
@@ -903,22 +988,15 @@ found"}"#,
             }
 
             #[test]
-            #[ignore = "requires installed resources"]
-            fn invalid_raid_mode() {
-                ensure_test_server();
-
-                if std::env::var_os("SKIP_CORE_TEST").is_some() {
-                    return;
-                }
-
-                let result = parse(["maa", "copilot", "maa://40051", "--raid", "3"]);
+            fn parse_raid_mode_rejects_invalid_value() {
+                let result = parse_raid_mode(["maa", "copilot", "maa://40051", "--raid", "3"]);
 
                 assert!(result.is_err());
                 assert!(
                     result
-                        .unwrap_err()
+                        .expect_err("invalid raid mode should fail in clap")
                         .to_string()
-                        .contains("Invalid raid mode")
+                        .contains("invalid value '3'")
                 );
             }
 
@@ -1524,6 +1602,31 @@ found"}"#,
             }
 
             #[test]
+            fn remote_recovers_from_corrupted_cache() {
+                ensure_test_server();
+
+                let test_root = temp_dir().join("maa-test-push-path-into-invalid-cache");
+                fs::create_dir_all(&test_root).unwrap();
+
+                let cached_file = test_root.join("40051.json");
+                fs::write(&cached_file, "{\"stage_name\":\"unterminated").unwrap();
+
+                // Should transparently re-download and succeed despite the corrupt cache
+                assert_push_path_into(
+                    "maa://40051",
+                    0,
+                    &test_root,
+                    &[test_root.join("40051.json")],
+                );
+
+                // The re-downloaded cache must be valid JSON now
+                let task: CopilotTask = json_from_file(&cached_file).unwrap();
+                assert!(!task.stage_name.is_empty());
+
+                fs::remove_dir_all(&test_root).unwrap();
+            }
+
+            #[test]
             fn remote_set() {
                 ensure_test_server();
 
@@ -1577,12 +1680,57 @@ found"}"#,
 
             #[test]
             fn local_relative() {
-                ensure_test_server();
-
                 let test_root = temp_dir().join("maa-test-push-path-into-local-rel");
                 fs::create_dir_all(&test_root).unwrap();
 
-                assert_push_path_into("file.json", 0, &test_root, &[test_root.join("file.json")]);
+                let test_file = test_root.join("file.json");
+                let test_content = serde_json::json!({
+                    "minimum_required": "v4.0.0",
+                    "stage_name": "act25side_01",
+                    "actions": [{ "type": "SpeedUp" }],
+                    "groups": [],
+                    "opers": [],
+                });
+                serde_json::to_writer(fs::File::create(&test_file).unwrap(), &test_content)
+                    .unwrap();
+
+                assert_push_path_into("file.json", 0, &test_root, &[test_file]);
+
+                fs::remove_dir_all(&test_root).unwrap();
+            }
+
+            #[test]
+            fn local_nonexistent_file_returns_error() {
+                let test_root = temp_dir().join("maa-test-push-path-into-local-nonexistent");
+                fs::create_dir_all(&test_root).unwrap();
+
+                let mut files = Vec::new();
+                let result =
+                    CopilotFile::from_uri(test_root.join("nonexistent.json").to_str().unwrap())
+                        .unwrap()
+                        .push_path_into::<CopilotTask>(0, &test_root, &mut files);
+
+                assert!(result.is_err());
+                assert!(files.is_empty());
+
+                fs::remove_dir_all(&test_root).unwrap();
+            }
+
+            #[test]
+            fn local_invalid_json_returns_error() {
+                let test_root = temp_dir().join("maa-test-push-path-into-local-invalid");
+                fs::create_dir_all(&test_root).unwrap();
+
+                let bad_file = test_root.join("bad.json");
+                fs::write(&bad_file, "{\"stage_name\":\"unterminated").unwrap();
+
+                let mut files = Vec::new();
+                let result = CopilotFile::from_uri(bad_file.to_str().unwrap())
+                    .unwrap()
+                    .push_path_into::<CopilotTask>(0, &test_root, &mut files);
+
+                assert!(result.is_err());
+                assert!(files.is_empty());
 
                 fs::remove_dir_all(&test_root).unwrap();
             }

@@ -1,9 +1,9 @@
-use std::{borrow::Cow, path::PathBuf};
+use std::path::PathBuf;
 
-use anyhow::Context;
 use maa_dirs::expand_tilde;
-use maa_value::userinput::{Input, UserInput};
 use serde::Deserialize;
+
+use super::secret::Secret;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Default, Clone)]
@@ -80,7 +80,7 @@ impl<'de> Deserialize<'de> for Remote {
             #[serde(default)]
             ssh_key: Option<PathBuf>,
             #[serde(default)]
-            passphrase: Passphrase,
+            passphrase: Secret,
         }
 
         let helper = RemoteHelper::deserialize(deserializer)?;
@@ -127,10 +127,7 @@ pub enum Certificate {
     /// Note: when using git backend, the encrypted key will not work in batch mode
     /// because we can not pass the passphrase to git command and it will prompt for passphrase.
     /// Use ssh-agent in this case.
-    SshKey {
-        path: PathBuf,
-        passphrase: Passphrase,
-    },
+    SshKey { path: PathBuf, passphrase: Secret },
 }
 
 #[cfg(feature = "git2")]
@@ -143,177 +140,10 @@ impl Certificate {
                 None,
                 expand_tilde(path).as_ref(),
                 passphrase
-                    .get()
+                    .get_with_desc("passphrase")
                     .map_err(|e| git2::Error::from_str(&format!("Failed to get passphrase {e}")))?
                     .as_deref(),
             ),
-        }
-    }
-}
-
-#[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Clone, Default)]
-pub enum Passphrase<Str = String> {
-    /// No passphrase
-    #[default]
-    None,
-    /// Prompt for passphrase
-    ///
-    /// This will not work in batch mode
-    Prompt,
-    /// Plain text passphrase
-    ///
-    /// This is not recommended for security reasons
-    Plain(Str),
-    /// From  Environment variable
-    ///
-    /// This is not recommended for security reasons
-    Env(Str),
-    /// Use a command to get passphrase
-    ///
-    /// A command that outputs the passphrase to stdout
-    /// This is useful to fetch passphrase from password manager
-    Command(Vec<Str>),
-}
-
-impl<'de> Deserialize<'de> for Passphrase {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::de::Deserializer<'de>,
-    {
-        enum PassphraseField {
-            Cmd,
-            Env,
-        }
-
-        impl<'de> serde::Deserialize<'de> for PassphraseField {
-            fn deserialize<D>(deserializer: D) -> Result<PassphraseField, D::Error>
-            where
-                D: serde::de::Deserializer<'de>,
-            {
-                struct PassphraseFieldVisitor;
-
-                impl serde::de::Visitor<'_> for PassphraseFieldVisitor {
-                    type Value = PassphraseField;
-
-                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                        formatter.write_str("`cmd` or `env`")
-                    }
-
-                    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-                    where
-                        E: serde::de::Error,
-                    {
-                        match v {
-                            "cmd" => Ok(PassphraseField::Cmd),
-                            "env" => Ok(PassphraseField::Env),
-                            _ => Err(serde::de::Error::unknown_field(v, &["cmd", "env"])),
-                        }
-                    }
-                }
-
-                deserializer.deserialize_identifier(PassphraseFieldVisitor)
-            }
-        }
-
-        struct PassphraseVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for PassphraseVisitor {
-            type Value = Passphrase;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a valid passphrase, which must be a bool, string, or map")
-            }
-
-            fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                if v {
-                    Ok(Passphrase::Prompt)
-                } else {
-                    Ok(Passphrase::None)
-                }
-            }
-
-            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                Ok(Passphrase::Plain(v.to_owned()))
-            }
-
-            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                Ok(Passphrase::Plain(v))
-            }
-
-            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-            where
-                A: serde::de::MapAccess<'de>,
-            {
-                let v = match map.next_key()? {
-                    Some(PassphraseField::Cmd) => {
-                        let cmd = map.next_value()?;
-                        Passphrase::Command(cmd)
-                    }
-                    Some(PassphraseField::Env) => {
-                        let name = map.next_value()?;
-                        Passphrase::Env(name)
-                    }
-                    None => return Err(serde::de::Error::custom("`cmd` or `env` is required")),
-                };
-
-                if map.next_key::<PassphraseField>()?.is_some() {
-                    return Err(serde::de::Error::custom("only one field is allowed"));
-                }
-
-                Ok(v)
-            }
-        }
-
-        deserializer.deserialize_any(PassphraseVisitor)
-    }
-}
-
-impl Passphrase {
-    pub fn compatible_with_git(&self) -> bool {
-        matches!(self, Passphrase::None | Passphrase::Prompt)
-    }
-
-    pub fn get(&self) -> anyhow::Result<Option<Cow<'_, str>>> {
-        match self {
-            Passphrase::None => Ok(None),
-            Passphrase::Prompt => Input::<String>::new(None)
-                .with_description("passphrase")
-                .value()
-                .map(Cow::Owned)
-                .map(Some)
-                .context("Failed to get passphrase from user input"),
-            Passphrase::Plain(password) => Ok(Some(Cow::Borrowed(password))),
-            Passphrase::Env(name) => std::env::var(name)
-                .map(Cow::Owned)
-                .map(Some)
-                .context("Failed to get passphrase from environment variable"),
-            Passphrase::Command(cmd) => {
-                let output = std::process::Command::new(&cmd[0])
-                    .args(&cmd[1..])
-                    .output()?;
-                if output.status.success() {
-                    let passphrase = std::str::from_utf8(&output.stdout)
-                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-                    Ok(Some(Cow::Owned(passphrase.trim().to_owned())))
-                } else {
-                    let stderr = String::from_utf8(output.stderr).unwrap_or_default();
-                    Err(anyhow::anyhow!(
-                        "Failed to execute command {:?}: {}",
-                        cmd,
-                        stderr
-                    ))
-                }
-            }
         }
     }
 }
@@ -336,7 +166,6 @@ impl Remote {
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub mod tests {
     use super::*;
-
     #[cfg(feature = "git2")]
     pub fn example_config() -> Config {
         Config {
@@ -348,7 +177,7 @@ pub mod tests {
                 branch: Some(String::from("main")),
                 certificate: Some(Certificate::SshKey {
                     path: PathBuf::from("~/.ssh/id_ed25519"),
-                    passphrase: Passphrase::Plain(String::from("password")),
+                    passphrase: Secret::Plain(String::from("password")),
                 }),
             },
         }
@@ -381,7 +210,7 @@ pub mod tests {
     }
 
     mod serde {
-        use serde_test::{Token, assert_de_tokens, assert_de_tokens_error};
+        use serde_test::{Token, assert_de_tokens};
 
         use super::*;
 
@@ -460,7 +289,7 @@ pub mod tests {
                 &Remote {
                     certificate: Some(Certificate::SshKey {
                         path: PathBuf::from("~/.ssh/id_ed25519"),
-                        passphrase: Passphrase::None,
+                        passphrase: Secret::None,
                     }),
                     ..Default::default()
                 },
@@ -477,7 +306,7 @@ pub mod tests {
                 &Remote {
                     certificate: Some(Certificate::SshKey {
                         path: PathBuf::from("~/.ssh/id_ed25519"),
-                        passphrase: Passphrase::Plain(String::from("password")),
+                        passphrase: Secret::Plain(String::from("password")),
                     }),
                     ..Default::default()
                 },
@@ -510,66 +339,6 @@ pub mod tests {
         }
 
         #[test]
-        fn passphrase() {
-            assert_de_tokens(&Passphrase::Prompt, &[Token::Bool(true)]);
-
-            assert_de_tokens(&Passphrase::None, &[Token::Bool(false)]);
-
-            assert_de_tokens(&Passphrase::Plain(String::from("password")), &[Token::Str(
-                "password",
-            )]);
-
-            assert_de_tokens(&Passphrase::Env(String::from("SSH_PASSPHRASE")), &[
-                Token::Map { len: Some(1) },
-                Token::Str("env"),
-                Token::Str("SSH_PASSPHRASE"),
-                Token::MapEnd,
-            ]);
-
-            assert_de_tokens(
-                &Passphrase::Command(vec![String::from("get"), String::from("passphrase")]),
-                &[
-                    Token::Map { len: Some(1) },
-                    Token::Str("cmd"),
-                    Token::Seq { len: Some(2) },
-                    Token::Str("get"),
-                    Token::Str("passphrase"),
-                    Token::SeqEnd,
-                    Token::MapEnd,
-                ],
-            );
-
-            assert_de_tokens_error::<Passphrase>(
-                &[Token::Map { len: Some(1) }, Token::Str("foo")],
-                "unknown field `foo`, expected `cmd` or `env`",
-            );
-
-            assert_de_tokens_error::<Passphrase>(
-                &[
-                    Token::Map { len: Some(2) },
-                    Token::Str("cmd"),
-                    Token::Seq { len: Some(2) },
-                    Token::Str("get"),
-                    Token::Str("passphrase"),
-                    Token::SeqEnd,
-                    Token::Str("env"),
-                ],
-                "only one field is allowed",
-            );
-
-            assert_de_tokens_error::<Passphrase>(
-                &[Token::Map { len: Some(0) }, Token::MapEnd],
-                "`cmd` or `env` is required",
-            );
-
-            assert_de_tokens_error::<Passphrase>(
-                &[Token::I64(0)],
-                "invalid type: integer `0`, \
-                expected a valid passphrase, which must be a bool, string, or map",
-            );
-        }
-
-        #[test]
         fn config() {
             assert_de_tokens(&Config::default(), &[
                 Token::Map { len: Some(0) },
@@ -586,7 +355,7 @@ pub mod tests {
                         branch: Some(String::from("main")),
                         certificate: Some(Certificate::SshKey {
                             path: PathBuf::from("~/.ssh/id_ed25519"),
-                            passphrase: Passphrase::Plain(String::from("password")),
+                            passphrase: Secret::Plain(String::from("password")),
                         }),
                     },
                 },
@@ -657,43 +426,6 @@ pub mod tests {
             }
             .certificate(),
             Some(&Certificate::SshAgent)
-        );
-    }
-
-    #[test]
-    fn passphrase() {
-        assert!(!Passphrase::Plain(String::from("password")).compatible_with_git());
-        assert!(Passphrase::Prompt.compatible_with_git());
-
-        assert_eq!(Passphrase::None.get().unwrap(), None);
-
-        assert_eq!(
-            Passphrase::Plain(String::from("password")).get().unwrap(),
-            Some(Cow::Borrowed("password"))
-        );
-
-        assert!(
-            Passphrase::Env(String::from("MMA_TEST_SSH_PASSPHRASE"))
-                .get()
-                .is_err()
-        );
-
-        unsafe { std::env::set_var("MMA_TEST_SSH_PASSPHRASE", "password") };
-        assert_eq!(
-            Passphrase::Env(String::from("MMA_TEST_SSH_PASSPHRASE"))
-                .get()
-                .unwrap()
-                .unwrap(),
-            "password"
-        );
-        unsafe { std::env::remove_var("MMA_TEST_SSH_PASSPHRASE") };
-
-        assert_eq!(
-            Passphrase::Command(vec![String::from("echo"), String::from("password")])
-                .get()
-                .unwrap()
-                .unwrap(),
-            "password"
         );
     }
 }

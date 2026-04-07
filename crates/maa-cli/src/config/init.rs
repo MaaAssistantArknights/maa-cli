@@ -1,15 +1,12 @@
 use std::path::Path;
 
 use anyhow::{Result, bail};
-use maa_value::{
-    MAAValue, insert, object,
-    userinput::{BoolInput, Input, SelectD, ValueWithDesc},
-};
+use maa_value::prelude::*;
 
-fn asst_config_template() -> MAAValue {
-    object!(
+fn asst_config_template() -> MAAValueTemplate {
+    template!(
         "setup_connection" => BoolInput::new(Some(true)).with_description("setup connection"),
-        "connection_config" if "setup_connection" == true => object!(
+        "connection_config" if "setup_connection" == true => template!(
             "preset" => SelectD::<String>::new(
                 vec![
                     ValueWithDesc::new(
@@ -43,7 +40,7 @@ fn asst_config_template() -> MAAValue {
             ).with_description("configuration name to connect (auto for most cases)"),
         ),
         "setup_instance_options" => BoolInput::new(Some(true)).with_description("setup instance options"),
-        "instance_options" if "setup_instance_options" == true => object!(
+        "instance_options" if "setup_instance_options" == true => template!(
             "touch_mode" => SelectD::<String>::new(
                 vec![
                     ValueWithDesc::new(
@@ -80,7 +77,7 @@ fn asst_config_template() -> MAAValue {
         "setup_resource" => BoolInput::new(
             Some(false),
         ).with_description("setup resource configurations (don't setup it for most cases)"),
-        "resource_config" if "setup_resource" == true => object!(
+        "resource_config" if "setup_resource" == true => template!(
             "global_resource" => SelectD::<String>::new(
                 vec![
                     ValueWithDesc::new(
@@ -125,7 +122,7 @@ fn asst_config_template() -> MAAValue {
         // most of cases don't need to setup static options
         "setup_static_options" => BoolInput::new(Some(false))
             .with_description("setup static options (for hardware acceleration)"),
-        "static_options" if "setup_static_options" == true => object!(
+        "static_options" if "setup_static_options" == true => template!(
             "cpu_ocr" => BoolInput::new(Some(true)).with_description("use CPU for OCR"),
             "gpu_ocr" if "cpu_ocr" == false => Input::<i32>::new(None)
                 .with_description("GPU device ID for OCR (make sure your MAA Core supports GPU OCR)"),
@@ -162,12 +159,12 @@ pub fn init(name: Option<&Path>, filetype: Option<super::Filetype>, force: bool)
         std::fs::create_dir_all(&profile_dir)?;
     }
 
-    let asst_config = asst_config_template().init()?;
-    let mut asst_config_out = object!();
+    // TODO: better logic to handle the template
+    let asst_config = asst_config_template().resolve()?;
+    let mut asst_config_out = MAAValue::default();
     if let Some(obj) = asst_config.get("connection_config") {
-        let mut config = object!(
-            "preset" => obj.get("preset").unwrap().to_owned(),
-        );
+        let mut config = MAAValue::default();
+        insert!(config, "preset" => obj.get("preset").unwrap().to_owned());
 
         if let Some(adb_path) = obj.get("adb_path") {
             let adb_path = adb_path.as_str().unwrap();
@@ -185,7 +182,7 @@ pub fn init(name: Option<&Path>, filetype: Option<super::Filetype>, force: bool)
             "auto" => {}
             x => insert!(config, "config" => x),
         };
-        asst_config_out.insert("connection", config);
+        insert!(asst_config_out, "connection" => config);
     }
 
     // no additional processing needed
@@ -194,9 +191,8 @@ pub fn init(name: Option<&Path>, filetype: Option<super::Filetype>, force: bool)
     }
 
     if let Some(obj) = asst_config.get("resource_config") {
-        let mut config = object!(
-            "user_resource" => obj.get("user_resource").unwrap().to_owned(),
-        );
+        let mut config = MAAValue::default();
+        insert!(config, "user_resource" => obj.get("user_resource").unwrap().to_owned());
         match obj.get("global_resource").unwrap().as_str().unwrap() {
             "None" => {}
             x => insert!(config, "global_resource" => x),
@@ -209,16 +205,15 @@ pub fn init(name: Option<&Path>, filetype: Option<super::Filetype>, force: bool)
     }
 
     if let Some(obj) = asst_config.get("static_options") {
-        let mut config = object!(
-            "cpu_ocr" => obj.get("cpu_ocr").unwrap().to_owned(),
-        );
+        let mut config = MAAValue::default();
+        insert!(config, "cpu_ocr" => obj.get("cpu_ocr").unwrap().to_owned());
         if let Some(gpu_ocr) = obj.get("gpu_ocr") {
             config.insert("gpu_ocr", gpu_ocr.to_owned());
         }
         asst_config_out.insert("static_options", config);
     }
 
-    filetype.write(std::fs::File::create(dest)?, &asst_config_out)?;
+    filetype.write(&dest, &asst_config_out)?;
 
     // remove same name profiles
     for path in tobe_removed {

@@ -430,7 +430,7 @@ mod tests {
         let core_cache = join!(state(), "cache");
         core_cache.ensure().unwrap();
 
-        std::fs::File::create(join!(&core_cache, "avatars")).unwrap();
+        std::fs::create_dir_all(join!(&core_cache, "avatars")).unwrap();
         std::fs::create_dir_all(join!(log(), "2024")).unwrap();
         std::fs::File::create(join!(log(), "asst.log")).unwrap();
         std::fs::File::create(join!(log(), "asst.bak.log")).unwrap();

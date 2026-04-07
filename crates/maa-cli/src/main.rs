@@ -4,9 +4,9 @@ use maa_dirs as dirs;
 #[macro_use(join)]
 extern crate maa_dirs;
 
-mod state;
-
+mod atomic_fs;
 mod log;
+mod state;
 
 mod activity;
 mod cleanup;

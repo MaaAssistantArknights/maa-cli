@@ -114,12 +114,16 @@ mod git {
     use anyhow::{Context, Result, bail};
 
     use super::StatusExt;
-    use crate::config::cli::resource::Certificate;
+    use crate::config::cli::{resource::Certificate, secret::Secret};
+
+    fn supports_git_auth_prompt(passphrase: &Secret) -> bool {
+        matches!(passphrase, Secret::None | Secret::Prompt)
+    }
 
     fn setup_cert(cmd: &mut Command, cert: Option<&Certificate>) -> Result<()> {
         match cert {
             Some(Certificate::SshKey { path, passphrase }) => {
-                if !passphrase.compatible_with_git() {
+                if !supports_git_auth_prompt(passphrase) {
                     bail!(
                         "Pass passphrase to git is not supported,
                         you will also need to provide the passphrase to the terminal.
