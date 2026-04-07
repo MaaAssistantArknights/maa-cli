@@ -24,19 +24,67 @@
 //! assert_eq!(config.count, 42);
 //! ```
 
-use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
+use serde::de::{
+    self, Deserializer, EnumAccess, IntoDeserializer, MapAccess, SeqAccess, VariantAccess, Visitor,
+};
 
 use crate::{primitive::MAAPrimitive, value::MAAValue};
 
-#[derive(Debug, thiserror::Error)]
-#[error("{0}")]
-pub struct Error(String);
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum Error {
+    #[error("{0}")]
+    Custom(String),
+    #[error("expected {expected}, got {actual}")]
+    TypeMismatch {
+        expected: &'static str,
+        actual: &'static str,
+    },
+    #[error("expected enum (string or single-key object), got {actual}")]
+    ExpectedEnum { actual: &'static str },
+    #[error("value is missing")]
+    MissingMapValue,
+    #[error("expected unit variant")]
+    ExpectedUnitVariant,
+    #[error("expected newtype variant payload")]
+    ExpectedNewtypeVariantPayload,
+    #[error("expected tuple variant payload")]
+    ExpectedTupleVariantPayload,
+    #[error("expected struct variant payload")]
+    ExpectedStructVariantPayload,
+}
 
 type Result<T> = std::result::Result<T, Error>;
 
 impl serde::de::Error for Error {
     fn custom<T: std::fmt::Display>(msg: T) -> Self {
-        Error(msg.to_string())
+        Self::Custom(msg.to_string())
+    }
+}
+
+impl Error {
+    fn type_mismatch(expected: &'static str, actual: &'static str) -> Self {
+        Self::TypeMismatch { expected, actual }
+    }
+}
+
+impl MAAValue {
+    fn type_name(&self) -> &'static str {
+        match self {
+            MAAValue::Primitive(primitive) => primitive.type_name(),
+            MAAValue::Array(_) => "array",
+            MAAValue::Object(_) => "object",
+        }
+    }
+}
+
+impl MAAPrimitive {
+    fn type_name(&self) -> &'static str {
+        match self {
+            MAAPrimitive::Bool(_) => "boolean",
+            MAAPrimitive::Int(_) => "integer",
+            MAAPrimitive::Float(_) => "float",
+            MAAPrimitive::String(_) => "string",
+        }
     }
 }
 
@@ -87,7 +135,7 @@ impl<'de> Deserializer<'de> for MAAValue {
                 iter: map.into_iter(),
                 value: None,
             }),
-            _ => Err(de::Error::custom("expected struct (object)")),
+            value => Err(Error::type_mismatch("struct (object)", value.type_name())),
         }
     }
 
@@ -95,13 +143,29 @@ impl<'de> Deserializer<'de> for MAAValue {
         self,
         _name: &'static str,
         _variants: &'static [&'static str],
-        _visitor: V,
+        visitor: V,
     ) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        // Enums are not directly supported in MAAValue
-        Err(de::Error::custom("enums are not supported"))
+        match self {
+            MAAValue::Primitive(MAAPrimitive::String(variant)) => {
+                visitor.visit_enum(EnumDeserializer {
+                    variant,
+                    value: None,
+                })
+            }
+            MAAValue::Object(mut map) if map.len() == 1 => {
+                let (variant, value) = map.shift_remove_index(0).unwrap();
+                visitor.visit_enum(EnumDeserializer {
+                    variant,
+                    value: Some(value),
+                })
+            }
+            value => Err(Error::ExpectedEnum {
+                actual: value.type_name(),
+            }),
+        }
     }
 }
 
@@ -154,7 +218,7 @@ impl<'de> MapAccess<'de> for MapDeserializer {
         match self.iter.next() {
             Some((key, value)) => {
                 self.value = Some(value);
-                seed.deserialize(KeyDeserializer { key }).map(Some)
+                seed.deserialize(key.into_deserializer()).map(Some)
             }
             None => Ok(None),
         }
@@ -166,7 +230,7 @@ impl<'de> MapAccess<'de> for MapDeserializer {
     {
         match self.value.take() {
             Some(value) => seed.deserialize(value),
-            None => Err(de::Error::custom("value is missing")),
+            None => Err(Error::MissingMapValue),
         }
     }
 
@@ -175,24 +239,69 @@ impl<'de> MapAccess<'de> for MapDeserializer {
     }
 }
 
-struct KeyDeserializer {
-    key: String,
+struct EnumDeserializer {
+    variant: String,
+    value: Option<MAAValue>,
 }
 
-impl<'de> Deserializer<'de> for KeyDeserializer {
+struct VariantDeserializer {
+    value: Option<MAAValue>,
+}
+
+impl<'de> EnumAccess<'de> for EnumDeserializer {
+    type Error = Error;
+    type Variant = VariantDeserializer;
+
+    fn variant_seed<V>(self, seed: V) -> Result<(V::Value, VariantDeserializer)>
+    where
+        V: de::DeserializeSeed<'de>,
+    {
+        let Self { variant, value } = self;
+        let variant = seed.deserialize(variant.into_deserializer())?;
+        Ok((variant, VariantDeserializer { value }))
+    }
+}
+
+impl<'de> VariantAccess<'de> for VariantDeserializer {
     type Error = Error;
 
-    serde::forward_to_deserialize_any! {
-        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
-        bytes byte_buf option unit unit_struct newtype_struct seq tuple
-        tuple_struct map struct enum identifier ignored_any
+    fn unit_variant(self) -> Result<()> {
+        match self.value {
+            None => Ok(()),
+            Some(_) => Err(Error::ExpectedUnitVariant),
+        }
     }
 
-    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value>
+    fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value>
+    where
+        T: de::DeserializeSeed<'de>,
+    {
+        seed.deserialize(self.value.ok_or(Error::ExpectedNewtypeVariantPayload)?)
+    }
+
+    fn tuple_variant<V>(self, _len: usize, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_string(self.key)
+        match self.value {
+            Some(MAAValue::Array(arr)) => visitor.visit_seq(SeqDeserializer {
+                iter: arr.into_iter(),
+            }),
+            _ => Err(Error::ExpectedTupleVariantPayload),
+        }
+    }
+
+    fn struct_variant<V>(self, _fields: &'static [&'static str], visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        match self.value {
+            Some(MAAValue::Object(map)) => visitor.visit_map(MapDeserializer {
+                iter: map.into_iter(),
+                value: None,
+            }),
+            _ => Err(Error::ExpectedStructVariantPayload),
+        }
     }
 }
 
@@ -200,7 +309,34 @@ impl<'de> Deserializer<'de> for KeyDeserializer {
 mod tests {
     use serde::Deserialize;
 
+    use super::Error;
     use crate::prelude::*;
+
+    #[test]
+    fn deserialize_numeric() {
+        assert_eq!(u8::deserialize(MAAValue::from(42)).unwrap(), 42u8);
+        assert_eq!(u16::deserialize(MAAValue::from(42)).unwrap(), 42u16);
+        assert_eq!(u32::deserialize(MAAValue::from(42)).unwrap(), 42u32);
+        assert_eq!(u64::deserialize(MAAValue::from(42)).unwrap(), 42u64);
+        assert_eq!(usize::deserialize(MAAValue::from(42)).unwrap(), 42usize);
+
+        assert_eq!(i8::deserialize(MAAValue::from(42)).unwrap(), 42i8);
+        assert_eq!(i16::deserialize(MAAValue::from(42)).unwrap(), 42i16);
+        assert_eq!(i32::deserialize(MAAValue::from(42)).unwrap(), 42i32);
+        assert_eq!(i64::deserialize(MAAValue::from(42)).unwrap(), 42i64);
+        assert_eq!(isize::deserialize(MAAValue::from(42)).unwrap(), 42isize);
+
+        assert_eq!(f32::deserialize(MAAValue::from(42)).unwrap(), 42.0f32);
+        assert_eq!(f64::deserialize(MAAValue::from(42)).unwrap(), 42.0f64);
+
+        assert_eq!(f32::deserialize(MAAValue::from(42.0)).unwrap(), 42.0f32);
+        assert_eq!(f64::deserialize(MAAValue::from(42.0)).unwrap(), 42.0f64);
+
+        assert!(u8::deserialize(MAAValue::from(300)).is_err());
+        assert!(i8::deserialize(MAAValue::from(200)).is_err());
+        assert!(u8::deserialize(MAAValue::from(-1)).is_err());
+        assert!(u8::deserialize(MAAValue::from(-1.0)).is_err());
+    }
 
     #[test]
     fn deserialize_struct() {
@@ -271,31 +407,159 @@ mod tests {
             optional: Option<i32>,
         }
 
-        let resolved = object!("required" => "value");
-
-        let config = Config::deserialize(resolved).unwrap();
-
+        let value = object!("required" => "value");
+        let config = Config::deserialize(value).unwrap();
         assert_eq!(config.required, "value");
         assert_eq!(config.optional, None);
+
+        let value = object!("required" => "value", "optional" => 42);
+        let config = Config::deserialize(value).unwrap();
+        assert_eq!(config.required, "value");
+        assert_eq!(config.optional, Some(42));
     }
 
     #[test]
-    fn compare_with_json_approach() {
+    fn deserialize_externally_tagged_enum_variants() {
         #[derive(Deserialize, Debug, PartialEq)]
-        struct Config {
-            name: String,
-            count: i32,
+        enum Example {
+            Unit,
+            Newtype(i32),
+            Tuple(i32, String),
+            Struct { value: i32 },
         }
 
-        let resolved = object!("name" => "app", "count" => 100);
+        assert_eq!(
+            Example::deserialize(MAAValue::from("Unit")).unwrap(),
+            Example::Unit
+        );
+        assert_eq!(
+            Example::deserialize(object!("Newtype" => 42)).unwrap(),
+            Example::Newtype(42)
+        );
+        assert_eq!(
+            Example::deserialize(object!(
+                "Tuple" => MAAValue::Array(vec![1.into(), "two".into()])
+            ))
+            .unwrap(),
+            Example::Tuple(1, "two".to_string())
+        );
+        assert_eq!(
+            Example::deserialize(object!("Struct" => object!("value" => 7))).unwrap(),
+            Example::Struct { value: 7 }
+        );
+    }
 
-        // Old way: via JSON
-        let json = serde_json::to_value(&resolved).unwrap();
-        let config1: Config = serde_json::from_value(json).unwrap();
+    #[test]
+    fn deserialize_struct_with_enum_field() {
+        #[derive(Deserialize, Debug, PartialEq)]
+        enum Mode {
+            Fast,
+            Custom { retries: i32 },
+        }
 
-        // New way: direct
-        let config2 = Config::deserialize(resolved.clone()).unwrap();
+        #[derive(Deserialize, Debug, PartialEq)]
+        struct Config {
+            mode: Mode,
+        }
 
-        assert_eq!(config1, config2);
+        assert_eq!(
+            Config::deserialize(object!("mode" => "Fast")).unwrap(),
+            Config { mode: Mode::Fast }
+        );
+        assert_eq!(
+            Config::deserialize(object!(
+                "mode" => object!("Custom" => object!("retries" => 3))
+            ))
+            .unwrap(),
+            Config {
+                mode: Mode::Custom { retries: 3 }
+            }
+        );
+    }
+
+    #[test]
+    fn deserialize_struct_reports_type_mismatch() {
+        #[derive(Deserialize, Debug, PartialEq)]
+        struct Config {
+            value: i32,
+        }
+
+        assert_eq!(
+            Config::deserialize(MAAValue::from(42)).unwrap_err(),
+            Error::TypeMismatch {
+                expected: "struct (object)",
+                actual: "integer",
+            }
+        );
+    }
+
+    #[test]
+    fn deserialize_internally_tagged_enum() {
+        #[derive(Deserialize, Debug, PartialEq)]
+        #[serde(tag = "type")]
+        enum Command {
+            Move { x: i32, y: i32 },
+            Stop,
+        }
+
+        assert_eq!(
+            Command::deserialize(object!("type" => "Move", "x" => 1, "y" => 2)).unwrap(),
+            Command::Move { x: 1, y: 2 }
+        );
+        assert_eq!(
+            Command::deserialize(object!("type" => "Stop")).unwrap(),
+            Command::Stop
+        );
+    }
+
+    #[test]
+    fn deserialize_adjacently_tagged_enum() {
+        #[derive(Deserialize, Debug, PartialEq)]
+        #[serde(tag = "t", content = "c")]
+        enum Payload {
+            Num(i32),
+            Text(String),
+        }
+
+        assert_eq!(
+            Payload::deserialize(object!("t" => "Num", "c" => 42)).unwrap(),
+            Payload::Num(42)
+        );
+        assert_eq!(
+            Payload::deserialize(object!("t" => "Text", "c" => "hello")).unwrap(),
+            Payload::Text("hello".to_string())
+        );
+    }
+
+    #[test]
+    fn deserialize_untagged_enum() {
+        #[derive(Deserialize, Debug, PartialEq)]
+        #[serde(untagged)]
+        enum Value {
+            Int(i32),
+            Text(String),
+        }
+
+        assert_eq!(
+            Value::deserialize(MAAValue::from(42)).unwrap(),
+            Value::Int(42)
+        );
+        assert_eq!(
+            Value::deserialize(MAAValue::from("hello")).unwrap(),
+            Value::Text("hello".to_string())
+        );
+    }
+
+    #[test]
+    fn deserialize_enum_reports_semantic_error() {
+        #[derive(Deserialize, Debug, PartialEq)]
+        enum Example {
+            Unit,
+        }
+
+        assert_eq!(
+            Example::deserialize(MAAValue::from(42)).unwrap_err(),
+            Error::ExpectedEnum { actual: "integer" }
+        );
     }
 }
