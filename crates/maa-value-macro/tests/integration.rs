@@ -10,7 +10,7 @@ fn mixed_insert_types() -> Result<()> {
     let none_value: Option<String> = None;
     let path = PathBuf::from("/path");
 
-    let obj = object!(
+    let obj = template!(
         "regular" => "normal",
         "optional_present" =>? some_value,
         "optional_absent" =>? none_value,
@@ -39,22 +39,22 @@ fn complex_nested_structure() -> Result<()> {
     let some_val: Option<i32> = Some(100);
     let path = PathBuf::from("/config");
 
-    let obj = object!(
-        "metadata" => object!(
+    let obj = template!(
+        "metadata" => template!(
             "version" => "1.0",
             "author" => "test"
         ),
-        "config" => object!(
+        "config" => template!(
             "enabled" => true,
             "path" => path?,
             "optional_setting" =>? some_val,
-            "nested" => object!(
+            "nested" => template!(
                 "deep" => "value"
             )
         ),
         "features" => ["feature1", "feature2"],
         "debug" => false,
-        "advanced" if "debug" == true => object!(
+        "advanced" if "debug" == true => template!(
             "verbose" => true
         )
     );
@@ -91,7 +91,7 @@ fn all_insert_kinds_together() -> Result<()> {
     let maybe_val: Option<i32> = Some(1);
     let try_val = PathBuf::from("/path");
 
-    let obj = object!(
+    let obj = template!(
         "a_regular" => regular,
         "b_maybe" =>? maybe_val,
         "c_try" => try_val?,

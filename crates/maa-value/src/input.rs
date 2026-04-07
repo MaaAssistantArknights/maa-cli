@@ -3,7 +3,7 @@ use serde::Deserialize;
 use crate::{
     primitive::MAAPrimitive,
     userinput::{BoolInput, Input, SelectD, UserInput},
-    value::MAAValue,
+    value::MAAValueTemplate,
 };
 
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -80,7 +80,7 @@ impl From<SelectD<String>> for MAAInput {
 macro_rules! impl_into_maa_value {
     ($($t:ty),* $(,)?) => {
         $(
-            impl From<$t> for MAAValue {
+            impl From<$t> for MAAValueTemplate {
                 fn from(v: $t) -> Self {
                     Self::Input(v.into())
                 }
@@ -247,12 +247,12 @@ mod tests {
 
         // Test conversion from input types to MAAValue
         let input = BoolInput::new(Some(true));
-        let value: MAAValue = input.clone().into();
-        assert_eq!(value, MAAValue::Input(MAAInput::InputBool(input)));
+        let value: MAAValueTemplate = input.clone().into();
+        assert_eq!(value, MAAValueTemplate::Input(MAAInput::InputBool(input)));
 
         let select = SelectD::from_iter([1, 2], NonZero::new(1)).unwrap();
-        let value: MAAValue = select.clone().into();
-        assert_eq!(value, MAAValue::Input(MAAInput::SelectInt(select)));
+        let value: MAAValueTemplate = select.clone().into();
+        assert_eq!(value, MAAValueTemplate::Input(MAAInput::SelectInt(select)));
     }
 
     #[test]

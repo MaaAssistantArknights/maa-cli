@@ -1,6 +1,6 @@
 use crate::{
     Outcome,
-    value::{MAAValue, ResolvedMAAValue},
+    value::{MAAValue, MAAValueTemplate},
 };
 
 pub trait ArrayOps: Sized {
@@ -34,24 +34,24 @@ impl ArrayOps for MAAValue {
     }
 }
 
-impl ArrayOps for ResolvedMAAValue {
+impl ArrayOps for MAAValueTemplate {
     fn as_slice(&self) -> Option<&[Self]> {
         match self {
-            ResolvedMAAValue::Array(arr) => Some(arr),
+            MAAValueTemplate::Array(arr) => Some(arr),
             _ => None,
         }
     }
 
     fn as_mut_vec(&mut self) -> Option<&mut Vec<Self>> {
         match self {
-            ResolvedMAAValue::Array(arr) => Some(arr),
+            MAAValueTemplate::Array(arr) => Some(arr),
             _ => None,
         }
     }
 
     fn into_vec(self) -> Outcome<Vec<Self>, Self> {
         match self {
-            ResolvedMAAValue::Array(arr) => Outcome::Value(arr),
+            MAAValueTemplate::Array(arr) => Outcome::Value(arr),
             _ => Outcome::Original(self),
         }
     }
@@ -108,9 +108,9 @@ mod tests {
             }
         }
 
-        // Test with ResolvedMAAValue
-        let resolved_array = MAAValue::from([1, 2, 3]).resolve().unwrap();
-        match resolved_array.into_vec() {
+        // Test with MAAValueTemplate
+        let tamplate = MAAValueTemplate::from([1, 2, 3]);
+        match tamplate.into_vec() {
             Outcome::Value(vec) => {
                 assert_eq!(vec.len(), 3);
             }
@@ -143,9 +143,9 @@ mod tests {
         assert_eq!(MAAValue::default().as_slice(), None);
         assert_eq!(object!("key" => "value").as_slice(), None);
 
-        // Test with ResolvedMAAValue
-        let resolved = MAAValue::from([1, 2, 3]).resolve().unwrap();
-        assert!(resolved.as_slice().is_some());
+        // Test with MAAValueTemplate
+        let teamplate = MAAValueTemplate::from([1, 2, 3]);
+        assert!(teamplate.as_slice().is_some());
     }
 
     #[test]
@@ -183,8 +183,8 @@ mod tests {
         assert_eq!(MAAValue::default().as_mut_vec(), None);
         assert_eq!(object!("key" => "value").as_mut_vec(), None);
 
-        // Test with ResolvedMAAValue
-        let mut resolved = MAAValue::from([1, 2, 3]).resolve().unwrap();
-        assert!(resolved.as_mut_vec().is_some());
+        // Test with MAAValueTemplate
+        let mut template = MAAValueTemplate::from([1, 2, 3]);
+        assert!(template.as_mut_vec().is_some());
     }
 }

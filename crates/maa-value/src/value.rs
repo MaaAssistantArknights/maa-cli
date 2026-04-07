@@ -12,9 +12,9 @@ use crate::{
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Deserialize, Clone, Debug, PartialEq)]
 #[serde(untagged)]
-pub enum MAAValue {
+pub enum MAAValueTemplate {
     /// An array of values
-    Array(Vec<MAAValue>),
+    Array(Vec<MAAValueTemplate>),
     /// A value that should be queried from user input
     Input(MAAInput),
     /// A optional value
@@ -35,12 +35,12 @@ pub enum MAAValue {
         value: BoxedMAAValue,
     },
     /// Object is a map of key-value pair
-    Object(Map<MAAValue>),
+    Object(Map<MAAValueTemplate>),
     /// Primitive json types: bool, int, float, string
     Primitive(MAAPrimitive),
 }
 
-impl Default for MAAValue {
+impl Default for MAAValueTemplate {
     fn default() -> Self {
         Self::Object(Map::default())
     }
@@ -49,40 +49,49 @@ impl Default for MAAValue {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Deserialize, Clone, PartialEq, Debug)]
 #[serde(transparent)]
-pub struct BoxedMAAValue(Box<MAAValue>);
+pub struct BoxedMAAValue(Box<MAAValueTemplate>);
 
 impl BoxedMAAValue {
-    fn resolve(self) -> Result<ResolvedMAAValue> {
+    fn resolve(self) -> Result<MAAValue> {
         self.0.resolve()
     }
 }
 
 impl<T> From<T> for BoxedMAAValue
 where
-    T: Into<MAAValue>,
+    T: Into<MAAValueTemplate>,
 {
     fn from(value: T) -> Self {
         Self(Box::new(value.into()))
     }
 }
 
-/// A resolved MAAValue containing only concrete values.
+/// A concrete value containing only resolved data.
 ///
-/// This type represents the output of [`MAAValue::resolve()`], containing only
-/// concrete data without any [`Input`](MAAValue::Input) or [`Optional`](MAAValue::Optional)
-/// variants. It implements both [`Serialize`] and [`serde::de::Deserializer`] to support
-/// serialization and deserialization to any types implementing [`Deserialize`].
+/// This type represents the output of [`MAAValueTemplate::resolve()`], containing only
+/// concrete data without any [`Input`](MAAValueTemplate::Input) or
+/// [`Optional`](MAAValueTemplate::Optional) variants. It implements both [`Serialize`] and
+/// [`serde::de::Deserializer`] to support serialization and deserialization to any types
+/// implementing [`Deserialize`].
 ///
-/// # Serde Support
+/// # Creating `MAAValue` Directly
 ///
-/// Unlike [`MAAValue`] which may contain user inputs and conditional logic, `ResolvedMAAValue`
-/// contains only concrete values (primitives, arrays, and objects). This makes it suitable for
-/// **Serialization** writing resolved configurations to files or APIs.
+/// Use the [`object!`](maa_value_macro::object) macro for simple concrete objects:
 ///
-/// ## Converting to Typed Structs
+/// ```
+/// use maa_value::prelude::*;
 ///
-/// `ResolvedMAAValue` implements the `Deserializer` trait, allowing direct conversion to
-/// typed structs without an intermediate format:
+/// let value = object!("name" => "app", "count" => 42);
+/// assert_eq!(value.get("name").unwrap().as_str(), Some("app"));
+/// ```
+///
+/// For templates with user inputs or conditionals, use [`template!`](maa_value_macro::template)
+/// and call [`MAAValueTemplate::resolve()`] to obtain a `MAAValue`.
+///
+/// # Converting to Typed Structs
+///
+/// `MAAValue` implements the `Deserializer` trait, allowing direct conversion to typed structs
+/// without an intermediate format:
 ///
 /// ```
 /// use maa_value::prelude::*;
@@ -94,16 +103,16 @@ where
 ///     count: i32,
 /// }
 ///
-/// let resolved = object!("name" => "app", "count" => 42).resolve().unwrap();
+/// let value = object!("name" => "app", "count" => 42);
 ///
-/// let config = Config::deserialize(resolved).unwrap();
+/// let config = Config::deserialize(value).unwrap();
 ///
 /// assert_eq!(config.name, "app");
 /// assert_eq!(config.count, 42);
 /// ```
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 #[serde(untagged)]
-pub enum ResolvedMAAValue {
+pub enum MAAValue {
     /// An array of resolved values
     Array(Vec<Self>),
     /// An object containing resolved key-value pairs
@@ -112,13 +121,13 @@ pub enum ResolvedMAAValue {
     Primitive(MAAPrimitive),
 }
 
-impl Default for ResolvedMAAValue {
+impl Default for MAAValue {
     fn default() -> Self {
         Self::Object(Map::new())
     }
 }
 
-impl MAAValue {
+impl MAAValueTemplate {
     /// Resolves the value by evaluating all user inputs and conditional fields.
     ///
     /// This method transforms a [`MAAValue`] (which may contain unresolved
@@ -151,11 +160,10 @@ impl MAAValue {
     /// **Example:**
     /// ```
     /// use maa_value::prelude::*;
-    /// # use maa_value::userinput::BoolInput;
     ///
-    /// let value = object!(
+    /// let value = template!(
     ///     "enabled" => true,
-    ///     "config" if "enabled" == true => object!(
+    ///     "config" if "enabled" == true => template!(
     ///         "nested_field" if "enabled" == false => "will_be_omitted"
     ///     )
     /// );
@@ -163,7 +171,7 @@ impl MAAValue {
     /// let resolved = value.resolve().unwrap();
     /// // "config" is included because "enabled" == true
     /// // But it's an empty object because the nested condition isn't satisfied
-    /// assert_eq!(resolved.get("config").unwrap(), &object!().resolve().unwrap());
+    /// assert_eq!(resolved.get("config").unwrap(), &MAAValue::default());
     /// ```
     ///
     /// # Performance
@@ -176,8 +184,7 @@ impl MAAValue {
     ///
     /// # Returns
     ///
-    /// Returns a [`ResolvedMAAValue`] containing only concrete values (no `Input` or `Optional`
-    /// variants).
+    /// Returns a [`MAAValue`] containing only concrete values (no `Input` or `Optional` variants).
     ///
     /// # Errors
     ///
@@ -195,22 +202,22 @@ impl MAAValue {
     /// ```
     /// use maa_value::prelude::*;
     ///
-    /// // Resolving a simple object with primitives
-    /// let value = object!("key" => "value", "count" => 42);
+    /// // Resolving a simple template with primitives
+    /// let value = template!("key" => "value", "count" => 42);
     /// let resolved = value.resolve().unwrap();
     /// assert_eq!(resolved.get("key").unwrap().as_str(), Some("value"));
     /// assert_eq!(resolved.get("count").unwrap().as_int(), Some(42));
     /// ```
-    pub fn resolve(self) -> Result<ResolvedMAAValue> {
-        use MAAValue::*;
+    pub fn resolve(self) -> Result<MAAValue> {
+        use MAAValueTemplate::*;
         match self {
-            Input(v) => Ok(ResolvedMAAValue::Primitive(v.into_primitive()?)),
+            Input(v) => Ok(MAAValue::Primitive(v.into_primitive()?)),
             Array(array) => {
                 let mut ret = Vec::with_capacity(array.len());
                 for value in array {
                     ret.push(value.resolve()?);
                 }
-                Ok(ResolvedMAAValue::Array(ret))
+                Ok(MAAValue::Array(ret))
             }
             Object(mut map) => {
                 enum Mark {
@@ -222,7 +229,7 @@ impl MAAValue {
                 fn visit<'key>(
                     sorted_keys: &mut Vec<String>,
                     key: &'key str,
-                    map: &'key Map<MAAValue>,
+                    map: &'key Map<MAAValueTemplate>,
                     marks: &mut Map<Mark, &'key str>,
                 ) -> Result<()> {
                     match marks.get(key) {
@@ -260,7 +267,7 @@ impl MAAValue {
                 }
 
                 // Initialize all the values with given order and put them into a new map
-                let mut initialized: Map<ResolvedMAAValue> = Map::new();
+                let mut initialized: Map<MAAValue> = Map::new();
                 for key in sorted_keys {
                     let value = map.swap_remove(&key).unwrap();
                     if let Optional { conditions, value } = value {
@@ -284,11 +291,29 @@ impl MAAValue {
                     }
                 }
 
-                Ok(ResolvedMAAValue::Object(initialized))
+                Ok(MAAValue::Object(initialized))
             }
             Optional { .. } => Err(Error::OptionalNotInObject),
-            Primitive(p) => Ok(ResolvedMAAValue::Primitive(p)),
+            Primitive(p) => Ok(MAAValue::Primitive(p)),
         }
+    }
+}
+
+impl From<MAAValue> for MAAValueTemplate {
+    fn from(value: MAAValue) -> Self {
+        match value {
+            MAAValue::Primitive(p) => Self::Primitive(p),
+            MAAValue::Array(a) => Self::Array(a.into_iter().map(Into::into).collect()),
+            MAAValue::Object(m) => {
+                Self::Object(m.into_iter().map(|(k, v)| (k, v.into())).collect())
+            }
+        }
+    }
+}
+
+impl<const N: usize, T: Into<MAAValueTemplate>> From<[T; N]> for MAAValueTemplate {
+    fn from(value: [T; N]) -> Self {
+        Self::Array(value.into_iter().map(|v| v.into()).collect::<Vec<_>>())
     }
 }
 
@@ -298,9 +323,16 @@ impl<const N: usize, T: Into<MAAValue>> From<[T; N]> for MAAValue {
     }
 }
 
-impl<const N: usize, T: Into<ResolvedMAAValue>> From<[T; N]> for ResolvedMAAValue {
-    fn from(value: [T; N]) -> Self {
-        Self::Array(value.into_iter().map(|v| v.into()).collect::<Vec<_>>())
+impl<T: TryInto<MAAValueTemplate>> TryFrom<Vec<T>> for MAAValueTemplate {
+    type Error = T::Error;
+
+    fn try_from(value: Vec<T>) -> Result<Self, Self::Error> {
+        Ok(Self::Array(
+            value
+                .into_iter()
+                .map(|v| v.try_into())
+                .collect::<Result<Vec<_>, _>>()?,
+        ))
     }
 }
 
@@ -317,16 +349,15 @@ impl<T: TryInto<MAAValue>> TryFrom<Vec<T>> for MAAValue {
     }
 }
 
-impl<T: TryInto<ResolvedMAAValue>> TryFrom<Vec<T>> for ResolvedMAAValue {
-    type Error = T::Error;
+impl From<MAAValueTemplate> for Cow<'_, MAAValueTemplate> {
+    fn from(value: MAAValueTemplate) -> Self {
+        Cow::Owned(value)
+    }
+}
 
-    fn try_from(value: Vec<T>) -> Result<Self, Self::Error> {
-        Ok(Self::Array(
-            value
-                .into_iter()
-                .map(|v| v.try_into())
-                .collect::<Result<Vec<_>, _>>()?,
-        ))
+impl<'a> From<&'a MAAValueTemplate> for Cow<'a, MAAValueTemplate> {
+    fn from(value: &'a MAAValueTemplate) -> Self {
+        Cow::Borrowed(value)
     }
 }
 
@@ -338,18 +369,6 @@ impl From<MAAValue> for Cow<'_, MAAValue> {
 
 impl<'a> From<&'a MAAValue> for Cow<'a, MAAValue> {
     fn from(value: &'a MAAValue) -> Self {
-        Cow::Borrowed(value)
-    }
-}
-
-impl From<ResolvedMAAValue> for Cow<'_, ResolvedMAAValue> {
-    fn from(value: ResolvedMAAValue) -> Self {
-        Cow::Owned(value)
-    }
-}
-
-impl<'a> From<&'a ResolvedMAAValue> for Cow<'a, ResolvedMAAValue> {
-    fn from(value: &'a ResolvedMAAValue) -> Self {
         Cow::Borrowed(value)
     }
 }
@@ -366,12 +385,12 @@ mod tests {
     fn serde() {
         use serde_test::Token;
 
-        let obj = object!(
+        let obj = template!(
             "array" => [1, 2],
             "bool" => true,
             "float" => 1.0,
             "int" => 1,
-            "object" => object!("key" => "value"),
+            "object" => template!("key" => "value"),
             "string" => "string",
             "input_bool" => BoolInput::new(Some(true)),
             "input_float" => Input::new(Some(1.0)),
@@ -383,7 +402,7 @@ mod tests {
             "optional" if "input_bool" == true => Input::new(Some(1)),
             "optional_no_satisfied" if "input_bool" == false => Input::new(Some(1)),
             "optional_object" if "input_bool" == true =>
-                object!("key1" => "value1", "key2" => "value2"),
+                template!("key1" => "value1", "key2" => "value2"),
         );
 
         serde_test::assert_de_tokens(&obj, &[
@@ -544,7 +563,7 @@ mod tests {
     fn resolve_optionals() {
         let input = BoolInput::new(Some(true));
 
-        let value = object!(
+        let value = template!(
             "input" => input.clone(),
             "array" => [1],
             "primitive" => 1,
@@ -552,7 +571,7 @@ mod tests {
             "optional_no_satisfied" if "input" == false => input.clone(),
             "optional_no_exist" if "no_exist" == true => input.clone(),
             "optional_chain" if "optional" == true => input.clone(),
-            "optional_nested" if "optional" == true => object!(
+            "optional_nested" if "optional" == true => template!(
                 "nested" if "optional" == true => input.clone(),
             ),
         );
@@ -563,57 +582,51 @@ mod tests {
             Error::OptionalNotInObject,
         ));
 
-        assert_eq!(value.get("input").unwrap(), &MAAValue::from(input.clone()));
+        assert_eq!(
+            value.get("input").unwrap(),
+            &MAAValueTemplate::from(input.clone())
+        );
+        assert_eq!(
+            value.get("array").unwrap(),
+            &MAAValueTemplate::Array(vec![1.into()])
+        );
+        assert_eq!(value.get("primitive").unwrap(), &MAAValueTemplate::from(1));
+        assert!(matches!(
+            value.get("optional").unwrap(),
+            MAAValueTemplate::Optional { .. }
+        ));
+        assert!(matches!(
+            value.get("optional_no_satisfied").unwrap(),
+            MAAValueTemplate::Optional { .. }
+        ));
+        assert!(matches!(
+            value.get("optional_no_exist").unwrap(),
+            MAAValueTemplate::Optional { .. }
+        ));
+        assert!(matches!(
+            value.get("optional_chain").unwrap(),
+            MAAValueTemplate::Optional { .. }
+        ));
+        assert!(matches!(
+            value.get("optional_nested").unwrap(),
+            MAAValueTemplate::Optional { .. }
+        ));
+
+        let value = value.resolve().unwrap();
+
+        assert_eq!(value.get("input").unwrap(), &MAAValue::from(true));
         assert_eq!(
             value.get("array").unwrap(),
             &MAAValue::Array(vec![1.into()])
         );
         assert_eq!(value.get("primitive").unwrap(), &MAAValue::from(1));
-        assert!(matches!(
-            value.get("optional").unwrap(),
-            MAAValue::Optional { .. }
-        ));
-        assert!(matches!(
-            value.get("optional_no_satisfied").unwrap(),
-            MAAValue::Optional { .. }
-        ));
-        assert!(matches!(
-            value.get("optional_no_exist").unwrap(),
-            MAAValue::Optional { .. }
-        ));
-        assert!(matches!(
-            value.get("optional_chain").unwrap(),
-            MAAValue::Optional { .. }
-        ));
-        assert!(matches!(
-            value.get("optional_nested").unwrap(),
-            MAAValue::Optional { .. }
-        ));
-
-        let value = value.resolve().unwrap();
-
-        assert_eq!(value.get("input").unwrap(), &ResolvedMAAValue::from(true));
-        assert_eq!(
-            value.get("array").unwrap(),
-            &ResolvedMAAValue::Array(vec![1.into()])
-        );
-        assert_eq!(value.get("primitive").unwrap(), &ResolvedMAAValue::from(1));
-        assert_eq!(
-            value.get("optional").unwrap(),
-            &ResolvedMAAValue::from(true)
-        );
+        assert_eq!(value.get("optional").unwrap(), &MAAValue::from(true));
         assert_eq!(value.get("optional_no_satisfied"), None);
         assert_eq!(value.get("optional_no_exist"), None);
-        assert_eq!(
-            value.get("optional_chain").unwrap(),
-            &ResolvedMAAValue::from(true)
-        );
-        assert_eq!(
-            value.get("optional_nested").unwrap(),
-            &object!().resolve().unwrap()
-        );
+        assert_eq!(value.get("optional_chain").unwrap(), &MAAValue::from(true));
+        assert_eq!(value.get("optional_nested").unwrap(), &MAAValue::default());
 
-        let value = object!(
+        let value = template!(
             "optional1" if "optional2" == true => input.clone(),
             "optional2" if "optional1" == true => input.clone(),
         );
@@ -622,7 +635,7 @@ mod tests {
             Error::CircularDependency,
         ));
 
-        let value = object!(
+        let value = template!(
             "optional1" if "optional2" == true => input.clone(),
             "optional2" if "optional3" == true => input.clone(),
             "optional3" if "optional1" == true => input.clone(),
@@ -636,22 +649,22 @@ mod tests {
     #[test]
     fn resolved_value_creation() {
         // Test From<primitive> for ResolvedMAAValue
-        let bool_val = ResolvedMAAValue::from(true);
+        let bool_val = MAAValue::from(true);
         assert_eq!(bool_val.as_bool(), Some(true));
 
-        let int_val = ResolvedMAAValue::from(42);
+        let int_val = MAAValue::from(42);
         assert_eq!(int_val.as_int(), Some(42));
 
-        let float_val = ResolvedMAAValue::from(2.14);
+        let float_val = MAAValue::from(2.14);
         assert_eq!(float_val.as_float(), Some(2.14));
 
-        let str_val = ResolvedMAAValue::from("hello");
+        let str_val = MAAValue::from("hello");
         assert_eq!(str_val.as_str(), Some("hello"));
 
         // Test From<[T; N]> for ResolvedMAAValue
-        let array_val = ResolvedMAAValue::from([1, 2, 3]);
+        let array_val = MAAValue::from([1, 2, 3]);
         match array_val {
-            ResolvedMAAValue::Array(vec) => {
+            MAAValue::Array(vec) => {
                 assert_eq!(vec.len(), 3);
                 assert_eq!(vec[0].as_int(), Some(1));
             }
@@ -659,72 +672,60 @@ mod tests {
         }
 
         // Test TryFrom<Vec<T>> for ResolvedMAAValue
-        let vec_val = ResolvedMAAValue::try_from(vec![1, 2, 3]).unwrap();
+        let vec_val = MAAValue::try_from(vec![1, 2, 3]).unwrap();
         match vec_val {
-            ResolvedMAAValue::Array(vec) => {
+            MAAValue::Array(vec) => {
                 assert_eq!(vec.len(), 3);
             }
             _ => panic!("Expected Array variant"),
         }
 
         // Test Default
-        let default_val = ResolvedMAAValue::default();
-        assert!(matches!(default_val, ResolvedMAAValue::Object(_)));
+        let default_val = MAAValue::default();
+        assert!(matches!(default_val, MAAValue::Object(_)));
         assert_eq!(default_val.as_map().unwrap().len(), 0);
     }
 
     #[test]
     fn resolved_value_equality() {
         // Test primitive equality
-        assert_eq!(ResolvedMAAValue::from(42), ResolvedMAAValue::from(42));
-        assert_ne!(ResolvedMAAValue::from(42), ResolvedMAAValue::from(43));
+        assert_eq!(MAAValue::from(42), MAAValue::from(42));
+        assert_ne!(MAAValue::from(42), MAAValue::from(43));
 
-        assert_eq!(
-            ResolvedMAAValue::from("hello"),
-            ResolvedMAAValue::from("hello")
-        );
-        assert_ne!(
-            ResolvedMAAValue::from("hello"),
-            ResolvedMAAValue::from("world")
-        );
+        assert_eq!(MAAValue::from("hello"), MAAValue::from("hello"));
+        assert_ne!(MAAValue::from("hello"), MAAValue::from("world"));
 
         // Test array equality
-        assert_eq!(
-            ResolvedMAAValue::from([1, 2, 3]),
-            ResolvedMAAValue::from([1, 2, 3])
-        );
-        assert_ne!(
-            ResolvedMAAValue::from([1, 2, 3]),
-            ResolvedMAAValue::from([1, 2, 4])
-        );
+        assert_eq!(MAAValue::from([1, 2, 3]), MAAValue::from([1, 2, 3]));
+        assert_ne!(MAAValue::from([1, 2, 3]), MAAValue::from([1, 2, 4]));
 
         // Test empty arrays
         let empty1: [i32; 0] = [];
         let empty2: [i32; 0] = [];
-        assert_eq!(
-            ResolvedMAAValue::from(empty1),
-            ResolvedMAAValue::from(empty2)
-        );
+        assert_eq!(MAAValue::from(empty1), MAAValue::from(empty2));
 
         // Test resolved object equality
-        let obj1 = object!("key" => 1).resolve().unwrap();
-        let obj2 = object!("key" => 1).resolve().unwrap();
-        let obj3 = object!("key" => 2).resolve().unwrap();
+        let obj1 = object!("key" => 1);
+        let obj2 = object!("key" => 1);
+        let obj3 = object!("key" => 2);
 
         assert_eq!(obj1, obj2);
         assert_ne!(obj1, obj3);
 
         // Test cross-type inequality
-        assert_ne!(ResolvedMAAValue::from(1), ResolvedMAAValue::from("1"));
-        assert_ne!(ResolvedMAAValue::from(1), ResolvedMAAValue::from([1]));
+        assert_ne!(MAAValue::from(1), MAAValue::from("1"));
+        assert_ne!(MAAValue::from(1), MAAValue::from([1]));
     }
 
     #[test]
     fn resolved_value_nested_structures() {
         // Test nested arrays
-        let nested_array = MAAValue::from([MAAValue::from([1, 2]), MAAValue::from([3, 4])])
-            .resolve()
-            .unwrap();
+        let nested_array = MAAValueTemplate::from([
+            MAAValueTemplate::from([1, 2]),
+            MAAValueTemplate::from([3, 4]),
+        ])
+        .resolve()
+        .unwrap();
 
         let outer = nested_array.as_slice().unwrap();
         assert_eq!(outer.len(), 2);
@@ -738,16 +739,14 @@ mod tests {
                     "value" => 42
                 )
             )
-        )
-        .resolve()
-        .unwrap();
+        );
 
         let outer = nested_obj.get("outer").unwrap();
         let inner = outer.get("inner").unwrap();
         assert_eq!(inner.get("value").unwrap().as_int(), Some(42));
 
         // Test mixed nesting (array in object in array)
-        let mixed = MAAValue::from([object!("key" => [1, 2])])
+        let mixed = MAAValueTemplate::from([template!("key" => [1, 2])])
             .resolve()
             .unwrap();
 
@@ -761,7 +760,7 @@ mod tests {
     #[test]
     fn resolved_value_cloning() {
         // Test that cloning works correctly
-        let original = ResolvedMAAValue::from([1, 2, 3]);
+        let original = MAAValue::from([1, 2, 3]);
         let cloned = original.clone();
 
         assert_eq!(original, cloned);
@@ -770,9 +769,7 @@ mod tests {
         let nested = object!(
             "array" => [1, 2],
             "obj" => object!("key" => "value")
-        )
-        .resolve()
-        .unwrap();
+        );
 
         let cloned_nested = nested.clone();
         assert_eq!(nested, cloned_nested);
@@ -793,43 +790,43 @@ mod tests {
     fn resolve_primitives() {
         // Test resolving primitive values directly
         assert_eq!(
-            MAAValue::from(42).resolve().unwrap(),
-            ResolvedMAAValue::from(42)
+            MAAValueTemplate::from(42).resolve().unwrap(),
+            MAAValue::from(42)
         );
 
         assert_eq!(
-            MAAValue::from(true).resolve().unwrap(),
-            ResolvedMAAValue::from(true)
+            MAAValueTemplate::from(true).resolve().unwrap(),
+            MAAValue::from(true)
         );
 
         assert_eq!(
-            MAAValue::from("hello").resolve().unwrap(),
-            ResolvedMAAValue::from("hello")
+            MAAValueTemplate::from("hello").resolve().unwrap(),
+            MAAValue::from("hello")
         );
 
         assert_eq!(
-            MAAValue::from(2.14).resolve().unwrap(),
-            ResolvedMAAValue::from(2.14)
+            MAAValueTemplate::from(2.14).resolve().unwrap(),
+            MAAValue::from(2.14)
         );
     }
 
     #[test]
     fn resolve_arrays() {
         // Test resolving simple array
-        let array = MAAValue::from([1, 2, 3]);
+        let array = MAAValueTemplate::from([1, 2, 3]);
         let resolved = array.resolve().unwrap();
-        assert_eq!(resolved, ResolvedMAAValue::from([1, 2, 3]));
+        assert_eq!(resolved, MAAValue::from([1, 2, 3]));
 
         // Test resolving empty array
         let empty: [i32; 0] = [];
-        let empty_resolved = MAAValue::from(empty).resolve().unwrap();
-        assert_eq!(empty_resolved, ResolvedMAAValue::from(empty));
+        let empty_resolved = MAAValueTemplate::from(empty).resolve().unwrap();
+        assert_eq!(empty_resolved, MAAValue::from(empty));
 
         // Test resolving array with inputs
-        let with_inputs = MAAValue::from([
-            MAAValue::from(1),
-            MAAValue::from(Input::new(Some(2))),
-            MAAValue::from(3),
+        let with_inputs = MAAValueTemplate::from([
+            MAAValueTemplate::from(1),
+            MAAValueTemplate::from(Input::new(Some(2))),
+            MAAValueTemplate::from(3),
         ]);
         let resolved = with_inputs.resolve().unwrap();
         let slice = resolved.as_slice().unwrap();
@@ -842,19 +839,17 @@ mod tests {
     #[test]
     fn resolve_objects() {
         // Test resolving simple object
-        let obj = object!("key1" => 1, "key2" => "value");
-        let resolved = obj.resolve().unwrap();
+        let resolved = object!("key1" => 1, "key2" => "value");
 
         assert_eq!(resolved.get("key1").unwrap().as_int(), Some(1));
         assert_eq!(resolved.get("key2").unwrap().as_str(), Some("value"));
 
         // Test resolving empty object
-        let empty = object!();
-        let resolved_empty = empty.resolve().unwrap();
+        let resolved_empty = object!();
         assert_eq!(resolved_empty.as_map().unwrap().len(), 0);
 
         // Test resolving object with inputs
-        let with_inputs = object!(
+        let with_inputs = template!(
             "direct" => 1,
             "input" => Input::new(Some(2))
         );
@@ -875,16 +870,16 @@ mod tests {
             fn input_variant() {
                 // Test Input variant with default value
                 let json = json!({"default": 42});
-                let value: MAAValue = serde_json::from_value(json).unwrap();
-                assert!(matches!(value, MAAValue::Input(_)));
+                let value: MAAValueTemplate = serde_json::from_value(json).unwrap();
+                assert!(matches!(value, MAAValueTemplate::Input(_)));
 
                 // Test Input variant with description
                 let json = json!({
                     "default": "hello",
                     "description": "Enter a greeting"
                 });
-                let value: MAAValue = serde_json::from_value(json).unwrap();
-                assert!(matches!(value, MAAValue::Input(_)));
+                let value: MAAValueTemplate = serde_json::from_value(json).unwrap();
+                assert!(matches!(value, MAAValueTemplate::Input(_)));
             }
 
             #[test]
@@ -894,16 +889,16 @@ mod tests {
                     "conditions": {"enabled": true},
                     "default": 42
                 });
-                let value: MAAValue = serde_json::from_value(json).unwrap();
-                assert!(matches!(value, MAAValue::Optional { .. }));
+                let value: MAAValueTemplate = serde_json::from_value(json).unwrap();
+                assert!(matches!(value, MAAValueTemplate::Optional { .. }));
 
                 // Test Optional variant with "deps" alias
                 let json = json!({
                     "deps": {"flag": false},
                     "default": "value"
                 });
-                let value: MAAValue = serde_json::from_value(json).unwrap();
-                assert!(matches!(value, MAAValue::Optional { .. }));
+                let value: MAAValueTemplate = serde_json::from_value(json).unwrap();
+                assert!(matches!(value, MAAValueTemplate::Optional { .. }));
 
                 // Test Optional with flatten (object value)
                 let json = json!({
@@ -911,8 +906,8 @@ mod tests {
                     "key1": "value1",
                     "key2": "value2"
                 });
-                let value: MAAValue = serde_json::from_value(json).unwrap();
-                assert!(matches!(value, MAAValue::Optional { .. }));
+                let value: MAAValueTemplate = serde_json::from_value(json).unwrap();
+                assert!(matches!(value, MAAValueTemplate::Optional { .. }));
             }
         }
 
@@ -921,14 +916,12 @@ mod tests {
 
             #[test]
             fn resolved_value() {
-                // Test that ResolvedMAAValue serializes correctly
+                // Test that MAAValue serializes correctly
                 let value = object!(
                     "primitive" => 42,
                     "array" => [1, 2, 3],
                     "nested" => object!("key" => "value")
-                )
-                .resolve()
-                .unwrap();
+                );
 
                 let json = serde_json::to_value(&value).unwrap();
 
@@ -944,12 +937,12 @@ mod tests {
             #[test]
             fn resolve_inputs_then_serialize() {
                 // Test that Input variants resolve to their default values
-                let value = object!(
+                let value = template!(
                     "direct" => 42,
                     "from_input" => Input::new(Some(100)),
                     "array_with_input" => [
-                        MAAValue::from(1),
-                        MAAValue::from(Input::new(Some(2)))
+                        MAAValueTemplate::from(1),
+                        MAAValueTemplate::from(Input::new(Some(2)))
                     ]
                 );
 
@@ -966,7 +959,7 @@ mod tests {
             #[test]
             fn resolve_optionals_then_serialize() {
                 // Test that Optional variants are evaluated based on conditions
-                let value = object!(
+                let value = template!(
                     "flag" => true,
                     "conditional" if "flag" == true => 42,
                     "not_included" if "flag" == false => 99

@@ -80,14 +80,12 @@ fn insert_maybe_with_try() -> Result<()> {
 
 #[test]
 fn insert_conditional() {
-    let mut obj = object!(
+    let mut obj = template!(
         "flag" => true,
         "base" => "value"
     );
 
-    insert!(obj,
-        "conditional" if "flag" == true => "inserted"
-    );
+    insert!(obj, "conditional" if "flag" == true => "inserted");
 
     let initialized = obj.resolve().unwrap();
     assert_eq!(
@@ -98,15 +96,13 @@ fn insert_conditional() {
 
 #[test]
 fn insert_conditional_multiple_conditions() {
-    let mut obj = object!(
+    let mut obj = template!(
         "flag1" => true,
         "flag2" => "yes",
         "base" => "value"
     );
 
-    insert!(obj,
-        "conditional" if "flag1" == true && "flag2" == "yes" => "both satisfied"
-    );
+    insert!(obj, "conditional" if "flag1" == true && "flag2" == "yes" => "both satisfied");
 
     let initialized = obj.resolve().unwrap();
     assert_eq!(

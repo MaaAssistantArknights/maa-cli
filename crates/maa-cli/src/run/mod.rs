@@ -18,7 +18,11 @@ use maa_dirs::{self as dirs, Ensure, MAA_CORE_LIB};
 use signal_hook::consts::TERM_SIGNALS;
 
 use crate::{
-    config::{FindFile, asst::AsstConfig, task::TaskConfig},
+    config::{
+        FindFile,
+        asst::AsstConfig,
+        task::{TaskConfig, TaskConfigTamplate},
+    },
     installer,
 };
 
@@ -130,8 +134,7 @@ where
 
     args.apply_to(&mut asst_config);
 
-    let task = f(&asst_config)?;
-    let task_config = task.init()?;
+    let task_config = f(&asst_config)?;
     if let Some(resource) = task_config.client_type.resource() {
         asst_config.resource.use_global_resource(resource);
     }
@@ -273,12 +276,14 @@ pub fn run_custom(path: impl AsRef<Path>, args: CommonArgs) -> Result<()> {
     run(
         |_| {
             let path = path.as_ref();
-            if let Some(abs_path) = dirs::abs_config(path, Some("tasks")) {
-                TaskConfig::find_file(abs_path)
+            let config = if let Some(abs_path) = dirs::abs_config(path, Some("tasks")) {
+                TaskConfigTamplate::find_file(abs_path)
             } else {
-                TaskConfig::find_file(path)
+                TaskConfigTamplate::find_file(path)
             }
-            .context("Failed to find task file!")
+            .context("Failed to find task file!")?;
+
+            config.init().context("Failed to initialize task config!")
         },
         args,
     )

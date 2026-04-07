@@ -20,22 +20,15 @@ pub struct TaskVariant {
     #[serde(default)]
     condition: Condition,
     #[serde(default)]
-    params: MAAValue,
+    params: MAAValueTemplate,
 }
 
 impl TaskVariant {
-    // This constructor seems to be useless,
-    // because predefined task always active and ask params from user.
-    // Variant is only used in user-defined task.
-    // pub fn new(condition: Condition, params: Value) -> Self {
-    //     Self { condition, params }
-    // }
-
     pub fn is_active(&self) -> bool {
         self.condition.is_active()
     }
 
-    pub fn params(&self) -> &MAAValue {
+    pub fn params(&self) -> &MAAValueTemplate {
         &self.params
     }
 }
@@ -58,13 +51,13 @@ pub enum Strategy {
 #[cfg_attr(test, derive(PartialEq, Debug))]
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Task {
+pub struct TaskTemaplte {
     #[serde(default)]
     name: Option<String>,
     #[serde(rename = "type")]
     task_type: TaskType,
     #[serde(default)]
-    params: MAAValue,
+    params: MAAValueTemplate,
     #[serde(default)]
     strategy: Strategy,
     #[serde(default)]
@@ -72,8 +65,9 @@ pub struct Task {
 }
 
 // Constructor for Task
-impl Task {
-    pub fn new(task_type: TaskType, params: MAAValue) -> Self {
+impl TaskTemaplte {
+    #[cfg(test)]
+    fn new(task_type: TaskType, params: MAAValueTemplate) -> Self {
         Self {
             name: None,
             task_type,
@@ -123,7 +117,7 @@ impl Task {
         false
     }
 
-    pub fn params(&self) -> MAAValue {
+    pub fn params(&self) -> MAAValueTemplate {
         let mut params = self.params.clone();
         for variant in &self.variants {
             if variant.is_active() {
@@ -138,29 +132,20 @@ impl Task {
 }
 
 #[derive(Deserialize)]
-pub struct TaskConfig {
+pub struct TaskConfigTamplate {
     client_type: Option<ClientType>,
     startup: Option<bool>,
     closedown: Option<bool>,
-    tasks: Vec<Task>,
+    tasks: Vec<TaskTemaplte>,
 }
 
-impl TaskConfig {
-    pub fn new_with_tasks(tasks: Vec<Task>) -> Self {
-        Self {
-            client_type: None,
-            startup: None,
-            closedown: None,
-            tasks,
-        }
-    }
-
-    pub fn init(&self) -> anyhow::Result<InitializedTaskConfig> {
+impl TaskConfigTamplate {
+    pub fn init(&self) -> anyhow::Result<TaskConfig> {
         let mut startup = self.startup;
         let mut closedown = self.closedown;
         let mut client_type = self.client_type;
 
-        let mut tasks: Vec<InitializedTask> = Vec::new();
+        let mut tasks: Vec<Task> = Vec::new();
         let mut prepend_startup = startup.unwrap_or(false);
         let mut append_closedown = closedown.unwrap_or(false);
 
@@ -244,7 +229,7 @@ impl TaskConfig {
                 _ => {}
             }
 
-            let mut inited_task = InitializedTask::new(task_type, params);
+            let mut inited_task = Task::new(task_type, params);
 
             if let Some(name) = &task.name {
                 inited_task = inited_task.with_name(name.to_owned());
@@ -269,28 +254,24 @@ impl TaskConfig {
         if prepend_startup {
             tasks.insert(
                 0,
-                InitializedTask::new(
+                Task::new(
                     TaskType::StartUp,
                     object!(
                         "start_game_enabled" => true,
                         "client_type" => client_type.to_string(),
-                    )
-                    .resolve()?,
+                    ),
                 ),
             );
         }
 
         if append_closedown {
-            tasks.push(InitializedTask::new(
+            tasks.push(Task::new(
                 TaskType::CloseDown,
-                object!(
-                    "client_type" => client_type.to_string(),
-                )
-                .resolve()?,
+                object!("client_type" => client_type.to_string()),
             ));
         }
 
-        Ok(InitializedTaskConfig {
+        Ok(TaskConfig {
             client_type,
             start_app: startup.unwrap_or(false),
             close_app: closedown.unwrap_or(false),
@@ -300,22 +281,33 @@ impl TaskConfig {
 }
 
 #[cfg_attr(test, derive(PartialEq, Debug))]
-pub struct InitializedTaskConfig {
+pub struct TaskConfig {
     pub client_type: ClientType,
     pub start_app: bool,
     pub close_app: bool,
-    pub tasks: Vec<InitializedTask>,
+    pub tasks: Vec<Task>,
+}
+
+impl TaskConfig {
+    pub const fn new_with_tasks(tasks: Vec<Task>) -> Self {
+        Self {
+            client_type: ClientType::Official,
+            start_app: false,
+            close_app: false,
+            tasks,
+        }
+    }
 }
 
 #[cfg_attr(test, derive(PartialEq, Debug))]
-pub struct InitializedTask {
+pub struct Task {
     pub name: Option<String>,
     pub task_type: TaskType,
-    pub params: ResolvedMAAValue,
+    pub params: MAAValue,
 }
 
-impl InitializedTask {
-    const fn new(task_type: TaskType, params: ResolvedMAAValue) -> Self {
+impl Task {
+    pub const fn new(task_type: TaskType, params: MAAValue) -> Self {
         Self {
             name: None,
             task_type,
@@ -347,7 +339,7 @@ mod tests {
         fn is_active() {
             fn test_with_veriants(variants: Vec<TaskVariant>, expected: bool) {
                 assert_eq!(
-                    Task::new(TaskType::StartUp, object!())
+                    TaskTemaplte::new(TaskType::StartUp, template!())
                         .with_variants(variants)
                         .is_active(),
                     expected
@@ -357,7 +349,7 @@ mod tests {
             fn always_active() -> TaskVariant {
                 TaskVariant {
                     condition: Condition::Always,
-                    params: MAAValue::default(),
+                    params: MAAValueTemplate::default(),
                 }
             }
 
@@ -366,7 +358,7 @@ mod tests {
                     condition: Condition::Not {
                         condition: Box::new(Condition::Always),
                     },
-                    params: MAAValue::default(),
+                    params: MAAValueTemplate::default(),
                 }
             }
 
@@ -380,7 +372,7 @@ mod tests {
         #[test]
         fn get_type() {
             assert_eq!(
-                Task::new(TaskType::StartUp, object!()).task_type(),
+                TaskTemaplte::new(TaskType::StartUp, template!()).task_type(),
                 TaskType::StartUp,
             );
         }
@@ -388,12 +380,12 @@ mod tests {
         #[test]
         fn get_params() {
             fn test_with_variants(
-                base: MAAValue,
+                base: MAAValueTemplate,
                 strategy: Strategy,
-                variants: impl IntoIterator<Item = MAAValue>,
-                expected: MAAValue,
+                variants: impl IntoIterator<Item = MAAValueTemplate>,
+                expected: MAAValueTemplate,
             ) {
-                let mut task = Task::new(TaskType::StartUp, base).with_strategy(strategy);
+                let mut task = TaskTemaplte::new(TaskType::StartUp, base).with_strategy(strategy);
                 for v in variants {
                     task.push_variant(TaskVariant {
                         condition: Condition::Always,
@@ -405,85 +397,86 @@ mod tests {
             }
 
             test_with_variants(
-                object!("a" => 1),
+                template!("a" => 1),
                 Strategy::First,
                 vec![],
-                object!("a" => 1),
+                template!("a" => 1),
             );
 
             test_with_variants(
-                object!("a" => 1),
+                template!("a" => 1),
                 Strategy::First,
-                vec![object!()],
-                object!("a" => 1),
+                vec![template!()],
+                template!("a" => 1),
             );
 
             test_with_variants(
-                object!(),
+                template!(),
                 Strategy::First,
-                vec![object!("a" => 1)],
-                object!("a" => 1),
+                vec![template!("a" => 1)],
+                template!("a" => 1),
             );
 
             test_with_variants(
-                object!("a" => 1),
+                template!("a" => 1),
                 Strategy::First,
-                vec![object!("b" => 2)],
-                object!("a" => 1, "b" => 2),
+                vec![template!("b" => 2)],
+                template!("a" => 1, "b" => 2),
             );
 
             test_with_variants(
-                object!("a" => 1),
+                template!("a" => 1),
                 Strategy::First,
-                vec![object!("a" => 2)],
-                object!("a" => 2),
+                vec![template!("a" => 2)],
+                template!("a" => 2),
             );
 
             test_with_variants(
-                object!("a" => 1),
+                template!("a" => 1),
                 Strategy::First,
-                vec![object!("a" => 2), object!("a" => 3)],
-                object!("a" => 2),
+                vec![template!("a" => 2), template!("a" => 3)],
+                template!("a" => 2),
             );
 
             test_with_variants(
-                object!("a" => 1),
+                template!("a" => 1),
                 Strategy::Merge,
-                vec![object!("a" => 2), object!("a" => 3)],
-                object!("a" => 3),
+                vec![template!("a" => 2), template!("a" => 3)],
+                template!("a" => 3),
             );
 
             test_with_variants(
-                object!("a" => 1),
+                template!("a" => 1),
                 Strategy::First,
-                vec![object!("a" => 2), object!("b" => 4)],
-                object!("a" => 2),
+                vec![template!("a" => 2), template!("b" => 4)],
+                template!("a" => 2),
             );
 
             test_with_variants(
-                object!("a" => 1),
+                template!("a" => 1),
                 Strategy::Merge,
-                vec![object!("a" => 2), object!("b" => 4)],
-                object!("a" => 2, "b" => 4),
+                vec![template!("a" => 2), template!("b" => 4)],
+                template!("a" => 2, "b" => 4),
             );
 
             assert_eq!(
                 {
-                    let mut task = Task::new(TaskType::StartUp, object!("a" => 1, "c" => 5))
-                        .with_strategy(Strategy::First);
+                    let mut task =
+                        TaskTemaplte::new(TaskType::StartUp, template!("a" => 1, "c" => 5))
+                            .with_strategy(Strategy::First);
                     task.push_variant(TaskVariant {
                         condition: Condition::Not {
                             condition: Box::new(Condition::Always),
                         },
-                        params: object!("a" => 2),
+                        params: template!("a" => 2),
                     });
                     task.push_variant(TaskVariant {
                         condition: Condition::Always,
-                        params: object!("a" => 3, "b" => 4),
+                        params: template!("a" => 3, "b" => 4),
                     });
                     task.params()
                 },
-                object!("a" => 3, "b" => 4, "c" => 5),
+                template!("a" => 3, "b" => 4, "c" => 5),
             );
         }
     }
@@ -514,14 +507,14 @@ mod tests {
                     .naive_local()
             }
 
-            fn example_task_config() -> TaskConfig {
+            fn example_task_config() -> TaskConfigTamplate {
                 use ClientType::*;
 
                 let mut task_list = Vec::new();
 
-                task_list.push(Task::new(
+                task_list.push(TaskTemaplte::new(
                     StartUp,
-                    object!(
+                    template!(
                         "start_game_enabled" => BoolInput::new(
                             Some(true),
                         ).with_description("start the game"),
@@ -538,7 +531,7 @@ mod tests {
                 ));
 
                 task_list.push(
-                    Task::new(Fight, object!())
+                    TaskTemaplte::new(Fight, template!())
                         .with_name("Fight Daily".to_string())
                         .with_strategy(Strategy::Merge)
                         .with_variants(vec![
@@ -547,11 +540,11 @@ mod tests {
                                     weekdays: vec![Weekday::Sun],
                                     timezone: TimeOffset::Local,
                                 },
-                                params: object!("expiring_medicine" => 5),
+                                params: template!("expiring_medicine" => 5),
                             },
                             TaskVariant {
                                 condition: Condition::Always,
-                                params: object!(
+                                params: template!(
                                     "stage" => Input::new(
                                         Some("1-7".to_string()),
                                     ).with_description("a stage to fight"),
@@ -562,7 +555,7 @@ mod tests {
                                     weekdays: vec![Weekday::Tue, Weekday::Thu, Weekday::Sat],
                                     timezone: TimeOffset::Client(ClientType::Official),
                                 },
-                                params: object!("stage" => "CE-6"),
+                                params: template!("stage" => "CE-6"),
                             },
                             TaskVariant {
                                 condition: Condition::DateTime {
@@ -570,7 +563,7 @@ mod tests {
                                     end: Some(naive_local_datetime(2023, 8, 21, 3, 59, 59)),
                                     timezone: TimeOffset::TimeZone(8),
                                 },
-                                params: object!(
+                                params: template!(
                                     "stage" => SelectD::<String>::from_iter(
                                         [
                                             "SL-6",
@@ -587,9 +580,9 @@ mod tests {
                 );
 
                 task_list.push(
-                    Task::new(
+                    TaskTemaplte::new(
                         Mall,
-                        object!(
+                        template!(
                             "shopping" => true,
                             "credit_fight" => true,
                             "buy_first" => [
@@ -609,18 +602,23 @@ mod tests {
                             end: None,
                             timezone: TimeOffset::Local,
                         },
-                        params: object!(),
+                        params: template!(),
                     }]),
                 );
 
-                task_list.push(Task::new(CloseDown, object!()));
+                task_list.push(TaskTemaplte::new(CloseDown, template!()));
 
-                TaskConfig::new_with_tasks(task_list)
+                TaskConfigTamplate {
+                    client_type: None,
+                    startup: None,
+                    closedown: None,
+                    tasks: task_list,
+                }
             }
 
             #[test]
             fn json() {
-                let task_config: TaskConfig = serde_json::from_reader(
+                let task_config: TaskConfigTamplate = serde_json::from_reader(
                     std::fs::File::open("./config_examples/tasks/daily.json").unwrap(),
                 )
                 .unwrap();
@@ -629,7 +627,7 @@ mod tests {
 
             #[test]
             fn toml() {
-                let task_config: TaskConfig = toml::from_str(
+                let task_config: TaskConfigTamplate = toml::from_str(
                     &std::fs::read_to_string("./config_examples/tasks/daily.toml").unwrap(),
                 )
                 .unwrap();
@@ -638,7 +636,7 @@ mod tests {
 
             #[test]
             fn yaml() {
-                let task_config: TaskConfig = serde_yaml::from_reader(
+                let task_config: TaskConfigTamplate = serde_yaml::from_reader(
                     std::fs::File::open("./config_examples/tasks/daily.yml").unwrap(),
                 )
                 .unwrap();
@@ -652,7 +650,7 @@ mod tests {
 
             // Default client type is Official
             assert_eq!(
-                TaskConfig {
+                TaskConfigTamplate {
                     client_type: None,
                     startup: None,
                     closedown: None,
@@ -660,7 +658,7 @@ mod tests {
                 }
                 .init()
                 .unwrap(),
-                InitializedTaskConfig {
+                TaskConfig {
                     client_type: Official,
                     start_app: false,
                     close_app: false,
@@ -670,24 +668,23 @@ mod tests {
 
             // No active tasks will be skipped
             assert_eq!(
-                TaskConfig {
+                TaskConfigTamplate {
                     client_type: None,
                     startup: None,
                     closedown: None,
                     tasks: vec![
-                        Task::new(StartUp, object!("start_game_enabled" => true)).with_variants(
-                            vec![TaskVariant {
+                        TaskTemaplte::new(StartUp, template!("start_game_enabled" => true))
+                            .with_variants(vec![TaskVariant {
                                 condition: Condition::Not {
                                     condition: Box::new(Condition::Always),
                                 },
-                                params: object!(),
-                            }]
-                        ),
+                                params: template!(),
+                            }]),
                     ],
                 }
                 .init()
                 .unwrap(),
-                InitializedTaskConfig {
+                TaskConfig {
                     client_type: Official,
                     start_app: false,
                     close_app: false,
@@ -696,14 +693,14 @@ mod tests {
             );
 
             assert_eq!(
-                TaskConfig {
+                TaskConfigTamplate {
                     client_type: None,
                     startup: None,
                     closedown: None,
                     tasks: vec![
-                        Task::new(
+                        TaskTemaplte::new(
                             StartUp,
-                            object!(
+                            template!(
                                 "start_game_enabled" => true,
                                 "client_type" => "YoStarEN",
                             )
@@ -713,14 +710,14 @@ mod tests {
                 }
                 .init()
                 .unwrap(),
-                InitializedTaskConfig {
+                TaskConfig {
                     client_type: YoStarEN,
                     start_app: true,
                     close_app: false,
                     tasks: vec![
-                        InitializedTask::new(
+                        Task::new(
                             StartUp,
-                            object!(
+                            template!(
                                 "start_game_enabled" => true,
                                 "client_type" => "YoStarEN",
                             )
@@ -733,13 +730,13 @@ mod tests {
             );
 
             assert_eq!(
-                TaskConfig {
+                TaskConfigTamplate {
                     client_type: None,
                     startup: None,
                     closedown: None,
-                    tasks: vec![Task::new(
+                    tasks: vec![TaskTemaplte::new(
                         StartUp,
-                        object!(
+                        template!(
                             "start_game_enabled" => false,
                             "client_type" => "YoStarEN",
                         )
@@ -747,13 +744,13 @@ mod tests {
                 }
                 .init()
                 .unwrap(),
-                InitializedTaskConfig {
+                TaskConfig {
                     client_type: YoStarEN,
                     start_app: false,
                     close_app: false,
-                    tasks: vec![InitializedTask::new(
+                    tasks: vec![Task::new(
                         StartUp,
-                        object!(
+                        template!(
                             "start_game_enabled" => false,
                             "client_type" => "YoStarEN",
                         )
@@ -765,33 +762,36 @@ mod tests {
 
             // Process CloseDown task
             assert_eq!(
-                TaskConfig {
+                TaskConfigTamplate {
                     client_type: None,
                     startup: None,
                     closedown: None,
-                    tasks: vec![Task::new(CloseDown, object!("client_type" => "YoStarEN"))],
+                    tasks: vec![TaskTemaplte::new(
+                        CloseDown,
+                        template!("client_type" => "YoStarEN")
+                    )],
                 }
                 .init()
                 .unwrap(),
-                InitializedTaskConfig {
+                TaskConfig {
                     client_type: YoStarEN,
                     start_app: false,
                     close_app: true,
-                    tasks: vec![InitializedTask::new(
+                    tasks: vec![Task::new(
                         CloseDown,
-                        object!("client_type" => "YoStarEN").resolve().unwrap()
+                        template!("client_type" => "YoStarEN").resolve().unwrap()
                     )]
                 }
             );
 
             assert_eq!(
-                TaskConfig {
+                TaskConfigTamplate {
                     client_type: None,
                     startup: None,
                     closedown: None,
-                    tasks: vec![Task::new(
+                    tasks: vec![TaskTemaplte::new(
                         CloseDown,
-                        object!(
+                        template!(
                             "enable" => false,
                             "client_type" => "YoStarEN",
                         )
@@ -799,13 +799,13 @@ mod tests {
                 }
                 .init()
                 .unwrap(),
-                InitializedTaskConfig {
+                TaskConfig {
                     client_type: YoStarEN,
                     start_app: false,
                     close_app: false,
-                    tasks: vec![InitializedTask::new(
+                    tasks: vec![Task::new(
                         CloseDown,
-                        object!(
+                        template!(
                             "enable" => false,
                             "client_type" => "YoStarEN",
                         )
@@ -816,116 +816,119 @@ mod tests {
             );
 
             assert_eq!(
-                TaskConfig {
+                TaskConfigTamplate {
                     client_type: None,
                     startup: None,
                     closedown: None,
-                    tasks: vec![Task::new(CloseDown, object!())],
+                    tasks: vec![TaskTemaplte::new(CloseDown, template!())],
                 }
                 .init()
                 .unwrap(),
-                InitializedTaskConfig {
+                TaskConfig {
                     client_type: Official,
                     start_app: false,
                     close_app: true,
-                    tasks: vec![InitializedTask::new(
+                    tasks: vec![Task::new(
                         CloseDown,
-                        object!("client_type" => "Official").resolve().unwrap()
+                        template!("client_type" => "Official").resolve().unwrap()
                     )]
                 }
             );
 
             assert_eq!(
-                TaskConfig {
+                TaskConfigTamplate {
                     client_type: None,
                     startup: None,
                     closedown: None,
-                    tasks: vec![Task::new(Fight, object!("client_type" => "YoStarEN"))],
+                    tasks: vec![TaskTemaplte::new(
+                        Fight,
+                        template!("client_type" => "YoStarEN")
+                    )],
                 }
                 .init()
                 .unwrap(),
-                InitializedTaskConfig {
+                TaskConfig {
                     client_type: YoStarEN,
                     start_app: false,
                     close_app: false,
-                    tasks: vec![InitializedTask::new(
+                    tasks: vec![Task::new(
                         Fight,
-                        object!("client_type" => "YoStarEN").resolve().unwrap()
+                        template!("client_type" => "YoStarEN").resolve().unwrap()
                     )]
                 }
             );
 
             assert_eq!(
-                TaskConfig {
+                TaskConfigTamplate {
                     client_type: None,
                     startup: None,
                     closedown: None,
                     tasks: vec![
-                        Task::new(
+                        TaskTemaplte::new(
                             StartUp,
-                            object!(
+                            template!(
                                 "start_game_enabled" => true,
                                 "client_type" => "Official",
                             ),
                         ),
-                        Task::new(Fight, object!("stage" => "1-7")),
-                        Task::new(CloseDown, object!()),
+                        TaskTemaplte::new(Fight, template!("stage" => "1-7")),
+                        TaskTemaplte::new(CloseDown, template!()),
                     ],
                 }
                 .init()
                 .unwrap(),
-                InitializedTaskConfig {
+                TaskConfig {
                     client_type: Official,
                     start_app: true,
                     close_app: true,
                     tasks: vec![
-                        InitializedTask::new(
+                        Task::new(
                             StartUp,
-                            object!(
+                            template!(
                                 "client_type" => "Official",
                                 "start_game_enabled" => true,
                             )
                             .resolve()
                             .unwrap()
                         ),
-                        InitializedTask::new(
+                        Task::new(
                             Fight,
-                            object!(
+                            template!(
                                 "stage" => "1-7",
                                 "client_type" => "Official",
                             )
                             .resolve()
                             .unwrap()
                         ),
-                        InitializedTask::new(
+                        Task::new(
                             CloseDown,
-                            object!("client_type" => "Official").resolve().unwrap()
+                            template!("client_type" => "Official").resolve().unwrap()
                         ),
                     ]
                 }
             );
 
             assert_eq!(
-                TaskConfig {
+                TaskConfigTamplate {
                     client_type: Some(Official),
                     startup: Some(true),
                     closedown: Some(true),
                     tasks: vec![
-                        Task::new(StartUp, object!( "start_game_enabled" => false)),
-                        Task::new(Fight, object!("stage" => "1-7")),
-                        Task::new(CloseDown, object!("enable" => false)),
+                        TaskTemaplte::new(StartUp, template!( "start_game_enabled" => false)),
+                        TaskTemaplte::new(Fight, template!("stage" => "1-7")),
+                        TaskTemaplte::new(CloseDown, template!("enable" => false)),
                     ],
                 }
                 .init()
                 .unwrap(),
-                InitializedTaskConfig {
+                TaskConfig {
                     client_type: Official,
                     start_app: true,
                     close_app: true,
                     tasks: vec![
-                        InitializedTask::new(
+                        Task::new(
                             StartUp,
-                            object!(
+                            template!(
                                 "enable" => true,
                                 "client_type" => "Official",
                                 "start_game_enabled" => true,
@@ -933,18 +936,18 @@ mod tests {
                             .resolve()
                             .unwrap()
                         ),
-                        InitializedTask::new(
+                        Task::new(
                             Fight,
-                            object!(
+                            template!(
                                 "stage" => "1-7",
                                 "client_type" => "Official",
                             )
                             .resolve()
                             .unwrap()
                         ),
-                        InitializedTask::new(
+                        Task::new(
                             CloseDown,
-                            object!(
+                            template!(
                                 "enable" => true,
                                 "client_type" => "Official",
                             )
@@ -956,80 +959,80 @@ mod tests {
             );
 
             assert_eq!(
-                TaskConfig {
+                TaskConfigTamplate {
                     client_type: None,
                     startup: Some(true),
                     closedown: Some(true),
-                    tasks: vec![Task::new(Fight, object!("stage" => "1-7"))],
+                    tasks: vec![TaskTemaplte::new(Fight, template!("stage" => "1-7"))],
                 }
                 .init()
                 .unwrap(),
-                InitializedTaskConfig {
+                TaskConfig {
                     client_type: Official,
                     start_app: true,
                     close_app: true,
                     tasks: vec![
-                        InitializedTask::new(
+                        Task::new(
                             StartUp,
-                            object!(
+                            template!(
                                 "client_type" => "Official",
                                 "start_game_enabled" => true,
                             )
                             .resolve()
                             .unwrap()
                         ),
-                        InitializedTask::new(
+                        Task::new(
                             Fight,
-                            object!(
+                            template!(
                                 "stage" => "1-7",
                                 "client_type" => "Official",
                             )
                             .resolve()
                             .unwrap()
                         ),
-                        InitializedTask::new(
+                        Task::new(
                             CloseDown,
-                            object!("client_type" => "Official").resolve().unwrap(),
+                            template!("client_type" => "Official").resolve().unwrap(),
                         ),
                     ]
                 },
             );
 
             assert_eq!(
-                TaskConfig {
+                TaskConfigTamplate {
                     client_type: Some(YoStarEN),
                     startup: Some(true),
                     closedown: Some(true),
-                    tasks: vec![Task::new(Fight, object!("stage" => "1-7"))],
+                    tasks: vec![TaskTemaplte::new(Fight, template!("stage" => "1-7"))],
                 }
                 .init()
                 .unwrap(),
-                InitializedTaskConfig {
+                TaskConfig {
                     client_type: YoStarEN,
                     start_app: true,
                     close_app: true,
                     tasks: vec![
-                        InitializedTask::new(
+                        Task::new(
                             StartUp,
-                            object!(
+                            template!(
                                 "start_game_enabled" => true,
                                 "client_type" => "YoStarEN",
                             )
                             .resolve()
                             .unwrap()
                         ),
-                        InitializedTask::new(
+                        Task::new(
                             Fight,
-                            object!(
+                            template!(
                                 "stage" => "1-7",
                                 "client_type" => "YoStarEN",
                             )
                             .resolve()
                             .unwrap()
                         ),
-                        InitializedTask::new(
+                        Task::new(
                             CloseDown,
-                            object!("client_type" => "YoStarEN").resolve().unwrap(),
+                            template!("client_type" => "YoStarEN").resolve().unwrap(),
                         ),
                     ]
                 }
@@ -1037,29 +1040,29 @@ mod tests {
 
             // Conflicting client type
             assert_eq!(
-                TaskConfig {
+                TaskConfigTamplate {
                     client_type: Some(Official),
                     startup: None,
                     closedown: None,
                     tasks: vec![
-                        Task::new(StartUp, object!("client_type" => "YoStarEN")),
-                        Task::new(CloseDown, object!("client_type" => "YoStarJP")),
+                        TaskTemaplte::new(StartUp, template!("client_type" => "YoStarEN")),
+                        TaskTemaplte::new(CloseDown, template!("client_type" => "YoStarJP")),
                     ],
                 }
                 .init()
                 .unwrap(),
-                InitializedTaskConfig {
+                TaskConfig {
                     client_type: Official,
                     start_app: false,
                     close_app: true,
                     tasks: vec![
-                        InitializedTask::new(
+                        Task::new(
                             StartUp,
-                            object!("client_type" => "Official").resolve().unwrap()
+                            template!("client_type" => "Official").resolve().unwrap()
                         ),
-                        InitializedTask::new(
+                        Task::new(
                             CloseDown,
-                            object!("client_type" => "Official").resolve().unwrap()
+                            template!("client_type" => "Official").resolve().unwrap()
                         ),
                     ]
                 }
@@ -1068,27 +1071,27 @@ mod tests {
             // Filename will be converted to absolute path
             #[cfg(unix)]
             assert_eq!(
-                TaskConfig {
+                TaskConfigTamplate {
                     client_type: None,
                     startup: None,
                     closedown: None,
                     tasks: vec![
-                        Task::new(Infrast, object!("filename" => "daily.json")),
-                        Task::new(Infrast, object!("filename" => "/tmp/daily.json")),
+                        TaskTemaplte::new(Infrast, template!("filename" => "daily.json")),
+                        TaskTemaplte::new(Infrast, template!("filename" => "/tmp/daily.json")),
                     ],
                 }
                 .init()
                 .unwrap(),
-                InitializedTaskConfig {
+                TaskConfig {
                     client_type: Official,
                     start_app: false,
                     close_app: false,
                     tasks: vec![
-                        InitializedTask::new(
+                        Task::new(
                             Infrast,
-                            object!("filename" => dirs::abs_config("daily.json", Some("infrast")).unwrap()??).resolve().unwrap(),
+                            template!("filename" => dirs::abs_config("daily.json", Some("infrast")).unwrap()??).resolve().unwrap(),
                         ),
-                        InitializedTask::new(Infrast, object!("filename" => "/tmp/daily.json").resolve().unwrap())
+                        Task::new(Infrast, template!("filename" => "/tmp/daily.json").resolve().unwrap())
                     ]
                 }
             );
@@ -1096,17 +1099,23 @@ mod tests {
 
         #[test]
         fn initialized_task() {
-            let task = InitializedTask::new(Fight, object!("stage" => "1-7").resolve().unwrap())
+            let task = Task::new(Fight, template!("stage" => "1-7").resolve().unwrap())
                 .with_name("Fight Daily".to_string());
             assert_eq!(task.name_or_default(), "Fight Daily");
             assert_eq!(task.task_type, Fight);
-            assert_eq!(&task.params, &object!("stage" => "1-7").resolve().unwrap());
+            assert_eq!(
+                &task.params,
+                &template!("stage" => "1-7").resolve().unwrap()
+            );
             assert_eq!(task.name, Some(String::from("Fight Daily")));
 
-            let task = InitializedTask::new(Fight, object!("stage" => "1-7").resolve().unwrap());
+            let task = Task::new(Fight, template!("stage" => "1-7").resolve().unwrap());
             assert_eq!(task.name_or_default(), "Fight");
             assert_eq!(task.task_type, Fight);
-            assert_eq!(&task.params, &object!("stage" => "1-7").resolve().unwrap());
+            assert_eq!(
+                &task.params,
+                &template!("stage" => "1-7").resolve().unwrap()
+            );
             assert_eq!(task.name, None);
         }
     }

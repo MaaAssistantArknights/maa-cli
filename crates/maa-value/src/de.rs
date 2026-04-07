@@ -26,7 +26,7 @@
 
 use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
 
-use crate::{primitive::MAAPrimitive, value::ResolvedMAAValue};
+use crate::{primitive::MAAPrimitive, value::MAAValue};
 
 #[derive(Debug, thiserror::Error)]
 #[error("{0}")]
@@ -40,7 +40,7 @@ impl serde::de::Error for Error {
     }
 }
 
-impl<'de> Deserializer<'de> for ResolvedMAAValue {
+impl<'de> Deserializer<'de> for MAAValue {
     type Error = Error;
 
     // Forward all other deserialize_* methods to deserialize_any
@@ -55,11 +55,11 @@ impl<'de> Deserializer<'de> for ResolvedMAAValue {
         V: Visitor<'de>,
     {
         match self {
-            ResolvedMAAValue::Primitive(p) => deserialize_primitive(p, visitor),
-            ResolvedMAAValue::Array(arr) => visitor.visit_seq(SeqDeserializer {
+            MAAValue::Primitive(p) => deserialize_primitive(p, visitor),
+            MAAValue::Array(arr) => visitor.visit_seq(SeqDeserializer {
                 iter: arr.into_iter(),
             }),
-            ResolvedMAAValue::Object(map) => visitor.visit_map(MapDeserializer {
+            MAAValue::Object(map) => visitor.visit_map(MapDeserializer {
                 iter: map.into_iter(),
                 value: None,
             }),
@@ -83,7 +83,7 @@ impl<'de> Deserializer<'de> for ResolvedMAAValue {
         V: Visitor<'de>,
     {
         match self {
-            ResolvedMAAValue::Object(map) => visitor.visit_map(MapDeserializer {
+            MAAValue::Object(map) => visitor.visit_map(MapDeserializer {
                 iter: map.into_iter(),
                 value: None,
             }),
@@ -118,7 +118,7 @@ where
 }
 
 struct SeqDeserializer {
-    iter: std::vec::IntoIter<ResolvedMAAValue>,
+    iter: std::vec::IntoIter<MAAValue>,
 }
 
 impl<'de> SeqAccess<'de> for SeqDeserializer {
@@ -140,8 +140,8 @@ impl<'de> SeqAccess<'de> for SeqDeserializer {
 }
 
 struct MapDeserializer {
-    iter: indexmap::map::IntoIter<String, ResolvedMAAValue>,
-    value: Option<ResolvedMAAValue>,
+    iter: indexmap::map::IntoIter<String, MAAValue>,
+    value: Option<MAAValue>,
 }
 
 impl<'de> MapAccess<'de> for MapDeserializer {
@@ -215,9 +215,7 @@ mod tests {
             "name" => "my-app",
             "count" => 42,
             "enabled" => true
-        )
-        .resolve()
-        .unwrap();
+        );
 
         // Direct conversion!
         let config = Config::deserialize(resolved).unwrap();
@@ -243,9 +241,7 @@ mod tests {
         let resolved = object!(
             "name" => "outer",
             "inner" => object!("value" => "inner_value")
-        )
-        .resolve()
-        .unwrap();
+        );
 
         let config = Outer::deserialize(resolved).unwrap();
 
@@ -260,7 +256,7 @@ mod tests {
             items: Vec<i32>,
         }
 
-        let resolved = object!("items" => [1, 2, 3, 4, 5]).resolve().unwrap();
+        let resolved = object!("items" => [1, 2, 3, 4, 5]);
 
         let config = Config::deserialize(resolved).unwrap();
 
@@ -275,7 +271,7 @@ mod tests {
             optional: Option<i32>,
         }
 
-        let resolved = object!("required" => "value").resolve().unwrap();
+        let resolved = object!("required" => "value");
 
         let config = Config::deserialize(resolved).unwrap();
 
@@ -291,7 +287,7 @@ mod tests {
             count: i32,
         }
 
-        let resolved = object!("name" => "app", "count" => 100).resolve().unwrap();
+        let resolved = object!("name" => "app", "count" => 100);
 
         // Old way: via JSON
         let json = serde_json::to_value(&resolved).unwrap();

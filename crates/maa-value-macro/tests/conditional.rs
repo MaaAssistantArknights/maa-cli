@@ -6,7 +6,7 @@ use maa_value::{error::Result, prelude::*};
 
 #[test]
 fn single_condition() {
-    let obj = object!(
+    let obj = template!(
         "flag" => true,
         "conditional" if "flag" == true => "included"
     );
@@ -14,7 +14,7 @@ fn single_condition() {
     // Before init, conditional should be Optional variant
     assert!(matches!(
         obj.get("conditional"),
-        Some(MAAValue::Optional { .. })
+        Some(MAAValueTemplate::Optional { .. })
     ));
 
     let initialized = obj.resolve().unwrap();
@@ -26,7 +26,7 @@ fn single_condition() {
 
 #[test]
 fn condition_not_satisfied() {
-    let obj = object!(
+    let obj = template!(
         "flag" => false,
         "conditional" if "flag" == true => "excluded"
     );
@@ -37,7 +37,7 @@ fn condition_not_satisfied() {
 
 #[test]
 fn condition_key_not_exist() {
-    let obj = object!(
+    let obj = template!(
         "conditional" if "nonexistent" == true => "excluded"
     );
 
@@ -47,7 +47,7 @@ fn condition_key_not_exist() {
 
 #[test]
 fn multiple_conditions() {
-    let obj = object!(
+    let obj = template!(
         "flag1" => true,
         "flag2" => "yes",
         "conditional" if "flag1" == true && "flag2" == "yes" => "both satisfied"
@@ -62,7 +62,7 @@ fn multiple_conditions() {
 
 #[test]
 fn multiple_conditions_one_fails() {
-    let obj = object!(
+    let obj = template!(
         "flag1" => true,
         "flag2" => "no",
         "conditional" if "flag1" == true && "flag2" == "yes" => "excluded"
@@ -74,7 +74,7 @@ fn multiple_conditions_one_fails() {
 
 #[test]
 fn chained_conditions() {
-    let obj = object!(
+    let obj = template!(
         "base" => true,
         "level1" if "base" == true => 1,
         "level2" if "level1" == 1 => 2,
@@ -90,7 +90,7 @@ fn chained_conditions() {
 
 #[test]
 fn chained_conditions_break() {
-    let obj = object!(
+    let obj = template!(
         "base" => false,
         "level1" if "base" == true => 1,
         "level2" if "level1" == 1 => 2,
@@ -106,7 +106,7 @@ fn chained_conditions_break() {
 
 #[test]
 fn conditional_with_nested_object() {
-    let obj = object!(
+    let obj = template!(
         "enable_nested" => true,
         "nested_obj" if "enable_nested" == true => object!(
             "key1" => "value1",
@@ -125,7 +125,7 @@ fn conditional_maybe_insert() {
     let some_value: Option<i32> = Some(42);
     let none_value: Option<i32> = None;
 
-    let obj = object!(
+    let obj = template!(
         "flag" => true,
         "cond_some" if "flag" == true =>? some_value,
         "cond_none" if "flag" == true =>? none_value
@@ -140,7 +140,7 @@ fn conditional_maybe_insert() {
 fn conditional_try_insert() -> Result<()> {
     let path = PathBuf::from("/test/path");
 
-    let obj = object!(
+    let obj = template!(
         "flag" => true,
         "cond_path" if "flag" == true => path?
     );
@@ -158,7 +158,7 @@ fn conditional_try_insert_multiple() -> Result<()> {
     let path1 = PathBuf::from("/path/one");
     let path2 = PathBuf::from("/path/two");
 
-    let obj = object!(
+    let obj = template!(
         "flag1" => true,
         "flag2" => false,
         "cond_path1" if "flag1" == true => path1?,
@@ -178,7 +178,7 @@ fn conditional_try_insert_multiple() -> Result<()> {
 
 #[test]
 fn condition_with_different_types() {
-    let obj = object!(
+    let obj = template!(
         "string_key" => "expected",
         "int_key" => 42,
         "bool_key" => true,
@@ -205,7 +205,7 @@ fn condition_with_different_types() {
 #[test]
 fn conditional_order_independence() {
     // Conditions should work regardless of declaration order
-    let obj = object!(
+    let obj = template!(
         "depends_on_flag" if "flag" == true => "yes",
         "flag" => true
     );

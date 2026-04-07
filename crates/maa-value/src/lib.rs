@@ -8,16 +8,16 @@
 //!
 //! This crate provides a two-stage value system designed for interactive configuration:
 //!
-//! 1. **[`value::MAAValue`]**: Represents configuration *templates* that may contain:
+//! 1. **[`value::MAAValueTemplate`]**: Represents configuration *templates* that may contain:
 //!    - User input fields (`Input`, `BoolInput`, `Select`)
 //!    - Conditional fields (`Optional`) that depend on other fields
 //!    - Regular values (primitives, arrays, objects)
 //!
-//! 2. **[`value::ResolvedMAAValue`]**: Represents *resolved* configuration containing only concrete
+//! 2. **[`value::MAAValue`]**: Represents *resolved* configuration containing only concrete
 //!    data after all user inputs have been collected and conditions evaluated.
 //!
-//! The transformation from template to resolved value happens via the
-//! [`value::MAAValue::resolve()`] method, which:
+//! The transformation from template to resolved value happens via
+//! [`value::MAAValueTemplate::resolve()`], which:
 //! - Queries the user for any required inputs
 //! - Evaluates conditional dependencies
 //! - Produces a final concrete configuration
@@ -27,20 +27,29 @@
 //! ```
 //! use maa_value::prelude::*;
 //!
-//! // Create a configuration template
-//! let config = object!(
+//! // Create a configuration template with user input and a conditional field
+//! let config = template!(
 //!     "name" => "my-app",
 //!     "debug" => BoolInput::new(Some(false)),  // User input with default
 //!     "log_level" if "debug" == true => "verbose"  // Conditional field
 //! );
 //!
-//! // Resolve it (in this case, uses defaults without prompting)
+//! // Resolve it (uses defaults in batch mode without prompting)
 //! let resolved = config.resolve().unwrap();
 //!
 //! // Access resolved values
 //! assert_eq!(resolved.get("name").unwrap().as_str(), Some("my-app"));
 //! assert_eq!(resolved.get("debug").unwrap().as_bool(), Some(false));
 //! assert!(resolved.get("log_level").is_none());  // Not included (debug is false)
+//! ```
+//!
+//! For simple concrete objects without user inputs or conditionals, use [`object!`] directly:
+//!
+//! ```
+//! use maa_value::prelude::*;
+//!
+//! let value = object!("name" => "my-app", "count" => 42);
+//! assert_eq!(value.get("name").unwrap().as_str(), Some("my-app"));
 //! ```
 //!
 //! ## Key Concepts
@@ -52,14 +61,14 @@
 //! ```
 //! use maa_value::prelude::*;
 //!
-//! let config = object!(
+//! let config = template!(
 //!     "username" => Input::new(Some("admin".to_string())),
 //!     "auto_update" => BoolInput::new(Some(true)),
 //!     "theme" => SelectD::<String>::from_iter(["light", "dark"], 1.try_into().ok()).unwrap()
 //! );
 //! ```
 //!
-//! When [`value::MAAValue::resolve()`] is called, these inputs use their default
+//! When [`value::MAAValueTemplate::resolve()`] is called, these inputs use their default
 //! values in batch mode or prompt the user in interactive mode.
 //!
 //! ### Conditional Fields
@@ -69,7 +78,7 @@
 //! ```
 //! use maa_value::prelude::*;
 //!
-//! let config = object!(
+//! let config = template!(
 //!     "mode" => "production",
 //!     "debug_port" if "mode" == "development" => 9229  // Only included if mode is development
 //! );
@@ -83,8 +92,8 @@
 //! The type system ensures you can't accidentally use an unresolved template where a
 //! resolved value is expected:
 //!
-//! - **[`value::MAAValue`]**: Implements `Deserialize` (load from config files)
-//! - **[`value::ResolvedMAAValue`]**: Implements `Serialize` (save resolved configs)
+//! - **[`value::MAAValueTemplate`]**: Implements `Deserialize` (load from config files)
+//! - **[`value::MAAValue`]**: Implements `Serialize` (write resolved configs)
 //!
 //! This prevents bugs where templates might be used directly without resolution.
 //!
@@ -97,21 +106,21 @@
 //! └────────┬─────────┘
 //!          │ Deserialize
 //!          ▼
-//! ┌─────────────┐
-//! │   MAAValue  │  ◄── Contains Input, Optional variants
-//! │  (Template) │
-//! └────────┬────┘
+//! ┌──────────────────┐
+//! │ MAAValueTemplate │  ◄── Contains Input, Optional variants
+//! │   (Template)     │
+//! └────────┬─────────┘
 //!          │ resolve()
 //!          │ • Query user inputs
 //!          │ • Evaluate conditionals
 //!          │ • Topological sort dependencies
 //!          ▼
-//! ┌─────────────────┐
-//! │ ResolvedMAAValue│  ◄── Contains only concrete data
-//! │   (Concrete)    │
-//! └────────┬────────┘
-//!          │ Serialize / Be-Deserialize
-//!          ▼
+//! ┌──────────────┐
+//! │   MAAValue   │  ◄── Contains only concrete data
+//! │  (Concrete)  │
+//! └──────┬───────┘
+//!        │ Serialize / De-Deserialize
+//!        ▼
 //! ┌──────────────┐
 //! │  JSON String │
 //! │   or Struct  │
@@ -120,7 +129,7 @@
 //!
 //! ## Module Organization
 //!
-//! - [`value`]: Core [`value::MAAValue`] and [`value::ResolvedMAAValue`] types
+//! - [`value`]: Core [`value::MAAValueTemplate`] and [`value::MAAValue`] types
 //! - [`de`]: Deserializer implementation for direct struct conversion
 //! - [`map`]: Map operations trait ([`MapOps`](map::MapOps))
 //! - [`array`]: Array operations trait ([`ArrayOps`](array::ArrayOps))
@@ -175,17 +184,18 @@ pub mod value;
 ///
 /// ## Macros
 ///
-/// - [`insert!`](maa_value_macro::insert): Macro for inserting values into objects with optional
-///   value support
-/// - [`object!`](maa_value_macro::object): Macro for creating [`MAAValue`](crate::value::MAAValue)
-///   objects with a clean syntax
+/// - [`object!`](maa_value_macro::object): Create a concrete [`MAAValue`](crate::value::MAAValue)
+///   object (no user inputs or conditional fields)
+/// - [`template!`](maa_value_macro::template): Create a
+///   [`MAAValueTemplate`](crate::value::MAAValueTemplate) that may contain user inputs and
+///   conditional fields
+/// - [`insert!`](maa_value_macro::insert): Insert entries into an existing object
 ///
 /// ## Core Types
 ///
-/// - [`MAAValue`](crate::value::MAAValue): Unresolved values that may contain user inputs and
-///   conditional fields
-/// - [`ResolvedMAAValue`](crate::value::ResolvedMAAValue): Fully resolved values containing only
-///   concrete data
+/// - [`MAAValueTemplate`](crate::value::MAAValueTemplate): Configuration templates that may
+///   contain user inputs and conditional fields
+/// - [`MAAValue`](crate::value::MAAValue): Fully resolved values containing only concrete data
 /// - [`MAAPrimitive`](crate::primitive::MAAPrimitive): Primitive value types (bool, int, float,
 ///   string)
 /// - [`MAAInput`](crate::input::MAAInput): Input value definitions
@@ -207,7 +217,7 @@ pub mod value;
 /// - [`AsPrimitive`](crate::convert::AsPrimitive): Convert to primitive types
 /// - [`TryAs`](crate::convert::TryAs): Try to convert to a specific type
 pub mod prelude {
-    pub use maa_value_macro::{insert, object};
+    pub use maa_value_macro::{insert, object, template};
 
     pub use crate::{
         array::ArrayOps,
@@ -216,7 +226,7 @@ pub mod prelude {
         map::MapOps,
         primitive::MAAPrimitive,
         userinput::{BoolInput, Input, Select, SelectD, Selectable, UserInput, ValueWithDesc},
-        value::{MAAValue, ResolvedMAAValue},
+        value::{MAAValueTemplate, MAAValue},
     };
 }
 

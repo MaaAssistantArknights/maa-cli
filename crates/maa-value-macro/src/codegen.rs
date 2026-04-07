@@ -6,10 +6,29 @@ use syn::{Expr, LitStr};
 
 use crate::parsing::{ConversionKind, InsertKind, InsertMacroInput, ObjectEntry, ObjectMacroInput};
 
+/// The target value type to generate code for.
+pub enum TargetType {
+    /// Generate a `MAAValue` (concrete, resolved values only — no Input or Optional)
+    MAAValue,
+    /// Generate a `MAAValueTemplate` (may contain Input and Optional variants)
+    MAAValueTemplate,
+}
+
+impl TargetType {
+    fn type_path(&self) -> TokenStream2 {
+        match self {
+            Self::MAAValue => quote! { ::maa_value::value::MAAValue },
+            Self::MAAValueTemplate => quote! { ::maa_value::value::MAAValueTemplate },
+        }
+    }
+}
+
 impl ObjectMacroInput {
-    pub fn generate(self) -> TokenStream2 {
+    pub fn generate(self, target: TargetType) -> TokenStream2 {
+        let type_path = target.type_path();
+
         if self.entries.is_empty() {
-            return quote! { ::maa_value::value::MAAValue::default() };
+            return quote! { #type_path::default() };
         }
 
         let object_var = Ident::new("object", Span::mixed_site());
@@ -17,12 +36,12 @@ impl ObjectMacroInput {
         let inserts: Vec<_> = self
             .entries
             .into_iter()
-            .map(|entry| entry.generate(&object_ref_var))
+            .map(|entry| entry.generate(&object_ref_var, &target))
             .collect();
 
         quote! {
             {
-                let mut #object_var = ::maa_value::value::MAAValue::default();
+                let mut #object_var = #type_path::default();
                 let #object_ref_var = &mut #object_var;
                 #(#inserts)*
                 #object_var
@@ -39,7 +58,7 @@ impl InsertMacroInput {
         let inserts: Vec<_> = self
             .entries
             .into_iter()
-            .map(|entry| entry.generate(&object_ref_var))
+            .map(|entry| entry.generate(&object_ref_var, &TargetType::MAAValueTemplate))
             .collect();
 
         quote! {
@@ -53,9 +72,21 @@ impl InsertMacroInput {
 
 impl ObjectEntry {
     /// Generate the insert statement for this entry
-    pub fn generate(self, object_var: &Ident) -> TokenStream2 {
+    pub fn generate(self, object_var: &Ident, target: &TargetType) -> TokenStream2 {
         match &self.conditions {
-            Some(conditions) => self.generate_conditional_insert(object_var, conditions),
+            Some(conditions) => match target {
+                TargetType::MAAValue => {
+                    quote! {
+                        compile_error!(
+                            "conditional fields (`if` syntax) are not supported in `object!()`; \
+                             use `template!()` instead"
+                        );
+                    }
+                }
+                TargetType::MAAValueTemplate => {
+                    self.generate_conditional_insert(object_var, conditions)
+                }
+            },
             None => self.generate_simple_insert(object_var),
         }
     }
@@ -87,25 +118,21 @@ impl ObjectEntry {
         let value = &self.value;
 
         let value_var = Ident::new("val", Span::mixed_site());
-
         let optional = generate_optional_value(&value_var, conditions);
 
-        // Generate the value with Optional wrapper
         match self.insert_kind {
             InsertKind::Insert => {
-                // Regular insert with conditions: directly convert and wrap
                 let converted_value = self.conversion_kind.generate_conversion(value);
                 quote! {{
-                    let #value_var: ::maa_value::value::MAAValue = #converted_value;
+                    let #value_var: ::maa_value::value::MAAValueTemplate = #converted_value;
                     ::maa_value::map::MapOps::insert(#object, #key, #optional);
                 }}
             }
             InsertKind::Maybe => {
-                // Maybe insert with conditions: extract Option first, then convert and wrap
                 let converted_value = self.conversion_kind.generate_conversion(&value_var);
                 quote! {
                     if let ::core::option::Option::Some(#value_var) = #value {
-                        let #value_var: ::maa_value::value::MAAValue = #converted_value;
+                        let #value_var: ::maa_value::value::MAAValueTemplate = #converted_value;
                         ::maa_value::map::MapOps::insert(#object, #key, #optional);
                     }
                 }
@@ -114,7 +141,7 @@ impl ObjectEntry {
     }
 }
 
-/// Generate code that create wrapped optional value and insert
+/// Generate code that creates a wrapped `MAAValueTemplate::Optional` value
 fn generate_optional_value(value_var: &Ident, conditions: &[(LitStr, Expr)]) -> TokenStream2 {
     let conditions_var = Ident::new("conditions", Span::mixed_site());
 
@@ -134,7 +161,7 @@ fn generate_optional_value(value_var: &Ident, conditions: &[(LitStr, Expr)]) -> 
     quote! {{
         let mut #conditions_var = ::maa_value::map::Map::new();
         #(#cond_inserts)*
-        ::maa_value::value::MAAValue::Optional {
+        ::maa_value::value::MAAValueTemplate::Optional {
             conditions: #conditions_var,
             value: ::core::convert::Into::into(#value_var),
         }

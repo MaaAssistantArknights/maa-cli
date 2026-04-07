@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use crate::{
     Outcome,
     convert::TryAs,
-    value::{MAAValue, ResolvedMAAValue},
+    value::{MAAValue, MAAValueTemplate},
 };
 
 /// Type alias for the underlying map structure.
@@ -253,24 +253,24 @@ impl MapOps for MAAValue {
     }
 }
 
-impl MapOps for ResolvedMAAValue {
+impl MapOps for MAAValueTemplate {
     fn as_map(&self) -> Option<&Map<Self>> {
         match self {
-            ResolvedMAAValue::Object(obj) => Some(obj),
+            MAAValueTemplate::Object(obj) => Some(obj),
             _ => None,
         }
     }
 
     fn as_mut_map(&mut self) -> Option<&mut Map<Self>> {
         match self {
-            ResolvedMAAValue::Object(obj) => Some(obj),
+            MAAValueTemplate::Object(obj) => Some(obj),
             _ => None,
         }
     }
 
     fn into_map(self) -> Outcome<Map<Self>, Self> {
         match self {
-            ResolvedMAAValue::Object(obj) => Outcome::Value(obj),
+            MAAValueTemplate::Object(obj) => Outcome::Value(obj),
             _ => Outcome::Original(self),
         }
     }
@@ -279,7 +279,7 @@ impl MapOps for ResolvedMAAValue {
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
-    use maa_value_macro::object;
+    use maa_value_macro::{object, template};
 
     use super::*;
     use crate::convert::AsPrimitive;
@@ -318,10 +318,10 @@ mod tests {
         // Test get_mut on non-map value
         assert_eq!(MAAValue::from(1).get_mut("int"), None);
 
-        // Test with ResolvedMAAValue
-        let resolved = object!("key" => 100).resolve().unwrap();
-        assert_eq!(resolved.get("key").unwrap().as_int().unwrap(), 100);
-        assert_eq!(resolved.get_or::<Int>("key", 999), 100);
+        // Test with MAAValueTemplate
+        let template = template!("key" => 100);
+        assert_eq!(template.get("key").unwrap().as_int().unwrap(), 100);
+        assert_eq!(template.get_or::<Int>("key", 999), 100);
     }
 
     #[test]
@@ -387,9 +387,9 @@ mod tests {
         let non_map = MAAValue::from(1);
         assert_eq!(non_map.get_typed::<Int>("int"), None);
 
-        // Test with ResolvedMAAValue
-        let resolved = value.resolve().unwrap();
-        assert_eq!(resolved.get_typed::<Int>("int"), Some(42));
+        // Test with MAAValueTemplate
+        let template = template!("int" => 42, "float" => 2.14, "string" => "hello");
+        assert_eq!(template.get_typed::<Int>("int"), Some(42));
     }
 
     #[test]
@@ -434,9 +434,9 @@ mod tests {
             }
         }
 
-        // Test with ResolvedMAAValue
-        let resolved = object!("key" => "value").resolve().unwrap();
-        match resolved.into_map() {
+        // Test with MAAValueTemplate
+        let template = template!("key" => "value");
+        match template.into_map() {
             Outcome::Value(map) => {
                 assert_eq!(map.len(), 1);
             }

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     error::Error,
-    value::{MAAValue, ResolvedMAAValue},
+    value::{MAAValue, MAAValueTemplate},
 };
 
 pub type Int = i32;
@@ -94,13 +94,13 @@ impl TryFrom<PathBuf> for MAAPrimitive {
     }
 }
 
-impl From<MAAPrimitive> for MAAValue {
+impl From<MAAPrimitive> for MAAValueTemplate {
     fn from(v: MAAPrimitive) -> Self {
         Self::Primitive(v)
     }
 }
 
-impl PartialEq<MAAPrimitive> for MAAValue {
+impl PartialEq<MAAPrimitive> for MAAValueTemplate {
     fn eq(&self, other: &MAAPrimitive) -> bool {
         match self {
             Self::Primitive(v) => v == other,
@@ -108,13 +108,13 @@ impl PartialEq<MAAPrimitive> for MAAValue {
         }
     }
 }
-impl From<MAAPrimitive> for ResolvedMAAValue {
+impl From<MAAPrimitive> for MAAValue {
     fn from(v: MAAPrimitive) -> Self {
         Self::Primitive(v)
     }
 }
 
-impl PartialEq<MAAPrimitive> for ResolvedMAAValue {
+impl PartialEq<MAAPrimitive> for MAAValue {
     fn eq(&self, other: &MAAPrimitive) -> bool {
         match self {
             Self::Primitive(v) => v == other,
@@ -211,50 +211,50 @@ mod tests {
     #[test]
     fn to_maa_value() {
         // Test conversion from primitives to MAAValue (via MAAPrimitive)
-        let value: MAAValue = true.into();
+        let value: MAAValueTemplate = true.into();
         assert_eq!(value.as_bool(), Some(true));
 
-        let value: MAAValue = 42.into();
+        let value: MAAValueTemplate = 42.into();
         assert_eq!(value.as_int(), Some(42));
 
-        let value: MAAValue = 1.5f32.into();
+        let value: MAAValueTemplate = 1.5f32.into();
         assert_eq!(value.as_float(), Some(1.5));
 
-        let value: MAAValue = "test".to_string().into();
+        let value: MAAValueTemplate = "test".to_string().into();
         assert_eq!(value.as_str(), Some("test"));
 
-        let value: MAAValue = "str".into();
+        let value: MAAValueTemplate = "str".into();
         assert_eq!(value.as_str(), Some("str"));
     }
 
     #[test]
     fn maa_value_eq_primitive() {
         // Test PartialEq between MAAValue and MAAPrimitive
-        assert_eq!(MAAValue::from(true), MAAPrimitive::Bool(true));
-        assert_ne!(MAAValue::from(true), MAAPrimitive::Bool(false));
-        assert_ne!(MAAValue::from(true), MAAPrimitive::Int(1));
+        assert_eq!(MAAValueTemplate::from(true), MAAPrimitive::Bool(true));
+        assert_ne!(MAAValueTemplate::from(true), MAAPrimitive::Bool(false));
+        assert_ne!(MAAValueTemplate::from(true), MAAPrimitive::Int(1));
 
-        assert_eq!(MAAValue::from(42), MAAPrimitive::Int(42));
-        assert_ne!(MAAValue::from(42), MAAPrimitive::Int(43));
-        assert_ne!(MAAValue::from(42), MAAPrimitive::Bool(true));
+        assert_eq!(MAAValueTemplate::from(42), MAAPrimitive::Int(42));
+        assert_ne!(MAAValueTemplate::from(42), MAAPrimitive::Int(43));
+        assert_ne!(MAAValueTemplate::from(42), MAAPrimitive::Bool(true));
 
-        assert_eq!(MAAValue::from(1.5f32), MAAPrimitive::Float(1.5));
-        assert_ne!(MAAValue::from(1.5f32), MAAPrimitive::Float(2.5));
+        assert_eq!(MAAValueTemplate::from(1.5f32), MAAPrimitive::Float(1.5));
+        assert_ne!(MAAValueTemplate::from(1.5f32), MAAPrimitive::Float(2.5));
 
         assert_eq!(
-            MAAValue::from("test"),
+            MAAValueTemplate::from("test"),
             MAAPrimitive::String("test".to_string())
         );
         assert_ne!(
-            MAAValue::from("test"),
+            MAAValueTemplate::from("test"),
             MAAPrimitive::String("other".to_string())
         );
 
         // Test that non-Primitive values don't equal Primitive
-        let array = MAAValue::Array(vec![1.into()]);
+        let array = MAAValueTemplate::Array(vec![1.into()]);
         assert_ne!(array, MAAPrimitive::Int(1));
 
-        let object = MAAValue::default();
+        let object = MAAValueTemplate::default();
         assert_ne!(object, MAAPrimitive::Bool(true));
     }
 
