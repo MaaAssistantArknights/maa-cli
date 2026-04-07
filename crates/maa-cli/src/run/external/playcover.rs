@@ -42,7 +42,7 @@ impl super::ExternalApp for PlayCoverApp<'_> {
             .status()
             .context("Failed to start game!")?;
         if !status.success() {
-            bail!("Failed to start game with bundle identifier {bundle_id}");
+            bail!("Failed to start game with bundle identifier {bundle_id}: {status}");
         }
 
         // Wait for game ready
