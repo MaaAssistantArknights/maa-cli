@@ -284,10 +284,9 @@ impl MAAValueTemplate {
                                 // Dependency key is missing completely.
                                 // TODO: Return an Error instead of silently failing.
                                 log::warn!(
-                                    "Optional field '{}' depends on a missing key '{}'. \
-                                         This condition is considered unmet and the field will be ignored.",
-                                    key,
-                                    cond_key
+                                    "Optional field '{key}' depends on a missing key '{cond_key}'. \
+                                         This condition is considered unmet and the field will be ignored. \
+                                         Please consider fixing this, this would be a hard failure in the future."
                                 );
                                 satisfied = false;
                                 break;
