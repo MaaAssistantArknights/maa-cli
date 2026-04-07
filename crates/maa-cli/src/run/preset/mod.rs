@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use maa_types::TaskType;
-use maa_value::{MAAValue, insert, object};
+use maa_value::prelude::*;
 
 use crate::config::{
     FindFileOrDefault,
@@ -53,7 +53,7 @@ where
         let context = TaskContext { default, config };
         let params: MAAValue = self.into_parameters(context)?;
         let task = Task::new(task_type, params);
-        Ok(TaskConfig::new_with_tasks(vec![task]))
+        TaskConfig::new_with_task(task)
     }
 }
 
@@ -130,7 +130,6 @@ fn test_context() -> TaskContext<'static> {
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use maa_dirs::Ensure;
-    use maa_value::object;
 
     use super::*;
     use crate::command::{Command, parse_from};
@@ -168,8 +167,6 @@ mod tests {
         let task_config = TestParams { bar: None }
             .into_task_config(&config)
             .unwrap()
-            .init()
-            .unwrap()
             .tasks;
         assert_eq!(task_config.len(), 1);
         assert_eq!(task_config[0].task_type, TaskType::Custom);
@@ -186,8 +183,6 @@ mod tests {
         let task_config = TestParams { bar: None }
             .into_task_config(&config)
             .unwrap()
-            .init()
-            .unwrap()
             .tasks;
         assert_eq!(task_config.len(), 1);
         assert_eq!(task_config[0].task_type, TaskType::Custom);
@@ -201,8 +196,6 @@ mod tests {
 
         let task_config = TestParams { bar: Some(200) }
             .into_task_config(&config)
-            .unwrap()
-            .init()
             .unwrap()
             .tasks;
         assert_eq!(task_config.len(), 1);

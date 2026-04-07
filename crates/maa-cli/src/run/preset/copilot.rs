@@ -6,10 +6,7 @@ use std::{
 use anyhow::{Context, Result, bail};
 use log::{debug, trace, warn};
 use maa_types::TaskType;
-use maa_value::{
-    MAAValue, insert, object,
-    userinput::{BoolInput, UserInput},
-};
+use maa_value::prelude::*;
 use prettytable::{Table, format, row};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use ureq::http::StatusCode;
@@ -140,7 +137,7 @@ struct StageOpts {
 }
 
 impl TryFrom<StageOpts> for MAAValue {
-    type Error = maa_value::Error;
+    type Error = maa_value::error::Error;
 
     fn try_from(opts: StageOpts) -> Result<Self, Self::Error> {
         Ok(object!(
@@ -263,7 +260,7 @@ impl IntoParameters for CopilotParams {
                 if loop_times != 1 {
                     warn!("loop_times is ignored when using copilot_list mode");
                 }
-                map.remove("loop_times");
+                map.swap_remove("loop_times");
             }
             insert!(params, "copilot_list" => stage_list?);
         }

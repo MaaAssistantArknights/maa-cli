@@ -1,6 +1,6 @@
 [package]
 name = "maa-value"
-version = "0.1.0"
+version = "0.2.0"
 edition.workspace = true
 rust-version.workspace = true
 description = "A JSON value like Value but support user-defined input"
@@ -9,13 +9,16 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
+indexmap = { workspace = true, features = ["serde"] }
 log = { workspace = true }
 maa-str-ext = { workspace = true }
 maa-value-macro = { workspace = true }
-schemars = { workspace = true, optional = true }
+schemars = { workspace = true, optional = true, features = ["indexmap2"] }
 serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
 
 [dev-dependencies]
+serde_json = { workspace = true }
 serde_test = { workspace = true }
 
 [features]

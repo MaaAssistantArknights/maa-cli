@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use maa_value::{Result, object};
+use maa_value::{error::Result, prelude::*};
 
 #[test]
 fn mixed_insert_types() -> Result<()> {
@@ -10,7 +10,7 @@ fn mixed_insert_types() -> Result<()> {
     let none_value: Option<String> = None;
     let path = PathBuf::from("/path");
 
-    let obj = object!(
+    let obj = template!(
         "regular" => "normal",
         "optional_present" =>? some_value,
         "optional_absent" =>? none_value,
@@ -19,7 +19,7 @@ fn mixed_insert_types() -> Result<()> {
         "conditional" if "flag" == true => "depends on flag"
     );
 
-    let initialized = obj.init()?;
+    let initialized = obj.resolve()?;
     assert_eq!(initialized.get("regular").unwrap().as_str(), Some("normal"));
     assert_eq!(
         initialized.get("optional_present").unwrap().as_int(),
@@ -39,27 +39,27 @@ fn complex_nested_structure() -> Result<()> {
     let some_val: Option<i32> = Some(100);
     let path = PathBuf::from("/config");
 
-    let obj = object!(
-        "metadata" => object!(
+    let obj = template!(
+        "metadata" => template!(
             "version" => "1.0",
             "author" => "test"
         ),
-        "config" => object!(
+        "config" => template!(
             "enabled" => true,
             "path" => path?,
             "optional_setting" =>? some_val,
-            "nested" => object!(
+            "nested" => template!(
                 "deep" => "value"
             )
         ),
         "features" => ["feature1", "feature2"],
         "debug" => false,
-        "advanced" if "debug" == true => object!(
+        "advanced" if "debug" == true => template!(
             "verbose" => true
         )
     );
 
-    let initialized = obj.init()?;
+    let initialized = obj.resolve()?;
 
     // Check metadata
     let metadata = initialized.get("metadata").unwrap();
@@ -91,7 +91,7 @@ fn all_insert_kinds_together() -> Result<()> {
     let maybe_val: Option<i32> = Some(1);
     let try_val = PathBuf::from("/path");
 
-    let obj = object!(
+    let obj = template!(
         "a_regular" => regular,
         "b_maybe" =>? maybe_val,
         "c_try" => try_val?,
@@ -99,7 +99,7 @@ fn all_insert_kinds_together() -> Result<()> {
         "e_conditional" if "d_flag" == true => "conditional"
     );
 
-    let initialized = obj.init()?;
+    let initialized = obj.resolve()?;
     assert_eq!(
         initialized.get("a_regular").unwrap().as_str(),
         Some("regular")

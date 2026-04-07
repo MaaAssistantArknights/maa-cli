@@ -1,9 +1,9 @@
 use serde::Deserialize;
 
-use super::{
-    MAAValue,
+use crate::{
     primitive::MAAPrimitive,
     userinput::{BoolInput, Input, SelectD, UserInput},
+    value::MAAValueTemplate,
 };
 
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -20,7 +20,7 @@ pub enum MAAInput {
 }
 
 impl MAAInput {
-    pub(super) fn into_primitive(self) -> crate::Result<MAAPrimitive> {
+    pub(super) fn into_primitive(self) -> crate::error::Result<MAAPrimitive> {
         use MAAInput::*;
         use MAAPrimitive::*;
         match self {
@@ -80,7 +80,7 @@ impl From<SelectD<String>> for MAAInput {
 macro_rules! impl_into_maa_value {
     ($($t:ty),* $(,)?) => {
         $(
-            impl From<$t> for MAAValue {
+            impl From<$t> for MAAValueTemplate {
                 fn from(v: $t) -> Self {
                     Self::Input(v.into())
                 }
@@ -105,10 +105,6 @@ impl_into_maa_value!(
 mod tests {
     use super::*;
 
-    fn sstr(s: &str) -> Option<String> {
-        Some(s.to_string())
-    }
-
     #[test]
     fn deserialize() {
         use std::num::NonZero;
@@ -119,7 +115,7 @@ mod tests {
             BoolInput::new(Some(true)).into(),
             Input::new(Some(1)).into(),
             Input::new(Some(1.0)).into(),
-            Input::new(sstr("1")).into(),
+            Input::new(Some("1".to_owned())).into(),
             SelectD::from_iter([1, 2], NonZero::new(2)).unwrap().into(),
             SelectD::from_iter([1.0, 2.0], NonZero::new(2))
                 .unwrap()
@@ -201,7 +197,7 @@ mod tests {
             1.0.into()
         );
         assert_eq!(
-            MAAInput::InputString(Input::new(sstr("1")))
+            MAAInput::InputString(Input::new(Some("1".to_owned())))
                 .into_primitive()
                 .unwrap(),
             "1".into()
@@ -251,12 +247,12 @@ mod tests {
 
         // Test conversion from input types to MAAValue
         let input = BoolInput::new(Some(true));
-        let value: MAAValue = input.clone().into();
-        assert_eq!(value, MAAValue::Input(MAAInput::InputBool(input)));
+        let value: MAAValueTemplate = input.clone().into();
+        assert_eq!(value, MAAValueTemplate::Input(MAAInput::InputBool(input)));
 
         let select = SelectD::from_iter([1, 2], NonZero::new(1)).unwrap();
-        let value: MAAValue = select.clone().into();
-        assert_eq!(value, MAAValue::Input(MAAInput::SelectInt(select)));
+        let value: MAAValueTemplate = select.clone().into();
+        assert_eq!(value, MAAValueTemplate::Input(MAAInput::SelectInt(select)));
     }
 
     #[test]
@@ -286,7 +282,7 @@ mod tests {
         );
 
         assert_eq!(
-            MAAInput::InputString(Input::new(sstr("hello")))
+            MAAInput::InputString(Input::new(Some("hello".to_owned())))
                 .into_primitive()
                 .unwrap(),
             "hello".into()

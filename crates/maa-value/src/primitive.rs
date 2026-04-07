@@ -5,66 +5,27 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use super::MAAValue;
+use crate::{
+    error::Error,
+    value::{MAAValue, MAAValueTemplate},
+};
 
+pub type Int = i32;
+pub type Float = f32;
+pub type String = std::string::String;
+
+/// Primitive value type
+///
+/// Represents the basic data types used in configuration and task parameters.
+/// Supports four types: boolean, integer, float, and string.
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Deserialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum MAAPrimitive {
     Bool(bool),
-    Int(i32),
-    Float(f32),
+    Int(Int),
+    Float(Float),
     String(String),
-}
-
-impl MAAPrimitive {
-    pub(super) fn as_bool(&self) -> Option<bool> {
-        match self {
-            Self::Bool(v) => Some(*v),
-            _ => None,
-        }
-    }
-
-    pub(super) fn as_int(&self) -> Option<i32> {
-        match self {
-            Self::Int(v) => Some(*v),
-            _ => None,
-        }
-    }
-
-    pub(super) fn as_float(&self) -> Option<f32> {
-        match self {
-            Self::Float(v) => Some(*v),
-            _ => None,
-        }
-    }
-
-    pub(super) fn as_str(&self) -> Option<&str> {
-        match self {
-            Self::String(v) => Some(v),
-            _ => None,
-        }
-    }
-}
-
-impl Serialize for MAAPrimitive {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Bool(v) => serializer.serialize_bool(*v),
-            Self::Int(v) => serializer.serialize_i32(*v),
-            Self::Float(v) => serializer.serialize_f32(*v),
-            Self::String(v) => serializer.serialize_str(v),
-        }
-    }
-}
-
-impl PartialEq<MAAPrimitive> for MAAValue {
-    fn eq(&self, other: &MAAPrimitive) -> bool {
-        match self {
-            Self::Primitive(v) => v == other,
-            _ => false,
-        }
-    }
 }
 
 impl From<bool> for MAAPrimitive {
@@ -73,14 +34,14 @@ impl From<bool> for MAAPrimitive {
     }
 }
 
-impl From<i32> for MAAPrimitive {
-    fn from(v: i32) -> Self {
+impl From<Int> for MAAPrimitive {
+    fn from(v: Int) -> Self {
         Self::Int(v)
     }
 }
 
-impl From<f32> for MAAPrimitive {
-    fn from(v: f32) -> Self {
+impl From<Float> for MAAPrimitive {
+    fn from(v: Float) -> Self {
         Self::Float(v)
     }
 }
@@ -98,7 +59,7 @@ impl From<&str> for MAAPrimitive {
 }
 
 impl TryFrom<&OsStr> for MAAPrimitive {
-    type Error = crate::Error;
+    type Error = Error;
 
     fn try_from(v: &OsStr) -> Result<Self, Self::Error> {
         use maa_str_ext::ToUtf8String;
@@ -107,7 +68,7 @@ impl TryFrom<&OsStr> for MAAPrimitive {
 }
 
 impl TryFrom<OsString> for MAAPrimitive {
-    type Error = crate::Error;
+    type Error = Error;
 
     fn try_from(v: OsString) -> Result<Self, Self::Error> {
         use maa_str_ext::ToUtf8String;
@@ -116,7 +77,7 @@ impl TryFrom<OsString> for MAAPrimitive {
 }
 
 impl TryFrom<&Path> for MAAPrimitive {
-    type Error = crate::Error;
+    type Error = Error;
 
     fn try_from(v: &Path) -> Result<Self, Self::Error> {
         use maa_str_ext::ToUtf8String;
@@ -125,7 +86,7 @@ impl TryFrom<&Path> for MAAPrimitive {
 }
 
 impl TryFrom<PathBuf> for MAAPrimitive {
-    type Error = crate::Error;
+    type Error = Error;
 
     fn try_from(v: PathBuf) -> Result<Self, Self::Error> {
         use maa_str_ext::ToUtf8String;
@@ -133,46 +94,40 @@ impl TryFrom<PathBuf> for MAAPrimitive {
     }
 }
 
+impl From<MAAPrimitive> for MAAValueTemplate {
+    fn from(v: MAAPrimitive) -> Self {
+        Self::Primitive(v)
+    }
+}
+
+impl PartialEq<MAAPrimitive> for MAAValueTemplate {
+    fn eq(&self, other: &MAAPrimitive) -> bool {
+        match self {
+            Self::Primitive(v) => v == other,
+            _ => false,
+        }
+    }
+}
 impl From<MAAPrimitive> for MAAValue {
     fn from(v: MAAPrimitive) -> Self {
         Self::Primitive(v)
     }
 }
 
-macro_rules! impl_from {
-    ($($t:ty),*) => {
-        $(
-            impl From<$t> for MAAValue {
-                fn from(v: $t) -> Self {
-                    Self::Primitive(v.into())
-                }
-            }
-        )*
-    };
+impl PartialEq<MAAPrimitive> for MAAValue {
+    fn eq(&self, other: &MAAPrimitive) -> bool {
+        match self {
+            Self::Primitive(v) => v == other,
+            _ => false,
+        }
+    }
 }
-
-impl_from!(bool, i32, f32, String, &str);
-
-macro_rules! impl_try_from {
-    ($($t:ty),*) => {
-        $(
-            impl TryFrom<$t> for MAAValue {
-                type Error = crate::Error;
-
-                fn try_from(v: $t) -> Result<Self, Self::Error> {
-                    Ok(Self::Primitive(v.try_into()?))
-                }
-            }
-        )*
-    };
-}
-
-impl_try_from!(&OsStr, OsString, &Path, PathBuf);
 
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
+    use crate::convert::AsPrimitive;
 
     #[test]
     fn deserialize() {
@@ -256,50 +211,50 @@ mod tests {
     #[test]
     fn to_maa_value() {
         // Test conversion from primitives to MAAValue (via MAAPrimitive)
-        let value: MAAValue = true.into();
+        let value: MAAValueTemplate = true.into();
         assert_eq!(value.as_bool(), Some(true));
 
-        let value: MAAValue = 42.into();
+        let value: MAAValueTemplate = 42.into();
         assert_eq!(value.as_int(), Some(42));
 
-        let value: MAAValue = 1.5f32.into();
+        let value: MAAValueTemplate = 1.5f32.into();
         assert_eq!(value.as_float(), Some(1.5));
 
-        let value: MAAValue = "test".to_string().into();
+        let value: MAAValueTemplate = "test".to_string().into();
         assert_eq!(value.as_str(), Some("test"));
 
-        let value: MAAValue = "str".into();
+        let value: MAAValueTemplate = "str".into();
         assert_eq!(value.as_str(), Some("str"));
     }
 
     #[test]
     fn maa_value_eq_primitive() {
         // Test PartialEq between MAAValue and MAAPrimitive
-        assert_eq!(MAAValue::from(true), MAAPrimitive::Bool(true));
-        assert_ne!(MAAValue::from(true), MAAPrimitive::Bool(false));
-        assert_ne!(MAAValue::from(true), MAAPrimitive::Int(1));
+        assert_eq!(MAAValueTemplate::from(true), MAAPrimitive::Bool(true));
+        assert_ne!(MAAValueTemplate::from(true), MAAPrimitive::Bool(false));
+        assert_ne!(MAAValueTemplate::from(true), MAAPrimitive::Int(1));
 
-        assert_eq!(MAAValue::from(42), MAAPrimitive::Int(42));
-        assert_ne!(MAAValue::from(42), MAAPrimitive::Int(43));
-        assert_ne!(MAAValue::from(42), MAAPrimitive::Bool(true));
+        assert_eq!(MAAValueTemplate::from(42), MAAPrimitive::Int(42));
+        assert_ne!(MAAValueTemplate::from(42), MAAPrimitive::Int(43));
+        assert_ne!(MAAValueTemplate::from(42), MAAPrimitive::Bool(true));
 
-        assert_eq!(MAAValue::from(1.5f32), MAAPrimitive::Float(1.5));
-        assert_ne!(MAAValue::from(1.5f32), MAAPrimitive::Float(2.5));
+        assert_eq!(MAAValueTemplate::from(1.5f32), MAAPrimitive::Float(1.5));
+        assert_ne!(MAAValueTemplate::from(1.5f32), MAAPrimitive::Float(2.5));
 
         assert_eq!(
-            MAAValue::from("test"),
+            MAAValueTemplate::from("test"),
             MAAPrimitive::String("test".to_string())
         );
         assert_ne!(
-            MAAValue::from("test"),
+            MAAValueTemplate::from("test"),
             MAAPrimitive::String("other".to_string())
         );
 
         // Test that non-Primitive values don't equal Primitive
-        let array = MAAValue::Array(vec![1.into()]);
+        let array = MAAValueTemplate::Array(vec![1.into()]);
         assert_ne!(array, MAAPrimitive::Int(1));
 
-        let object = MAAValue::default();
+        let object = MAAValueTemplate::default();
         assert_ne!(object, MAAPrimitive::Bool(true));
     }
 
