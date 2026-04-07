@@ -164,14 +164,15 @@ impl MAAValueTemplate {
     /// let value = template!(
     ///     "enabled" => true,
     ///     "config" if "enabled" == true => template!(
-    ///         "nested_field" if "enabled" == false => "will_be_omitted"
-    ///     )
+    ///         "enabled" => false,
+    ///         "nested_field" if "enabled" == true => "will_be_omitted",
+    ///     ),
     /// );
     ///
     /// let resolved = value.resolve().unwrap();
     /// // "config" is included because "enabled" == true
     /// // But it's an empty object because the nested condition isn't satisfied
-    /// assert_eq!(resolved.get("config").unwrap(), &MAAValue::default());
+    /// assert_eq!(resolved.get("config").unwrap(), &object!("enabled" => false));
     /// ```
     ///
     /// # Performance
