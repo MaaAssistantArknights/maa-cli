@@ -1,6 +1,6 @@
 use crate::{
     primitive::{Float, Int, MAAPrimitive},
-    value::{MAAValueTemplate, MAAValue},
+    value::{MAAValue, MAAValueTemplate},
 };
 
 pub trait TryAs<'a, V> {

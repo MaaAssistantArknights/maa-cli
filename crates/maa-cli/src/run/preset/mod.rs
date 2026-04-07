@@ -53,7 +53,7 @@ where
         let context = TaskContext { default, config };
         let params: MAAValue = self.into_parameters(context)?;
         let task = Task::new(task_type, params);
-        Ok(TaskConfig::new_with_tasks(vec![task]))
+        TaskConfig::new_with_task(task)
     }
 }
 

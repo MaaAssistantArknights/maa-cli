@@ -4,7 +4,7 @@ pub use client_type::ClientType;
 mod condition;
 use std::path::PathBuf;
 
-use anyhow::Context;
+use anyhow::{Context, Result};
 use condition::Condition;
 pub use condition::{TimeOffset, remainder_of_day_mod};
 use maa_types::TaskType;
@@ -65,8 +65,8 @@ pub struct TaskTemplate {
 }
 
 // Constructor for Task
+#[cfg(test)]
 impl TaskTemplate {
-    #[cfg(test)]
     fn new(task_type: TaskType, params: MAAValueTemplate) -> Self {
         Self {
             name: None,
@@ -77,30 +77,28 @@ impl TaskTemplate {
         }
     }
 
-    #[cfg(test)]
     pub fn with_name(mut self, name: String) -> Self {
         self.name = Some(name);
         self
     }
 
-    #[cfg(test)]
     pub fn with_strategy(mut self, strategy: Strategy) -> Self {
         self.strategy = strategy;
         self
     }
 
-    #[cfg(test)]
     pub fn with_variants(mut self, variants: Vec<TaskVariant>) -> Self {
         self.variants = variants;
         self
     }
 
-    #[cfg(test)]
     pub fn push_variant(&mut self, variants: TaskVariant) -> &mut Self {
         self.variants.push(variants);
         self
     }
+}
 
+impl TaskTemplate {
     pub fn task_type(&self) -> TaskType {
         self.task_type
     }
@@ -162,8 +160,7 @@ impl TaskConfigTemplate {
             // If startup task is not enabled, enable it automatically
             match task_type {
                 StartUp => {
-                    let start_game =
-                        params.get_or("enable", true) && params.get_or("start_game_enabled", false);
+                    let start_game = determine_start_app(&params);
 
                     match (start_game, startup) {
                         (true, None) => {
@@ -178,7 +175,8 @@ impl TaskConfigTemplate {
                     prepend_startup = false;
                 }
                 CloseDown => {
-                    match (params.get_or("enable", true), closedown) {
+                    let close_game = determine_close_app(&params);
+                    match (close_game, closedown) {
                         // If closedown task is enabled, enable closedown automatically
                         (true, None) => {
                             closedown = Some(true);
@@ -289,14 +287,46 @@ pub struct TaskConfig {
 }
 
 impl TaskConfig {
-    pub const fn new_with_tasks(tasks: Vec<Task>) -> Self {
-        Self {
-            client_type: ClientType::Official,
-            start_app: false,
-            close_app: false,
-            tasks,
+    pub fn new_with_task(task: Task) -> Result<Self> {
+        match task.task_type {
+            TaskType::StartUp => Ok(Self {
+                client_type: task
+                    .params
+                    .get_typed::<&str>("client_type")
+                    .map(|v| v.parse())
+                    .transpose()?
+                    .unwrap_or(ClientType::Official),
+                start_app: determine_start_app(&task.params),
+                close_app: false,
+                tasks: vec![task],
+            }),
+            TaskType::CloseDown => Ok(Self {
+                client_type: task
+                    .params
+                    .get_typed::<&str>("client_type")
+                    .map(|v| v.parse())
+                    .transpose()?
+                    .unwrap_or(ClientType::Official),
+                start_app: false,
+                close_app: determine_close_app(&task.params),
+                tasks: vec![task],
+            }),
+            _ => Ok(Self {
+                client_type: ClientType::Official,
+                start_app: false,
+                close_app: false,
+                tasks: vec![task],
+            }),
         }
     }
+}
+
+fn determine_start_app(params: &MAAValue) -> bool {
+    params.get_or("enable", true) && params.get_or("start_game_enabled", false)
+}
+
+fn determine_close_app(params: &MAAValue) -> bool {
+    params.get_or("enable", true)
 }
 
 #[cfg_attr(test, derive(PartialEq, Debug))]
@@ -1098,9 +1128,9 @@ mod tests {
         }
 
         #[test]
-        fn initialized_task() {
-            let task = Task::new(Fight, template!("stage" => "1-7").resolve().unwrap())
-                .with_name("Fight Daily".to_string());
+        fn new_task() {
+            let task =
+                Task::new(Fight, object!("stage" => "1-7")).with_name("Fight Daily".to_string());
             assert_eq!(task.name_or_default(), "Fight Daily");
             assert_eq!(task.task_type, Fight);
             assert_eq!(
@@ -1109,7 +1139,7 @@ mod tests {
             );
             assert_eq!(task.name, Some(String::from("Fight Daily")));
 
-            let task = Task::new(Fight, template!("stage" => "1-7").resolve().unwrap());
+            let task = Task::new(Fight, object!("stage" => "1-7"));
             assert_eq!(task.name_or_default(), "Fight");
             assert_eq!(task.task_type, Fight);
             assert_eq!(
@@ -1117,6 +1147,92 @@ mod tests {
                 &template!("stage" => "1-7").resolve().unwrap()
             );
             assert_eq!(task.name, None);
+        }
+
+        #[test]
+        fn new_task_config() {
+            fn assert_new_task_config(
+                task_type: TaskType,
+                params: MAAValue,
+                client_type: ClientType,
+                start_app: bool,
+                close_app: bool,
+            ) {
+                let expected_params = params.clone();
+                let task_config = TaskConfig::new_with_task(Task::new(task_type, params)).unwrap();
+
+                assert_eq!(task_config.client_type, client_type);
+                assert_eq!(task_config.start_app, start_app);
+                assert_eq!(task_config.close_app, close_app);
+                assert_eq!(task_config.tasks.len(), 1);
+
+                let task = &task_config.tasks[0];
+                assert_eq!(task.name, None);
+                assert_eq!(task.task_type, task_type);
+                assert_eq!(task.params, expected_params);
+            }
+
+            assert_new_task_config(StartUp, object!(), ClientType::Official, false, false);
+
+            assert_new_task_config(
+                StartUp,
+                object!(
+                    "start_game_enabled" => true,
+                    "client_type" => "YoStarEN",
+                ),
+                ClientType::YoStarEN,
+                true,
+                false,
+            );
+
+            assert_new_task_config(
+                StartUp,
+                object!(
+                    "enable" => false,
+                    "start_game_enabled" => true,
+                    "client_type" => "YoStarJP",
+                ),
+                ClientType::YoStarJP,
+                false,
+                false,
+            );
+
+            assert_new_task_config(CloseDown, object!(), ClientType::Official, false, true);
+
+            assert_new_task_config(
+                CloseDown,
+                object!(
+                    "enable" => false,
+                    "client_type" => "YoStarEN",
+                ),
+                ClientType::YoStarEN,
+                false,
+                false,
+            );
+
+            assert_new_task_config(
+                Fight,
+                object!("stage" => "1-7"),
+                ClientType::Official,
+                false,
+                false,
+            );
+
+            assert!(
+                TaskConfig::new_with_task(Task::new(
+                    StartUp,
+                    object!("client_type" => "NotAClientType"),
+                ))
+                .is_err()
+            );
+
+            assert!(
+                TaskConfig::new_with_task(Task::new(
+                    CloseDown,
+                    object!("client_type" => "NotAClientType"),
+                ))
+                .is_err()
+            );
         }
     }
 }

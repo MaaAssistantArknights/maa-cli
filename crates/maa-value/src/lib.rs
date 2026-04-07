@@ -13,8 +13,8 @@
 //!    - Conditional fields (`Optional`) that depend on other fields
 //!    - Regular values (primitives, arrays, objects)
 //!
-//! 2. **[`value::MAAValue`]**: Represents *resolved* configuration containing only concrete
-//!    data after all user inputs have been collected and conditions evaluated.
+//! 2. **[`value::MAAValue`]**: Represents *resolved* configuration containing only concrete data
+//!    after all user inputs have been collected and conditions evaluated.
 //!
 //! The transformation from template to resolved value happens via
 //! [`value::MAAValueTemplate::resolve()`], which:
@@ -193,8 +193,8 @@ pub mod value;
 ///
 /// ## Core Types
 ///
-/// - [`MAAValueTemplate`](crate::value::MAAValueTemplate): Configuration templates that may
-///   contain user inputs and conditional fields
+/// - [`MAAValueTemplate`](crate::value::MAAValueTemplate): Configuration templates that may contain
+///   user inputs and conditional fields
 /// - [`MAAValue`](crate::value::MAAValue): Fully resolved values containing only concrete data
 /// - [`MAAPrimitive`](crate::primitive::MAAPrimitive): Primitive value types (bool, int, float,
 ///   string)
@@ -226,7 +226,7 @@ pub mod prelude {
         map::MapOps,
         primitive::MAAPrimitive,
         userinput::{BoolInput, Input, Select, SelectD, Selectable, UserInput, ValueWithDesc},
-        value::{MAAValueTemplate, MAAValue},
+        value::{MAAValue, MAAValueTemplate},
     };
 }
 
