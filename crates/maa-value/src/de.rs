@@ -15,10 +15,10 @@
 //!     count: i32,
 //! }
 //!
-//! let resolved = object!("name" => "app", "count" => 42).resolve().unwrap();
+//! let object = object!("name" => "app", "count" => 42);
 //!
 //! // Direct conversion - no intermediate JSON!
-//! let config = Config::deserialize(resolved).unwrap();
+//! let config = Config::deserialize(object).unwrap();
 //!
 //! assert_eq!(config.name, "app");
 //! assert_eq!(config.count, 42);
