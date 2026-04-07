@@ -208,10 +208,10 @@ where
             .transpose()?
             .flatten();
 
-        let address = runtime_address.unwrap_or_else(|| address.into_owned());
+        let address = runtime_address.as_deref().unwrap_or(&address);
 
         // Connect to game or emulator
-        asst.async_connect(adb_path, address.as_str(), config, true)?;
+        asst.async_connect(adb_path, address, config, true)?;
 
         debug!("Starting MAA...");
         asst.start()?;

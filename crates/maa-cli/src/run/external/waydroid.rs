@@ -1,6 +1,6 @@
-use std::io::BufRead as _;
+use std::io::{BufRead, BufReader};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use log::{info, trace};
 
 #[cfg_attr(test, derive(PartialEq, Debug))]
@@ -64,12 +64,16 @@ fn start_waydroid_session() -> Result<()> {
         .stderr
         .take()
         .context("Failed to capture waydroid stderr")?;
-    let mut rdr = std::io::BufReader::new(stderr);
+    let mut reader = BufReader::new(stderr);
     let mut line = String::new();
 
     loop {
         line.clear();
-        if rdr.read_line(&mut line).context("Failed to read waydroid stderr")? == 0 {
+        if reader
+            .read_line(&mut line)
+            .context("Failed to read waydroid stderr")?
+            == 0
+        {
             bail!("waydroid session start exited without establishing ADB");
         }
 
@@ -78,7 +82,10 @@ fn start_waydroid_session() -> Result<()> {
             return Ok(());
         }
 
-        if let Some(status) = child.try_wait().context("Failed to query Waydroid process status")? {
+        if let Some(status) = child
+            .try_wait()
+            .context("Failed to query Waydroid process status")?
+        {
             if !status.success() {
                 bail!("`waydroid session start` exited with {status}");
             }
@@ -146,8 +153,9 @@ impl super::ExternalApp for WaydroidApp {
         let (_, address) = parse_status(&run_waydroid(&["status"])?);
         let address = address.map(|address| format!("{address}:5555"));
 
-        if start_if_needed && address.is_none() {
-            Err(anyhow::anyhow!("Waydroid failed to provide a device address"))
+        // We always need an address
+        if address.is_none() {
+            Err(anyhow!("Waydroid failed to provide a device address"))
         } else {
             Ok(address)
         }

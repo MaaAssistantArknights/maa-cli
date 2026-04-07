@@ -115,7 +115,7 @@ impl ConnectionConfig {
                 );
             }
             debug!(
-                "Waydroid preset: using runtime-managed ADB address; user-configured address will be ignored. config={config} via {adb_path}"
+                "Waydroid preset: using runtime-managed ADB address; user-configured address will be ignored."
             );
             Cow::Borrowed("waydroid")
         } else {
@@ -125,12 +125,14 @@ impl ConnectionConfig {
                 .unwrap_or_else(|| self.preset.default_address(adb_path))
         };
 
-        if !matches!(self.preset, Preset::Waydroid) {
-            debug!(
-                "Connecting to {address} with config {config} via {}",
+        debug!(
+            "Connecting to {address} with config {config} via {}",
+            if matches!(self.preset, Preset::PlayCover) {
+                "PlayTools"
+            } else {
                 adb_path
-            );
-        }
+            }
+        );
 
         (adb_path, address, config)
     }
