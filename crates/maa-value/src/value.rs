@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     error::{Error, Result},
     input::MAAInput,
-    map::Map,
+    map::{Map, StringMap},
     primitive::MAAPrimitive,
 };
 
@@ -29,35 +29,35 @@ pub enum MAAValueTemplate {
         ///
         /// Keys are the keys of the dependencies in the same object and values are the expected
         #[serde(alias = "deps")]
-        conditions: Map<MAAPrimitive>,
+        conditions: StringMap<MAAPrimitive>,
         /// Input value query from user when all the dependencies are satisfied
         #[serde(alias = "input", flatten)]
-        value: BoxedMAAValue,
+        value: BoxedMAAValueTemplate,
     },
     /// Object is a map of key-value pair
-    Object(Map<MAAValueTemplate>),
+    Object(StringMap<MAAValueTemplate>),
     /// Primitive json types: bool, int, float, string
     Primitive(MAAPrimitive),
 }
 
 impl Default for MAAValueTemplate {
     fn default() -> Self {
-        Self::Object(Map::default())
+        Self::Object(StringMap::default())
     }
 }
 
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Deserialize, Clone, PartialEq, Debug)]
 #[serde(transparent)]
-pub struct BoxedMAAValue(Box<MAAValueTemplate>);
+pub struct BoxedMAAValueTemplate(Box<MAAValueTemplate>);
 
-impl BoxedMAAValue {
+impl BoxedMAAValueTemplate {
     fn resolve(self) -> Result<MAAValue> {
         self.0.resolve()
     }
 }
 
-impl<T> From<T> for BoxedMAAValue
+impl<T> From<T> for BoxedMAAValueTemplate
 where
     T: Into<MAAValueTemplate>,
 {
@@ -116,14 +116,14 @@ pub enum MAAValue {
     /// An array of resolved values
     Array(Vec<Self>),
     /// An object containing resolved key-value pairs
-    Object(Map<Self>),
+    Object(StringMap<Self>),
     /// A primitive JSON value: bool, int, float, or string
     Primitive(MAAPrimitive),
 }
 
 impl Default for MAAValue {
     fn default() -> Self {
-        Self::Object(Map::new())
+        Self::Object(StringMap::new())
     }
 }
 
@@ -229,8 +229,8 @@ impl MAAValueTemplate {
                 fn visit<'key>(
                     sorted_keys: &mut Vec<String>,
                     key: &'key str,
-                    map: &'key Map<MAAValueTemplate>,
-                    marks: &mut Map<Mark, &'key str>,
+                    map: &'key StringMap<MAAValueTemplate>,
+                    marks: &mut Map<&'key str, Mark>,
                 ) -> Result<()> {
                     match marks.get(key) {
                         Some(Mark::Visited) => return Ok(()),
@@ -260,14 +260,14 @@ impl MAAValueTemplate {
                 }
 
                 let mut sorted_keys: Vec<String> = Vec::with_capacity(map.len());
-                let mut marks = Map::<Mark, &str>::new();
+                let mut marks = Map::<&str, Mark>::new();
 
                 for key in map.keys() {
                     visit(&mut sorted_keys, key, &map, &mut marks)?;
                 }
 
                 // Initialize all the values with given order and put them into a new map
-                let mut initialized: Map<MAAValue> = Map::new();
+                let mut initialized: StringMap<MAAValue> = StringMap::new();
                 for key in sorted_keys {
                     let value = map.swap_remove(&key).unwrap();
                     if let Optional { conditions, value } = value {

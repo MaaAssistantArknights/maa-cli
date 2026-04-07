@@ -83,7 +83,7 @@ impl super::IntoParameters for FightParams {
         // Drops handling
         let drops = self.drops;
         if !drops.is_empty() {
-            let mut drop_map = maa_value::map::Map::new();
+            let mut drop_map = maa_value::map::StringMap::new();
 
             for drop in drops {
                 let mut parts = drop.split('=');

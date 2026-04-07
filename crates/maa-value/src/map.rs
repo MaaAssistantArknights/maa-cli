@@ -9,7 +9,10 @@ use crate::{
 /// Type alias for the underlying map structure.
 ///
 /// Uses [`IndexMap`](indexmap::IndexMap) to maintain insertion order.
-pub type Map<T, K = String> = indexmap::IndexMap<K, T>;
+pub type Map<K, V> = indexmap::IndexMap<K, V>;
+
+/// A convenience type alias for a map with string keys.
+pub type StringMap<V> = Map<String, V>;
 
 /// Trait for map-like operations on values.
 ///
@@ -18,17 +21,17 @@ pub trait MapOps: Sized + Clone {
     /// Returns a reference to the inner map if this value is map-like.
     ///
     /// Returns `None` if the value is not map-like.
-    fn as_map(&self) -> Option<&Map<Self>>;
+    fn as_map(&self) -> Option<&StringMap<Self>>;
 
     /// Returns a mutable reference to the inner map if this value is map-like.
     ///
     /// Returns `None` if the value is not map-like.
-    fn as_mut_map(&mut self) -> Option<&mut Map<Self>>;
+    fn as_mut_map(&mut self) -> Option<&mut StringMap<Self>>;
 
     /// Consumes the value and returns the inner map if this value is map-like.
     ///
     /// Returns back if the value is not map-like.
-    fn into_map(self) -> Outcome<Map<Self>, Self>;
+    fn into_map(self) -> Outcome<StringMap<Self>, Self>;
 
     /// Returns a reference to the value associated with the given key.
     ///
@@ -219,51 +222,35 @@ pub trait MapOps: Sized + Clone {
     }
 }
 
-impl MapOps for MAAValue {
-    fn as_map(&self) -> Option<&Map<Self>> {
-        match self {
-            MAAValue::Object(obj) => Some(obj),
-            _ => None,
-        }
-    }
+macro_rules! impl_map_ops {
+    ($type_name:ident) => {
+        impl MapOps for $type_name {
+            fn as_map(&self) -> Option<&StringMap<Self>> {
+                match self {
+                    $type_name::Object(obj) => Some(obj),
+                    _ => None,
+                }
+            }
 
-    fn as_mut_map(&mut self) -> Option<&mut Map<Self>> {
-        match self {
-            MAAValue::Object(obj) => Some(obj),
-            _ => None,
-        }
-    }
+            fn as_mut_map(&mut self) -> Option<&mut StringMap<Self>> {
+                match self {
+                    $type_name::Object(obj) => Some(obj),
+                    _ => None,
+                }
+            }
 
-    fn into_map(self) -> Outcome<Map<Self>, Self> {
-        match self {
-            MAAValue::Object(obj) => Outcome::Value(obj),
-            _ => Outcome::Original(self),
+            fn into_map(self) -> Outcome<StringMap<Self>, Self> {
+                match self {
+                    $type_name::Object(obj) => Outcome::Value(obj),
+                    _ => Outcome::Original(self),
+                }
+            }
         }
-    }
+    };
 }
 
-impl MapOps for MAAValueTemplate {
-    fn as_map(&self) -> Option<&Map<Self>> {
-        match self {
-            MAAValueTemplate::Object(obj) => Some(obj),
-            _ => None,
-        }
-    }
-
-    fn as_mut_map(&mut self) -> Option<&mut Map<Self>> {
-        match self {
-            MAAValueTemplate::Object(obj) => Some(obj),
-            _ => None,
-        }
-    }
-
-    fn into_map(self) -> Outcome<Map<Self>, Self> {
-        match self {
-            MAAValueTemplate::Object(obj) => Outcome::Value(obj),
-            _ => Outcome::Original(self),
-        }
-    }
-}
+impl_map_ops!(MAAValue);
+impl_map_ops!(MAAValueTemplate);
 
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]

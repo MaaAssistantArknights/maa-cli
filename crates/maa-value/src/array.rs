@@ -11,51 +11,35 @@ pub trait ArrayOps: Sized {
     fn into_vec(self) -> Outcome<Vec<Self>, Self>;
 }
 
-impl ArrayOps for MAAValue {
-    fn as_slice(&self) -> Option<&[Self]> {
-        match self {
-            MAAValue::Array(arr) => Some(arr),
-            _ => None,
-        }
-    }
+macro_rules! impl_array_ops {
+    ($type_name:ident) => {
+        impl ArrayOps for $type_name {
+            fn as_slice(&self) -> Option<&[Self]> {
+                match self {
+                    $type_name::Array(arr) => Some(arr),
+                    _ => None,
+                }
+            }
 
-    fn as_mut_vec(&mut self) -> Option<&mut Vec<Self>> {
-        match self {
-            MAAValue::Array(arr) => Some(arr),
-            _ => None,
-        }
-    }
+            fn as_mut_vec(&mut self) -> Option<&mut Vec<Self>> {
+                match self {
+                    $type_name::Array(arr) => Some(arr),
+                    _ => None,
+                }
+            }
 
-    fn into_vec(self) -> Outcome<Vec<Self>, Self> {
-        match self {
-            MAAValue::Array(arr) => Outcome::Value(arr),
-            _ => Outcome::Original(self),
+            fn into_vec(self) -> Outcome<Vec<Self>, Self> {
+                match self {
+                    $type_name::Array(arr) => Outcome::Value(arr),
+                    _ => Outcome::Original(self),
+                }
+            }
         }
-    }
+    };
 }
 
-impl ArrayOps for MAAValueTemplate {
-    fn as_slice(&self) -> Option<&[Self]> {
-        match self {
-            MAAValueTemplate::Array(arr) => Some(arr),
-            _ => None,
-        }
-    }
-
-    fn as_mut_vec(&mut self) -> Option<&mut Vec<Self>> {
-        match self {
-            MAAValueTemplate::Array(arr) => Some(arr),
-            _ => None,
-        }
-    }
-
-    fn into_vec(self) -> Outcome<Vec<Self>, Self> {
-        match self {
-            MAAValueTemplate::Array(arr) => Outcome::Value(arr),
-            _ => Outcome::Original(self),
-        }
-    }
-}
+impl_array_ops!(MAAValue);
+impl_array_ops!(MAAValueTemplate);
 
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
