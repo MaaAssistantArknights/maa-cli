@@ -75,14 +75,22 @@ pub trait MapOps: Sized + Clone {
 
     /// Inserts a key-value pair into the map.
     ///
-    /// If the value is not map-like, this method does nothing.
+    /// # Panics
+    ///
+    /// Panics if the value is not map-like.
     fn insert(&mut self, key: impl Into<String>, value: Self) {
-        self.as_mut_map().map(|m| m.insert(key.into(), value));
+        self.as_mut_map()
+            .expect("value is not an object")
+            .insert(key.into(), value);
     }
 
     /// Inserts a key-value pair into the map if the value is `Some`.
     ///
-    /// If the value is `None` or the value is not map-like, this method does nothing.
+    /// If the value is `None`, this method does nothing.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value is `Some` and `self` is not map-like.
     fn maybe_insert(&mut self, key: impl Into<String>, value: Option<Self>) {
         if let Some(value) = value {
             self.insert(key, value);
@@ -311,12 +319,20 @@ mod tests {
         // Test insert overwrites existing value
         value.insert("int", 2.into());
         assert_eq!(value.get("int").unwrap().as_int().unwrap(), 2);
+    }
 
-        // Test insert on non-map value does nothing
+    #[test]
+    #[should_panic(expected = "value is not an object")]
+    fn insert_panics_on_non_map() {
         let mut non_map = MAAValue::from(42);
         non_map.insert("key", 1.into());
-        assert_eq!(non_map.as_int(), Some(42)); // Value unchanged
-        assert_eq!(non_map.get("key"), None);
+    }
+
+    #[test]
+    #[should_panic(expected = "value is not an object")]
+    fn maybe_insert_panics_on_non_map() {
+        let mut non_map = MAAValue::from(42);
+        non_map.maybe_insert("key", Some(1.into()));
     }
 
     #[test]
