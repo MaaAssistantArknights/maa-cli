@@ -90,7 +90,7 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
         push_runtime_library_path(&mut test_env_vars, &core_dir)?;
     }
 
-    if !opts.no_clippy {
+    if opts.clippy {
         // Build first if we run clippy
         Group::new("Build").run(|| {
             let mut cmd = cargo();

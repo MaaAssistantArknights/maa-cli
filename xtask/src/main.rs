@@ -82,9 +82,9 @@ struct TestOptions {
     #[arg(long, default_value = "none")]
     coverage: CoverageMode,
 
-    /// Disable cargo clippy
+    /// Enable cargo clippy
     #[arg(long)]
-    no_clippy: bool,
+    clippy: bool,
 
     /// Disable all features
     #[arg(long)]

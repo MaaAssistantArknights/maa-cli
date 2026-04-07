@@ -88,7 +88,7 @@ jobs:
       - name: Test
         run: |
           # TODO: Re-enable macOS Core-backed tests once beta releases ship macOS MaaCore assets again.
-          cargo x test \
+          cargo x test --clippy \
             ${{ matrix.runner != 'macos-latest' && '--install-core' || '--no-core-tests' }}
 
   build-tier2:
@@ -109,7 +109,7 @@ jobs:
       - name: Test
         run: |
           # TODO: Re-enable macOS Core-backed tests once beta releases ship macOS MaaCore assets again.
-          cargo x test --no-core-tests
+          cargo x test --clippy --no-core-tests
 
   build-no-default-features:
     name: Build and Test (feature=${{ matrix.feature }})
@@ -126,7 +126,7 @@ jobs:
         uses: actions/checkout@v6
       - name: Test
         run: |
-          cargo x test --no-clippy --no-all-features --no-core-tests \
+          cargo x test --no-all-features --no-core-tests \
             --no-default-features --features '${{ matrix.feature }}' \
 
   build-core:
@@ -146,7 +146,7 @@ jobs:
           tool: cargo-llvm-cov
       - name: Coverage
         run: |
-          cargo x test --install-core --runtime-library-path --no-clippy \
+          cargo x test --install-core --runtime-library-path \
             --package maa-core --coverage test-only \
             -- --no-default-features
       - name: Upload to Codecov
@@ -178,7 +178,7 @@ jobs:
       - name: Coverage
         run: |
           # TODO: Re-enable macOS Core-backed tests once beta releases ship macOS MaaCore assets again.
-          cargo x test --no-clippy --coverage all \
+          cargo x test --coverage all \
             ${{ matrix.os != 'macos-latest' && '--install-core' || '--no-core-tests' }}
       - name: Upload to Codecov
         uses: codecov/codecov-action@v6
