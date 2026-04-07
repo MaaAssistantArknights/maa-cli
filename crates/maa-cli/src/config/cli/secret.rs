@@ -235,32 +235,24 @@ mod tests {
             );
         }
 
-        mod env {
-            use super::*;
+        #[test]
+        fn env() {
+            const TEST_SECRET_ENV: &str = "MAA_TEST_SECRET";
+            assert!(
+                Secret::Env(String::from(TEST_SECRET_ENV))
+                    .get_with_desc("token")
+                    .is_err()
+            );
 
-            const TEST_SECRET_ENV: &str = "MMA_TEST_SECRET";
-
-            #[test]
-            fn missing_returns_error() {
-                assert!(
-                    Secret::Env(String::from(TEST_SECRET_ENV))
-                        .get_with_desc("token")
-                        .is_err()
-                );
-            }
-
-            #[test]
-            fn existing_returns_value() {
-                unsafe { std::env::set_var(TEST_SECRET_ENV, "secret") };
-                assert_eq!(
-                    Secret::Env(String::from(TEST_SECRET_ENV))
-                        .get_with_desc("token")
-                        .unwrap()
-                        .unwrap(),
-                    "secret"
-                );
-                unsafe { std::env::remove_var(TEST_SECRET_ENV) };
-            }
+            unsafe { std::env::set_var(TEST_SECRET_ENV, "secret") };
+            assert_eq!(
+                Secret::Env(String::from(TEST_SECRET_ENV))
+                    .get_with_desc("token")
+                    .unwrap()
+                    .unwrap(),
+                "secret"
+            );
+            unsafe { std::env::remove_var(TEST_SECRET_ENV) };
         }
 
         mod command {
