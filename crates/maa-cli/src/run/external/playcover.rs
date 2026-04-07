@@ -1,6 +1,6 @@
 use std::net::TcpStream;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use log::{info, trace};
 
 use crate::config::task::ClientType;
@@ -30,13 +30,22 @@ impl super::ExternalApp for PlayCoverApp<'_> {
             return Ok(true);
         }
 
-        let app = self.client.app();
-        info!("Starting app: {app}");
-        std::process::Command::new("open")
-            .arg("-a")
-            .arg(app)
+        let bundle_id = self.client.bundle_id().with_context(|| {
+            format!(
+                "Client {} does not provide an iOS bundle identifier for PlayCover",
+                self.client
+            )
+        })?;
+
+        info!("Starting app: {bundle_id}");
+        let status = std::process::Command::new("open")
+            .arg("-b")
+            .arg(bundle_id)
             .status()
             .context("Failed to start game!")?;
+        if !status.success() {
+            bail!("Failed to start game with bundle identifier {bundle_id}");
+        }
 
         // Wait for game ready
         loop {
