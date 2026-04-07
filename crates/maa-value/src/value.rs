@@ -917,6 +917,30 @@ mod tests {
                 let value: MAAValueTemplate = serde_json::from_value(json).unwrap();
                 assert!(matches!(value, MAAValueTemplate::Optional { .. }));
             }
+
+            #[test]
+            fn resolved_value_preserves_object_order() {
+                let value: MAAValue =
+                    serde_json::from_str(r#"{"z":1,"a":{"k2":2,"k1":1},"m":3}"#).unwrap();
+
+                let keys = value
+                    .as_map()
+                    .unwrap()
+                    .keys()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>();
+                assert_eq!(keys, ["z", "a", "m"]);
+
+                let nested_keys = value
+                    .get("a")
+                    .unwrap()
+                    .as_map()
+                    .unwrap()
+                    .keys()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>();
+                assert_eq!(nested_keys, ["k2", "k1"]);
+            }
         }
 
         mod serialize {
@@ -936,6 +960,23 @@ mod tests {
                 assert_eq!(json["primitive"], 42);
                 assert_eq!(json["array"], json!([1, 2, 3]));
                 assert_eq!(json["nested"]["key"], "value");
+            }
+
+            #[test]
+            fn resolved_value_preserves_object_order() {
+                let value = object!(
+                    "z" => 1,
+                    "a" => object!(
+                        "k2" => 2,
+                        "k1" => 1,
+                    ),
+                    "m" => 3,
+                );
+
+                assert_eq!(
+                    serde_json::to_string(&value).unwrap(),
+                    r#"{"z":1,"a":{"k2":2,"k1":1},"m":3}"#
+                );
             }
         }
 
