@@ -1,6 +1,6 @@
-//! Deserializer implementation for ResolvedMAAValue
+//! Deserializer implementation for MAAValue
 //!
-//! This allows direct conversion from ResolvedMAAValue to any type implementing Deserialize,
+//! This allows direct conversion from MAAValue to any type implementing Deserialize,
 //! without going through an intermediate format like serde_json::Value.
 //!
 //! # Example
@@ -100,7 +100,7 @@ impl<'de> Deserializer<'de> for MAAValue {
     where
         V: Visitor<'de>,
     {
-        // Enums are not directly supported in ResolvedMAAValue
+        // Enums are not directly supported in MAAValue
         Err(de::Error::custom("enums are not supported"))
     }
 }

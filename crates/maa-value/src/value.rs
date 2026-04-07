@@ -130,9 +130,9 @@ impl Default for MAAValue {
 impl MAAValueTemplate {
     /// Resolves the value by evaluating all user inputs and conditional fields.
     ///
-    /// This method transforms a [`MAAValue`] (which may contain unresolved
+    /// This method transforms a [`MAAValueTemplate`] (which may contain unresolved
     /// [`Input`](MAAValue::Input) and [`Optional`](MAAValue::Optional) variants) into a
-    /// [`ResolvedMAAValue`] (which contains only concrete values). The resolution process
+    /// [`MAAValue`] (which contains only concrete values). The resolution process
     /// recursively processes the value structure:
     ///
     /// - **Primitive**: Returns the value unchanged as a resolved primitive.
@@ -647,8 +647,7 @@ mod tests {
     }
 
     #[test]
-    fn resolved_value_creation() {
-        // Test From<primitive> for ResolvedMAAValue
+    fn value_creation() {
         let bool_val = MAAValue::from(true);
         assert_eq!(bool_val.as_bool(), Some(true));
 
@@ -661,7 +660,6 @@ mod tests {
         let str_val = MAAValue::from("hello");
         assert_eq!(str_val.as_str(), Some("hello"));
 
-        // Test From<[T; N]> for ResolvedMAAValue
         let array_val = MAAValue::from([1, 2, 3]);
         match array_val {
             MAAValue::Array(vec) => {
@@ -671,7 +669,6 @@ mod tests {
             _ => panic!("Expected Array variant"),
         }
 
-        // Test TryFrom<Vec<T>> for ResolvedMAAValue
         let vec_val = MAAValue::try_from(vec![1, 2, 3]).unwrap();
         match vec_val {
             MAAValue::Array(vec) => {
@@ -687,7 +684,7 @@ mod tests {
     }
 
     #[test]
-    fn resolved_value_equality() {
+    fn value_equality() {
         // Test primitive equality
         assert_eq!(MAAValue::from(42), MAAValue::from(42));
         assert_ne!(MAAValue::from(42), MAAValue::from(43));
@@ -718,7 +715,7 @@ mod tests {
     }
 
     #[test]
-    fn resolved_value_nested_structures() {
+    fn value_nested_structures() {
         // Test nested arrays
         let nested_array = MAAValueTemplate::from([
             MAAValueTemplate::from([1, 2]),
@@ -758,7 +755,7 @@ mod tests {
     }
 
     #[test]
-    fn resolved_value_cloning() {
+    fn value_cloning() {
         // Test that cloning works correctly
         let original = MAAValue::from([1, 2, 3]);
         let cloned = original.clone();
