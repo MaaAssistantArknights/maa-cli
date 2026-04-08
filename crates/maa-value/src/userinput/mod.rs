@@ -117,6 +117,7 @@ pub trait UserInput: Sized {
     fn parse(self, input: &str) -> Outcome<Self::Value, (Self, std::borrow::Cow<'_, str>)>;
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawInput<T> {
