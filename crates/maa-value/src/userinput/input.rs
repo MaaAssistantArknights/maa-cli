@@ -7,11 +7,11 @@ use std::{
 
 use serde::Deserialize;
 
-use super::{Outcome, UserInput};
+use super::{Outcome, RawInput, UserInput};
 
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Deserialize, Debug, Clone, PartialEq)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(try_from = "RawInput<F>")]
 /// A generic struct that represents a user input that queries the user for input.
 ///
 /// For example, `Input::<i64>::new(Some(0), Some("medicine to use"))` represents a user input
@@ -24,6 +24,24 @@ pub struct Input<F> {
     default: Option<F>,
     /// Description of this input
     description: Option<Cow<'static, str>>,
+}
+
+impl<T> TryFrom<RawInput<T>> for Input<T> {
+    type Error = crate::error::Error;
+
+    fn try_from(value: RawInput<T>) -> Result<Self, Self::Error> {
+        let RawInput {
+            default,
+            description,
+        } = value;
+        if default.is_none() && description.is_none() {
+            return Err(crate::error::Error::EmptyInput);
+        }
+        Ok(Input {
+            default,
+            description,
+        })
+    }
 }
 
 impl<F> Input<F> {
@@ -95,11 +113,10 @@ mod tests {
             Input::new(Some(0)).with_description("how many apples to eat"),
             Input::new(Some(0)),
             Input::new(None).with_description("how many bananas to eat"),
-            Input::new(None),
         ];
 
         assert_de_tokens(&values, &[
-            Token::Seq { len: Some(4) },
+            Token::Seq { len: Some(3) },
             Token::Map { len: Some(2) },
             Token::Str("default"),
             Token::Some,
@@ -118,10 +135,18 @@ mod tests {
             Token::Some,
             Token::Str("how many bananas to eat"),
             Token::MapEnd,
-            Token::Map { len: Some(0) },
-            Token::MapEnd,
             Token::SeqEnd,
         ]);
+    }
+
+    #[test]
+    fn empty_map_is_rejected() {
+        use serde_test::{Token, assert_de_tokens_error};
+
+        assert_de_tokens_error::<Input<i64>>(
+            &[Token::Map { len: Some(0) }, Token::MapEnd],
+            &crate::error::Error::EmptyInput.to_string(),
+        );
     }
 
     #[test]

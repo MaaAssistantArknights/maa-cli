@@ -39,6 +39,12 @@ pub enum Error {
     #[error("Selection input has an empty alternatives list")]
     EmptyAlternatives,
 
+    /// Empty Input
+    ///
+    /// Neither 'default' nor 'description' was provided.
+    #[error("Empty input: neither 'default' nor 'description' was provided")]
+    EmptyInput,
+
     /// The default index for a selection is out of the valid range.
     ///
     /// The index is 1-based (not 0-based) and must be between 1 and the number of alternatives.

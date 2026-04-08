@@ -5,17 +5,35 @@ use std::{
 
 use serde::Deserialize;
 
-use super::{Outcome, UserInput};
+use super::{Outcome, RawInput, UserInput};
 
 /// A struct that represents a user input that queries the user for boolean input.
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Deserialize, Debug, Clone, PartialEq)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(try_from = "RawInput<bool>")]
 pub struct BoolInput {
     /// Default value for this parameter.
     default: Option<bool>,
     /// Description of this parameter
     description: Option<Cow<'static, str>>,
+}
+
+impl TryFrom<RawInput<bool>> for BoolInput {
+    type Error = crate::error::Error;
+
+    fn try_from(value: RawInput<bool>) -> Result<Self, Self::Error> {
+        let RawInput {
+            default,
+            description,
+        } = value;
+        if default.is_none() && description.is_none() {
+            return Err(crate::error::Error::EmptyInput);
+        }
+        Ok(Self {
+            default,
+            description,
+        })
+    }
 }
 
 impl BoolInput {
@@ -94,11 +112,10 @@ mod tests {
             BoolInput::new(Some(true)).with_description("do something"),
             BoolInput::new(Some(false)),
             BoolInput::new(None).with_description("do something"),
-            BoolInput::new(None),
         ];
 
         assert_de_tokens(&values, &[
-            Token::Seq { len: Some(4) },
+            Token::Seq { len: Some(3) },
             Token::Map { len: Some(2) },
             Token::Str("default"),
             Token::Some,
@@ -117,10 +134,18 @@ mod tests {
             Token::Some,
             Token::Str("do something"),
             Token::MapEnd,
-            Token::Map { len: Some(0) },
-            Token::MapEnd,
             Token::SeqEnd,
         ]);
+    }
+
+    #[test]
+    fn empty_map_is_rejected() {
+        use serde_test::{Token, assert_de_tokens_error};
+
+        assert_de_tokens_error::<BoolInput>(
+            &[Token::Map { len: Some(0) }, Token::MapEnd],
+            &crate::error::Error::EmptyInput.to_string(),
+        );
     }
 
     #[test]

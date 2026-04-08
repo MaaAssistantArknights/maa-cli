@@ -117,6 +117,13 @@ pub trait UserInput: Sized {
     fn parse(self, input: &str) -> Outcome<Self::Value, (Self, std::borrow::Cow<'_, str>)>;
 }
 
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawInput<T> {
+    default: Option<T>,
+    description: Option<std::borrow::Cow<'static, str>>,
+}
+
 mod bool_input;
 pub use bool_input::BoolInput;
 
