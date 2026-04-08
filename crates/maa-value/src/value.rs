@@ -875,6 +875,14 @@ mod tests {
             use super::*;
 
             #[test]
+            fn empty_map_is_object() {
+                // Test that an empty map is deserialized as an object instead of an input
+                let json = json!({});
+                let value: MAAValueTemplate = serde_json::from_value(json).unwrap();
+                assert!(matches!(value, MAAValueTemplate::Object(_)));
+            }
+
+            #[test]
             fn input_variant() {
                 // Test Input variant with default value
                 let json = json!({"default": 42});

@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     io::{self, BufRead, Write},
     sync::atomic::{AtomicBool, Ordering},
 };
@@ -115,6 +116,23 @@ pub trait UserInput: Sized {
     /// If the input is valid, return the parsed value.
     /// If the input is invalid, give back the ownership and an error message.
     fn parse(self, input: &str) -> Outcome<Self::Value, (Self, std::borrow::Cow<'_, str>)>;
+}
+
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawInput<T> {
+    default: Option<T>,
+    description: Option<Cow<'static, str>>,
+}
+
+impl<T> RawInput<T> {
+    fn validate(self) -> Result<(Option<T>, Option<Cow<'static, str>>)> {
+        if self.default.is_none() && self.description.is_none() {
+            return Err(Error::EmptyInput);
+        }
+        Ok((self.default, self.description))
+    }
 }
 
 mod bool_input;
