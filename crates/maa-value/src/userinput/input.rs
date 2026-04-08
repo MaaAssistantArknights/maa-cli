@@ -30,14 +30,8 @@ impl<T> TryFrom<RawInput<T>> for Input<T> {
     type Error = crate::error::Error;
 
     fn try_from(value: RawInput<T>) -> Result<Self, Self::Error> {
-        let RawInput {
-            default,
-            description,
-        } = value;
-        if default.is_none() && description.is_none() {
-            return Err(crate::error::Error::EmptyInput);
-        }
-        Ok(Input {
+        let (default, description) = value.validate()?;
+        Ok(Self {
             default,
             description,
         })

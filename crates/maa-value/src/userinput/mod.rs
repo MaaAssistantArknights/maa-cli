@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     io::{self, BufRead, Write},
     sync::atomic::{AtomicBool, Ordering},
 };
@@ -122,7 +123,16 @@ pub trait UserInput: Sized {
 #[serde(deny_unknown_fields)]
 struct RawInput<T> {
     default: Option<T>,
-    description: Option<std::borrow::Cow<'static, str>>,
+    description: Option<Cow<'static, str>>,
+}
+
+impl<T> RawInput<T> {
+    fn validate(self) -> Result<(Option<T>, Option<Cow<'static, str>>)> {
+        if self.default.is_none() && self.description.is_none() {
+            return Err(Error::EmptyInput);
+        }
+        Ok((self.default, self.description))
+    }
 }
 
 mod bool_input;
