@@ -71,8 +71,8 @@ pub struct RoguelikeParams {
     roles: Option<String>,
 
     /// Stop after given count, if not given, never stop
-    #[arg(long)]
-    start_count: Option<i32>,
+    #[arg(long, alias = "start-count")]
+    starts_count: Option<i32>,
 
     /// Difficulty, not valid for Phantom theme (no numerical difficulty)
     ///
@@ -166,7 +166,7 @@ impl super::IntoParameters for RoguelikeParams {
             "squad" =>? self.squad,
             "roles" =>? self.roles,
             "core_char" =>? self.core_char,
-            "start_count" =>? self.start_count,
+            "starts_count" =>? self.starts_count,
             "stop_at_final_boss" => self.stop_at_final_boss,
         );
 
@@ -359,7 +359,7 @@ mod tests {
                 "squad" => "蓝图测绘分队",
                 "roles" => "取长补短",
                 "core_char" => "维什戴尔",
-                "start_count" => 100,
+                "starts_count" => 100,
                 "difficulty" => 15,
             )),
         );
