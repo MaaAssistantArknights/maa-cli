@@ -4,11 +4,8 @@
 
 - Run `cargo +nightly fmt` first to normalize formatting.
 - Run `cargo clippy` early to catch lint failures.
-- Quick smoke: `cargo test -p <crate>` for the edited crate(s).
-- Local verification: `cargo x test --no-clippy` (skip duplicate clippy if already run).
-- Final check: `cargo x test` (CI parity: build + clippy + tests).
-- `cargo x test` sets `MAA_CONFIG_DIR` and `MAA_EXTRA_SHARE_NAME`; avoid overrides unless required.
-- Avoid `cargo x release` or packaging tasks unless explicitly requested.
+- Quick: `cargo test -p <crate>` for the edited crate(s).
+- Local verification: `cargo x test` (build + tests).
 
 ## Architecture Overview (Understand This)
 
