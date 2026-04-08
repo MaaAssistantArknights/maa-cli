@@ -59,6 +59,10 @@ fn asst_config_template() -> MAAValueTemplate {
                         "MacPlayTools",
                         Some("this if and only if you are connecting to PlayCover"),
                     ),
+                    ValueWithDesc::new(
+                        "MaaFwAdb",
+                        Some("use MaaFramework ADB controller for emulator extras support"),
+                    ),
                 ],
                 std::num::NonZero::new(3),
             ).unwrap()

@@ -77,7 +77,7 @@
     },
     "touchMode": {
       "type": "string",
-      "enum": ["ADB", "MiniTouch", "MaaTouch", "MacPlayTools"],
+      "enum": ["ADB", "MiniTouch", "MaaTouch", "MacPlayTools", "MaaFwAdb"],
       "default": "ADB"
     }
   }
