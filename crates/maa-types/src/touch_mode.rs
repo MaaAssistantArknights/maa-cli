@@ -16,10 +16,13 @@ pub enum TouchMode {
     ///
     /// If you use preset `PlayCover`, you can ignore this option as it's set automatically.
     MacPlayTools,
+    /// A MaaFramework-based ADB controller that enables emulator-specific fast screencap support,
+    /// such as Android Emulator AVD extras.
+    MaaFwAdb,
 }
 
 impl TouchMode {
-    impl_enum_utils!(TouchMode, 4, TouchMode::Adb);
+    impl_enum_utils!(TouchMode, 5, TouchMode::Adb);
 
     impl_from_str_opt!();
 
@@ -30,6 +33,7 @@ impl TouchMode {
             TouchMode::MiniTouch => "minitouch",
             TouchMode::MaaTouch => "maatouch",
             TouchMode::MacPlayTools => "MacPlayTools",
+            TouchMode::MaaFwAdb => "MaaFwAdb",
         }
     }
 }
@@ -69,6 +73,8 @@ mod tests {
         assert_eq!("MAATouch".parse(), Ok(TouchMode::MaaTouch));
         assert_eq!("macplaytools".parse(), Ok(TouchMode::MacPlayTools));
         assert_eq!("MacPlayTools".parse(), Ok(TouchMode::MacPlayTools));
+        assert_eq!("maafwadb".parse(), Ok(TouchMode::MaaFwAdb));
+        assert_eq!("MaaFwAdb".parse(), Ok(TouchMode::MaaFwAdb));
 
         assert_eq!(
             "Unknown".parse::<TouchMode>(),
@@ -76,7 +82,7 @@ mod tests {
         );
         assert_eq!(
             UnknownTouchModeError("Unknown".to_owned()).to_string(),
-            "unknown touch mode `Unknown`, expected one of `adb`, `minitouch`, `maatouch`, `MacPlayTools`",
+            "unknown touch mode `Unknown`, expected one of `adb`, `minitouch`, `maatouch`, `MacPlayTools`, `MaaFwAdb`",
         );
     }
 
@@ -93,15 +99,17 @@ mod tests {
                 TouchMode::MiniTouch,
                 TouchMode::MaaTouch,
                 TouchMode::MacPlayTools,
+                TouchMode::MaaFwAdb,
             ];
 
             // Test deserializing from string
             assert_de_tokens(&modes, &[
-                Token::Seq { len: Some(4) },
+                Token::Seq { len: Some(5) },
                 Token::Str("adb"),
                 Token::Str("minitouch"),
                 Token::Str("maatouch"),
                 Token::Str("MacPlayTools"),
+                Token::Str("MaaFwAdb"),
                 Token::SeqEnd,
             ]);
         }
@@ -111,12 +119,12 @@ mod tests {
             assert_de_tokens_error::<TouchMode>(
                 &[Token::Str("Unknown")],
                 "unknown variant `Unknown`, expected one of \
-                `adb`, `minitouch`, `maatouch`, `MacPlayTools`",
+                `adb`, `minitouch`, `maatouch`, `MacPlayTools`, `MaaFwAdb`",
             );
 
             assert_de_tokens_error::<TouchMode>(
-                &[Token::U64(4)],
-                "invalid type: integer `4`, expected a valid touch mode",
+                &[Token::U64(5)],
+                "invalid type: integer `5`, expected a valid touch mode",
             );
         }
 
@@ -126,6 +134,7 @@ mod tests {
             assert_ser_tokens(&TouchMode::MiniTouch, &[Token::Str("minitouch")]);
             assert_ser_tokens(&TouchMode::MaaTouch, &[Token::Str("maatouch")]);
             assert_ser_tokens(&TouchMode::MacPlayTools, &[Token::Str("MacPlayTools")]);
+            assert_ser_tokens(&TouchMode::MaaFwAdb, &[Token::Str("MaaFwAdb")]);
         }
     }
 
@@ -135,6 +144,7 @@ mod tests {
         assert_eq!(TouchMode::MiniTouch.to_str(), "minitouch");
         assert_eq!(TouchMode::MaaTouch.to_str(), "maatouch");
         assert_eq!(TouchMode::MacPlayTools.to_str(), "MacPlayTools");
+        assert_eq!(TouchMode::MaaFwAdb.to_str(), "MaaFwAdb");
     }
 
     #[cfg(feature = "ffi")]
