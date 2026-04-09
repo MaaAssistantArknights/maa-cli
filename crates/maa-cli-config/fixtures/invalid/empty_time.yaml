@@ -1,0 +1,9 @@
+version: 2
+tasks:
+  - type: Fight
+    if:
+      time_range:
+        from:
+        until:
+    params:
+      stage: 1-7
