@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "client_type": "Official",
+  "connection": {
+    "type": "MuMuPro",
+    "address": "127.0.0.1:16384",
+    "touch_mode": "MaaTouch",
+    "kill_adb_on_exit": true
+  },
+  "behavior": {
+    "deployment_with_pause": false
+  }
+}

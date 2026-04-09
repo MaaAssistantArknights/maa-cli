@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "manage_environment_lifecycle": false,
+  "manage_game_lifecycle": false,
+  "tasks": [
+    {
+      "type": "Mall",
+      "params": {
+        "shopping": true
+      },
+      "override_strategy": "merge",
+      "overrides": [
+        {
+          "if": "OnSideStory",
+          "params": {
+            "shopping": false
+          }
+        }
+      ]
+    }
+  ]
+}

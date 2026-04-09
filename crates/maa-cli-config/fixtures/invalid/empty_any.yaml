@@ -1,0 +1,7 @@
+version: 2
+tasks:
+  - type: Fight
+    if:
+      any: []
+    params:
+      stage: 1-7

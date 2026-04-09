@@ -1,0 +1,6 @@
+version: 2
+inherits: cn-android
+client_type: Official
+connection:
+  type: General
+  address: emulator-5554

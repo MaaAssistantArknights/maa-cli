@@ -1,0 +1,5 @@
+version: 2
+connection:
+  type: PlayCover
+  address: 127.0.0.1:1717
+  screencap_mode: SCK

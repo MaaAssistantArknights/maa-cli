@@ -1,1 +1,3 @@
 MD013: false
+no-duplicate-heading:
+  siblings_only: true
