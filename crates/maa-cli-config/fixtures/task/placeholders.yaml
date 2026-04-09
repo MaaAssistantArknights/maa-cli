@@ -1,0 +1,17 @@
+version: 2
+tasks:
+  - type: Fight
+    params:
+      stage: ${stage}
+      note: farm ${stage}
+    override_strategy: first
+    overrides:
+      - if: OnSideStory
+        params:
+          note: side ${stage}
+
+  - type: Fight
+    if:
+      weekdays: [Mon]
+    params:
+      stage: ignored

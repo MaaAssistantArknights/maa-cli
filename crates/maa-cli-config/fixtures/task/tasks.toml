@@ -1,0 +1,23 @@
+version = 2
+manage_environment_lifecycle = true
+manage_game_lifecycle = false
+account_name = "main"
+
+[[tasks]]
+type = "Fight"
+
+[tasks.if]
+weekdays = ["Tue", "Thu"]
+timezone = "Local"
+
+[tasks.params]
+stage = "CE-6"
+
+[[tasks.overrides]]
+if = "OnSideStory"
+
+[tasks.overrides.params]
+stage = "SL-7"
+
+[[tasks]]
+type = "Recruit"

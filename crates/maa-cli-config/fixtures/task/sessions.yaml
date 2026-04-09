@@ -1,0 +1,28 @@
+version: 2
+manage_environment_lifecycle: true
+manage_game_lifecycle: true
+sessions:
+  - account_name: main
+    tasks:
+      - type: Fight
+        params:
+          stage: 1-7
+      - type: Recruit
+
+  - account_name: alt
+    tasks:
+      - type: Infrast
+        if:
+          any:
+            - OnSideStory
+            - weekdays: [Sat, Sun]
+        params:
+          mode: 10000
+      - type: Mall
+        override_strategy: merge
+        params:
+          shopping: true
+        overrides:
+          - if: OnSideStory
+            params:
+              shopping: false

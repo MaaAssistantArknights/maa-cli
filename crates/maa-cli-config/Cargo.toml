@@ -1,0 +1,35 @@
+[package]
+name = "maa-cli-config"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Configuration file types for maa-cli"
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+chrono = { workspace = true, features = ["clock", "serde", "std"] }
+maa-types = { workspace = true, features = ["serde"] }
+maa-value = { workspace = true }
+nonempty-vec = { workspace = true, features = ["serde"] }
+schemars = { workspace = true, features = ["chrono04"], optional = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+maa-question = { workspace = true }
+serde_yaml = { workspace = true }
+toml = { workspace = true }
+
+[features]
+schema = [
+  "dep:schemars",
+  "maa-types/schema",
+  "maa-value/schema",
+  "nonempty-vec/schema"
+]
+
+[lints]
+workspace = true

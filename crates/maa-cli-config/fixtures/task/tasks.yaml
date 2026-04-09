@@ -1,0 +1,29 @@
+version: 2
+manage_environment_lifecycle: true
+manage_game_lifecycle: false
+account_name: main
+tasks:
+  - type: StartUp
+    params:
+      start_game_enabled: true
+      client_type: Official
+
+  - type: Fight
+    if:
+      weekdays: [Mon, Wed, Fri]
+      timezone: Local
+    params:
+      stage: 1-7
+      medicine: 1
+    overrides:
+      - if: OnSideStory
+        params:
+          stage: SL-8
+      - if:
+          time_range:
+            from: 20:00:00
+          timezone: Official
+        params:
+          stage: AP-5
+
+  - type: CloseDown

@@ -1,0 +1,9 @@
+version = 2
+client_type = "YoStarEN"
+
+[connection]
+type = "AVD"
+sdk_path = "/opt/android-sdk"
+avd_name = "Pixel_8"
+touch_mode = "ADB"
+kill_adb_on_exit = true

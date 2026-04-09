@@ -1,0 +1,7 @@
+version: 2
+account_name: main
+sessions:
+  - tasks:
+      - type: Fight
+        params:
+          stage: 1-7
