@@ -1,5 +1,60 @@
 # Release Notes
 
+## Release 0.7.3
+
+### Features
+
+- Add auto_reconnect option to disable game server reconnect by [@wangl-cc](https://github.com/wangl-cc) in [#510](https://github.com/MaaAssistantArknights/maa-cli/pull/510)
+- Use atomic file writes to avoid partial files by [@wangl-cc](https://github.com/wangl-cc) in [#517](https://github.com/MaaAssistantArknights/maa-cli/pull/517)
+- Enhance Waydroid integration with automatic session management and improved ADB connection handling by [@Constrat](https://github.com/Constrat) in [#514](https://github.com/MaaAssistantArknights/maa-cli/pull/514)
+- Use bound ID to open PlayCover app on macOS by [@wangl-cc](https://github.com/wangl-cc) in [#522](https://github.com/MaaAssistantArknights/maa-cli/pull/522)
+- Add MaaFwAdb touch mode support by [@wangl-cc](https://github.com/wangl-cc) in [#526](https://github.com/MaaAssistantArknights/maa-cli/pull/526)
+
+### Bug Fixes
+
+- Ignore concurrent cache write races by [@wangl-cc](https://github.com/wangl-cc) in [#519](https://github.com/MaaAssistantArknights/maa-cli/pull/519)
+- Preserve map order when converting config by [@wangl-cc](https://github.com/wangl-cc) in [#523](https://github.com/MaaAssistantArknights/maa-cli/pull/523)
+- Reject empty user input definitions in maa-value by [@wangl-cc](https://github.com/wangl-cc) in [#525](https://github.com/MaaAssistantArknights/maa-cli/pull/525)
+
+### Refactor
+
+- Split maa-sys safe API into maa-core  by [@wangl-cc](https://github.com/wangl-cc) in [#507](https://github.com/MaaAssistantArknights/maa-cli/pull/507)
+- Model copilot raid mode as enum by [@wangl-cc](https://github.com/wangl-cc) in [#518](https://github.com/MaaAssistantArknights/maa-cli/pull/518)
+- Extract shared secret config by [@wangl-cc](https://github.com/wangl-cc) in [#520](https://github.com/MaaAssistantArknights/maa-cli/pull/520)
+- Split `maa-value` into template and resolved types by [@wangl-cc](https://github.com/wangl-cc) in [#485](https://github.com/MaaAssistantArknights/maa-cli/pull/485)
+
+### Testing
+
+- Isolate cargo x test runtime directories by [@wangl-cc](https://github.com/wangl-cc) in [#515](https://github.com/MaaAssistantArknights/maa-cli/pull/515)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.7.2...v0.7.3>
+
+## Release 0.7.2
+
+### Features
+
+- Add loop-times support for copilot by [@wangl-cc](https://github.com/wangl-cc) in [#501](https://github.com/MaaAssistantArknights/maa-cli/pull/501)
+
+### Bug Fixes
+
+- Remove duplicated `Fetched ...` message during download by [@wangl-cc](https://github.com/wangl-cc) in [#504](https://github.com/MaaAssistantArknights/maa-cli/pull/504)
+- Add default value for missing skill in CopilotOperator by [@travellerse](https://github.com/travellerse) in [#496](https://github.com/MaaAssistantArknights/maa-cli/pull/496)
+- Align hot update task cache with MaaCore by [@wangl-cc](https://github.com/wangl-cc) in [#505](https://github.com/MaaAssistantArknights/maa-cli/pull/505)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.7.1...v0.7.2>
+
+## Release 0.7.1
+
+### Features
+
+- Use simplified UA for HTTP requests by [@wangl-cc](https://github.com/wangl-cc) in [#488](https://github.com/MaaAssistantArknights/maa-cli/pull/488)
+
+### Bug Fixes
+
+- Single-task copilot uses `filename` instead of `copilot_list` by [@travellerse](https://github.com/travellerse) in [#492](https://github.com/MaaAssistantArknights/maa-cli/pull/492)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.7.0...v0.7.1>
+
 ## Release 0.7.0
 
 ### Features
