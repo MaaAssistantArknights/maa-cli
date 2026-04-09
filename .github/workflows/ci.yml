@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "dev-0.8"]
   pull_request:
-    branches: ["main"]
+    branches: ["main", "dev-0.8"]
   merge_group:
     branches: ["main"]
     types: [checks_requested]
