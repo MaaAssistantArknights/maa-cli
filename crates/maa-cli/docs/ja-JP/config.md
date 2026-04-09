@@ -332,7 +332,13 @@ address = "127.0.0.1:7777" # 如果你需要的话，你可以覆盖预设的地
 
 目前只有 `MuMuPro` 一个模拟器的预设，如果有其他常用模拟器的预设，欢迎提交 issue 或者 PR。
 
-此处有一个特殊的预设 `PlayCover`，其用于在 macOS 上连接直接通过 `PlayCover` 原生运行的游戏客户端。这种情况下不需要指定 `adb_path` 且 `address` 不是 `adb` l连接的地址而是 `PlayTools` 的地址，具体使用参见 [PlayCover 支持文档][playcover-doc].
+#### 特殊预设
+
+目前预配置了两种特殊预设：`PlayCover`（macOS）和 `Waydroid`（Linux）
+
+- `PlayCover` 用于在 macOS 上连接直接通过 `PlayCover` 原生运行的游戏客户端。这种情况下不需要指定 `adb_path`，`address` 是 `PlayTools` 的地址。具体使用参见 [PlayCover 支持文档][playcover-doc].
+
+- `Waydroid` 用于在 Linux 上连接直接通过 `Waydroid` 原生运行的游戏客户端。这种情况下仍需要指定 `adb_path` 供 MaaCore 连接设备使用。maa-cli 会自动管理会话：通过 `waydroid status` 检测会话是否已在运行，必要时启动会话，然后通过 `waydroid adb connect` 建立 ADB 连接。具体使用参见 [Waydroid 支持文档][waydroid-doc].
 
 ### 资源配置
 

@@ -341,15 +341,20 @@ Currently only `MuMuPro` preset is available. Issues and PRs for more presets ar
 
 #### Special Presets
 
-There are two special presets: `PlayCover (macOS)` and `Waydroid (Linux)`
+There are two special presets: `PlayCover` (macOS) and `Waydroid` (Linux)
 
-- `PlayCover` is for connecting to iOS apps running natively on macOS through PlayCover. In this case, `adb_path` is ignored and `address` is the address of `PlayTools`. See [PlayCover documentation][playcover-doc] for details.
+- `PlayCover` is for connecting to iOS apps running natively on macOS through PlayCover.
 
-- `Waydroid` is for connecting to Android apps running natively on Linux through Waydroid.
-  `adb_path` is required for MaaCore's device connection.
-  maa-cli manages the session automatically: it checks `waydroid status` to detect whether a
-  session is already running, starts one if needed, and then connects ADB via `waydroid adb connect`.
-  See [Waydroid documentation][waydroid-doc] for details.
+   In this case, `adb_path` is ignored and `address` is the address of `PlayTools`.
+   See [PlayCover documentation][playcover-doc] for details.
+
+- `Waydroid` is for connecting to Android apps running natively on Linux through Waydroid. 
+
+   `adb_path` is required for MaaCore's device connection.
+   
+   maa-cli manages the session automatically: it checks `waydroid status` to detect whether a
+   session is already running, starts one if needed, and then connects ADB via `waydroid adb connect`.
+   See [Waydroid documentation][waydroid-doc] for details.
 
 ### Resource
 
