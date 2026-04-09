@@ -181,9 +181,12 @@ pub fn create_zip<P: AsRef<Path>>(output_path: P, files: &[(&str, &str)]) -> Res
             output_path.display()
         )
     })?;
-    let mut hasher = Sha256::new();
+    let mut hasher = digest_io::IoWrapper(Sha256::new());
     io::copy(&mut file, &mut hasher)
         .with_context(|| format!("Failed to hash archive: {}", output_path.display()))?;
 
-    Ok(format!("{:x}", hasher.finalize()))
+    Ok(format!(
+        "{:x}",
+        base16ct::HexDisplay(hasher.0.finalize().as_slice())
+    ))
 }

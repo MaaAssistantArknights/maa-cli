@@ -192,55 +192,11 @@ pub mod digest {
         }
 
         pub fn from_hex_str(hex: &str) -> Result<Self> {
-            /// The map of hex characters to their corresponding byte values.
-            ///
-            /// Instead of using a match statement, this approach is branchless for better
-            /// performance.
-            static HEX_TABLE: [u8; 256] = {
-                let mut t = [0xff; 256];
-                let mut i = b'0';
-                while i <= b'9' {
-                    t[i as usize] = i - b'0';
-                    i += 1;
-                }
-                let mut i = b'a';
-                while i <= b'f' {
-                    t[i as usize] = i - b'a' + 10;
-                    i += 1;
-                }
-                let mut i = b'A';
-                while i <= b'F' {
-                    t[i as usize] = i - b'A' + 10;
-                    i += 1;
-                }
-                t
-            };
-
-            let len = hex.len();
-            if !len.is_multiple_of(2) {
-                return Err(Error::new(ErrorKind::Verifier)
-                    .with_desc(format!("Invalid hex string length {len}")));
-            }
-
-            let bytes = hex
-                .as_bytes()
-                .chunks(2)
-                .enumerate()
-                .map(|(i, chunk)| {
-                    let hi = HEX_TABLE[chunk[0] as usize];
-                    let lo = HEX_TABLE[chunk[1] as usize];
-                    if (hi | lo) == 0xff {
-                        let (c, idx) = if hi == 0xff {
-                            (chunk[0] as char, i * 2)
-                        } else {
-                            (chunk[1] as char, i * 2 + 1)
-                        };
-                        return Err(Error::new(ErrorKind::Verifier)
-                            .with_desc(format!("Invalid hex character {c} at index and {idx}",)));
-                    }
-                    Ok(hi << 4 | lo)
-                })
-                .collect::<Result<Vec<u8>>>()?;
+            let bytes = base16ct::mixed::decode_vec(hex).map_err(|e| {
+                Error::new(ErrorKind::Verifier)
+                    .with_source(e)
+                    .with_desc("Failed to decode hex string")
+            })?;
 
             Self::valid(&bytes)?;
 

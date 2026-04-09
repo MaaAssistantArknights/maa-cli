@@ -9,7 +9,9 @@ license.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
+base16ct = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
+digest-io = { workspace = true }
 flate2 = { workspace = true }
 maa-dirs.workspace = true
 maa-version = { workspace = true }
