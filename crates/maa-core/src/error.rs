@@ -2,8 +2,8 @@ use maa_ffi_types::{AsstBool, AsstId, AsstSize};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("MaaCore returned an error, check its log ({0}) for details")]
-    MAAError(std::path::PathBuf),
+    #[error("MaaCore returned an error")]
+    MAAError,
     #[error("Failed to create Assistant")]
     NullHandle,
     #[error("Buffer too small")]
@@ -25,16 +25,15 @@ pub enum Error {
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Specific error produced when an `AsstBool` or `AsstId` FFI call returns its
-/// failure sentinel. Carries the path to MaaCore's log file so callers can
-/// direct users to it for diagnosis.
+/// failure sentinel.
 ///
 /// Converts to [`Error::MAAError`] via `From`.
 #[derive(Debug)]
-pub(crate) struct MaaCoreError(pub(crate) std::path::PathBuf);
+pub(crate) struct MaaCoreError;
 
 impl From<MaaCoreError> for Error {
-    fn from(e: MaaCoreError) -> Self {
-        Error::MAAError(e.0)
+    fn from(_: MaaCoreError) -> Self {
+        Error::MAAError
     }
 }
 
@@ -97,11 +96,7 @@ impl AsstResult for AsstBool {
     type Return = ();
 
     fn to_result(self) -> std::result::Result<(), MaaCoreError> {
-        if self == 1 {
-            Ok(())
-        } else {
-            Err(MaaCoreError(crate::get_log_path()))
-        }
+        if self == 1 { Ok(()) } else { Err(MaaCoreError) }
     }
 }
 
@@ -124,7 +119,7 @@ impl AsstResult for AsstId {
 
     fn to_result(self) -> std::result::Result<AsstId, MaaCoreError> {
         if self == INVALID_ID {
-            Err(MaaCoreError(crate::get_log_path()))
+            Err(MaaCoreError)
         } else {
             Ok(self)
         }
@@ -138,12 +133,12 @@ mod tests {
 
     #[test]
     fn asst_bool() {
-        assert!(matches!(0u8.to_result(), Err(MaaCoreError(_))));
+        assert!(matches!(0u8.to_result(), Err(MaaCoreError)));
         assert!(matches!(1u8.to_result(), Ok(())));
         // to_maa_result: Ok path
         assert!(1u8.to_maa_result().is_ok());
         // to_maa_result: Err path exercises From<MaaCoreError>
-        assert!(matches!(0u8.to_maa_result(), Err(Error::MAAError(_))));
+        assert!(matches!(0u8.to_maa_result(), Err(Error::MAAError)));
     }
 
     #[test]
@@ -162,13 +157,10 @@ mod tests {
 
     #[test]
     fn asst_id() {
-        assert!(matches!(INVALID_ID.to_result(), Err(MaaCoreError(_))));
+        assert!(matches!(INVALID_ID.to_result(), Err(MaaCoreError)));
         assert_eq!(1i32.to_result().unwrap(), 1i32);
         // to_maa_result: Err path
-        assert!(matches!(
-            INVALID_ID.to_maa_result(),
-            Err(Error::MAAError(_))
-        ));
+        assert!(matches!(INVALID_ID.to_maa_result(), Err(Error::MAAError)));
         assert_eq!(1i32.to_maa_result().unwrap(), 1i32);
     }
 }

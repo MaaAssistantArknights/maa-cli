@@ -1,9 +1,6 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-use std::{
-    ffi::{c_char, c_void},
-    sync::RwLock,
-};
+use std::ffi::{c_char, c_void};
 
 use maa_ffi_string::ToCString;
 use maa_ffi_types::*;
@@ -16,17 +13,6 @@ use callback::trampoline;
 mod error;
 use error::{AsstResult, BufferTooSmall};
 pub use error::{Error, Result};
-
-/// The user directory of the assistant.
-static USER_DIR: RwLock<std::path::PathBuf> = RwLock::new(std::path::PathBuf::new());
-
-/// Get the path of MaaCore's log file.
-///
-/// For use with `Error::MAAError`.
-pub(crate) fn get_log_path() -> std::path::PathBuf {
-    // Unwrap: The RwLock only errors if it is poisoned, which should never happen.
-    USER_DIR.read().unwrap().join("debug").join("asst.log")
-}
 
 /// A safe and convenient wrapper of MaaCore Assistant API.
 ///
@@ -116,9 +102,6 @@ impl Assistant {
     pub fn set_user_dir(path: impl ToCString) -> Result<()> {
         let cstring = path.to_cstring()?;
         unsafe { maa_sys::binding::AsstSetUserDir(cstring.as_ptr()) }.to_maa_result()?;
-        let path_buf = std::path::PathBuf::from(cstring.to_string_lossy().as_ref());
-        // Unwrap: The RwLock only errors if it is poisoned, which should never happen.
-        *USER_DIR.write().unwrap() = path_buf;
         Ok(())
     }
 
