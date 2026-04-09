@@ -1,5 +1,13 @@
 # Release Notes
 
+## Release 0.7.4
+
+### Bug Fixes
+
+- Align roguelike starts_count CLI param with upstream by [@travellerse](https://github.com/travellerse) in [#527](https://github.com/MaaAssistantArknights/maa-cli/pull/527)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.7.3...v0.7.4>
+
 ## Release 0.7.3
 
 ### Features
