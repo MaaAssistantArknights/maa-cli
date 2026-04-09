@@ -12,6 +12,7 @@ license = "AGPL-3.0-only"
 
 [workspace.dependencies]
 anyhow = "1"
+base16ct = "1.0.0"
 chrono = { version = "0.4.31", default-features = false }
 clap = { version = "4.4", features = ["unstable-markdown"] }
 clap_complete = "4.4"
@@ -19,6 +20,7 @@ clap_mangen = "0.3"
 color-print = "0.3.6"
 constcat = "0.6.0"
 digest = "0.11"
+digest-io = "0.1.0"
 directories = "6"
 dunce = "1.0.4"
 env_logger = { version = "0.11", default-features = false }

@@ -95,6 +95,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
+name = "base16ct"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd307490d624467aa6f74b0eabb77633d1f758a7b25f12bceb0b22e08d9726f6"
+
+[[package]]
 name = "base64"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -406,6 +412,15 @@ dependencies = [
  "block-buffer",
  "const-oid",
  "crypto-common",
+]
+
+[[package]]
+name = "digest-io"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2de63d600bc7fab91180bc17385f29b342468dc8ef2af09dceba450a293de3da"
+dependencies = [
+ "digest",
 ]
 
 [[package]]
@@ -1118,6 +1133,7 @@ version = "1.0.0"
 name = "maa-installer"
 version = "0.2.0"
 dependencies = [
+ "base16ct",
  "digest",
  "flate2",
  "indicatif",
@@ -2663,7 +2679,9 @@ name = "xtask"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base16ct",
  "clap",
+ "digest-io",
  "flate2",
  "maa-dirs",
  "maa-version",
