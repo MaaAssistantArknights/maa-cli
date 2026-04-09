@@ -451,6 +451,7 @@ passphrase = "password"       # ssh 키의 암호
 [task-types]: https://maa.plus/docs/ko-kr/protocol/integration.html#작업-유형-목록
 [emulator-ports]: https://maa.plus/docs/ko-kr/manual/connection.html#포트-번호-입력
 [playcover-doc]: https://maa.plus/docs/ko-kr/manual/device/macos.html#✅-playcover-제일-부드럽습니다-🚀
+[waydroid-doc]: https://maa.plus/docs/zh-cn/manual/device/linux.html#✅-waydroid
 [example-config]: ../../config_examples
 [wangl-cc-dotfiles]: https://github.com/wangl-cc/dotfiles/tree/main/home/dot_config/maa
 [schema-dir]: ../../schemas/

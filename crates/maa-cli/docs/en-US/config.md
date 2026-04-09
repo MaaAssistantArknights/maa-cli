@@ -348,10 +348,10 @@ There are two special presets: `PlayCover` (macOS) and `Waydroid` (Linux)
    In this case, `adb_path` is ignored and `address` is the address of `PlayTools`.
    See [PlayCover documentation][playcover-doc] for details.
 
-- `Waydroid` is for connecting to Android apps running natively on Linux through Waydroid. 
+- `Waydroid` is for connecting to Android apps running natively on Linux through Waydroid.
 
    `adb_path` is required for MaaCore's device connection.
-   
+
    maa-cli manages the session automatically: it checks `waydroid status` to detect whether a
    session is already running, starts one if needed, and then connects ADB via `waydroid adb connect`.
    See [Waydroid documentation][waydroid-doc] for details.
