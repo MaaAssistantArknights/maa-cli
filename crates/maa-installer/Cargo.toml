@@ -12,9 +12,9 @@ digest = { workspace = true, optional = true }
 flate2 = { workspace = true, optional = true }
 indicatif = { workspace = true }
 log = { workspace = true }
+maa-error = { workspace = true }
 semver = { workspace = true }
 tar = { workspace = true, optional = true }
-thiserror = { workspace = true }
 ureq = { workspace = true }
 zip = { workspace = true, optional = true }
 

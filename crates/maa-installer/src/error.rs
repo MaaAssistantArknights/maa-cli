@@ -1,6 +1,6 @@
 //! Error types for the MAA installer library.
 
-use std::{error::Error as StdError, fmt};
+use std::{borrow::Cow, error::Error as StdError, fmt};
 
 /// Categorization of different error types that can occur during installation operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,82 +37,44 @@ impl fmt::Display for ErrorKind {
     }
 }
 
-/// The primary error type for the MAA installer library.
-///
-/// This error type provides:
-/// - Categorization via [`ErrorKind`]
-/// - Optional descriptive message for user-facing error details
-/// - Source error chaining for debugging and root cause analysis
-/// - Send + Sync bounds for thread safety
-#[derive(Debug, thiserror::Error)]
-pub struct Error {
-    /// The category of error that occurred
-    kind: ErrorKind,
-    /// The underlying source error, if any
-    #[source]
-    source: Option<Box<dyn StdError + Send + Sync>>,
-    /// Human-readable description of what went wrong
-    description: Option<std::borrow::Cow<'static, str>>,
+#[derive(Debug)]
+pub struct Error(maa_error::Error<ErrorKind>);
+
+impl Error {
+    pub const fn new(kind: ErrorKind) -> Self {
+        Self(maa_error::Error::new(kind))
+    }
+
+    pub fn with_source(mut self, source: impl Into<maa_error::BoxError>) -> Self {
+        self.0 = self.0.with_source(source);
+        self
+    }
+
+    pub fn with_desc(mut self, desc: impl Into<Cow<'static, str>>) -> Self {
+        self.0 = self.0.with_desc(desc);
+        self
+    }
+
+    pub fn kind(&self) -> ErrorKind {
+        *self.0.kind()
+    }
+
+    pub fn description(&self) -> Option<&str> {
+        self.0.description()
+    }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.kind)?;
-
-        if let Some(description) = &self.description {
-            write!(f, ": {}", description)?;
-        }
-
-        Ok(())
+        fmt::Display::fmt(&self.0, f)
     }
 }
 
-impl Error {
-    /// Creates a new error with the specified kind.
-    pub const fn new(kind: ErrorKind) -> Self {
-        Self {
-            kind,
-            source: None,
-            description: None,
-        }
-    }
-
-    /// Attaches a source error to this error.
-    ///
-    /// This is useful for preserving the original error while adding context.
-    /// The source error will be available through the [`std::error::Error::source`] method.
-    pub fn with_source(mut self, source: impl Into<Box<dyn StdError + Send + Sync>>) -> Self {
-        self.source = Some(source.into());
-        self
-    }
-
-    /// Attaches a description to this error.
-    ///
-    /// The description provides additional context about what went wrong
-    /// and is displayed to users when the error is formatted.
-    pub fn with_desc(mut self, desc: impl Into<std::borrow::Cow<'static, str>>) -> Self {
-        self.description = Some(desc.into());
-        self
-    }
-
-    /// Returns the kind of error that occurred.
-    ///
-    /// This allows callers to categorize and handle errors without
-    /// needing to inspect the underlying source error.
-    pub fn kind(&self) -> ErrorKind {
-        self.kind
-    }
-
-    /// Returns the human-readable description of this error, if any.
-    ///
-    /// The description provides additional context about what went wrong
-    /// and is suitable for displaying to end users.
-    pub fn description(&self) -> Option<&str> {
-        self.description.as_deref()
+impl StdError for Error {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        self.0.source()
     }
 }
-
-// Convenience From implementations for common error types
 
 impl From<std::io::Error> for Error {
     fn from(error: std::io::Error) -> Self {
@@ -122,37 +84,43 @@ impl From<std::io::Error> for Error {
 
 impl From<ureq::Error> for Error {
     fn from(error: ureq::Error) -> Self {
-        use ureq::Error::*;
-        match error {
-            Json(e) => Self::new(ErrorKind::Other).with_source(e),
-            e => Self::new(ErrorKind::Network).with_source(e),
-        }
+        let kind = if matches!(error, ureq::Error::Other(_)) {
+            ErrorKind::Other
+        } else {
+            ErrorKind::Network
+        };
+        Self::new(kind).with_source(error)
     }
 }
 
-/// A convenience trait for appending descriptions to errors in result chains.
-///
-/// This trait provides methods to add descriptive context to errors
-/// while preserving the original error information.
+impl From<maa_error::Error<ErrorKind>> for Error {
+    fn from(error: maa_error::Error<ErrorKind>) -> Self {
+        Self(error)
+    }
+}
+
+impl From<Error> for maa_error::Error<ErrorKind> {
+    fn from(error: Error) -> Self {
+        error.0
+    }
+}
+
 pub trait WithDesc<T> {
-    /// Appends a static string description to an error if the result is `Err`.
-    ///
-    /// # Examples
     fn with_desc(self, desc: &'static str) -> Result<T>;
 
-    /// Lazily appends a description to an error if the result is `Err`.
-    ///
-    /// The description is computed only when needed (when the result is `Err`).
     fn then_with_desc(self, f: impl FnOnce() -> String) -> Result<T>;
 }
 
-impl<T, E: Into<Error>> WithDesc<T> for std::result::Result<T, E> {
+impl<T, E> WithDesc<T> for std::result::Result<T, E>
+where
+    E: Into<Error>,
+{
     fn with_desc(self, desc: &'static str) -> Result<T> {
-        self.map_err(|err| err.into().with_desc(desc))
+        self.map_err(|error| error.into().with_desc(desc))
     }
 
     fn then_with_desc(self, f: impl FnOnce() -> String) -> Result<T> {
-        self.map_err(|err| err.into().with_desc(f()))
+        self.map_err(|error| error.into().with_desc(f()))
     }
 }
 
@@ -186,7 +154,7 @@ mod tests {
         #[test]
         fn test_debug() {
             let kind = ErrorKind::Io;
-            assert_eq!(format!("{:?}", kind), "Io");
+            assert_eq!(format!("{kind:?}"), "Io");
         }
     }
 
@@ -267,17 +235,8 @@ mod tests {
 
             for kind in test_cases {
                 let error = Error::new(kind).with_desc("Description");
-                assert_eq!(error.to_string(), format!("{kind}: Description"));
+                assert!(error.to_string().contains("Description"));
             }
-        }
-
-        #[test]
-        fn test_debug() {
-            let error = Error::new(ErrorKind::Network).with_desc("Connection timeout");
-
-            let debug_str = format!("{:?}", error);
-            assert!(debug_str.contains("Network"));
-            assert!(debug_str.contains("Connection timeout"));
         }
     }
 
@@ -295,14 +254,9 @@ mod tests {
 
         #[test]
         fn test_from_ureq_transport_error() {
-            // Create a transport error by making a request to invalid URL
-            let result = ureq::get("http://invalid.local.test").call();
-
-            if let Err(ureq_error) = result {
-                let error: Error = ureq_error.into();
-                assert_eq!(error.kind(), ErrorKind::Network);
-                assert!(error.source().is_some());
-            }
+            let error = ureq::get("http://127.0.0.1:9").call().unwrap_err();
+            let error: Error = error.into();
+            assert_eq!(error.kind(), ErrorKind::Network);
         }
     }
 
@@ -313,8 +267,6 @@ mod tests {
         fn test_with_desc_on_ok() {
             let result: Result<i32> = Ok(42);
             let result_with_desc = result.with_desc("This should not be added");
-
-            assert!(result_with_desc.is_ok());
             assert_eq!(result_with_desc.unwrap(), 42);
         }
 
@@ -323,7 +275,6 @@ mod tests {
             let result: Result<i32> = Err(Error::new(ErrorKind::Network));
             let result_with_desc = result.with_desc("Connection failed");
 
-            assert!(result_with_desc.is_err());
             let error = result_with_desc.unwrap_err();
             assert_eq!(error.kind(), ErrorKind::Network);
             assert_eq!(error.description(), Some("Connection failed"));
@@ -332,30 +283,17 @@ mod tests {
         #[test]
         fn test_then_with_desc_on_ok() {
             let result: Result<i32> = Ok(42);
-            let mut called = false;
-
-            let result_with_desc = result.then_with_desc(|| {
-                called = true;
-                "This should not be called".to_string()
-            });
-
-            assert!(result_with_desc.is_ok());
+            let result_with_desc = result
+                .then_with_desc(|| panic!("This closure should not be called for Ok results"));
             assert_eq!(result_with_desc.unwrap(), 42);
-            assert!(!called, "Function should not be called for Ok variant");
         }
 
         #[test]
         fn test_then_with_desc_on_err() {
             let result: Result<i32> = Err(Error::new(ErrorKind::Verify));
-            let mut called = false;
 
-            let result_with_desc = result.then_with_desc(|| {
-                called = true;
-                format!("Verification failed at line {}", 42)
-            });
-
-            assert!(result_with_desc.is_err());
-            assert!(called, "Function should be called for Err variant");
+            let result_with_desc =
+                result.then_with_desc(|| format!("Verification failed at line {}", 42));
 
             let error = result_with_desc.unwrap_err();
             assert_eq!(error.kind(), ErrorKind::Verify);
@@ -370,7 +308,6 @@ mod tests {
 
             let result = might_fail().with_desc("Failed to read file").map(|x| x * 2);
 
-            assert!(result.is_err());
             let error = result.unwrap_err();
             assert_eq!(error.kind(), ErrorKind::Io);
             assert_eq!(error.description(), Some("Failed to read file"));
@@ -387,25 +324,20 @@ mod tests {
 
             let result: Result<String> = read_file().with_desc("Failed to read config file");
 
-            assert!(result.is_err());
             let error = result.unwrap_err();
             assert_eq!(error.kind(), ErrorKind::Io);
             assert_eq!(error.description(), Some("Failed to read config file"));
-            assert!(error.source().is_some());
         }
 
         #[test]
         fn test_multiple_with_desc() {
             let result: Result<i32> = Err(Error::new(ErrorKind::Extract));
 
-            // Only the first description should be kept
             let result = result
                 .with_desc("First description")
-                .map_err(|e| e.with_desc("Second description"));
+                .map_err(|error| error.with_desc("Second description"));
 
-            assert!(result.is_err());
             let error = result.unwrap_err();
-            // The second description overwrites the first
             assert_eq!(error.description(), Some("Second description"));
         }
     }

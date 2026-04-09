@@ -1118,6 +1118,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "maa-error"
+version = "0.1.0"
+
+[[package]]
 name = "maa-ffi-string"
 version = "0.1.0"
 dependencies = [
@@ -1138,11 +1142,11 @@ dependencies = [
  "flate2",
  "indicatif",
  "log",
+ "maa-error",
  "semver",
  "sha2",
  "tar",
  "tempfile",
- "thiserror 2.0.18",
  "ureq",
  "zip",
 ]
