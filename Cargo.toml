@@ -73,7 +73,7 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 ] }
 
 [workspace.metadata.typos.files]
-extend-exclude = ["licenses.md"]
+extend-exclude = ["CHANGELOG.md"]
 
 [profile.release-lto]
 inherits = "release"
