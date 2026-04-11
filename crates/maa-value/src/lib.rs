@@ -9,7 +9,7 @@
 //! This crate provides a two-stage value system designed for interactive configuration:
 //!
 //! 1. **[`value::MAAValueTemplate`]**: Represents configuration *templates* that may contain:
-//!    - User input fields (`Input`, `BoolInput`, `Select`)
+//!    - User input fields (`Inquiry`, `Confirm`, `Select`)
 //!    - Conditional fields (`Optional`) that depend on other fields
 //!    - Regular values (primitives, arrays, objects)
 //!
@@ -17,7 +17,8 @@
 //!    after all user inputs have been collected and conditions evaluated.
 //!
 //! The transformation from template to resolved value happens via
-//! [`value::MAAValueTemplate::resolve()`], which:
+//! [`value::MAAValueTemplate::resolved_by()`] or
+//! [`value::MAAValueTemplate::resolved_by()`], which:
 //! - Queries the user for any required inputs
 //! - Evaluates conditional dependencies
 //! - Produces a final concrete configuration
@@ -26,16 +27,18 @@
 //!
 //! ```
 //! use maa_value::prelude::*;
+//! use maa_question::prelude::{BatchResolver, Confirm};
 //!
 //! // Create a configuration template with user input and a conditional field
 //! let config = template!(
 //!     "name" => "my-app",
-//!     "debug" => BoolInput::new(Some(false)),  // User input with default
+//!     "debug" => Confirm::new(false),  // User input with default
 //!     "log_level" if "debug" == true => "verbose"  // Conditional field
 //! );
 //!
-//! // Resolve it (uses defaults in batch mode without prompting)
-//! let resolved = config.resolve().unwrap();
+//! // Resolve it without prompting
+//! let mut resolver = BatchResolver::default();
+//! let resolved = config.resolved_by(&mut resolver).unwrap();
 //!
 //! // Access resolved values
 //! assert_eq!(resolved.get("name").unwrap().as_str(), Some("my-app"));
@@ -61,16 +64,18 @@
 //!
 //! ```
 //! use maa_value::prelude::*;
+//! use std::num::NonZero;
+//! use maa_question::prelude::{Confirm, Inquiry, SelectD};
 //!
 //! let config = template!(
-//!     "username" => Input::new(Some("admin".to_string())),
-//!     "auto_update" => BoolInput::new(Some(true)),
-//!     "theme" => SelectD::<String>::from_iter(["light", "dark"], 1.try_into().ok()).unwrap()
+//!     "username" => Inquiry::new("admin".to_string()),
+//!     "auto_update" => Confirm::new(true),
+//!     "theme" => SelectD::<String>::from_iter(["light", "dark"], NonZero::new(1).unwrap()).unwrap()
 //! );
 //! ```
 //!
-//! When [`value::MAAValueTemplate::resolve()`] is called, these inputs use their default
-//! values in batch mode or prompt the user in interactive mode.
+//! When [`value::MAAValueTemplate::resolved_by()`] is called, these inputs are answered by the
+//! provided resolver.
 //!
 //! ### Conditional Fields
 //!
@@ -84,7 +89,10 @@
 //!     "debug_port" if "mode" == "development" => 9229  // Only included if mode is development
 //! );
 //!
-//! let resolved = config.resolve().unwrap();
+//! use maa_question::prelude::BatchResolver;
+//!
+//! let mut resolver = BatchResolver::default();
+//! let resolved = config.resolved_by(&mut resolver).unwrap();
 //! assert!(resolved.get("debug_port").is_none());  // Not included
 //! ```
 //!
@@ -111,7 +119,7 @@
 //! ┌──────────────────┐
 //! │ MAAValueTemplate │  ◄── Contains Input, Optional variants
 //! └────────┬─────────┘
-//!          │ resolve()
+//!          │ resolved_by(...)
 //!          │ • Query user inputs
 //!          │ • Evaluate conditionals
 //!          │ • Topological sort dependencies
@@ -135,8 +143,8 @@
 //! - [`mod@array`]: Array operations trait ([`ArrayOps`](array::ArrayOps))
 //! - [`convert`]: Type conversion traits ([`AsPrimitive`](convert::AsPrimitive),
 //!   [`TryAs`](convert::TryAs))
-//! - [`input`]: Input value definitions
-//! - [`userinput`]: User input types and traits
+//! - [`input`]: Question value definitions
+//! - [`maa_question`]: Question/form types and traits (external crate)
 //! - [`primitive`]: Primitive value types
 //! - [`error`]: Error types
 //! - [`prelude`]: Common imports for convenience
@@ -155,7 +163,6 @@ pub mod error;
 pub mod input;
 pub mod map;
 pub mod primitive;
-pub mod userinput;
 pub mod value;
 
 /// Convenience re-exports for common types and traits.
@@ -196,17 +203,7 @@ pub mod value;
 /// - [`MAAValue`]: Fully resolved values containing only concrete data
 /// - [`MAAPrimitive`](crate::primitive::MAAPrimitive): Primitive value types (bool, int, float,
 ///   string)
-/// - [`MAAInput`](crate::input::MAAInput): Input value definitions
-///
-/// ## User Input Types
-///
-/// - [`Input`](crate::userinput::Input): Generic user input with default value
-/// - [`BoolInput`](crate::userinput::BoolInput): Boolean user input
-/// - [`Select`](crate::userinput::Select): Selection from alternatives
-/// - [`Selectable`](crate::userinput::Selectable): Trait for selectable types
-/// - [`UserInput`](crate::userinput::UserInput): Trait for user input types
-/// - [`ValueWithDesc`](crate::userinput::ValueWithDesc): Value with description
-/// - [`SelectD`](crate::userinput::SelectD): type alias for `Select<ValueWithDesc<_>>`
+/// - [`MAAInput`](crate::input::MAAInput): Question value definitions
 ///
 /// ## Traits
 ///
@@ -214,6 +211,10 @@ pub mod value;
 /// - [`MapOps`](crate::map::MapOps): Operations on map-like values (get, insert, merge, etc.)
 /// - [`AsPrimitive`](crate::convert::AsPrimitive): Convert to primitive types
 /// - [`TryAs`](crate::convert::TryAs): Try to convert to a specific type
+///
+/// Related question types such as [`Inquiry`](maa_question::Inquiry),
+/// [`Confirm`](maa_question::Confirm), and [`SelectD`](maa_question::SelectD)
+/// are provided by the `maa-question` crate.
 ///
 /// [`MAAValue`]: crate::value::MAAValue
 /// [`MAAValueTemplate`]: crate::value::MAAValueTemplate
@@ -226,7 +227,6 @@ pub mod prelude {
         input::MAAInput,
         map::MapOps,
         primitive::MAAPrimitive,
-        userinput::{BoolInput, Input, Select, SelectD, Selectable, UserInput, ValueWithDesc},
         value::{MAAValue, MAAValueTemplate},
     };
 }

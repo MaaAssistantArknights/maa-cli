@@ -5,6 +5,7 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use log::{debug, trace, warn};
+use maa_question::prelude::*;
 use maa_types::TaskType;
 use maa_value::prelude::*;
 use prettytable::{Table, format, row};
@@ -67,6 +68,15 @@ impl RaidMode {
 fn validate_loop_times(loop_times: i32) -> Result<i32> {
     anyhow::ensure!(loop_times > 0, "loop_times must be greater than 0");
     Ok(loop_times)
+}
+
+fn ask_confirm(
+    description: &'static str,
+    default: bool,
+) -> Result<bool, crate::resolver::CliResolverError> {
+    crate::resolver::with_global_resolver(|resolver| {
+        resolver.resolve(Confirm::new(default).with_description(description))
+    })
 }
 
 #[cfg_attr(test, derive(Default))]
@@ -224,10 +234,7 @@ impl IntoParameters for CopilotParams {
             if !formation {
                 println!("Operators:\n{}", operator_table(&copilot_task)?);
                 println!("Please set up your formation manually");
-                while !BoolInput::new(Some(true))
-                    .with_description("continue")
-                    .value()?
-                {
+                while !ask_confirm("continue", true)? {
                     println!("Please confirm you have set up your formation");
                 }
             }
@@ -334,35 +341,25 @@ impl IntoParameters for SSSCopilotParams {
         let stage_name = &task.stage_name;
 
         println!("Fight Stage: {stage_name}, please navigate to the stage manually");
-        while !BoolInput::new(Some(true))
-            .with_description("continue")
-            .value()?
-        {
+        while !ask_confirm("continue", true)? {
             println!("Please confirm you have navigated to the stage");
         }
         println!("Core Operators:\n{}", operator_table(&task)?);
         // TODO: equipment, support unit, toolmans
         if let Some(doc) = &task.doc
-            && BoolInput::new(Some(false))
-                .with_description("show doc")
-                .value()?
+            && ask_confirm("show doc", false)?
         {
             println!("{}", doc.details);
         }
 
-        while !BoolInput::new(Some(true))
-            .with_description("continue")
-            .value()?
-        {
+        while !ask_confirm("continue", true)? {
             println!("Please confirm you have set up your formation");
         }
 
-        let value = object!(
+        Ok(object!(
             "filename" => file?,
             "loop_times" => loop_times,
-        );
-
-        Ok(value)
+        ))
     }
 }
 

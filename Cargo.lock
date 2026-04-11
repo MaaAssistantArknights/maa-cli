@@ -1070,6 +1070,7 @@ dependencies = [
  "maa-core",
  "maa-dirs",
  "maa-installer",
+ "maa-question",
  "maa-str-ext",
  "maa-types",
  "maa-value",
@@ -1086,6 +1087,7 @@ dependencies = [
  "sha2",
  "signal-hook",
  "tempfile",
+ "thiserror 2.0.18",
  "tiny_http",
  "toml",
  "ureq",
@@ -1148,6 +1150,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "maa-question"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "nonempty-vec",
+ "schemars",
+ "serde",
+ "serde_test",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "maa-str-ext"
 version = "0.1.0"
 
@@ -1177,6 +1191,7 @@ version = "0.2.0"
 dependencies = [
  "indexmap",
  "log",
+ "maa-question",
  "maa-str-ext",
  "maa-value-macro",
  "schemars",
@@ -1190,6 +1205,7 @@ dependencies = [
 name = "maa-value-macro"
 version = "0.1.0"
 dependencies = [
+ "maa-question",
  "maa-value",
  "proc-macro2",
  "quote",
@@ -1236,6 +1252,15 @@ checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
 dependencies = [
  "memchr",
  "minimal-lexical",
+]
+
+[[package]]
+name = "nonempty-vec"
+version = "0.1.0"
+dependencies = [
+ "schemars",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -2,7 +2,13 @@
 
 use std::path::PathBuf;
 
+use maa_question::resolver::batch::BatchResolver;
 use maa_value::{error::Result, prelude::*};
+
+fn resolve(template: MAAValueTemplate) -> Result<MAAValue> {
+    let mut resolver = BatchResolver::default();
+    template.resolved_by(&mut resolver)
+}
 
 #[test]
 fn mixed_insert_types() -> Result<()> {
@@ -19,7 +25,7 @@ fn mixed_insert_types() -> Result<()> {
         "conditional" if "flag" == true => "depends on flag"
     );
 
-    let initialized = obj.resolve()?;
+    let initialized = resolve(obj)?;
     assert_eq!(initialized.get("regular").unwrap().as_str(), Some("normal"));
     assert_eq!(
         initialized.get("optional_present").unwrap().as_int(),
@@ -59,7 +65,7 @@ fn complex_nested_structure() -> Result<()> {
         )
     );
 
-    let initialized = obj.resolve()?;
+    let initialized = resolve(obj)?;
 
     // Check metadata
     let metadata = initialized.get("metadata").unwrap();
@@ -99,7 +105,7 @@ fn all_insert_kinds_together() -> Result<()> {
         "e_conditional" if "d_flag" == true => "conditional"
     );
 
-    let initialized = obj.resolve()?;
+    let initialized = resolve(obj)?;
     assert_eq!(
         initialized.get("a_regular").unwrap().as_str(),
         Some("regular")
