@@ -82,7 +82,7 @@ where
         if let Some(description) = self.description.as_deref() {
             write!(writer, " {description}")?;
         } else if let Some(id) = self.id.as_deref() {
-            write!(writer, "  {id}")?;
+            write!(writer, " {id}")?;
         } else {
             write!(writer, " a {}", std::any::type_name::<F>())?;
         }

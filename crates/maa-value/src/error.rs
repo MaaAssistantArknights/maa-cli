@@ -20,7 +20,7 @@ pub enum Error {
     #[error("Optional fields can only exist within objects")]
     OptionalNotInObject,
 
-    /// An error occurred during resolve input
+    /// An error occurred during input resolution.
     #[error("Failed to resolve input: {0}")]
     Resolve(#[source] Box<dyn std::error::Error + Send + Sync + 'static>),
 

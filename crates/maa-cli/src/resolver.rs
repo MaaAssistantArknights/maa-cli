@@ -6,7 +6,7 @@ static BATCH_MODE: atomic::AtomicBool = atomic::AtomicBool::new(cfg!(test));
 
 /// Initialize the global resolver mode.
 ///
-/// Must be called once before any code that uses [`with`].
+/// Must be called once before any code that uses [`with_global_resolver`] or [`ask`].
 pub fn init(batch: bool) {
     BATCH_MODE.store(batch, std::sync::atomic::Ordering::SeqCst);
 }

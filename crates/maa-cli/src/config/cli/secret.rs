@@ -139,6 +139,8 @@ impl Secret {
                     if !answer.is_empty() {
                         break Ok(some_owned(answer));
                     }
+
+                    eprintln!("{description} cannot be empty. Please try again.");
                 }
             }
             Secret::Plain(value) => Ok(Some(Cow::Borrowed(value))),
