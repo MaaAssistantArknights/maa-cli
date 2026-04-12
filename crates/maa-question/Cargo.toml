@@ -6,20 +6,20 @@ rust-version.workspace = true
 homepage.workspace = true
 repository.workspace = true
 license.workspace = true
-description = "Question-and-form framework for interactive value resolution"
 
 [dependencies]
 log = { workspace = true }
 nonempty-vec = { workspace = true }
 schemars = { workspace = true, optional = true }
-serde = { workspace = true, features = ["derive"] }
+serde = { workspace = true, optional = true, features = ["derive"] }
 thiserror = { workspace = true }
 
 [dev-dependencies]
 serde_test = { workspace = true }
 
 [features]
-schema = ["dep:schemars", "nonempty-vec/schema"]
+schema = ["serde", "dep:schemars", "nonempty-vec/schema"]
+serde = ["dep:serde"]
 
 [lints]
 workspace = true
