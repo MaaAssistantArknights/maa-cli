@@ -10,7 +10,6 @@ use crate::{
     primitive::MAAPrimitive,
 };
 
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Deserialize, Clone, Debug, PartialEq)]
 #[serde(untagged)]
 pub enum MAAValueTemplate {
@@ -44,6 +43,50 @@ pub enum MAAValueTemplate {
 impl Default for MAAValueTemplate {
     fn default() -> Self {
         Self::Object(StringMap::default())
+    }
+}
+
+#[cfg(feature = "schema")]
+impl schemars::JsonSchema for MAAValueTemplate {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "MAAValueTemplate".into()
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        concat!(module_path!(), "::MAAValueTemplate").into()
+    }
+
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        let self_schema = generator.subschema_for::<MAAValueTemplate>();
+        let primitive_schema = generator.subschema_for::<MAAPrimitive>();
+        let input_schema = generator.subschema_for::<MAAInput>();
+
+        schemars::json_schema!({
+            "oneOf": [
+                primitive_schema,
+                {
+                    "type": "array",
+                    "items": self_schema.clone(),
+                },
+                input_schema,
+                {
+                    "type": "object",
+                    "required": ["conditions", "value"],
+                    "properties": {
+                        "conditions": {
+                            "type": "object",
+                            "additionalProperties": primitive_schema,
+                        },
+                        "value": self_schema.clone(),
+                    },
+                    "additionalProperties": false,
+                },
+                {
+                    "type": "object",
+                    "additionalProperties": self_schema,
+                }
+            ]
+        })
     }
 }
 
@@ -653,6 +696,39 @@ mod tests {
             Token::MapEnd,
             Token::MapEnd,
         ]);
+    }
+
+    #[cfg(feature = "schema")]
+    mod schema {
+        use super::*;
+
+        #[test]
+        fn generate_maa_value_template_schema() {
+            let schema = schemars::schema_for!(MAAValueTemplate);
+            let value = serde_json::to_value(&schema).unwrap();
+            assert!(value.is_object());
+        }
+
+        #[test]
+        fn generate_boxed_maa_value_template_schema() {
+            let schema = schemars::schema_for!(BoxedMAAValueTemplate);
+            let value = serde_json::to_value(&schema).unwrap();
+            assert!(value.is_object());
+        }
+
+        #[test]
+        fn generate_maa_input_schema() {
+            let schema = schemars::schema_for!(crate::input::MAAInput);
+            let value = serde_json::to_value(&schema).unwrap();
+            assert!(value.is_object());
+        }
+
+        #[test]
+        fn generate_maa_primitive_schema() {
+            let schema = schemars::schema_for!(crate::primitive::MAAPrimitive);
+            let value = serde_json::to_value(&schema).unwrap();
+            assert!(value.is_object());
+        }
     }
 
     #[test]
