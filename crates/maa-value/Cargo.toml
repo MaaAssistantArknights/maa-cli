@@ -10,8 +10,8 @@ license.workspace = true
 
 [dependencies]
 indexmap = { workspace = true, features = ["serde"] }
-maa-question = { workspace = true }
 log = { workspace = true }
+maa-question = { workspace = true, features = ["serde"] }
 maa-str-ext = { workspace = true }
 maa-value-macro = { workspace = true }
 schemars = { workspace = true, optional = true, features = ["indexmap2"] }

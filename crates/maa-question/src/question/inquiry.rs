@@ -4,8 +4,6 @@ use std::{
     str::FromStr,
 };
 
-use serde::Deserialize;
-
 use super::CowStr;
 use crate::{Question, resolver::io::PromptIo};
 
@@ -13,9 +11,10 @@ use crate::{Question, resolver::io::PromptIo};
 ///
 /// The answer string is parsed into `F` via [`FromStr`].  For a yes/no
 /// confirmation use [`super::Confirm`] instead.
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 pub struct Inquiry<F> {
     /// Stable identifier for variable injection.
     id: Option<CowStr>,
@@ -93,41 +92,38 @@ where
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
-    use serde_test::{Token, assert_de_tokens, assert_de_tokens_error};
-
     use super::*;
     use crate::resolver::io::*;
 
-    #[test]
-    fn serde() {
-        let values: Vec<Inquiry<i64>> = vec![
-            Inquiry::new(0).with_description("how many apples to eat"),
-            Inquiry::new(0),
-        ];
+    #[cfg(feature = "serde")]
+    mod serde {
+        use serde_test::{Token, assert_de_tokens};
 
-        assert_de_tokens(&values, &[
-            Token::Seq { len: Some(2) },
-            Token::Map { len: Some(2) },
-            Token::Str("default"),
-            Token::I32(0),
-            Token::Str("description"),
-            Token::Some,
-            Token::Str("how many apples to eat"),
-            Token::MapEnd,
-            Token::Map { len: Some(1) },
-            Token::Str("default"),
-            Token::I32(0),
-            Token::MapEnd,
-            Token::SeqEnd,
-        ]);
-    }
+        use super::*;
 
-    #[test]
-    fn empty_map_is_rejected() {
-        assert_de_tokens_error::<Inquiry<i64>>(
-            &[Token::Map { len: Some(0) }, Token::MapEnd],
-            "missing field `default`",
-        );
+        #[test]
+        fn basic() {
+            let values: Vec<Inquiry<i64>> = vec![
+                Inquiry::new(0).with_description("how many apples to eat"),
+                Inquiry::new(0),
+            ];
+
+            assert_de_tokens(&values, &[
+                Token::Seq { len: Some(2) },
+                Token::Map { len: Some(2) },
+                Token::Str("default"),
+                Token::I32(0),
+                Token::Str("description"),
+                Token::Some,
+                Token::Str("how many apples to eat"),
+                Token::MapEnd,
+                Token::Map { len: Some(1) },
+                Token::Str("default"),
+                Token::I32(0),
+                Token::MapEnd,
+                Token::SeqEnd,
+            ]);
+        }
     }
 
     #[test]

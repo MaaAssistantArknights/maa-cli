@@ -7,6 +7,7 @@ use std::{
 };
 
 use nonempty_vec::NonEmptyVec;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, de::Error};
 
 use crate::{Question, question::CowStr, resolver::io::PromptIo};
@@ -26,6 +27,7 @@ pub struct Select<S> {
     allow_custom: bool,
 }
 
+#[cfg(feature = "serde")]
 impl<'de, S: Deserialize<'de>> Deserialize<'de> for Select<S> {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
@@ -234,9 +236,10 @@ pub trait Selectable {
     fn parse(input: &str) -> Result<Self::Value, Self::Error>;
 }
 
+#[derive(Clone, PartialEq, Debug)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Deserialize, Clone, PartialEq, Debug)]
-#[serde(untagged, deny_unknown_fields)]
+#[cfg_attr(feature = "serde", derive(Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged, deny_unknown_fields))]
 pub enum ValueWithDesc<T> {
     Value(T),
     WithDesc { value: T, desc: String },
@@ -328,8 +331,6 @@ pub type SelectD<T> = Select<ValueWithDesc<T>>;
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
-    use serde_test::{Token, assert_de_tokens};
-
     use super::*;
     use crate::resolver::io::*;
 
@@ -337,7 +338,7 @@ mod tests {
         NonZero::new(value).unwrap()
     }
 
-    fn test_full() -> SelectD<String> {
+    fn complex_select() -> SelectD<String> {
         SelectD::<String>::from_iter(
             vec![
                 ValueWithDesc::new("CE-5", Some("LMB stage 5")),
@@ -350,56 +351,63 @@ mod tests {
         .with_allow_custom(true)
     }
 
-    fn test_none() -> SelectD<String> {
+    fn simple_select() -> SelectD<String> {
         SelectD::<String>::from_iter(vec!["CE-5", "CE-6"], nz(1)).unwrap()
     }
 
-    #[test]
-    fn serde() {
-        let values = [test_full(), test_none()];
+    #[cfg(feature = "serde")]
+    mod serde {
+        use serde_test::{Token, assert_de_tokens};
 
-        assert_de_tokens(&values, &[
-            Token::Seq { len: Some(2) },
-            Token::Map { len: Some(4) },
-            Token::Str("alternatives"),
-            Token::Seq { len: Some(2) },
-            Token::Map { len: Some(2) },
-            Token::Str("value"),
-            Token::Str("CE-5"),
-            Token::Str("desc"),
-            Token::Str("LMB stage 5"),
-            Token::MapEnd,
-            Token::Map { len: Some(2) },
-            Token::Str("value"),
-            Token::Str("CE-6"),
-            Token::Str("desc"),
-            Token::Str("LMB stage 6"),
-            Token::MapEnd,
-            Token::SeqEnd,
-            Token::Str("default_index"),
-            Token::U64(2),
-            Token::Str("description"),
-            Token::Some,
-            Token::Str("a stage to fight"),
-            Token::Str("allow_custom"),
-            Token::Bool(true),
-            Token::MapEnd,
-            Token::Map { len: Some(2) },
-            Token::Str("alternatives"),
-            Token::Seq { len: Some(2) },
-            Token::Str("CE-5"),
-            Token::Str("CE-6"),
-            Token::SeqEnd,
-            Token::Str("default_index"),
-            Token::U64(1),
-            Token::MapEnd,
-            Token::SeqEnd,
-        ]);
+        use super::*;
+
+        #[test]
+        fn basic() {
+            let values = [complex_select(), simple_select()];
+
+            assert_de_tokens(&values, &[
+                Token::Seq { len: Some(2) },
+                Token::Map { len: Some(4) },
+                Token::Str("alternatives"),
+                Token::Seq { len: Some(2) },
+                Token::Map { len: Some(2) },
+                Token::Str("value"),
+                Token::Str("CE-5"),
+                Token::Str("desc"),
+                Token::Str("LMB stage 5"),
+                Token::MapEnd,
+                Token::Map { len: Some(2) },
+                Token::Str("value"),
+                Token::Str("CE-6"),
+                Token::Str("desc"),
+                Token::Str("LMB stage 6"),
+                Token::MapEnd,
+                Token::SeqEnd,
+                Token::Str("default_index"),
+                Token::U64(2),
+                Token::Str("description"),
+                Token::Some,
+                Token::Str("a stage to fight"),
+                Token::Str("allow_custom"),
+                Token::Bool(true),
+                Token::MapEnd,
+                Token::Map { len: Some(2) },
+                Token::Str("alternatives"),
+                Token::Seq { len: Some(2) },
+                Token::Str("CE-5"),
+                Token::Str("CE-6"),
+                Token::SeqEnd,
+                Token::Str("default_index"),
+                Token::U64(1),
+                Token::MapEnd,
+                Token::SeqEnd,
+            ]);
+        }
     }
 
     #[test]
     fn construct() {
-        let full = test_full();
+        let full = complex_select();
         assert_eq!(&*full.alternatives, &[
             ValueWithDesc::new("CE-5", Some("LMB stage 5")),
             ValueWithDesc::new("CE-6", Some("LMB stage 6")),
@@ -408,7 +416,7 @@ mod tests {
         assert_eq!(full.description.as_deref(), Some("a stage to fight"));
         assert!(full.allow_custom);
 
-        let none = test_none();
+        let none = simple_select();
         assert_eq!(&*none.alternatives, &[
             ValueWithDesc::new("CE-5", None),
             ValueWithDesc::new("CE-6", None),
@@ -426,14 +434,14 @@ mod tests {
 
     #[test]
     fn with_id() {
-        let select = test_none().with_id("stage");
+        let select = simple_select().with_id("stage");
         assert_eq!(select.id.as_deref(), Some("stage"));
     }
 
     #[test]
     fn default() {
-        assert_eq!(test_full().default(), "CE-6");
-        assert_eq!(test_none().default(), "CE-5");
+        assert_eq!(complex_select().default(), "CE-6");
+        assert_eq!(simple_select().default(), "CE-5");
     }
 
     mod prompt_prefix_first {
@@ -442,7 +450,7 @@ mod tests {
         #[test]
         fn with_description_and_custom() {
             assert_first_prompt(
-                &test_full(),
+                &complex_select(),
                 "1. CE-5 (LMB stage 5)\n\
                  2. CE-6 (LMB stage 6) [default]\n\
                  Please select a stage to fight or input a custom value (empty for default)",
@@ -452,7 +460,7 @@ mod tests {
         #[test]
         fn without_description() {
             assert_first_prompt(
-                &test_none(),
+                &simple_select(),
                 "1. CE-5 [default]\n\
                  2. CE-6\n\
                  Please select one of the alternatives (empty for default)",
@@ -466,7 +474,7 @@ mod tests {
         #[test]
         fn returns_please_select() {
             let mut buffer: Vec<u8> = Vec::new();
-            test_full().write_invalid_prefix(&mut buffer).unwrap();
+            complex_select().write_invalid_prefix(&mut buffer).unwrap();
             assert_eq!(String::from_utf8(buffer).unwrap(), "please select");
         }
     }
@@ -477,7 +485,7 @@ mod tests {
         #[test]
         fn with_description_and_custom() {
             assert_prompt(
-                &test_full(),
+                &complex_select(),
                 " a stage to fight or input a custom value (empty for default)",
                 |ui, buf| ui.write_description_to(buf),
             );
@@ -486,7 +494,7 @@ mod tests {
         #[test]
         fn without_description_or_custom() {
             assert_prompt(
-                &test_none(),
+                &simple_select(),
                 " one of the alternatives (empty for default)",
                 |ui, buf| ui.write_description_to(buf),
             );
@@ -643,7 +651,7 @@ mod tests {
         #[test]
         fn empty_input_returns_default() {
             assert_output(
-                test_none(),
+                simple_select(),
                 "\n",
                 "1. CE-5 [default]\n\
                  2. CE-6\n\
@@ -655,7 +663,7 @@ mod tests {
         #[test]
         fn valid_index_returns_value() {
             assert_output(
-                test_none(),
+                simple_select(),
                 "2\n",
                 "1. CE-5 [default]\n\
                  2. CE-6\n\
@@ -667,7 +675,7 @@ mod tests {
         #[test]
         fn invalid_index_reprompts() {
             assert_output(
-                test_none(),
+                simple_select(),
                 "3\n2\n",
                 "1. CE-5 [default]\n\
                  2. CE-6\n\
@@ -679,7 +687,7 @@ mod tests {
         #[test]
         fn custom_value_when_allowed() {
             assert_output(
-                test_full(),
+                complex_select(),
                 "CE-4\n",
                 "1. CE-5 (LMB stage 5)\n\
                  2. CE-6 (LMB stage 6) [default]\n\
