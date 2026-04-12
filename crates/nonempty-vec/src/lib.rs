@@ -19,8 +19,18 @@ impl<T> NonEmptyVec<T> {
         if vec.is_empty() {
             None
         } else {
-            Some(Self(vec))
+            // Safety: we just checked that `vec` is not empty.
+            Some(unsafe { Self::new_unchecked(vec) })
         }
+    }
+
+    /// Creates a new `NonEmptyVec` from `vec` without checking if it is empty.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `vec` is not empty.
+    pub const unsafe fn new_unchecked(vec: Vec<T>) -> Self {
+        Self(vec)
     }
 
     /// Collects `iter` into a `NonEmptyVec`.
@@ -119,10 +129,12 @@ impl<T: JsonSchema> JsonSchema for NonEmptyVec<T> {
 }
 
 #[macro_export]
-macro_rules! nevev {
-    [$item:expr $(, $rest:expr)* $(,)?] => {
-        NonEmptyVec(vec![$item, $($rest),*])
-    };
+macro_rules! nevec {
+    [$item:expr $(, $rest:expr)* $(,)?] => {{
+        let vec = vec![$item, $($rest),*];
+        // Safety: the macro ensures that there are at least one item in the vector.
+        unsafe { NonEmptyVec::new_unchecked(vec) }
+    }};
 }
 
 #[cfg(test)]
@@ -156,34 +168,34 @@ mod tests {
 
     #[test]
     fn len_and_is_empty_reflect_invariant() {
-        let vec = nevev![1, 2, 3];
+        let vec = nevec![1, 2, 3];
         assert_eq!(vec.len(), 3);
         assert!(!vec.is_empty());
     }
 
     #[test]
     fn into_vec_returns_inner_vec() {
-        let vec = nevev![1, 2, 3];
+        let vec = nevec![1, 2, 3];
         assert_eq!(vec.into_vec(), vec![1, 2, 3]);
     }
 
     #[test]
     fn first_and_last_always_return() {
-        let vec = nevev![42];
+        let vec = nevec![42];
         assert_eq!(vec.first(), &42);
         assert_eq!(vec.last(), &42);
     }
 
     #[test]
     fn deref_gives_correct_slice() {
-        let vec = nevev![1, 2, 3];
+        let vec = nevec![1, 2, 3];
         let slice: &[i32] = &vec;
         assert_eq!(slice, &[1, 2, 3]);
     }
 
     #[test]
     fn deref_mut_can_modify_inner_vec() {
-        let mut vec = nevev![1, 2, 3];
+        let mut vec = nevec![1, 2, 3];
         vec.iter_mut().for_each(|i| *i *= 2);
         assert_eq!(&*vec, &[2, 4, 6]);
     }
@@ -194,7 +206,7 @@ mod tests {
 
         #[test]
         fn serde_roundtrip_preserves_values() {
-            let vec = nevev![1, 2, 3];
+            let vec = nevec![1, 2, 3];
             let json = serde_json::to_string(&vec).unwrap();
             assert_eq!(json, "[1,2,3]");
             let restored: NonEmptyVec<i32> = serde_json::from_str(&json).unwrap();
@@ -225,19 +237,19 @@ mod tests {
 
         #[test]
         fn nevev_single_element() {
-            let vec: NonEmptyVec<i32> = nevev![1];
+            let vec: NonEmptyVec<i32> = nevec![1];
             assert_eq!(&*vec, &[1]);
         }
 
         #[test]
         fn nevev_multiple_elements() {
-            let vec = nevev![1, 2, 3];
+            let vec = nevec![1, 2, 3];
             assert_eq!(&*vec, &[1, 2, 3]);
         }
 
         #[test]
         fn nevev_trailing_comma() {
-            let vec = nevev![1, 2, 3,];
+            let vec = nevec![1, 2, 3,];
             assert_eq!(&*vec, &[1, 2, 3]);
         }
     }
