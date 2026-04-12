@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use maa_question::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -52,8 +53,18 @@ impl Default for MAAValueTemplate {
 pub struct BoxedMAAValueTemplate(Box<MAAValueTemplate>);
 
 impl BoxedMAAValueTemplate {
-    fn resolve(self) -> Result<MAAValue> {
-        self.0.resolve()
+    fn resolved_by<R>(self, resolver: &mut R) -> Result<MAAValue>
+    where
+        R: Resolve<Confirm>
+            + Resolve<Inquiry<i32>>
+            + Resolve<Inquiry<f32>>
+            + Resolve<Inquiry<String>>
+            + Resolve<SelectD<i32>>
+            + Resolve<SelectD<f32>>
+            + Resolve<SelectD<String>>
+            + ?Sized,
+    {
+        self.0.resolved_by(resolver)
     }
 }
 
@@ -68,7 +79,7 @@ where
 
 /// A concrete value containing only resolved data.
 ///
-/// This type represents the output of [`MAAValueTemplate::resolve()`], containing only
+/// This type represents the output of [`MAAValueTemplate::resolved_by()`], containing only
 /// concrete data without any [`Input`](MAAValueTemplate::Input) or
 /// [`Optional`](MAAValueTemplate::Optional) variants. It implements both [`Serialize`] and
 /// [`serde::de::Deserializer`] to support serialization and deserialization to any types
@@ -86,7 +97,7 @@ where
 /// ```
 ///
 /// For templates with user inputs or conditionals, use [`template!`](maa_value_macro::template)
-/// and call [`MAAValueTemplate::resolve()`] to obtain a `MAAValue`.
+/// and call [`MAAValueTemplate::resolved_by()`] to obtain a `MAAValue`.
 ///
 /// # Converting to Typed Structs
 ///
@@ -128,7 +139,8 @@ impl Default for MAAValue {
 }
 
 impl MAAValueTemplate {
-    /// Resolves the value by evaluating all user inputs and conditional fields.
+    /// Resolves the value by evaluating all user inputs and conditional fields using the provided
+    /// resolver.
     ///
     /// This method transforms a [`MAAValueTemplate`] (which may contain unresolved
     /// [`Input`](Self::Input) and [`Optional`](Self::Optional) variants) into a
@@ -160,6 +172,7 @@ impl MAAValueTemplate {
     /// **Example:**
     /// ```
     /// use maa_value::prelude::*;
+    /// use maa_question::prelude::BatchResolver;
     ///
     /// let value = template!(
     ///     "enabled" => true,
@@ -169,7 +182,8 @@ impl MAAValueTemplate {
     ///     ),
     /// );
     ///
-    /// let resolved = value.resolve().unwrap();
+    /// let mut resolver = BatchResolver::default();
+    /// let resolved = value.resolved_by(&mut resolver).unwrap();
     /// // "config" is included because "enabled" == true
     /// // But it's an empty object because the nested condition isn't satisfied
     /// assert_eq!(resolved.get("config").unwrap(), &object!("enabled" => false));
@@ -204,19 +218,32 @@ impl MAAValueTemplate {
     /// use maa_value::prelude::*;
     ///
     /// // Resolving a simple template with primitives
+    /// use maa_question::prelude::BatchResolver;
+    ///
     /// let value = template!("key" => "value", "count" => 42);
-    /// let resolved = value.resolve().unwrap();
+    /// let mut resolver = BatchResolver::default();
+    /// let resolved = value.resolved_by(&mut resolver).unwrap();
     /// assert_eq!(resolved.get("key").unwrap().as_str(), Some("value"));
     /// assert_eq!(resolved.get("count").unwrap().as_int(), Some(42));
     /// ```
-    pub fn resolve(self) -> Result<MAAValue> {
+    pub fn resolved_by<R>(self, resolver: &mut R) -> Result<MAAValue>
+    where
+        R: Resolve<Confirm>
+            + Resolve<Inquiry<i32>>
+            + Resolve<Inquiry<f32>>
+            + Resolve<Inquiry<String>>
+            + Resolve<SelectD<i32>>
+            + Resolve<SelectD<f32>>
+            + Resolve<SelectD<String>>
+            + ?Sized,
+    {
         use MAAValueTemplate::*;
         match self {
-            Input(v) => Ok(MAAValue::Primitive(v.into_primitive()?)),
+            Input(v) => Ok(MAAValue::Primitive(v.into_primitive_with(resolver)?)),
             Array(array) => {
                 let mut ret = Vec::with_capacity(array.len());
                 for value in array {
-                    ret.push(value.resolve()?);
+                    ret.push(value.resolved_by(resolver)?);
                 }
                 Ok(MAAValue::Array(ret))
             }
@@ -295,10 +322,10 @@ impl MAAValueTemplate {
                         }
                         // if all the dependencies are satisfied, initialize the value
                         if satisfied {
-                            initialized.insert(key, value.resolve()?);
+                            initialized.insert(key, value.resolved_by(resolver)?);
                         }
                     } else {
-                        initialized.insert(key, value.resolve()?);
+                        initialized.insert(key, value.resolved_by(resolver)?);
                     }
                 }
 
@@ -387,10 +414,63 @@ impl<'a> From<&'a MAAValue> for Cow<'a, MAAValue> {
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
-    use std::num::NonZero;
+    use std::{collections::VecDeque, convert::Infallible, num::NonZero};
+
+    use maa_question::prelude::*;
 
     use super::*;
     use crate::prelude::*;
+
+    struct TextResolver {
+        inputs: VecDeque<&'static str>,
+    }
+
+    impl TextResolver {
+        fn new(inputs: impl IntoIterator<Item = &'static str>) -> Self {
+            Self {
+                inputs: inputs.into_iter().collect(),
+            }
+        }
+
+        fn resolve_question<Q: Question>(&mut self, question: Q) -> Q::Answer {
+            let next = self.inputs.pop_front().expect("missing test input");
+            if next.is_empty() {
+                return question.default();
+            }
+
+            match question.interpret(next) {
+                Ok(value) => value,
+                Err((_, msg)) => panic!("failed to parse {next:?}: {msg}"),
+            }
+        }
+    }
+
+    macro_rules! impl_resolve_for_text_resolver {
+        ($($question:ty),* $(,)?) => {
+            $(
+                impl Resolve<$question> for TextResolver {
+                    type Error = Infallible;
+
+                    fn resolve(
+                        &mut self,
+                        question: $question,
+                    ) -> Result<<$question as Question>::Answer, Self::Error> {
+                        Ok(self.resolve_question(question))
+                    }
+                }
+            )*
+        };
+    }
+
+    impl_resolve_for_text_resolver!(
+        Confirm,
+        Inquiry<i32>,
+        Inquiry<f32>,
+        Inquiry<String>,
+        SelectD<i32>,
+        SelectD<f32>,
+        SelectD<String>,
+    );
 
     #[test]
     fn serde() {
@@ -403,15 +483,19 @@ mod tests {
             "int" => 1,
             "object" => template!("key" => "value"),
             "string" => "string",
-            "input_bool" => BoolInput::new(Some(true)),
-            "input_float" => Input::new(Some(1.0)),
-            "input_int" => Input::new(Some(1)),
-            "input_string" => Input::new(Some("string".to_string())),
-            "select_int" => SelectD::from_iter([1, 2], NonZero::new(2)).unwrap(),
-            "select_float" => SelectD::from_iter([1.0, 2.0], NonZero::new(2)).unwrap(),
-            "select_string" => SelectD::<String>::from_iter(["string1", "string2"], NonZero::new(2)).unwrap(),
-            "optional" if "input_bool" == true => Input::new(Some(1)),
-            "optional_no_satisfied" if "input_bool" == false => Input::new(Some(1)),
+            "input_bool" => Confirm::new(true),
+            "input_float" => Inquiry::new(1.0),
+            "input_int" => Inquiry::new(1),
+            "input_string" => Inquiry::new("string".to_string()),
+            "select_int" => SelectD::from_iter([1, 2], NonZero::new(2).unwrap()).unwrap(),
+            "select_float" => SelectD::from_iter([1.0, 2.0], NonZero::new(2).unwrap()).unwrap(),
+            "select_string" => SelectD::<String>::from_iter(
+                ["string1", "string2"],
+                NonZero::new(2).unwrap(),
+            )
+            .unwrap(),
+            "optional" if "input_bool" == true => Inquiry::new(1),
+            "optional_no_satisfied" if "input_bool" == false => Inquiry::new(1),
             "optional_object" if "input_bool" == true =>
                 template!("key1" => "value1", "key2" => "value2"),
         );
@@ -521,7 +605,8 @@ mod tests {
             Token::MapEnd,
         ]);
 
-        let obj = obj.resolve().unwrap();
+        let mut resolver = BatchResolver::default();
+        let obj = obj.resolved_by(&mut resolver).unwrap();
 
         serde_test::assert_ser_tokens(&obj, &[
             Token::Map { len: Some(15) },
@@ -572,7 +657,7 @@ mod tests {
 
     #[test]
     fn resolve_optionals() {
-        let input = BoolInput::new(Some(true));
+        let input = Confirm::new(true);
 
         let value = template!(
             "input" => input.clone(),
@@ -588,8 +673,11 @@ mod tests {
         );
 
         let optional_uninitialized = value.get("optional").unwrap().clone();
+        let mut resolver = BatchResolver::default();
         assert!(matches!(
-            optional_uninitialized.resolve().unwrap_err(),
+            optional_uninitialized
+                .resolved_by(&mut resolver)
+                .unwrap_err(),
             Error::OptionalNotInObject,
         ));
 
@@ -623,7 +711,8 @@ mod tests {
             MAAValueTemplate::Optional { .. }
         ));
 
-        let value = value.resolve().unwrap();
+        let mut resolver = BatchResolver::default();
+        let value = value.resolved_by(&mut resolver).unwrap();
 
         assert_eq!(value.get("input").unwrap(), &MAAValue::from(true));
         assert_eq!(
@@ -642,7 +731,10 @@ mod tests {
             "optional2" if "optional1" == true => input.clone(),
         );
         assert!(matches!(
-            value.resolve().unwrap_err(),
+            {
+                let mut resolver = BatchResolver::default();
+                value.resolved_by(&mut resolver).unwrap_err()
+            },
             Error::CircularDependency,
         ));
 
@@ -652,9 +744,26 @@ mod tests {
             "optional3" if "optional1" == true => input.clone(),
         );
         assert!(matches!(
-            value.resolve().unwrap_err(),
+            {
+                let mut resolver = BatchResolver::default();
+                value.resolved_by(&mut resolver).unwrap_err()
+            },
             Error::CircularDependency,
         ));
+    }
+
+    #[test]
+    fn resolve_with_explicit_input_context() {
+        let value = template!(
+            "setup" => Confirm::new(false).with_description("set up task"),
+            "stage" if "setup" == true => Inquiry::<String>::new(String::new()).with_description("stage"),
+        );
+
+        let mut resolver = TextResolver::new(["yes", "1-7"]);
+        let resolved = value.resolved_by(&mut resolver).unwrap();
+
+        assert_eq!(resolved.get("setup").unwrap().as_bool(), Some(true));
+        assert_eq!(resolved.get("stage").unwrap().as_str(), Some("1-7"));
     }
 
     #[test]
@@ -728,11 +837,12 @@ mod tests {
     #[test]
     fn value_nested_structures() {
         // Test nested arrays
+        let mut resolver = BatchResolver::default();
         let nested_array = MAAValueTemplate::from([
             MAAValueTemplate::from([1, 2]),
             MAAValueTemplate::from([3, 4]),
         ])
-        .resolve()
+        .resolved_by(&mut resolver)
         .unwrap();
 
         let outer = nested_array.as_slice().unwrap();
@@ -754,8 +864,9 @@ mod tests {
         assert_eq!(inner.get("value").unwrap().as_int(), Some(42));
 
         // Test mixed nesting (array in object in array)
+        let mut resolver = BatchResolver::default();
         let mixed = MAAValueTemplate::from([template!("key" => [1, 2])])
-            .resolve()
+            .resolved_by(&mut resolver)
             .unwrap();
 
         let arr = mixed.as_slice().unwrap();
@@ -797,23 +908,35 @@ mod tests {
     #[test]
     fn resolve_primitives() {
         // Test resolving primitive values directly
+        let mut resolver = BatchResolver::default();
         assert_eq!(
-            MAAValueTemplate::from(42).resolve().unwrap(),
+            MAAValueTemplate::from(42)
+                .resolved_by(&mut resolver)
+                .unwrap(),
             MAAValue::from(42)
         );
 
+        let mut resolver = BatchResolver::default();
         assert_eq!(
-            MAAValueTemplate::from(true).resolve().unwrap(),
+            MAAValueTemplate::from(true)
+                .resolved_by(&mut resolver)
+                .unwrap(),
             MAAValue::from(true)
         );
 
+        let mut resolver = BatchResolver::default();
         assert_eq!(
-            MAAValueTemplate::from("hello").resolve().unwrap(),
+            MAAValueTemplate::from("hello")
+                .resolved_by(&mut resolver)
+                .unwrap(),
             MAAValue::from("hello")
         );
 
+        let mut resolver = BatchResolver::default();
         assert_eq!(
-            MAAValueTemplate::from(2.14).resolve().unwrap(),
+            MAAValueTemplate::from(2.14)
+                .resolved_by(&mut resolver)
+                .unwrap(),
             MAAValue::from(2.14)
         );
     }
@@ -822,21 +945,26 @@ mod tests {
     fn resolve_arrays() {
         // Test resolving simple array
         let array = MAAValueTemplate::from([1, 2, 3]);
-        let resolved = array.resolve().unwrap();
+        let mut resolver = BatchResolver::default();
+        let resolved = array.resolved_by(&mut resolver).unwrap();
         assert_eq!(resolved, MAAValue::from([1, 2, 3]));
 
         // Test resolving empty array
         let empty: [i32; 0] = [];
-        let empty_resolved = MAAValueTemplate::from(empty).resolve().unwrap();
+        let mut resolver = BatchResolver::default();
+        let empty_resolved = MAAValueTemplate::from(empty)
+            .resolved_by(&mut resolver)
+            .unwrap();
         assert_eq!(empty_resolved, MAAValue::from(empty));
 
         // Test resolving array with inputs
         let with_inputs = MAAValueTemplate::from([
             MAAValueTemplate::from(1),
-            MAAValueTemplate::from(Input::new(Some(2))),
+            MAAValueTemplate::from(Inquiry::new(2)),
             MAAValueTemplate::from(3),
         ]);
-        let resolved = with_inputs.resolve().unwrap();
+        let mut resolver = BatchResolver::default();
+        let resolved = with_inputs.resolved_by(&mut resolver).unwrap();
         let slice = resolved.as_slice().unwrap();
         assert_eq!(slice.len(), 3);
         assert_eq!(slice[0].as_int(), Some(1));
@@ -859,9 +987,10 @@ mod tests {
         // Test resolving object with inputs
         let with_inputs = template!(
             "direct" => 1,
-            "input" => Input::new(Some(2))
+            "input" => Inquiry::new(2)
         );
-        let resolved = with_inputs.resolve().unwrap();
+        let mut resolver = BatchResolver::default();
+        let resolved = with_inputs.resolved_by(&mut resolver).unwrap();
         assert_eq!(resolved.get("direct").unwrap().as_int(), Some(1));
         assert_eq!(resolved.get("input").unwrap().as_int(), Some(2));
     }
@@ -996,14 +1125,15 @@ mod tests {
                 // Test that Input variants resolve to their default values
                 let value = template!(
                     "direct" => 42,
-                    "from_input" => Input::new(Some(100)),
+                    "from_input" => Inquiry::new(100),
                     "array_with_input" => [
                         MAAValueTemplate::from(1),
-                        MAAValueTemplate::from(Input::new(Some(2)))
+                        MAAValueTemplate::from(Inquiry::new(2))
                     ]
                 );
 
-                let resolved = value.resolve().unwrap();
+                let mut resolver = BatchResolver::default();
+                let resolved = value.resolved_by(&mut resolver).unwrap();
                 let json = serde_json::to_value(&resolved).unwrap();
 
                 // Inputs should be resolved to their default values
@@ -1022,7 +1152,8 @@ mod tests {
                     "not_included" if "flag" == false => 99
                 );
 
-                let resolved = value.resolve().unwrap();
+                let mut resolver = BatchResolver::default();
+                let resolved = value.resolved_by(&mut resolver).unwrap();
                 let json = serde_json::to_value(&resolved).unwrap();
 
                 // Satisfied optional should be included

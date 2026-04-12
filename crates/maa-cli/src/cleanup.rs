@@ -6,7 +6,7 @@ use std::{
 };
 
 use anyhow::{Result, bail};
-use maa_value::userinput::{BoolInput, UserInput};
+use maa_question::prelude::*;
 
 use crate::dirs::{cache, log, state};
 
@@ -149,10 +149,9 @@ fn remove(target_paths: Vec<PathBuf>) -> Result<()> {
         println!("{}. {}", i + 1, p.display());
     }
 
-    if !BoolInput::new(Some(true))
-        .with_description("clear files or folders mentioned above")
-        .value()?
-    {
+    if !crate::resolver::ask(
+        Confirm::new(true).with_description("clear files or folders mentioned above"),
+    )? {
         println!("Canceled.");
         return Ok(());
     }

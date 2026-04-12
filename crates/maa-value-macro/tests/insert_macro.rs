@@ -2,7 +2,13 @@
 
 use std::path::PathBuf;
 
+use maa_question::resolver::batch::BatchResolver;
 use maa_value::{error::Result, prelude::*};
+
+fn resolve(template: MAAValueTemplate) -> Result<MAAValue> {
+    let mut resolver = BatchResolver::default();
+    template.resolved_by(&mut resolver)
+}
 
 #[test]
 fn insert_basic() {
@@ -87,7 +93,7 @@ fn insert_conditional() {
 
     insert!(obj, "conditional" if "flag" == true => "inserted");
 
-    let initialized = obj.resolve().unwrap();
+    let initialized = resolve(obj).unwrap();
     assert_eq!(
         initialized.get("conditional").unwrap().as_str(),
         Some("inserted")
@@ -104,7 +110,7 @@ fn insert_conditional_multiple_conditions() {
 
     insert!(obj, "conditional" if "flag1" == true && "flag2" == "yes" => "both satisfied");
 
-    let initialized = obj.resolve().unwrap();
+    let initialized = resolve(obj).unwrap();
     assert_eq!(
         initialized.get("conditional").unwrap().as_str(),
         Some("both satisfied")
