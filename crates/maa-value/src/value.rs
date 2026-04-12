@@ -70,15 +70,16 @@ impl schemars::JsonSchema for MAAValueTemplate {
                 input_schema,
                 {
                     "type": "object",
-                    "required": ["conditions", "value"],
+                    "required": ["conditions"],
                     "properties": {
                         "conditions": {
                             "type": "object",
                             "additionalProperties": primitive_schema,
                         },
-                        "value": self_schema.clone(),
                     },
-                    "additionalProperties": false,
+                    // `value` is flattened during deserialization, so its fields appear
+                    // directly on the surrounding object instead of under a dedicated key.
+                    "additionalProperties": self_schema.clone(),
                 },
                 {
                     "type": "object",
@@ -699,6 +700,16 @@ mod tests {
             let schema = schemars::schema_for!(BoxedMAAValueTemplate);
             let value = serde_json::to_value(&schema).unwrap();
             assert!(value.is_object());
+        }
+
+        #[test]
+        fn optional_schema_matches_flattened_value_shape() {
+            let schema = schemars::schema_for!(MAAValueTemplate);
+            let value = serde_json::to_value(&schema).unwrap();
+            let schema_text = value.to_string();
+
+            assert!(schema_text.contains("\"conditions\""));
+            assert!(!schema_text.contains("\"required\":[\"conditions\",\"value\"]"));
         }
 
         #[test]
