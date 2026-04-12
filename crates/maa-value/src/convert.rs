@@ -145,8 +145,9 @@ impl_all_by_from_primitive!(crate::value::MAAValue);
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
+    use maa_question::prelude::{Confirm, Inquiry};
+
     use super::*;
-    use crate::userinput::{BoolInput, Input};
 
     #[test]
     fn value_from_others() {
@@ -169,21 +170,21 @@ mod tests {
         let bool_val = MAAValueTemplate::from(true);
         assert_eq!(TryAs::<bool>::try_as(&bool_val), Some(true));
         assert_eq!(TryAs::<Int>::try_as(&bool_val), None);
-        let bool_input_val = MAAValueTemplate::from(BoolInput::new(Some(true)));
+        let bool_input_val = MAAValueTemplate::from(Confirm::new(true));
         assert_eq!(TryAs::<bool>::try_as(&bool_input_val), None);
 
         // Int
         let int_val = MAAValueTemplate::from(1);
         assert_eq!(TryAs::<Int>::try_as(&int_val), Some(1));
         assert_eq!(TryAs::<Float>::try_as(&int_val), None);
-        let int_input_val = MAAValueTemplate::from(Input::new(Some(1)));
+        let int_input_val = MAAValueTemplate::from(Inquiry::new(1));
         assert_eq!(TryAs::<Int>::try_as(&int_input_val), None);
 
         // Float
         let float_val = MAAValueTemplate::from(1.0);
         assert_eq!(TryAs::<Float>::try_as(&float_val), Some(1.0));
         assert_eq!(TryAs::<Int>::try_as(&float_val), None);
-        let float_input_val = MAAValueTemplate::from(Input::new(Some(1.0)));
+        let float_input_val = MAAValueTemplate::from(Inquiry::new(1.0));
         assert_eq!(TryAs::<Float>::try_as(&float_input_val), None);
 
         // String
@@ -212,10 +213,7 @@ mod tests {
             assert_eq!(MAAValueTemplate::default().as_bool(), None);
 
             // Test with input values (should return None)
-            assert_eq!(
-                MAAValueTemplate::from(BoolInput::new(Some(true))).as_bool(),
-                None
-            );
+            assert_eq!(MAAValueTemplate::from(Confirm::new(true)).as_bool(), None);
         }
 
         #[test]
@@ -238,7 +236,7 @@ mod tests {
             assert_eq!(MAAValueTemplate::default().as_int(), None);
 
             // Test with input values (should return None)
-            assert_eq!(MAAValueTemplate::from(Input::new(Some(42))).as_int(), None);
+            assert_eq!(MAAValueTemplate::from(Inquiry::new(42)).as_int(), None);
         }
 
         #[test]
@@ -261,10 +259,7 @@ mod tests {
             assert_eq!(MAAValueTemplate::default().as_float(), None);
 
             // Test with input values (should return None)
-            assert_eq!(
-                MAAValueTemplate::from(Input::new(Some(2.14))).as_float(),
-                None
-            );
+            assert_eq!(MAAValueTemplate::from(Inquiry::new(2.14)).as_float(), None);
         }
 
         #[test]
@@ -288,7 +283,7 @@ mod tests {
 
             // Test with input values (should return None)
             assert_eq!(
-                MAAValueTemplate::from(Input::new(Some(String::from("hello")))).as_str(),
+                MAAValueTemplate::from(Inquiry::new(String::from("hello"))).as_str(),
                 None
             );
         }
@@ -319,7 +314,7 @@ mod tests {
             assert_eq!(MAAValueTemplate::from([1, 2]).as_primitive(), None);
             assert_eq!(MAAValueTemplate::default().as_primitive(), None);
             assert_eq!(
-                MAAValueTemplate::from(BoolInput::new(Some(true))).as_primitive(),
+                MAAValueTemplate::from(Confirm::new(true)).as_primitive(),
                 None
             );
         }
