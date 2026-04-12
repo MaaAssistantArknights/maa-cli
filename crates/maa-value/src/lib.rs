@@ -17,8 +17,8 @@
 //!    after all user inputs have been collected and conditions evaluated.
 //!
 //! The transformation from template to resolved value happens via
-//! [`value::MAAValueTemplate::resolved_by()`] or
 //! [`value::MAAValueTemplate::resolved_by()`], which:
+//!
 //! - Queries the user for any required inputs
 //! - Evaluates conditional dependencies
 //! - Produces a final concrete configuration

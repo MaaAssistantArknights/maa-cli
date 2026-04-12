@@ -34,19 +34,11 @@ impl From<IoResolver<StdIo>> for CliResolver {
 
 #[derive(Debug, thiserror::Error)]
 pub enum CliResolverError {
+    #[error(transparent)]
     Batch(#[from] BatchError),
+    #[error(transparent)]
     StdIo(#[from] std::io::Error),
 }
-
-impl std::fmt::Display for CliResolverError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CliResolverError::Batch(e) => e.fmt(f),
-            CliResolverError::StdIo(e) => e.fmt(f),
-        }
-    }
-}
-
 macro_rules! forward_resolve_impl {
     ($question:ty) => {
         impl Resolve<$question> for CliResolver {

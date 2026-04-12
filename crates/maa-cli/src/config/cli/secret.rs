@@ -252,8 +252,6 @@ mod tests {
 
         #[test]
         fn prompt_rejects_batch_mode() {
-            crate::resolver::init(true);
-
             let error = Secret::Prompt.get_with_desc("token").unwrap_err();
 
             assert_eq!(

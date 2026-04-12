@@ -1,9 +1,11 @@
 use maa_question::prelude::*;
 use serde::Deserialize;
 
-// Error is only used in tests but must be imported at module level.
-use crate::error::Error;
-use crate::{error::Result, primitive::MAAPrimitive, value::MAAValueTemplate};
+use crate::{
+    error::{Error, Result},
+    primitive::MAAPrimitive,
+    value::MAAValueTemplate,
+};
 
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Deserialize, Clone, Debug, PartialEq)]

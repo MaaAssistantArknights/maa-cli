@@ -2,7 +2,7 @@ use std::io::{self, BufRead, Write};
 
 use crate::{Question, Resolve};
 
-/// A [`Resolver`] backed by a pair of IO streams.
+/// A resolver backed by a pair of IO streams.
 #[derive(Debug)]
 pub struct IoResolver<I: Io = StdIo>(pub I);
 
@@ -37,10 +37,6 @@ pub trait PromptIo: Question {
     /// Writes the prefix for when an invalid answer is provided and re-asking the question to the
     /// given writer.
     fn write_invalid_prefix(&self, writer: &mut dyn Write) -> io::Result<()>;
-
-    fn refuse_empty_default(&self) -> bool {
-        false
-    }
 }
 
 impl<Q: PromptIo, I: Io> Resolve<Q> for IoResolver<I> {
