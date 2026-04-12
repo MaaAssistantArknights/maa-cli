@@ -44,12 +44,14 @@ impl<T> NonEmptyVec<T> {
 
     /// Returns a shared reference to the first element.
     pub fn first(&self) -> &T {
-        &self.0[0]
+        // SAFETY: the vector is non-empty, so the first element always exists
+        unsafe { self.0.get_unchecked(0) }
     }
 
     /// Returns a shared reference to the last element.
     pub fn last(&self) -> &T {
-        &self.0[self.0.len() - 1]
+        // SAFETY: the vector is non-empty, so the last element always exists
+        unsafe { self.0.get_unchecked(self.0.len() - 1) }
     }
 
     /// Consumes `self` and returns the underlying `Vec`.
@@ -110,6 +112,13 @@ impl<T: JsonSchema> JsonSchema for NonEmptyVec<T> {
     }
 }
 
+#[macro_export]
+macro_rules! nevev {
+    [$item:expr $(, $rest:expr)* $(,)?] => {
+        NonEmptyVec(vec![$item, $($rest),*])
+    };
+}
+
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
@@ -141,42 +150,82 @@ mod tests {
 
     #[test]
     fn len_and_is_empty_reflect_invariant() {
-        let vec = NonEmptyVec::new(vec![1, 2, 3]).unwrap();
+        let vec = nevev![1, 2, 3];
         assert_eq!(vec.len(), 3);
         assert!(!vec.is_empty());
     }
 
     #[test]
     fn into_vec_returns_inner_vec() {
-        let vec = NonEmptyVec::new(vec![1, 2, 3]).unwrap();
+        let vec = nevev![1, 2, 3];
         assert_eq!(vec.into_vec(), vec![1, 2, 3]);
     }
 
-    #[cfg(feature = "serde")]
     #[test]
-    fn serde_roundtrip_preserves_values() {
-        let vec = NonEmptyVec::new(vec![1, 2, 3]).unwrap();
-        let json = serde_json::to_string(&vec).unwrap();
-        assert_eq!(json, "[1,2,3]");
-        let restored: NonEmptyVec<i32> = serde_json::from_str(&json).unwrap();
-        assert_eq!(restored, vec);
+    fn first_and_last_always_return() {
+        let vec = nevev![42];
+        assert_eq!(vec.first(), &42);
+        assert_eq!(vec.last(), &42);
+    }
+
+    #[test]
+    fn deref_gives_correct_slice() {
+        let vec = nevev![1, 2, 3];
+        let slice: &[i32] = &vec;
+        assert_eq!(slice, &[1, 2, 3]);
     }
 
     #[cfg(feature = "serde")]
-    #[test]
-    fn serde_rejects_empty_array() {
-        let error = serde_json::from_str::<NonEmptyVec<i32>>("[]").unwrap_err();
-        assert!(error.to_string().contains("a non-empty array"));
+    mod serde {
+        use super::*;
+
+        #[test]
+        fn serde_roundtrip_preserves_values() {
+            let vec = nevev![1, 2, 3];
+            let json = serde_json::to_string(&vec).unwrap();
+            assert_eq!(json, "[1,2,3]");
+            let restored: NonEmptyVec<i32> = serde_json::from_str(&json).unwrap();
+            assert_eq!(restored, vec);
+        }
+
+        #[cfg(feature = "serde")]
+        #[test]
+        fn serde_rejects_empty_array() {
+            let error = serde_json::from_str::<NonEmptyVec<i32>>("[]").unwrap_err();
+            assert!(error.to_string().contains("a non-empty array"));
+        }
+
+        #[cfg(feature = "schema")]
+        #[test]
+        fn schema_marks_array_as_non_empty() {
+            let schema = schemars::schema_for!(NonEmptyVec<i32>);
+            let schema = serde_json::to_value(&schema).unwrap();
+
+            assert_eq!(schema["type"], "array");
+            assert_eq!(schema["minItems"], 1);
+            assert_eq!(schema["items"]["type"], "integer");
+        }
     }
 
-    #[cfg(feature = "schema")]
-    #[test]
-    fn schema_marks_array_as_non_empty() {
-        let schema = schemars::schema_for!(NonEmptyVec<i32>);
-        let schema = serde_json::to_value(&schema).unwrap();
+    mod nevev_macro {
+        use super::NonEmptyVec;
 
-        assert_eq!(schema["type"], "array");
-        assert_eq!(schema["minItems"], 1);
-        assert_eq!(schema["items"]["type"], "integer");
+        #[test]
+        fn nevev_single_element() {
+            let vec: NonEmptyVec<i32> = nevev![1];
+            assert_eq!(&*vec, &[1]);
+        }
+
+        #[test]
+        fn nevev_multiple_elements() {
+            let vec = nevev![1, 2, 3];
+            assert_eq!(&*vec, &[1, 2, 3]);
+        }
+
+        #[test]
+        fn nevev_trailing_comma() {
+            let vec = nevev![1, 2, 3,];
+            assert_eq!(&*vec, &[1, 2, 3]);
+        }
     }
 }

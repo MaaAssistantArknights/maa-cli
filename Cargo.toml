@@ -36,13 +36,13 @@ maa-question = { path = "crates/maa-question", version = "0.1" }
 maa-ffi-string = { path = "crates/maa-ffi-string", version = "0.1" }
 maa-ffi-types = { path = "crates/maa-ffi-types", version = "1" }
 maa-installer = { path = "crates/maa-installer", version = "0.2" }
-nonempty-vec = { path = "crates/nonempty-vec", version = "0.1" }
 maa-str-ext = { path = "crates/maa-str-ext", version = "0.1" }
 maa-sys = { path = "crates/maa-sys", version = "0.10", default-features = false }
 maa-types = { path = "crates/maa-types", version = "0.3" }
 maa-value = { path = "crates/maa-value", version = "0.2" }
 maa-value-macro = { path = "crates/maa-value-macro", version = "0.1" }
 maa-version = { path = "crates/maa-version", version = "0.1" }
+nonempty-vec = { path = "crates/nonempty-vec", version = "0.1" }
 prettytable = { version = "0.10.0", default-features = false }
 proc-macro2 = "1"
 quote = "1"
