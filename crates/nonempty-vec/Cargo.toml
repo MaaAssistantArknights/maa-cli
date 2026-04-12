@@ -19,6 +19,5 @@ serde_json = { workspace = true }
 workspace = true
 
 [features]
-default = []
 schema = ["dep:schemars"]
 serde = ["dep:serde"]
