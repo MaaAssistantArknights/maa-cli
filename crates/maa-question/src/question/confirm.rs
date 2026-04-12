@@ -1,5 +1,6 @@
 use std::io::{self, Write};
 
+#[cfg(feature = "serde")]
 use serde::Deserialize;
 
 use super::CowStr;
@@ -9,9 +10,10 @@ use crate::{Question, resolver::io::PromptIo};
 ///
 /// When resolved through [`PromptIo`](crate::resolver::io::PromptIo), this renders as a
 /// `[Y/n]` or `[y/N]` prompt.
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "serde", derive(Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 pub struct Confirm {
     /// Stable identifier for variable injection.
     id: Option<CowStr>,
@@ -97,41 +99,46 @@ impl PromptIo for Confirm {
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
-    use serde_test::{Token, assert_de_tokens, assert_de_tokens_error};
-
     use super::*;
     use crate::resolver::io::*;
 
-    #[test]
-    fn serde() {
-        let values = vec![
-            Confirm::new(true).with_description("do something"),
-            Confirm::new(false),
-        ];
+    #[cfg(feature = "serde")]
+    mod serde {
+        use serde_test::{Token, assert_de_tokens, assert_de_tokens_error};
 
-        assert_de_tokens(&values, &[
-            Token::Seq { len: Some(2) },
-            Token::Map { len: Some(2) },
-            Token::Str("default"),
-            Token::Bool(true),
-            Token::Str("description"),
-            Token::Some,
-            Token::Str("do something"),
-            Token::MapEnd,
-            Token::Map { len: Some(1) },
-            Token::Str("default"),
-            Token::Bool(false),
-            Token::MapEnd,
-            Token::SeqEnd,
-        ]);
-    }
+        use super::*;
 
-    #[test]
-    fn empty_map_is_rejected() {
-        assert_de_tokens_error::<Confirm>(
-            &[Token::Map { len: Some(0) }, Token::MapEnd],
-            "missing field `default`",
-        );
+        #[test]
+        fn basic() {
+            let values = vec![
+                Confirm::new(true).with_description("do something"),
+                Confirm::new(false),
+            ];
+
+            assert_de_tokens(&values, &[
+                Token::Seq { len: Some(2) },
+                Token::Map { len: Some(2) },
+                Token::Str("default"),
+                Token::Bool(true),
+                Token::Str("description"),
+                Token::Some,
+                Token::Str("do something"),
+                Token::MapEnd,
+                Token::Map { len: Some(1) },
+                Token::Str("default"),
+                Token::Bool(false),
+                Token::MapEnd,
+                Token::SeqEnd,
+            ]);
+        }
+
+        #[test]
+        fn empty_map_is_rejected() {
+            assert_de_tokens_error::<Confirm>(
+                &[Token::Map { len: Some(0) }, Token::MapEnd],
+                "missing field `default`",
+            );
+        }
     }
 
     #[test]
