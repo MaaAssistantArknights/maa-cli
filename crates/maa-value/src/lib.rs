@@ -211,6 +211,8 @@ pub mod value;
 /// - [`MapOps`](crate::map::MapOps): Operations on map-like values (get, insert, merge, etc.)
 /// - [`AsPrimitive`](crate::convert::AsPrimitive): Convert to primitive types
 /// - [`TryAs`](crate::convert::TryAs): Try to convert to a specific type
+/// - [`MAAInputResolver`](crate::input::MAAInputResolver): Resolver capability for
+///   [`MAAValueTemplate::resolved_by`](crate::value::MAAValueTemplate::resolved_by)
 ///
 /// Related question types such as [`Inquiry`](maa_question::Inquiry),
 /// [`Confirm`](maa_question::Confirm), and [`SelectD`](maa_question::SelectD)
@@ -224,7 +226,7 @@ pub mod prelude {
     pub use crate::{
         array::ArrayOps,
         convert::{AsPrimitive, TryAs},
-        input::MAAInput,
+        input::{MAAInput, MAAInputResolver},
         map::MapOps,
         primitive::MAAPrimitive,
         value::{MAAValue, MAAValueTemplate},
