@@ -2,9 +2,15 @@
 
 use std::path::PathBuf;
 
+use maa_question::resolver::batch::BatchResolver;
 #[cfg(unix)]
 use maa_value::error::Result;
 use maa_value::prelude::*;
+
+fn resolve(template: MAAValueTemplate) -> maa_value::error::Result<MAAValue> {
+    let mut resolver = BatchResolver::default();
+    template.resolved_by(&mut resolver)
+}
 
 #[cfg(unix)]
 pub fn invalid_utf8_path() -> PathBuf {
@@ -253,7 +259,7 @@ fn object_conditional_maybe_try_unwrap_success() {
         "conditional" if "flag" == true =>? some_valid??
     );
 
-    let initialized = obj.resolve().unwrap();
+    let initialized = resolve(obj).unwrap();
     assert_eq!(
         initialized.get("conditional").unwrap().as_str(),
         Some("/valid/path")
@@ -269,7 +275,7 @@ fn object_conditional_maybe_try_unwrap_none() {
         "conditional" if "flag" == true =>? none_value??
     );
 
-    let initialized = obj.resolve().unwrap();
+    let initialized = resolve(obj).unwrap();
     assert!(initialized.get("conditional").is_none());
 }
 
@@ -300,7 +306,7 @@ fn insert_conditional_maybe_try_unwrap_success() {
         "conditional" if "flag" == true =>? some_valid??
     );
 
-    let initialized = obj.resolve().unwrap();
+    let initialized = resolve(obj).unwrap();
     assert_eq!(
         initialized.get("conditional").unwrap().as_str(),
         Some("/test")

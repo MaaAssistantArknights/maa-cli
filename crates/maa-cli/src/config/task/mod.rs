@@ -155,7 +155,9 @@ impl TaskConfigTemplate {
             }
 
             let task_type = task.task_type();
-            let mut params = task.params().resolve()?;
+            let mut params = crate::resolver::with_global_resolver(|resolver| {
+                task.params().resolved_by(resolver)
+            })?;
 
             // If startup task is not enabled, enable it automatically
             match task_type {
@@ -516,13 +518,19 @@ mod tests {
 
     mod task_config {
         use TaskType::*;
+        use maa_question::resolver::batch::BatchResolver;
 
         use super::*;
+
+        fn resolve(template: MAAValueTemplate) -> MAAValue {
+            let mut resolver = BatchResolver::default();
+            template.resolved_by(&mut resolver).unwrap()
+        }
 
         mod serde {
             use chrono::{NaiveDateTime, NaiveTime, TimeZone, Weekday};
             use condition::TimeOffset;
-            use maa_value::userinput::{BoolInput, Input, SelectD};
+            use maa_question::prelude::*;
 
             use super::*;
 
@@ -548,9 +556,7 @@ mod tests {
                 task_list.push(TaskTemplate::new(
                     StartUp,
                     template!(
-                        "start_game_enabled" => BoolInput::new(
-                            Some(true),
-                        ).with_description("start the game"),
+                        "start_game_enabled" => Confirm::new(true).with_description("start the game"),
                         "client_type" if "start_game_enabled" == true =>
                             SelectD::<String>::from_iter(
                                 [
@@ -558,7 +564,7 @@ mod tests {
                                     YoStarEN.to_str(),
                                     YoStarJP.to_str(),
                                 ],
-                                None,
+                                std::num::NonZero::new(1).unwrap(),
                             ).unwrap().with_description("a client type"),
                     ),
                 ));
@@ -578,8 +584,8 @@ mod tests {
                             TaskVariant {
                                 condition: Condition::Always,
                                 params: template!(
-                                    "stage" => Input::new(
-                                        Some("1-7".to_string()),
+                                    "stage" => Inquiry::new(
+                                        "1-7".to_string(),
                                     ).with_description("a stage to fight"),
                                 ),
                             },
@@ -603,7 +609,7 @@ mod tests {
                                             "SL-7",
                                             "SL-8",
                                         ],
-                                        std::num::NonZero::new(2),
+                                        std::num::NonZero::new(2).unwrap(),
                                     ).unwrap()
                                     .with_description("a stage to fight in summer event")
                                     .with_allow_custom(true),
@@ -750,12 +756,10 @@ mod tests {
                     tasks: vec![
                         Task::new(
                             StartUp,
-                            template!(
+                            resolve(template!(
                                 "start_game_enabled" => true,
                                 "client_type" => "YoStarEN",
-                            )
-                            .resolve()
-                            .unwrap()
+                            ))
                         )
                         .with_name(String::from("StartUp"))
                     ]
@@ -783,12 +787,10 @@ mod tests {
                     close_app: false,
                     tasks: vec![Task::new(
                         StartUp,
-                        template!(
+                        resolve(template!(
                             "start_game_enabled" => false,
                             "client_type" => "YoStarEN",
-                        )
-                        .resolve()
-                        .unwrap()
+                        ))
                     )]
                 }
             );
@@ -812,7 +814,7 @@ mod tests {
                     close_app: true,
                     tasks: vec![Task::new(
                         CloseDown,
-                        template!("client_type" => "YoStarEN").resolve().unwrap()
+                        resolve(template!("client_type" => "YoStarEN"))
                     )]
                 }
             );
@@ -838,12 +840,10 @@ mod tests {
                     close_app: false,
                     tasks: vec![Task::new(
                         CloseDown,
-                        template!(
+                        resolve(template!(
                             "enable" => false,
                             "client_type" => "YoStarEN",
-                        )
-                        .resolve()
-                        .unwrap()
+                        ))
                     )]
                 }
             );
@@ -863,7 +863,7 @@ mod tests {
                     close_app: true,
                     tasks: vec![Task::new(
                         CloseDown,
-                        template!("client_type" => "Official").resolve().unwrap()
+                        resolve(template!("client_type" => "Official"))
                     )]
                 }
             );
@@ -886,7 +886,7 @@ mod tests {
                     close_app: false,
                     tasks: vec![Task::new(
                         Fight,
-                        template!("client_type" => "YoStarEN").resolve().unwrap()
+                        resolve(template!("client_type" => "YoStarEN"))
                     )]
                 }
             );
@@ -917,26 +917,19 @@ mod tests {
                     tasks: vec![
                         Task::new(
                             StartUp,
-                            template!(
+                            resolve(template!(
                                 "client_type" => "Official",
                                 "start_game_enabled" => true,
-                            )
-                            .resolve()
-                            .unwrap()
+                            ))
                         ),
                         Task::new(
                             Fight,
-                            template!(
+                            resolve(template!(
                                 "stage" => "1-7",
                                 "client_type" => "Official",
-                            )
-                            .resolve()
-                            .unwrap()
+                            ))
                         ),
-                        Task::new(
-                            CloseDown,
-                            template!("client_type" => "Official").resolve().unwrap()
-                        ),
+                        Task::new(CloseDown, resolve(template!("client_type" => "Official"))),
                     ]
                 }
             );
@@ -961,31 +954,25 @@ mod tests {
                     tasks: vec![
                         Task::new(
                             StartUp,
-                            template!(
+                            resolve(template!(
                                 "enable" => true,
                                 "client_type" => "Official",
                                 "start_game_enabled" => true,
-                            )
-                            .resolve()
-                            .unwrap()
+                            ))
                         ),
                         Task::new(
                             Fight,
-                            template!(
+                            resolve(template!(
                                 "stage" => "1-7",
                                 "client_type" => "Official",
-                            )
-                            .resolve()
-                            .unwrap()
+                            ))
                         ),
                         Task::new(
                             CloseDown,
-                            template!(
+                            resolve(template!(
                                 "enable" => true,
                                 "client_type" => "Official",
-                            )
-                            .resolve()
-                            .unwrap()
+                            ))
                         ),
                     ]
                 },
@@ -1007,26 +994,19 @@ mod tests {
                     tasks: vec![
                         Task::new(
                             StartUp,
-                            template!(
+                            resolve(template!(
                                 "client_type" => "Official",
                                 "start_game_enabled" => true,
-                            )
-                            .resolve()
-                            .unwrap()
+                            ))
                         ),
                         Task::new(
                             Fight,
-                            template!(
+                            resolve(template!(
                                 "stage" => "1-7",
                                 "client_type" => "Official",
-                            )
-                            .resolve()
-                            .unwrap()
+                            ))
                         ),
-                        Task::new(
-                            CloseDown,
-                            template!("client_type" => "Official").resolve().unwrap(),
-                        ),
+                        Task::new(CloseDown, resolve(template!("client_type" => "Official")),),
                     ]
                 },
             );
@@ -1047,26 +1027,19 @@ mod tests {
                     tasks: vec![
                         Task::new(
                             StartUp,
-                            template!(
+                            resolve(template!(
                                 "start_game_enabled" => true,
                                 "client_type" => "YoStarEN",
-                            )
-                            .resolve()
-                            .unwrap()
+                            ))
                         ),
                         Task::new(
                             Fight,
-                            template!(
+                            resolve(template!(
                                 "stage" => "1-7",
                                 "client_type" => "YoStarEN",
-                            )
-                            .resolve()
-                            .unwrap()
+                            ))
                         ),
-                        Task::new(
-                            CloseDown,
-                            template!("client_type" => "YoStarEN").resolve().unwrap(),
-                        ),
+                        Task::new(CloseDown, resolve(template!("client_type" => "YoStarEN")),),
                     ]
                 }
             );
@@ -1089,14 +1062,8 @@ mod tests {
                     start_app: false,
                     close_app: true,
                     tasks: vec![
-                        Task::new(
-                            StartUp,
-                            template!("client_type" => "Official").resolve().unwrap()
-                        ),
-                        Task::new(
-                            CloseDown,
-                            template!("client_type" => "Official").resolve().unwrap()
-                        ),
+                        Task::new(StartUp, resolve(template!("client_type" => "Official"))),
+                        Task::new(CloseDown, resolve(template!("client_type" => "Official"))),
                     ]
                 }
             );
@@ -1122,9 +1089,11 @@ mod tests {
                     tasks: vec![
                         Task::new(
                             Infrast,
-                            template!("filename" => dirs::abs_config("daily.json", Some("infrast")).unwrap()??).resolve().unwrap(),
+                            resolve(
+                                template!("filename" => dirs::abs_config("daily.json", Some("infrast")).unwrap()??)
+                            ),
                         ),
-                        Task::new(Infrast, template!("filename" => "/tmp/daily.json").resolve().unwrap())
+                        Task::new(Infrast, resolve(template!("filename" => "/tmp/daily.json")))
                     ]
                 }
             );
@@ -1136,19 +1105,13 @@ mod tests {
                 Task::new(Fight, object!("stage" => "1-7")).with_name("Fight Daily".to_string());
             assert_eq!(task.name_or_default(), "Fight Daily");
             assert_eq!(task.task_type, Fight);
-            assert_eq!(
-                &task.params,
-                &template!("stage" => "1-7").resolve().unwrap()
-            );
+            assert_eq!(&task.params, &resolve(template!("stage" => "1-7")));
             assert_eq!(task.name, Some(String::from("Fight Daily")));
 
             let task = Task::new(Fight, object!("stage" => "1-7"));
             assert_eq!(task.name_or_default(), "Fight");
             assert_eq!(task.task_type, Fight);
-            assert_eq!(
-                &task.params,
-                &template!("stage" => "1-7").resolve().unwrap()
-            );
+            assert_eq!(&task.params, &resolve(template!("stage" => "1-7")));
             assert_eq!(task.name, None);
         }
 
@@ -1238,11 +1201,9 @@ mod tests {
                     .unwrap()
                     .tasks[0]
                     .params,
-                template!(
+                resolve(template!(
                     "filename" => dirs::abs_config("daily.json", Some("infrast")).unwrap()??
-                )
-                .resolve()
-                .unwrap()
+                ))
             );
 
             #[cfg(unix)]
@@ -1254,9 +1215,7 @@ mod tests {
                 .unwrap()
                 .tasks[0]
                     .params,
-                template!("filename" => "/tmp/daily.json")
-                    .resolve()
-                    .unwrap()
+                resolve(template!("filename" => "/tmp/daily.json"))
             );
 
             assert!(

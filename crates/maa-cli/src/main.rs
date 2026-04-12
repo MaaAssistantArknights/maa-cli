@@ -6,6 +6,7 @@ extern crate maa_dirs;
 
 mod atomic_fs;
 mod log;
+mod resolver;
 mod state;
 
 mod activity;
@@ -21,15 +22,16 @@ use clap::{CommandFactory, Parser};
 use crate::command::{Cli, Command, Component, Dir};
 
 fn main() -> Result<()> {
-    let cli = command::Cli::parse();
+    let Cli {
+        command,
+        batch,
+        log,
+    } = Cli::parse();
 
-    cli.log.init_logger()?;
+    log.init_logger()?;
+    resolver::init(batch);
 
-    if cli.batch {
-        maa_value::userinput::enable_batch_mode()
-    }
-
-    match cli.command {
+    match command {
         #[cfg(feature = "core_installer")]
         Command::Install { force, common } => {
             installer::maa_core::install(force, &common)?;

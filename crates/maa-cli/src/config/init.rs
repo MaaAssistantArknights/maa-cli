@@ -1,14 +1,15 @@
 use std::path::Path;
 
 use anyhow::{Result, bail};
+use maa_question::prelude::*;
 use maa_value::prelude::*;
 
 fn asst_config_template() -> MAAValueTemplate {
     template!(
-        "setup_connection" => BoolInput::new(Some(true)).with_description("setup connection"),
+        "setup_connection" => Confirm::new(true).with_description("setup connection"),
         "connection_config" if "setup_connection" == true => template!(
-            "preset" => SelectD::<String>::new(
-                vec![
+            "preset" => SelectD::<String>::from_iter(
+                [
                     ValueWithDesc::new(
                         "MuMuPro",
                         None,
@@ -26,23 +27,23 @@ fn asst_config_template() -> MAAValueTemplate {
                         None,
                     ),
                 ],
-                std::num::NonZero::new(4),
+                std::num::NonZero::new(4).unwrap(),
             ).unwrap()
             .with_description("connection preset"),
-            "adb_path" if "preset" == "ADB" => Input::<String>::new(
-                Some(String::from("adb")),
+            "adb_path" if "preset" == "ADB" => Inquiry::<String>::new(
+                String::from("adb"),
             ).with_description("adb path"),
-            "address" => Input::<String>::new(
-                Some(String::from("auto")),
+            "address" => Inquiry::<String>::new(
+                String::from("auto"),
             ).with_description("address to connect"),
-            "config" => Input::<String>::new(
-                Some(String::from("auto")),
+            "config" => Inquiry::<String>::new(
+                String::from("auto"),
             ).with_description("configuration name to connect (auto for most cases)"),
         ),
-        "setup_instance_options" => BoolInput::new(Some(true)).with_description("setup instance options"),
+        "setup_instance_options" => Confirm::new(true).with_description("setup instance options"),
         "instance_options" if "setup_instance_options" == true => template!(
-            "touch_mode" => SelectD::<String>::new(
-                vec![
+            "touch_mode" => SelectD::<String>::from_iter(
+                [
                     ValueWithDesc::new(
                         "ADB",
                         Some("most compatible but slow"),
@@ -64,26 +65,26 @@ fn asst_config_template() -> MAAValueTemplate {
                         Some("use MaaFramework ADB controller for emulator extras support"),
                     ),
                 ],
-                std::num::NonZero::new(3),
+                std::num::NonZero::new(3).unwrap(),
             ).unwrap()
             .with_description("touch mode"),
-            "deployment_with_pause" => BoolInput::new(
-                Some(false),
+            "deployment_with_pause" => Confirm::new(
+                false,
             ).with_description("deploy operator with pause"),
-            "adb_lite_enabled" => BoolInput::new(
-                Some(false),
+            "adb_lite_enabled" => Confirm::new(
+                false,
             ).with_description("enable ADB Lite (a lightweight ADB implementation)"),
-            "kill_adb_on_exit" => BoolInput::new(
-                Some(false),
+            "kill_adb_on_exit" => Confirm::new(
+                false,
             ).with_description("kill ADB server on exit"),
         ),
         // most of cases don't need to setup resource
-        "setup_resource" => BoolInput::new(
-            Some(false),
+        "setup_resource" => Confirm::new(
+            false,
         ).with_description("setup resource configurations (don't setup it for most cases)"),
         "resource_config" if "setup_resource" == true => template!(
-            "global_resource" => SelectD::<String>::new(
-                vec![
+            "global_resource" => SelectD::<String>::from_iter(
+                [
                     ValueWithDesc::new(
                         "None",
                         Some("no global resource needed by Official and BiliBili client"),
@@ -105,10 +106,10 @@ fn asst_config_template() -> MAAValueTemplate {
                         Some("resource for Traditional Chinese client"),
                     ),
                 ],
-                std::num::NonZero::new(1),
+                std::num::NonZero::new(1).unwrap(),
             ).unwrap().with_description("global resource to load"),
-            "platform_diff_resource" => SelectD::<String>::new(
-                vec![
+            "platform_diff_resource" => SelectD::<String>::from_iter(
+                [
                     ValueWithDesc::new(
                         "None",
                         Some("no platform different resource needed by Android client"),
@@ -118,17 +119,17 @@ fn asst_config_template() -> MAAValueTemplate {
                         Some("resource for PlayCover which run iOS client on macOS"),
                     ),
                 ],
-                std::num::NonZero::new(1),
+                std::num::NonZero::new(1).unwrap(),
             ).unwrap().with_description("platform different resource to load"),
-            "user_resource" => BoolInput::new(Some(false))
+            "user_resource" => Confirm::new(false)
                 .with_description("load custom resource from user configuration directory"),
         ),
         // most of cases don't need to setup static options
-        "setup_static_options" => BoolInput::new(Some(false))
+        "setup_static_options" => Confirm::new(false)
             .with_description("setup static options (for hardware acceleration)"),
         "static_options" if "setup_static_options" == true => template!(
-            "cpu_ocr" => BoolInput::new(Some(true)).with_description("use CPU for OCR"),
-            "gpu_ocr" if "cpu_ocr" == false => Input::<i32>::new(None)
+            "cpu_ocr" => Confirm::new(true).with_description("use CPU for OCR"),
+            "gpu_ocr" if "cpu_ocr" == false => Inquiry::<i32>::new(0)
                 .with_description("GPU device ID for OCR (make sure your MAA Core supports GPU OCR)"),
         ),
     )
@@ -164,7 +165,9 @@ pub fn init(name: Option<&Path>, filetype: Option<super::Filetype>, force: bool)
     }
 
     // TODO: better logic to handle the template
-    let asst_config = asst_config_template().resolve()?;
+    let asst_config = crate::resolver::with_global_resolver(|resolver| {
+        asst_config_template().resolved_by(resolver)
+    })?;
     let mut asst_config_out = MAAValue::default();
     if let Some(obj) = asst_config.get("connection_config") {
         let mut config = MAAValue::default();
