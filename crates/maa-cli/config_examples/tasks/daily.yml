@@ -6,6 +6,7 @@ tasks:
         description: start the game
       client_type:
         alternatives: [Official, YoStarEN, YoStarJP]
+        default_index: 1
         description: a client type
         deps:
           start_game_enabled: true

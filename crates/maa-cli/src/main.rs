@@ -6,6 +6,7 @@ use maa_dirs as dirs;
 extern crate maa_dirs;
 
 mod log;
+mod resolver;
 mod state;
 
 mod activity;
@@ -26,15 +27,16 @@ fn main() -> Result<()> {
         .var("MAA_COMPLETE")
         .complete();
 
-    let cli = Cli::parse();
+    let Cli {
+        command,
+        batch,
+        log,
+    } = Cli::parse();
 
-    cli.log.init_logger()?;
+    log.init_logger()?;
+    resolver::init(batch);
 
-    if cli.batch {
-        maa_value::userinput::enable_batch_mode()
-    }
-
-    match cli.command {
+    match command {
         #[cfg(feature = "core_installer")]
         Command::Install { force, common } => {
             installer::maa_core::install(force, &common)?;

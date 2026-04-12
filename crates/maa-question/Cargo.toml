@@ -1,0 +1,25 @@
+[package]
+name = "maa-question"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+description = "Question-and-form framework for interactive value resolution"
+
+[dependencies]
+log = { workspace = true }
+nonempty-vec = { workspace = true }
+schemars = { workspace = true, optional = true }
+serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_test = { workspace = true }
+
+[features]
+schema = ["dep:schemars", "nonempty-vec/schema"]
+
+[lints]
+workspace = true

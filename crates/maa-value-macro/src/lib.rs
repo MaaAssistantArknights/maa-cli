@@ -16,7 +16,7 @@ use parsing::{InsertMacroInput, ObjectMacroInput};
 ///
 /// # Syntax
 ///
-/// ```ignore
+/// ```text
 /// object!(
 ///     "key" => value,           // insert(key, value)
 ///     "key" => value?,          // insert(key, value.try_into()?) — propagates error
@@ -33,6 +33,7 @@ use parsing::{InsertMacroInput, ObjectMacroInput};
 ///
 /// ```
 /// use maa_value::prelude::*;
+/// use maa_value_macro::object;
 ///
 /// let value = object!(
 ///     "bool" => true,
@@ -51,6 +52,7 @@ use parsing::{InsertMacroInput, ObjectMacroInput};
 ///
 /// ```
 /// use maa_value::prelude::*;
+/// use maa_value_macro::object;
 ///
 /// let optional_value: Option<i32> = Some(10);
 /// let value = object!(
@@ -63,6 +65,7 @@ use parsing::{InsertMacroInput, ObjectMacroInput};
 ///
 /// ```
 /// use maa_value::{error::Result, prelude::*};
+/// use maa_value_macro::object;
 ///
 /// fn example(some_path: &std::path::Path) -> Result<MAAValue> {
 ///     Ok(object!(
@@ -81,16 +84,17 @@ pub fn object(input: TokenStream) -> TokenStream {
 ///
 /// Use this macro when the template may contain user inputs
 /// ([`Input`](maa_value::value::MAAValueTemplate::Input),
-/// [`BoolInput`](maa_value::userinput::BoolInput),
-/// [`Select`](maa_value::userinput::Select)) or conditional fields (`if` syntax). Call
-/// [`MAAValueTemplate::resolve()`](maa_value::value::MAAValueTemplate::resolve) to evaluate the
-/// template into a concrete [`MAAValue`](maa_value::value::MAAValue).
+/// [`Confirm`](maa_question::Confirm),
+/// [`Select`](maa_question::Select),
+/// [`Inquiry`](maa_question::Inquiry)) or conditional fields (`if` syntax).
+/// Call [`MAAValueTemplate::resolved_by()`](maa_value::value::MAAValueTemplate::resolved_by) to
+/// evaluate the template into a concrete [`MAAValue`](maa_value::value::MAAValue).
 ///
 /// For simple concrete objects without inputs or conditionals, use [`object!`] instead.
 ///
 /// # Syntax
 ///
-/// ```ignore
+/// ```text
 /// template!(
 ///     "key" => value,                              // insert(key, value)
 ///     "key" => value?,                             // insert(key, value.try_into()?) — propagates error
@@ -107,6 +111,7 @@ pub fn object(input: TokenStream) -> TokenStream {
 ///
 /// ```
 /// use maa_value::prelude::*;
+/// use maa_value_macro::template;
 ///
 /// let tmpl = template!(
 ///     "bool" => true,
@@ -116,7 +121,10 @@ pub fn object(input: TokenStream) -> TokenStream {
 ///     "optional_chain" if "optional" == true => 1,
 /// );
 ///
-/// let resolved = tmpl.resolve().unwrap();
+/// use maa_question::prelude::BatchResolver;
+///
+/// let mut resolver = BatchResolver::default();
+/// let resolved = tmpl.resolved_by(&mut resolver).unwrap();
 /// assert_eq!(resolved.get("optional").unwrap().as_int(), Some(1));
 /// assert!(resolved.get("optional_no_satisfied").is_none());
 /// ```
@@ -125,13 +133,18 @@ pub fn object(input: TokenStream) -> TokenStream {
 ///
 /// ```
 /// use maa_value::prelude::*;
+/// use maa_value_macro::template;
+/// use maa_question::prelude::{Confirm, Inquiry};
 ///
 /// let tmpl = template!(
-///     "name" => Input::new(Some("default_name".to_string())),
-///     "enabled" => BoolInput::new(Some(true)),
+///     "name" => Inquiry::new("default_name".to_string()),
+///     "enabled" => Confirm::new(true),
 /// );
 ///
-/// let resolved = tmpl.resolve().unwrap();
+/// use maa_question::prelude::BatchResolver;
+///
+/// let mut resolver = BatchResolver::default();
+/// let resolved = tmpl.resolved_by(&mut resolver).unwrap();
 /// assert_eq!(resolved.get("name").unwrap().as_str(), Some("default_name"));
 /// ```
 ///
@@ -139,6 +152,7 @@ pub fn object(input: TokenStream) -> TokenStream {
 ///
 /// ```
 /// use maa_value::{error::Result, prelude::*};
+/// use maa_value_macro::template;
 ///
 /// fn example(path: &std::path::Path) -> Result<MAAValueTemplate> {
 ///     Ok(template!(
@@ -163,7 +177,7 @@ pub fn template(input: TokenStream) -> TokenStream {
 ///
 /// # Syntax
 ///
-/// ```ignore
+/// ```text
 /// insert!(object_expr,
 ///     "key" => value,                              // insert(key, value)
 ///     "key" => value?,                             // insert(key, value.try_into()?) — propagates error
@@ -180,6 +194,7 @@ pub fn template(input: TokenStream) -> TokenStream {
 ///
 /// ```
 /// use maa_value::prelude::*;
+/// use maa_value_macro::{insert, template};
 ///
 /// let mut obj = template!("existing" => "value");
 /// insert!(obj,
@@ -196,6 +211,7 @@ pub fn template(input: TokenStream) -> TokenStream {
 ///
 /// ```
 /// use maa_value::prelude::*;
+/// use maa_value_macro::{insert, template};
 ///
 /// let mut obj = template!("base" => "value");
 /// let optional: Option<i32> = Some(10);

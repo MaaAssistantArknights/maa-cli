@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use anyhow::{Context, anyhow};
-use maa_value::userinput::{Input, UserInput};
+use maa_question::prelude::*;
 use serde::Deserialize;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -121,11 +121,28 @@ impl Secret {
 
         match self {
             Secret::None => Ok(None),
-            Secret::Prompt => Input::<String>::new(None)
-                .with_description(description)
-                .value()
-                .map(some_owned)
-                .with_context(|| format!("Failed to get {description} from user input")),
+            Secret::Prompt => {
+                if crate::resolver::is_batch() {
+                    anyhow::bail!(
+                        "Failed to get {description} from user input: prompt is not available in batch mode"
+                    );
+                }
+
+                let mut resolver = IoResolver(StdIo::new());
+                // HACK: As all inquiries must have a default value, we need to loop until we get a
+                // non-empty value
+                loop {
+                    let answer = resolver
+                        .resolve(Inquiry::new(String::new()).with_description(description))
+                        .with_context(|| format!("Failed to get {description} from user input"))?;
+
+                    if !answer.is_empty() {
+                        break Ok(some_owned(answer));
+                    }
+
+                    eprintln!("{description} cannot be empty. Please try again.");
+                }
+            }
             Secret::Plain(value) => Ok(Some(Cow::Borrowed(value))),
             Secret::Env(name) => std::env::var(name)
                 .map(some_owned)
@@ -232,6 +249,16 @@ mod tests {
             assert_eq!(
                 Secret::Plain(s!("secret")).get_with_desc("token").unwrap(),
                 Some(Cow::Borrowed("secret"))
+            );
+        }
+
+        #[test]
+        fn prompt_rejects_batch_mode() {
+            let error = Secret::Prompt.get_with_desc("token").unwrap_err();
+
+            assert_eq!(
+                error.to_string(),
+                "Failed to get token from user input: prompt is not available in batch mode"
             );
         }
 
