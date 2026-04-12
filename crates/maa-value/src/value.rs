@@ -1,11 +1,10 @@
 use std::borrow::Cow;
 
-use maa_question::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     error::{Error, Result},
-    input::MAAInput,
+    input::{MAAInput, MAAInputResolver},
     map::{Map, StringMap},
     primitive::MAAPrimitive,
 };
@@ -98,14 +97,7 @@ pub struct BoxedMAAValueTemplate(Box<MAAValueTemplate>);
 impl BoxedMAAValueTemplate {
     fn resolved_by<R>(self, resolver: &mut R) -> Result<MAAValue>
     where
-        R: Resolve<Confirm>
-            + Resolve<Inquiry<i32>>
-            + Resolve<Inquiry<f32>>
-            + Resolve<Inquiry<String>>
-            + Resolve<SelectD<i32>>
-            + Resolve<SelectD<f32>>
-            + Resolve<SelectD<String>>
-            + ?Sized,
+        R: MAAInputResolver + ?Sized,
     {
         self.0.resolved_by(resolver)
     }
@@ -271,14 +263,7 @@ impl MAAValueTemplate {
     /// ```
     pub fn resolved_by<R>(self, resolver: &mut R) -> Result<MAAValue>
     where
-        R: Resolve<Confirm>
-            + Resolve<Inquiry<i32>>
-            + Resolve<Inquiry<f32>>
-            + Resolve<Inquiry<String>>
-            + Resolve<SelectD<i32>>
-            + Resolve<SelectD<f32>>
-            + Resolve<SelectD<String>>
-            + ?Sized,
+        R: MAAInputResolver + ?Sized,
     {
         use MAAValueTemplate::*;
         match self {

@@ -20,17 +20,37 @@ pub enum MAAInput {
     SelectString(SelectD<String>),
 }
 
+/// Resolver capability required to fully resolve any [`MAAInput`].
+///
+/// This trait groups all question kinds that `maa-value` may emit while resolving
+/// [`crate::value::MAAValueTemplate`].
+pub trait MAAInputResolver:
+    Resolve<Confirm>
+    + Resolve<Inquiry<i32>>
+    + Resolve<Inquiry<f32>>
+    + Resolve<Inquiry<String>>
+    + Resolve<SelectD<i32>>
+    + Resolve<SelectD<f32>>
+    + Resolve<SelectD<String>>
+{
+}
+
+impl<R> MAAInputResolver for R where
+    R: Resolve<Confirm>
+        + Resolve<Inquiry<i32>>
+        + Resolve<Inquiry<f32>>
+        + Resolve<Inquiry<String>>
+        + Resolve<SelectD<i32>>
+        + Resolve<SelectD<f32>>
+        + Resolve<SelectD<String>>
+        + ?Sized
+{
+}
+
 impl MAAInput {
     pub(super) fn into_primitive_with<R>(self, resolver: &mut R) -> Result<MAAPrimitive>
     where
-        R: Resolve<Confirm>
-            + Resolve<Inquiry<i32>>
-            + Resolve<Inquiry<f32>>
-            + Resolve<Inquiry<String>>
-            + Resolve<SelectD<i32>>
-            + Resolve<SelectD<f32>>
-            + Resolve<SelectD<String>>
-            + ?Sized,
+        R: MAAInputResolver + ?Sized,
     {
         use MAAInput::*;
         use MAAPrimitive::*;
