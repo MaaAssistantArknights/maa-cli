@@ -1,6 +1,6 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 #[cfg(feature = "schema")]
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
@@ -65,6 +65,12 @@ impl<T> Deref for NonEmptyVec<T> {
 
     fn deref(&self) -> &[T] {
         &self.0
+    }
+}
+
+impl<T> DerefMut for NonEmptyVec<T> {
+    fn deref_mut(&mut self) -> &mut [T] {
+        &mut self.0
     }
 }
 
@@ -173,6 +179,13 @@ mod tests {
         let vec = nevev![1, 2, 3];
         let slice: &[i32] = &vec;
         assert_eq!(slice, &[1, 2, 3]);
+    }
+
+    #[test]
+    fn deref_mut_can_modify_inner_vec() {
+        let mut vec = nevev![1, 2, 3];
+        vec.iter_mut().for_each(|i| *i *= 2);
+        assert_eq!(&*vec, &[2, 4, 6]);
     }
 
     #[cfg(feature = "serde")]
