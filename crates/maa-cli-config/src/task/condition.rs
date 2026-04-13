@@ -341,14 +341,26 @@ impl<'de> Deserialize<'de> for Condition {
                 let field = object.keys().next().map(String::as_str).unwrap_or_default();
                 Err(D::Error::unknown_field(field, CONDITION_FIELDS))
             }
-            Value::Bool(_) => Err(D::Error::invalid_type(
-                serde::de::Unexpected::Bool(false),
+            Value::Bool(v) => Err(D::Error::invalid_type(
+                serde::de::Unexpected::Bool(v),
                 &"a string or object condition",
             )),
-            Value::Number(_) => Err(D::Error::invalid_type(
-                serde::de::Unexpected::Other("number"),
-                &"a string or object condition",
-            )),
+            Value::Number(v) => {
+                let unexpected = if let Some(value) = v.as_i64() {
+                    serde::de::Unexpected::Signed(value)
+                } else if let Some(value) = v.as_u64() {
+                    serde::de::Unexpected::Unsigned(value)
+                } else if let Some(value) = v.as_f64() {
+                    serde::de::Unexpected::Float(value)
+                } else {
+                    serde::de::Unexpected::Other("number")
+                };
+
+                Err(D::Error::invalid_type(
+                    unexpected,
+                    &"a string or object condition",
+                ))
+            }
             Value::Array(_) => Err(D::Error::invalid_type(
                 serde::de::Unexpected::Seq,
                 &"a string or object condition",
@@ -521,6 +533,163 @@ mod tests {
             ));
 
             assert!(Condition::OnSideStory.is_active(&context));
+        }
+
+        #[test]
+        fn on_side_story_boundary_semantics() {
+            // Tests [from, until) semantics for OnSideStory condition
+            let from = Utc.with_ymd_and_hms(2026, 4, 10, 0, 0, 0).unwrap();
+            let until = Utc.with_ymd_and_hms(2026, 4, 11, 0, 0, 0).unwrap();
+
+            // At from boundary (inclusive)
+            let mut context_at_from = ConditionContext::with_now(from);
+            context_at_from.side_story_open_time = Some((from, until));
+            assert!(Condition::OnSideStory.is_active(&context_at_from));
+
+            // Past from, before until
+            let mut context_mid =
+                ConditionContext::with_now(Utc.with_ymd_and_hms(2026, 4, 10, 12, 0, 0).unwrap());
+            context_mid.side_story_open_time = Some((from, until));
+            assert!(Condition::OnSideStory.is_active(&context_mid));
+
+            // At until boundary (exclusive)
+            let mut context_at_until = ConditionContext::with_now(until);
+            context_at_until.side_story_open_time = Some((from, until));
+            assert!(!Condition::OnSideStory.is_active(&context_at_until));
+        }
+
+        #[test]
+        fn time_condition_boundary_semantics() {
+            let timezone =
+                TimeZone::FixedOffset(crate::task::time::UtcOffsetHours::try_from(8).unwrap());
+
+            let at_from = context(8, 2024, 2, 14, 11, 0);
+            assert!(
+                Condition::Time {
+                    time_range: TimeRange {
+                        from: Some(NaiveTime::from_hms_opt(11, 0, 0).unwrap()),
+                        until: Some(NaiveTime::from_hms_opt(13, 0, 0).unwrap()),
+                    },
+                    timezone,
+                }
+                .is_active(&at_from)
+            );
+
+            let at_until = context(8, 2024, 2, 14, 13, 0);
+            assert!(
+                !Condition::Time {
+                    time_range: TimeRange {
+                        from: Some(NaiveTime::from_hms_opt(11, 0, 0).unwrap()),
+                        until: Some(NaiveTime::from_hms_opt(13, 0, 0).unwrap()),
+                    },
+                    timezone,
+                }
+                .is_active(&at_until)
+            );
+
+            assert!(
+                Condition::Time {
+                    time_range: TimeRange {
+                        from: Some(NaiveTime::from_hms_opt(11, 0, 0).unwrap()),
+                        until: None,
+                    },
+                    timezone,
+                }
+                .is_active(&at_from)
+            );
+
+            assert!(
+                Condition::Time {
+                    time_range: TimeRange {
+                        from: None,
+                        until: Some(NaiveTime::from_hms_opt(13, 0, 0).unwrap()),
+                    },
+                    timezone,
+                }
+                .is_active(&at_until)
+            );
+        }
+
+        #[test]
+        fn datetime_condition_boundary_semantics() {
+            let timezone =
+                TimeZone::FixedOffset(crate::task::time::UtcOffsetHours::try_from(8).unwrap());
+
+            let at_from = context(8, 2024, 2, 14, 11, 0);
+            assert!(
+                Condition::DateTime {
+                    date_range: DateTimeRange {
+                        from: Some(
+                            NaiveDate::from_ymd_opt(2024, 2, 14)
+                                .unwrap()
+                                .and_hms_opt(11, 0, 0)
+                                .unwrap()
+                        ),
+                        until: Some(
+                            NaiveDate::from_ymd_opt(2024, 2, 14)
+                                .unwrap()
+                                .and_hms_opt(13, 0, 0)
+                                .unwrap()
+                        ),
+                    },
+                    timezone,
+                }
+                .is_active(&at_from)
+            );
+
+            let at_until = context(8, 2024, 2, 14, 13, 0);
+            assert!(
+                !Condition::DateTime {
+                    date_range: DateTimeRange {
+                        from: Some(
+                            NaiveDate::from_ymd_opt(2024, 2, 14)
+                                .unwrap()
+                                .and_hms_opt(11, 0, 0)
+                                .unwrap()
+                        ),
+                        until: Some(
+                            NaiveDate::from_ymd_opt(2024, 2, 14)
+                                .unwrap()
+                                .and_hms_opt(13, 0, 0)
+                                .unwrap()
+                        ),
+                    },
+                    timezone,
+                }
+                .is_active(&at_until)
+            );
+
+            assert!(
+                Condition::DateTime {
+                    date_range: DateTimeRange {
+                        from: Some(
+                            NaiveDate::from_ymd_opt(2024, 2, 14)
+                                .unwrap()
+                                .and_hms_opt(11, 0, 0)
+                                .unwrap()
+                        ),
+                        until: None,
+                    },
+                    timezone,
+                }
+                .is_active(&at_from)
+            );
+
+            assert!(
+                Condition::DateTime {
+                    date_range: DateTimeRange {
+                        from: None,
+                        until: Some(
+                            NaiveDate::from_ymd_opt(2024, 2, 14)
+                                .unwrap()
+                                .and_hms_opt(13, 0, 0)
+                                .unwrap()
+                        ),
+                    },
+                    timezone,
+                }
+                .is_active(&at_until)
+            );
         }
 
         #[test]
@@ -727,6 +896,69 @@ mod tests {
                 }
                 .is_active(&context)
             );
+        }
+
+        #[test]
+        fn time_condition_uses_half_open_range() {
+            // Tests [from, until) semantics for time ranges
+            let tz = TimeZone::FixedOffset(crate::task::time::UtcOffsetHours::try_from(8).unwrap());
+
+            // Context at exactly 12:00:00
+            let context_at_from = context(8, 2024, 2, 14, 12, 0);
+            let context_past_from = context(8, 2024, 2, 14, 12, 1);
+            let context_at_until = context(8, 2024, 2, 14, 13, 0);
+
+            let condition = Condition::Time {
+                time_range: TimeRange {
+                    from: Some(NaiveTime::from_hms_opt(12, 0, 0).unwrap()),
+                    until: Some(NaiveTime::from_hms_opt(13, 0, 0).unwrap()),
+                },
+                timezone: tz,
+            };
+
+            // At from boundary (inclusive)
+            assert!(condition.is_active(&context_at_from));
+            // Past from, before until
+            assert!(condition.is_active(&context_past_from));
+            // At until boundary (exclusive)
+            assert!(!condition.is_active(&context_at_until));
+        }
+
+        #[test]
+        fn datetime_condition_uses_half_open_range() {
+            // Tests [from, until) semantics for datetime ranges
+            let tz = TimeZone::FixedOffset(crate::task::time::UtcOffsetHours::try_from(8).unwrap());
+
+            let from = NaiveDate::from_ymd_opt(2024, 2, 14)
+                .unwrap()
+                .and_hms_opt(12, 0, 0)
+                .unwrap();
+            let until = NaiveDate::from_ymd_opt(2024, 2, 14)
+                .unwrap()
+                .and_hms_opt(13, 0, 0)
+                .unwrap();
+
+            // Context at exactly from time
+            let context_at_from = context(8, 2024, 2, 14, 12, 0);
+            // Context past from, before until
+            let context_past_from = context(8, 2024, 2, 14, 12, 30);
+            // Context at exactly until time
+            let context_at_until = context(8, 2024, 2, 14, 13, 0);
+
+            let condition = Condition::DateTime {
+                date_range: DateTimeRange {
+                    from: Some(from),
+                    until: Some(until),
+                },
+                timezone: tz,
+            };
+
+            // At from boundary (inclusive)
+            assert!(condition.is_active(&context_at_from));
+            // Past from, before until
+            assert!(condition.is_active(&context_past_from));
+            // At until boundary (exclusive)
+            assert!(!condition.is_active(&context_at_until));
         }
     }
 }

@@ -139,16 +139,20 @@ fn hour_to_secs(offset_in_hour: i8) -> FixedOffset {
 }
 
 pub trait TimeIn: Ord {
+    fn before(&self, until: &Self) -> bool {
+        self < until
+    }
+
     fn not_after(&self, until: &Self) -> bool {
         self <= until
     }
 
-    fn is_after(&self, from: &Self) -> bool {
-        self > from
+    fn not_before(&self, from: &Self) -> bool {
+        self >= from
     }
 
     fn is_in_range(&self, from: &Self, until: &Self) -> bool {
-        self.is_after(from) && self.not_after(until)
+        self.not_before(from) && self.before(until)
     }
 }
 
@@ -157,12 +161,14 @@ impl TimeIn for DateTime {}
 impl TimeIn for NaiveDateTime {}
 
 impl TimeIn for NaiveTime {
-    // This is a workaround to allow cross-midnight time ranges for NaiveTime.
+    // Cross-midnight time ranges use [from, until) semantics:
+    // - When from <= until: standard [from, until) range
+    // - When from > until (wraparound): [from, midnight) U [midnight, until)
     fn is_in_range(&self, from: &Self, until: &Self) -> bool {
         if from <= until {
-            from <= self && self < until
+            *from <= *self && *self < *until
         } else {
-            from <= self || self < until
+            *from <= *self || *self < *until
         }
     }
 }
@@ -224,7 +230,7 @@ impl<T: TimeIn> TimeRange<T> {
     pub fn contains(&self, value: &T) -> bool {
         match (self.from.as_ref(), self.until.as_ref()) {
             (Some(from), Some(until)) => value.is_in_range(from, until),
-            (Some(from), None) => value.is_after(from),
+            (Some(from), None) => value.not_before(from),
             (None, Some(until)) => value.not_after(until),
             (None, None) => true,
         }
