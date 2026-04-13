@@ -237,4 +237,35 @@ mod tests {
         assert_eq!(YoStarJP.server_report(), Some("JP"));
         assert_eq!(YoStarKR.server_report(), Some("KR"));
     }
+
+    #[cfg(feature = "selectable")]
+    mod selectable {
+        use maa_question::question::Selectable;
+
+        use super::*;
+
+        #[test]
+        fn value() {
+            assert_eq!(Official.value(), Official);
+            assert_eq!(Bilibili.value(), Bilibili);
+            assert_eq!(Txwy.value(), Txwy);
+            assert_eq!(YoStarEN.value(), YoStarEN);
+            assert_eq!(YoStarJP.value(), YoStarJP);
+            assert_eq!(YoStarKR.value(), YoStarKR);
+        }
+
+        #[test]
+        fn parse() {
+            assert_eq!(ClientType::parse("Official").unwrap(), Official);
+            assert_eq!(ClientType::parse("Bilibili").unwrap(), Bilibili);
+            assert_eq!(ClientType::parse("txwy").unwrap(), Txwy);
+            assert_eq!(ClientType::parse("YoStarEN").unwrap(), YoStarEN);
+            assert_eq!(ClientType::parse("YoStarJP").unwrap(), YoStarJP);
+            assert_eq!(ClientType::parse("YoStarKR").unwrap(), YoStarKR);
+            assert_eq!(
+                ClientType::parse("Unknown").unwrap_err(),
+                UnknownClientTypeError("Unknown".to_owned())
+            );
+        }
+    }
 }
