@@ -1,5 +1,4 @@
 use std::{
-    convert::Infallible,
     fmt::Display,
     io::{self, Write},
     num::NonZero,
@@ -265,6 +264,30 @@ impl<T: Display> ValueWithDesc<T> {
     }
 }
 
+macro_rules! impl_selectable {
+    ($type:ty) => {
+        impl Selectable for $type {
+            type Error = <$type as FromStr>::Err;
+            type Value = $type;
+
+            fn value(self) -> $type {
+                self
+            }
+
+            fn parse(input: &str) -> Result<$type, Self::Error> {
+                input.parse()
+            }
+        }
+    };
+    ($($type:ty),*) => {
+        $(
+            impl_selectable!($type);
+        )*
+    };
+}
+
+impl_selectable!(i32, f32, String);
+
 impl<T> From<T> for ValueWithDesc<T> {
     fn from(value: T) -> Self {
         ValueWithDesc::Value(value)
@@ -277,19 +300,6 @@ impl From<&str> for ValueWithDesc<String> {
     }
 }
 
-impl Selectable for ValueWithDesc<i32> {
-    type Error = <i32 as FromStr>::Err;
-    type Value = i32;
-
-    fn value(self) -> i32 {
-        self.value()
-    }
-
-    fn parse(input: &str) -> Result<i32, Self::Error> {
-        input.parse()
-    }
-}
-
 impl<T: Display> Display for ValueWithDesc<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -299,29 +309,16 @@ impl<T: Display> Display for ValueWithDesc<T> {
     }
 }
 
-impl Selectable for ValueWithDesc<f32> {
-    type Error = <f32 as FromStr>::Err;
-    type Value = f32;
+impl<T: Selectable + Display> Selectable for ValueWithDesc<T> {
+    type Error = T::Error;
+    type Value = T::Value;
 
-    fn value(self) -> f32 {
-        self.value()
+    fn value(self) -> T::Value {
+        self.value().value()
     }
 
-    fn parse(input: &str) -> Result<f32, Self::Error> {
-        input.parse()
-    }
-}
-
-impl Selectable for ValueWithDesc<String> {
-    type Error = Infallible;
-    type Value = String;
-
-    fn value(self) -> String {
-        self.value()
-    }
-
-    fn parse(input: &str) -> Result<String, Self::Error> {
-        Ok(input.to_owned())
+    fn parse(input: &str) -> Result<T::Value, Self::Error> {
+        T::parse(input)
     }
 }
 
