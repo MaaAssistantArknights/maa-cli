@@ -192,10 +192,7 @@ mod tests {
                 TouchMode::parse("MacPlayTools").unwrap(),
                 TouchMode::MacPlayTools
             );
-            assert_eq!(
-                TouchMode::parse("MaaFwAdb").unwrap(),
-                TouchMode::MaaFwAdb
-            );
+            assert_eq!(TouchMode::parse("MaaFwAdb").unwrap(), TouchMode::MaaFwAdb);
             assert_eq!(
                 TouchMode::parse("Unknown").unwrap_err(),
                 UnknownTouchModeError("Unknown".to_owned())
