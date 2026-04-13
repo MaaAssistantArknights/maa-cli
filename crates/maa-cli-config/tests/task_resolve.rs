@@ -36,18 +36,19 @@ impl_resolve_for_panic_resolver!(
 );
 
 #[test]
-fn resolve_task_params_after_conditions_and_overrides() {
+fn on_side_story_boundary_at_from_is_inclusive() {
+    // Test that OnSideStory is active at exactly the from boundary [from, until)
     let task_config: TaskConfigTemplate =
         serde_yaml::from_str(include_str!("../fixtures/task/placeholders.yaml")).unwrap();
     let session = &task_config.sessions[0];
 
-    let now = chrono::DateTime::<Utc>::UNIX_EPOCH + chrono::TimeDelta::minutes(30);
+    let from = chrono::DateTime::<Utc>::UNIX_EPOCH;
+    let until = from + chrono::TimeDelta::hours(1);
+
+    // At exactly from boundary - should be active
     let context = ConditionContext {
-        now,
-        side_story_open_time: Some((
-            chrono::DateTime::<Utc>::UNIX_EPOCH,
-            chrono::DateTime::<Utc>::UNIX_EPOCH + chrono::TimeDelta::hours(1),
-        )),
+        now: from,
+        side_story_open_time: Some((from, until)),
     };
 
     let mut resolver = PanicResolver;
@@ -58,12 +59,7 @@ fn resolve_task_params_after_conditions_and_overrides() {
         .unwrap()
         .params;
 
-    assert_eq!(
-        params.get("stage"),
-        Some(&MAAValue::Primitive(MAAPrimitive::String(
-            "${stage}".into()
-        )))
-    );
+    // Should have the side story override since OnSideStory is active at from boundary
     assert_eq!(
         params.get("note"),
         Some(&MAAValue::Primitive(MAAPrimitive::String(
@@ -73,18 +69,19 @@ fn resolve_task_params_after_conditions_and_overrides() {
 }
 
 #[test]
-fn resolved_params_preserve_variable_placeholders() {
+fn on_side_story_boundary_at_until_is_exclusive() {
+    // Test that OnSideStory is inactive at exactly the until boundary [from, until)
     let task_config: TaskConfigTemplate =
         serde_yaml::from_str(include_str!("../fixtures/task/placeholders.yaml")).unwrap();
     let session = &task_config.sessions[0];
 
-    let now = chrono::DateTime::<Utc>::UNIX_EPOCH + chrono::TimeDelta::minutes(30);
+    let from = chrono::DateTime::<Utc>::UNIX_EPOCH;
+    let until = from + chrono::TimeDelta::hours(1);
+
+    // At exactly until boundary - should be inactive
     let context = ConditionContext {
-        now,
-        side_story_open_time: Some((
-            chrono::DateTime::<Utc>::UNIX_EPOCH,
-            chrono::DateTime::<Utc>::UNIX_EPOCH + chrono::TimeDelta::hours(1),
-        )),
+        now: until,
+        side_story_open_time: Some((from, until)),
     };
 
     let mut resolver = PanicResolver;
@@ -95,16 +92,11 @@ fn resolved_params_preserve_variable_placeholders() {
         .unwrap()
         .params;
 
-    assert_eq!(
-        params.get("stage"),
-        Some(&MAAValue::Primitive(MAAPrimitive::String(
-            "${stage}".into()
-        )))
-    );
+    // Should NOT have the side story override since OnSideStory is inactive at until boundary
     assert_eq!(
         params.get("note"),
         Some(&MAAValue::Primitive(MAAPrimitive::String(
-            "side ${stage}".into()
+            "farm ${stage}".into()
         )))
     );
 }

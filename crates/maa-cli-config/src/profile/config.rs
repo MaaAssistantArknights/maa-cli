@@ -3,7 +3,6 @@ use serde::Deserialize;
 
 use crate::profile::{AdvancedConfig, BehaviorConfig, ConnectionConfig};
 
-#[cfg(feature = "schema")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 pub struct VersionedProfileConfig {
@@ -41,6 +40,16 @@ pub struct ResolvedProfileConfig {
 }
 
 impl ProfileConfig {
+    fn validate_connection(connection: &ConnectionConfig) -> Result<(), crate::ValidationError> {
+        match connection {
+            ConnectionConfig::AVD(crate::profile::connection::AvdConnectionConfig {
+                sdk_path: Some(path),
+                ..
+            }) if path.trim().is_empty() => Err(crate::ValidationError::EmptyAvdSdkPath),
+            _ => Ok(()),
+        }
+    }
+
     /// Merge a parent (self) and child (other) profile.
     ///
     /// For `connection`:
@@ -71,11 +80,7 @@ impl ProfileConfig {
     pub fn validate(&self) -> Result<(), crate::ValidationError> {
         match self.connection.as_ref() {
             None => Err(crate::ValidationError::MissingConnection),
-            Some(ConnectionConfig::AVD(crate::profile::connection::AvdConnectionConfig {
-                sdk_path: Some(path),
-                ..
-            })) if path.trim().is_empty() => Err(crate::ValidationError::EmptyAvdSdkPath),
-            Some(_) => Ok(()),
+            Some(connection) => Self::validate_connection(connection),
         }
     }
 
@@ -94,15 +99,7 @@ impl ProfileConfig {
             .connection
             .ok_or(crate::ValidationError::MissingConnection)?;
 
-        // Validate AVD SDK path if applicable
-        if let ConnectionConfig::AVD(crate::profile::connection::AvdConnectionConfig {
-            sdk_path: Some(ref path),
-            ..
-        }) = connection
-            && path.trim().is_empty()
-        {
-            return Err(crate::ValidationError::EmptyAvdSdkPath);
-        }
+        Self::validate_connection(&connection)?;
 
         Ok(ResolvedProfileConfig {
             client_type: self.client_type,

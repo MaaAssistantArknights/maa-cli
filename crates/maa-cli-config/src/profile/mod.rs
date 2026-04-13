@@ -5,7 +5,5 @@ mod connection;
 
 pub use advanced::AdvancedConfig;
 pub use behavior::BehaviorConfig;
-#[cfg(feature = "schema")]
-pub use config::VersionedProfileConfig;
-pub use config::{ProfileConfig, ResolvedProfileConfig};
+pub use config::{ProfileConfig, ResolvedProfileConfig, VersionedProfileConfig};
 pub use connection::{ConnectionConfig, ScreencapMode};
