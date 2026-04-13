@@ -185,6 +185,14 @@ const CONDITION_PRIMARY_FIELDS: &[&str] = &[
     "not",
 ];
 
+fn condition_primary_fields(object: &serde_json::Map<String, Value>) -> Vec<&'static str> {
+    CONDITION_PRIMARY_FIELDS
+        .iter()
+        .copied()
+        .filter(|field| object.contains_key(*field))
+        .collect()
+}
+
 impl<'de> Deserialize<'de> for Condition {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -201,12 +209,12 @@ impl<'de> Deserialize<'de> for Condition {
                     return Err(D::Error::invalid_length(0, &"a non-empty condition object"));
                 }
 
+                let primary_fields = condition_primary_fields(&object);
+
                 if object
                     .keys()
                     .all(|key| CONDITION_FIELDS.contains(&key.as_str()))
-                    && !object
-                        .keys()
-                        .any(|key| CONDITION_PRIMARY_FIELDS.contains(&key.as_str()))
+                    && primary_fields.is_empty()
                 {
                     return Err(D::Error::invalid_value(
                         serde::de::Unexpected::Other(
@@ -214,6 +222,13 @@ impl<'de> Deserialize<'de> for Condition {
                         ),
                         &"a condition object containing one of `weekdays`, `divisor`, `time_range`, `date_range`, `all`, `any`, or `not`",
                     ));
+                }
+
+                if primary_fields.len() > 1 {
+                    return Err(D::Error::custom(format!(
+                        "condition object must contain exactly one primary field, found: {}",
+                        primary_fields.join(", ")
+                    )));
                 }
 
                 if object.contains_key("weekdays") {
@@ -427,6 +442,19 @@ mod tests {
         fn reject_empty_weekdays() {
             let err = serde_yaml::from_str::<NonEmptyVec<Weekday>>("[]").unwrap_err();
             assert!(err.to_string().contains("invalid length 0"));
+        }
+
+        #[test]
+        fn reject_conflicting_primary_fields() {
+            let err = serde_yaml::from_str::<Condition>(
+                "weekdays: [Mon]\nall:\n  - Always\ntimezone: Local\n",
+            )
+            .unwrap_err();
+            assert!(
+                err.to_string()
+                    .contains("condition object must contain exactly one primary field"),
+                "{err}"
+            );
         }
 
         #[test]
