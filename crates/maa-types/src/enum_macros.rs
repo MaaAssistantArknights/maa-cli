@@ -237,3 +237,21 @@ macro_rules! impl_debug_display {
         }
     };
 }
+
+#[cfg(feature = "selectable")]
+macro_rules! impl_selectable {
+    ($enum_type:ty, $error_type:ty) => {
+        impl ::maa_question::question::Selectable for $enum_type {
+            type Error = $error_type;
+            type Value = $enum_type;
+
+            fn value(self) -> Self::Value {
+                self
+            }
+
+            fn parse(input: &str) -> Result<Self::Value, Self::Error> {
+                input.parse()
+            }
+        }
+    };
+}
