@@ -56,6 +56,9 @@ impl maa_ffi_string::ToCString for TouchMode {
 
 impl_debug_display!(TouchMode);
 
+#[cfg(feature = "selectable")]
+impl_selectable!(TouchMode, UnknownTouchModeError);
+
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
@@ -163,5 +166,37 @@ mod tests {
     fn fmt() {
         assert_eq!(format!("{}", TouchMode::Adb), "adb");
         assert_eq!(format!("{:?}", TouchMode::MiniTouch), "minitouch");
+    }
+
+    #[cfg(feature = "selectable")]
+    mod selectable {
+        use maa_question::question::Selectable;
+
+        use super::*;
+
+        #[test]
+        fn value() {
+            assert_eq!(TouchMode::Adb.value(), TouchMode::Adb);
+            assert_eq!(TouchMode::MiniTouch.value(), TouchMode::MiniTouch);
+            assert_eq!(TouchMode::MaaTouch.value(), TouchMode::MaaTouch);
+            assert_eq!(TouchMode::MacPlayTools.value(), TouchMode::MacPlayTools);
+            assert_eq!(TouchMode::MaaFwAdb.value(), TouchMode::MaaFwAdb);
+        }
+
+        #[test]
+        fn parse() {
+            assert_eq!(TouchMode::parse("adb").unwrap(), TouchMode::Adb);
+            assert_eq!(TouchMode::parse("minitouch").unwrap(), TouchMode::MiniTouch);
+            assert_eq!(TouchMode::parse("maatouch").unwrap(), TouchMode::MaaTouch);
+            assert_eq!(
+                TouchMode::parse("MacPlayTools").unwrap(),
+                TouchMode::MacPlayTools
+            );
+            assert_eq!(TouchMode::parse("MaaFwAdb").unwrap(), TouchMode::MaaFwAdb);
+            assert_eq!(
+                TouchMode::parse("Unknown").unwrap_err(),
+                UnknownTouchModeError("Unknown".to_owned())
+            );
+        }
     }
 }
