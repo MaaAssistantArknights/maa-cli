@@ -9,11 +9,11 @@ pub use error::ValidationError;
 pub use maa_types::{ClientType, TaskType, TouchMode};
 pub use profile::{
     AdvancedConfig, BehaviorConfig, ConnectionConfig, ProfileConfig, ResolvedProfileConfig,
-    ScreencapMode,
+    ScreencapMode, VersionedProfileConfig,
 };
 pub use task::{
     ConditionContext, Session, SessionTemplate, Task, TaskConfig, TaskConfigTemplate, TaskParams,
-    TaskTemplate,
+    TaskTemplate, VersionedTaskConfig,
 };
 pub use version::Version;
 

@@ -5,7 +5,6 @@ use serde::Deserialize;
 use super::{ConditionContext, Session, SessionTemplate, TaskTemplate};
 use crate::ValidationError;
 
-#[cfg(feature = "schema")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 pub struct VersionedTaskConfig {
