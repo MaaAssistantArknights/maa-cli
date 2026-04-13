@@ -36,13 +36,25 @@ Profile 和 Task 必须同时升级，不保证交叉兼容，必须是 Profile 
 
 ```toml
 version = 2              # 必填，标识配置格式版本
-inherits = "default"     # 可选，继承另一个 Profile，深度合并（子字段覆盖父字段）
+inherits = "default"     # 可选，继承另一个 Profile
 client_type = "Official" # 可选
 ```
 
-#### 继承示例
+#### 继承规则
 
-`inherits` 字段用来继承另一个 Profile，方便实现配置复用：
+`inherits` 字段用来继承另一个 Profile，方便实现配置复用。合并规则如下：
+
+- **`client_type`**：子配置覆盖父配置，未设置则保留父配置的值
+- **`connection`**：
+  - 子配置完全省略 `[connection]`：继承父配置的 `connection`
+  - 同 `type`：逐字段合并，子配置中已设置的字段覆盖父配置的同名字段，未设置的字段保留父配置的值
+  - 不同 `type`：子配置的 `connection` 整体替换父配置的
+- **`behavior`**（`auto_reconnect`、`deployment_with_pause`）：逐字段合并，规则同上
+- **`advanced`**（`inference_engine`、`user_resource`）：逐字段合并，规则同上
+- `inherits` 本身在合并结果中被清除（由调用方在加载时解析继承链）
+- 继承解析完成后的最终 Profile 必须包含有效的 `connection`
+
+#### 继承示例
 
 ```toml
 # profiles/default.toml
@@ -73,6 +85,7 @@ client_type = "YoStarEN"   # 只改这一个字段，其余全部继承
 ### `[connection]`
 
 `type` 选择连接类型，决定哪些字段合法，以及是否需要管理外部环境（例如 Waydroid）。
+子 Profile 可以完全省略 `[connection]` 以继承父 Profile 的连接配置。
 
 ```toml
 [connection]
@@ -138,12 +151,15 @@ kill_adb_on_exit = false     # 可选
 
 #### `AVD`（Android 虚拟设备）
 
-`sdk_path` 必填，`adb_path` 和模拟器命令从中推导：
+`sdk_path` 可选，`adb_path` 和模拟器命令从中推导。
+未设置时由上层（CLI）负责自动探测并回填，配置层不做环境变量或文件系统检测。
+
+显式设置时不能为空字符串或纯空白（校验会报错）。
 
 ```toml
 [connection]
 type = "AVD"
-sdk_path = "/home/user/Android/Sdk"   # 必填
+sdk_path = "/home/user/Android/Sdk"   # 可选，省略时由上层自动探测
 avd_name = "Pixel_6_API_33"           # 可选，用于启动指定模拟器
 touch_mode = "MaaTouch"               # 可选
 adb_lite = false                      # 可选
