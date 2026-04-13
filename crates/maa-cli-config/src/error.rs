@@ -8,6 +8,10 @@ pub enum ValidationError {
     ConflictingTaskModes,
     #[error("`account_name` is only allowed in `tasks` mode")]
     AccountNameWithSessions,
+    #[error("`connection` is required in a resolved profile")]
+    MissingConnection,
+    #[error("`sdk_path` must not be empty or whitespace for AVD")]
+    EmptyAvdSdkPath,
     #[error("`weekdays` cannot be empty")]
     EmptyWeekdays,
     #[error("`time_range.from` or `time_range.until` must be set")]

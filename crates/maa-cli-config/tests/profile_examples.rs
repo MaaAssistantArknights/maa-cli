@@ -9,7 +9,7 @@ fn deserialize_profile_from_toml_fixture() {
     assert_eq!(profile.inherits.as_deref(), Some("base"));
     assert!(matches!(
         profile.connection,
-        ConnectionConfig::General { .. }
+        Some(ConnectionConfig::General(..))
     ));
 }
 
@@ -20,7 +20,7 @@ fn deserialize_profile_from_yaml_fixture() {
 
     assert!(matches!(
         profile.connection,
-        ConnectionConfig::PlayCover { .. }
+        Some(ConnectionConfig::PlayCover(..))
     ));
 }
 
@@ -32,7 +32,7 @@ fn deserialize_profile_from_json_fixture() {
     assert_eq!(profile.client_type, Some(ClientType::Official));
     assert!(matches!(
         profile.connection,
-        ConnectionConfig::MuMuPro { .. }
+        Some(ConnectionConfig::MuMuPro(..))
     ));
 }
 
@@ -43,7 +43,7 @@ fn deserialize_profile_from_waydroid_yaml_fixture() {
 
     assert!(matches!(
         profile.connection,
-        ConnectionConfig::Waydroid { .. }
+        Some(ConnectionConfig::Waydroid(..))
     ));
 }
 
@@ -53,7 +53,10 @@ fn deserialize_profile_from_avd_toml_fixture() {
         toml::from_str(include_str!("../fixtures/profile/avd.toml")).unwrap();
 
     assert_eq!(profile.client_type, Some(ClientType::YoStarEN));
-    assert!(matches!(profile.connection, ConnectionConfig::AVD { .. }));
+    assert!(matches!(
+        profile.connection,
+        Some(ConnectionConfig::AVD(..))
+    ));
 }
 
 #[test]
@@ -63,8 +66,5 @@ fn deserialize_profile_with_inherits_fixture() {
 
     assert_eq!(profile.inherits.as_deref(), Some("cn-android"));
     assert_eq!(profile.client_type, Some(ClientType::Official));
-    assert!(matches!(
-        profile.connection,
-        ConnectionConfig::General { .. }
-    ));
+    assert_eq!(profile.connection, None);
 }

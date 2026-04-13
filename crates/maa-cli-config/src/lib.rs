@@ -7,7 +7,10 @@ mod version;
 
 pub use error::ValidationError;
 pub use maa_types::{ClientType, TaskType, TouchMode};
-pub use profile::{AdvancedConfig, BehaviorConfig, ConnectionConfig, ProfileConfig, ScreencapMode};
+pub use profile::{
+    AdvancedConfig, BehaviorConfig, ConnectionConfig, ProfileConfig, ResolvedProfileConfig,
+    ScreencapMode,
+};
 pub use task::{
     ConditionContext, Session, SessionTemplate, Task, TaskConfig, TaskConfigTemplate, TaskParams,
     TaskTemplate,
