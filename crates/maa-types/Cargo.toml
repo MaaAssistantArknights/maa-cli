@@ -10,6 +10,7 @@ license.workspace = true
 clap = { workspace = true, optional = true }
 maa-ffi-string = { workspace = true, optional = true }
 maa-ffi-types = { workspace = true }
+maa-question = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 
@@ -20,6 +21,7 @@ serde_test = { workspace = true }
 clap = ["dep:clap"]
 ffi = ["dep:maa-ffi-string"]
 schema = ["dep:schemars", "serde"]
+selectable = ["dep:maa-question"]
 serde = ["dep:serde"]
 
 [lints]

@@ -101,6 +101,9 @@ impl clap::ValueEnum for ClientType {
 
 impl_debug_display!(ClientType);
 
+#[cfg(feature = "selectable")]
+impl_selectable!(ClientType, UnknownClientTypeError);
+
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {

@@ -56,6 +56,9 @@ impl maa_ffi_string::ToCString for TouchMode {
 
 impl_debug_display!(TouchMode);
 
+#[cfg(feature = "selectable")]
+impl_selectable!(TouchMode, UnknownTouchModeError);
+
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
