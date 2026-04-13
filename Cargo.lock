@@ -1204,6 +1204,7 @@ dependencies = [
  "clap",
  "maa-ffi-string",
  "maa-ffi-types",
+ "maa-question",
  "schemars",
  "serde",
  "serde_test",
