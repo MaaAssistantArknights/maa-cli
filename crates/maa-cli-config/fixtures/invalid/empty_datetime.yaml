@@ -1,0 +1,10 @@
+version: 2
+tasks:
+  - type: Fight
+    if:
+      date_range:
+        from:
+        until:
+      timezone: Local
+    params:
+      stage: 1-7

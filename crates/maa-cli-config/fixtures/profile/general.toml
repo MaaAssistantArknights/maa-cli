@@ -1,0 +1,14 @@
+version = 2
+client_type = "Official"
+inherits = "base"
+
+[connection]
+type = "General"
+address = "emulator-5554"
+touch_mode = "MaaTouch"
+
+[behavior]
+auto_reconnect = true
+
+[advanced]
+user_resource = true

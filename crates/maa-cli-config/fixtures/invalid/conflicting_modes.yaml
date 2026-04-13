@@ -1,0 +1,10 @@
+version: 2
+tasks:
+  - type: Fight
+    params:
+      stage: 1-7
+sessions:
+  - tasks:
+      - type: Fight
+        params:
+          stage: CE-6

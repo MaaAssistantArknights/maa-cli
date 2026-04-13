@@ -1,0 +1,18 @@
+version = 2
+manage_environment_lifecycle = true
+manage_game_lifecycle = true
+
+[[sessions]]
+account_name = "main"
+
+[[sessions.tasks]]
+type = "Fight"
+
+[sessions.tasks.params]
+stage = "1-7"
+
+[[sessions]]
+account_name = "alt"
+
+[[sessions.tasks]]
+type = "CloseDown"
