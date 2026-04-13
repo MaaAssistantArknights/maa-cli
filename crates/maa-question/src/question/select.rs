@@ -1,5 +1,4 @@
 use std::{
-    convert::Infallible,
     fmt::Display,
     io::{self, Write},
     num::NonZero,
@@ -236,6 +235,38 @@ pub trait Selectable {
     fn parse(input: &str) -> Result<Self::Value, Self::Error>;
 }
 
+/// A helper macro to implement [`Selectable`] for a type that implements [`FromStr`].
+///
+///
+/// As rust don't support specialization, we cannot use a blanket implementation for
+/// any type that implements [`FromStr`].
+macro_rules! impl_selectable {
+    ($type:path) => {
+        impl Selectable for $type {
+            type Error = <$type as FromStr>::Err;
+            type Value = $type;
+
+            fn value(self) -> $type {
+                self
+            }
+
+            fn parse(input: &str) -> Result<$type, Self::Error> {
+                input.parse()
+            }
+        }
+    };
+    ($($type:path),*) => {
+        $(
+            impl_selectable!($type);
+        )*
+    };
+}
+
+impl_selectable!(i8, i16, i32, i64, isize);
+impl_selectable!(u8, u16, u32, u64, usize);
+impl_selectable!(f32, f64);
+impl_selectable!(String, std::path::PathBuf);
+
 #[derive(Clone, PartialEq, Debug)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Deserialize))]
@@ -245,7 +276,7 @@ pub enum ValueWithDesc<T> {
     WithDesc { value: T, desc: String },
 }
 
-impl<T: Display> ValueWithDesc<T> {
+impl<T> ValueWithDesc<T> {
     pub fn new(value: impl Into<T>, desc: Option<&str>) -> Self {
         match desc {
             Some(desc) => Self::WithDesc {
@@ -277,19 +308,6 @@ impl From<&str> for ValueWithDesc<String> {
     }
 }
 
-impl Selectable for ValueWithDesc<i32> {
-    type Error = <i32 as FromStr>::Err;
-    type Value = i32;
-
-    fn value(self) -> i32 {
-        self.value()
-    }
-
-    fn parse(input: &str) -> Result<i32, Self::Error> {
-        input.parse()
-    }
-}
-
 impl<T: Display> Display for ValueWithDesc<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -299,29 +317,16 @@ impl<T: Display> Display for ValueWithDesc<T> {
     }
 }
 
-impl Selectable for ValueWithDesc<f32> {
-    type Error = <f32 as FromStr>::Err;
-    type Value = f32;
+impl<T: Selectable> Selectable for ValueWithDesc<T> {
+    type Error = T::Error;
+    type Value = T::Value;
 
-    fn value(self) -> f32 {
-        self.value()
+    fn value(self) -> T::Value {
+        self.value().value()
     }
 
-    fn parse(input: &str) -> Result<f32, Self::Error> {
-        input.parse()
-    }
-}
-
-impl Selectable for ValueWithDesc<String> {
-    type Error = Infallible;
-    type Value = String;
-
-    fn value(self) -> String {
-        self.value()
-    }
-
-    fn parse(input: &str) -> Result<String, Self::Error> {
-        Ok(input.to_owned())
+    fn parse(input: &str) -> Result<T::Value, Self::Error> {
+        T::parse(input)
     }
 }
 
