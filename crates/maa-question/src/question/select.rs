@@ -235,6 +235,38 @@ pub trait Selectable {
     fn parse(input: &str) -> Result<Self::Value, Self::Error>;
 }
 
+/// A helper macro to implement [`Selectable`] for a type that implements [`FromStr`].
+///
+///
+/// As rust don't support specialization, we cannot use a blanket implementation for
+/// any type that implements [`FromStr`].
+macro_rules! impl_selectable {
+    ($type:path) => {
+        impl Selectable for $type {
+            type Error = <$type as FromStr>::Err;
+            type Value = $type;
+
+            fn value(self) -> $type {
+                self
+            }
+
+            fn parse(input: &str) -> Result<$type, Self::Error> {
+                input.parse()
+            }
+        }
+    };
+    ($($type:path),*) => {
+        $(
+            impl_selectable!($type);
+        )*
+    };
+}
+
+impl_selectable!(i8, i16, i32, i64, isize);
+impl_selectable!(u8, u16, u32, u64, usize);
+impl_selectable!(f32, f64);
+impl_selectable!(String, std::path::PathBuf);
+
 #[derive(Clone, PartialEq, Debug)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Deserialize))]
@@ -244,7 +276,7 @@ pub enum ValueWithDesc<T> {
     WithDesc { value: T, desc: String },
 }
 
-impl<T: Display> ValueWithDesc<T> {
+impl<T> ValueWithDesc<T> {
     pub fn new(value: impl Into<T>, desc: Option<&str>) -> Self {
         match desc {
             Some(desc) => Self::WithDesc {
@@ -263,30 +295,6 @@ impl<T: Display> ValueWithDesc<T> {
         }
     }
 }
-
-macro_rules! impl_selectable {
-    ($type:ty) => {
-        impl Selectable for $type {
-            type Error = <$type as FromStr>::Err;
-            type Value = $type;
-
-            fn value(self) -> $type {
-                self
-            }
-
-            fn parse(input: &str) -> Result<$type, Self::Error> {
-                input.parse()
-            }
-        }
-    };
-    ($($type:ty),*) => {
-        $(
-            impl_selectable!($type);
-        )*
-    };
-}
-
-impl_selectable!(i32, f32, String);
 
 impl<T> From<T> for ValueWithDesc<T> {
     fn from(value: T) -> Self {
@@ -309,7 +317,7 @@ impl<T: Display> Display for ValueWithDesc<T> {
     }
 }
 
-impl<T: Selectable + Display> Selectable for ValueWithDesc<T> {
+impl<T: Selectable> Selectable for ValueWithDesc<T> {
     type Error = T::Error;
     type Value = T::Value;
 
