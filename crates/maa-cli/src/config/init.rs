@@ -22,11 +22,15 @@ fn asst_config_template() -> MAAValueTemplate {
                         Some("Linux"),
                     ),
                     ValueWithDesc::new(
+                        "Androws",
+                        Some("Windows, Tencent Androws emulator"),
+                    ),
+                    ValueWithDesc::new(
                         "ADB",
                         None,
                     ),
                 ],
-                std::num::NonZero::new(4),
+                std::num::NonZero::new(5),
             ).unwrap()
             .with_description("connection preset"),
             "adb_path" if "preset" == "ADB" => Input::<String>::new(
