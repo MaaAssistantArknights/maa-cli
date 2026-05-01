@@ -11,13 +11,20 @@ impl AndrowsApp {
 
     /// Check if Androws is running by looking for AndrowsVm.exe or ABoxHeadless.exe processes.
     fn is_running() -> bool {
-        std::process::Command::new("tasklist")
+        // Try the full path first to avoid PATH lookup issues, then fall back to bare name.
+        let output = std::process::Command::new(r"C:\Windows\System32\tasklist.exe")
             .output()
-            .ok()
-            .and_then(|output| String::from_utf8(output.stdout).ok())
-            .is_some_and(|output| {
-                output.contains("AndrowsVm.exe") || output.contains("ABoxHeadless.exe")
-            })
+            .or_else(|_| std::process::Command::new("tasklist").output());
+
+        match output {
+            Ok(out) => {
+                // tasklist may output GBK on non-UTF-8 Windows locales; use lossy decoding
+                // so that non-UTF-8 bytes are replaced rather than causing a silent failure.
+                let text = String::from_utf8_lossy(&out.stdout);
+                text.contains("AndrowsVm.exe") || text.contains("ABoxHeadless.exe")
+            }
+            Err(_) => false,
+        }
     }
 }
 

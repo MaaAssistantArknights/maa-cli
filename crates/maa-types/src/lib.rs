@@ -31,6 +31,8 @@ pub enum InstanceOptionKey {
     AdbLiteEnabled = 4,
     /// set to true to kill Adb on exit
     KillAdbOnExit = 5,
+    /// set client type (game channel), used to resolve PackageName on connect
+    ClientType = 6,
 }
 
 pub use client_type::{ClientType, UnknownClientTypeError};

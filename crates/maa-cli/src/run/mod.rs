@@ -25,6 +25,7 @@ use crate::{
     },
     installer,
 };
+use maa_types::InstanceOptionKey;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Args, Default)]
@@ -158,6 +159,9 @@ where
     let asst = Assistant::new_with_callback(maa_callback)
         .context("Failed to create Assistant: resources may not be loaded")?;
     asst_config.instance_options.apply_to(&asst)?;
+    debug!("Setting client type to {}", task_config.client_type);
+    asst.set_instance_option(InstanceOptionKey::ClientType, task_config.client_type.to_str())
+        .context("Failed to set client type")?;
 
     // Register tasks to Assistant and prepare summary
     let mut task_summary = (!args.no_summary).then(summary::Summary::new);
