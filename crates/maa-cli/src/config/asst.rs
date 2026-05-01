@@ -98,10 +98,11 @@ impl ConnectionConfig {
         self
     }
 
-    pub fn connect_args(&self) -> (&str, Cow<'_, str>, &str) {
-        let adb_path = self
+    pub fn connect_args(&self) -> (Cow<'static, str>, Cow<'_, str>, &str) {
+        let adb_path: Cow<'static, str> = self
             .adb_path
             .as_deref()
+            .map(|s| Cow::Owned(s.to_owned()))
             .unwrap_or_else(|| self.preset.default_adb_path());
         let config = self
             .config
@@ -122,7 +123,7 @@ impl ConnectionConfig {
             self.address
                 .as_deref()
                 .map(Cow::Borrowed)
-                .unwrap_or_else(|| self.preset.default_address(adb_path))
+                .unwrap_or_else(|| self.preset.default_address(adb_path.as_ref()))
         };
 
         debug!(
@@ -130,7 +131,7 @@ impl ConnectionConfig {
             if matches!(self.preset, Preset::PlayCover) {
                 "PlayTools"
             } else {
-                adb_path
+                adb_path.as_ref()
             }
         );
 
@@ -186,13 +187,20 @@ impl<'de> Deserialize<'de> for Preset {
 }
 
 impl Preset {
-    fn default_adb_path(self) -> &'static str {
+    fn default_adb_path(self) -> Cow<'static, str> {
         match self {
-            Preset::MuMuPro => {
-                "/Applications/MuMuPlayer.app/Contents/MacOS/MuMuEmulator.app/Contents/MacOS/tools/adb"
+            Preset::MuMuPro => Cow::Borrowed(
+                "/Applications/MuMuPlayer.app/Contents/MacOS/MuMuEmulator.app/Contents/MacOS/tools/adb",
+            ),
+            Preset::PlayCover => Cow::Borrowed(""),
+            Preset::Waydroid | Preset::Adb => Cow::Borrowed("adb"),
+            Preset::Androws => {
+                #[cfg(windows)]
+                if let Some(path) = get_androws_adb_path() {
+                    return Cow::Owned(path);
+                }
+                Cow::Borrowed("adb")
             }
-            Preset::PlayCover => "",
-            Preset::Waydroid | Preset::Adb | Preset::Androws => "adb",
         }
     }
 
@@ -250,6 +258,114 @@ fn config_based_on_os() -> &'static str {
         "General"
     }
 }
+
+/// Detect the ADB path for Androws emulator from Windows Registry.
+///
+/// Androws runs as an elevated process, so its path cannot be obtained via process inspection.
+/// Registry layout:
+/// - `HKLM\SOFTWARE\Tencent\Androws`         → `InstallPath` (e.g. `C:\Program Files\Androws`)
+/// - `HKLM\SOFTWARE\Tencent\Androws\Androws` → `Version`     (e.g. `1.2.3.4`)
+/// - adb path: `{InstallPath}\Application\{Version}\adb.exe`
+#[cfg(windows)]
+fn get_androws_adb_path() -> Option<String> {
+    use std::ffi::OsString;
+    use std::os::windows::ffi::OsStringExt;
+    use windows_sys::Win32::Foundation::ERROR_SUCCESS;
+    use windows_sys::Win32::System::Registry::{
+        HKEY, HKEY_LOCAL_MACHINE, KEY_READ, REG_SZ, RegCloseKey, RegOpenKeyExW,
+        RegQueryValueExW,
+    };
+
+    /// Read a `REG_SZ` string value from an open registry key.
+    /// Returns `None` if the value is missing, not a string, or contains invalid UTF-16.
+    unsafe fn read_reg_sz(hkey: HKEY, value_name: &str) -> Option<String> {
+        // Encode value name as null-terminated UTF-16
+        let name_wide: Vec<u16> = value_name.encode_utf16().chain(std::iter::once(0)).collect();
+        // First call: query required buffer size
+        let mut data_type: u32 = 0;
+        let mut buf_len: u32 = 0;
+        let rc = unsafe {
+            RegQueryValueExW(
+                hkey,
+                name_wide.as_ptr(),
+                std::ptr::null_mut(),
+                &mut data_type,
+                std::ptr::null_mut(),
+                &mut buf_len,
+            )
+        };
+        if rc != ERROR_SUCCESS || data_type != REG_SZ {
+            return None;
+        }
+        // Second call: read the actual data
+        let num_u16 = (buf_len as usize).div_ceil(2);
+        let mut buf: Vec<u16> = vec![0u16; num_u16];
+        let rc = unsafe {
+            RegQueryValueExW(
+                hkey,
+                name_wide.as_ptr(),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                buf.as_mut_ptr().cast::<u8>(),
+                &mut buf_len,
+            )
+        };
+        if rc != ERROR_SUCCESS {
+            return None;
+        }
+        // Strip trailing null characters introduced by REG_SZ
+        while buf.last() == Some(&0) {
+            buf.pop();
+        }
+        OsString::from_wide(&buf).into_string().ok()
+    }
+
+    /// Open a registry subkey under HKLM with KEY_READ access.
+    unsafe fn open_hklm_key(subkey: &str) -> Option<HKEY> {
+        let subkey_wide: Vec<u16> = subkey.encode_utf16().chain(std::iter::once(0)).collect();
+        let mut hkey: HKEY = 0;
+        let rc = unsafe {
+            RegOpenKeyExW(
+                HKEY_LOCAL_MACHINE,
+                subkey_wide.as_ptr(),
+                0,
+                KEY_READ,
+                &mut hkey,
+            )
+        };
+        if rc == ERROR_SUCCESS { Some(hkey) } else { None }
+    }
+
+    unsafe {
+        // Read InstallPath
+        let install_key = open_hklm_key(r"SOFTWARE\Tencent\Androws")?;
+        let install_path = read_reg_sz(install_key, "InstallPath");
+        RegCloseKey(install_key);
+        let install_path = install_path?;
+
+        // Read Version
+        let app_key = open_hklm_key(r"SOFTWARE\Tencent\Androws\Androws")?;
+        let version = read_reg_sz(app_key, "Version");
+        RegCloseKey(app_key);
+        let version = version?;
+
+        // Build and verify path
+        let adb_path = std::path::Path::new(&install_path)
+            .join("Application")
+            .join(&version)
+            .join("adb.exe");
+        if adb_path.exists() {
+            adb_path.to_str().map(str::to_owned)
+        } else {
+            warn!(
+                "Androws adb not found at expected path: {}",
+                adb_path.display()
+            );
+            None
+        }
+    }
+}
+
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Clone)]
@@ -943,7 +1059,7 @@ mod tests {
         #[test]
         fn connect_args() {
             fn args_eq(
-                args: (&str, Cow<str>, &str),
+                args: (Cow<str>, Cow<str>, &str),
                 (adb_path, address, config): (&str, &str, &str),
             ) {
                 assert_eq!(args.0, adb_path);

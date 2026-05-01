@@ -217,7 +217,7 @@ where
         let address = runtime_address.as_deref().unwrap_or(&address);
 
         // Connect to game or emulator
-        asst.async_connect(adb_path, address, config, true)?;
+        asst.async_connect(adb_path.as_ref(), address, config, true)?;
 
         debug!("Starting MAA...");
         asst.start()?;
