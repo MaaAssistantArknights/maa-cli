@@ -13,3 +13,8 @@ pub(super) use playcover::PlayCoverApp;
 mod waydroid;
 #[cfg(target_os = "linux")]
 pub(super) use waydroid::WaydroidApp;
+
+#[cfg(target_os = "windows")]
+mod androws;
+#[cfg(target_os = "windows")]
+pub(super) use androws::AndrowsApp;
