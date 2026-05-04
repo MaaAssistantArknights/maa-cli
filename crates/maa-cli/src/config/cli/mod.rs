@@ -20,6 +20,12 @@ use crate::dirs;
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Default)]
 pub struct CLIConfig {
+    /// GitHub proxy prefix for accelerating downloads
+    ///
+    /// When set, URLs containing `github.com` in maa-core download manifests
+    /// will be prefixed with this value.
+    /// Can also be set via the `MAA_GITHUB_PROXY` environment variable.
+    github_proxy: Option<String>,
     /// MaaCore configuration
     #[cfg(feature = "core_installer")]
     #[serde(default)]
@@ -34,6 +40,25 @@ pub struct CLIConfig {
 }
 
 impl CLIConfig {
+    /// Get the GitHub proxy prefix.
+    ///
+    /// Returns the value of the `MAA_GITHUB_PROXY` environment variable if set
+    /// and non-empty, otherwise falls back to the configured value.
+    ///
+    /// Empty strings from either source are treated as `None`.
+    /// The returned value has trailing slashes removed.
+    pub fn github_proxy(&self) -> Option<String> {
+        if let Ok(val) = std::env::var("MAA_GITHUB_PROXY")
+            && !val.is_empty()
+        {
+            return Some(val.trim_end_matches('/').to_string());
+        }
+        self.github_proxy
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .map(|s| s.trim_end_matches('/').to_string())
+    }
+
     #[cfg(feature = "core_installer")]
     pub fn core_config(&self) -> maa_core::Config {
         self.core.clone()
@@ -231,6 +256,7 @@ mod tests {
                 .unwrap();
 
         let expect = CLIConfig {
+            github_proxy: None,
             #[cfg(feature = "core_installer")]
             core: maa_core::tests::example_config(),
             #[cfg(feature = "cli_installer")]
@@ -314,5 +340,57 @@ mod tests {
     fn normalize_url_test() {
         assert_eq!(normalize_url("https://foo.bar"), "https://foo.bar");
         assert_eq!(normalize_url("https://foo.bar/"), "https://foo.bar");
+    }
+
+    mod github_proxy {
+        use super::*;
+
+        #[test]
+        fn priority_and_fallback() {
+            // Ensure no pre-existing env variable from parent shell
+            unsafe { std::env::remove_var("MAA_GITHUB_PROXY") };
+
+            // Config-only
+            let config = CLIConfig {
+                github_proxy: Some("https://config.example/".to_string()),
+                ..Default::default()
+            };
+            assert_eq!(
+                config.github_proxy(),
+                Some("https://config.example".to_string())
+            );
+
+            // Env overrides config
+            unsafe { std::env::set_var("MAA_GITHUB_PROXY", "https://hk.gh-proxy.org/") };
+            assert_eq!(
+                config.github_proxy(),
+                Some("https://hk.gh-proxy.org".to_string())
+            );
+
+            // Empty env falls back to config
+            unsafe { std::env::set_var("MAA_GITHUB_PROXY", "") };
+            assert_eq!(
+                config.github_proxy(),
+                Some("https://config.example".to_string())
+            );
+
+            // Unset env falls back to config
+            unsafe { std::env::remove_var("MAA_GITHUB_PROXY") };
+            assert_eq!(
+                config.github_proxy(),
+                Some("https://config.example".to_string())
+            );
+
+            // Empty config value is treated as None
+            let config = CLIConfig {
+                github_proxy: Some("".to_string()),
+                ..Default::default()
+            };
+            assert_eq!(config.github_proxy(), None);
+
+            // Neither env nor config set
+            let config = CLIConfig::default();
+            assert_eq!(config.github_proxy(), None);
+        }
     }
 }

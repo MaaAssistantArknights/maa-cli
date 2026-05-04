@@ -1,5 +1,11 @@
 "$schema" = "../schemas/cli.schema.json"
 
+# GitHub proxy prefix for accelerating downloads
+# When set, GitHub releases download URLs in maa-core manifests will be
+# prefixed with this value. Currently only affects maa-core installation.
+# Can also be set via the `MAA_GITHUB_PROXY` environment variable.
+# github_proxy = "https://ghproxy.com/"
+
 # Configurations for MaaCore installation and update
 [core]
 # Update channel of MaaCore, can be "Alpha", "Beta" or "Stable"
