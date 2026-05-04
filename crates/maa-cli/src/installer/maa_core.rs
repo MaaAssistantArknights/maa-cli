@@ -27,14 +27,37 @@ struct CoreManifest(VersionManifest<core::Details>);
 
 struct CoreAsset<'a>(&'a core::Asset);
 
+fn is_github_release_url(url: &str) -> bool {
+    url.split('/').nth(2) == Some("github.com") && url.contains("/releases/download/")
+}
+
+fn apply_github_proxy(manifest: &mut VersionManifest<core::Details>, proxy: &str) {
+    let proxy = proxy.trim_end_matches('/');
+    for asset in &mut manifest.details.assets {
+        if is_github_release_url(&asset.browser_download_url) {
+            asset.browser_download_url = format!("{proxy}/{}", asset.browser_download_url);
+        }
+        for mirror in &mut asset.mirrors {
+            if is_github_release_url(mirror) {
+                *mirror = format!("{proxy}/{mirror}");
+            }
+        }
+    }
+}
+
 impl CoreManifest {
     fn from_reader(file: std::fs::File) -> maa_installer::error::Result<Self> {
         use maa_installer::error::{Error, ErrorKind};
-        let manifest = serde_json::from_reader(file).map_err(|e| {
-            Error::new(ErrorKind::Other)
-                .with_source(e)
-                .with_desc("Failed to parse core version manifest")
-        })?;
+        let mut manifest: VersionManifest<core::Details> =
+            serde_json::from_reader(file).map_err(|e| {
+                Error::new(ErrorKind::Other)
+                    .with_source(e)
+                    .with_desc("Failed to parse core version manifest")
+            })?;
+
+        if let Some(ref proxy) = CLI_CONFIG.github_proxy() {
+            apply_github_proxy(&mut manifest, proxy);
+        }
 
         Ok(CoreManifest(manifest))
     }
@@ -489,6 +512,105 @@ mod tests {
             assert!(asset.url().contains("macos-runtime-universal.zip"));
             assert!(asset.verifier().is_ok());
             assert!(asset.mirror_opts().is_some());
+        }
+    }
+
+    mod apply_github_proxy_tests {
+        use super::*;
+
+        fn get_test_manifest() -> VersionManifest<core::Details> {
+            serde_json::from_str(FIXTURE_JSON).expect("Failed to parse fixture")
+        }
+
+        #[test]
+        fn proxy_without_trailing_slash() {
+            let mut manifest = get_test_manifest();
+            apply_github_proxy(&mut manifest, "https://hk.gh-proxy.org");
+
+            let asset = manifest
+                .details
+                .assets
+                .iter()
+                .find(|a| a.name == "MAA-v4.26.1-linux-x86_64.tar.gz")
+                .unwrap();
+            assert_eq!(
+                asset.browser_download_url,
+                "https://hk.gh-proxy.org/https://github.com/MaaAssistantArknights/MaaAssistantArknights/releases/download/v4.26.1/MAA-v4.26.1-linux-x86_64.tar.gz"
+            );
+        }
+
+        #[test]
+        fn proxy_with_trailing_slash() {
+            let mut manifest = get_test_manifest();
+            apply_github_proxy(&mut manifest, "https://hk.gh-proxy.org/");
+
+            let asset = manifest
+                .details
+                .assets
+                .iter()
+                .find(|a| a.name == "MAA-v4.26.1-linux-x86_64.tar.gz")
+                .unwrap();
+            assert_eq!(
+                asset.browser_download_url,
+                "https://hk.gh-proxy.org/https://github.com/MaaAssistantArknights/MaaAssistantArknights/releases/download/v4.26.1/MAA-v4.26.1-linux-x86_64.tar.gz"
+            );
+        }
+
+        #[test]
+        fn mirrors_not_modified() {
+            let mut manifest = get_test_manifest();
+            apply_github_proxy(&mut manifest, "https://hk.gh-proxy.org/");
+
+            let asset = manifest
+                .details
+                .assets
+                .iter()
+                .find(|a| a.name == "MAA-v4.26.1-linux-x86_64.tar.gz")
+                .unwrap();
+            assert!(asset.mirrors[0].contains("s3.maa-org.net"));
+            assert!(asset.mirrors[1].contains("agent.imgg.dev"));
+            assert!(asset.mirrors[2].contains("maa.r2.imgg.dev"));
+        }
+
+        #[test]
+        fn github_mirror_is_proxied() {
+            let mut manifest = get_test_manifest();
+            // Add a GitHub mirror to test
+            manifest.details.assets[0].mirrors.push(
+                "https://github.com/MaaAssistantArknights/MaaAssistantArknights/releases/download/v4.26.1/MAA-v4.26.1-linux-x86_64.tar.gz".to_string(),
+            );
+            apply_github_proxy(&mut manifest, "https://hk.gh-proxy.org/");
+
+            let asset = &manifest.details.assets[0];
+            assert!(asset.mirrors[3].starts_with("https://hk.gh-proxy.org/https://github.com/"));
+        }
+
+        #[test]
+        fn non_github_url_unchanged() {
+            let mut manifest = get_test_manifest();
+            manifest.details.assets[0].browser_download_url =
+                "https://example.com/file.tar.gz".to_string();
+            apply_github_proxy(&mut manifest, "https://hk.gh-proxy.org/");
+
+            assert_eq!(
+                manifest.details.assets[0].browser_download_url,
+                "https://example.com/file.tar.gz"
+            );
+        }
+
+        #[test]
+        fn github_raw_url_unchanged() {
+            let mut manifest = get_test_manifest();
+            manifest.details.assets[0].browser_download_url =
+                "https://github.com/MaaAssistantArknights/MaaRelease/raw/main/version.json"
+                    .to_string();
+            apply_github_proxy(&mut manifest, "https://hk.gh-proxy.org/");
+
+            // raw content URL should NOT be proxied
+            assert_eq!(
+                manifest.details.assets[0].browser_download_url,
+                "https://github.com/MaaAssistantArknights/MaaRelease/raw/main/version.json"
+            );
         }
     }
 }

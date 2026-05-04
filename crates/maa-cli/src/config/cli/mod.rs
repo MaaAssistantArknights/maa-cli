@@ -20,6 +20,12 @@ use crate::dirs;
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Default)]
 pub struct CLIConfig {
+    /// GitHub proxy prefix for accelerating downloads
+    ///
+    /// When set, URLs containing `github.com` in maa-core download manifests
+    /// will be prefixed with this value.
+    /// Can also be set via the `MAA_GITHUB_PROXY` environment variable.
+    github_proxy: Option<String>,
     /// MaaCore configuration
     #[cfg(feature = "core_installer")]
     #[serde(default)]
@@ -34,6 +40,17 @@ pub struct CLIConfig {
 }
 
 impl CLIConfig {
+    /// Get the GitHub proxy prefix.
+    ///
+    /// Returns the value of the `MAA_GITHUB_PROXY` environment variable if set
+    /// and non-empty, otherwise falls back to the configured value.
+    pub fn github_proxy(&self) -> Option<String> {
+        std::env::var("MAA_GITHUB_PROXY")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .or_else(|| self.github_proxy.clone())
+    }
+
     #[cfg(feature = "core_installer")]
     pub fn core_config(&self) -> maa_core::Config {
         self.core.clone()
@@ -231,6 +248,7 @@ mod tests {
                 .unwrap();
 
         let expect = CLIConfig {
+            github_proxy: None,
             #[cfg(feature = "core_installer")]
             core: maa_core::tests::example_config(),
             #[cfg(feature = "cli_installer")]
@@ -314,5 +332,62 @@ mod tests {
     fn normalize_url_test() {
         assert_eq!(normalize_url("https://foo.bar"), "https://foo.bar");
         assert_eq!(normalize_url("https://foo.bar/"), "https://foo.bar");
+    }
+
+    mod github_proxy {
+        use super::*;
+
+        #[test]
+        fn priority_and_fallback() {
+            // Ensure no pre-existing env variable from parent shell
+            // Safety: only used in single-threaded test context
+            unsafe {
+                std::env::remove_var("MAA_GITHUB_PROXY");
+            }
+
+            // Config-only
+            let config = CLIConfig {
+                github_proxy: Some("https://config.example/".to_string()),
+                ..Default::default()
+            };
+            assert_eq!(
+                config.github_proxy(),
+                Some("https://config.example/".to_string())
+            );
+
+            // Env overrides config
+            // Safety: only used in single-threaded test context
+            unsafe {
+                std::env::set_var("MAA_GITHUB_PROXY", "https://hk.gh-proxy.org/");
+            }
+            assert_eq!(
+                config.github_proxy(),
+                Some("https://hk.gh-proxy.org/".to_string())
+            );
+
+            // Empty env falls back to config
+            // Safety: only used in single-threaded test context
+            unsafe {
+                std::env::set_var("MAA_GITHUB_PROXY", "");
+            }
+            assert_eq!(
+                config.github_proxy(),
+                Some("https://config.example/".to_string())
+            );
+
+            // Unset env falls back to config
+            // Safety: only used in single-threaded test context
+            unsafe {
+                std::env::remove_var("MAA_GITHUB_PROXY");
+            }
+            assert_eq!(
+                config.github_proxy(),
+                Some("https://config.example/".to_string())
+            );
+
+            // Neither env nor config set
+            let config = CLIConfig::default();
+            assert_eq!(config.github_proxy(), None);
+        }
     }
 }
