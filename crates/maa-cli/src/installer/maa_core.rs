@@ -32,6 +32,10 @@ fn is_github_release_url(url: &str) -> bool {
 }
 
 fn apply_github_proxy(manifest: &mut VersionManifest<core::Details>, proxy: &str) {
+    if proxy.is_empty() {
+        return;
+    }
+    // Defensive: also trim here in case callers pass a raw value
     let proxy = proxy.trim_end_matches('/');
     for asset in &mut manifest.details.assets {
         if is_github_release_url(&asset.browser_download_url) {
@@ -520,6 +524,17 @@ mod tests {
 
         fn get_test_manifest() -> VersionManifest<core::Details> {
             serde_json::from_str(FIXTURE_JSON).expect("Failed to parse fixture")
+        }
+
+        #[test]
+        fn empty_proxy_is_noop() {
+            let mut manifest = get_test_manifest();
+            let original_url = manifest.details.assets[0].browser_download_url.clone();
+            apply_github_proxy(&mut manifest, "");
+            assert_eq!(
+                manifest.details.assets[0].browser_download_url,
+                original_url
+            );
         }
 
         #[test]

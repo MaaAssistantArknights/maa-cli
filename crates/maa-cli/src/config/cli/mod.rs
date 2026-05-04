@@ -44,11 +44,19 @@ impl CLIConfig {
     ///
     /// Returns the value of the `MAA_GITHUB_PROXY` environment variable if set
     /// and non-empty, otherwise falls back to the configured value.
+    ///
+    /// Empty strings from either source are treated as `None`.
+    /// The returned value has trailing slashes removed.
     pub fn github_proxy(&self) -> Option<String> {
-        std::env::var("MAA_GITHUB_PROXY")
-            .ok()
+        if let Ok(val) = std::env::var("MAA_GITHUB_PROXY")
+            && !val.is_empty()
+        {
+            return Some(val.trim_end_matches('/').to_string());
+        }
+        self.github_proxy
+            .as_deref()
             .filter(|s| !s.is_empty())
-            .or_else(|| self.github_proxy.clone())
+            .map(|s| s.trim_end_matches('/').to_string())
     }
 
     #[cfg(feature = "core_installer")]
@@ -340,10 +348,7 @@ mod tests {
         #[test]
         fn priority_and_fallback() {
             // Ensure no pre-existing env variable from parent shell
-            // Safety: only used in single-threaded test context
-            unsafe {
-                std::env::remove_var("MAA_GITHUB_PROXY");
-            }
+            unsafe { std::env::remove_var("MAA_GITHUB_PROXY") };
 
             // Config-only
             let config = CLIConfig {
@@ -352,38 +357,36 @@ mod tests {
             };
             assert_eq!(
                 config.github_proxy(),
-                Some("https://config.example/".to_string())
+                Some("https://config.example".to_string())
             );
 
             // Env overrides config
-            // Safety: only used in single-threaded test context
-            unsafe {
-                std::env::set_var("MAA_GITHUB_PROXY", "https://hk.gh-proxy.org/");
-            }
+            unsafe { std::env::set_var("MAA_GITHUB_PROXY", "https://hk.gh-proxy.org/") };
             assert_eq!(
                 config.github_proxy(),
-                Some("https://hk.gh-proxy.org/".to_string())
+                Some("https://hk.gh-proxy.org".to_string())
             );
 
             // Empty env falls back to config
-            // Safety: only used in single-threaded test context
-            unsafe {
-                std::env::set_var("MAA_GITHUB_PROXY", "");
-            }
+            unsafe { std::env::set_var("MAA_GITHUB_PROXY", "") };
             assert_eq!(
                 config.github_proxy(),
-                Some("https://config.example/".to_string())
+                Some("https://config.example".to_string())
             );
 
             // Unset env falls back to config
-            // Safety: only used in single-threaded test context
-            unsafe {
-                std::env::remove_var("MAA_GITHUB_PROXY");
-            }
+            unsafe { std::env::remove_var("MAA_GITHUB_PROXY") };
             assert_eq!(
                 config.github_proxy(),
-                Some("https://config.example/".to_string())
+                Some("https://config.example".to_string())
             );
+
+            // Empty config value is treated as None
+            let config = CLIConfig {
+                github_proxy: Some("".to_string()),
+                ..Default::default()
+            };
+            assert_eq!(config.github_proxy(), None);
 
             // Neither env nor config set
             let config = CLIConfig::default();
