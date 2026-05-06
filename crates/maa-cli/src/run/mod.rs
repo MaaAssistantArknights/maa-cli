@@ -226,7 +226,7 @@ where
         match asst_config.connection.preset() {
             #[cfg(target_os = "windows")]
             crate::config::asst::Preset::Pc => {
-                let attach_args = asst_config.connection.attach_window_args();
+                let attach_args = asst_config.connection.attach_window_args()?;
                 let window = windows::find_window_by_title(attach_args.window_title.as_ref())?;
 
                 // Connect to PC client via Win32 AttachWindow.

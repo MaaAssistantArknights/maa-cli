@@ -92,11 +92,11 @@ pub struct ConnectionConfig {
     #[serde(default)]
     pub(super) window_title: Option<String>,
     #[serde(default)]
-    pub(super) screencap_method: Option<u64>,
+    pub(super) screencap_method: Option<i32>,
     #[serde(default)]
-    pub(super) mouse_method: Option<u64>,
+    pub(super) mouse_method: Option<i32>,
     #[serde(default)]
-    pub(super) keyboard_method: Option<u64>,
+    pub(super) keyboard_method: Option<i32>,
 }
 
 impl ConnectionConfig {
@@ -153,7 +153,7 @@ impl ConnectionConfig {
         (adb_path, address, config)
     }
 
-    pub fn attach_window_args(&self) -> AttachWindowArgs<'_> {
+    pub fn attach_window_args(&self) -> Result<AttachWindowArgs<'_>> {
         let window_title = self
             .window_title
             .as_deref()
@@ -168,17 +168,20 @@ impl ConnectionConfig {
         let keyboard_method = self
             .keyboard_method
             .unwrap_or_else(|| self.preset.default_keyboard_method());
+        let screencap_method = validate_attach_window_method("screencap_method", screencap_method)?;
+        let mouse_method = validate_attach_window_method("mouse_method", mouse_method)?;
+        let keyboard_method = validate_attach_window_method("keyboard_method", keyboard_method)?;
 
         debug!(
             "Attaching to window {window_title} with screencap method {screencap_method}, mouse method {mouse_method}, keyboard method {keyboard_method}"
         );
 
-        AttachWindowArgs {
+        Ok(AttachWindowArgs {
             window_title,
             screencap_method,
             mouse_method,
             keyboard_method,
-        }
+        })
     }
 }
 
@@ -285,26 +288,34 @@ impl Preset {
         }
     }
 
-    fn default_screencap_method(self) -> u64 {
+    fn default_screencap_method(self) -> i32 {
         match self {
             Preset::Pc => 2,
             _ => 0,
         }
     }
 
-    fn default_mouse_method(self) -> u64 {
+    fn default_mouse_method(self) -> i32 {
         match self {
             Preset::Pc => 32,
             _ => 0,
         }
     }
 
-    fn default_keyboard_method(self) -> u64 {
+    fn default_keyboard_method(self) -> i32 {
         match self {
             Preset::Pc => 2,
             _ => 0,
         }
     }
+}
+
+fn validate_attach_window_method(name: &str, value: i32) -> Result<u64> {
+    if value < 0 {
+        bail!("connection.{name} must be a non-negative integer, got {value}");
+    }
+
+    Ok(value as u64)
 }
 
 fn parse_adb_devices(output: impl AsRef<str>) -> Option<String> {
@@ -1187,7 +1198,8 @@ mod tests {
                     preset: Preset::Pc,
                     ..Default::default()
                 }
-                .attach_window_args(),
+                .attach_window_args()
+                .unwrap(),
                 AttachWindowArgs {
                     window_title: Cow::Borrowed("明日方舟"),
                     screencap_method: 2,
@@ -1205,13 +1217,24 @@ mod tests {
                     keyboard_method: Some(1),
                     ..Default::default()
                 }
-                .attach_window_args(),
+                .attach_window_args()
+                .unwrap(),
                 AttachWindowArgs {
                     window_title: Cow::Borrowed("Arknights"),
                     screencap_method: 16,
                     mouse_method: 1,
                     keyboard_method: 1,
                 }
+            );
+
+            assert!(
+                ConnectionConfig {
+                    preset: Preset::Pc,
+                    screencap_method: Some(-1),
+                    ..Default::default()
+                }
+                .attach_window_args()
+                .is_err()
             );
         }
 

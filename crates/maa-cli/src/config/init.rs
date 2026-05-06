@@ -215,18 +215,27 @@ pub fn init(name: Option<&Path>, filetype: Option<super::Filetype>, force: bool)
         if let Some(screencap_method) = obj.get("screencap_method") {
             match screencap_method.as_int().unwrap() {
                 2 => {}
+                x if x < 0 => {
+                    bail!("connection.screencap_method must be a non-negative integer, got {x}")
+                }
                 x => insert!(config, "screencap_method" => x),
             };
         }
         if let Some(mouse_method) = obj.get("mouse_method") {
             match mouse_method.as_int().unwrap() {
                 32 => {}
+                x if x < 0 => {
+                    bail!("connection.mouse_method must be a non-negative integer, got {x}")
+                }
                 x => insert!(config, "mouse_method" => x),
             };
         }
         if let Some(keyboard_method) = obj.get("keyboard_method") {
             match keyboard_method.as_int().unwrap() {
                 2 => {}
+                x if x < 0 => {
+                    bail!("connection.keyboard_method must be a non-negative integer, got {x}")
+                }
                 x => insert!(config, "keyboard_method" => x),
             };
         }
