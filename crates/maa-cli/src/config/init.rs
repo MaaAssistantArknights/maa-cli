@@ -3,6 +3,11 @@ use std::path::Path;
 use anyhow::{Result, bail};
 use maa_value::prelude::*;
 
+use super::{
+    PC_KEYBOARD_METHOD_DEFAULT, PC_MOUSE_METHOD_DEFAULT, PC_SCREENCAP_METHOD_DEFAULT,
+    PC_WINDOW_TITLE_DEFAULT, validate_attach_window_method,
+};
+
 fn asst_config_template() -> MAAValueTemplate {
     template!(
         "setup_connection" => BoolInput::new(Some(true)).with_description("setup connection"),
@@ -43,16 +48,16 @@ fn asst_config_template() -> MAAValueTemplate {
                 Some(String::from("auto")),
             ).with_description("configuration name to connect (auto for most cases)"),
             "window_title" if "preset" == "PC" => Input::<String>::new(
-                Some(String::from("明日方舟")),
+                Some(String::from(PC_WINDOW_TITLE_DEFAULT)),
             ).with_description("exact window title to attach"),
             "screencap_method" if "preset" == "PC" => Input::<i32>::new(
-                Some(2),
+                Some(PC_SCREENCAP_METHOD_DEFAULT),
             ).with_description("screencap method (2 = FramePool)"),
             "mouse_method" if "preset" == "PC" => Input::<i32>::new(
-                Some(32),
+                Some(PC_MOUSE_METHOD_DEFAULT),
             ).with_description("mouse method (32 = SendMessageWithCursorPos)"),
             "keyboard_method" if "preset" == "PC" => Input::<i32>::new(
-                Some(2),
+                Some(PC_KEYBOARD_METHOD_DEFAULT),
             ).with_description("keyboard method (2 = SendMessage)"),
         ),
         "setup_instance_options" => BoolInput::new(Some(true)).with_description("setup instance options"),
@@ -208,36 +213,33 @@ pub fn init(name: Option<&Path>, filetype: Option<super::Filetype>, force: bool)
         };
         if let Some(window_title) = obj.get("window_title") {
             match window_title.as_str().unwrap() {
-                "明日方舟" => {}
+                PC_WINDOW_TITLE_DEFAULT => {}
                 x => insert!(config, "window_title" => x),
             };
         }
         if let Some(screencap_method) = obj.get("screencap_method") {
-            match screencap_method.as_int().unwrap() {
-                2 => {}
-                x if x < 0 => {
-                    bail!("connection.screencap_method must be a non-negative integer, got {x}")
-                }
+            let x = screencap_method.as_int().unwrap();
+            validate_attach_window_method("connection.screencap_method", x)?;
+            match x {
+                PC_SCREENCAP_METHOD_DEFAULT => {}
                 x => insert!(config, "screencap_method" => x),
-            };
+            }
         }
         if let Some(mouse_method) = obj.get("mouse_method") {
-            match mouse_method.as_int().unwrap() {
-                32 => {}
-                x if x < 0 => {
-                    bail!("connection.mouse_method must be a non-negative integer, got {x}")
-                }
+            let x = mouse_method.as_int().unwrap();
+            validate_attach_window_method("connection.mouse_method", x)?;
+            match x {
+                PC_MOUSE_METHOD_DEFAULT => {}
                 x => insert!(config, "mouse_method" => x),
-            };
+            }
         }
         if let Some(keyboard_method) = obj.get("keyboard_method") {
-            match keyboard_method.as_int().unwrap() {
-                2 => {}
-                x if x < 0 => {
-                    bail!("connection.keyboard_method must be a non-negative integer, got {x}")
-                }
+            let x = keyboard_method.as_int().unwrap();
+            validate_attach_window_method("connection.keyboard_method", x)?;
+            match x {
+                PC_KEYBOARD_METHOD_DEFAULT => {}
                 x => insert!(config, "keyboard_method" => x),
-            };
+            }
         }
         insert!(asst_config_out, "connection" => config);
     }

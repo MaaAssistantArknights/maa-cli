@@ -6,6 +6,19 @@ use std::{
 use anyhow::{Context, Result, bail};
 use maa_value::value::MAAValue;
 
+pub(crate) const PC_WINDOW_TITLE_DEFAULT: &str = "明日方舟";
+pub(crate) const PC_SCREENCAP_METHOD_DEFAULT: i32 = 2;
+pub(crate) const PC_MOUSE_METHOD_DEFAULT: i32 = 32;
+pub(crate) const PC_KEYBOARD_METHOD_DEFAULT: i32 = 2;
+
+pub(crate) fn validate_attach_window_method(key: &str, value: i32) -> Result<()> {
+    if value < 0 {
+        bail!("{key} must be a non-negative integer, got {value}");
+    }
+
+    Ok(())
+}
+
 fn file_not_found(path: impl AsRef<Path>) -> std::io::Error {
     std::io::Error::new(
         std::io::ErrorKind::NotFound,
@@ -257,10 +270,13 @@ mod tests {
             let test_file = dir.path().join("test");
             std::fs::write(test_file.with_extension("json"), r#"{"a": 1, "b": "test"}"#).unwrap();
 
-            assert_eq!(TestConfig::find_file(&test_file).unwrap(), TestConfig {
-                a: 1,
-                b: "test".into()
-            });
+            assert_eq!(
+                TestConfig::find_file(&test_file).unwrap(),
+                TestConfig {
+                    a: 1,
+                    b: "test".into()
+                }
+            );
         }
 
         #[test]

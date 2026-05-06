@@ -10,6 +10,11 @@ use maa_core::Assistant;
 use maa_types::{InstanceOptionKey, StaticOptionKey, TouchMode};
 use serde::Deserialize;
 
+use super::{
+    PC_KEYBOARD_METHOD_DEFAULT, PC_MOUSE_METHOD_DEFAULT, PC_SCREENCAP_METHOD_DEFAULT,
+    PC_WINDOW_TITLE_DEFAULT, validate_attach_window_method,
+};
+
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Default, Clone)]
 pub struct AsstConfig {
@@ -168,9 +173,12 @@ impl ConnectionConfig {
         let keyboard_method = self
             .keyboard_method
             .unwrap_or_else(|| self.preset.default_keyboard_method());
-        let screencap_method = validate_attach_window_method("screencap_method", screencap_method)?;
-        let mouse_method = validate_attach_window_method("mouse_method", mouse_method)?;
-        let keyboard_method = validate_attach_window_method("keyboard_method", keyboard_method)?;
+        validate_attach_window_method("connection.screencap_method", screencap_method)?;
+        validate_attach_window_method("connection.mouse_method", mouse_method)?;
+        validate_attach_window_method("connection.keyboard_method", keyboard_method)?;
+        let screencap_method = screencap_method as u64;
+        let mouse_method = mouse_method as u64;
+        let keyboard_method = keyboard_method as u64;
 
         debug!(
             "Attaching to window {window_title} with screencap method {screencap_method}, mouse method {mouse_method}, keyboard method {keyboard_method}"
@@ -283,39 +291,31 @@ impl Preset {
 
     fn default_window_title(self) -> &'static str {
         match self {
-            Preset::Pc => "明日方舟",
+            Preset::Pc => PC_WINDOW_TITLE_DEFAULT,
             _ => "",
         }
     }
 
     fn default_screencap_method(self) -> i32 {
         match self {
-            Preset::Pc => 2,
+            Preset::Pc => PC_SCREENCAP_METHOD_DEFAULT,
             _ => 0,
         }
     }
 
     fn default_mouse_method(self) -> i32 {
         match self {
-            Preset::Pc => 32,
+            Preset::Pc => PC_MOUSE_METHOD_DEFAULT,
             _ => 0,
         }
     }
 
     fn default_keyboard_method(self) -> i32 {
         match self {
-            Preset::Pc => 2,
+            Preset::Pc => PC_KEYBOARD_METHOD_DEFAULT,
             _ => 0,
         }
     }
-}
-
-fn validate_attach_window_method(name: &str, value: i32) -> Result<u64> {
-    if value < 0 {
-        bail!("connection.{name} must be a non-negative integer, got {value}");
-    }
-
-    Ok(value as u64)
 }
 
 fn parse_adb_devices(output: impl AsRef<str>) -> Option<String> {
