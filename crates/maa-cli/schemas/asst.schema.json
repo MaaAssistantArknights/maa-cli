@@ -8,7 +8,7 @@
       "properties": {
         "preset": {
           "type": "string",
-          "enum": ["ADB", "PlayCover", "MuMuPro", "Waydroid"],
+          "enum": ["ADB", "PlayCover", "PC", "MuMuPro", "Waydroid"],
           "default": "ADB"
         },
         "adb_path": {
@@ -17,7 +17,11 @@
           "default": "adb"
         },
         "address": { "type": "string" },
-        "config": { "type": "string" }
+        "config": { "type": "string" },
+        "window_title": { "type": "string" },
+        "screencap_method": { "type": "integer" },
+        "mouse_method": { "type": "integer" },
+        "keyboard_method": { "type": "integer" }
       }
     },
     "resource": {
@@ -67,13 +71,24 @@
       },
       "required": ["type"]
     },
+    "pcConnection": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "PC" },
+        "window_title": { "type": "string" },
+        "screencap_method": { "type": "integer" },
+        "mouse_method": { "type": "integer" },
+        "keyboard_method": { "type": "integer" }
+      },
+      "required": ["type"]
+    },
     "globalResource": {
       "type": "string",
       "enum": ["txwy", "YoStarEN", "YoStarJP", "YoStarKR"]
     },
     "platformDiffResource": {
       "type": "string",
-      "enum": ["iOS"]
+      "enum": ["iOS", "PC"]
     },
     "touchMode": {
       "type": "string",

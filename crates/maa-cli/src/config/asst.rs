@@ -32,6 +32,9 @@ impl AsstConfig {
             info!("Detected connection with PlayTools");
             instance_options.force_playtools();
             resource.use_platform_diff_resource("iOS");
+        } else if matches!(connection.preset, Preset::Pc) {
+            info!("Detected connection with Windows AttachWindow");
+            resource.use_platform_diff_resource("PC");
         }
 
         Self {
@@ -86,6 +89,14 @@ pub struct ConnectionConfig {
     pub(super) address: Option<String>,
     #[serde(default)]
     pub(super) config: Option<String>,
+    #[serde(default)]
+    pub(super) window_title: Option<String>,
+    #[serde(default)]
+    pub(super) screencap_method: Option<u64>,
+    #[serde(default)]
+    pub(super) mouse_method: Option<u64>,
+    #[serde(default)]
+    pub(super) keyboard_method: Option<u64>,
 }
 
 impl ConnectionConfig {
@@ -95,6 +106,11 @@ impl ConnectionConfig {
 
     pub fn set_address(&mut self, address: impl Into<String>) -> &mut Self {
         self.address = Some(address.into());
+        self
+    }
+
+    pub fn set_window_title(&mut self, title: impl Into<String>) -> &mut Self {
+        self.window_title = Some(title.into());
         self
     }
 
@@ -136,6 +152,42 @@ impl ConnectionConfig {
 
         (adb_path, address, config)
     }
+
+    pub fn attach_window_args(&self) -> AttachWindowArgs<'_> {
+        let window_title = self
+            .window_title
+            .as_deref()
+            .map(Cow::Borrowed)
+            .unwrap_or_else(|| Cow::Borrowed(self.preset.default_window_title()));
+        let screencap_method = self
+            .screencap_method
+            .unwrap_or_else(|| self.preset.default_screencap_method());
+        let mouse_method = self
+            .mouse_method
+            .unwrap_or_else(|| self.preset.default_mouse_method());
+        let keyboard_method = self
+            .keyboard_method
+            .unwrap_or_else(|| self.preset.default_keyboard_method());
+
+        debug!(
+            "Attaching to window {window_title} with screencap method {screencap_method}, mouse method {mouse_method}, keyboard method {keyboard_method}"
+        );
+
+        AttachWindowArgs {
+            window_title,
+            screencap_method,
+            mouse_method,
+            keyboard_method,
+        }
+    }
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq))]
+pub struct AttachWindowArgs<'a> {
+    pub window_title: Cow<'a, str>,
+    pub screencap_method: u64,
+    pub mouse_method: u64,
+    pub keyboard_method: u64,
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -143,6 +195,7 @@ impl ConnectionConfig {
 pub enum Preset {
     MuMuPro,
     PlayCover,
+    Pc,
     Waydroid,
     #[default]
     Adb,
@@ -169,6 +222,7 @@ impl<'de> Deserialize<'de> for Preset {
                 match value {
                     "MuMuPro" => Ok(Preset::MuMuPro),
                     "PlayCover" | "PlayTools" => Ok(Preset::PlayCover),
+                    "PC" | "Pc" | "pc" => Ok(Preset::Pc),
                     "ADB" | "Adb" | "adb" => Ok(Preset::Adb),
                     "Waydroid" | "waydroid" => Ok(Preset::Waydroid),
                     _ => {
@@ -190,6 +244,7 @@ impl Preset {
                 "/Applications/MuMuPlayer.app/Contents/MacOS/MuMuEmulator.app/Contents/MacOS/tools/adb"
             }
             Preset::PlayCover => "",
+            Preset::Pc => "",
             Preset::Waydroid | Preset::Adb => "adb",
         }
     }
@@ -198,6 +253,7 @@ impl Preset {
         match self {
             Preset::MuMuPro => "127.0.0.1:16384".into(),
             Preset::PlayCover => "127.0.0.1:1717".into(),
+            Preset::Pc => "".into(),
             Preset::Waydroid => "waydroid".into(),
             Preset::Adb => std::process::Command::new(adb_path)
                 .arg("devices")
@@ -215,9 +271,38 @@ impl Preset {
 
     fn default_config(self) -> &'static str {
         match self {
+            Preset::Pc => "PC",
             Preset::Waydroid => "Waydroid",
             // May be preset specific in the future
             Preset::MuMuPro | Preset::PlayCover | Preset::Adb => config_based_on_os(),
+        }
+    }
+
+    fn default_window_title(self) -> &'static str {
+        match self {
+            Preset::Pc => "明日方舟",
+            _ => "",
+        }
+    }
+
+    fn default_screencap_method(self) -> u64 {
+        match self {
+            Preset::Pc => 2,
+            _ => 0,
+        }
+    }
+
+    fn default_mouse_method(self) -> u64 {
+        match self {
+            Preset::Pc => 32,
+            _ => 0,
+        }
+    }
+
+    fn default_keyboard_method(self) -> u64 {
+        match self {
+            Preset::Pc => 2,
+            _ => 0,
         }
     }
 }
@@ -616,43 +701,50 @@ mod tests {
             )
             .unwrap();
 
-            assert_eq!(config, AsstConfig {
-                connection: ConnectionConfig {
-                    preset: Preset::Adb,
-                    adb_path: Some(String::from("adb")),
-                    address: Some(String::from("emulator-5554")),
-                    config: Some(String::from("CompatMac")),
-                },
-                resource: ResourceConfig {
-                    resource_base_dirs: {
-                        let mut base_dirs = default_resource_base_dirs();
-                        base_dirs.push(user_resource_dir);
-                        base_dirs
+            assert_eq!(
+                config,
+                AsstConfig {
+                    connection: ConnectionConfig {
+                        preset: Preset::Adb,
+                        adb_path: Some(String::from("adb")),
+                        address: Some(String::from("emulator-5554")),
+                        config: Some(String::from("CompatMac")),
+                        window_title: None,
+                        screencap_method: None,
+                        mouse_method: None,
+                        keyboard_method: None,
                     },
-                    global_resource: Some(PathBuf::from("YoStarEN")),
-                    platform_diff_resource: Some(PathBuf::from("iOS")),
-                    user_resource: true,
-                },
-                static_options: StaticOptions {
-                    cpu_ocr: Some(false),
-                    gpu_ocr: Some(1),
-                },
-                instance_options: InstanceOptions {
-                    touch_mode: Some(TouchMode::MaaTouch),
-                    deployment_with_pause: Some(false),
-                    adb_lite_enabled: Some(false),
-                    kill_adb_on_exit: Some(false),
-                },
-                behavior: BehaviorConfig::default(),
-            });
+                    resource: ResourceConfig {
+                        resource_base_dirs: {
+                            let mut base_dirs = default_resource_base_dirs();
+                            base_dirs.push(user_resource_dir);
+                            base_dirs
+                        },
+                        global_resource: Some(PathBuf::from("YoStarEN")),
+                        platform_diff_resource: Some(PathBuf::from("iOS")),
+                        user_resource: true,
+                    },
+                    static_options: StaticOptions {
+                        cpu_ocr: Some(false),
+                        gpu_ocr: Some(1),
+                    },
+                    instance_options: InstanceOptions {
+                        touch_mode: Some(TouchMode::MaaTouch),
+                        deployment_with_pause: Some(false),
+                        adb_lite_enabled: Some(false),
+                        kill_adb_on_exit: Some(false),
+                    },
+                    behavior: BehaviorConfig::default(),
+                }
+            );
         }
 
         #[test]
         fn connection_config() {
-            assert_de_tokens(&ConnectionConfig::default(), &[
-                Token::Map { len: Some(0) },
-                Token::MapEnd,
-            ]);
+            assert_de_tokens(
+                &ConnectionConfig::default(),
+                &[Token::Map { len: Some(0) }, Token::MapEnd],
+            );
 
             assert_de_tokens(
                 &ConnectionConfig {
@@ -699,6 +791,10 @@ mod tests {
                     adb_path: Some(String::from("/path/to/adb")),
                     address: Some(String::from("127.0.0.1:5555")),
                     config: Some(String::from("SomeConfig")),
+                    window_title: None,
+                    screencap_method: None,
+                    mouse_method: None,
+                    keyboard_method: None,
                 },
                 &[
                     Token::Map { len: Some(4) },
@@ -835,6 +931,8 @@ mod tests {
             assert_de_tokens(&Preset::Adb, &[Token::Str("adb")]);
 
             assert_de_tokens(&Preset::MuMuPro, &[Token::Str("MuMuPro")]);
+            assert_de_tokens(&Preset::Pc, &[Token::Str("PC")]);
+            assert_de_tokens(&Preset::Pc, &[Token::Str("pc")]);
             assert_de_tokens(&Preset::Waydroid, &[Token::Str("Waydroid")]);
             assert_de_tokens(&Preset::Waydroid, &[Token::Str("waydroid")]);
         }
@@ -893,6 +991,32 @@ mod tests {
                     Token::MapEnd,
                 ],
             );
+
+            // Auto load PC platform diff resource for AttachWindow mode
+            assert_de_tokens(
+                &AsstConfig {
+                    connection: ConnectionConfig {
+                        preset: Preset::Pc,
+                        ..Default::default()
+                    },
+                    resource: ResourceConfig {
+                        platform_diff_resource: Some(PathBuf::from("PC")),
+                        ..Default::default()
+                    },
+                    static_options: Default::default(),
+                    instance_options: Default::default(),
+                    behavior: BehaviorConfig::default(),
+                },
+                &[
+                    Token::Map { len: Some(1) },
+                    Token::Str("connection"),
+                    Token::Map { len: Some(1) },
+                    Token::Str("type"),
+                    Token::Str("PC"),
+                    Token::MapEnd,
+                    Token::MapEnd,
+                ],
+            );
         }
     }
 
@@ -901,12 +1025,19 @@ mod tests {
 
         #[test]
         fn default() {
-            assert_matches!(ConnectionConfig::default(), ConnectionConfig {
-                preset: Preset::Adb,
-                adb_path: None,
-                address: None,
-                config: None,
-            });
+            assert_matches!(
+                ConnectionConfig::default(),
+                ConnectionConfig {
+                    preset: Preset::Adb,
+                    adb_path: None,
+                    address: None,
+                    config: None,
+                    window_title: None,
+                    screencap_method: None,
+                    mouse_method: None,
+                    keyboard_method: None,
+                }
+            );
         }
 
         #[cfg(target_os = "macos")]
@@ -931,6 +1062,16 @@ mod tests {
             assert_eq!(
                 config.set_address("127.0.0.1:12345").address,
                 Some("127.0.0.1:12345".to_owned())
+            );
+        }
+
+        #[test]
+        fn set_window_title() {
+            let mut config = ConnectionConfig::default();
+            assert_eq!(config.window_title, None);
+            assert_eq!(
+                config.set_window_title("明日方舟").window_title,
+                Some("明日方舟".to_owned())
             );
         }
 
@@ -965,6 +1106,10 @@ mod tests {
                     adb_path: None,
                     address: None,
                     config: None,
+                    window_title: None,
+                    screencap_method: None,
+                    mouse_method: None,
+                    keyboard_method: None,
                 }
                 .connect_args(),
                 (
@@ -980,6 +1125,10 @@ mod tests {
                     adb_path: None,
                     address: None,
                     config: None,
+                    window_title: None,
+                    screencap_method: None,
+                    mouse_method: None,
+                    keyboard_method: None,
                 }
                 .connect_args(),
                 ("", "127.0.0.1:1717", config_based_on_os()),
@@ -991,6 +1140,10 @@ mod tests {
                     adb_path: None,
                     address: None,
                     config: None,
+                    window_title: None,
+                    screencap_method: None,
+                    mouse_method: None,
+                    keyboard_method: None,
                 }
                 .connect_args(),
                 ("adb", "waydroid", "Waydroid"),
@@ -1002,6 +1155,10 @@ mod tests {
                     adb_path: None,
                     address: Some("127.0.0.1:11111".to_owned()),
                     config: None,
+                    window_title: None,
+                    screencap_method: None,
+                    mouse_method: None,
+                    keyboard_method: None,
                 }
                 .connect_args(),
                 ("adb", "waydroid", "Waydroid"),
@@ -1013,9 +1170,48 @@ mod tests {
                     adb_path: Some("/path/to/adb".to_owned()),
                     address: Some("127.0.0.1:11111".to_owned()),
                     config: Some("SomeConfig".to_owned()),
+                    window_title: None,
+                    screencap_method: None,
+                    mouse_method: None,
+                    keyboard_method: None,
                 }
                 .connect_args(),
                 ("/path/to/adb", "127.0.0.1:11111", "SomeConfig"),
+            );
+        }
+
+        #[test]
+        fn attach_window_args() {
+            assert_eq!(
+                ConnectionConfig {
+                    preset: Preset::Pc,
+                    ..Default::default()
+                }
+                .attach_window_args(),
+                AttachWindowArgs {
+                    window_title: Cow::Borrowed("明日方舟"),
+                    screencap_method: 2,
+                    mouse_method: 32,
+                    keyboard_method: 2,
+                }
+            );
+
+            assert_eq!(
+                ConnectionConfig {
+                    preset: Preset::Pc,
+                    window_title: Some("Arknights".to_owned()),
+                    screencap_method: Some(16),
+                    mouse_method: Some(1),
+                    keyboard_method: Some(1),
+                    ..Default::default()
+                }
+                .attach_window_args(),
+                AttachWindowArgs {
+                    window_title: Cow::Borrowed("Arknights"),
+                    screencap_method: 16,
+                    mouse_method: 1,
+                    keyboard_method: 1,
+                }
             );
         }
 
@@ -1055,12 +1251,15 @@ mod tests {
 
         #[test]
         fn default() {
-            assert_eq!(ResourceConfig::default(), ResourceConfig {
-                resource_base_dirs: default_resource_base_dirs(),
-                global_resource: None,
-                platform_diff_resource: None,
-                user_resource: false,
-            });
+            assert_eq!(
+                ResourceConfig::default(),
+                ResourceConfig {
+                    resource_base_dirs: default_resource_base_dirs(),
+                    global_resource: None,
+                    platform_diff_resource: None,
+                    user_resource: false,
+                }
+            );
         }
 
         #[test]
@@ -1395,18 +1594,21 @@ mod tests {
 
         #[test]
         fn default() {
-            assert_eq!(BehaviorConfig::default(), BehaviorConfig {
-                auto_reconnect: true,
-            });
+            assert_eq!(
+                BehaviorConfig::default(),
+                BehaviorConfig {
+                    auto_reconnect: true,
+                }
+            );
         }
 
         #[test]
         fn deserialize() {
             // Empty map uses default (auto_reconnect = true)
-            assert_de_tokens(&BehaviorConfig::default(), &[
-                Token::Map { len: Some(0) },
-                Token::MapEnd,
-            ]);
+            assert_de_tokens(
+                &BehaviorConfig::default(),
+                &[Token::Map { len: Some(0) }, Token::MapEnd],
+            );
 
             // Explicit false
             assert_de_tokens(

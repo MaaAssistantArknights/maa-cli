@@ -2,7 +2,7 @@
 
 use std::{
     ffi::{c_char, c_void},
-    sync::RwLock,
+    sync::{LazyLock, RwLock},
 };
 
 use maa_ffi_string::ToCString;
@@ -18,7 +18,8 @@ use error::{AsstResult, BufferTooSmall};
 pub use error::{Error, Result};
 
 /// The user directory of the assistant.
-static USER_DIR: RwLock<std::path::PathBuf> = RwLock::new(std::path::PathBuf::new());
+static USER_DIR: LazyLock<RwLock<std::path::PathBuf>> =
+    LazyLock::new(|| RwLock::new(std::path::PathBuf::new()));
 
 /// Get the path of MaaCore's log file.
 ///
@@ -270,6 +271,29 @@ impl Assistant {
                 adb_path.as_ptr(),
                 address.as_ptr(),
                 config.as_ptr(),
+                block.into(),
+            )
+        }
+        .to_maa_result()
+    }
+
+    /// Attach to a Win32 game window asynchronously.
+    #[cfg(target_os = "windows")]
+    pub fn async_attach_window(
+        &self,
+        hwnd: isize,
+        screencap_method: u64,
+        mouse_method: u64,
+        keyboard_method: u64,
+        block: bool,
+    ) -> Result<AsstAsyncCallId> {
+        unsafe {
+            maa_sys::binding::AsstAsyncAttachWindow(
+                self.handle,
+                hwnd as *mut c_void,
+                screencap_method,
+                mouse_method,
+                keyboard_method,
                 block.into(),
             )
         }

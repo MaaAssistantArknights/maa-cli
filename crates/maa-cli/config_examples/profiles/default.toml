@@ -1,7 +1,7 @@
 "$schema" = "../schemas/asst.schema.json"
 
 # connection options for MAA Core
-# There are two ways to connect to Arknights
+# There are three ways to connect to Arknights
 # 1. Connect by ADB
 [connection]
 type = "ADB"             # connection type
@@ -17,6 +17,15 @@ config = "CompatMac"     # connect config name
 # address = "localhost:1717" # PlayTools address
 # config = "CompatMac"       # connect config name
 
+# 3. Connect by Win32 AttachWindow (Windows only)
+# The window title match is exact, following the MAA GUI behavior.
+# [connection]
+# type = "PC"
+# window_title = "明日方舟"
+# screencap_method = 2 # FramePool
+# mouse_method = 32    # SendMessageWithCursorPos
+# keyboard_method = 2  # SendMessage
+
 
 # Resource options for MAA Core
 [resource]
@@ -27,7 +36,7 @@ config = "CompatMac"     # connect config name
 # More details about `client_type` check documentation of task config
 global_resource = "YoStarEN"
 # Load additional resources for non Android version of Arknights
-# all base resource is for android, only iOS is supported and need to be specified here
+# all base resource is for android, iOS and PC are supported platform-diff resources
 # Leave it empty if you are using Android version
 # This option will be set automatically based on `connection.type` field,
 # so you don't need to set it manually
