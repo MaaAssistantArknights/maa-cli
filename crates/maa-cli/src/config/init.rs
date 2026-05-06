@@ -25,8 +25,12 @@ fn asst_config_template() -> MAAValueTemplate {
                         "ADB",
                         None,
                     ),
+                    ValueWithDesc::new(
+                        "PC",
+                        Some("Windows"),
+                    ),
                 ],
-                std::num::NonZero::new(4),
+                std::num::NonZero::new(5),
             ).unwrap()
             .with_description("connection preset"),
             "adb_path" if "preset" == "ADB" => Input::<String>::new(
@@ -38,6 +42,18 @@ fn asst_config_template() -> MAAValueTemplate {
             "config" => Input::<String>::new(
                 Some(String::from("auto")),
             ).with_description("configuration name to connect (auto for most cases)"),
+            "window_title" if "preset" == "PC" => Input::<String>::new(
+                Some(String::from("明日方舟")),
+            ).with_description("exact window title to attach"),
+            "screencap_method" if "preset" == "PC" => Input::<i32>::new(
+                Some(2),
+            ).with_description("screencap method (2 = FramePool)"),
+            "mouse_method" if "preset" == "PC" => Input::<i32>::new(
+                Some(32),
+            ).with_description("mouse method (32 = SendMessageWithCursorPos)"),
+            "keyboard_method" if "preset" == "PC" => Input::<i32>::new(
+                Some(2),
+            ).with_description("keyboard method (2 = SendMessage)"),
         ),
         "setup_instance_options" => BoolInput::new(Some(true)).with_description("setup instance options"),
         "instance_options" if "setup_instance_options" == true => template!(
@@ -117,6 +133,10 @@ fn asst_config_template() -> MAAValueTemplate {
                         "iOS",
                         Some("resource for PlayCover which run iOS client on macOS"),
                     ),
+                    ValueWithDesc::new(
+                        "PC",
+                        Some("resource for Windows AttachWindow client"),
+                    ),
                 ],
                 std::num::NonZero::new(1),
             ).unwrap().with_description("platform different resource to load"),
@@ -186,6 +206,30 @@ pub fn init(name: Option<&Path>, filetype: Option<super::Filetype>, force: bool)
             "auto" => {}
             x => insert!(config, "config" => x),
         };
+        if let Some(window_title) = obj.get("window_title") {
+            match window_title.as_str().unwrap() {
+                "明日方舟" => {}
+                x => insert!(config, "window_title" => x),
+            };
+        }
+        if let Some(screencap_method) = obj.get("screencap_method") {
+            match screencap_method.as_int().unwrap() {
+                2 => {}
+                x => insert!(config, "screencap_method" => x),
+            };
+        }
+        if let Some(mouse_method) = obj.get("mouse_method") {
+            match mouse_method.as_int().unwrap() {
+                32 => {}
+                x => insert!(config, "mouse_method" => x),
+            };
+        }
+        if let Some(keyboard_method) = obj.get("keyboard_method") {
+            match keyboard_method.as_int().unwrap() {
+                2 => {}
+                x => insert!(config, "keyboard_method" => x),
+            };
+        }
         insert!(asst_config_out, "connection" => config);
     }
 
