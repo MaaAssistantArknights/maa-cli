@@ -1,5 +1,6 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
+use clap_complete::CompleteEnv;
 use maa_dirs as dirs;
 #[macro_use(join)]
 extern crate maa_dirs;
@@ -21,6 +22,10 @@ use clap::{CommandFactory, Parser};
 use crate::command::{Cli, Command, Component, Dir};
 
 fn main() -> Result<()> {
+    CompleteEnv::with_factory(command::Cli::command)
+        .var("MAA_COMPLETE")
+        .complete();
+
     let cli = command::Cli::parse();
 
     cli.log.init_logger()?;
@@ -132,9 +137,6 @@ fn main() -> Result<()> {
             }
         }
         Command::Import(opts) => config::import::import(opts)?,
-        Command::Complete { shell } => {
-            clap_complete::generate(shell, &mut Cli::command(), "maa", &mut std::io::stdout());
-        }
         Command::Init {
             name,
             format,

@@ -1,5 +1,7 @@
 # Fish completion for maa-cli
 
+# TODO: remove this file
+
 # Global options
 complete -c maa -s v -l verbose -d 'Output more information, repeat to increase verbosity'
 complete -c maa -s q -l quiet -d 'Output less information, repeat to increase quietness'
