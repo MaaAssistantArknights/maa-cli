@@ -1,5 +1,9 @@
 # 설치 및 빌드
 
+::: important Translation Required
+This page is outdated and maybe still in Simplified Chinese. Translation is needed.
+:::
+
 maa-cli는 패키지 관리자, 사전 컴파일된 바이너리 파일, `cargo`를 통한 자체 컴파일 설치 등 다양한 설치 방법을 제공합니다.
 
 ## 패키지 관리자를 통한 설치
