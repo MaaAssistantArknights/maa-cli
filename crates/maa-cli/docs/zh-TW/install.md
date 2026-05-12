@@ -91,6 +91,22 @@ Rust 开发者可以通过 `cargo` 自行编译安装 maa-cli：
 - `git2`: 提供 `libgit2` 资源更新后端，这个特性默认启用；
 - `vendored-openssl`: 自行编译 `openssl` 库，而不是使用系统的 `openssl` 库，这个特性默认禁用，这个特性通常在你的系统没有安装 `openssl` 库或者 `openssl` 版本过低时启用。
 
+## 生成补全脚本
+
+::: tip
+
+对于使用包管理器安装的用户，这通常是自动进行的，请先检查是否已经有补全提示了。
+
+:::
+
+你可以使用下面的命令为你的 shell 生成补全脚本：
+
+```bash
+env MAA_COMPLETE=<shell> maa
+```
+
+其中 `<shell>` 可以是 `bash`、`zsh`、`fish`、`powershell` 或 `elvish`。
+
 ## 安装 MaaCore 及资源
 
 maa-cli 只提供了一个命令行界面，它需要 MaaCore 和资源来运行任务。一旦 maa-cli 安装完成，你可以通过它安装 MaaCore 及资源：

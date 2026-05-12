@@ -87,6 +87,22 @@ Rust 개발자는 `cargo`를 통해 maa-cli를 직접 컴파일하여 설치할 
 - `git2`: `libgit2` 리소스 업데이트 백엔드를 제공합니다. 이 기능은 기본적으로 활성화되어 있습니다.
 - `vendored-openssl`: 시스템의 `openssl` 라이브러리를 사용하는 대신 자체적으로 `openssl` 라이브러리를 컴파일합니다. 이 기능은 기본적으로 비활성화되어 있으며, 시스템에 `openssl` 라이브러리가 없거나 버전이 너무 낮을 때 활성화합니다.
 
+## 生成补全脚本
+
+::: tip
+
+对于使用包管理器安装的用户，这通常是自动进行的，请先检查是否已经有补全提示了。
+
+:::
+
+你可以使用下面的命令为你的 shell 生成补全脚本：
+
+```bash
+env MAA_COMPLETE=<shell> maa
+```
+
+其中 `<shell>` 可以是 `bash`、`zsh`、`fish`、`powershell` 或 `elvish`。
+
 ## MaaCore 및 리소스 설치
 
 maa-cli는 명령줄 인터페이스만 제공하며, 작업을 실행하려면 MaaCore와 리소스가 필요합니다. maa-cli를 설치한 후, 다음 명령어를 통해 MaaCore와 리소스를 설치할 수 있습니다:
