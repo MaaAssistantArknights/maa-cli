@@ -15,6 +15,7 @@ mod command;
 mod config;
 mod installer;
 mod run;
+mod tasks;
 
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser};
@@ -22,11 +23,11 @@ use clap::{CommandFactory, Parser};
 use crate::command::{Cli, Command, Component, Dir};
 
 fn main() -> Result<()> {
-    CompleteEnv::with_factory(command::Cli::command)
+    CompleteEnv::with_factory(Cli::command)
         .var("MAA_COMPLETE")
         .complete();
 
-    let cli = command::Cli::parse();
+    let cli = Cli::parse();
 
     cli.log.init_logger()?;
 
@@ -120,21 +121,7 @@ fn main() -> Result<()> {
         }
         Command::Cleanup { targets } => cleanup::cleanup(&targets)?,
         Command::List => {
-            let task_dir = dirs::config().join("tasks");
-            if !task_dir.exists() {
-                eprintln!("No tasks found");
-            } else {
-                for entry in task_dir.read_dir()? {
-                    let entry = entry?;
-                    let path = entry.path();
-                    if path.is_file()
-                        && let Some(stem) = path.file_stem()
-                        && let Some(name) = stem.to_str()
-                    {
-                        println!("{name}");
-                    }
-                }
-            }
+            println!("{}", tasks::Tasks::new()?)
         }
         Command::Import(opts) => config::import::import(opts)?,
         Command::Init {

@@ -1,10 +1,9 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum};
-use clap_complete::{ArgValueCompleter, CompletionCandidate};
-use maa_dirs as dirs;
+use clap_complete::ArgValueCompleter;
 
-use crate::{cleanup, config, log, run};
+use crate::{cleanup, config, log, run, tasks::Tasks};
 
 #[derive(Parser)]
 #[command(name = "maa", author, version = env!("MAA_VERSION"), about = "A tool for Arknights.")]
@@ -21,32 +20,6 @@ pub(crate) struct Cli {
     pub(crate) batch: bool,
     #[command(flatten)]
     pub(crate) log: log::Args,
-}
-
-fn completer_list_tasks(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
-    let mut completions = vec![];
-
-    let Some(current) = current.to_str() else {
-        return completions;
-    };
-
-    let task_dir = dirs::config().join("tasks");
-    if task_dir.exists()
-        && let Ok(dir) = task_dir.read_dir()
-    {
-        for entry in dir.flatten() {
-            let path = entry.path();
-            if path.is_file()
-                && let Some(stem) = path.file_stem()
-                && let Some(name) = stem.to_str()
-                && name.starts_with(current)
-            {
-                completions.push(CompletionCandidate::new(name))
-            }
-        }
-    }
-
-    completions
 }
 
 #[derive(Subcommand)]
@@ -131,7 +104,7 @@ pub(crate) enum Command {
         /// The task name is the name of the task file without the extension.
         /// The task file must be in the `tasks` directory of the config directory.
         /// The task file must be in the TOML, YAML or JSON format.
-        #[arg(add = ArgValueCompleter::new(completer_list_tasks))]
+        #[arg(add = ArgValueCompleter::new(Tasks::completer))]
         task: String,
         #[command(flatten)]
         common: run::CommonArgs,
