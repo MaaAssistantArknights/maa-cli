@@ -77,7 +77,7 @@ complete -c maa -n "__fish_seen_subcommand_from $run_commands" -l dry-run -d 'Pa
 complete -c maa -n "__fish_seen_subcommand_from $run_commands" -l no-summary -d 'Do not print summary when finnish'
 complete -c maa -n "__fish_seen_subcommand_from $run_commands" -f # prevent fish complete from path
 ## command specific options
-complete -c maa -n "__fish_seen_subcommand_from run" -f -a "$(maa list)"
+complete -c maa -n "__fish_seen_subcommand_from run" -f -a "$(maa list 2>/dev/null)"
 complete -c maa -n "__fish_seen_subcommand_from startup" -f -a "$clients"
 complete -c maa -n "__fish_seen_subcommand_from startup" -f -l account -d 'Account to login' -r
 complete -c maa -n "__fish_seen_subcommand_from closedown" -f -a "$clients"
