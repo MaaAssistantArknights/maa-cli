@@ -32,7 +32,7 @@ pub(super) fn find_window_by_title(expected_title: &str) -> Result<WindowMatch> 
 
         bail!(
             "No visible window found with exact title `{expected_title}`. \
-Start the PC client first or override `connection.window_title` / `--window-title`.{related_titles}"
+Start the PC client first or override `connection.window_title`.{related_titles}"
         );
     }
 

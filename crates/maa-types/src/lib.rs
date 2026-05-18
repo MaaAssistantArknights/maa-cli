@@ -7,6 +7,8 @@ mod client_type;
 mod message_kind;
 mod task_type;
 mod touch_mode;
+mod win32_input_method;
+mod win32_screencap_method;
 
 pub use maa_ffi_types as primitive;
 /// Available static option key
@@ -37,3 +39,5 @@ pub use client_type::{ClientType, UnknownClientTypeError};
 pub use message_kind::MessageKind;
 pub use task_type::{TaskType, UnknownTaskType};
 pub use touch_mode::{TouchMode, UnknownTouchModeError};
+pub use win32_input_method::{UnknownWin32InputMethodError, Win32InputMethod};
+pub use win32_screencap_method::{UnknownWin32ScreencapMethodError, Win32ScreencapMethod};

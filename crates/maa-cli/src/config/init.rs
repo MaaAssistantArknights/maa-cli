@@ -1,41 +1,57 @@
 use std::path::Path;
 
 use anyhow::{Result, bail};
+use maa_types::{Win32InputMethod, Win32ScreencapMethod};
 use maa_value::prelude::*;
 
 use super::{
     PC_KEYBOARD_METHOD_DEFAULT, PC_MOUSE_METHOD_DEFAULT, PC_SCREENCAP_METHOD_DEFAULT,
-    PC_WINDOW_TITLE_DEFAULT, validate_attach_window_method,
+    PC_WINDOW_TITLE_DEFAULT,
 };
 
 fn asst_config_template() -> MAAValueTemplate {
+    let mut connection_presets = vec![
+        ValueWithDesc::new("MuMuPro", None),
+        ValueWithDesc::new("PlayCover", Some("macOS")),
+        ValueWithDesc::new("Waydroid", Some("Linux")),
+        ValueWithDesc::new("ADB", None),
+    ];
+    #[cfg(target_os = "windows")]
+    connection_presets.push(ValueWithDesc::new("PC", Some("Windows")));
+    let connection_preset_window = std::num::NonZero::new(connection_presets.len());
+
+    let pc_screencap_methods = vec![
+        ValueWithDesc::new(
+            Win32ScreencapMethod::FramePool.to_str(),
+            Some("default from MAA GUI"),
+        ),
+        ValueWithDesc::new(Win32ScreencapMethod::PrintWindow.to_str(), None),
+        ValueWithDesc::new(Win32ScreencapMethod::ScreenDc.to_str(), None),
+        ValueWithDesc::new(Win32ScreencapMethod::DxgiDesktopDupWindow.to_str(), None),
+    ];
+    let pc_mouse_methods = vec![
+        ValueWithDesc::new(
+            Win32InputMethod::SendMessageWithCursorPos.to_str(),
+            Some("default from MAA GUI"),
+        ),
+        ValueWithDesc::new(Win32InputMethod::Seize.to_str(), None),
+        ValueWithDesc::new(Win32InputMethod::SendMessageWithWindowPos.to_str(), None),
+    ];
+    let pc_keyboard_methods = vec![
+        ValueWithDesc::new(
+            Win32InputMethod::SendMessage.to_str(),
+            Some("default from MAA GUI"),
+        ),
+        ValueWithDesc::new(Win32InputMethod::Seize.to_str(), None),
+        ValueWithDesc::new(Win32InputMethod::PostMessage.to_str(), None),
+    ];
+
     template!(
         "setup_connection" => BoolInput::new(Some(true)).with_description("setup connection"),
         "connection_config" if "setup_connection" == true => template!(
             "preset" => SelectD::<String>::new(
-                vec![
-                    ValueWithDesc::new(
-                        "MuMuPro",
-                        None,
-                    ),
-                    ValueWithDesc::new(
-                        "PlayCover",
-                        Some("macOS"),
-                    ),
-                    ValueWithDesc::new(
-                        "Waydroid",
-                        Some("Linux"),
-                    ),
-                    ValueWithDesc::new(
-                        "ADB",
-                        None,
-                    ),
-                    ValueWithDesc::new(
-                        "PC",
-                        Some("Windows"),
-                    ),
-                ],
-                std::num::NonZero::new(5),
+                connection_presets,
+                connection_preset_window,
             ).unwrap()
             .with_description("connection preset"),
             "adb_path" if "preset" == "ADB" => Input::<String>::new(
@@ -50,15 +66,18 @@ fn asst_config_template() -> MAAValueTemplate {
             "window_title" if "preset" == "PC" => Input::<String>::new(
                 Some(String::from(PC_WINDOW_TITLE_DEFAULT)),
             ).with_description("exact window title to attach"),
-            "screencap_method" if "preset" == "PC" => Input::<i32>::new(
-                Some(PC_SCREENCAP_METHOD_DEFAULT),
-            ).with_description("screencap method (2 = FramePool)"),
-            "mouse_method" if "preset" == "PC" => Input::<i32>::new(
-                Some(PC_MOUSE_METHOD_DEFAULT),
-            ).with_description("mouse method (32 = SendMessageWithCursorPos)"),
-            "keyboard_method" if "preset" == "PC" => Input::<i32>::new(
-                Some(PC_KEYBOARD_METHOD_DEFAULT),
-            ).with_description("keyboard method (2 = SendMessage)"),
+            "screencap_method" if "preset" == "PC" => SelectD::<String>::new(
+                pc_screencap_methods,
+                std::num::NonZero::new(4),
+            ).unwrap().with_description("screencap method"),
+            "mouse_method" if "preset" == "PC" => SelectD::<String>::new(
+                pc_mouse_methods,
+                std::num::NonZero::new(3),
+            ).unwrap().with_description("mouse method"),
+            "keyboard_method" if "preset" == "PC" => SelectD::<String>::new(
+                pc_keyboard_methods,
+                std::num::NonZero::new(3),
+            ).unwrap().with_description("keyboard method"),
         ),
         "setup_instance_options" => BoolInput::new(Some(true)).with_description("setup instance options"),
         "instance_options" if "setup_instance_options" == true => template!(
@@ -159,6 +178,89 @@ fn asst_config_template() -> MAAValueTemplate {
     )
 }
 
+fn render_asst_config(asst_config: &MAAValue) -> Result<MAAValue> {
+    let mut asst_config_out = MAAValue::default();
+
+    if let Some(obj) = asst_config.get("connection_config") {
+        let mut config = MAAValue::default();
+        insert!(config, "preset" => obj.get("preset").unwrap().to_owned());
+
+        if let Some(adb_path) = obj.get("adb_path") {
+            let adb_path = adb_path.as_str().unwrap();
+            match adb_path {
+                "adb" => {}
+                x => insert!(config, "adb_path" => x),
+            };
+        }
+
+        match obj.get("address").unwrap().as_str().unwrap() {
+            "auto" => {}
+            x => insert!(config, "address" => x),
+        };
+        match obj.get("config").unwrap().as_str().unwrap() {
+            "auto" => {}
+            x => insert!(config, "config" => x),
+        };
+        if let Some(window_title) = obj.get("window_title") {
+            match window_title.as_str().unwrap() {
+                PC_WINDOW_TITLE_DEFAULT => {}
+                x => insert!(config, "window_title" => x),
+            };
+        }
+        if let Some(screencap_method) = obj.get("screencap_method") {
+            let x = screencap_method.as_str().unwrap();
+            match x {
+                x if x == PC_SCREENCAP_METHOD_DEFAULT.to_str() => {}
+                x => insert!(config, "screencap_method" => x),
+            }
+        }
+        if let Some(mouse_method) = obj.get("mouse_method") {
+            let x = mouse_method.as_str().unwrap();
+            match x {
+                x if x == PC_MOUSE_METHOD_DEFAULT.to_str() => {}
+                x => insert!(config, "mouse_method" => x),
+            }
+        }
+        if let Some(keyboard_method) = obj.get("keyboard_method") {
+            let x = keyboard_method.as_str().unwrap();
+            match x {
+                x if x == PC_KEYBOARD_METHOD_DEFAULT.to_str() => {}
+                x => insert!(config, "keyboard_method" => x),
+            }
+        }
+        insert!(asst_config_out, "connection" => config);
+    }
+
+    if let Some(obj) = asst_config.get("instance_options") {
+        asst_config_out.insert("instance_options", obj.to_owned());
+    }
+
+    if let Some(obj) = asst_config.get("resource_config") {
+        let mut config = MAAValue::default();
+        insert!(config, "user_resource" => obj.get("user_resource").unwrap().to_owned());
+        match obj.get("global_resource").unwrap().as_str().unwrap() {
+            "None" => {}
+            x => insert!(config, "global_resource" => x),
+        };
+        match obj.get("platform_diff_resource").unwrap().as_str().unwrap() {
+            "None" => {}
+            x => insert!(config, "platform_diff_resource" => x),
+        };
+        asst_config_out.insert("resource", config);
+    }
+
+    if let Some(obj) = asst_config.get("static_options") {
+        let mut config = MAAValue::default();
+        insert!(config, "cpu_ocr" => obj.get("cpu_ocr").unwrap().to_owned());
+        if let Some(gpu_ocr) = obj.get("gpu_ocr") {
+            config.insert("gpu_ocr", gpu_ocr.to_owned());
+        }
+        asst_config_out.insert("static_options", config);
+    }
+
+    Ok(asst_config_out)
+}
+
 pub fn init(name: Option<&Path>, filetype: Option<super::Filetype>, force: bool) -> Result<()> {
     let name = name.unwrap_or_else(|| Path::new("default"));
     let filetype = filetype.unwrap_or(super::Filetype::Json);
@@ -190,87 +292,7 @@ pub fn init(name: Option<&Path>, filetype: Option<super::Filetype>, force: bool)
 
     // TODO: better logic to handle the template
     let asst_config = asst_config_template().resolve()?;
-    let mut asst_config_out = MAAValue::default();
-    if let Some(obj) = asst_config.get("connection_config") {
-        let mut config = MAAValue::default();
-        insert!(config, "preset" => obj.get("preset").unwrap().to_owned());
-
-        if let Some(adb_path) = obj.get("adb_path") {
-            let adb_path = adb_path.as_str().unwrap();
-            match adb_path {
-                "adb" => {} // default value
-                x => insert!(config, "adb_path" => x),
-            };
-        }
-
-        match obj.get("address").unwrap().as_str().unwrap() {
-            "auto" => {}
-            x => insert!(config, "address" => x),
-        };
-        match obj.get("config").unwrap().as_str().unwrap() {
-            "auto" => {}
-            x => insert!(config, "config" => x),
-        };
-        if let Some(window_title) = obj.get("window_title") {
-            match window_title.as_str().unwrap() {
-                PC_WINDOW_TITLE_DEFAULT => {}
-                x => insert!(config, "window_title" => x),
-            };
-        }
-        if let Some(screencap_method) = obj.get("screencap_method") {
-            let x = screencap_method.as_int().unwrap();
-            validate_attach_window_method("connection.screencap_method", x)?;
-            match x {
-                PC_SCREENCAP_METHOD_DEFAULT => {}
-                x => insert!(config, "screencap_method" => x),
-            }
-        }
-        if let Some(mouse_method) = obj.get("mouse_method") {
-            let x = mouse_method.as_int().unwrap();
-            validate_attach_window_method("connection.mouse_method", x)?;
-            match x {
-                PC_MOUSE_METHOD_DEFAULT => {}
-                x => insert!(config, "mouse_method" => x),
-            }
-        }
-        if let Some(keyboard_method) = obj.get("keyboard_method") {
-            let x = keyboard_method.as_int().unwrap();
-            validate_attach_window_method("connection.keyboard_method", x)?;
-            match x {
-                PC_KEYBOARD_METHOD_DEFAULT => {}
-                x => insert!(config, "keyboard_method" => x),
-            }
-        }
-        insert!(asst_config_out, "connection" => config);
-    }
-
-    // no additional processing needed
-    if let Some(obj) = asst_config.get("instance_options") {
-        asst_config_out.insert("instance_options", obj.to_owned());
-    }
-
-    if let Some(obj) = asst_config.get("resource_config") {
-        let mut config = MAAValue::default();
-        insert!(config, "user_resource" => obj.get("user_resource").unwrap().to_owned());
-        match obj.get("global_resource").unwrap().as_str().unwrap() {
-            "None" => {}
-            x => insert!(config, "global_resource" => x),
-        };
-        match obj.get("platform_diff_resource").unwrap().as_str().unwrap() {
-            "None" => {}
-            x => insert!(config, "platform_diff_resource" => x),
-        };
-        asst_config_out.insert("resource", config);
-    }
-
-    if let Some(obj) = asst_config.get("static_options") {
-        let mut config = MAAValue::default();
-        insert!(config, "cpu_ocr" => obj.get("cpu_ocr").unwrap().to_owned());
-        if let Some(gpu_ocr) = obj.get("gpu_ocr") {
-            config.insert("gpu_ocr", gpu_ocr.to_owned());
-        }
-        asst_config_out.insert("static_options", config);
-    }
+    let asst_config_out = render_asst_config(&asst_config)?;
 
     filetype.write(&dest, &asst_config_out)?;
 
@@ -286,6 +308,58 @@ pub fn init(name: Option<&Path>, filetype: Option<super::Filetype>, force: bool)
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod test {
     use super::{super::Filetype, *};
+
+    #[test]
+    fn render_asst_config_omits_pc_defaults() {
+        let input = object!(
+            "connection_config" => object!(
+                "preset" => "PC",
+                "address" => "auto",
+                "config" => "auto",
+                "window_title" => PC_WINDOW_TITLE_DEFAULT,
+                "screencap_method" => PC_SCREENCAP_METHOD_DEFAULT.to_str(),
+                "mouse_method" => PC_MOUSE_METHOD_DEFAULT.to_str(),
+                "keyboard_method" => PC_KEYBOARD_METHOD_DEFAULT.to_str(),
+            )
+        );
+
+        assert_eq!(
+            render_asst_config(&input).unwrap(),
+            object!(
+                "connection" => object!(
+                    "preset" => "PC",
+                )
+            )
+        );
+    }
+
+    #[test]
+    fn render_asst_config_keeps_non_default_pc_methods_as_strings() {
+        let input = object!(
+            "connection_config" => object!(
+                "preset" => "PC",
+                "address" => "auto",
+                "config" => "auto",
+                "window_title" => "Arknights",
+                "screencap_method" => Win32ScreencapMethod::PrintWindow.to_str(),
+                "mouse_method" => Win32InputMethod::Seize.to_str(),
+                "keyboard_method" => Win32InputMethod::PostMessage.to_str(),
+            )
+        );
+
+        assert_eq!(
+            render_asst_config(&input).unwrap(),
+            object!(
+                "connection" => object!(
+                    "preset" => "PC",
+                    "window_title" => "Arknights",
+                    "screencap_method" => "PrintWindow",
+                    "mouse_method" => "Seize",
+                    "keyboard_method" => "PostMessage",
+                )
+            )
+        );
+    }
 
     #[test]
     #[ignore = "write to user's config directory"]

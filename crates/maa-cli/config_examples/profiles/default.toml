@@ -22,9 +22,9 @@ config = "CompatMac"     # connect config name
 # [connection]
 # type = "PC"
 # window_title = "明日方舟"
-# screencap_method = 2 # FramePool
-# mouse_method = 32    # SendMessageWithCursorPos
-# keyboard_method = 2  # SendMessage
+# screencap_method = "FramePool"
+# mouse_method = "SendMessageWithCursorPos"
+# keyboard_method = "SendMessage"
 
 
 # Resource options for MAA Core

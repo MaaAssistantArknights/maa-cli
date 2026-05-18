@@ -7,12 +7,14 @@ use std::{
 use anyhow::{Context, Result, bail};
 use log::{debug, info, warn};
 use maa_core::Assistant;
-use maa_types::{InstanceOptionKey, StaticOptionKey, TouchMode};
+use maa_types::{
+    InstanceOptionKey, StaticOptionKey, TouchMode, Win32InputMethod, Win32ScreencapMethod,
+};
 use serde::Deserialize;
 
 use super::{
     PC_KEYBOARD_METHOD_DEFAULT, PC_MOUSE_METHOD_DEFAULT, PC_SCREENCAP_METHOD_DEFAULT,
-    PC_WINDOW_TITLE_DEFAULT, validate_attach_window_method,
+    PC_WINDOW_TITLE_DEFAULT,
 };
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -37,7 +39,9 @@ impl AsstConfig {
             info!("Detected connection with PlayTools");
             instance_options.force_playtools();
             resource.use_platform_diff_resource("iOS");
-        } else if matches!(connection.preset, Preset::Pc) {
+        }
+        #[cfg(target_os = "windows")]
+        if matches!(connection.preset, Preset::Pc) {
             info!("Detected connection with Windows AttachWindow");
             resource.use_platform_diff_resource("PC");
         }
@@ -97,11 +101,11 @@ pub struct ConnectionConfig {
     #[serde(default)]
     pub(super) window_title: Option<String>,
     #[serde(default)]
-    pub(super) screencap_method: Option<i32>,
+    pub(super) screencap_method: Option<Win32ScreencapMethod>,
     #[serde(default)]
-    pub(super) mouse_method: Option<i32>,
+    pub(super) mouse_method: Option<Win32InputMethod>,
     #[serde(default)]
-    pub(super) keyboard_method: Option<i32>,
+    pub(super) keyboard_method: Option<Win32InputMethod>,
 }
 
 impl ConnectionConfig {
@@ -111,11 +115,6 @@ impl ConnectionConfig {
 
     pub fn set_address(&mut self, address: impl Into<String>) -> &mut Self {
         self.address = Some(address.into());
-        self
-    }
-
-    pub fn set_window_title(&mut self, title: impl Into<String>) -> &mut Self {
-        self.window_title = Some(title.into());
         self
     }
 
@@ -173,22 +172,19 @@ impl ConnectionConfig {
         let keyboard_method = self
             .keyboard_method
             .unwrap_or_else(|| self.preset.default_keyboard_method());
-        validate_attach_window_method("connection.screencap_method", screencap_method)?;
-        validate_attach_window_method("connection.mouse_method", mouse_method)?;
-        validate_attach_window_method("connection.keyboard_method", keyboard_method)?;
-        let screencap_method = screencap_method as u64;
-        let mouse_method = mouse_method as u64;
-        let keyboard_method = keyboard_method as u64;
+        let screencap_method_value = u64::from(screencap_method);
+        let mouse_method_value = u64::from(mouse_method);
+        let keyboard_method_value = u64::from(keyboard_method);
 
         debug!(
-            "Attaching to window {window_title} with screencap method {screencap_method}, mouse method {mouse_method}, keyboard method {keyboard_method}"
+            "Attaching to window {window_title} with screencap method {screencap_method} ({screencap_method_value}), mouse method {mouse_method} ({mouse_method_value}), keyboard method {keyboard_method} ({keyboard_method_value})"
         );
 
         Ok(AttachWindowArgs {
             window_title,
-            screencap_method,
-            mouse_method,
-            keyboard_method,
+            screencap_method: screencap_method_value,
+            mouse_method: mouse_method_value,
+            keyboard_method: keyboard_method_value,
         })
     }
 }
@@ -206,6 +202,7 @@ pub struct AttachWindowArgs<'a> {
 pub enum Preset {
     MuMuPro,
     PlayCover,
+    #[cfg(target_os = "windows")]
     Pc,
     Waydroid,
     #[default]
@@ -233,7 +230,12 @@ impl<'de> Deserialize<'de> for Preset {
                 match value {
                     "MuMuPro" => Ok(Preset::MuMuPro),
                     "PlayCover" | "PlayTools" => Ok(Preset::PlayCover),
+                    #[cfg(target_os = "windows")]
                     "PC" | "Pc" | "pc" => Ok(Preset::Pc),
+                    #[cfg(not(target_os = "windows"))]
+                    "PC" | "Pc" | "pc" => Err(E::custom(
+                        "`connection.type = \"PC\"` is only supported on Windows",
+                    )),
                     "ADB" | "Adb" | "adb" => Ok(Preset::Adb),
                     "Waydroid" | "waydroid" => Ok(Preset::Waydroid),
                     _ => {
@@ -255,6 +257,7 @@ impl Preset {
                 "/Applications/MuMuPlayer.app/Contents/MacOS/MuMuEmulator.app/Contents/MacOS/tools/adb"
             }
             Preset::PlayCover => "",
+            #[cfg(target_os = "windows")]
             Preset::Pc => "",
             Preset::Waydroid | Preset::Adb => "adb",
         }
@@ -264,6 +267,7 @@ impl Preset {
         match self {
             Preset::MuMuPro => "127.0.0.1:16384".into(),
             Preset::PlayCover => "127.0.0.1:1717".into(),
+            #[cfg(target_os = "windows")]
             Preset::Pc => "".into(),
             Preset::Waydroid => "waydroid".into(),
             Preset::Adb => std::process::Command::new(adb_path)
@@ -282,6 +286,7 @@ impl Preset {
 
     fn default_config(self) -> &'static str {
         match self {
+            #[cfg(target_os = "windows")]
             Preset::Pc => "PC",
             Preset::Waydroid => "Waydroid",
             // May be preset specific in the future
@@ -291,29 +296,33 @@ impl Preset {
 
     fn default_window_title(self) -> &'static str {
         match self {
+            #[cfg(target_os = "windows")]
             Preset::Pc => PC_WINDOW_TITLE_DEFAULT,
             _ => "",
         }
     }
 
-    fn default_screencap_method(self) -> i32 {
+    fn default_screencap_method(self) -> Win32ScreencapMethod {
         match self {
+            #[cfg(target_os = "windows")]
             Preset::Pc => PC_SCREENCAP_METHOD_DEFAULT,
-            _ => 0,
+            _ => Win32ScreencapMethod::None,
         }
     }
 
-    fn default_mouse_method(self) -> i32 {
+    fn default_mouse_method(self) -> Win32InputMethod {
         match self {
+            #[cfg(target_os = "windows")]
             Preset::Pc => PC_MOUSE_METHOD_DEFAULT,
-            _ => 0,
+            _ => Win32InputMethod::None,
         }
     }
 
-    fn default_keyboard_method(self) -> i32 {
+    fn default_keyboard_method(self) -> Win32InputMethod {
         match self {
+            #[cfg(target_os = "windows")]
             Preset::Pc => PC_KEYBOARD_METHOD_DEFAULT,
-            _ => 0,
+            _ => Win32InputMethod::None,
         }
     }
 }
@@ -699,6 +708,8 @@ mod tests {
 
     mod serde {
         use serde_test::{Token, assert_de_tokens};
+        #[cfg(not(target_os = "windows"))]
+        use serde_test::assert_de_tokens_error;
 
         use super::*;
 
@@ -823,6 +834,36 @@ mod tests {
                     Token::MapEnd,
                 ],
             );
+
+            #[cfg(target_os = "windows")]
+            assert_de_tokens(
+                &ConnectionConfig {
+                    preset: Preset::Pc,
+                    window_title: Some(String::from("Arknights")),
+                    screencap_method: Some(Win32ScreencapMethod::PrintWindow),
+                    mouse_method: Some(Win32InputMethod::Seize),
+                    keyboard_method: Some(Win32InputMethod::PostMessage),
+                    ..Default::default()
+                },
+                &[
+                    Token::Map { len: Some(5) },
+                    Token::Str("type"),
+                    Token::Str("PC"),
+                    Token::Str("window_title"),
+                    Token::Some,
+                    Token::Str("Arknights"),
+                    Token::Str("screencap_method"),
+                    Token::Some,
+                    Token::Str("PrintWindow"),
+                    Token::Str("mouse_method"),
+                    Token::Some,
+                    Token::Str("Seize"),
+                    Token::Str("keyboard_method"),
+                    Token::Some,
+                    Token::Str("PostMessage"),
+                    Token::MapEnd,
+                ],
+            );
         }
 
         #[test]
@@ -942,10 +983,18 @@ mod tests {
             assert_de_tokens(&Preset::Adb, &[Token::Str("adb")]);
 
             assert_de_tokens(&Preset::MuMuPro, &[Token::Str("MuMuPro")]);
+            #[cfg(target_os = "windows")]
             assert_de_tokens(&Preset::Pc, &[Token::Str("PC")]);
+            #[cfg(target_os = "windows")]
             assert_de_tokens(&Preset::Pc, &[Token::Str("pc")]);
             assert_de_tokens(&Preset::Waydroid, &[Token::Str("Waydroid")]);
             assert_de_tokens(&Preset::Waydroid, &[Token::Str("waydroid")]);
+
+            #[cfg(not(target_os = "windows"))]
+            assert_de_tokens_error::<Preset>(
+                &[Token::Str("PC")],
+                "`connection.type = \"PC\"` is only supported on Windows",
+            );
         }
 
         #[test]
@@ -1004,6 +1053,7 @@ mod tests {
             );
 
             // Auto load PC platform diff resource for AttachWindow mode
+            #[cfg(target_os = "windows")]
             assert_de_tokens(
                 &AsstConfig {
                     connection: ConnectionConfig {
@@ -1073,16 +1123,6 @@ mod tests {
             assert_eq!(
                 config.set_address("127.0.0.1:12345").address,
                 Some("127.0.0.1:12345".to_owned())
-            );
-        }
-
-        #[test]
-        fn set_window_title() {
-            let mut config = ConnectionConfig::default();
-            assert_eq!(config.window_title, None);
-            assert_eq!(
-                config.set_window_title("明日方舟").window_title,
-                Some("明日方舟".to_owned())
             );
         }
 
@@ -1191,6 +1231,7 @@ mod tests {
             );
         }
 
+        #[cfg(target_os = "windows")]
         #[test]
         fn attach_window_args() {
             assert_eq!(
@@ -1212,9 +1253,9 @@ mod tests {
                 ConnectionConfig {
                     preset: Preset::Pc,
                     window_title: Some("Arknights".to_owned()),
-                    screencap_method: Some(16),
-                    mouse_method: Some(1),
-                    keyboard_method: Some(1),
+                    screencap_method: Some(Win32ScreencapMethod::PrintWindow),
+                    mouse_method: Some(Win32InputMethod::Seize),
+                    keyboard_method: Some(Win32InputMethod::Seize),
                     ..Default::default()
                 }
                 .attach_window_args()
@@ -1225,16 +1266,6 @@ mod tests {
                     mouse_method: 1,
                     keyboard_method: 1,
                 }
-            );
-
-            assert!(
-                ConnectionConfig {
-                    preset: Preset::Pc,
-                    screencap_method: Some(-1),
-                    ..Default::default()
-                }
-                .attach_window_args()
-                .is_err()
             );
         }
 

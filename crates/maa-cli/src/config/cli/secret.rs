@@ -173,27 +173,21 @@ mod tests {
         assert_de_tokens(&Secret::None, &[Token::Bool(false)]);
         assert_de_tokens(&Secret::Plain(s!("secret")), &[Token::Str("secret")]);
         assert_de_tokens(&Secret::Plain(s!("secret")), &[Token::String("secret")]);
-        assert_de_tokens(
-            &Secret::Env(s!("TOKEN")),
-            &[
-                Token::Map { len: Some(1) },
-                Token::Str("env"),
-                Token::Str("TOKEN"),
-                Token::MapEnd,
-            ],
-        );
-        assert_de_tokens(
-            &Secret::Command(svec!["pass", "show"]),
-            &[
-                Token::Map { len: Some(1) },
-                Token::Str("cmd"),
-                Token::Seq { len: Some(2) },
-                Token::Str("pass"),
-                Token::Str("show"),
-                Token::SeqEnd,
-                Token::MapEnd,
-            ],
-        );
+        assert_de_tokens(&Secret::Env(s!("TOKEN")), &[
+            Token::Map { len: Some(1) },
+            Token::Str("env"),
+            Token::Str("TOKEN"),
+            Token::MapEnd,
+        ]);
+        assert_de_tokens(&Secret::Command(svec!["pass", "show"]), &[
+            Token::Map { len: Some(1) },
+            Token::Str("cmd"),
+            Token::Seq { len: Some(2) },
+            Token::Str("pass"),
+            Token::Str("show"),
+            Token::SeqEnd,
+            Token::MapEnd,
+        ]);
     }
 
     #[test]
@@ -266,13 +260,11 @@ mod tests {
 
             #[test]
             fn success() {
-                #[cfg(target_os = "windows")]
-                let command = svec!["cmd", "/C", "echo", "secret"];
-                #[cfg(not(target_os = "windows"))]
-                let command = svec!["echo", "secret"];
-
                 assert_eq!(
-                    Secret::Command(command).get_with_desc("token").unwrap().unwrap(),
+                    Secret::Command(svec!["echo", "secret"])
+                        .get_with_desc("token")
+                        .unwrap()
+                        .unwrap(),
                     "secret"
                 );
             }

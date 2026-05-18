@@ -4,20 +4,15 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
+use maa_types::{Win32InputMethod, Win32ScreencapMethod};
 use maa_value::value::MAAValue;
 
 pub(crate) const PC_WINDOW_TITLE_DEFAULT: &str = "明日方舟";
-pub(crate) const PC_SCREENCAP_METHOD_DEFAULT: i32 = 2;
-pub(crate) const PC_MOUSE_METHOD_DEFAULT: i32 = 32;
-pub(crate) const PC_KEYBOARD_METHOD_DEFAULT: i32 = 2;
-
-pub(crate) fn validate_attach_window_method(key: &str, value: i32) -> Result<()> {
-    if value < 0 {
-        bail!("{key} must be a non-negative integer, got {value}");
-    }
-
-    Ok(())
-}
+pub(crate) const PC_SCREENCAP_METHOD_DEFAULT: Win32ScreencapMethod =
+    Win32ScreencapMethod::FramePool;
+pub(crate) const PC_MOUSE_METHOD_DEFAULT: Win32InputMethod =
+    Win32InputMethod::SendMessageWithCursorPos;
+pub(crate) const PC_KEYBOARD_METHOD_DEFAULT: Win32InputMethod = Win32InputMethod::SendMessage;
 
 fn file_not_found(path: impl AsRef<Path>) -> std::io::Error {
     std::io::Error::new(

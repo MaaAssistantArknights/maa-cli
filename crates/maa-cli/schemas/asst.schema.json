@@ -19,9 +19,9 @@
         "address": { "type": "string" },
         "config": { "type": "string" },
         "window_title": { "type": "string" },
-        "screencap_method": { "type": "integer" },
-        "mouse_method": { "type": "integer" },
-        "keyboard_method": { "type": "integer" }
+        "screencap_method": { "$ref": "#/definitions/win32ScreencapMethod" },
+        "mouse_method": { "$ref": "#/definitions/win32InputMethod" },
+        "keyboard_method": { "$ref": "#/definitions/win32InputMethod" }
       }
     },
     "resource": {
@@ -76,9 +76,9 @@
       "properties": {
         "type": { "const": "PC" },
         "window_title": { "type": "string" },
-        "screencap_method": { "type": "integer" },
-        "mouse_method": { "type": "integer" },
-        "keyboard_method": { "type": "integer" }
+        "screencap_method": { "$ref": "#/definitions/win32ScreencapMethod" },
+        "mouse_method": { "$ref": "#/definitions/win32InputMethod" },
+        "keyboard_method": { "$ref": "#/definitions/win32InputMethod" }
       },
       "required": ["type"]
     },
@@ -94,6 +94,33 @@
       "type": "string",
       "enum": ["ADB", "MiniTouch", "MaaTouch", "MacPlayTools", "MaaFwAdb"],
       "default": "ADB"
+    },
+    "win32ScreencapMethod": {
+      "type": "string",
+      "enum": [
+        "None",
+        "GDI",
+        "FramePool",
+        "DXGIDesktopDup",
+        "DXGIDesktopDupWindow",
+        "PrintWindow",
+        "ScreenDC"
+      ]
+    },
+    "win32InputMethod": {
+      "type": "string",
+      "enum": [
+        "None",
+        "Seize",
+        "SendMessage",
+        "PostMessage",
+        "LegacyEvent",
+        "PostThreadMessage",
+        "SendMessageWithCursorPos",
+        "PostMessageWithCursorPos",
+        "SendMessageWithWindowPos",
+        "PostMessageWithWindowPos"
+      ]
     }
   }
 }

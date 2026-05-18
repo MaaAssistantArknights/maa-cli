@@ -41,13 +41,6 @@ pub struct CommonArgs {
     /// and then you can specify the address of MaaTools here.
     #[arg(short, long, verbatim_doc_comment)]
     pub addr: Option<String>,
-    /// Exact window title to match when `connection.type = "PC"`
-    ///
-    /// This is only used by the Windows AttachWindow mode.
-    /// The match is exact and case-sensitive, following MAA GUI behavior.
-    /// If omitted, `明日方舟` is used by default.
-    #[arg(long, verbatim_doc_comment)]
-    pub window_title: Option<String>,
     /// Profile (asst config file) name
     ///
     /// A profile is a config file that contains the configuration passed to MaaCore.
@@ -104,10 +97,6 @@ impl CommonArgs {
     pub fn apply_to(&self, config: &mut AsstConfig) {
         if let Some(addr) = self.addr.as_ref() {
             config.connection.set_address(addr);
-        }
-
-        if let Some(window_title) = self.window_title.as_ref() {
-            config.connection.set_window_title(window_title);
         }
 
         if self.user_resource {
@@ -237,10 +226,6 @@ where
                     attach_args.keyboard_method,
                     true,
                 )?;
-            }
-            #[cfg(not(target_os = "windows"))]
-            crate::config::asst::Preset::Pc => {
-                bail!("`connection.type = \"PC\"` is only supported on Windows");
             }
             _ => {
                 // Connect to game or emulator.
