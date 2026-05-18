@@ -611,7 +611,7 @@ fn resolve_copilot_uris(uri_list: Vec<String>) -> Result<Vec<(usize, PathBuf, Co
             a.extend(b);
             Ok(a)
         })?;
-    copilot_files.sort_by(|(index_a, ..), (index_b, ..)| index_a.cmp(index_b));
+    copilot_files.sort_by_key(|(index, ..)| *index);
 
     Ok(copilot_files)
 }
