@@ -21,7 +21,6 @@ pub enum Win32ScreencapMethod {
 
 impl Win32ScreencapMethod {
     pub const COUNT: usize = 7;
-
     pub const NAMES: [&'static str; Self::COUNT] = [
         "None",
         "GDI",
@@ -31,7 +30,6 @@ impl Win32ScreencapMethod {
         "PrintWindow",
         "ScreenDC",
     ];
-
     pub const VARIANTS: [Self; Self::COUNT] = [
         Self::None,
         Self::Gdi,
@@ -132,20 +130,17 @@ mod tests {
                 Win32ScreencapMethod::ScreenDc,
             ];
 
-            assert_de_tokens(
-                &methods,
-                &[
-                    Token::Seq { len: Some(7) },
-                    Token::Str("None"),
-                    Token::Str("GDI"),
-                    Token::Str("FramePool"),
-                    Token::Str("DXGIDesktopDup"),
-                    Token::Str("DXGIDesktopDupWindow"),
-                    Token::Str("PrintWindow"),
-                    Token::Str("ScreenDC"),
-                    Token::SeqEnd,
-                ],
-            );
+            assert_de_tokens(&methods, &[
+                Token::Seq { len: Some(7) },
+                Token::Str("None"),
+                Token::Str("GDI"),
+                Token::Str("FramePool"),
+                Token::Str("DXGIDesktopDup"),
+                Token::Str("DXGIDesktopDupWindow"),
+                Token::Str("PrintWindow"),
+                Token::Str("ScreenDC"),
+                Token::SeqEnd,
+            ]);
         }
 
         #[test]
@@ -166,10 +161,9 @@ mod tests {
             assert_ser_tokens(&Win32ScreencapMethod::None, &[Token::Str("None")]);
             assert_ser_tokens(&Win32ScreencapMethod::Gdi, &[Token::Str("GDI")]);
             assert_ser_tokens(&Win32ScreencapMethod::FramePool, &[Token::Str("FramePool")]);
-            assert_ser_tokens(
-                &Win32ScreencapMethod::DxgiDesktopDupWindow,
-                &[Token::Str("DXGIDesktopDupWindow")],
-            );
+            assert_ser_tokens(&Win32ScreencapMethod::DxgiDesktopDupWindow, &[Token::Str(
+                "DXGIDesktopDupWindow",
+            )]);
         }
     }
 

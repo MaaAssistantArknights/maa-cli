@@ -27,7 +27,6 @@ pub enum Win32InputMethod {
 
 impl Win32InputMethod {
     pub const COUNT: usize = 10;
-
     pub const NAMES: [&'static str; Self::COUNT] = [
         "None",
         "Seize",
@@ -40,7 +39,6 @@ impl Win32InputMethod {
         "SendMessageWithWindowPos",
         "PostMessageWithWindowPos",
     ];
-
     pub const VARIANTS: [Self; Self::COUNT] = [
         Self::None,
         Self::Seize,
@@ -162,23 +160,20 @@ mod tests {
                 Win32InputMethod::PostMessageWithWindowPos,
             ];
 
-            assert_de_tokens(
-                &methods,
-                &[
-                    Token::Seq { len: Some(10) },
-                    Token::Str("None"),
-                    Token::Str("Seize"),
-                    Token::Str("SendMessage"),
-                    Token::Str("PostMessage"),
-                    Token::Str("LegacyEvent"),
-                    Token::Str("PostThreadMessage"),
-                    Token::Str("SendMessageWithCursorPos"),
-                    Token::Str("PostMessageWithCursorPos"),
-                    Token::Str("SendMessageWithWindowPos"),
-                    Token::Str("PostMessageWithWindowPos"),
-                    Token::SeqEnd,
-                ],
-            );
+            assert_de_tokens(&methods, &[
+                Token::Seq { len: Some(10) },
+                Token::Str("None"),
+                Token::Str("Seize"),
+                Token::Str("SendMessage"),
+                Token::Str("PostMessage"),
+                Token::Str("LegacyEvent"),
+                Token::Str("PostThreadMessage"),
+                Token::Str("SendMessageWithCursorPos"),
+                Token::Str("PostMessageWithCursorPos"),
+                Token::Str("SendMessageWithWindowPos"),
+                Token::Str("PostMessageWithWindowPos"),
+                Token::SeqEnd,
+            ]);
         }
 
         #[test]
@@ -198,10 +193,9 @@ mod tests {
         fn serialize() {
             assert_ser_tokens(&Win32InputMethod::Seize, &[Token::Str("Seize")]);
             assert_ser_tokens(&Win32InputMethod::SendMessage, &[Token::Str("SendMessage")]);
-            assert_ser_tokens(
-                &Win32InputMethod::SendMessageWithCursorPos,
-                &[Token::Str("SendMessageWithCursorPos")],
-            );
+            assert_ser_tokens(&Win32InputMethod::SendMessageWithCursorPos, &[Token::Str(
+                "SendMessageWithCursorPos",
+            )]);
         }
     }
 

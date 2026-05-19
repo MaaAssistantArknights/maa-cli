@@ -1,10 +1,14 @@
 use anyhow::{Result, bail};
 use log::{debug, warn};
-use windows_sys::Win32::{
-    Foundation::{HWND, LPARAM},
-    UI::WindowsAndMessaging::{EnumWindows, GetWindowTextLengthW, GetWindowTextW, IsWindowVisible},
+use windows_sys::{
+    Win32::{
+        Foundation::{HWND, LPARAM},
+        UI::WindowsAndMessaging::{
+            EnumWindows, GetWindowTextLengthW, GetWindowTextW, IsWindowVisible,
+        },
+    },
+    core::BOOL,
 };
-use windows_sys::core::BOOL;
 
 pub(super) struct WindowMatch {
     pub hwnd: isize,

@@ -265,13 +265,10 @@ mod tests {
             let test_file = dir.path().join("test");
             std::fs::write(test_file.with_extension("json"), r#"{"a": 1, "b": "test"}"#).unwrap();
 
-            assert_eq!(
-                TestConfig::find_file(&test_file).unwrap(),
-                TestConfig {
-                    a: 1,
-                    b: "test".into()
-                }
-            );
+            assert_eq!(TestConfig::find_file(&test_file).unwrap(), TestConfig {
+                a: 1,
+                b: "test".into()
+            });
         }
 
         #[test]

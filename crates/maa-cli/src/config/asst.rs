@@ -12,6 +12,7 @@ use maa_types::{
 };
 use serde::Deserialize;
 
+#[cfg(target_os = "windows")]
 use super::{
     PC_KEYBOARD_METHOD_DEFAULT, PC_MOUSE_METHOD_DEFAULT, PC_SCREENCAP_METHOD_DEFAULT,
     PC_WINDOW_TITLE_DEFAULT,
@@ -98,12 +99,16 @@ pub struct ConnectionConfig {
     pub(super) address: Option<String>,
     #[serde(default)]
     pub(super) config: Option<String>,
+    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
     #[serde(default)]
     pub(super) window_title: Option<String>,
+    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
     #[serde(default)]
     pub(super) screencap_method: Option<Win32ScreencapMethod>,
+    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
     #[serde(default)]
     pub(super) mouse_method: Option<Win32InputMethod>,
+    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
     #[serde(default)]
     pub(super) keyboard_method: Option<Win32InputMethod>,
 }
@@ -157,7 +162,8 @@ impl ConnectionConfig {
         (adb_path, address, config)
     }
 
-    pub fn attach_window_args(&self) -> Result<AttachWindowArgs<'_>> {
+    #[cfg(target_os = "windows")]
+    pub fn attach_window_args(&self) -> AttachWindowArgs<'_> {
         let window_title = self
             .window_title
             .as_deref()
@@ -180,15 +186,16 @@ impl ConnectionConfig {
             "Attaching to window {window_title} with screencap method {screencap_method} ({screencap_method_value}), mouse method {mouse_method} ({mouse_method_value}), keyboard method {keyboard_method} ({keyboard_method_value})"
         );
 
-        Ok(AttachWindowArgs {
+        AttachWindowArgs {
             window_title,
             screencap_method: screencap_method_value,
             mouse_method: mouse_method_value,
             keyboard_method: keyboard_method_value,
-        })
+        }
     }
 }
 
+#[cfg(target_os = "windows")]
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub struct AttachWindowArgs<'a> {
     pub window_title: Cow<'a, str>,
@@ -294,33 +301,33 @@ impl Preset {
         }
     }
 
+    #[cfg(target_os = "windows")]
     fn default_window_title(self) -> &'static str {
         match self {
-            #[cfg(target_os = "windows")]
             Preset::Pc => PC_WINDOW_TITLE_DEFAULT,
             _ => "",
         }
     }
 
+    #[cfg(target_os = "windows")]
     fn default_screencap_method(self) -> Win32ScreencapMethod {
         match self {
-            #[cfg(target_os = "windows")]
             Preset::Pc => PC_SCREENCAP_METHOD_DEFAULT,
             _ => Win32ScreencapMethod::None,
         }
     }
 
+    #[cfg(target_os = "windows")]
     fn default_mouse_method(self) -> Win32InputMethod {
         match self {
-            #[cfg(target_os = "windows")]
             Preset::Pc => PC_MOUSE_METHOD_DEFAULT,
             _ => Win32InputMethod::None,
         }
     }
 
+    #[cfg(target_os = "windows")]
     fn default_keyboard_method(self) -> Win32InputMethod {
         match self {
-            #[cfg(target_os = "windows")]
             Preset::Pc => PC_KEYBOARD_METHOD_DEFAULT,
             _ => Win32InputMethod::None,
         }
@@ -707,9 +714,9 @@ mod tests {
     });
 
     mod serde {
-        use serde_test::{Token, assert_de_tokens};
         #[cfg(not(target_os = "windows"))]
         use serde_test::assert_de_tokens_error;
+        use serde_test::{Token, assert_de_tokens};
 
         use super::*;
 
@@ -723,50 +730,47 @@ mod tests {
             )
             .unwrap();
 
-            assert_eq!(
-                config,
-                AsstConfig {
-                    connection: ConnectionConfig {
-                        preset: Preset::Adb,
-                        adb_path: Some(String::from("adb")),
-                        address: Some(String::from("emulator-5554")),
-                        config: Some(String::from("CompatMac")),
-                        window_title: None,
-                        screencap_method: None,
-                        mouse_method: None,
-                        keyboard_method: None,
+            assert_eq!(config, AsstConfig {
+                connection: ConnectionConfig {
+                    preset: Preset::Adb,
+                    adb_path: Some(String::from("adb")),
+                    address: Some(String::from("emulator-5554")),
+                    config: Some(String::from("CompatMac")),
+                    window_title: None,
+                    screencap_method: None,
+                    mouse_method: None,
+                    keyboard_method: None,
+                },
+                resource: ResourceConfig {
+                    resource_base_dirs: {
+                        let mut base_dirs = default_resource_base_dirs();
+                        base_dirs.push(user_resource_dir);
+                        base_dirs
                     },
-                    resource: ResourceConfig {
-                        resource_base_dirs: {
-                            let mut base_dirs = default_resource_base_dirs();
-                            base_dirs.push(user_resource_dir);
-                            base_dirs
-                        },
-                        global_resource: Some(PathBuf::from("YoStarEN")),
-                        platform_diff_resource: Some(PathBuf::from("iOS")),
-                        user_resource: true,
-                    },
-                    static_options: StaticOptions {
-                        cpu_ocr: Some(false),
-                        gpu_ocr: Some(1),
-                    },
-                    instance_options: InstanceOptions {
-                        touch_mode: Some(TouchMode::MaaTouch),
-                        deployment_with_pause: Some(false),
-                        adb_lite_enabled: Some(false),
-                        kill_adb_on_exit: Some(false),
-                    },
-                    behavior: BehaviorConfig::default(),
-                }
-            );
+                    global_resource: Some(PathBuf::from("YoStarEN")),
+                    platform_diff_resource: Some(PathBuf::from("iOS")),
+                    user_resource: true,
+                },
+                static_options: StaticOptions {
+                    cpu_ocr: Some(false),
+                    gpu_ocr: Some(1),
+                },
+                instance_options: InstanceOptions {
+                    touch_mode: Some(TouchMode::MaaTouch),
+                    deployment_with_pause: Some(false),
+                    adb_lite_enabled: Some(false),
+                    kill_adb_on_exit: Some(false),
+                },
+                behavior: BehaviorConfig::default(),
+            });
         }
 
         #[test]
         fn connection_config() {
-            assert_de_tokens(
-                &ConnectionConfig::default(),
-                &[Token::Map { len: Some(0) }, Token::MapEnd],
-            );
+            assert_de_tokens(&ConnectionConfig::default(), &[
+                Token::Map { len: Some(0) },
+                Token::MapEnd,
+            ]);
 
             assert_de_tokens(
                 &ConnectionConfig {
@@ -1086,19 +1090,16 @@ mod tests {
 
         #[test]
         fn default() {
-            assert_matches!(
-                ConnectionConfig::default(),
-                ConnectionConfig {
-                    preset: Preset::Adb,
-                    adb_path: None,
-                    address: None,
-                    config: None,
-                    window_title: None,
-                    screencap_method: None,
-                    mouse_method: None,
-                    keyboard_method: None,
-                }
-            );
+            assert_matches!(ConnectionConfig::default(), ConnectionConfig {
+                preset: Preset::Adb,
+                adb_path: None,
+                address: None,
+                config: None,
+                window_title: None,
+                screencap_method: None,
+                mouse_method: None,
+                keyboard_method: None,
+            });
         }
 
         #[cfg(target_os = "macos")]
@@ -1239,8 +1240,7 @@ mod tests {
                     preset: Preset::Pc,
                     ..Default::default()
                 }
-                .attach_window_args()
-                .unwrap(),
+                .attach_window_args(),
                 AttachWindowArgs {
                     window_title: Cow::Borrowed("明日方舟"),
                     screencap_method: 2,
@@ -1258,8 +1258,7 @@ mod tests {
                     keyboard_method: Some(Win32InputMethod::Seize),
                     ..Default::default()
                 }
-                .attach_window_args()
-                .unwrap(),
+                .attach_window_args(),
                 AttachWindowArgs {
                     window_title: Cow::Borrowed("Arknights"),
                     screencap_method: 16,
@@ -1305,15 +1304,12 @@ mod tests {
 
         #[test]
         fn default() {
-            assert_eq!(
-                ResourceConfig::default(),
-                ResourceConfig {
-                    resource_base_dirs: default_resource_base_dirs(),
-                    global_resource: None,
-                    platform_diff_resource: None,
-                    user_resource: false,
-                }
-            );
+            assert_eq!(ResourceConfig::default(), ResourceConfig {
+                resource_base_dirs: default_resource_base_dirs(),
+                global_resource: None,
+                platform_diff_resource: None,
+                user_resource: false,
+            });
         }
 
         #[test]
@@ -1648,21 +1644,18 @@ mod tests {
 
         #[test]
         fn default() {
-            assert_eq!(
-                BehaviorConfig::default(),
-                BehaviorConfig {
-                    auto_reconnect: true,
-                }
-            );
+            assert_eq!(BehaviorConfig::default(), BehaviorConfig {
+                auto_reconnect: true,
+            });
         }
 
         #[test]
         fn deserialize() {
             // Empty map uses default (auto_reconnect = true)
-            assert_de_tokens(
-                &BehaviorConfig::default(),
-                &[Token::Map { len: Some(0) }, Token::MapEnd],
-            );
+            assert_de_tokens(&BehaviorConfig::default(), &[
+                Token::Map { len: Some(0) },
+                Token::MapEnd,
+            ]);
 
             // Explicit false
             assert_de_tokens(
