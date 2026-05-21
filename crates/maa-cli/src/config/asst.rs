@@ -268,110 +268,26 @@ fn config_based_on_os() -> &'static str {
 /// - adb path: `{InstallPath}\Application\{Version}\adb.exe`
 #[cfg(windows)]
 fn get_androws_adb_path() -> Option<String> {
-    use std::{ffi::OsString, os::windows::ffi::OsStringExt};
+    let hklm = winreg::HKLM;
 
-    use windows_sys::Win32::{
-        Foundation::ERROR_SUCCESS,
-        System::Registry::{
-            HKEY, HKEY_LOCAL_MACHINE, KEY_READ, REG_SZ, RegCloseKey, RegOpenKeyExW,
-            RegQueryValueExW,
-        },
-    };
+    let install_key = hklm.open_subkey(r"SOFTWARE\Tencent\Androws").ok()?;
+    let install_path: String = install_key.get_value("InstallPath").ok()?;
 
-    /// Read a `REG_SZ` string value from an open registry key.
-    /// Returns `None` if the value is missing, not a string, or contains invalid UTF-16.
-    unsafe fn read_reg_sz(hkey: HKEY, value_name: &str) -> Option<String> {
-        // Encode value name as null-terminated UTF-16
-        let name_wide: Vec<u16> = value_name
-            .encode_utf16()
-            .chain(std::iter::once(0))
-            .collect();
-        // First call: query required buffer size
-        let mut data_type: u32 = 0;
-        let mut buf_len: u32 = 0;
-        let rc = unsafe {
-            RegQueryValueExW(
-                hkey,
-                name_wide.as_ptr(),
-                std::ptr::null_mut(),
-                &mut data_type,
-                std::ptr::null_mut(),
-                &mut buf_len,
-            )
-        };
-        if rc != ERROR_SUCCESS || data_type != REG_SZ {
-            return None;
-        }
-        // Second call: read the actual data
-        let num_u16 = (buf_len as usize).div_ceil(2);
-        let mut buf: Vec<u16> = vec![0u16; num_u16];
-        let rc = unsafe {
-            RegQueryValueExW(
-                hkey,
-                name_wide.as_ptr(),
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                buf.as_mut_ptr().cast::<u8>(),
-                &mut buf_len,
-            )
-        };
-        if rc != ERROR_SUCCESS {
-            return None;
-        }
-        // Strip trailing null characters introduced by REG_SZ
-        while buf.last() == Some(&0) {
-            buf.pop();
-        }
-        OsString::from_wide(&buf).into_string().ok()
-    }
+    let app_key = hklm.open_subkey(r"SOFTWARE\Tencent\Androws\Androws").ok()?;
+    let version: String = app_key.get_value("Version").ok()?;
 
-    /// Open a registry subkey under HKLM with KEY_READ access.
-    unsafe fn open_hklm_key(subkey: &str) -> Option<HKEY> {
-        let subkey_wide: Vec<u16> = subkey.encode_utf16().chain(std::iter::once(0)).collect();
-        let mut hkey: HKEY = std::ptr::null_mut();
-        let rc = unsafe {
-            RegOpenKeyExW(
-                HKEY_LOCAL_MACHINE,
-                subkey_wide.as_ptr(),
-                0,
-                KEY_READ,
-                &mut hkey,
-            )
-        };
-        if rc == ERROR_SUCCESS {
-            Some(hkey)
-        } else {
-            None
-        }
-    }
-
-    unsafe {
-        // Read InstallPath
-        let install_key = open_hklm_key(r"SOFTWARE\Tencent\Androws")?;
-        let install_path = read_reg_sz(install_key, "InstallPath");
-        RegCloseKey(install_key);
-        let install_path = install_path?;
-
-        // Read Version
-        let app_key = open_hklm_key(r"SOFTWARE\Tencent\Androws\Androws")?;
-        let version = read_reg_sz(app_key, "Version");
-        RegCloseKey(app_key);
-        let version = version?;
-
-        // Build and verify path
-        let adb_path = std::path::Path::new(&install_path)
-            .join("Application")
-            .join(&version)
-            .join("adb.exe");
-        if adb_path.exists() {
-            adb_path.to_str().map(str::to_owned)
-        } else {
-            warn!(
-                "Androws adb not found at expected path: {}",
-                adb_path.display()
-            );
-            None
-        }
+    let adb_path = std::path::Path::new(&install_path)
+        .join("Application")
+        .join(&version)
+        .join("adb.exe");
+    if adb_path.exists() {
+        adb_path.to_str().map(str::to_owned)
+    } else {
+        warn!(
+            "Androws adb not found at expected path: {}",
+            adb_path.display()
+        );
+        None
     }
 }
 

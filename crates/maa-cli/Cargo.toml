@@ -43,7 +43,7 @@ toml = { workspace = true }
 ureq = { workspace = true, features = ["json", "platform-verifier"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { workspace = true, features = ["Win32_System_Registry", "Win32_Foundation"] }
+winreg = { workspace = true }
 
 [dev-dependencies]
 maa-value = { workspace = true, features = ["default_batch_mode"] }

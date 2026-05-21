@@ -65,6 +65,7 @@ ureq = { version = "3" }
 windows-result = "0.4.0"
 windows-strings = "0.5.0"
 windows-sys = "0.61.0"
+winreg = "0.56"
 zip = { version = "8", default-features = false, features = ["deflate-flate2"] }
 
 [workspace.lints.rust]
