@@ -260,8 +260,12 @@ mod tests {
 
             #[test]
             fn success() {
+                #[cfg(windows)]
+                let cmd = svec!["cmd", "/c", "echo secret"];
+                #[cfg(not(windows))]
+                let cmd = svec!["echo", "secret"];
                 assert_eq!(
-                    Secret::Command(svec!["echo", "secret"])
+                    Secret::Command(cmd)
                         .get_with_desc("token")
                         .unwrap()
                         .unwrap(),

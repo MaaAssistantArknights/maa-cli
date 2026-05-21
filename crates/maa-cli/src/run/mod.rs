@@ -205,8 +205,6 @@ where
             ))),
             #[cfg(target_os = "linux")]
             crate::config::asst::Preset::Waydroid => Some(Box::new(external::WaydroidApp::new())),
-            #[cfg(target_os = "windows")]
-            crate::config::asst::Preset::Androws => Some(Box::new(external::AndrowsApp::new())),
             _ => None,
         };
 

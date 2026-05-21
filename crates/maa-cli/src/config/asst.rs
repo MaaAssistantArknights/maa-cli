@@ -259,6 +259,26 @@ fn config_based_on_os() -> &'static str {
     }
 }
 
+/// Build the expected ADB path from Androws install path and version.
+///
+/// Returns the path string if the adb.exe file exists at the expected location, otherwise None.
+#[cfg(windows)]
+fn build_androws_adb_path(install_path: &str, version: &str) -> Option<String> {
+    let adb_path = std::path::Path::new(install_path)
+        .join("Application")
+        .join(version)
+        .join("adb.exe");
+    if adb_path.exists() {
+        adb_path.to_str().map(str::to_owned)
+    } else {
+        warn!(
+            "Androws adb not found at expected path: {}",
+            adb_path.display()
+        );
+        None
+    }
+}
+
 /// Detect the ADB path for Androws emulator from Windows Registry.
 ///
 /// Androws runs as an elevated process, so its path cannot be obtained via process inspection.
@@ -276,19 +296,7 @@ fn get_androws_adb_path() -> Option<String> {
     let app_key = hklm.open_subkey(r"SOFTWARE\Tencent\Androws\Androws").ok()?;
     let version: String = app_key.get_value("Version").ok()?;
 
-    let adb_path = std::path::Path::new(&install_path)
-        .join("Application")
-        .join(&version)
-        .join("adb.exe");
-    if adb_path.exists() {
-        adb_path.to_str().map(str::to_owned)
-    } else {
-        warn!(
-            "Androws adb not found at expected path: {}",
-            adb_path.display()
-        );
-        None
-    }
+    build_androws_adb_path(&install_path, &version)
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -1061,7 +1069,11 @@ mod tests {
                     config: None,
                 }
                 .connect_args(),
-                ("adb", "127.0.0.1:5555", "Androws"),
+                (
+                    Preset::Androws.default_adb_path().as_ref(),
+                    "127.0.0.1:5555",
+                    "Androws",
+                ),
             );
 
             args_eq(
@@ -1101,6 +1113,32 @@ mod tests {
 
             #[cfg(not(any(target_os = "macos", target_os = "linux")))]
             assert_eq!(config_based_on_os(), "General");
+        }
+
+        #[cfg(windows)]
+        #[test]
+        fn build_androws_adb_path_nonexistent() {
+            // A path that does not exist should return None and emit a warning.
+            let result = build_androws_adb_path(r"C:\NonExistentAndrowsInstall", "0.0.0.0");
+            assert_eq!(result, None);
+        }
+
+        #[cfg(windows)]
+        #[test]
+        fn build_androws_adb_path_existing() {
+            // Create a temporary directory tree that mimics the Androws layout and
+            // place a dummy adb.exe there, then verify the function returns it.
+            let tmp = std::env::temp_dir().join("maa_cli_test_androws");
+            let adb_dir = tmp.join("Application").join("1.2.3.4");
+            std::fs::create_dir_all(&adb_dir).unwrap();
+            let adb_exe = adb_dir.join("adb.exe");
+            std::fs::write(&adb_exe, b"").unwrap();
+
+            let result = build_androws_adb_path(tmp.to_str().unwrap(), "1.2.3.4");
+            assert_eq!(result, adb_exe.to_str().map(str::to_owned));
+
+            // cleanup
+            let _ = std::fs::remove_dir_all(&tmp);
         }
     }
 
