@@ -64,8 +64,9 @@ impl std::fmt::Display for Tasks {
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
-    use super::*;
     use std::fs::{self, File};
+
+    use super::*;
 
     #[test]
     fn test_tasks_dir_not_exists() {
