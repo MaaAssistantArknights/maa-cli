@@ -1,5 +1,9 @@
 # 설치 및 빌드
 
+::: important Translation Required
+This page is outdated and maybe still in Simplified Chinese. Translation is needed.
+:::
+
 maa-cli는 패키지 관리자, 사전 컴파일된 바이너리 파일, `cargo`를 통한 자체 컴파일 설치 등 다양한 설치 방법을 제공합니다.
 
 ## 패키지 관리자를 통한 설치
@@ -86,6 +90,26 @@ Rust 개발자는 `cargo`를 통해 maa-cli를 직접 컴파일하여 설치할 
 - `core_installer`: `maa install` 및 `maa update` 명령어를 활성화하여 MaaCore 및 리소스를 설치하고 업데이트할 수 있습니다. 이 기능은 기본적으로 활성화되어 있습니다.
 - `git2`: `libgit2` 리소스 업데이트 백엔드를 제공합니다. 이 기능은 기본적으로 활성화되어 있습니다.
 - `vendored-openssl`: 시스템의 `openssl` 라이브러리를 사용하는 대신 자체적으로 `openssl` 라이브러리를 컴파일합니다. 이 기능은 기본적으로 비활성화되어 있으며, 시스템에 `openssl` 라이브러리가 없거나 버전이 너무 낮을 때 활성화합니다.
+
+## 生成补全脚本
+
+::: tip
+
+对于使用包管理器安装的用户，这通常是自动进行的，请先检查是否已经有补全提示了。
+
+:::
+
+你可以使用下面的命令为你的 shell 生成补全脚本：
+
+```bash
+# 支持动态补全，例如动态补全 run 命令的任务列表
+env MAA_COMPLETE=<shell> maa
+
+# 或使用静态补全
+maa complete <shell>
+```
+
+其中 `<shell>` 可以是 `bash`、`zsh`、`fish`、`powershell` 或 `elvish`。
 
 ## MaaCore 및 리소스 설치
 

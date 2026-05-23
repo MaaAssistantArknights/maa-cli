@@ -87,6 +87,26 @@ When compiling from source, you can disable the default features with `--no-defa
 - `git2`: Provide `libgit2` resource backend, this feature is enabled by default;
 - `vendored-openssl`: Build OpenSSL library by self instead of using system library, this feature is disabled by default;
 
+## Generate Completion Script
+
+::: tip
+
+It is usually done automatically for users who installed via package managers, please check if you already have completion hints first.
+
+:::
+
+You can use the following command to generate completion scripts for your shell:
+
+```bash
+# Support dynamic completion, such as the task list of the run subcommand
+env MAA_COMPLETE=<shell> maa
+
+# Or using static completion
+maa complete <shell>
+```
+
+Where `<shell>` can be `bash`, `zsh`, `fish`, `powershell`, or `elvish`.
+
 ## Install MaaCore
 
 maa-cli only provides an interface for MaaCore, it needs MaaCore and resources to run tasks, which can be installed by maa-cli once it is installed:
