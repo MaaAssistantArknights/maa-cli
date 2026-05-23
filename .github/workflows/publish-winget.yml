@@ -36,14 +36,56 @@ permissions:
 jobs:
   publish:
     name: Publish to Winget
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
+    env:
+      RELEASE_REPOSITORY: ${{ github.repository }}
+      RELEASE_TAG: ${{ inputs.tag || format('v{0}', inputs.version) }}
+      WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.MAABOT_WINGET_TOKEN }}
+      WINGET_CREATE_VERSION: "v1.12.8.0"
+      WINGET_CREATE_SHA256: "8BD738851B524885410112678E3771B341C5C716DE60FBBECB88AB0A363ED85D"
     steps:
       - name: Update Winget Package
-        uses: vedantmgoyal9/winget-releaser@main
-        with:
-          identifier: MaaAssistantArknights.maa-cli
-          version: ${{ inputs.version }}
-          installers-regex: winget
-          release-tag: ${{ inputs.tag || format('v{0}', inputs.version) }}
-          fork-user: MaaAssistantArknights
-          token: ${{ secrets.MAABOT_WINGET_TOKEN }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          if (-not $env:WINGET_CREATE_GITHUB_TOKEN) {
+            Write-Error "MAABOT_WINGET_TOKEN is required to submit the WinGet PR."
+            exit 1
+          }
+
+          $headers = @{
+            Accept                 = "application/vnd.github+json"
+            Authorization          = "Bearer $env:WINGET_CREATE_GITHUB_TOKEN"
+            "X-GitHub-Api-Version" = "2026-03-10"
+          }
+
+          $release = Invoke-RestMethod `
+            -Uri "https://api.github.com/repos/$env:RELEASE_REPOSITORY/releases/tags/$env:RELEASE_TAG" `
+            -Headers $headers
+
+          $escapedReleaseTag = [regex]::Escape($env:RELEASE_TAG)
+          $urlX64 = $release.assets |
+            Where-Object { $_.name -match "^maa_cli-$escapedReleaseTag-x86_64-pc-windows-msvc-winget\.zip$" } |
+            Select-Object -First 1 -ExpandProperty browser_download_url
+          $urlArm64 = $release.assets |
+            Where-Object { $_.name -match "^maa_cli-$escapedReleaseTag-aarch64-pc-windows-msvc-winget\.zip$" } |
+            Select-Object -First 1 -ExpandProperty browser_download_url
+
+          if (-not $urlX64 -or -not $urlArm64) {
+            $assetNames = ($release.assets | ForEach-Object { $_.name }) -join ', '
+            Write-Error "Failed to resolve WinGet release assets for tag '$env:RELEASE_TAG'. Assets: $assetNames"
+            exit 1
+          }
+
+          curl.exe -JLO "https://github.com/microsoft/winget-create/releases/download/$env:WINGET_CREATE_VERSION/wingetcreate.exe"
+
+          if ((Get-FileHash wingetcreate.exe).Hash -ne $env:WINGET_CREATE_SHA256) {
+            Write-Error "wingetcreate.exe hash does not match expected value. Aborting."
+            exit 1
+          }
+
+          .\wingetcreate.exe update MaaAssistantArknights.maa-cli `
+            --version "${{ inputs.version }}" `
+            --urls "$urlX64|x64" "$urlArm64|arm64" `
+            --submit
