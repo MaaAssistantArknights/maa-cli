@@ -121,7 +121,7 @@ fn main() -> Result<()> {
         }
         Command::Cleanup { targets } => cleanup::cleanup(&targets)?,
         Command::List => {
-            println!("{}", tasks::Tasks::new()?)
+            print!("{}", tasks::Tasks::new()?)
         }
         Command::Import(opts) => config::import::import(opts)?,
         Command::Init {
