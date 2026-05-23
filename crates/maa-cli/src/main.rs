@@ -124,6 +124,9 @@ fn main() -> Result<()> {
             print!("{}", tasks::Tasks::new()?)
         }
         Command::Import(opts) => config::import::import(opts)?,
+        Command::Complete { shell } => {
+            clap_complete::generate(shell, &mut Cli::command(), "maa", &mut std::io::stdout());
+        }
         Command::Init {
             name,
             format,
