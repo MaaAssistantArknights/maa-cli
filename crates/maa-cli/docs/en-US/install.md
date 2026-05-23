@@ -98,7 +98,11 @@ It is usually done automatically for users who installed via package managers, p
 You can use the following command to generate completion scripts for your shell:
 
 ```bash
+# Support dynamic completion, such as the task list of the run subcommand
 env MAA_COMPLETE=<shell> maa
+
+# Or using static completion
+maa complete <shell>
 ```
 
 Where `<shell>` can be `bash`, `zsh`, `fish`, `powershell`, or `elvish`.

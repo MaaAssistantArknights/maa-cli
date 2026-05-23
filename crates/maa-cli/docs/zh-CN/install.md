@@ -122,7 +122,11 @@ Rust 开发者可以通过 `cargo` 自行编译安装 maa-cli：
 你可以使用下面的命令为你的 shell 生成补全脚本：
 
 ```bash
+# 支持动态补全，例如动态补全 run 命令的任务列表
 env MAA_COMPLETE=<shell> maa
+
+# 或使用静态补全
+maa complete <shell>
 ```
 
 其中 `<shell>` 可以是 `bash`、`zsh`、`fish`、`powershell` 或 `elvish`。
