@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use anyhow::Result;
 use clap_complete::CompletionCandidate;
 use maa_dirs::config;
@@ -8,10 +10,10 @@ pub struct Tasks {
 }
 
 impl Tasks {
-    pub fn new() -> Result<Self> {
+    pub fn new_with(config_path: &Path) -> Result<Self> {
         let mut names = vec![];
 
-        let task_dir = config().join("tasks");
+        let task_dir = config_path.join("tasks");
         if task_dir.exists() {
             for entry in task_dir.read_dir()? {
                 let path = entry?.path();
@@ -25,6 +27,10 @@ impl Tasks {
         }
 
         Ok(Self { names })
+    }
+
+    pub fn new() -> Result<Self> {
+        Self::new_with(config())
     }
 }
 
@@ -52,5 +58,48 @@ impl std::fmt::Display for Tasks {
             writeln!(f, "{name}")?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+mod tests {
+    use super::*;
+    use std::fs::{self, File};
+
+    #[test]
+    fn test_tasks_dir_not_exists() {
+        let tmp = tempfile::tempdir().unwrap();
+
+        let tasks = Tasks::new_with(tmp.path()).unwrap();
+        assert!(tasks.names.is_empty());
+    }
+
+    #[test]
+    fn test_read_task_files() {
+        let tmp = tempfile::tempdir().unwrap();
+
+        let task_dir = tmp.path().join("tasks");
+        fs::create_dir(&task_dir).unwrap();
+
+        File::create(task_dir.join("a.toml")).unwrap();
+        File::create(task_dir.join("b.json")).unwrap();
+
+        let Tasks { names } = Tasks::new_with(tmp.path()).unwrap();
+
+        assert_eq!(names.len(), 2);
+        assert!(names.contains(&"a".to_string()));
+        assert!(names.contains(&"b".to_string()));
+    }
+
+    #[test]
+    fn test_display() {
+        let tasks = Tasks {
+            names: vec!["a".into(), "b".into()],
+        };
+
+        let output = format!("{}", tasks);
+
+        assert_eq!(output, "a\nb\n");
     }
 }
