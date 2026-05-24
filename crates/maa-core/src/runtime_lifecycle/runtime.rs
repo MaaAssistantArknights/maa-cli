@@ -151,7 +151,7 @@ impl PendingAssistantRegistration {
             let next_count = count
                 .checked_add(1)
                 .filter(|count| *count <= ASSISTANT_COUNT_MASK)
-                .expect("Assistant count overflowed");
+                .ok_or(Error::TooManyAssistants)?;
             let next = (state & !ASSISTANT_COUNT_MASK) | next_count;
             if RUNTIME_STATE
                 .compare_exchange(state, next, Ordering::AcqRel, Ordering::Acquire)
@@ -250,6 +250,21 @@ pub(crate) mod tests {
             PendingAssistantRegistration::begin(),
             Err(Error::RuntimeNotLoaded)
         ));
+    }
+
+    #[test]
+    fn assistant_registration_rejects_count_overflow() {
+        let _state_lock = RUNTIME_STATE_TEST_LOCK.lock().unwrap();
+        reset_runtime_state_for_test(RUNTIME_LOADED | ASSISTANT_COUNT_MASK);
+
+        assert!(matches!(
+            PendingAssistantRegistration::begin(),
+            Err(Error::TooManyAssistants)
+        ));
+        assert_eq!(
+            RUNTIME_STATE.load(Ordering::Acquire),
+            RUNTIME_LOADED | ASSISTANT_COUNT_MASK
+        );
     }
 
     #[test]

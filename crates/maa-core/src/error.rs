@@ -19,6 +19,9 @@ pub enum Error {
     #[cfg(feature = "runtime")]
     #[error("Cannot create Assistant before MaaCore runtime is loaded")]
     RuntimeNotLoaded,
+    #[cfg(feature = "runtime")]
+    #[error("Cannot create Assistant because too many Assistant instances are alive")]
+    TooManyAssistants,
     #[error("Input argument contains invalid bytes")]
     InvalidArgument(#[from] maa_ffi_string::Error),
     #[error("Returned value contains invalid bytes")]
