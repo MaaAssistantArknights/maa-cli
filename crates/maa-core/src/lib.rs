@@ -17,6 +17,8 @@ mod error;
 use error::{AsstResult, BufferTooSmall};
 pub use error::{Error, Result};
 
+mod runtime_lifecycle;
+
 /// The user directory of the assistant.
 static USER_DIR: RwLock<std::path::PathBuf> = RwLock::new(std::path::PathBuf::new());
 
@@ -42,68 +44,11 @@ pub struct Assistant {
 impl Drop for Assistant {
     fn drop(&mut self) {
         // Destroy the handle before the callback is dropped to make sure the callback is not used
-        // after the Box is freed.
+        // after the Box is freed. The active-assistant count is decremented after this call so a
+        // concurrent runtime load or unload still sees this instance as alive during destruction.
         unsafe { maa_sys::binding::AsstDestroy(self.handle) };
-    }
-}
 
-#[cfg(feature = "runtime")]
-impl Assistant {
-    /// Load the shared library of the MaaCore
-    ///
-    /// Must be called first before any other method.
-    pub fn load(path: impl AsRef<std::path::Path>) -> Result<()> {
-        let path = path.as_ref();
-
-        #[cfg(target_os = "windows")]
-        if let Some(dir) = path.parent() {
-            use windows_strings::HSTRING;
-            use windows_sys::Win32::System::LibraryLoader::SetDllDirectoryW;
-
-            if dir != std::path::Path::new(".") {
-                // Safety: HSTRING::as_ptr returns a valid, NUL-terminated wide
-                // string pointer that lives for the duration of this call.
-                let code = unsafe { SetDllDirectoryW(HSTRING::from(dir).as_ptr()) };
-                if code == 0 {
-                    windows_result::HRESULT::from_thread().ok()?;
-                }
-            }
-        }
-
-        maa_sys::binding::load(path)?;
-
-        Ok(())
-    }
-
-    /// Unload the shared library of the MaaCore.
-    ///
-    /// Must be called after all assistant instances are destroyed.
-    pub fn unload() -> Result<()> {
-        maa_sys::binding::unload();
-        Ok(())
-    }
-
-    /// Check if the shared library of the MaaCore is loaded in this thread.
-    pub fn loaded() -> bool {
-        maa_sys::binding::loaded()
-    }
-}
-
-#[cfg(not(feature = "runtime"))]
-impl Assistant {
-    /// Do nothing, as MaaCore is dynamically linked
-    pub fn load(_: impl AsRef<std::path::Path>) -> Result<()> {
-        Ok(())
-    }
-
-    /// Do nothing, as MaaCore is dynamically linked
-    pub fn unload() -> Result<()> {
-        Ok(())
-    }
-
-    /// Always returns true, as MaaCore is dynamically linked.
-    pub fn loaded() -> bool {
-        true
+        runtime_lifecycle::unregister_assistant();
     }
 }
 
@@ -170,10 +115,15 @@ impl Assistant {
 impl Assistant {
     /// Create a new assistant instance without a callback.
     pub fn new() -> Result<Self> {
+        let registration = runtime_lifecycle::PendingAssistantRegistration::begin()?;
+
         let handle = unsafe { maa_sys::binding::AsstCreate() };
         if handle.is_null() {
             return Err(Error::NullHandle);
         }
+
+        registration.commit();
+
         Ok(Self {
             handle,
             _callback: None,
@@ -187,10 +137,16 @@ impl Assistant {
     pub fn new_with_callback<C: Callback + 'static>(callback: C) -> Result<Self> {
         let boxed = Box::new(callback);
         let raw = &raw const *boxed as *mut c_void;
+
+        let registration = runtime_lifecycle::PendingAssistantRegistration::begin()?;
+
         let handle = unsafe { maa_sys::binding::AsstCreateEx(Some(trampoline::<C>), raw) };
         if handle.is_null() {
             return Err(Error::NullHandle);
         }
+
+        registration.commit();
+
         Ok(Self {
             handle,
             _callback: Some(boxed as Box<dyn Callback>),
