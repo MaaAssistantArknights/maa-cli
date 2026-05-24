@@ -106,7 +106,7 @@ impl MaaCallback {
                 message.get("details")?.get("uuid")?.as_str()?
             ),
             "ConnectFailed" => error!(
-                "Failed to connect to android device, {}, Please check your connect configuration: {}",
+                "Failed to connect to game client, {}, Please check your connect configuration: {}",
                 message.get("why")?.as_str()?,
                 json_pretty(message.get("details")?)
             ),

@@ -232,6 +232,29 @@ impl Assistant {
         .to_maa_result()
     }
 
+    /// Attach to a Win32 game window asynchronously.
+    #[cfg(target_os = "windows")]
+    pub fn async_attach_window(
+        &self,
+        hwnd: isize,
+        screencap_method: u64,
+        mouse_method: u64,
+        keyboard_method: u64,
+        block: bool,
+    ) -> Result<AsstAsyncCallId> {
+        unsafe {
+            maa_sys::binding::AsstAsyncAttachWindow(
+                self.handle,
+                hwnd as *mut c_void,
+                screencap_method,
+                mouse_method,
+                keyboard_method,
+                block.into(),
+            )
+        }
+        .to_maa_result()
+    }
+
     /// Click the screen at the given position.
     pub fn async_click(&self, x: i32, y: i32, block: bool) -> Result<AsstAsyncCallId> {
         unsafe { maa_sys::binding::AsstAsyncClick(self.handle, x, y, block.into()) }.to_maa_result()

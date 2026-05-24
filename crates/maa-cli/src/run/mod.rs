@@ -2,6 +2,8 @@ mod callback;
 use callback::summary;
 
 mod external;
+#[cfg(target_os = "windows")]
+mod windows;
 
 pub mod preset;
 
@@ -210,8 +212,26 @@ where
 
         let address = runtime_address.as_deref().unwrap_or(&address);
 
-        // Connect to game or emulator
-        asst.async_connect(adb_path, address, config, true)?;
+        match asst_config.connection.preset() {
+            #[cfg(target_os = "windows")]
+            crate::config::asst::Preset::Pc => {
+                let attach_args = asst_config.connection.attach_window_args();
+                let window = windows::find_window_by_title(attach_args.window_title.as_ref())?;
+
+                // Connect to PC client via Win32 AttachWindow.
+                asst.async_attach_window(
+                    window.hwnd,
+                    attach_args.screencap_method,
+                    attach_args.mouse_method,
+                    attach_args.keyboard_method,
+                    true,
+                )?;
+            }
+            _ => {
+                // Connect to game or emulator.
+                asst.async_connect(adb_path, address, config, true)?;
+            }
+        }
 
         debug!("Starting MAA...");
         asst.start()?;

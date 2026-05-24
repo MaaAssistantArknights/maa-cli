@@ -1123,6 +1123,7 @@ dependencies = [
  "tiny_http",
  "toml",
  "ureq",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

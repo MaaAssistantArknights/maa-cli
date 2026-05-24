@@ -48,6 +48,9 @@ regex = { workspace = true }
 serde_test = { workspace = true }
 tiny_http = { workspace = true }
 
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
+
 [features]
 default = ["cli_installer", "core_installer", "git2"]
 # Common features used to install and update MAA Core and maa-cli self
