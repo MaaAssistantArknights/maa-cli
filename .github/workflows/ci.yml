@@ -79,7 +79,6 @@ jobs:
           - ubuntu-22.04
           - ubuntu-22.04-arm
           - macos-latest
-          - windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -87,9 +86,22 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: Test
         run: |
-          # TODO: Re-enable macOS Core-backed tests once beta releases ship macOS MaaCore assets again.
-          cargo x test --clippy \
-            ${{ matrix.runner != 'macos-latest' && '--install-core' || '--no-core-tests' }}
+          cargo x test --clippy  --install-core
+
+  build-windows:
+    name: Build and Test (Windows, ${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        runner:
+          - windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Test
+        run: cargo x test --clippy --install-core
 
   build-tier2:
     name: Build and Test (Tier 2, ${{ matrix.runner }})
@@ -167,7 +179,6 @@ jobs:
         os:
           - ubuntu-22.04
           - macos-latest
-          - windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -177,9 +188,27 @@ jobs:
           tool: cargo-llvm-cov
       - name: Coverage
         run: |
-          # TODO: Re-enable macOS Core-backed tests once beta releases ship macOS MaaCore assets again.
-          cargo x test --coverage all \
-            ${{ matrix.os != 'macos-latest' && '--install-core' || '--no-core-tests' }}
+          cargo x test --coverage all --install-core
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v6
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: codecov.json
+          fail_ci_if_error: true
+
+  coverage-windows:
+    name: Coverage (Windows)
+    needs: [build-windows]
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      - name: Coverage
+        run: cargo x test --coverage all --install-core
       - name: Upload to Codecov
         uses: codecov/codecov-action@v6
         with:
