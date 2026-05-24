@@ -125,7 +125,7 @@ impl Assistant {
         Ok(())
     }
 
-    /// Check if the shared library of the MaaCore is loaded in this thread.
+    /// Check if the shared library of the MaaCore is currently loaded.
     pub fn loaded() -> bool {
         maa_sys::binding::loaded()
     }
