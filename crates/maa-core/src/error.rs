@@ -14,7 +14,7 @@ pub enum Error {
     #[error("Cannot load or unload MaaCore runtime while Assistant instances are alive")]
     ActiveAssistants,
     #[cfg(feature = "runtime")]
-    #[error("Cannot create Assistant while MaaCore runtime is loading or unloading")]
+    #[error("Cannot perform this operation while MaaCore runtime is loading or unloading")]
     RuntimeChanging,
     #[cfg(feature = "runtime")]
     #[error("Cannot create Assistant before MaaCore runtime is loaded")]
