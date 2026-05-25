@@ -98,10 +98,11 @@ impl ConnectionConfig {
         self
     }
 
-    pub fn connect_args(&self) -> (&str, Cow<'_, str>, &str) {
-        let adb_path = self
+    pub fn connect_args(&self) -> (Cow<'static, str>, Cow<'_, str>, &str) {
+        let adb_path: Cow<'static, str> = self
             .adb_path
             .as_deref()
+            .map(|s| Cow::Owned(s.to_owned()))
             .unwrap_or_else(|| self.preset.default_adb_path());
         let config = self
             .config
@@ -122,7 +123,7 @@ impl ConnectionConfig {
             self.address
                 .as_deref()
                 .map(Cow::Borrowed)
-                .unwrap_or_else(|| self.preset.default_address(adb_path))
+                .unwrap_or_else(|| self.preset.default_address(adb_path.as_ref()))
         };
 
         debug!(
@@ -130,7 +131,7 @@ impl ConnectionConfig {
             if matches!(self.preset, Preset::PlayCover) {
                 "PlayTools"
             } else {
-                adb_path
+                adb_path.as_ref()
             }
         );
 
@@ -144,6 +145,7 @@ pub enum Preset {
     MuMuPro,
     PlayCover,
     Waydroid,
+    Androws,
     #[default]
     Adb,
 }
@@ -171,6 +173,7 @@ impl<'de> Deserialize<'de> for Preset {
                     "PlayCover" | "PlayTools" => Ok(Preset::PlayCover),
                     "ADB" | "Adb" | "adb" => Ok(Preset::Adb),
                     "Waydroid" | "waydroid" => Ok(Preset::Waydroid),
+                    "Androws" | "androws" => Ok(Preset::Androws),
                     _ => {
                         warn!("Unknown connection preset: {value}, ignoring");
                         Ok(Preset::Adb)
@@ -184,13 +187,20 @@ impl<'de> Deserialize<'de> for Preset {
 }
 
 impl Preset {
-    fn default_adb_path(self) -> &'static str {
+    fn default_adb_path(self) -> Cow<'static, str> {
         match self {
-            Preset::MuMuPro => {
-                "/Applications/MuMuPlayer.app/Contents/MacOS/MuMuEmulator.app/Contents/MacOS/tools/adb"
+            Preset::MuMuPro => Cow::Borrowed(
+                "/Applications/MuMuPlayer.app/Contents/MacOS/MuMuEmulator.app/Contents/MacOS/tools/adb",
+            ),
+            Preset::PlayCover => Cow::Borrowed(""),
+            Preset::Waydroid | Preset::Adb => Cow::Borrowed("adb"),
+            Preset::Androws => {
+                #[cfg(windows)]
+                if let Some(path) = get_androws_adb_path() {
+                    return Cow::Owned(path);
+                }
+                Cow::Borrowed("adb")
             }
-            Preset::PlayCover => "",
-            Preset::Waydroid | Preset::Adb => "adb",
         }
     }
 
@@ -198,6 +208,7 @@ impl Preset {
         match self {
             Preset::MuMuPro => "127.0.0.1:16384".into(),
             Preset::PlayCover => "127.0.0.1:1717".into(),
+            Preset::Androws => "127.0.0.1:5555".into(),
             Preset::Waydroid => "waydroid".into(),
             Preset::Adb => std::process::Command::new(adb_path)
                 .arg("devices")
@@ -216,6 +227,7 @@ impl Preset {
     fn default_config(self) -> &'static str {
         match self {
             Preset::Waydroid => "Waydroid",
+            Preset::Androws => "Androws",
             // May be preset specific in the future
             Preset::MuMuPro | Preset::PlayCover | Preset::Adb => config_based_on_os(),
         }
@@ -245,6 +257,46 @@ fn config_based_on_os() -> &'static str {
     } else {
         "General"
     }
+}
+
+/// Build the expected ADB path from Androws install path and version.
+///
+/// Returns the path string if the adb.exe file exists at the expected location, otherwise None.
+#[cfg(windows)]
+fn build_androws_adb_path(install_path: &str, version: &str) -> Option<String> {
+    let adb_path = std::path::Path::new(install_path)
+        .join("Application")
+        .join(version)
+        .join("adb.exe");
+    if adb_path.exists() {
+        adb_path.to_str().map(str::to_owned)
+    } else {
+        warn!(
+            "Androws adb not found at expected path: {}",
+            adb_path.display()
+        );
+        None
+    }
+}
+
+/// Detect the ADB path for Androws emulator from Windows Registry.
+///
+/// Androws runs as an elevated process, so its path cannot be obtained via process inspection.
+/// Registry layout:
+/// - `HKLM\SOFTWARE\Tencent\Androws`         → `InstallPath` (e.g. `C:\Program Files\Androws`)
+/// - `HKLM\SOFTWARE\Tencent\Androws\Androws` → `Version`     (e.g. `1.2.3.4`)
+/// - adb path: `{InstallPath}\Application\{Version}\adb.exe`
+#[cfg(windows)]
+fn get_androws_adb_path() -> Option<String> {
+    let hklm = winreg::HKLM;
+
+    let install_key = hklm.open_subkey(r"SOFTWARE\Tencent\Androws").ok()?;
+    let install_path: String = install_key.get_value("InstallPath").ok()?;
+
+    let app_key = hklm.open_subkey(r"SOFTWARE\Tencent\Androws\Androws").ok()?;
+    let version: String = app_key.get_value("Version").ok()?;
+
+    build_androws_adb_path(&install_path, &version)
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -837,6 +889,8 @@ mod tests {
             assert_de_tokens(&Preset::MuMuPro, &[Token::Str("MuMuPro")]);
             assert_de_tokens(&Preset::Waydroid, &[Token::Str("Waydroid")]);
             assert_de_tokens(&Preset::Waydroid, &[Token::Str("waydroid")]);
+            assert_de_tokens(&Preset::Androws, &[Token::Str("Androws")]);
+            assert_de_tokens(&Preset::Androws, &[Token::Str("androws")]);
         }
 
         #[test]
@@ -937,7 +991,7 @@ mod tests {
         #[test]
         fn connect_args() {
             fn args_eq(
-                args: (&str, Cow<str>, &str),
+                args: (Cow<str>, Cow<str>, &str),
                 (adb_path, address, config): (&str, &str, &str),
             ) {
                 assert_eq!(args.0, adb_path);
@@ -1009,6 +1063,21 @@ mod tests {
 
             args_eq(
                 ConnectionConfig {
+                    preset: Preset::Androws,
+                    adb_path: None,
+                    address: None,
+                    config: None,
+                }
+                .connect_args(),
+                (
+                    Preset::Androws.default_adb_path().as_ref(),
+                    "127.0.0.1:5555",
+                    "Androws",
+                ),
+            );
+
+            args_eq(
+                ConnectionConfig {
                     preset: Preset::Adb,
                     adb_path: Some("/path/to/adb".to_owned()),
                     address: Some("127.0.0.1:11111".to_owned()),
@@ -1044,6 +1113,32 @@ mod tests {
 
             #[cfg(not(any(target_os = "macos", target_os = "linux")))]
             assert_eq!(config_based_on_os(), "General");
+        }
+
+        #[cfg(windows)]
+        #[test]
+        fn build_androws_adb_path_nonexistent() {
+            // A path that does not exist should return None and emit a warning.
+            let result = build_androws_adb_path(r"C:\NonExistentAndrowsInstall", "0.0.0.0");
+            assert_eq!(result, None);
+        }
+
+        #[cfg(windows)]
+        #[test]
+        fn build_androws_adb_path_existing() {
+            // Create a temporary directory tree that mimics the Androws layout and
+            // place a dummy adb.exe there, then verify the function returns it.
+            let tmp = std::env::temp_dir().join("maa_cli_test_androws");
+            let adb_dir = tmp.join("Application").join("1.2.3.4");
+            std::fs::create_dir_all(&adb_dir).unwrap();
+            let adb_exe = adb_dir.join("adb.exe");
+            std::fs::write(&adb_exe, b"").unwrap();
+
+            let result = build_androws_adb_path(tmp.to_str().unwrap(), "1.2.3.4");
+            assert_eq!(result, adb_exe.to_str().map(str::to_owned));
+
+            // cleanup
+            let _ = std::fs::remove_dir_all(&tmp);
         }
     }
 
