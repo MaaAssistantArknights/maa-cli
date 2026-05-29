@@ -1,5 +1,32 @@
 # Release Notes
 
+## Release 0.7.5
+
+### Features
+
+- Add dynamic completion  support to `run` command by [@PFiS1737](https://github.com/PFiS1737) in [#546](https://github.com/MaaAssistantArknights/maa-cli/pull/546)
+- 支持腾讯应用宝5.10.56.xx+ by [@srdr0p](https://github.com/srdr0p) in [#540](https://github.com/MaaAssistantArknights/maa-cli/pull/540)
+
+### Bug Fixes
+
+- Markdown lint by [@Constrat](https://github.com/Constrat)
+- Unexpected output during completion in fish by [@PFiS1737](https://github.com/PFiS1737) in [#545](https://github.com/MaaAssistantArknights/maa-cli/pull/545)
+- Guard MaaCore runtime lifecycle state by [@wangl-cc](https://github.com/wangl-cc) in [#549](https://github.com/MaaAssistantArknights/maa-cli/pull/549)
+
+### Documentation
+
+- Update waydroid preset docs by [@Constrat](https://github.com/Constrat)
+
+### Security
+
+- Bump tar from 0.4.45 to 0.4.46 by [@dependabot](https://github.com/dependabot) in [#551](https://github.com/MaaAssistantArknights/maa-cli/pull/551)
+
+### Miscellaneous
+
+- Update changelog for 0.7.4 by [@github-actions](https://github.com/github-actions)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.7.4...v0.7.5>
+
 ## Release 0.7.4
 
 ### Bug Fixes
