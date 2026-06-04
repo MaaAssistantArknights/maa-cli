@@ -1,7 +1,7 @@
-use std::net::TcpStream;
+use std::{env, net::TcpStream};
 
 use anyhow::{Context, Result, bail};
-use log::{info, trace};
+use log::{info, trace, warn};
 
 use crate::config::task::ClientType;
 
@@ -39,14 +39,34 @@ impl super::ExternalApp for PlayCoverApp<'_> {
             .bundle_id()
             .with_context(|| format!("Client {} is not available on the App Store", self.client))?;
 
-        info!("Starting app: {bundle_id}");
-        let status = std::process::Command::new("open")
-            .arg("-b")
-            .arg(bundle_id)
-            .status()
-            .context("Failed to start game!")?;
-        if !status.success() {
-            bail!("Failed to start game with bundle identifier {bundle_id}: {status}");
+        let success = if let Some(home) = env::home_dir() {
+            info!("Starting app: {bundle_id} by path");
+            std::process::Command::new("open")
+                .arg("-a")
+                .arg(
+                    home.join("Library")
+                        .join("Containers")
+                        .join("io.playcover.PlayCover")
+                        .join("Applications")
+                        .join(format!("{bundle_id}.app")),
+                )
+                .status()
+                .context("Failed to start game!")?
+                .success()
+        } else {
+            false
+        };
+        if !success {
+            warn!("Failed to start game by path, fall back to bundle id");
+            info!("Starting app: {bundle_id} by bundle id");
+            let status = std::process::Command::new("open")
+                .arg("-b")
+                .arg(bundle_id)
+                .status()
+                .context("Failed to start game!")?;
+            if !status.success() {
+                bail!("Failed to start game with bundle identifier {bundle_id}: {status}");
+            }
         }
 
         // Wait for game ready
