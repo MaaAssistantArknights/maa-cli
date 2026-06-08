@@ -162,7 +162,7 @@ jobs:
             --package maa-core --coverage test-only \
             -- --no-default-features
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         if: ${{ !startsWith(matrix.os, 'windows') }}
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -190,7 +190,7 @@ jobs:
         run: |
           cargo x test --coverage all --install-core
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: codecov.json
@@ -210,7 +210,7 @@ jobs:
       - name: Coverage
         run: cargo x test --coverage all --install-core
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: codecov.json
