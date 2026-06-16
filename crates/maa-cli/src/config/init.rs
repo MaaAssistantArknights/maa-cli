@@ -67,6 +67,10 @@ fn asst_config_template() -> MAAValueTemplate {
                         "MaaFwAdb",
                         Some("use MaaFramework ADB controller for emulator extras support"),
                     ),
+                    ValueWithDesc::new(
+                        "MaaFwWlr",
+                        Some("use MaaFramework wlroots controller for wayland support"),
+                    ),
                 ],
                 std::num::NonZero::new(3),
             ).unwrap()
