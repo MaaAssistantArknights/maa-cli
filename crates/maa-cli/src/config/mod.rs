@@ -154,6 +154,9 @@ pub fn convert(file: &Path, out: Option<&Path>, ft: Option<Filetype>) -> Result<
 
     let value = MAAValue::from_file(file)?;
 
+    // TODO: 等flag写了套个if
+    let value = gui::convert(value)?;
+
     let Some(format) = ft else {
         bail!("Format not given")
     };
@@ -172,6 +175,8 @@ pub fn convert(file: &Path, out: Option<&Path>, ft: Option<Filetype>) -> Result<
 }
 
 pub mod import;
+
+mod gui;
 
 pub mod asst;
 
