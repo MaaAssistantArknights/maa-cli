@@ -1,5 +1,52 @@
+use std::num::NonZero;
+
 use anyhow::{Context, Result, bail};
-use maa_value::prelude::*;
+use maa_value::{
+    map::StringMap,
+    prelude::*,
+    userinput::{SelectD, UserInput},
+};
+
+/// Pick one configuration from a multi-profile GUI export.
+///
+/// Legacy single-config profiles are returned unchanged.
+pub(crate) fn select_configuration(input: MAAValue) -> Result<MAAValue> {
+    let Some(configurations_value) = input.get("Configurations") else {
+        return Ok(input);
+    };
+    let Some(configurations) = configurations_value.as_map() else {
+        bail!("GUI profile Configurations must be an object");
+    };
+
+    match configurations.len() {
+        0 => bail!("GUI profile has no configuration"),
+        1 => Ok(configurations.values().next().unwrap().clone()),
+        _ => pick_configuration(&input, configurations),
+    }
+}
+
+fn pick_configuration(
+    input: &MAAValue,
+    configurations: &StringMap<MAAValue>,
+) -> Result<MAAValue> {
+    let names: Vec<&str> = configurations.keys().map(String::as_str).collect();
+    let default_index = input
+        .get("Current")
+        .and_then(|v| v.as_str())
+        .and_then(|current| names.iter().position(|name| *name == current))
+        .and_then(|i| NonZero::new(i + 1));
+
+    let selected_name = SelectD::<String>::from_iter(names, default_index)
+        .context("Failed to build configuration selection")?
+        .with_description("a GUI configuration")
+        .value()
+        .context("Failed to select GUI configuration")?;
+
+    configurations
+        .get(&selected_name)
+        .cloned()
+        .with_context(|| format!("GUI configuration {selected_name} not found"))
+}
 
 /// Convert a GUI profile `MAAValue` into maa-cli task config shape.
 pub(crate) fn convert(input: MAAValue) -> Result<MAAValue> {
@@ -60,6 +107,40 @@ mod tests {
     }
 
     #[test]
+    fn select_configuration_passes_through_legacy_profile() {
+        let input = object!("legacy" => true);
+        assert_eq!(select_configuration(input.clone()).unwrap(), input);
+    }
+
+    #[test]
+    fn select_configuration_picks_the_only_configuration() {
+        let input = object!(
+            "Configurations" => object!(
+                "Default" => object!("name" => "only")
+            )
+        );
+        assert_eq!(
+            select_configuration(input).unwrap(),
+            object!("name" => "only")
+        );
+    }
+
+    #[test]
+    fn select_configuration_uses_current_in_batch_mode() {
+        let input = object!(
+            "Current" => "Dev",
+            "Configurations" => object!(
+                "Default" => object!("name" => "default"),
+                "Dev" => object!("name" => "dev"),
+            )
+        );
+        assert_eq!(
+            select_configuration(input).unwrap(),
+            object!("name" => "dev")
+        );
+    }
+
+    #[test]
     fn missing_task_queue_is_error() {
         let input = object!("a" => 1);
         let err = convert(input).unwrap_err();
@@ -80,7 +161,7 @@ mod tests {
         let output = dir.path().join("tasks.json");
 
         let input: MAAValue = serde_json::from_reader(File::open(&input).unwrap()).unwrap();
-        let value = convert(input).unwrap();
+        let value = convert(select_configuration(input).unwrap()).unwrap();
         let file = File::create(&output).unwrap();
         serde_json::to_writer_pretty(file, &value).unwrap();
 

@@ -163,6 +163,7 @@ pub fn convert(file: &Path, out: Option<&Path>, ft: Option<Filetype>, gui: bool)
     let mut value = MAAValue::from_file(file)?;
 
     if gui {
+        value = gui::select_configuration(value)?;
         value = gui::convert(value)?;
     }
 
