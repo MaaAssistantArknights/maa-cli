@@ -143,13 +143,16 @@ impl<T> FindFile for T where T: FromFile {}
 
 impl<T> FindFileOrDefault for T where T: FromFile + Default {}
 
-pub fn convert(
-    file: &Path,
-    out: Option<&Path>,
-    ft: Option<Filetype>,
-    gui: bool,
-) -> Result<()> {
+pub fn convert(file: &Path, out: Option<&Path>, ft: Option<Filetype>, gui: bool) -> Result<()> {
     use maa_dirs::Ensure;
+
+    if gui && !matches!(Filetype::parse_filetype(file), Some(Filetype::Json)) {
+        log::warn!(
+            "The --gui flag is for converting MAA GUI profiles, which are typically JSON files; \
+             input {} is not JSON",
+            file.display()
+        );
+    }
 
     let ft = ft.or_else(|| {
         out.and_then(|path| path.extension())
