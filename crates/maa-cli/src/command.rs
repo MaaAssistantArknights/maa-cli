@@ -188,6 +188,9 @@ pub(crate) enum Command {
         /// file. If output file is not specified, the output will be default to "json".
         #[arg(short, long)]
         format: Option<config::Filetype>,
+        /// Convert a GUI profile TaskQueue into maa-cli task config
+        #[arg(short = 'g', long)]
+        gui: bool,
     },
     /// Show stage activity of given client
     Activity {
@@ -552,6 +555,7 @@ mod test {
                 input,
                 output: None,
                 format: None,
+                gui: false,
             } if input == Path::new("input.toml")
         );
 
@@ -578,6 +582,16 @@ mod test {
                 format: Some(config::Filetype::Yaml),
                 ..
             } if output == Path::new("output.json")
+        );
+
+        assert_matches!(
+            parse_from(["maa", "convert", "-g", "profile.json", "tasks.toml"]).command,
+            Command::Convert {
+                input,
+                output: Some(output),
+                gui: true,
+                ..
+            } if input == Path::new("profile.json") && output == Path::new("tasks.toml")
         );
     }
 

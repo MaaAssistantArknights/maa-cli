@@ -143,7 +143,12 @@ impl<T> FindFile for T where T: FromFile {}
 
 impl<T> FindFileOrDefault for T where T: FromFile + Default {}
 
-pub fn convert(file: &Path, out: Option<&Path>, ft: Option<Filetype>) -> Result<()> {
+pub fn convert(
+    file: &Path,
+    out: Option<&Path>,
+    ft: Option<Filetype>,
+    gui: bool,
+) -> Result<()> {
     use maa_dirs::Ensure;
 
     let ft = ft.or_else(|| {
@@ -152,10 +157,11 @@ pub fn convert(file: &Path, out: Option<&Path>, ft: Option<Filetype>) -> Result<
             .and_then(Filetype::parse_extension)
     });
 
-    let value = MAAValue::from_file(file)?;
+    let mut value = MAAValue::from_file(file)?;
 
-    // TODO: 等flag写了套个if
-    let value = gui::convert(value)?;
+    if gui {
+        value = gui::convert(value)?;
+    }
 
     let Some(format) = ft else {
         bail!("Format not given")
@@ -307,9 +313,9 @@ mod tests {
             let value = object!("z" => 1, "a" => "test", "m" => false);
             Json.write(&input, &value).unwrap();
 
-            super::super::convert(&input, None, Some(Json)).unwrap();
-            super::super::convert(&input, Some(&toml), None).unwrap();
-            super::super::convert(&input, Some(&toml), Some(Yaml)).unwrap();
+            super::super::convert(&input, None, Some(Json), false).unwrap();
+            super::super::convert(&input, Some(&toml), None, false).unwrap();
+            super::super::convert(&input, Some(&toml), Some(Yaml), false).unwrap();
 
             assert_eq!(MAAValue::from_file(&toml).unwrap(), value);
             assert_eq!(MAAValue::from_file(&yaml).unwrap(), value);
@@ -323,7 +329,7 @@ mod tests {
             let value = object!("z" => 1);
             Filetype::Json.write(&input, &value).unwrap();
 
-            assert!(super::super::convert(&input, None, None).is_err());
+            assert!(super::super::convert(&input, None, None, false).is_err());
         }
 
         #[test]
@@ -357,7 +363,7 @@ mod tests {
                 .collect();
             assert_eq!(inner_keys, ["k2", "k1"]);
 
-            super::super::convert(&input, Some(&yaml), None).unwrap();
+            super::super::convert(&input, Some(&yaml), None, false).unwrap();
 
             assert_eq!(
                 std::fs::read_to_string(&yaml).unwrap(),
