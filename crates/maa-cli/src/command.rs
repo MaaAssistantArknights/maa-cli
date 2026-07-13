@@ -191,6 +191,11 @@ pub(crate) enum Command {
         /// Convert a GUI profile TaskQueue into maa-cli task config
         #[arg(short = 'g', long)]
         gui: bool,
+        /// Select a named configuration when converting a multi-profile GUI export
+        ///
+        /// Can also be set with the `MAA_GUI_CONFIG` environment variable.
+        #[arg(long)]
+        gui_config: Option<String>,
     },
     /// Show stage activity of given client
     Activity {
@@ -556,6 +561,7 @@ mod test {
                 output: None,
                 format: None,
                 gui: false,
+                gui_config: None,
             } if input == Path::new("input.toml")
         );
 

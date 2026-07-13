@@ -7,10 +7,15 @@ use maa_value::{
     userinput::{SelectD, UserInput},
 };
 
+const GUI_CONFIG_ENV: &str = "MAA_GUI_CONFIG";
+
 /// Pick one configuration from a multi-profile GUI export.
 ///
 /// Legacy single-config profiles are returned unchanged.
-pub(crate) fn select_configuration(input: MAAValue) -> Result<MAAValue> {
+///
+/// When multiple configurations exist, `gui_config` or [`GUI_CONFIG_ENV`] can be
+/// used to select one without an interactive prompt.
+pub(crate) fn select_configuration(input: MAAValue, gui_config: Option<&str>) -> Result<MAAValue> {
     let Some(configurations_value) = input.get("Configurations") else {
         return Ok(input);
     };
@@ -21,14 +26,28 @@ pub(crate) fn select_configuration(input: MAAValue) -> Result<MAAValue> {
     match configurations.len() {
         0 => bail!("GUI profile has no configuration"),
         1 => Ok(configurations.values().next().unwrap().clone()),
-        _ => pick_configuration(&input, configurations),
+        _ => {
+            let selected_name = resolve_configuration_name(&input, configurations, gui_config)?;
+            configurations
+                .get(&selected_name)
+                .cloned()
+                .with_context(|| format!("GUI configuration {selected_name} not found"))
+        }
     }
 }
 
-fn pick_configuration(
+fn resolve_configuration_name(
     input: &MAAValue,
     configurations: &StringMap<MAAValue>,
-) -> Result<MAAValue> {
+    gui_config: Option<&str>,
+) -> Result<String> {
+    if let Some(name) = gui_config {
+        return Ok(name.to_string());
+    }
+    if let Ok(name) = std::env::var(GUI_CONFIG_ENV) {
+        return Ok(name);
+    }
+
     let names: Vec<&str> = configurations.keys().map(String::as_str).collect();
     let default_index = input
         .get("Current")
@@ -36,16 +55,11 @@ fn pick_configuration(
         .and_then(|current| names.iter().position(|name| *name == current))
         .and_then(|i| NonZero::new(i + 1));
 
-    let selected_name = SelectD::<String>::from_iter(names, default_index)
+    SelectD::<String>::from_iter(names, default_index)
         .context("Failed to build configuration selection")?
         .with_description("a GUI configuration")
         .value()
-        .context("Failed to select GUI configuration")?;
-
-    configurations
-        .get(&selected_name)
-        .cloned()
-        .with_context(|| format!("GUI configuration {selected_name} not found"))
+        .context("Failed to select GUI configuration")
 }
 
 /// Convert a GUI profile `MAAValue` into maa-cli task config shape.
@@ -83,33 +97,38 @@ fn convert_task(task: &MAAValue) -> Result<Option<MAAValue>> {
         "AwardTask" => award::convert_award_task(task),
         "RoguelikeTask" => roguelike::convert_roguelike_task(task),
         "ReclamationTask" => reclamation::convert_reclamation_task(task),
-        _ => Ok(None),
+        type_tag => {
+            log::warn!("Skipping unsupported GUI task type: {type_tag}");
+            Ok(None)
+        }
     }
 }
 
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
-    use std::{fs::File, path::Path};
-
     use super::*;
 
+    macro_rules! gui_task_test {
+        ($name:ident, $converter:path, $task_json:expr, $($expected:tt)*) => {
+            #[test]
+            fn $name() {
+                let task: MAAValue = serde_json::from_str($task_json).unwrap();
+                let actual = $converter(&task).unwrap().unwrap();
+                assert_eq!(
+                    serde_json::to_value(&actual).unwrap(),
+                    serde_json::json!($($expected)*)
+                );
+            }
+        };
+    }
+
     const DEFAULT_PROFILE: &str = include_str!("../../fixtures/gui/default_profile.json");
-
-    fn write_json(dir: &Path, name: &str, content: &str) -> std::path::PathBuf {
-        let path = dir.join(name);
-        std::fs::write(&path, content).unwrap();
-        path
-    }
-
-    fn read_json(path: &Path) -> serde_json::Value {
-        serde_json::from_reader(File::open(path).unwrap()).unwrap()
-    }
 
     #[test]
     fn select_configuration_passes_through_legacy_profile() {
         let input = object!("legacy" => true);
-        assert_eq!(select_configuration(input.clone()).unwrap(), input);
+        assert_eq!(select_configuration(input.clone(), None).unwrap(), input);
     }
 
     #[test]
@@ -120,7 +139,7 @@ mod tests {
             )
         );
         assert_eq!(
-            select_configuration(input).unwrap(),
+            select_configuration(input, None).unwrap(),
             object!("name" => "only")
         );
     }
@@ -135,9 +154,41 @@ mod tests {
             )
         );
         assert_eq!(
-            select_configuration(input).unwrap(),
+            select_configuration(input, None).unwrap(),
             object!("name" => "dev")
         );
+    }
+
+    #[test]
+    fn select_configuration_uses_gui_config_override() {
+        let input = object!(
+            "Current" => "Default",
+            "Configurations" => object!(
+                "Default" => object!("name" => "default"),
+                "Dev" => object!("name" => "dev"),
+            )
+        );
+        assert_eq!(
+            select_configuration(input, Some("Dev")).unwrap(),
+            object!("name" => "dev")
+        );
+    }
+
+    #[test]
+    fn select_configuration_uses_env_override() {
+        let input = object!(
+            "Configurations" => object!(
+                "Default" => object!("name" => "default"),
+                "Dev" => object!("name" => "dev"),
+            )
+        );
+
+        // SAFETY: test-only env var, restored before return.
+        unsafe { std::env::set_var(GUI_CONFIG_ENV, "Dev") };
+        let result = select_configuration(input, None);
+        unsafe { std::env::remove_var(GUI_CONFIG_ENV) };
+
+        assert_eq!(result.unwrap(), object!("name" => "dev"));
     }
 
     #[test]
@@ -155,19 +206,26 @@ mod tests {
     }
 
     #[test]
+    fn unknown_task_type_is_skipped() {
+        let input = object!(
+            "TaskQueue" => vec![
+                object!("$type" => "UserDataUpdateTask", "Name" => "update"),
+                object!("$type" => "StartUpTask", "IsEnable" => true),
+            ]??
+        );
+        let value = convert(input).unwrap();
+        let MAAValue::Array(tasks) = value.get("tasks").unwrap() else {
+            panic!("tasks should be an array");
+        };
+        assert_eq!(tasks.len(), 1);
+        assert_eq!(tasks[0].get("type").unwrap().as_str().unwrap(), "StartUp");
+    }
+
+    #[test]
     fn json_to_json_default_profile() {
-        let dir = tempfile::tempdir().unwrap();
-        let input = write_json(dir.path(), "profile.json", DEFAULT_PROFILE);
-        let output = dir.path().join("tasks.json");
-
-        let input: MAAValue = serde_json::from_reader(File::open(&input).unwrap()).unwrap();
-        let value = convert(select_configuration(input).unwrap()).unwrap();
-        let file = File::create(&output).unwrap();
-        serde_json::to_writer_pretty(file, &value).unwrap();
-
-        assert_eq!(
-            read_json(&output),
-            serde_json::json!({
+        let input: MAAValue = serde_json::from_str(DEFAULT_PROFILE).unwrap();
+        let value = convert(select_configuration(input, None).unwrap()).unwrap();
+        let expected: MAAValue = serde_json::from_value(serde_json::json!({
                 "tasks": [
                     {
                         "type": "StartUp",
@@ -322,49 +380,12 @@ mod tests {
                         }
                     }
                 ]
-            })
-        );
-    }
-}
-
-mod start_up {
-    use anyhow::Result;
-    use maa_value::prelude::*;
-
-    pub(super) fn convert_start_up_task(task: &MAAValue) -> Result<Option<MAAValue>> {
-        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(false))) = task.get("IsEnable") {
-            log::warn!("GUI StartUpTask is disabled but will still be converted");
-        }
-
-        let mut params = MAAValue::default();
-        // -> client_type
-        insert!(params, "client_type" => object!(
-            "alternatives" => vec!["Official", "YoStarEN", "YoStarJP"]??,
-            "description" => "a client type",
-            "deps" => object!("start_game_enabled" => true)
-        ));
-        // -> start_game_enabled
-        insert!(params, "start_game_enabled" => object!(
-            "default" => true,
-            "description" => "start the game"
-        ));
-
-        let item = object!(
-            "type" => "StartUp",
-            "params" => params
-        );
-
-        Ok(Some(item))
+            }))
+            .unwrap();
+        assert_eq!(value, expected);
     }
 
-    #[cfg(test)]
-    #[cfg_attr(coverage_nightly, coverage(off))]
-    mod tests {
-        use std::{fs::File, path::Path};
-
-        use super::*;
-
-        const STARTUP_TASK: &str = r#"{
+    const STARTUP_TASK: &str = r#"{
   "$type": "StartUpTask",
   "AccountName": "",
   "Name": "",
@@ -372,7 +393,7 @@ mod start_up {
   "TaskType": "StartUp"
 }"#;
 
-        const STARTUP_TASK_WITH_ACCOUNT: &str = r#"{
+    const STARTUP_TASK_WITH_ACCOUNT: &str = r#"{
   "$type": "StartUpTask",
   "AccountName": "123****4567",
   "Name": "启动游戏",
@@ -380,183 +401,51 @@ mod start_up {
   "TaskType": "StartUp"
 }"#;
 
-        fn write_task_to_file(dir: &Path, name: &str, task_json: &str) -> std::path::PathBuf {
-            let path = dir.join(name);
-            std::fs::write(&path, task_json).unwrap();
-            path
-        }
-
-        fn read_task_from_file(path: &Path) -> MAAValue {
-            serde_json::from_reader(File::open(path).unwrap()).unwrap()
-        }
-
-        fn write_output_json(output: &Path, value: &MAAValue) {
-            let file = File::create(output).unwrap();
-            serde_json::to_writer_pretty(file, value).unwrap();
-        }
-
-        fn read_json_file(path: &Path) -> serde_json::Value {
-            serde_json::from_reader(File::open(path).unwrap()).unwrap()
-        }
-
-        #[test]
-        fn basic() {
-            let dir = tempfile::tempdir().unwrap();
-            let input = write_task_to_file(dir.path(), "startup.json", STARTUP_TASK);
-            let output = dir.path().join("task.json");
-
-            let task = read_task_from_file(&input);
-            let value = super::convert_start_up_task(&task).unwrap().unwrap();
-            write_output_json(&output, &value);
-
-            assert_eq!(
-                read_json_file(&output),
-                serde_json::json!({
-                    "type": "StartUp",
-                    "params": {
-                        "client_type": {
-                            "alternatives": ["Official", "YoStarEN", "YoStarJP"],
-                            "description": "a client type",
-                            "deps": {
-                                "start_game_enabled": true
-                            }
-                        },
-                        "start_game_enabled": {
-                            "default": true,
-                            "description": "start the game"
-                        }
-                    }
-                })
-            );
-        }
-
-        #[test]
-        fn with_account_and_name() {
-            let dir = tempfile::tempdir().unwrap();
-            let input = write_task_to_file(dir.path(), "startup.json", STARTUP_TASK_WITH_ACCOUNT);
-            let output = dir.path().join("task.json");
-
-            let task = read_task_from_file(&input);
-            let value = super::convert_start_up_task(&task).unwrap().unwrap();
-            write_output_json(&output, &value);
-
-            assert_eq!(
-                read_json_file(&output),
-                serde_json::json!({
-                    "type": "StartUp",
-                    "params": {
-                        "client_type": {
-                            "alternatives": ["Official", "YoStarEN", "YoStarJP"],
-                            "description": "a client type",
-                            "deps": {
-                                "start_game_enabled": true
-                            }
-                        },
-                        "start_game_enabled": {
-                            "default": true,
-                            "description": "start the game"
-                        }
-                    }
-                })
-            );
-        }
-    }
-}
-
-mod fight {
-    use anyhow::Result;
-    use maa_value::prelude::*;
-
-    pub(super) fn convert_fight_task(task: &MAAValue) -> Result<Option<MAAValue>> {
-        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(false))) = task.get("IsEnable") {
-            log::warn!("GUI FightTask is disabled but will still be converted");
-        }
-
-        let mut item = object!("type" => "Fight");
-        // -> task name
-        if let Some(MAAValue::Primitive(MAAPrimitive::String(name))) = task.get("Name") {
-            insert!(item, "name" => name.as_str());
-        }
-
-        let mut weekday_condition = None;
-        // UseWeeklySchedule + WeeklySchedule -> condition
-        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(true))) = task.get("UseWeeklySchedule") {
-            if let Some(MAAValue::Object(map)) = task.get("WeeklySchedule") {
-                const DAYS: [(&str, &str); 7] = [
-                    ("Sunday", "Sun"),
-                    ("Monday", "Mon"),
-                    ("Tuesday", "Tue"),
-                    ("Wednesday", "Wed"),
-                    ("Thursday", "Thu"),
-                    ("Friday", "Fri"),
-                    ("Saturday", "Sat"),
-                ];
-
-                let mut weekdays = Vec::new();
-                for (gui_day, cli_day) in DAYS {
-                    if let Some(MAAValue::Primitive(MAAPrimitive::Bool(true))) = map.get(gui_day)
-                    {
-                        weekdays.push(cli_day);
-                    }
-                }
-
-                weekday_condition = Some(object!(
-                    "type" => "Weekday",
-                    "weekdays" => weekdays??
-                ));
-            }
-        }
-
-        let mut params = MAAValue::default();
-        // StagePlan -> stage
-        if let Some(MAAValue::Array(stages)) = task.get("StagePlan") {
-            let mut stage_list = Vec::new();
-            for stage in stages {
-                if let MAAValue::Primitive(MAAPrimitive::String(stage)) = stage {
-                    stage_list.push(stage.as_str());
-                }
-            }
-            if stage_list.len() == 1 {
-                insert!(params, "stage" => stage_list[0]);
-            } else if !stage_list.is_empty() {
-                insert!(params, "stage" => stage_list??);
-            }
-        }
-        // UseExpiringMedicine + MedicineExpireDays -> medicine_expire_days
-        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(true))) =
-            task.get("UseExpiringMedicine")
+    gui_task_test!(
+        convert_start_up_task_basic,
+        start_up::convert_start_up_task,
+        STARTUP_TASK,
         {
-            if let Some(MAAValue::Primitive(MAAPrimitive::Int(days))) =
-                task.get("MedicineExpireDays")
-            {
-                insert!(params, "medicine_expire_days" => *days);
+            "type": "StartUp",
+            "params": {
+                "client_type": {
+                    "alternatives": ["Official", "YoStarEN", "YoStarJP"],
+                    "description": "a client type",
+                    "deps": {
+                        "start_game_enabled": true
+                    }
+                },
+                "start_game_enabled": {
+                    "default": true,
+                    "description": "start the game"
+                }
             }
         }
+    );
 
-        if let Some(condition) = weekday_condition {
-            insert!(item, "strategy" => "merge");
-            insert!(
-                item,
-                "variants" => vec![object!(
-                    "condition" => condition,
-                    "params" => params
-                )]??
-            );
-        } else {
-            insert!(item, "params" => params);
+    gui_task_test!(
+        convert_start_up_task_with_account_and_name,
+        start_up::convert_start_up_task,
+        STARTUP_TASK_WITH_ACCOUNT,
+        {
+            "type": "StartUp",
+            "params": {
+                "client_type": {
+                    "alternatives": ["Official", "YoStarEN", "YoStarJP"],
+                    "description": "a client type",
+                    "deps": {
+                        "start_game_enabled": true
+                    }
+                },
+                "start_game_enabled": {
+                    "default": true,
+                    "description": "start the game"
+                }
+            }
         }
+    );
 
-        Ok(Some(item))
-    }
-
-    #[cfg(test)]
-    #[cfg_attr(coverage_nightly, coverage(off))]
-    mod tests {
-        use std::{fs::File, path::Path};
-
-        use super::*;
-
-        const FIGHT_TASK: &str = r#"{
+    const FIGHT_TASK: &str = r#"{
   "$type": "FightTask",
   "UseMedicine": false,
   "MedicineCount": 0,
@@ -575,7 +464,7 @@ mod fight {
   "TaskType": "Fight"
 }"#;
 
-        const DISABLED_FIGHT_TASK: &str = r#"{
+    const DISABLED_FIGHT_TASK: &str = r#"{
   "$type": "FightTask",
   "UseMedicine": false,
   "MedicineCount": 0,
@@ -594,7 +483,7 @@ mod fight {
   "TaskType": "Fight"
 }"#;
 
-        const WEEKLY_LS6_TASK: &str = r#"{
+    const WEEKLY_LS6_TASK: &str = r#"{
   "$type": "FightTask",
   "UseMedicine": false,
   "MedicineCount": 0,
@@ -635,7 +524,7 @@ mod fight {
   "TaskType": "Fight"
 }"#;
 
-        const WEEKLY_CE6_TASK: &str = r#"{
+    const WEEKLY_CE6_TASK: &str = r#"{
   "$type": "FightTask",
   "UseMedicine": false,
   "MedicineCount": 0,
@@ -676,132 +565,192 @@ mod fight {
   "TaskType": "Fight"
 }"#;
 
-        fn write_task_to_file(dir: &Path, name: &str, task_json: &str) -> std::path::PathBuf {
-            let path = dir.join(name);
-            std::fs::write(&path, task_json).unwrap();
-            path
+    gui_task_test!(
+        convert_fight_task_basic,
+        fight::convert_fight_task,
+        FIGHT_TASK,
+        {
+            "type": "Fight",
+            "name": "日常经验本",
+            "params": {
+                "stage": "LS-6"
+            }
         }
+    );
 
-        fn read_task_from_file(path: &Path) -> MAAValue {
-            serde_json::from_reader(File::open(path).unwrap()).unwrap()
+    gui_task_test!(
+        convert_fight_task_when_disabled,
+        fight::convert_fight_task,
+        DISABLED_FIGHT_TASK,
+        {
+            "type": "Fight",
+            "name": "日常经验本",
+            "params": {
+                "stage": "LS-6"
+            }
         }
+    );
 
-        fn write_output_json(output: &Path, value: &MAAValue) {
-            let file = File::create(output).unwrap();
-            serde_json::to_writer_pretty(file, value).unwrap();
-        }
-
-        fn read_json_file(path: &Path) -> serde_json::Value {
-            serde_json::from_reader(File::open(path).unwrap()).unwrap()
-        }
-
-        #[test]
-        fn basic() {
-            let dir = tempfile::tempdir().unwrap();
-            let input = write_task_to_file(dir.path(), "fight.json", FIGHT_TASK);
-            let output = dir.path().join("task.json");
-
-            let task = read_task_from_file(&input);
-            let value = super::convert_fight_task(&task).unwrap().unwrap();
-            write_output_json(&output, &value);
-
-            assert_eq!(
-                read_json_file(&output),
-                serde_json::json!({
-                    "type": "Fight",
-                    "name": "日常经验本",
+    gui_task_test!(
+        convert_fight_task_weekly_schedule_ls6,
+        fight::convert_fight_task,
+        WEEKLY_LS6_TASK,
+        {
+            "type": "Fight",
+            "name": "日常经验本",
+            "strategy": "merge",
+            "variants": [
+                {
+                    "condition": {
+                        "type": "Weekday",
+                        "weekdays": ["Mon", "Wed", "Fri"]
+                    },
                     "params": {
+                        "medicine_expire_days": 2,
                         "stage": "LS-6"
                     }
-                })
-            );
+                }
+            ]
         }
+    );
 
-        #[test]
-        fn when_disabled() {
-            let dir = tempfile::tempdir().unwrap();
-            let input = write_task_to_file(dir.path(), "fight.json", DISABLED_FIGHT_TASK);
-            let output = dir.path().join("task.json");
-
-            let task = read_task_from_file(&input);
-            let value = super::convert_fight_task(&task).unwrap().unwrap();
-            write_output_json(&output, &value);
-
-            assert_eq!(
-                read_json_file(&output),
-                serde_json::json!({
-                    "type": "Fight",
-                    "name": "日常经验本",
+    gui_task_test!(
+        convert_fight_task_weekly_schedule_ce6,
+        fight::convert_fight_task,
+        WEEKLY_CE6_TASK,
+        {
+            "type": "Fight",
+            "name": "日常龙门币",
+            "strategy": "merge",
+            "variants": [
+                {
+                    "condition": {
+                        "type": "Weekday",
+                        "weekdays": ["Tue", "Thu", "Sat"]
+                    },
                     "params": {
-                        "stage": "LS-6"
+                        "medicine_expire_days": 2,
+                        "stage": "CE-6"
                     }
-                })
-            );
+                }
+            ]
+        }
+    );
+}
+
+mod start_up {
+    use anyhow::Result;
+    use maa_value::prelude::*;
+
+    pub(super) fn convert_start_up_task(task: &MAAValue) -> Result<Option<MAAValue>> {
+        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(false))) = task.get("IsEnable") {
+            log::warn!("GUI StartUpTask is disabled but will still be converted");
         }
 
-        #[test]
-        fn weekly_schedule_ls6() {
-            let dir = tempfile::tempdir().unwrap();
-            let input = write_task_to_file(dir.path(), "fight.json", WEEKLY_LS6_TASK);
-            let output = dir.path().join("task.json");
+        let mut params = MAAValue::default();
+        // -> client_type
+        insert!(params, "client_type" => object!(
+            "alternatives" => vec!["Official", "YoStarEN", "YoStarJP"]??,
+            "description" => "a client type",
+            "deps" => object!("start_game_enabled" => true)
+        ));
+        // -> start_game_enabled
+        insert!(params, "start_game_enabled" => object!(
+            "default" => true,
+            "description" => "start the game"
+        ));
 
-            let task = read_task_from_file(&input);
-            let value = super::convert_fight_task(&task).unwrap().unwrap();
-            write_output_json(&output, &value);
+        let item = object!(
+            "type" => "StartUp",
+            "params" => params
+        );
 
-            assert_eq!(
-                read_json_file(&output),
-                serde_json::json!({
-                    "type": "Fight",
-                    "name": "日常经验本",
-                    "strategy": "merge",
-                    "variants": [
-                        {
-                            "condition": {
-                                "type": "Weekday",
-                                "weekdays": ["Mon", "Wed", "Fri"]
-                            },
-                            "params": {
-                                "medicine_expire_days": 2,
-                                "stage": "LS-6"
-                            }
-                        }
-                    ]
-                })
-            );
+        Ok(Some(item))
+    }
+}
+
+mod fight {
+    use anyhow::Result;
+    use maa_value::prelude::*;
+
+    pub(super) fn convert_fight_task(task: &MAAValue) -> Result<Option<MAAValue>> {
+        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(false))) = task.get("IsEnable") {
+            log::warn!("GUI FightTask is disabled but will still be converted");
         }
 
-        #[test]
-        fn weekly_schedule_ce6() {
-            let dir = tempfile::tempdir().unwrap();
-            let input = write_task_to_file(dir.path(), "fight.json", WEEKLY_CE6_TASK);
-            let output = dir.path().join("task.json");
-
-            let task = read_task_from_file(&input);
-            let value = super::convert_fight_task(&task).unwrap().unwrap();
-            write_output_json(&output, &value);
-
-            assert_eq!(
-                read_json_file(&output),
-                serde_json::json!({
-                    "type": "Fight",
-                    "name": "日常龙门币",
-                    "strategy": "merge",
-                    "variants": [
-                        {
-                            "condition": {
-                                "type": "Weekday",
-                                "weekdays": ["Tue", "Thu", "Sat"]
-                            },
-                            "params": {
-                                "medicine_expire_days": 2,
-                                "stage": "CE-6"
-                            }
-                        }
-                    ]
-                })
-            );
+        let mut item = object!("type" => "Fight");
+        // -> task name
+        if let Some(MAAValue::Primitive(MAAPrimitive::String(name))) = task.get("Name") {
+            insert!(item, "name" => name.as_str());
         }
+
+        let mut weekday_condition = None;
+        // UseWeeklySchedule + WeeklySchedule -> condition
+        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(true))) = task.get("UseWeeklySchedule") {
+            if let Some(MAAValue::Object(map)) = task.get("WeeklySchedule") {
+                const DAYS: [(&str, &str); 7] = [
+                    ("Sunday", "Sun"),
+                    ("Monday", "Mon"),
+                    ("Tuesday", "Tue"),
+                    ("Wednesday", "Wed"),
+                    ("Thursday", "Thu"),
+                    ("Friday", "Fri"),
+                    ("Saturday", "Sat"),
+                ];
+
+                let mut weekdays = Vec::new();
+                for (gui_day, cli_day) in DAYS {
+                    if let Some(MAAValue::Primitive(MAAPrimitive::Bool(true))) = map.get(gui_day) {
+                        weekdays.push(cli_day);
+                    }
+                }
+
+                weekday_condition = Some(object!(
+                    "type" => "Weekday",
+                    "weekdays" => weekdays??
+                ));
+            }
+        }
+
+        let mut params = MAAValue::default();
+        // StagePlan -> stage
+        if let Some(MAAValue::Array(stages)) = task.get("StagePlan") {
+            let mut stage_list = Vec::new();
+            for stage in stages {
+                if let MAAValue::Primitive(MAAPrimitive::String(stage)) = stage {
+                    stage_list.push(stage.as_str());
+                }
+            }
+            if stage_list.len() == 1 {
+                insert!(params, "stage" => stage_list[0]);
+            } else if !stage_list.is_empty() {
+                insert!(params, "stage" => stage_list??);
+            }
+        }
+        // UseExpiringMedicine + MedicineExpireDays -> medicine_expire_days
+        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(true))) = task.get("UseExpiringMedicine")
+        {
+            if let Some(MAAValue::Primitive(MAAPrimitive::Int(days))) =
+                task.get("MedicineExpireDays")
+            {
+                insert!(params, "medicine_expire_days" => *days);
+            }
+        }
+
+        if let Some(condition) = weekday_condition {
+            insert!(item, "strategy" => "merge");
+            insert!(
+                item,
+                "variants" => vec![object!(
+                    "condition" => condition,
+                    "params" => params
+                )]??
+            );
+        } else {
+            insert!(item, "params" => params);
+        }
+
+        Ok(Some(item))
     }
 }
 
@@ -837,8 +786,7 @@ mod infrast {
             let mut facility = Vec::new();
             for room in rooms {
                 if let MAAValue::Object(map) = room {
-                    if let Some(MAAValue::Primitive(MAAPrimitive::String(room))) = map.get("Room")
-                    {
+                    if let Some(MAAValue::Primitive(MAAPrimitive::String(room))) = map.get("Room") {
                         facility.push(room.as_str());
                     }
                 }
@@ -848,14 +796,11 @@ mod infrast {
             }
         }
         // UsesOfDrones -> drones
-        if let Some(MAAValue::Primitive(MAAPrimitive::String(drones))) = task.get("UsesOfDrones")
-        {
+        if let Some(MAAValue::Primitive(MAAPrimitive::String(drones))) = task.get("UsesOfDrones") {
             insert!(params, "drones" => drones.as_str());
         }
         // DormThreshold -> threshold
-        if let Some(MAAValue::Primitive(MAAPrimitive::Int(threshold))) =
-            task.get("DormThreshold")
-        {
+        if let Some(MAAValue::Primitive(MAAPrimitive::Int(threshold))) = task.get("DormThreshold") {
             insert!(params, "threshold" => *threshold as f32 / 100.0);
         }
         // OriginiumShardAutoReplenishment -> replenish
@@ -871,8 +816,7 @@ mod infrast {
             insert!(params, "dorm_notstationed_enabled" => *enabled);
         }
         // DormTrustEnabled -> dorm_trust_enabled
-        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(enabled))) =
-            task.get("DormTrustEnabled")
+        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(enabled))) = task.get("DormTrustEnabled")
         {
             insert!(params, "dorm_trust_enabled" => *enabled);
         }
@@ -899,8 +843,7 @@ mod infrast {
             }
         }
         // PlanSelect -> plan_index
-        if let Some(MAAValue::Primitive(MAAPrimitive::Int(plan_index))) = task.get("PlanSelect")
-        {
+        if let Some(MAAValue::Primitive(MAAPrimitive::Int(plan_index))) = task.get("PlanSelect") {
             if *plan_index >= 0 {
                 insert!(params, "plan_index" => *plan_index);
             }
@@ -936,13 +879,11 @@ mod recruit {
             insert!(params, "extra_tags_mode" => *mode);
         }
         // RefreshLevel3 -> refresh
-        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(refresh))) = task.get("RefreshLevel3")
-        {
+        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(refresh))) = task.get("RefreshLevel3") {
             insert!(params, "refresh" => *refresh);
         }
         // ForceRefresh -> expedite
-        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(expedite))) = task.get("ForceRefresh")
-        {
+        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(expedite))) = task.get("ForceRefresh") {
             insert!(params, "expedite" => *expedite);
         }
         // LevelXChoose -> select / confirm
@@ -972,9 +913,7 @@ mod recruit {
             insert!(params, "recruitment_time" => recruitment_time);
         }
         // PreferTagEnabled + Level3PreferTags -> first_tags
-        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(true))) =
-            task.get("PreferTagEnabled")
-        {
+        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(true))) = task.get("PreferTagEnabled") {
             if let Some(MAAValue::Array(tags)) = task.get("Level3PreferTags") {
                 let mut first_tags = Vec::new();
                 for tag in tags {
@@ -988,8 +927,7 @@ mod recruit {
             }
         }
         // PreserveTagEnabled + PreserveTagList -> preserve_tags
-        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(true))) =
-            task.get("PreserveTagEnabled")
+        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(true))) = task.get("PreserveTagEnabled")
         {
             if let Some(MAAValue::Array(tags)) = task.get("PreserveTagList") {
                 let mut preserve_tags = Vec::new();
@@ -1030,8 +968,7 @@ mod mall {
             insert!(params, "shopping" => *shopping);
         }
         // CreditFight -> credit_fight
-        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(credit_fight))) =
-            task.get("CreditFight")
+        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(credit_fight))) = task.get("CreditFight")
         {
             insert!(params, "credit_fight" => *credit_fight);
         }
@@ -1049,20 +986,14 @@ mod mall {
         }
         // FirstList -> buy_first
         if let Some(MAAValue::Primitive(MAAPrimitive::String(list))) = task.get("FirstList") {
-            let buy_first: Vec<_> = list
-                .split(';')
-                .filter(|item| !item.is_empty())
-                .collect();
+            let buy_first: Vec<_> = list.split(';').filter(|item| !item.is_empty()).collect();
             if !buy_first.is_empty() {
                 insert!(params, "buy_first" => buy_first??);
             }
         }
         // BlackList -> blacklist
         if let Some(MAAValue::Primitive(MAAPrimitive::String(list))) = task.get("BlackList") {
-            let blacklist: Vec<_> = list
-                .split(';')
-                .filter(|item| !item.is_empty())
-                .collect();
+            let blacklist: Vec<_> = list.split(';').filter(|item| !item.is_empty()).collect();
             if !blacklist.is_empty() {
                 insert!(params, "blacklist" => blacklist??);
             }
@@ -1080,8 +1011,7 @@ mod mall {
             insert!(params, "only_buy_discount" => *only_discount);
         }
         // ReserveMaxCredit -> reserve_max_credit
-        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(reserve))) =
-            task.get("ReserveMaxCredit")
+        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(reserve))) = task.get("ReserveMaxCredit")
         {
             insert!(params, "reserve_max_credit" => *reserve);
         }
@@ -1232,8 +1162,7 @@ mod roguelike {
             insert!(params, "stop_at_max_level" => *stop_at_max_level);
         }
         // UseSupport -> use_support
-        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(use_support))) = task.get("UseSupport")
-        {
+        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(use_support))) = task.get("UseSupport") {
             insert!(params, "use_support" => *use_support);
         }
         // UseSupportNonFriend -> use_nonfriend_support

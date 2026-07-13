@@ -108,7 +108,14 @@ fn main() -> Result<()> {
             output,
             format,
             gui,
-        } => config::convert(&input, output.as_deref(), format, gui)?,
+            gui_config,
+        } => config::convert(
+            &input,
+            output.as_deref(),
+            format,
+            gui,
+            gui_config.as_deref(),
+        )?,
         Command::Activity { client } => activity::display_stage_activity(client)?,
         Command::Remainder { divisor, timezone } => {
             use crate::config::task::{TimeOffset, remainder_of_day_mod};
