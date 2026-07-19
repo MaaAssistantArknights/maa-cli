@@ -22,6 +22,7 @@ use crate::{
     config::{
         FindFile,
         asst::AsstConfig,
+        cli::CLI_CONFIG,
         task::{TaskConfig, TaskConfigTemplate},
     },
     installer,
@@ -127,7 +128,9 @@ where
     F: FnOnce(&AsstConfig) -> Result<TaskConfig>,
 {
     // Auto update hot update resource
-    installer::hot_update::update()?;
+    if CLI_CONFIG.hot_update_config().auto_update() {
+        installer::hot_update::update()?;
+    }
     installer::resource::update(true)?;
 
     // Load asst config
