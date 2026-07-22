@@ -73,13 +73,13 @@ Rust 개발자는 `cargo`를 통해 maa-cli를 직접 컴파일하여 설치할 
 - 안정 버전:
 
   ```bash
-  cargo install --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --tag stable --locked
+  cargo install maa-cli --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --tag stable --locked
   ```
 
 - 개발 버전:
 
   ```bash
-  cargo install --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --locked
+  cargo install maa-cli --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --locked
   ```
 
 ### 컴파일 옵션

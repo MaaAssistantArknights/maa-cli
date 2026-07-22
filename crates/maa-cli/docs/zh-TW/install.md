@@ -73,13 +73,13 @@ Rust 开发者可以通过 `cargo` 自行编译安装 maa-cli：
 - 稳定版本：
 
   ```bash
-  cargo install --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --tag stable --locked
+  cargo install maa-cli --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --tag stable --locked
   ```
 
 - 开发版本：
 
   ```bash
-  cargo install --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --locked
+  cargo install maa-cli --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --locked
   ```
 
 ### 编译选项

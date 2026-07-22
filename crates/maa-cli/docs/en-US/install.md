@@ -69,13 +69,13 @@ Rust developers can compile and install maa-cli themselves via `cargo`:
 - Stable version:
 
   ```bash
-  cargo install --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --tag stable --locked
+  cargo install maa-cli --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --tag stable --locked
   ```
 
 - Development version:
 
   ```bash
-  cargo install --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --locked
+  cargo install maa-cli --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --locked
   ```
 
 ### Features
