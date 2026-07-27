@@ -24,7 +24,7 @@ jobs:
       docs: ${{ steps.resolve.outputs.docs }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Detect relevant paths
         if: >-
           github.event_name == 'pull_request' ||
@@ -65,7 +65,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Run typos
         uses: crate-ci/typos@v1
 
@@ -76,7 +76,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Run markdownlint
         uses: DavidAnson/markdownlint-cli2-action@v23
         with:
@@ -93,7 +93,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Setup Lychee Cache
         uses: actions/cache@v5
         with:
