@@ -21,10 +21,6 @@
 
 - Bump tar from 0.4.45 to 0.4.46 by [@dependabot](https://github.com/dependabot) in [#551](https://github.com/MaaAssistantArknights/maa-cli/pull/551)
 
-### Miscellaneous
-
-- Update changelog for 0.7.4 by [@github-actions](https://github.com/github-actions)
-
 **Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.7.4...v0.7.5>
 
 ## Release 0.7.4
