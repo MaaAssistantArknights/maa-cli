@@ -6,6 +6,7 @@ on:
   pull_request:
     branches: ["main"]
   merge_group:
+    branches: ["main"]
     types: [checks_requested]
 
 env:
@@ -25,28 +26,27 @@ jobs:
     name: Detect code changes
     runs-on: ubuntu-latest
     outputs:
-      code: >-
-        ${{
-          (github.event_name != 'pull_request' && github.event_name != 'push') ||
-          steps.filter.outputs.code == 'true'
-        }}
+      code: ${{ steps.filter.outputs.code }}
     steps:
       - name: Checkout
-        if: github.event_name == 'push'
         uses: actions/checkout@v6
       - name: Detect relevant paths
-        if: github.event_name == 'pull_request' || github.event_name == 'push'
         id: filter
         uses: dorny/paths-filter@v4
         with:
-          base: ${{ github.ref }}
           filters: |
             code:
               - "crates/*/src/**"
+              - "crates/*/tests/**"
+              - "crates/*/fixtures/**"
+              - "crates/*/config_examples/**"
               - "crates/*/Cargo.toml"
               - "crates/*/build.rs"
               - "xtask/**"
+              - "Cargo.toml"
               - "Cargo.lock"
+              - "deny.toml"
+              - "rustfmt.toml"
               - "codecov.yml"
               - ".cargo/config.toml"
               - ".github/workflows/ci.yml"

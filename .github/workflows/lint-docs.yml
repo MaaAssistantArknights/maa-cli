@@ -6,6 +6,7 @@ on:
   pull_request:
     branches: ["main"]
   merge_group:
+    branches: ["main"]
     types: [checks_requested]
   schedule:
     - cron: "44 7 * * 2"
@@ -20,25 +21,42 @@ jobs:
     name: Detect documentation changes
     runs-on: ubuntu-latest
     outputs:
-      docs: >-
-        ${{
-          (github.event_name != 'pull_request' && github.event_name != 'push') ||
-          steps.filter.outputs.docs == 'true'
-        }}
+      docs: ${{ steps.resolve.outputs.docs }}
     steps:
       - name: Checkout
-        if: github.event_name == 'push'
         uses: actions/checkout@v6
       - name: Detect relevant paths
-        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        if: >-
+          github.event_name == 'pull_request' ||
+          github.event_name == 'push' ||
+          github.event_name == 'merge_group'
         id: filter
         uses: dorny/paths-filter@v4
         with:
-          base: ${{ github.ref }}
           filters: |
             docs:
               - "**/*.md"
+              - ".markdownlint.yaml"
               - ".github/workflows/lint-docs.yml"
+      - name: Resolve documentation changes
+        id: resolve
+        env:
+          FILTER_RESULT: ${{ steps.filter.outputs.docs }}
+        run: |
+          case "$GITHUB_EVENT_NAME" in
+            pull_request | push | merge_group)
+              if [[ "$FILTER_RESULT" != "true" && "$FILTER_RESULT" != "false" ]]; then
+                echo "Invalid documentation filter result: $FILTER_RESULT"
+                exit 1
+              fi
+              docs="$FILTER_RESULT"
+              ;;
+            *)
+              docs=true
+              ;;
+          esac
+
+          echo "docs=$docs" >> "$GITHUB_OUTPUT"
 
   typos:
     name: Typos
