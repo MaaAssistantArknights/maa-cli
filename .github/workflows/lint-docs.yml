@@ -5,22 +5,40 @@ on:
     branches: ["main"]
     paths:
       - "**/*.md"
-      - ".github/workflows/lint-markdown.yml"
+      - ".github/workflows/lint-docs.yml"
   pull_request:
     branches: ["main"]
-    paths:
-      - "**/*.md"
-      - ".github/workflows/lint-markdown.yml"
+  merge_group:
+    types: [checks_requested]
   schedule:
     - cron: "44 7 * * 2"
   workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
+  changes:
+    name: Detect documentation changes
+    runs-on: ubuntu-latest
+    outputs:
+      docs: ${{ github.event_name != 'pull_request' || steps.filter.outputs.docs == 'true' }}
+    steps:
+      - name: Detect relevant paths
+        if: github.event_name == 'pull_request'
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            docs:
+              - "**/*.md"
+              - ".github/workflows/lint-docs.yml"
+
   typos:
     name: Typos
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -30,6 +48,8 @@ jobs:
 
   markdownlint:
     name: Markdownlint
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -42,8 +62,11 @@ jobs:
 
   deadlinks:
     name: Dead Links
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pull-requests: write
     steps:
       - name: Checkout
@@ -67,3 +90,41 @@ jobs:
           message: |
             Dead links found in the documentation. Please fix them.
             Details: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+  required:
+    name: Docs Required
+    if: always()
+    needs:
+      - changes
+      - typos
+      - markdownlint
+      - deadlinks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify required jobs
+        env:
+          DOCS_CHANGED: ${{ needs.changes.outputs.docs }}
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          TYPOS_RESULT: ${{ needs.typos.result }}
+          MARKDOWNLINT_RESULT: ${{ needs.markdownlint.result }}
+          DEADLINKS_RESULT: ${{ needs.deadlinks.result }}
+        run: |
+          if [[ "$CHANGES_RESULT" != "success" ]]; then
+            echo "Change detection failed"
+            exit 1
+          fi
+
+          if [[ "$DOCS_CHANGED" != "true" ]]; then
+            echo "No documentation changes require linting"
+            exit 0
+          fi
+
+          for result in \
+            "$TYPOS_RESULT" \
+            "$MARKDOWNLINT_RESULT" \
+            "$DEADLINKS_RESULT"; do
+            if [[ "$result" != "success" ]]; then
+              echo "A required documentation job did not succeed: $result"
+              exit 1
+            fi
+          done
