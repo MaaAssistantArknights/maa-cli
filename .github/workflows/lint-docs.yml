@@ -3,24 +3,65 @@ name: Lint Markdown files
 on:
   push:
     branches: ["main"]
-    paths:
-      - "**/*.md"
-      - ".github/workflows/lint-markdown.yml"
   pull_request:
     branches: ["main"]
-    paths:
-      - "**/*.md"
-      - ".github/workflows/lint-markdown.yml"
+  merge_group:
+    branches: ["main"]
+    types: [checks_requested]
   schedule:
     - cron: "44 7 * * 2"
   workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
+  changes:
+    name: Detect documentation changes
+    runs-on: ubuntu-latest
+    outputs:
+      docs: ${{ steps.resolve.outputs.docs }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Detect relevant paths
+        if: >-
+          github.event_name == 'pull_request' ||
+          github.event_name == 'push' ||
+          github.event_name == 'merge_group'
+        id: filter
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            docs:
+              - "**/*.md"
+              - ".markdownlint.yaml"
+              - ".github/workflows/lint-docs.yml"
+      - name: Resolve documentation changes
+        id: resolve
+        env:
+          FILTER_RESULT: ${{ steps.filter.outputs.docs }}
+        run: |
+          case "$GITHUB_EVENT_NAME" in
+            pull_request | push | merge_group)
+              if [[ "$FILTER_RESULT" != "true" && "$FILTER_RESULT" != "false" ]]; then
+                echo "Invalid documentation filter result: $FILTER_RESULT"
+                exit 1
+              fi
+              docs="$FILTER_RESULT"
+              ;;
+            *)
+              docs=true
+              ;;
+          esac
+
+          echo "docs=$docs" >> "$GITHUB_OUTPUT"
+
   typos:
     name: Typos
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -30,6 +71,8 @@ jobs:
 
   markdownlint:
     name: Markdownlint
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -42,8 +85,11 @@ jobs:
 
   deadlinks:
     name: Dead Links
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pull-requests: write
     steps:
       - name: Checkout
@@ -67,3 +113,41 @@ jobs:
           message: |
             Dead links found in the documentation. Please fix them.
             Details: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+  required:
+    name: Docs Required
+    if: always()
+    needs:
+      - changes
+      - typos
+      - markdownlint
+      - deadlinks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify required jobs
+        env:
+          DOCS_CHANGED: ${{ needs.changes.outputs.docs }}
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          TYPOS_RESULT: ${{ needs.typos.result }}
+          MARKDOWNLINT_RESULT: ${{ needs.markdownlint.result }}
+          DEADLINKS_RESULT: ${{ needs.deadlinks.result }}
+        run: |
+          if [[ "$CHANGES_RESULT" != "success" ]]; then
+            echo "Change detection failed"
+            exit 1
+          fi
+
+          if [[ "$DOCS_CHANGED" != "true" ]]; then
+            echo "No documentation changes require linting"
+            exit 0
+          fi
+
+          for result in \
+            "$TYPOS_RESULT" \
+            "$MARKDOWNLINT_RESULT" \
+            "$DEADLINKS_RESULT"; do
+            if [[ "$result" != "success" ]]; then
+              echo "A required documentation job did not succeed: $result"
+              exit 1
+            fi
+          done
