@@ -3,15 +3,6 @@ name: CI
 on:
   push:
     branches: ["main"]
-    paths:
-      - "crates/*/src/**"
-      - "crates/*/Cargo.toml"
-      - "crates/*/build.rs"
-      - "xtask/**"
-      - "Cargo.lock"
-      - "codecov.yml"
-      - ".cargo/config.toml"
-      - ".github/workflows/ci.yml"
   pull_request:
     branches: ["main"]
   merge_group:
@@ -34,13 +25,21 @@ jobs:
     name: Detect code changes
     runs-on: ubuntu-latest
     outputs:
-      code: ${{ github.event_name != 'pull_request' || steps.filter.outputs.code == 'true' }}
+      code: >-
+        ${{
+          (github.event_name != 'pull_request' && github.event_name != 'push') ||
+          steps.filter.outputs.code == 'true'
+        }}
     steps:
+      - name: Checkout
+        if: github.event_name == 'push'
+        uses: actions/checkout@v6
       - name: Detect relevant paths
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
         id: filter
         uses: dorny/paths-filter@v3
         with:
+          base: ${{ github.ref }}
           filters: |
             code:
               - "crates/*/src/**"

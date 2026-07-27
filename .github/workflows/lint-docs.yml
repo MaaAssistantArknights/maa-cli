@@ -3,9 +3,6 @@ name: Lint Markdown files
 on:
   push:
     branches: ["main"]
-    paths:
-      - "**/*.md"
-      - ".github/workflows/lint-docs.yml"
   pull_request:
     branches: ["main"]
   merge_group:
@@ -23,13 +20,21 @@ jobs:
     name: Detect documentation changes
     runs-on: ubuntu-latest
     outputs:
-      docs: ${{ github.event_name != 'pull_request' || steps.filter.outputs.docs == 'true' }}
+      docs: >-
+        ${{
+          (github.event_name != 'pull_request' && github.event_name != 'push') ||
+          steps.filter.outputs.docs == 'true'
+        }}
     steps:
+      - name: Checkout
+        if: github.event_name == 'push'
+        uses: actions/checkout@v6
       - name: Detect relevant paths
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
         id: filter
         uses: dorny/paths-filter@v3
         with:
+          base: ${{ github.ref }}
           filters: |
             docs:
               - "**/*.md"
