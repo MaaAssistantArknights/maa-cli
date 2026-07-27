@@ -469,7 +469,7 @@ impl CopilotFile {
                     // (os error 5) when the file is locked by another process.  If another
                     // thread/process already wrote the cache file we can safely move on.
                     #[cfg(windows)]
-                    if let Err(e) = crate::atomic_fs::write(&json_file, &content) {
+                    if let Err(e) = maa_atomic_fs::write(&json_file, &content) {
                         if e.kind() == std::io::ErrorKind::PermissionDenied
                             && let Ok(m) = fs::metadata(&json_file)
                             && m.is_file()
@@ -487,7 +487,7 @@ impl CopilotFile {
                     }
 
                     #[cfg(not(windows))]
-                    crate::atomic_fs::write(&json_file, &content).with_context(|| {
+                    maa_atomic_fs::write(&json_file, &content).with_context(|| {
                         format!(
                             "Failed to write downloaded copilot cache file to {}",
                             json_file.display()
