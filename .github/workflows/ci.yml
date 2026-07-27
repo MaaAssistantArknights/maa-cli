@@ -3,26 +3,11 @@ name: CI
 on:
   push:
     branches: ["main"]
-    paths:
-      - "crates/*/src/**"
-      - "crates/*/Cargo.toml"
-      - "crates/*/build.rs"
-      - "xtask/**"
-      - "Cargo.lock"
-      - "codecov.yml"
-      - ".cargo/config.toml"
-      - ".github/workflows/ci.yml"
   pull_request:
     branches: ["main"]
-    paths:
-      - "crates/*/src/**"
-      - "crates/*/Cargo.toml"
-      - "crates/*/build.rs"
-      - "xtask/**"
-      - "Cargo.lock"
-      - "codecov.yml"
-      - ".cargo/config.toml"
-      - ".github/workflows/ci.yml"
+  merge_group:
+    branches: ["main"]
+    types: [checks_requested]
 
 env:
   RUST_BACKTRACE: full
@@ -30,27 +15,61 @@ env:
 
 permissions:
   contents: read
+  pull-requests: read
 
 defaults:
   run:
     shell: bash
 
 jobs:
+  changes:
+    name: Detect code changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Detect relevant paths
+        id: filter
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            code:
+              - "crates/*/src/**"
+              - "crates/*/tests/**"
+              - "crates/*/fixtures/**"
+              - "crates/*/config_examples/**"
+              - "crates/*/Cargo.toml"
+              - "crates/*/build.rs"
+              - "xtask/**"
+              - "Cargo.toml"
+              - "Cargo.lock"
+              - "deny.toml"
+              - "rustfmt.toml"
+              - "codecov.yml"
+              - ".cargo/config.toml"
+              - ".github/workflows/ci.yml"
+
   typos:
     name: Lint (typos)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Run typos
         uses: crate-ci/typos@v1
 
   format:
     name: Lint (format)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Format Check
         run: |
           rustup toolchain install nightly --profile minimal --component rustfmt
@@ -58,10 +77,12 @@ jobs:
 
   deny:
     name: Lint (cargo deny)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Install cargo-deny
         uses: taiki-e/install-action@v2
         with:
@@ -71,6 +92,8 @@ jobs:
 
   build:
     name: Build and Test (${{ matrix.runner }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -81,7 +104,7 @@ jobs:
           - macos-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
       - name: Test
@@ -90,6 +113,8 @@ jobs:
 
   build-windows:
     name: Build and Test (Windows, ${{ matrix.runner }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
@@ -97,7 +122,7 @@ jobs:
           - windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
       - name: Test
@@ -105,7 +130,8 @@ jobs:
 
   build-tier2:
     name: Build and Test (Tier 2, ${{ matrix.runner }})
-    needs: [build]
+    needs: [changes, build]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -115,7 +141,7 @@ jobs:
           - windows-11-arm
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
       - name: Test
@@ -125,7 +151,8 @@ jobs:
 
   build-no-default-features:
     name: Build and Test (feature=${{ matrix.feature }})
-    needs: [build]
+    needs: [changes, build]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
@@ -135,7 +162,7 @@ jobs:
           - git2 # disabled both cli_installer and core_installer, used by appimage
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Test
         run: |
           cargo x test --no-all-features --no-core-tests \
@@ -143,6 +170,8 @@ jobs:
 
   build-core:
     name: Build and Test (core binding, dynamic, ${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -151,7 +180,7 @@ jobs:
           - ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2
         with:
@@ -171,7 +200,8 @@ jobs:
 
   coverage:
     name: Coverage
-    needs: [build]
+    needs: [changes, build]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -181,7 +211,7 @@ jobs:
           - macos-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2
         with:
@@ -198,11 +228,12 @@ jobs:
 
   coverage-windows:
     name: Coverage (Windows)
-    needs: [build-windows]
+    needs: [changes, build-windows]
+    if: needs.changes.outputs.code == 'true'
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2
         with:
@@ -215,3 +246,62 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: codecov.json
           fail_ci_if_error: true
+
+  required:
+    name: CI Required
+    if: always()
+    needs:
+      - changes
+      - typos
+      - format
+      - deny
+      - build
+      - build-windows
+      - build-tier2
+      - build-no-default-features
+      - build-core
+      - coverage
+      - coverage-windows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify required jobs
+        env:
+          CODE_CHANGED: ${{ needs.changes.outputs.code }}
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          TYPOS_RESULT: ${{ needs.typos.result }}
+          FORMAT_RESULT: ${{ needs.format.result }}
+          DENY_RESULT: ${{ needs.deny.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          BUILD_WINDOWS_RESULT: ${{ needs.build-windows.result }}
+          BUILD_TIER2_RESULT: ${{ needs.build-tier2.result }}
+          BUILD_FEATURES_RESULT: ${{ needs.build-no-default-features.result }}
+          BUILD_CORE_RESULT: ${{ needs.build-core.result }}
+          COVERAGE_RESULT: ${{ needs.coverage.result }}
+          COVERAGE_WINDOWS_RESULT: ${{ needs.coverage-windows.result }}
+        run: |
+          if [[ "$CHANGES_RESULT" != "success" ]]; then
+            echo "Change detection failed"
+            exit 1
+          fi
+
+          if [[ "$CODE_CHANGED" != "true" ]]; then
+            echo "No code changes require CI"
+            exit 0
+          fi
+
+          for result in \
+            "$TYPOS_RESULT" \
+            "$FORMAT_RESULT" \
+            "$DENY_RESULT" \
+            "$BUILD_RESULT" \
+            "$BUILD_WINDOWS_RESULT" \
+            "$BUILD_TIER2_RESULT" \
+            "$BUILD_FEATURES_RESULT" \
+            "$BUILD_CORE_RESULT" \
+            "$COVERAGE_RESULT" \
+            "$COVERAGE_WINDOWS_RESULT"; do
+            if [[ "$result" != "success" ]]; then
+              echo "A required CI job did not succeed: $result"
+              exit 1
+            fi
+          done

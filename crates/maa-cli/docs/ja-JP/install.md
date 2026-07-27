@@ -41,12 +41,7 @@ Homebrew 用户可以通过非官方的 [tap](https://github.com/MaaAssistantArk
   nix run nixpkgs#maa-cli
   ```
 
-  ```bash
-  # 每夜构建
-  nix run github:Cryolitia/nur-packages#maa-cli-nightly
-  ```
-
-  稳定版打包至 [nixpkgs](https://github.com/NixOS/nixpkgs/blob/nixos-unstable/pkgs/by-name/ma/maa-cli/package.nix) 中，使用 `nixpkgs` 中的 Rust 工具链；每夜构建位于 [NUR](https://github.com/Cryolitia/nur-packages/blob/master/pkgs/maa-assistant-arknights/maa-cli.nix) 中，使用 Beta channel 的 Rust 工具链，由 Github Action 每日自动更新和构建验证。
+  稳定版打包至 [nixpkgs](https://github.com/NixOS/nixpkgs/blob/nixos-unstable/pkgs/by-name/ma/maa-cli/package.nix) 中，使用 `nixpkgs` 中的 Rust 工具链。
 
 - 对于在 Linux 上使用 Homebrew 的用户，参见上述 macOS 的安装方式。
 
@@ -73,13 +68,13 @@ Rust 开发者可以通过 `cargo` 自行编译安装 maa-cli：
 - 稳定版本：
 
   ```bash
-  cargo install --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --tag stable --locked
+  cargo install maa-cli --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --tag stable --locked
   ```
 
 - 开发版本：
 
   ```bash
-  cargo install --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --locked
+  cargo install maa-cli --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --locked
   ```
 
 ### 编译选项

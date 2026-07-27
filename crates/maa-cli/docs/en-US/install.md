@@ -37,12 +37,7 @@ Homebrew users can install maa-cli via the unofficial [tap](https://github.com/M
   nix run nixpkgs#maa-cli
   ```
 
-  ```bash
-  # Nightly build
-  nix run github:Cryolitia/nur-packages#maa-cli-nightly
-  ```
-
-  Stable is packaged in [nixpkgs](https://github.com/NixOS/nixpkgs/blob/nixos-unstable/pkgs/by-name/ma/maa-cli/package.nix), using the nixpkgs Rust toolchain; Nightly is in [NUR](https://github.com/Cryolitia/nur-packages/blob/master/pkgs/maa-assistant-arknights/maa-cli.nix), using the Beta Channel Rust toolchain, automatically updated and built daily by GitHub Actions.
+  The stable release is packaged in [nixpkgs](https://github.com/NixOS/nixpkgs/blob/nixos-unstable/pkgs/by-name/ma/maa-cli/package.nix) and uses the nixpkgs Rust toolchain.
 
 - Users using Homebrew on Linux please refer to the macOS installation method above.
 
@@ -69,13 +64,13 @@ Rust developers can compile and install maa-cli themselves via `cargo`:
 - Stable version:
 
   ```bash
-  cargo install --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --tag stable --locked
+  cargo install maa-cli --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --tag stable --locked
   ```
 
 - Development version:
 
   ```bash
-  cargo install --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --locked
+  cargo install maa-cli --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --locked
   ```
 
 ### Features

@@ -41,12 +41,7 @@ Homebrew 사용자는 비공식 [tap](https://github.com/MaaAssistantArknights/h
   nix run nixpkgs#maa-cli
   ```
 
-  ```bash
-  # 매일 최신화 버전
-  nix run github:Cryolitia/nur-packages#maa-cli-nightly
-  ```
-
-  안정 버전은 [nixpkgs](https://github.com/NixOS/nixpkgs/blob/nixos-unstable/pkgs/by-name/ma/maa-cli/package.nix)에 포함되어 있으며, `nixpkgs`의 Rust 도구 체인을 사용합니다. 매일 빌드는 [NUR](https://github.com/Cryolitia/nur-packages/blob/master/pkgs/maa-assistant-arknights/maa-cli.nix)에 위치하며, Beta 채널의 Rust 도구 체인을 사용하고 GitHub Action을 통해 매일 자동으로 업데이트 및 빌드 검증을 수행합니다.
+  안정 버전은 [nixpkgs](https://github.com/NixOS/nixpkgs/blob/nixos-unstable/pkgs/by-name/ma/maa-cli/package.nix)에 포함되어 있으며, `nixpkgs`의 Rust 도구 체인을 사용합니다.
 
 - Linux에서 Homebrew를 사용하는 경우 위의 macOS 설치 방법을 참조하세요.
 
@@ -73,13 +68,13 @@ Rust 개발자는 `cargo`를 통해 maa-cli를 직접 컴파일하여 설치할 
 - 안정 버전:
 
   ```bash
-  cargo install --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --tag stable --locked
+  cargo install maa-cli --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --tag stable --locked
   ```
 
 - 개발 버전:
 
   ```bash
-  cargo install --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --locked
+  cargo install maa-cli --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --locked
   ```
 
 ### 컴파일 옵션

@@ -36,7 +36,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Generate Release Notes
@@ -70,5 +70,5 @@ jobs:
         if: ${{ !inputs.dryrun }}
         run: |
           git add CHANGELOG.md
-          git commit -m "chore(Changelog): update changelog for ${{ inputs.version }}"
+          git commit -m "chore(changelog): update changelog for ${{ inputs.version }}"
           git push
