@@ -84,11 +84,16 @@ impl VarOs for EnvVarOs {
 /// The `maa_env` usually is `MAA_XXX_DIR`, and the `xdg_env` usually is `XDG_XXX_HOME`.
 /// If the `maa_env` is set, return the directory `maa_env`.
 /// If the `xdg_env` is set, return the directory `xdg_env/maa`.
-/// Otherwise, return `None`.
+/// Empty values are treated as unset; otherwise, return `None`.
 fn dir_from_env(v: impl VarOs + Copy, maa_env: &str, xdg_env: &str) -> Option<PathBuf> {
     v.var_os(maa_env)
+        .filter(|value| !value.is_empty())
         .map(PathBuf::from)
-        .or_else(|| v.var_os(xdg_env).map(|xdg| join!(xdg, "maa")))
+        .or_else(|| {
+            v.var_os(xdg_env)
+                .filter(|value| !value.is_empty())
+                .map(|xdg| join!(xdg, "maa"))
+        })
 }
 
 /// Get the data directory.
@@ -682,6 +687,35 @@ mod tests {
             assert_eq!(dirs.library(), PathBuf::from("/maa/lib"));
             assert_eq!(dirs.resource(), PathBuf::from("/maa/resource"));
             assert_eq!(dirs.maa_resource(), PathBuf::from("/maa/MaaResource"));
+        }
+
+        #[test]
+        fn empty_env_dirs_are_ignored() {
+            // An empty MAA-specific override should fall back to its XDG counterpart.
+            let mock = MockVarOs::new()
+                .with_var("MAA_DATA_DIR", "")
+                .with_var("XDG_DATA_HOME", "/xdg");
+            let dirs = Dirs::new_inner(PROJECT.as_ref(), &mock);
+            assert_eq!(dirs.data(), PathBuf::from("/xdg/maa"));
+
+            // Empty variables should behave the same as unset variables.
+            let expected = Dirs::new_inner(PROJECT.as_ref(), &MockVarOs::new());
+            let mock = MockVarOs::from(vec![
+                ("MAA_DATA_DIR", ""),
+                ("XDG_DATA_HOME", ""),
+                ("MAA_STATE_DIR", ""),
+                ("XDG_STATE_HOME", ""),
+                ("MAA_CACHE_DIR", ""),
+                ("XDG_CACHE_HOME", ""),
+                ("MAA_CONFIG_DIR", ""),
+                ("XDG_CONFIG_HOME", ""),
+            ]);
+            let dirs = Dirs::new_inner(PROJECT.as_ref(), &mock);
+
+            assert_eq!(dirs.data(), expected.data());
+            assert_eq!(dirs.state(), expected.state());
+            assert_eq!(dirs.cache(), expected.cache());
+            assert_eq!(dirs.config(), expected.config());
         }
 
         #[test]
