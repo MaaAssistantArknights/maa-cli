@@ -667,7 +667,7 @@ mod tests {
 
         #[test]
         fn float() {
-            let value = ValueWithDesc::<f32>::new(1.0, None);
+            let value = ValueWithDesc::<f32>::new(1.0_f32, None);
             assert_eq!(value.value(), 1.0);
             assert_eq!(ValueWithDesc::<f32>::parse("1.0").unwrap(), 1.0);
             assert!(ValueWithDesc::<f32>::parse("a").is_err())
