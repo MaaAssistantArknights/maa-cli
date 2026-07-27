@@ -93,15 +93,15 @@ fn asst_config_template() -> MAAValueTemplate {
                         Some("no global resource needed by Official and BiliBili client"),
                     ),
                     ValueWithDesc::new(
-                        "YostarJP",
-                        Some("resource fror Japanese client"),
+                        "YoStarJP",
+                        Some("resource for Japanese client"),
                     ),
                     ValueWithDesc::new(
-                        "YostarKR",
+                        "YoStarKR",
                         Some("resource for Korean client"),
                     ),
                     ValueWithDesc::new(
-                        "YostarEN",
+                        "YoStarEN",
                         Some("resource for English client"),
                     ),
                     ValueWithDesc::new(

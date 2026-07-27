@@ -25,7 +25,7 @@ directories = "6"
 dunce = "1.0.4"
 env_logger = { version = "0.11", default-features = false }
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
-git2 = "0.20"
+git2 = { version = "0.21", features = ["https", "ssh"] }
 indexmap = "2.13.1"
 indicatif = "0.18"
 libloading = "0.9"
