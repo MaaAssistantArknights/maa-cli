@@ -128,7 +128,7 @@ commit_parsers = [
   { message = "^chore\\(xtask\\)", skip = true },
 
   # skip changelog commits
-  { message = "(?i)^chore(?:\\(changelog\\))?: update changelog", skip = true },
+  { message = "(?i)^chore(?:\\(changelog\\))?: update changelog(?: for \\S+)?$", skip = true },
 
   # chore should be the last one to avoid overriding above rules
   { message = "^chore", group = "<!-- 99 -->Miscellaneous" },
