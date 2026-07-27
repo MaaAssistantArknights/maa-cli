@@ -23,8 +23,6 @@
 
 ### Miscellaneous
 
-- Update changelog for 0.7.4 by [@github-actions](https://github.com/github-actions)
-
 **Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.7.4...v0.7.5>
 
 ## Release 0.7.4
