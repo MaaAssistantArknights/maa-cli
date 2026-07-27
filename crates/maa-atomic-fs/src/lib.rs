@@ -1,3 +1,5 @@
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
+
 //! Utilities for atomically replacing individual files.
 //!
 //! Writes are staged in a temporary file beside the destination, synchronized,
