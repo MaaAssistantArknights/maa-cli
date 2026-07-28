@@ -376,15 +376,29 @@ enum CopilotFile {
 impl CopilotFile {
     fn from_uri(uri: &str) -> Result<Self> {
         let trimmed = uri.trim();
-        if let Some(code_str) = trimmed.strip_prefix("maa://") {
-            if let Some(code_str) = code_str.strip_suffix('s') {
-                Ok(CopilotFile::RemoteSet(
-                    code_str.parse::<u64>().context("Invalid code")?,
-                ))
+        let remote = if let Some(code_str) = trimmed.strip_prefix("prts://") {
+            if let Some(code_str) = code_str.strip_prefix('s') {
+                Some((code_str, true))
             } else {
-                Ok(CopilotFile::Remote(
-                    code_str.parse::<u64>().context("Invalid code")?,
-                ))
+                Some((code_str, false))
+            }
+        } else if let Some(code_str) = trimmed.strip_prefix("maa://") {
+            warn!("The maa:// URI format is deprecated; use prts://<id> or prts://s<id> instead");
+            if let Some(code_str) = code_str.strip_suffix('s') {
+                Some((code_str, true))
+            } else {
+                Some((code_str, false))
+            }
+        } else {
+            None
+        };
+
+        if let Some((code_str, is_set)) = remote {
+            let code = code_str.parse::<u64>().context("Invalid code")?;
+            if is_set {
+                Ok(CopilotFile::RemoteSet(code))
+            } else {
+                Ok(CopilotFile::Remote(code))
             }
         } else if let Some(code) = trimmed.strip_prefix("file://") {
             Ok(CopilotFile::Local(PathBuf::from(code)))
@@ -1484,13 +1498,14 @@ found"}"#,
 
             #[test]
             fn invalid_code() {
-                assert!(CopilotFile::from_uri("maa://xyz").is_err());
+                assert!(CopilotFile::from_uri("prts://xyz").is_err());
+                assert!(CopilotFile::from_uri("prts://s").is_err());
             }
 
             #[test]
             fn remote_set() {
                 assert_eq!(
-                    CopilotFile::from_uri("maa://20001s").unwrap(),
+                    CopilotFile::from_uri("prts://s20001").unwrap(),
                     CopilotFile::RemoteSet(20001)
                 );
             }
@@ -1498,8 +1513,20 @@ found"}"#,
             #[test]
             fn remote() {
                 assert_eq!(
+                    CopilotFile::from_uri("prts://30001").unwrap(),
+                    CopilotFile::Remote(30001)
+                );
+            }
+
+            #[test]
+            fn legacy_remote_remains_supported() {
+                assert_eq!(
                     CopilotFile::from_uri("maa://30001").unwrap(),
                     CopilotFile::Remote(30001)
+                );
+                assert_eq!(
+                    CopilotFile::from_uri("maa://20001s").unwrap(),
+                    CopilotFile::RemoteSet(20001)
                 );
             }
 
@@ -1522,7 +1549,7 @@ found"}"#,
             #[test]
             fn with_whitespace() {
                 assert_eq!(
-                    CopilotFile::from_uri("  maa://30001  ").unwrap(),
+                    CopilotFile::from_uri("  prts://30001  ").unwrap(),
                     CopilotFile::Remote(30001)
                 );
 
