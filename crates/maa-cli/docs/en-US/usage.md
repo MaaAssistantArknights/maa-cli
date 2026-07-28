@@ -78,6 +78,10 @@ By default, logs go to standard error (stderr). The `--log-file` option can redi
 
 All logs normally include a timestamp and level prefix. The `MAA_LOG_PREFIX` environment variable controls this behavior: `Always` always includes prefixes, `Auto` includes prefixes in log files but not in stderr output, and `Never` omits prefixes even in log files.
 
+### Structured Event Output
+
+For programmatic callers (such as a web UI or scheduler wrapping maa-cli), the global `--emit-json` flag makes every MaaCore callback appear as one JSON object per line on stdout, with the shape `{"kind": "TaskChainStart", "message": {…}}` — `kind` is the callback variant name and `message` is the raw MaaCore payload. The human-readable log still goes to stderr, and side effects such as the end-of-run summary, non-zero exit on task errors, and outbound report requests still fire. The flag is not intended for interactive use.
+
 ### Other Subcommands
 
 Besides the above commands, maa-cli provides additional subcommands:

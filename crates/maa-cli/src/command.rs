@@ -18,6 +18,15 @@ pub(crate) struct Cli {
     /// and parameters will be set to default values.
     #[arg(long, global = true)]
     pub(crate) batch: bool,
+    /// Emit MaaCore callback events as JSONL on stdout for structured consumption.
+    ///
+    /// When set, each MaaCore callback becomes one line of JSON on stdout with
+    /// the shape `{"kind": "TaskChainStart", "message": {…}}`. The human log
+    /// still goes to stderr as usual, and the summary / error-flagging side
+    /// effects of callback processing still run. Intended for programmatic
+    /// drivers, not for interactive use.
+    #[arg(long, global = true, verbatim_doc_comment)]
+    pub(crate) emit_json: bool,
     #[command(flatten)]
     pub(crate) log: log::Args,
 }
@@ -318,6 +327,13 @@ mod test {
     fn batch() {
         assert!(!parse_from(["maa", "list"]).batch);
         assert!(parse_from(["maa", "list", "--batch"]).batch);
+    }
+
+    #[test]
+    fn emit_json() {
+        assert!(!parse_from(["maa", "run", "stage"]).emit_json);
+        assert!(parse_from(["maa", "--emit-json", "run", "stage"]).emit_json);
+        assert!(parse_from(["maa", "run", "stage", "--emit-json"]).emit_json);
     }
 
     #[cfg(feature = "core_installer")]

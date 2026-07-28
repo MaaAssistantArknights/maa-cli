@@ -1,6 +1,7 @@
 pub mod summary;
 use std::{
     fmt::Write,
+    io::Write as _,
     sync::{Arc, atomic::AtomicBool},
 };
 
@@ -18,16 +19,33 @@ fn json_pretty(value: &impl serde::Serialize) -> String {
     serde_json::to_string_pretty(value).unwrap_or_else(|e| format!("<serialization error: {e}>"))
 }
 
+/// Render a callback event as a single line of JSON for `--emit-json` mode.
+///
+/// The shape is `{"kind": "<VariantName>", "message": <raw callback payload>}`.
+/// `MessageKind` does not derive `Serialize`, so its `Debug` representation is
+/// used (e.g. `"TaskChainStart"`, `"Unknown(9999)"`). Returns `None` if the
+/// event fails to serialize (should not happen in practice — `message` is a
+/// `Value` we just parsed).
+fn format_event_line(kind: MessageKind, message: &Value) -> Option<String> {
+    let event = serde_json::json!({
+        "kind": format!("{kind:?}"),
+        "message": message,
+    });
+    serde_json::to_string(&event).ok()
+}
+
 pub struct MaaCallback {
     auto_reconnect: bool,
+    emit_json: bool,
     offline_stop_requested: Arc<AtomicBool>,
 }
 
 impl MaaCallback {
-    pub fn new(auto_reconnect: bool) -> (Self, Arc<AtomicBool>) {
+    pub fn new(auto_reconnect: bool, emit_json: bool) -> (Self, Arc<AtomicBool>) {
         let offline_stop_requested = Arc::new(AtomicBool::new(false));
         let cb = Self {
             auto_reconnect,
+            emit_json,
             offline_stop_requested: Arc::clone(&offline_stop_requested),
         };
         (cb, offline_stop_requested)
@@ -44,6 +62,25 @@ impl Callback for MaaCallback {
             log::warn!("Failed to parse message for {kind:?}: {message}");
             return;
         };
+
+        // Emit structured event on stdout for programmatic consumers before
+        // running the human-facing processor. `process_message` is always
+        // invoked afterwards because it carries side effects a driver still
+        // needs — `MAA_CORE_ERRORED` for the exit status, the `summary::`
+        // state for `--no-summary`, and the outbound `ReportRequest` HTTP
+        // send in `process_report`.
+        if self.emit_json {
+            if let Some(line) = format_event_line(kind, &message) {
+                let mut out = std::io::stdout().lock();
+                // Ignore write errors: if stdout is closed (broken pipe), we
+                // silently drop the line rather than panic inside a MaaCore
+                // callback thread.
+                let _ = writeln!(out, "{line}");
+            } else {
+                log::warn!("Failed to serialize event for {kind:?}");
+            }
+        }
+
         self.process_message(kind, message);
     }
 }
@@ -629,15 +666,53 @@ mod tests {
 
     #[test]
     fn offline_confirm_stops_when_auto_reconnect_disabled() {
-        let (cb, offline_stop) = MaaCallback::new(false);
+        let (cb, offline_stop) = MaaCallback::new(false, false);
         cb.on_message(MessageKind::SubTaskStart, Some(offline_confirm_msg()));
         assert!(offline_stop.load(std::sync::atomic::Ordering::Relaxed));
     }
 
     #[test]
     fn offline_confirm_does_not_stop_when_auto_reconnect_enabled() {
-        let (cb, offline_stop) = MaaCallback::new(true);
+        let (cb, offline_stop) = MaaCallback::new(true, false);
         cb.on_message(MessageKind::SubTaskStart, Some(offline_confirm_msg()));
         assert!(!offline_stop.load(std::sync::atomic::Ordering::Relaxed));
+    }
+
+    #[test]
+    fn format_event_line_known_kind() {
+        let message: Value = serde_json::from_str(r#"{"taskchain":"Fight","taskid":42}"#).unwrap();
+        let line = format_event_line(MessageKind::TaskChainStart, &message).unwrap();
+        let parsed: Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(
+            parsed.get("kind").and_then(Value::as_str),
+            Some("TaskChainStart")
+        );
+        assert_eq!(
+            parsed
+                .get("message")
+                .and_then(|m| m.get("taskchain"))
+                .and_then(Value::as_str),
+            Some("Fight"),
+        );
+        assert_eq!(
+            parsed
+                .get("message")
+                .and_then(|m| m.get("taskid"))
+                .and_then(Value::as_i64),
+            Some(42),
+        );
+        // The whole event is a single JSON line, no embedded newlines.
+        assert!(!line.contains('\n'));
+    }
+
+    #[test]
+    fn format_event_line_unknown_kind() {
+        let message: Value = serde_json::from_str("{}").unwrap();
+        let line = format_event_line(MessageKind::Unknown(9999), &message).unwrap();
+        let parsed: Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(
+            parsed.get("kind").and_then(Value::as_str),
+            Some("Unknown(9999)"),
+        );
     }
 }

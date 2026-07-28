@@ -122,7 +122,7 @@ fn find_profile(root: impl AsRef<Path>, profile: Option<&str>) -> Result<AsstCon
     }
 }
 
-fn run_core<F>(f: F, args: CommonArgs) -> Result<()>
+fn run_core<F>(f: F, args: CommonArgs, emit_json: bool) -> Result<()>
 where
     F: FnOnce(&AsstConfig) -> Result<TaskConfig>,
 {
@@ -155,7 +155,7 @@ where
 
     // Create and setup Assistant
     let auto_reconnect = asst_config.behavior.auto_reconnect && !args.no_auto_reconnect;
-    let (maa_callback, offline_stop) = callback::MaaCallback::new(auto_reconnect);
+    let (maa_callback, offline_stop) = callback::MaaCallback::new(auto_reconnect, emit_json);
     let asst = Assistant::new_with_callback(maa_callback)
         .context("Failed to create Assistant: resources may not be loaded")?;
     asst_config.instance_options.apply_to(&asst)?;
@@ -251,13 +251,19 @@ where
 
 // Wrapper for run_core, always try to display summary even if error occurred
 // It's safe to display summary even if summary is not initialized
-pub fn run<F>(f: F, args: CommonArgs) -> Result<()>
+pub fn run<F>(f: F, args: CommonArgs, emit_json: bool) -> Result<()>
 where
     F: FnOnce(&AsstConfig) -> Result<TaskConfig>,
 {
-    let ret = run_core(f, args);
+    let ret = run_core(f, args, emit_json);
 
-    summary::display();
+    // Under `--emit-json`, stdout is a pure JSONL stream for programmatic
+    // consumers; route the human-facing summary to stderr instead.
+    if emit_json {
+        summary::display_to_stderr();
+    } else {
+        summary::display();
+    }
 
     ret?;
 
@@ -268,11 +274,15 @@ where
     Ok(())
 }
 
-pub fn run_preset(params: impl preset::IntoTaskConfig, args: CommonArgs) -> Result<()> {
-    run(|config| params.into_task_config(config), args)
+pub fn run_preset(
+    params: impl preset::IntoTaskConfig,
+    args: CommonArgs,
+    emit_json: bool,
+) -> Result<()> {
+    run(|config| params.into_task_config(config), args, emit_json)
 }
 
-pub fn run_custom(path: impl AsRef<Path>, args: CommonArgs) -> Result<()> {
+pub fn run_custom(path: impl AsRef<Path>, args: CommonArgs, emit_json: bool) -> Result<()> {
     run(
         |_| {
             let path = path.as_ref();
@@ -286,6 +296,7 @@ pub fn run_custom(path: impl AsRef<Path>, args: CommonArgs) -> Result<()> {
             config.init().context("Failed to initialize task config!")
         },
         args,
+        emit_json,
     )
 }
 
