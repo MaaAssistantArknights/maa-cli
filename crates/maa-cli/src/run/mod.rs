@@ -184,6 +184,20 @@ where
                 )
             })?;
 
+        // Under `--emit-json`, publish a synthetic `TaskRegistered` event so
+        // consumers can preview the resolved plan before MaaCore starts
+        // firing per-task callbacks. Emitted only on successful registration
+        // to keep failed tasks out of the plan.
+        if emit_json {
+            let message = serde_json::json!({
+                "id": id,
+                "name": task.name_or_default(),
+                "task_type": task_type,
+                "params": task.params,
+            });
+            callback::emit_json_event("TaskRegistered", &message);
+        }
+
         if let Some(s) = task_summary.as_mut() {
             s.insert(id, task.name, task_type);
         }

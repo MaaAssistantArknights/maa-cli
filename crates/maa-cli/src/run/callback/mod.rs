@@ -19,19 +19,32 @@ fn json_pretty(value: &impl serde::Serialize) -> String {
     serde_json::to_string_pretty(value).unwrap_or_else(|e| format!("<serialization error: {e}>"))
 }
 
-/// Render a callback event as a single line of JSON for `--emit-json` mode.
+/// Render an event as a single line of JSON for `--emit-json` mode.
 ///
-/// The shape is `{"kind": "<VariantName>", "message": <raw callback payload>}`.
-/// `MessageKind` does not derive `Serialize`, so its `Debug` representation is
-/// used (e.g. `"TaskChainStart"`, `"Unknown(9999)"`). Returns `None` if the
-/// event fails to serialize (should not happen in practice — `message` is a
-/// `Value` we just parsed).
-fn format_event_line(kind: MessageKind, message: &Value) -> Option<String> {
+/// The shape is `{"kind": "<Kind>", "message": <payload>}`. The caller
+/// supplies the kind as a string so the same helper can emit both MaaCore
+/// callbacks (whose `MessageKind` is stringified via its `Debug` repr, e.g.
+/// `"TaskChainStart"`, `"Unknown(9999)"`) and synthetic events such as
+/// `"TaskRegistered"`. Returns `None` if the event fails to serialize (should
+/// not happen in practice — `message` is a `Value` we just built).
+pub(crate) fn format_event_line(kind: &str, message: &Value) -> Option<String> {
     let event = serde_json::json!({
-        "kind": format!("{kind:?}"),
+        "kind": kind,
         "message": message,
     });
     serde_json::to_string(&event).ok()
+}
+
+/// Write one JSONL event to stdout under `--emit-json`, silently dropping the
+/// line on write failure (e.g. broken pipe). Locks stdout for the duration.
+pub(crate) fn emit_json_event(kind: &str, message: &Value) {
+    if let Some(line) = format_event_line(kind, message) {
+        let mut out = std::io::stdout().lock();
+        // Ignore write errors: if stdout is closed (broken pipe), we silently
+        // drop the line rather than propagate an error up through a MaaCore
+        // callback thread or the task-registration loop.
+        let _ = writeln!(out, "{line}");
+    }
 }
 
 pub struct MaaCallback {
@@ -70,15 +83,7 @@ impl Callback for MaaCallback {
         // state for `--no-summary`, and the outbound `ReportRequest` HTTP
         // send in `process_report`.
         if self.emit_json {
-            if let Some(line) = format_event_line(kind, &message) {
-                let mut out = std::io::stdout().lock();
-                // Ignore write errors: if stdout is closed (broken pipe), we
-                // silently drop the line rather than panic inside a MaaCore
-                // callback thread.
-                let _ = writeln!(out, "{line}");
-            } else {
-                log::warn!("Failed to serialize event for {kind:?}");
-            }
+            emit_json_event(&format!("{kind:?}"), &message);
         }
 
         self.process_message(kind, message);
@@ -680,8 +685,9 @@ mod tests {
 
     #[test]
     fn format_event_line_known_kind() {
+        let kind = MessageKind::TaskChainStart;
         let message: Value = serde_json::from_str(r#"{"taskchain":"Fight","taskid":42}"#).unwrap();
-        let line = format_event_line(MessageKind::TaskChainStart, &message).unwrap();
+        let line = format_event_line(&format!("{kind:?}"), &message).unwrap();
         let parsed: Value = serde_json::from_str(&line).unwrap();
         assert_eq!(
             parsed.get("kind").and_then(Value::as_str),
@@ -707,12 +713,63 @@ mod tests {
 
     #[test]
     fn format_event_line_unknown_kind() {
+        let kind = MessageKind::Unknown(9999);
         let message: Value = serde_json::from_str("{}").unwrap();
-        let line = format_event_line(MessageKind::Unknown(9999), &message).unwrap();
+        let line = format_event_line(&format!("{kind:?}"), &message).unwrap();
         let parsed: Value = serde_json::from_str(&line).unwrap();
         assert_eq!(
             parsed.get("kind").and_then(Value::as_str),
             Some("Unknown(9999)"),
         );
+    }
+
+    #[test]
+    fn format_event_line_task_registered() {
+        // Synthetic event emitted by `run_core` for each task registered with
+        // MaaCore. Shape mirrors the JSON built in `run/mod.rs`.
+        let message = serde_json::json!({
+            "id": 42,
+            "name": "Daily Fight",
+            "task_type": "Fight",
+            "params": { "stage": "1-7" },
+        });
+        let line = format_event_line("TaskRegistered", &message).unwrap();
+        let parsed: Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(
+            parsed.get("kind").and_then(Value::as_str),
+            Some("TaskRegistered"),
+        );
+        // The task id MaaCore assigned at registration; consumers match it
+        // against the `taskid` carried by `TaskChainStart`.
+        assert_eq!(
+            parsed
+                .get("message")
+                .and_then(|m| m.get("id"))
+                .and_then(Value::as_i64),
+            Some(42),
+        );
+        assert_eq!(
+            parsed
+                .get("message")
+                .and_then(|m| m.get("name"))
+                .and_then(Value::as_str),
+            Some("Daily Fight"),
+        );
+        assert_eq!(
+            parsed
+                .get("message")
+                .and_then(|m| m.get("task_type"))
+                .and_then(Value::as_str),
+            Some("Fight"),
+        );
+        assert_eq!(
+            parsed
+                .get("message")
+                .and_then(|m| m.get("params"))
+                .and_then(|p| p.get("stage"))
+                .and_then(Value::as_str),
+            Some("1-7"),
+        );
+        assert!(!line.contains('\n'));
     }
 }

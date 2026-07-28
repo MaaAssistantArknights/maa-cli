@@ -82,6 +82,8 @@ All logs normally include a timestamp and level prefix. The `MAA_LOG_PREFIX` env
 
 For programmatic callers (such as a web UI or scheduler wrapping maa-cli), the global `--emit-json` flag makes every MaaCore callback appear as one JSON object per line on stdout, with the shape `{"kind": "TaskChainStart", "message": {…}}` — `kind` is the callback variant name and `message` is the raw MaaCore payload. The human-readable log still goes to stderr, and side effects such as the end-of-run summary, non-zero exit on task errors, and outbound report requests still fire. The flag is not intended for interactive use.
 
+In addition to MaaCore callbacks, maa-cli emits a synthetic `TaskRegistered` event once per task before the run starts, in the same JSONL stream. Each event carries `{"id": …, "name": …, "task_type": …, "params": …}` — the task id MaaCore assigned at registration, the task's configured name (or its task type name when unnamed), the task type as it appears in MaaCore (e.g. `"Fight"`, `"Award"`), and the resolved parameter object. The `id` value matches the `taskid` field carried by MaaCore's own `TaskChainStart` and `TaskChainCompleted` callbacks, which lets a consumer tie a running task chain back to the parameters it was registered with. Consumers can use these events to preview the plan, for example to display which stage a `Fight` task will target, before any real MaaCore callback arrives.
+
 ### Other Subcommands
 
 Besides the above commands, maa-cli provides additional subcommands:
