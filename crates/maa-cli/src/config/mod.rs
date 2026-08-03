@@ -143,22 +143,8 @@ impl<T> FindFile for T where T: FromFile {}
 
 impl<T> FindFileOrDefault for T where T: FromFile + Default {}
 
-pub fn convert(
-    file: &Path,
-    out: Option<&Path>,
-    ft: Option<Filetype>,
-    gui: bool,
-    gui_config: Option<&str>,
-) -> Result<()> {
+pub fn convert(file: &Path, out: Option<&Path>, ft: Option<Filetype>) -> Result<()> {
     use maa_dirs::Ensure;
-
-    if gui && !matches!(Filetype::parse_filetype(file), Some(Filetype::Json)) {
-        log::warn!(
-            "The --gui flag is for converting MAA GUI profiles, which are typically JSON files; \
-             input {} is not JSON",
-            file.display()
-        );
-    }
 
     let ft = ft.or_else(|| {
         out.and_then(|path| path.extension())
@@ -166,12 +152,7 @@ pub fn convert(
             .and_then(Filetype::parse_extension)
     });
 
-    let mut value = MAAValue::from_file(file)?;
-
-    if gui {
-        value = gui::select_configuration(value, gui_config)?;
-        value = gui::convert(value)?;
-    }
+    let value = MAAValue::from_file(file)?;
 
     let Some(format) = ft else {
         bail!("Format not given")
@@ -192,7 +173,7 @@ pub fn convert(
 
 pub mod import;
 
-mod gui;
+pub mod migrate;
 
 pub mod asst;
 
@@ -323,9 +304,9 @@ mod tests {
             let value = object!("z" => 1, "a" => "test", "m" => false);
             Json.write(&input, &value).unwrap();
 
-            super::super::convert(&input, None, Some(Json), false, None).unwrap();
-            super::super::convert(&input, Some(&toml), None, false, None).unwrap();
-            super::super::convert(&input, Some(&toml), Some(Yaml), false, None).unwrap();
+            super::super::convert(&input, None, Some(Json)).unwrap();
+            super::super::convert(&input, Some(&toml), None).unwrap();
+            super::super::convert(&input, Some(&toml), Some(Yaml)).unwrap();
 
             assert_eq!(MAAValue::from_file(&toml).unwrap(), value);
             assert_eq!(MAAValue::from_file(&yaml).unwrap(), value);
@@ -339,7 +320,7 @@ mod tests {
             let value = object!("z" => 1);
             Filetype::Json.write(&input, &value).unwrap();
 
-            assert!(super::super::convert(&input, None, None, false, None).is_err());
+            assert!(super::super::convert(&input, None, None).is_err());
         }
 
         #[test]
@@ -373,7 +354,7 @@ mod tests {
                 .collect();
             assert_eq!(inner_keys, ["k2", "k1"]);
 
-            super::super::convert(&input, Some(&yaml), None, false, None).unwrap();
+            super::super::convert(&input, Some(&yaml), None).unwrap();
 
             assert_eq!(
                 std::fs::read_to_string(&yaml).unwrap(),

@@ -171,12 +171,14 @@ pub(crate) enum Command {
     },
     /// Convert file format between TOML, YAML and JSON
     ///
-    /// This command will convert a file from TOML, YAML or JSON format to another format.
+    /// This command keeps the data structure unchanged and only converts serialization
+    /// format between TOML, YAML and JSON.
     /// This is useful when you want to write your infrastructure configuration
     /// in TOML or YAML format, and use it in MaaCore, which only supports JSON format.
     ///
-    /// It may also be useful when you want to migrate your cli configuration from
-    /// one format to another format.
+    /// To migrate from an external configuration model (e.g. MAA WPF GUI), use
+    /// `maa migrate` instead. To install an existing maa-cli config into the config
+    /// directory, use `maa import`.
     Convert {
         /// Path of the input file
         input: PathBuf,
@@ -188,15 +190,15 @@ pub(crate) enum Command {
         /// file. If output file is not specified, the output will be default to "json".
         #[arg(short, long)]
         format: Option<config::Filetype>,
-        /// Convert a GUI profile TaskQueue into maa-cli task config
-        #[arg(short = 'g', long)]
-        gui: bool,
-        /// Select a named configuration when converting a multi-profile GUI export
-        ///
-        /// Can also be set with the `MAA_GUI_CONFIG` environment variable.
-        #[arg(long)]
-        gui_config: Option<String>,
     },
+    /// Migrate configuration from an external model into maa-cli config
+    ///
+    /// Unlike `convert` (same data structure, different format) and `import`
+    /// (install an existing maa-cli config into the config directory), `migrate`
+    /// remaps an external configuration model into maa-cli's config model.
+    /// The migration may be lossy; skipped tasks and fields are summarized afterward.
+    #[command(subcommand)]
+    Migrate(MigrateCommand),
     /// Show stage activity of given client
     Activity {
         #[arg(default_value_t = config::task::ClientType::Official)]
@@ -251,6 +253,33 @@ pub(crate) enum Command {
         /// Path of the output file
         #[arg(long)]
         path: PathBuf,
+    },
+}
+
+#[derive(Subcommand)]
+pub(crate) enum MigrateCommand {
+    /// Migrate a MAA WPF GUI profile TaskQueue into maa-cli task config
+    ///
+    /// The input is typically a GUI-exported JSON profile. When multiple
+    /// configurations exist, use `--config` or `MAA_GUI_CONFIG` to select one.
+    /// Disabled GUI tasks are kept inactive (never-true condition) so they will
+    /// not run until re-enabled manually.
+    Wpf {
+        /// Path of the input GUI profile
+        input: PathBuf,
+        /// Path of the output file, if not specified, the output will be printed to stdout
+        output: Option<PathBuf>,
+        /// Format of the output file, can be one of "toml", "yaml" and "json"
+        ///
+        /// If not specified, the format will be guessed from the file extension of the output
+        /// file. If output file is not specified, the output will be default to "json".
+        #[arg(short, long)]
+        format: Option<config::Filetype>,
+        /// Select a named configuration when migrating a multi-profile GUI export
+        ///
+        /// Can also be set with the `MAA_GUI_CONFIG` environment variable.
+        #[arg(long)]
+        config: Option<String>,
     },
 }
 
@@ -560,8 +589,6 @@ mod test {
                 input,
                 output: None,
                 format: None,
-                gui: false,
-                gui_config: None,
             } if input == Path::new("input.toml")
         );
 
@@ -589,15 +616,47 @@ mod test {
                 ..
             } if output == Path::new("output.json")
         );
+    }
+
+    #[test]
+    fn migrate() {
+        assert_matches!(
+            parse_from(["maa", "migrate", "wpf", "profile.json"]).command,
+            Command::Migrate(MigrateCommand::Wpf {
+                input,
+                output: None,
+                format: None,
+                config: None,
+            }) if input == Path::new("profile.json")
+        );
 
         assert_matches!(
-            parse_from(["maa", "convert", "-g", "profile.json", "tasks.toml"]).command,
-            Command::Convert {
+            parse_from([
+                "maa",
+                "migrate",
+                "wpf",
+                "profile.json",
+                "tasks.toml",
+                "--config",
+                "Default"
+            ])
+            .command,
+            Command::Migrate(MigrateCommand::Wpf {
                 input,
                 output: Some(output),
-                gui: true,
+                format: None,
+                config: Some(config),
+            }) if input == Path::new("profile.json")
+                && output == Path::new("tasks.toml")
+                && config == "Default"
+        );
+
+        assert_matches!(
+            parse_from(["maa", "migrate", "wpf", "profile.json", "-f", "yaml"]).command,
+            Command::Migrate(MigrateCommand::Wpf {
+                format: Some(config::Filetype::Yaml),
                 ..
-            } if input == Path::new("profile.json") && output == Path::new("tasks.toml")
+            })
         );
     }
 

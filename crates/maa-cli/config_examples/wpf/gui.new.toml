@@ -1,0 +1,150 @@
+[[tasks]]
+type = "StartUp"
+
+[tasks.params]
+client_type = "Official"
+start_game_enabled = true
+
+[[tasks]]
+type = "Fight"
+name = "理智作战"
+
+[tasks.params]
+stage = [
+    "TO-5",
+    "LS-6",
+    "CE-6",
+]
+medicine_expire_days = 2
+
+[[tasks]]
+type = "Infrast"
+name = ""
+
+[tasks.params]
+mode = 0
+facility = [
+    "Mfg",
+    "Trade",
+    "Control",
+    "Power",
+    "Reception",
+    "Office",
+    "Dorm",
+    "Processing",
+    "Training",
+]
+drones = "Money"
+threshold = 0.3
+replenish = true
+dorm_notstationed_enabled = true
+dorm_trust_enabled = true
+reception_message_board = true
+reception_clue_exchange = true
+reception_send_clue = true
+
+[[tasks]]
+type = "Recruit"
+name = ""
+
+[tasks.params]
+times = 4
+extra_tags_mode = 0
+refresh = true
+expedite = true
+select = [
+    5,
+    4,
+    3,
+]
+confirm = [
+    5,
+    4,
+    3,
+]
+
+[tasks.params.recruitment_time]
+4 = 540
+3 = 540
+
+[[tasks]]
+type = "Mall"
+name = ""
+
+[tasks.params]
+shopping = true
+credit_fight = false
+formation_index = 0
+visit_friends = true
+buy_first = [
+    "加急许可",
+    "招聘许可",
+]
+blacklist = [
+    "碳",
+    "家具",
+]
+force_shopping_if_credit_full = true
+only_buy_discount = false
+reserve_max_credit = false
+
+[[tasks]]
+type = "Award"
+name = ""
+
+[tasks.params]
+award = true
+mail = true
+recruit = false
+orundum = true
+mining = true
+specialaccess = true
+
+[[tasks]]
+type = "Roguelike"
+name = ""
+
+[[tasks.variants]]
+
+[tasks.variants.condition]
+type = "Not"
+
+[tasks.variants.condition.condition]
+type = "Always"
+
+[tasks.variants.params]
+theme = "JieGarden"
+mode = 1
+squad = "指挥分队"
+roles = "稳扎稳打"
+core_char = "维什戴尔"
+starts_count = 999999
+investment_enabled = true
+investments_count = 999
+investment_with_more_score = false
+stop_when_investment_full = true
+stop_at_final_boss = false
+stop_at_max_level = false
+use_support = false
+use_nonfriend_support = false
+refresh_trader_with_dice = false
+start_with_elite_two = false
+only_start_with_elite_two = false
+
+[[tasks]]
+type = "Reclamation"
+name = ""
+
+[[tasks.variants]]
+
+[tasks.variants.condition]
+type = "Not"
+
+[tasks.variants.condition.condition]
+type = "Always"
+
+[tasks.variants.params]
+theme = "Tales"
+mode = 1
+increment_mode = 0
+num_craft_batches = 16
