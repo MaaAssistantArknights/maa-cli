@@ -217,7 +217,7 @@ jobs:
       - name: Download Artifacts
         uses: actions/download-artifact@v8
       - name: Install cargo-about
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.85.5
         with:
           tool: cargo-about
       - name: Generate Third-Party Licenses Information
