@@ -9,13 +9,39 @@ start_game_enabled = true
 type = "Fight"
 name = "理智作战"
 
-[tasks.params]
-stage = [
-    "TO-5",
-    "LS-6",
-    "CE-6",
-]
+[[tasks.variants]]
+
+[tasks.variants.condition]
+type = "OnSideStory"
+
+[tasks.variants.params]
 medicine_expire_days = 2
+stage = "TO-5"
+
+[[tasks.variants]]
+
+[tasks.variants.condition]
+type = "Weekday"
+weekdays = [
+    "Tue",
+    "Thu",
+    "Sat",
+    "Sun",
+]
+timezone = "Official"
+
+[tasks.variants.params]
+medicine_expire_days = 2
+stage = "CE-6"
+
+[[tasks.variants]]
+
+[tasks.variants.condition]
+type = "Always"
+
+[tasks.variants.params]
+medicine_expire_days = 2
+stage = "LS-6"
 
 [[tasks]]
 type = "Infrast"

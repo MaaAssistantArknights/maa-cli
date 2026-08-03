@@ -19,6 +19,18 @@ pub fn has_side_story_open(client: ClientType) -> bool {
         .unwrap_or(false)
 }
 
+/// Stage codes listed under side-story activities for `client`.
+///
+/// Used to decide whether a fight stage should use an `OnSideStory` condition.
+/// Returns an empty list when the activity file is missing or the client has no entry.
+pub fn side_story_stages(client: ClientType) -> Vec<String> {
+    STAGE_ACTIVITY
+        .as_ref()
+        .and_then(|stage_activity| stage_activity.get_stage_activity(client))
+        .map(StageActivityContent::side_story_stage_codes)
+        .unwrap_or_default()
+}
+
 pub fn display_stage_activity(client: ClientType) -> std::io::Result<()> {
     if let Some(stage_activity) = STAGE_ACTIVITY.as_ref() {
         stage_activity.display(std::io::stdout(), client)?;
@@ -116,6 +128,26 @@ impl StageActivityContent {
             .values()
             .any(|activity| activity.activity.is_active())
     }
+
+    /// Collect unique fight stage codes from all side-story activities.
+    ///
+    /// Prefers `Value` when present, otherwise falls back to `Display`.
+    pub fn side_story_stage_codes(&self) -> Vec<String> {
+        let mut stages = Vec::new();
+        for activity in self.side_story_stage.values() {
+            for stage in &activity.stages {
+                let code = if stage.value.is_empty() {
+                    stage.display.as_str()
+                } else {
+                    stage.value.as_str()
+                };
+                if !stages.iter().any(|s| s == code) {
+                    stages.push(code.to_owned());
+                }
+            }
+        }
+        stages
+    }
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq, Clone))]
@@ -147,7 +179,8 @@ impl ActivityInfo {
 #[serde(rename_all = "PascalCase")]
 struct StageInfo {
     display: String,
-    // value: String,
+    #[serde(default)]
+    value: String,
     drop: String,
 }
 

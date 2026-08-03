@@ -25,8 +25,8 @@
           "Series": 0,
           "StagePlan": [
             "TO-5",
-            "LS-6",
-            "CE-6"
+            "CE-6",
+            "LS-6"
           ],
           "IsDrGrandet": false,
           "UseExpiringMedicine": true,

@@ -418,7 +418,6 @@ mod tests {
                     {
                         "type": "Fight",
                         "name": "日常经验本",
-                        "strategy": "merge",
                         "variants": [
                             {
                                 "condition": {
@@ -435,7 +434,6 @@ mod tests {
                     {
                         "type": "Fight",
                         "name": "日常龙门币",
-                        "strategy": "merge",
                         "variants": [
                             {
                                 "condition": {
@@ -861,7 +859,6 @@ mod tests {
         {
             "type": "Fight",
             "name": "日常经验本",
-            "strategy": "merge",
             "variants": [
                 {
                     "condition": {
@@ -884,7 +881,6 @@ mod tests {
         {
             "type": "Fight",
             "name": "日常龙门币",
-            "strategy": "merge",
             "variants": [
                 {
                     "condition": {
@@ -899,6 +895,152 @@ mod tests {
             ]
         }
     );
+
+    #[test]
+    fn migrate_fight_task_rejects_multi_stage_without_optional() {
+        let task = object!(
+            "$type" => "FightTask",
+            "StagePlan" => vec!["CE-6", "LS-6"]??,
+            "UseWeeklySchedule" => false,
+            "UseOptionalStage" => false,
+            "IsEnable" => true,
+        );
+        let mut summary = MigrationSummary::default();
+        let err = fight::migrate_fight_task(&task, &mut summary).unwrap_err();
+        assert!(
+            err.to_string().contains("single stage string"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn migrate_fight_task_shared_params() {
+        let task = object!(
+            "$type" => "FightTask",
+            "UseMedicine" => true,
+            "MedicineCount" => 3,
+            "UseStone" => true,
+            "StoneCount" => 2,
+            "EnableTimesLimit" => true,
+            "TimesLimit" => 10,
+            "EnableTargetDrop" => true,
+            "DropId" => "30012",
+            "DropCount" => 100,
+            "Series" => 6,
+            "StagePlan" => vec!["1-7"]??,
+            "IsEnable" => true,
+        );
+        let mut summary = MigrationSummary::default();
+        let actual = fight::migrate_fight_task(&task, &mut summary)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            serde_json::to_value(&actual).unwrap(),
+            serde_json::json!({
+                "type": "Fight",
+                "params": {
+                    "medicine": 3,
+                    "stone": 2,
+                    "times": 10,
+                    "drops": { "30012": 100 },
+                    "series": 6,
+                    "stage": "1-7"
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn migrate_fight_task_optional_stage_conditions() {
+        let task = object!(
+            "$type" => "FightTask",
+            "UseOptionalStage" => true,
+            "UseWeeklySchedule" => false,
+            "StagePlan" => vec!["CE-6", "LS-6", "Annihilation", "1-7"]??,
+            "IsEnable" => true,
+        );
+        let mut summary = MigrationSummary::default();
+        let actual = fight::migrate_fight_task(&task, &mut summary)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            serde_json::to_value(&actual).unwrap(),
+            serde_json::json!({
+                "type": "Fight",
+                "variants": [
+                    {
+                        "condition": {
+                            "type": "Weekday",
+                            "weekdays": ["Tue", "Thu", "Sat", "Sun"],
+                            "timezone": "Official"
+                        },
+                        "params": { "stage": "CE-6" }
+                    },
+                    {
+                        "condition": { "type": "Always" },
+                        "params": { "stage": "LS-6" }
+                    },
+                    {
+                        "condition": { "type": "Always" },
+                        "params": { "stage": "Annihilation" }
+                    },
+                    {
+                        "condition": { "type": "Always" },
+                        "params": { "stage": "1-7" }
+                    }
+                ]
+            })
+        );
+    }
+
+    #[test]
+    fn migrate_fight_task_weekly_and_optional_and_condition() {
+        let task = object!(
+            "$type" => "FightTask",
+            "UseOptionalStage" => true,
+            "UseWeeklySchedule" => true,
+            "WeeklySchedule" => object!(
+                "Sunday" => true,
+                "Monday" => false,
+                "Tuesday" => false,
+                "Wednesday" => false,
+                "Thursday" => false,
+                "Friday" => false,
+                "Saturday" => false,
+            ),
+            "StagePlan" => vec!["CE-6"]??,
+            "IsEnable" => true,
+        );
+        let mut summary = MigrationSummary::default();
+        let actual = fight::migrate_fight_task(&task, &mut summary)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            serde_json::to_value(&actual).unwrap(),
+            serde_json::json!({
+                "type": "Fight",
+                "variants": [
+                    {
+                        "condition": {
+                            "type": "And",
+                            "conditions": [
+                                {
+                                    "type": "Weekday",
+                                    "weekdays": ["Sun"]
+                                },
+                                {
+                                    "type": "Weekday",
+                                    "weekdays": ["Tue", "Thu", "Sat", "Sun"],
+                                    "timezone": "Official"
+                                }
+                            ]
+                        },
+                        "params": { "stage": "CE-6" }
+                    }
+                ]
+            })
+        );
+    }
 }
 
 mod start_up {
@@ -972,10 +1114,12 @@ mod start_up {
 }
 
 mod fight {
-    use anyhow::Result;
+    use anyhow::{Result, bail};
+    use log::warn;
     use maa_value::prelude::*;
 
     use super::{MigrationSummary, report_unhandled_fields};
+    use crate::config::task::ClientType;
 
     pub(super) fn migrate_fight_task(
         task: &MAAValue,
@@ -987,68 +1131,68 @@ mod fight {
             insert!(item, "name" => name.as_str());
         }
 
-        let mut weekday_condition = None;
-        // UseWeeklySchedule + WeeklySchedule -> condition
-        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(true))) = task.get("UseWeeklySchedule")
-            && let Some(MAAValue::Object(map)) = task.get("WeeklySchedule")
-        {
-            const DAYS: [(&str, &str); 7] = [
-                ("Sunday", "Sun"),
-                ("Monday", "Mon"),
-                ("Tuesday", "Tue"),
-                ("Wednesday", "Wed"),
-                ("Thursday", "Thu"),
-                ("Friday", "Fri"),
-                ("Saturday", "Sat"),
-            ];
+        let shared_params = shared_fight_params(task);
 
-            let mut weekdays = Vec::new();
-            for (gui_day, cli_day) in DAYS {
-                if let Some(MAAValue::Primitive(MAAPrimitive::Bool(true))) = map.get(gui_day) {
-                    weekdays.push(cli_day);
+        let use_weekly = flag(task, "UseWeeklySchedule");
+        let use_optional = flag(task, "UseOptionalStage");
+
+        match (use_weekly, use_optional) {
+            // No variants: StagePlan must be a single stage.
+            (false, false) => {
+                let stage = stage_plan_single(task)?;
+                let mut params = shared_params;
+                insert!(params, "stage" => stage);
+                insert!(item, "params" => params);
+            }
+            // One variant gated by weekly schedule; StagePlan must be a single stage.
+            (true, false) => {
+                let stage = stage_plan_single(task)?;
+                let weekly = weekly_schedule_condition(task)?;
+                let mut params = shared_params;
+                insert!(params, "stage" => stage);
+                insert!(
+                    item,
+                    "variants" => vec![object!(
+                        "condition" => weekly,
+                        "params" => params
+                    )]??
+                );
+            }
+            // One variant per optional stage, each with its own open-condition.
+            (false, true) => {
+                let stages = stage_plan_array(task)?;
+                let mut variants = Vec::with_capacity(stages.len());
+                for stage in stages {
+                    let mut params = shared_params.clone();
+                    insert!(params, "stage" => stage);
+                    variants.push(object!(
+                        "condition" => stage_condition(stage),
+                        "params" => params
+                    ));
                 }
+                insert!(item, "variants" => variants??);
             }
-
-            weekday_condition = Some(object!(
-                "type" => "Weekday",
-                "weekdays" => weekdays??
-            ));
-        }
-
-        let mut params = MAAValue::default();
-        // StagePlan -> stage
-        if let Some(MAAValue::Array(stages)) = task.get("StagePlan") {
-            let mut stage_list = Vec::new();
-            for stage in stages {
-                if let MAAValue::Primitive(MAAPrimitive::String(stage)) = stage {
-                    stage_list.push(stage.as_str());
+            // Weekly schedule AND each stage's open-condition.
+            (true, true) => {
+                let stages = stage_plan_array(task)?;
+                let weekly = weekly_schedule_condition(task)?;
+                let mut variants = Vec::with_capacity(stages.len());
+                for stage in stages {
+                    let mut params = shared_params.clone();
+                    insert!(params, "stage" => stage);
+                    variants.push(object!(
+                        "condition" => object!(
+                            "type" => "And",
+                            "conditions" => vec![
+                                weekly.clone(),
+                                stage_condition(stage)
+                            ]??
+                        ),
+                        "params" => params
+                    ));
                 }
+                insert!(item, "variants" => variants??);
             }
-            if stage_list.len() == 1 {
-                insert!(params, "stage" => stage_list[0]);
-            } else if !stage_list.is_empty() {
-                insert!(params, "stage" => stage_list??);
-            }
-        }
-        // UseExpiringMedicine + MedicineExpireDays -> medicine_expire_days
-        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(true))) = task.get("UseExpiringMedicine")
-            && let Some(MAAValue::Primitive(MAAPrimitive::Int(days))) =
-                task.get("MedicineExpireDays")
-        {
-            insert!(params, "medicine_expire_days" => *days);
-        }
-
-        if let Some(condition) = weekday_condition {
-            insert!(item, "strategy" => "merge");
-            insert!(
-                item,
-                "variants" => vec![object!(
-                    "condition" => condition,
-                    "params" => params
-                )]??
-            );
-        } else {
-            insert!(item, "params" => params);
         }
 
         report_unhandled_fields(
@@ -1058,13 +1202,217 @@ mod fight {
             &[
                 "UseWeeklySchedule",
                 "WeeklySchedule",
+                "UseOptionalStage",
                 "StagePlan",
+                "UseMedicine",
+                "MedicineCount",
+                "UseStone",
+                "StoneCount",
+                "EnableTimesLimit",
+                "TimesLimit",
+                "EnableTargetDrop",
+                "DropId",
+                "DropCount",
+                "Series",
                 "UseExpiringMedicine",
                 "MedicineExpireDays",
             ],
         );
 
         Ok(Some(item))
+    }
+
+    fn flag(task: &MAAValue, key: &str) -> bool {
+        matches!(
+            task.get(key),
+            Some(MAAValue::Primitive(MAAPrimitive::Bool(true)))
+        )
+    }
+
+    /// Shared Fight params that do not depend on stage / condition branching.
+    fn shared_fight_params(task: &MAAValue) -> MAAValue {
+        let mut params = MAAValue::default();
+
+        // UseMedicine + MedicineCount -> medicine
+        if flag(task, "UseMedicine")
+            && let Some(MAAValue::Primitive(MAAPrimitive::Int(count))) = task.get("MedicineCount")
+        {
+            insert!(params, "medicine" => *count);
+        }
+
+        // UseStone + StoneCount -> stone
+        if flag(task, "UseStone")
+            && let Some(MAAValue::Primitive(MAAPrimitive::Int(count))) = task.get("StoneCount")
+        {
+            warn!(
+                "FightTask enables stone={count}; this setting may consume Originite Prime (源石)"
+            );
+            insert!(params, "stone" => *count);
+        }
+
+        // EnableTimesLimit + TimesLimit -> times
+        if flag(task, "EnableTimesLimit")
+            && let Some(MAAValue::Primitive(MAAPrimitive::Int(times))) = task.get("TimesLimit")
+        {
+            insert!(params, "times" => *times);
+        }
+
+        // EnableTargetDrop + DropId/DropCount -> drops = { <DropId> = <DropCount> }
+        if flag(task, "EnableTargetDrop")
+            && let (
+                Some(MAAValue::Primitive(MAAPrimitive::String(drop_id))),
+                Some(MAAValue::Primitive(MAAPrimitive::Int(drop_count))),
+            ) = (task.get("DropId"), task.get("DropCount"))
+        {
+            let mut drop_map = maa_value::map::StringMap::new();
+            drop_map.insert(drop_id.clone(), (*drop_count).into());
+            insert!(params, "drops" => MAAValue::Object(drop_map));
+        }
+
+        // Series -> series (only when non-zero)
+        if let Some(MAAValue::Primitive(MAAPrimitive::Int(series))) = task.get("Series")
+            && *series != 0
+        {
+            insert!(params, "series" => *series);
+        }
+
+        // UseExpiringMedicine + MedicineExpireDays -> medicine_expire_days
+        if flag(task, "UseExpiringMedicine")
+            && let Some(MAAValue::Primitive(MAAPrimitive::Int(days))) =
+                task.get("MedicineExpireDays")
+        {
+            insert!(params, "medicine_expire_days" => *days);
+        }
+
+        params
+    }
+
+    /// `UseWeeklySchedule` + `WeeklySchedule` -> `Weekday` condition.
+    fn weekly_schedule_condition(task: &MAAValue) -> Result<MAAValue> {
+        let Some(MAAValue::Object(map)) = task.get("WeeklySchedule") else {
+            bail!("FightTask UseWeeklySchedule is true but WeeklySchedule is missing or invalid");
+        };
+
+        const DAYS: [(&str, &str); 7] = [
+            ("Sunday", "Sun"),
+            ("Monday", "Mon"),
+            ("Tuesday", "Tue"),
+            ("Wednesday", "Wed"),
+            ("Thursday", "Thu"),
+            ("Friday", "Fri"),
+            ("Saturday", "Sat"),
+        ];
+
+        let mut weekdays = Vec::new();
+        for (gui_day, cli_day) in DAYS {
+            if let Some(MAAValue::Primitive(MAAPrimitive::Bool(true))) = map.get(gui_day) {
+                weekdays.push(cli_day);
+            }
+        }
+
+        Ok(object!(
+            "type" => "Weekday",
+            "weekdays" => weekdays??
+        ))
+    }
+
+    /// Parse `StagePlan` as a single stage name.
+    ///
+    /// GUI usually stores a single stage as a one-element array (`["CE-6"]`).
+    /// A multi-element array is rejected when `UseOptionalStage` is false.
+    fn stage_plan_single(task: &MAAValue) -> Result<&str> {
+        match task.get("StagePlan") {
+            Some(MAAValue::Primitive(MAAPrimitive::String(stage))) => Ok(stage.as_str()),
+            Some(MAAValue::Array(stages)) if stages.len() == 1 => match &stages[0] {
+                MAAValue::Primitive(MAAPrimitive::String(stage)) => Ok(stage.as_str()),
+                _ => bail!("FightTask StagePlan must be a string when UseOptionalStage is false"),
+            },
+            Some(MAAValue::Array(_)) => {
+                bail!(
+                    "FightTask StagePlan must be a single stage string when UseOptionalStage is false, \
+                     got a string array; enable UseOptionalStage for multiple stages"
+                )
+            }
+            Some(_) => bail!("FightTask StagePlan must be a string when UseOptionalStage is false"),
+            None => bail!("FightTask missing StagePlan"),
+        }
+    }
+
+    /// Parse `StagePlan` as a non-empty string array (optional-stage mode).
+    fn stage_plan_array(task: &MAAValue) -> Result<Vec<&str>> {
+        match task.get("StagePlan") {
+            Some(MAAValue::Array(stages)) => {
+                let mut stage_list = Vec::with_capacity(stages.len());
+                for stage in stages {
+                    match stage {
+                        MAAValue::Primitive(MAAPrimitive::String(stage)) => {
+                            stage_list.push(stage.as_str());
+                        }
+                        _ => bail!(
+                            "FightTask StagePlan array elements must be strings when UseOptionalStage is true"
+                        ),
+                    }
+                }
+                if stage_list.is_empty() {
+                    bail!(
+                        "FightTask StagePlan must be a non-empty string array when UseOptionalStage is true"
+                    );
+                }
+                Ok(stage_list)
+            }
+            Some(MAAValue::Primitive(MAAPrimitive::String(_))) => {
+                bail!(
+                    "FightTask StagePlan must be a string array when UseOptionalStage is true, got a string"
+                )
+            }
+            Some(_) => {
+                bail!("FightTask StagePlan must be a string array when UseOptionalStage is true")
+            }
+            None => bail!("FightTask missing StagePlan"),
+        }
+    }
+
+    /// Build the open-condition for a fight stage name.
+    ///
+    /// - Resource stages with a weekly rotation → `Weekday` (server timezone Official)
+    /// - Permanent stages (mainline, annihilation, LS-6, OF-*) → `Always`
+    /// - Side-story stages listed in `StageActivityV2.json` → `OnSideStory`
+    fn stage_condition(stage: &str) -> MAAValue {
+        match stage {
+            // 资源本 / 芯片本（同开放日合并）
+            "CE-6" => weekday_condition(&["Tue", "Thu", "Sat", "Sun"]),
+            "AP-5" => weekday_condition(&["Mon", "Thu", "Sat", "Sun"]),
+            "CA-5" => weekday_condition(&["Tue", "Wed", "Fri", "Sun"]),
+            "SK-5" => weekday_condition(&["Mon", "Wed", "Fri", "Sat"]),
+            "PR-A-1" | "PR-A-2" => weekday_condition(&["Mon", "Thu", "Fri", "Sun"]),
+            "PR-B-1" | "PR-B-2" => weekday_condition(&["Mon", "Tue", "Fri", "Sat"]),
+            "PR-C-1" | "PR-C-2" => weekday_condition(&["Wed", "Thu", "Sat", "Sun"]),
+            "PR-D-1" | "PR-D-2" => weekday_condition(&["Tue", "Wed", "Sat", "Sun"]),
+            // 永久开启
+            "LS-6" | "Annihilation" | "OF-1" | "OF-F3" => always_condition(),
+            _ => {
+                let side_story = crate::activity::side_story_stages(ClientType::Official);
+                if side_story.iter().any(|code| code == stage) {
+                    return object!("type" => "OnSideStory");
+                }
+                warn!(
+                    "FightTask stage `{stage}` has no known open schedule; treating as Always"
+                );
+                always_condition()
+            }
+        }
+    }
+
+    fn always_condition() -> MAAValue {
+        object!("type" => "Always")
+    }
+
+    fn weekday_condition(weekdays: &[&str]) -> MAAValue {
+        object!(
+            "type" => "Weekday",
+            "weekdays" => weekdays.iter().copied().collect::<Vec<_>>()??,
+            "timezone" => "Official"
+        )
     }
 }
 
