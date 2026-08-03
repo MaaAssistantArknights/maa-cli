@@ -1041,6 +1041,37 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn migrate_infrast_task_rejects_custom_mode() {
+        let task = object!(
+            "$type" => "InfrastTask",
+            "Mode" => "Custom",
+            "IsEnable" => true,
+        );
+        let mut summary = MigrationSummary::default();
+        let err = infrast::migrate_infrast_task(&task, &mut summary).unwrap_err();
+        assert!(
+            err.to_string().contains("not supported yet"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn migrate_infrast_task_rejects_custom_filename() {
+        let task = object!(
+            "$type" => "InfrastTask",
+            "Mode" => "Normal",
+            "Filename" => "custom.json",
+            "IsEnable" => true,
+        );
+        let mut summary = MigrationSummary::default();
+        let err = infrast::migrate_infrast_task(&task, &mut summary).unwrap_err();
+        assert!(
+            err.to_string().contains("not supported yet"),
+            "unexpected error: {err}"
+        );
+    }
 }
 
 mod start_up {
@@ -1417,7 +1448,7 @@ mod fight {
 }
 
 mod infrast {
-    use anyhow::Result;
+    use anyhow::{Result, bail};
     use maa_value::prelude::*;
 
     use super::{MigrationSummary, report_unhandled_fields};
@@ -1426,6 +1457,18 @@ mod infrast {
         task: &MAAValue,
         summary: &mut MigrationSummary,
     ) -> Result<Option<MAAValue>> {
+        // Custom infrastructure plans are not migrated yet.
+        if let Some(MAAValue::Primitive(MAAPrimitive::String(mode))) = task.get("Mode")
+            && mode == "Custom"
+        {
+            bail!("InfrastTask custom mode is not supported yet");
+        }
+        if let Some(MAAValue::Primitive(MAAPrimitive::String(filename))) = task.get("Filename")
+            && !filename.is_empty()
+        {
+            bail!("InfrastTask custom plan (Filename) is not supported yet");
+        }
+
         let mut item = object!("type" => "Infrast");
         // -> task name
         if let Some(MAAValue::Primitive(MAAPrimitive::String(name))) = task.get("Name") {
@@ -1444,14 +1487,14 @@ mod infrast {
             "ReceptionMessageBoard",
             "ReceptionClueExchange",
             "SendClue",
+            // Custom plan fields: rejected above when set; keep handled so defaults are quiet.
             "Filename",
             "PlanSelect",
         ];
-        // Mode -> mode
+        // Mode -> mode (Custom is rejected above)
         if let Some(MAAValue::Primitive(MAAPrimitive::String(mode))) = task.get("Mode") {
             if let Some(mode) = match mode.as_str() {
                 "Normal" => Some(0),
-                "Custom" => Some(10000),
                 "Rotation" => Some(20000),
                 _ => None,
             } {
@@ -1514,18 +1557,6 @@ mod infrast {
         // SendClue -> reception_send_clue
         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(enabled))) = task.get("SendClue") {
             insert!(params, "reception_send_clue" => *enabled);
-        }
-        // Filename -> filename
-        if let Some(MAAValue::Primitive(MAAPrimitive::String(filename))) = task.get("Filename")
-            && !filename.is_empty()
-        {
-            insert!(params, "filename" => filename.as_str());
-        }
-        // PlanSelect -> plan_index
-        if let Some(MAAValue::Primitive(MAAPrimitive::Int(plan_index))) = task.get("PlanSelect")
-            && *plan_index >= 0
-        {
-            insert!(params, "plan_index" => *plan_index);
         }
 
         insert!(item, "params" => params);
