@@ -411,8 +411,7 @@ mod tests {
                         "params": {
                             "client_type": {
                                 "alternatives": ["Official", "Bilibili", "txwy", "YoStarEN", "YoStarJP", "YoStarKR"],
-                            },
-                            "start_game_enabled": "false"
+                            }
                         }
                     },
                     {
@@ -629,12 +628,7 @@ mod tests {
                 "type": "StartUp",
                 "params": {
                     "client_type": {
-                        "alternatives": ["Official", "YoStarEN", "YoStarJP"],
-                        "description": "a client type"
-                    },
-                    "start_game_enabled": {
-                        "default": true,
-                        "description": "start the game"
+                        "alternatives": ["Official", "Bilibili", "txwy", "YoStarEN", "YoStarJP", "YoStarKR"]
                     }
                 }
             })
@@ -689,8 +683,7 @@ mod tests {
                 "type": "StartUp",
                 "params": {
                     "client_type": {
-                        "alternatives": ["Official", "YoStarEN", "YoStarJP"],
-                        "description": "a client type"
+                        "alternatives": ["Official", "Bilibili", "txwy", "YoStarEN", "YoStarJP", "YoStarKR"]
                     },
                     "start_game_enabled": false
                 }
@@ -1113,11 +1106,10 @@ mod start_up {
         }
 
         // Gui.RuntimeSettings.StartGame -> start_game_enabled
-        match runtime.and_then(|settings| settings.get("StartGame")) {
-            Some(MAAValue::Primitive(MAAPrimitive::Bool(start_game))) => {
-                insert!(params, "start_game_enabled" => *start_game);
-            }
-            _ => {}
+        if let Some(MAAValue::Primitive(MAAPrimitive::Bool(start_game))) =
+            runtime.and_then(|settings| settings.get("StartGame"))
+        {
+            insert!(params, "start_game_enabled" => *start_game);
         }
 
         // AccountSwitchEnabled + AccountName -> account_name
@@ -1441,7 +1433,7 @@ mod fight {
     fn weekday_condition(weekdays: &[&str]) -> MAAValue {
         object!(
             "type" => "Weekday",
-            "weekdays" => weekdays.iter().copied().collect::<Vec<_>>()??,
+            "weekdays" => weekdays.to_vec()??,
             "timezone" => "Official"
         )
     }
