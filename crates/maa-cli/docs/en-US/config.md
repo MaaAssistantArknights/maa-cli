@@ -345,8 +345,39 @@ There are two special presets: `PlayCover` (macOS) and `Waydroid` (Linux)
 
 - `PlayCover` is for connecting to iOS apps running natively on macOS through PlayCover.
 
-   In this case, `adb_path` is ignored and `address` is the address of `PlayTools`.
-   See [PlayCover documentation][playcover-doc] for details.
+   In this case, `adb_path` is ignored and `address` is the address of `PlayTools`
+   (the MaaTools port configured in PlayCover, `localhost:1717` by default):
+
+   ```toml
+   [connection]
+   preset = "PlayCover"
+   address = "localhost:1717"
+   ```
+
+   > **Prerequisite:** the game must already be running under PlayCover with MaaTools
+   > enabled and listening (default port `1717`) before maa-cli connects; otherwise the
+   > connection falls back to ADB and fails. maa-cli can also launch the app for you when
+   > a `StartUp` task sets `start_game_enabled = true`.
+
+   A complete task file (`$MAA_CONFIG_DIR/tasks/daily.toml`) that starts the game, runs
+   the Sami roguelike, then closes it looks like:
+
+   ```toml
+   [[tasks]]
+   type = "StartUp"
+   params = { client_type = "Official", start_game_enabled = true }
+
+   [[tasks]]
+   type = "Roguelike"
+   params = { theme = "Sami", mode = 0, squad = "指挥分队", investment_enabled = true }
+
+   [[tasks]]
+   type = "CloseDown"
+   params = { client_type = "Official" }
+   ```
+
+   Run it with `maa run daily`. See [PlayCover documentation][playcover-doc] for
+   installing the client and enabling MaaTools.
 
 - `Waydroid` is for connecting to Android apps running natively on Linux through Waydroid.
 

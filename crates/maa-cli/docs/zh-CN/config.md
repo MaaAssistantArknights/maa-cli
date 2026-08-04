@@ -332,7 +332,33 @@ address = "127.0.0.1:7777" # 如果你需要的话，你可以覆盖预设的地
 
 目前预配置了两种预设，为 `PlayCover` (MacOS), `Waydroid` (Linux)
 
-- `PlayCover`用于在 macOS 上连接直接通过 `PlayCover` 原生运行的游戏客户端。这种情况下不需要指定 `adb_path` 且 `address` 不是 `adb` 连接的地址而是 `PlayTools` 的地址，具体使用参见 [PlayCover 支持文档][playcover-doc].
+- `PlayCover` 用于在 macOS 上连接直接通过 `PlayCover` 原生运行的游戏客户端。这种情况下不需要指定 `adb_path`，`address` 不是 `adb` 连接的地址，而是 `PlayTools` 的地址（在 PlayCover 中配置的 MaaTools 端口，默认 `localhost:1717`）：
+
+  ```toml
+  [connection]
+  preset = "PlayCover"
+  address = "localhost:1717"
+  ```
+
+  > **前置条件**：在 maa-cli 连接之前，游戏必须已在 PlayCover 中运行并启用 MaaTools 监听端口（默认 `1717`），否则连接会回退到 ADB 并失败。若 `StartUp` 任务设置了 `start_game_enabled = true`，maa-cli 也可以替你启动游戏。
+
+  一个完整的任务文件（`$MAA_CONFIG_DIR/tasks/daily.toml`）——启动游戏、跑萨米肉鸽、再关闭：
+
+  ```toml
+  [[tasks]]
+  type = "StartUp"
+  params = { client_type = "Official", start_game_enabled = true }
+
+  [[tasks]]
+  type = "Roguelike"
+  params = { theme = "Sami", mode = 0, squad = "指挥分队", investment_enabled = true }
+
+  [[tasks]]
+  type = "CloseDown"
+  params = { client_type = "Official" }
+  ```
+
+  用 `maa run daily` 运行。安装客户端与启用 MaaTools 的方法参见 [PlayCover 支持文档][playcover-doc]。
 
 - `Waydroid`用于在 Linux 上连接直接通过 `Waydroid` 原生运行的游戏客户端。这种情况下仍需要指定 `adb_path` 供 MaaCore 连接设备使用。maa-cli 会自动管理会话：通过 `waydroid status` 检测会话是否已在运行，必要时启动会话，然后通过 `waydroid adb connect` 建立 ADB 连接。
   具体使用参见 [Waydroid 支持文档][waydroid-doc].
