@@ -30,11 +30,12 @@ struct CoreAsset<'a>(&'a core::Asset);
 impl CoreManifest {
     fn from_reader(file: std::fs::File) -> maa_installer::error::Result<Self> {
         use maa_installer::error::{Error, ErrorKind};
-        let manifest = serde_json::from_reader(file).map_err(|e| {
-            Error::new(ErrorKind::Other)
-                .with_source(e)
-                .with_desc("Failed to parse core version manifest")
-        })?;
+        let manifest: VersionManifest<core::Details> =
+            serde_json::from_reader(file).map_err(|e| {
+                Error::new(ErrorKind::Other)
+                    .with_source(e)
+                    .with_desc("Failed to parse core version manifest")
+            })?;
 
         Ok(CoreManifest(manifest))
     }
