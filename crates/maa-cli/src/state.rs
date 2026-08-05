@@ -9,7 +9,10 @@ use ureq::{
     tls::{RootCerts, TlsConfig},
 };
 
-use crate::config::cli::CLI_CONFIG;
+use crate::{
+    config::{FindFile, cli::CLIConfig},
+    dirs,
+};
 
 pub const CLI_VERSION_STR: &str = env!("MAA_VERSION");
 
@@ -49,10 +52,19 @@ pub(crate) fn rewrite_github_url(url: &str, proxy: &str) -> Option<String> {
     Some(format!("{proxy}/{url}"))
 }
 
+/// GitHub proxy prefix, read lazily from the config file.
+///
+/// Unlike `CLI_CONFIG`, this never panics: if the config file fails to parse
+/// (e.g. with a feature-gated field), the proxy is simply disabled.
+static GITHUB_PROXY: LazyLock<Option<String>> = LazyLock::new(|| {
+    CLIConfig::find_file_or_none(dirs::config().join("cli"))
+        .ok()
+        .flatten()
+        .and_then(|cfg| cfg.github_proxy())
+});
+
 /// Middleware that rewrites GitHub release download URLs through a proxy.
-struct GitHubProxyMiddleware {
-    proxy: String,
-}
+struct GitHubProxyMiddleware;
 
 impl Middleware for GitHubProxyMiddleware {
     fn handle(
@@ -60,11 +72,13 @@ impl Middleware for GitHubProxyMiddleware {
         mut req: ureq::http::Request<SendBody>,
         next: MiddlewareNext,
     ) -> Result<ureq::http::Response<Body>, ureq::Error> {
-        let uri_str = req.uri().to_string();
-        if let Some(new_url) = rewrite_github_url(&uri_str, &self.proxy)
-            && let Ok(uri) = new_url.parse()
-        {
-            *req.uri_mut() = uri;
+        if let Some(proxy) = GITHUB_PROXY.as_deref() {
+            let uri_str = req.uri().to_string();
+            if let Some(new_url) = rewrite_github_url(&uri_str, proxy)
+                && let Ok(uri) = new_url.parse()
+            {
+                *req.uri_mut() = uri;
+            }
         }
         next.handle(req)
     }
@@ -79,8 +93,8 @@ pub static AGENT: LazyLock<Agent> = LazyLock::new(|| {
         )
         .user_agent(format!("maa-cli/{CLI_VERSION_STR}"));
 
-    if let Some(proxy) = CLI_CONFIG.github_proxy() {
-        config = config.middleware(GitHubProxyMiddleware { proxy });
+    if GITHUB_PROXY.is_some() {
+        config = config.middleware(GitHubProxyMiddleware);
     }
 
     config.build().into()
