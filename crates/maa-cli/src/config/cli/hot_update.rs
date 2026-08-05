@@ -3,11 +3,13 @@ use std::path::{Path, PathBuf};
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
 
-use crate::config::cli::normalize_url;
+use crate::config::cli::{normalize_url, return_true};
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Clone)]
 pub struct Config {
+    #[serde(default = "return_true")]
+    auto_update: bool,
     #[serde(default = "default_api_url")]
     api_url: String,
     /// Check interval in seconds (0 to disable caching)
@@ -18,6 +20,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            auto_update: true,
             api_url: default_api_url(),
             check_interval: default_check_interval(),
         }
@@ -41,6 +44,10 @@ impl Config {
         &["global", "YoStarKR", "resource"],
         &["global", "txwy", "resource"],
     ];
+
+    pub fn auto_update(&self) -> bool {
+        self.auto_update
+    }
 
     pub fn api_url(&self) -> &str {
         normalize_url(&self.api_url)
@@ -114,6 +121,7 @@ pub mod tests {
 
     pub fn example_config() -> Config {
         Config {
+            auto_update: true,
             api_url: "https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api".to_string(),
             check_interval: 3600, // 1 hour
         }
@@ -123,6 +131,7 @@ pub mod tests {
     fn default() {
         let config = Config::default();
         assert_eq!(config, Config {
+            auto_update: true,
             api_url: default_api_url(),
             check_interval: default_check_interval(),
         });
@@ -145,7 +154,7 @@ pub mod tests {
             assert_de_tokens(
                 &Config {
                     api_url: "https://custom.api.com".to_string(),
-                    check_interval: default_check_interval(),
+                    ..Default::default()
                 },
                 &[
                     Token::Map { len: Some(1) },
@@ -158,8 +167,8 @@ pub mod tests {
             // Custom check_interval
             assert_de_tokens(
                 &Config {
-                    api_url: default_api_url(),
                     check_interval: 3600, // 1 hour
+                    ..Default::default()
                 },
                 &[
                     Token::Map { len: Some(1) },
@@ -174,6 +183,7 @@ pub mod tests {
                 &Config {
                     api_url: "https://custom.api.com".to_string(),
                     check_interval: 0, // Disable caching
+                    ..Default::default()
                 },
                 &[
                     Token::Map { len: Some(2) },
@@ -184,11 +194,37 @@ pub mod tests {
                     Token::MapEnd,
                 ],
             );
+
+            // Disable automatic API hot update
+            assert_de_tokens(
+                &Config {
+                    auto_update: false,
+                    ..Default::default()
+                },
+                &[
+                    Token::Map { len: Some(1) },
+                    Token::Str("auto_update"),
+                    Token::Bool(false),
+                    Token::MapEnd,
+                ],
+            );
         }
     }
 
     mod methods {
         use super::*;
+
+        #[test]
+        fn auto_update() {
+            assert!(Config::default().auto_update());
+            assert!(
+                !Config {
+                    auto_update: false,
+                    ..Default::default()
+                }
+                .auto_update()
+            );
+        }
 
         #[test]
         fn resource_files() {

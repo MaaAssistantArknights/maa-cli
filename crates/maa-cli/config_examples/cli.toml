@@ -71,6 +71,8 @@ passphrase = "password"  # Passphrase of ssh key
 # Note: this is different from `resource`, this is for hot update of activity files
 # and resource files from MAA API, while `resource` is for resource repository
 [hot_update]
+# Whether to update activity and API resource files before running tasks
+auto_update = true
 # URL of the hot update API, used to get activity and hot update resource files
 api_url = "https://github.com/MaaAssistantArknights/MaaRelease/raw/main/MaaAssistantArknights/api"
 # Check interval in seconds, files will be re-downloaded if older than this interval
