@@ -319,13 +319,10 @@ mod tests {
         };
         assert_eq!(tasks.len(), 1);
         assert_eq!(tasks[0].get("type").unwrap().as_str().unwrap(), "StartUp");
-        assert_eq!(
-            summary.skipped_tasks,
-            vec![SkippedTask {
-                type_tag: "UserDataUpdateTask".into(),
-                name: Some("update".into()),
-            }]
-        );
+        assert_eq!(summary.skipped_tasks, vec![SkippedTask {
+            type_tag: "UserDataUpdateTask".into(),
+            name: Some("update".into()),
+        }]);
     }
 
     #[test]
@@ -356,13 +353,10 @@ mod tests {
         }))
         .unwrap();
         assert_eq!(value, expected);
-        assert_eq!(
-            summary.disabled_tasks,
-            vec![SkippedTask {
-                type_tag: "FightTask".into(),
-                name: Some("日常经验本".into()),
-            }]
-        );
+        assert_eq!(summary.disabled_tasks, vec![SkippedTask {
+            type_tag: "FightTask".into(),
+            name: Some("日常经验本".into()),
+        }]);
     }
 
     #[test]
@@ -564,26 +558,20 @@ mod tests {
             }))
             .unwrap();
         assert_eq!(value, expected);
-        assert_eq!(
-            summary.skipped_tasks,
-            vec![SkippedTask {
-                type_tag: "UserDataUpdateTask".into(),
+        assert_eq!(summary.skipped_tasks, vec![SkippedTask {
+            type_tag: "UserDataUpdateTask".into(),
+            name: None,
+        }]);
+        assert_eq!(summary.disabled_tasks, vec![
+            SkippedTask {
+                type_tag: "RoguelikeTask".into(),
                 name: None,
-            }]
-        );
-        assert_eq!(
-            summary.disabled_tasks,
-            vec![
-                SkippedTask {
-                    type_tag: "RoguelikeTask".into(),
-                    name: None,
-                },
-                SkippedTask {
-                    type_tag: "ReclamationTask".into(),
-                    name: None,
-                },
-            ]
-        );
+            },
+            SkippedTask {
+                type_tag: "ReclamationTask".into(),
+                name: None,
+            },
+        ]);
         assert!(
             summary
                 .skipped_fields
@@ -1218,29 +1206,24 @@ mod fight {
             }
         }
 
-        report_unhandled_fields(
-            summary,
-            task,
-            "FightTask",
-            &[
-                "UseWeeklySchedule",
-                "WeeklySchedule",
-                "UseOptionalStage",
-                "StagePlan",
-                "UseMedicine",
-                "MedicineCount",
-                "UseStone",
-                "StoneCount",
-                "EnableTimesLimit",
-                "TimesLimit",
-                "EnableTargetDrop",
-                "DropId",
-                "DropCount",
-                "Series",
-                "UseExpiringMedicine",
-                "MedicineExpireDays",
-            ],
-        );
+        report_unhandled_fields(summary, task, "FightTask", &[
+            "UseWeeklySchedule",
+            "WeeklySchedule",
+            "UseOptionalStage",
+            "StagePlan",
+            "UseMedicine",
+            "MedicineCount",
+            "UseStone",
+            "StoneCount",
+            "EnableTimesLimit",
+            "TimesLimit",
+            "EnableTargetDrop",
+            "DropId",
+            "DropCount",
+            "Series",
+            "UseExpiringMedicine",
+            "MedicineExpireDays",
+        ]);
 
         Ok(Some(item))
     }
@@ -1418,9 +1401,7 @@ mod fight {
                 if side_story.iter().any(|code| code == stage) {
                     return object!("type" => "OnSideStory");
                 }
-                warn!(
-                    "FightTask stage `{stage}` has no known open schedule; treating as Always"
-                );
+                warn!("FightTask stage `{stage}` has no known open schedule; treating as Always");
                 always_condition()
             }
         }
@@ -1646,29 +1627,24 @@ mod recruit {
         }
 
         insert!(item, "params" => params);
-        report_unhandled_fields(
-            summary,
-            task,
-            "RecruitTask",
-            &[
-                "MaxTimes",
-                "ExtraTagMode",
-                "RefreshLevel3",
-                "ForceRefresh",
-                "Level6Choose",
-                "Level6Time",
-                "Level5Choose",
-                "Level5Time",
-                "Level4Choose",
-                "Level4Time",
-                "Level3Choose",
-                "Level3Time",
-                "PreferTagEnabled",
-                "Level3PreferTags",
-                "PreserveTagEnabled",
-                "PreserveTagList",
-            ],
-        );
+        report_unhandled_fields(summary, task, "RecruitTask", &[
+            "MaxTimes",
+            "ExtraTagMode",
+            "RefreshLevel3",
+            "ForceRefresh",
+            "Level6Choose",
+            "Level6Time",
+            "Level5Choose",
+            "Level5Time",
+            "Level4Choose",
+            "Level4Time",
+            "Level3Choose",
+            "Level3Time",
+            "PreferTagEnabled",
+            "Level3PreferTags",
+            "PreserveTagEnabled",
+            "PreserveTagList",
+        ]);
         Ok(Some(item))
     }
 }
@@ -1744,22 +1720,17 @@ mod mall {
         }
 
         insert!(item, "params" => params);
-        report_unhandled_fields(
-            summary,
-            task,
-            "MallTask",
-            &[
-                "Shopping",
-                "CreditFight",
-                "CreditFightFormation",
-                "VisitFriends",
-                "FirstList",
-                "BlackList",
-                "ShoppingIgnoreBlackListWhenFull",
-                "OnlyBuyDiscount",
-                "ReserveMaxCredit",
-            ],
-        );
+        report_unhandled_fields(summary, task, "MallTask", &[
+            "Shopping",
+            "CreditFight",
+            "CreditFightFormation",
+            "VisitFriends",
+            "FirstList",
+            "BlackList",
+            "ShoppingIgnoreBlackListWhenFull",
+            "OnlyBuyDiscount",
+            "ReserveMaxCredit",
+        ]);
         Ok(Some(item))
     }
 }
@@ -1809,19 +1780,14 @@ mod award {
         }
 
         insert!(item, "params" => params);
-        report_unhandled_fields(
-            summary,
-            task,
-            "AwardTask",
-            &[
-                "Award",
-                "Mail",
-                "FreeGacha",
-                "Orundum",
-                "Mining",
-                "SpecialAccess",
-            ],
-        );
+        report_unhandled_fields(summary, task, "AwardTask", &[
+            "Award",
+            "Mail",
+            "FreeGacha",
+            "Orundum",
+            "Mining",
+            "SpecialAccess",
+        ]);
         Ok(Some(item))
     }
 }

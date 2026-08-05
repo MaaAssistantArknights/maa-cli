@@ -74,7 +74,7 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 ] }
 
 [workspace.metadata.typos.files]
-extend-exclude = ["CHANGELOG.md"]
+extend-exclude = ["CHANGELOG.md", "crates/maa-cli/config_examples/wpf/gui.new.json"]
 
 [profile.release-lto]
 inherits = "release"

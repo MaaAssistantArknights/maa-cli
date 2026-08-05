@@ -87,9 +87,7 @@ impl MigrationSummary {
         }
 
         if !self.disabled_tasks.is_empty() {
-            eprintln!(
-                "  Disabled tasks (kept inactive with never-true condition; will not run):"
-            );
+            eprintln!("  Disabled tasks (kept inactive with never-true condition; will not run):");
             for task in &self.disabled_tasks {
                 eprintln!("    - {}", format_task_ref(task));
             }
