@@ -103,6 +103,7 @@ fn main() -> Result<()> {
         Command::SSSCopilot { params, common } => run::run_preset(params, common)?,
         Command::ParadoxCopilot { params, common } => run::run_preset(params, common)?,
         Command::Reclamation { params, common } => run::run_preset(params, common)?,
+        Command::Recruit { params, common } => run::run_preset(params, common)?,
         Command::Convert {
             input,
             output,
