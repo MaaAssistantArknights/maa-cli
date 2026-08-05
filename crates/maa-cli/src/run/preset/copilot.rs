@@ -1,6 +1,7 @@
 use std::{
     fs,
     path::{Path, PathBuf},
+    sync::Once,
 };
 
 use anyhow::{Context, Result, bail};
@@ -26,6 +27,8 @@ const COPILOT_SET_API: &str = "https://prts.maa.plus/set/get?id=";
 const COPILOT_API: &str = "http://127.0.0.1:18080/copilot/get/";
 #[cfg(test)]
 const COPILOT_SET_API: &str = "http://127.0.0.1:18080/set/get?id=";
+
+static LEGACY_URI_WARNING: Once = Once::new();
 
 /// Raid mode for copilot stages.
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
@@ -374,23 +377,36 @@ enum CopilotFile {
 }
 
 impl CopilotFile {
+    fn parse_code(code: &str) -> Result<u64> {
+        code.parse::<u64>().context("Invalid code")
+    }
+
     fn from_uri(uri: &str) -> Result<Self> {
         let trimmed = uri.trim();
-        if let Some(code_str) = trimmed.strip_prefix("maa://") {
-            if let Some(code_str) = code_str.strip_suffix('s') {
-                Ok(CopilotFile::RemoteSet(
-                    code_str.parse::<u64>().context("Invalid code")?,
-                ))
-            } else {
-                Ok(CopilotFile::Remote(
-                    code_str.parse::<u64>().context("Invalid code")?,
-                ))
-            }
-        } else if let Some(code) = trimmed.strip_prefix("file://") {
-            Ok(CopilotFile::Local(PathBuf::from(code)))
-        } else {
-            Ok(CopilotFile::Local(PathBuf::from(trimmed)))
+
+        if let Some(code) = trimmed.strip_prefix("prts://s") {
+            return Ok(Self::RemoteSet(Self::parse_code(code)?));
         }
+
+        if let Some(code) = trimmed.strip_prefix("prts://") {
+            return Ok(Self::Remote(Self::parse_code(code)?));
+        }
+
+        if let Some(code) = trimmed.strip_prefix("maa://") {
+            LEGACY_URI_WARNING.call_once(|| {
+                warn!(
+                    "The maa:// URI format is deprecated; use prts://<id> or prts://s<id> instead"
+                );
+            });
+
+            if let Some(code) = code.strip_suffix('s') {
+                return Ok(Self::RemoteSet(Self::parse_code(code)?));
+            }
+            return Ok(Self::Remote(Self::parse_code(code)?));
+        }
+
+        let path = trimmed.strip_prefix("file://").unwrap_or(trimmed);
+        Ok(Self::Local(PathBuf::from(path)))
     }
 
     pub fn push_path_into<T>(
@@ -1484,13 +1500,15 @@ found"}"#,
 
             #[test]
             fn invalid_code() {
+                assert!(CopilotFile::from_uri("prts://xyz").is_err());
+                assert!(CopilotFile::from_uri("prts://s").is_err());
                 assert!(CopilotFile::from_uri("maa://xyz").is_err());
             }
 
             #[test]
             fn remote_set() {
                 assert_eq!(
-                    CopilotFile::from_uri("maa://20001s").unwrap(),
+                    CopilotFile::from_uri("prts://s20001").unwrap(),
                     CopilotFile::RemoteSet(20001)
                 );
             }
@@ -1498,8 +1516,20 @@ found"}"#,
             #[test]
             fn remote() {
                 assert_eq!(
+                    CopilotFile::from_uri("prts://30001").unwrap(),
+                    CopilotFile::Remote(30001)
+                );
+            }
+
+            #[test]
+            fn legacy_remote_remains_supported() {
+                assert_eq!(
                     CopilotFile::from_uri("maa://30001").unwrap(),
                     CopilotFile::Remote(30001)
+                );
+                assert_eq!(
+                    CopilotFile::from_uri("maa://20001s").unwrap(),
+                    CopilotFile::RemoteSet(20001)
                 );
             }
 
@@ -1522,7 +1552,7 @@ found"}"#,
             #[test]
             fn with_whitespace() {
                 assert_eq!(
-                    CopilotFile::from_uri("  maa://30001  ").unwrap(),
+                    CopilotFile::from_uri("  prts://30001  ").unwrap(),
                     CopilotFile::Remote(30001)
                 );
 
