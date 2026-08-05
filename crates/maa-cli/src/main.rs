@@ -108,6 +108,12 @@ fn main() -> Result<()> {
             output,
             format,
         } => config::convert(&input, output.as_deref(), format)?,
+        Command::Migrate(command::MigrateCommand::Wpf {
+            input,
+            output,
+            format,
+            config,
+        }) => config::migrate::wpf(&input, output.as_deref(), format, config.as_deref())?,
         Command::Activity { client } => activity::display_stage_activity(client)?,
         Command::Remainder { divisor, timezone } => {
             use crate::config::task::{TimeOffset, remainder_of_day_mod};
