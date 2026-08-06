@@ -21,9 +21,11 @@ pub(crate) struct Cli {
     /// Emit MaaCore callback events as JSONL on stdout for structured consumption.
     ///
     /// When set, each MaaCore callback becomes one line of JSON on stdout with
-    /// the shape `{"kind": "TaskChainStart", "message": {…}}`. The human log
-    /// still goes to stderr as usual, and the summary / error-flagging side
-    /// effects of callback processing still run. Intended for programmatic
+    /// the shape `{"kind": "TaskChainStart", "time": "<RFC 3339>", "message": {…}}`.
+    /// MaaCore payloads carry no time of their own, so `time` is generated when the
+    /// event is written, with millisecond precision and the local UTC offset. The
+    /// human log still goes to stderr as usual, and the summary / error-flagging
+    /// side effects of callback processing still run. Intended for programmatic
     /// drivers, not for interactive use.
     #[arg(long, global = true, verbatim_doc_comment)]
     pub(crate) emit_json: bool,

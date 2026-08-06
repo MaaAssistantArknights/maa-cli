@@ -87,7 +87,7 @@ maa-cli 默认会向标准误 (stderr) 输出日志。`--log-file` 选项可以�
 
 ### 结构化事件输出
 
-面向程序化调用方（例如上层的 Web UI 或调度器），maa-cli 提供 `--emit-json` 全局参数。启用后，MaaCore 每次回调都会以一行 JSON 的形式写入标准输出（stdout），每行的结构为 `{"kind": "TaskChainStart", "message": {…}}`，其中 `kind` 为回调类型名，`message` 为 MaaCore 原始回调载荷。人类可读的日志仍然写入 stderr，任务总结、错误退出码、上报请求等副作用也照常触发。该选项不适合交互式使用，建议仅在被其他程序调用时启用。
+面向程序化调用方（例如上层的 Web UI 或调度器），maa-cli 提供 `--emit-json` 全局参数。启用后，MaaCore 每次回调都会以一行 JSON 的形式写入标准输出（stdout），每行的结构为 `{"kind": "TaskChainStart", "time": "2026-08-07T02:15:51.123+08:00", "message": {…}}`，其中 `kind` 为回调类型名，`time` 为事件的发出时刻，`message` 为 MaaCore 原始回调载荷。MaaCore 的回调载荷本身不携带时间，因此 `time` 由 maa-cli 在写出该事件的那一刻生成，所用时钟与人类可读日志一致。其格式为 RFC 3339，精确到毫秒，并带有本地时区偏移；该格式在各类调用方中均可无歧义地解析，且同一秒内发出的多条事件仅凭时间戳即可排序。人类可读的日志仍然写入 stderr，任务总结、错误退出码、上报请求等副作用也照常触发。该选项不适合交互式使用，建议仅在被其他程序调用时启用。
 
 除 MaaCore 回调之外，maa-cli 会在任务开始运行前，为每个成功注册到 MaaCore 的任务额外向同一 JSONL 流发送一条 `TaskRegistered` 合成事件。每条事件的 `message` 结构为 `{"id": …, "name": …, "task_type": …, "params": …}`：`id` 为注册时 MaaCore 为该任务分配的任务 id，与 MaaCore 自身 `TaskChainStart`、`TaskChainCompleted` 等回调所携带的 `taskid` 字段取值一致，调用方据此可将正在运行的任务链准确关联回其注册参数；`name` 为任务配置中的名称（未指定时回退为任务类型名称），`task_type` 为 MaaCore 使用的任务类型名（如 `"Fight"`、`"Award"`），`params` 为解析后的参数对象。调用方可利用这些事件预览本次运行的完整计划，例如在 `Fight` 任务真正开始前就得知其目标关卡。
 
