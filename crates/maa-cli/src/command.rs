@@ -262,7 +262,7 @@ pub(crate) enum MigrateCommand {
     ///
     /// The input is typically a GUI-exported JSON profile. When multiple
     /// configurations exist, use `--config` or `MAA_GUI_CONFIG` to select one.
-    /// Disabled GUI tasks are kept inactive (never-true condition) so they will
+    /// Disabled GUI tasks are kept with `params.enable = false` so they will
     /// not run until re-enabled manually.
     Wpf {
         /// Path of the input GUI profile

@@ -1,13 +1,12 @@
 use chrono::{DateTime, Datelike, NaiveDateTime, NaiveTime, TimeZone, Utc, Weekday};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::client_type::ClientType;
 use crate::activity::has_side_story_open;
 
 #[cfg_attr(test, derive(PartialEq, Debug))]
-#[derive(Deserialize)]
+#[derive(Clone, Default, Deserialize, Serialize)]
 #[serde(tag = "type")]
-#[derive(Default)]
 pub enum Condition {
     /// The task is always active
     #[default]
@@ -20,7 +19,11 @@ pub enum Condition {
     /// 03:59:59.
     Weekday {
         weekdays: Vec<Weekday>,
-        #[serde(default, alias = "client")]
+        #[serde(
+            default,
+            alias = "client",
+            skip_serializing_if = "TimeOffset::is_local"
+        )]
         timezone: TimeOffset,
     },
     /// Day modula
@@ -30,9 +33,9 @@ pub enum Condition {
     /// If `remainder` is not specified, it is 0.
     DayMod {
         divisor: u32,
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "is_zero_u32")]
         remainder: u32,
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "TimeOffset::is_local")]
         timezone: TimeOffset,
     },
     /// The task is active on the specified time range
@@ -40,11 +43,11 @@ pub enum Condition {
     /// If `start` is `None`, the task is active before `end`.
     /// If `end` is `None`, the task is active after `start`.
     Time {
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         start: Option<NaiveTime>,
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         end: Option<NaiveTime>,
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "TimeOffset::is_local")]
         timezone: TimeOffset,
     },
     /// The task is active on the specified datetime range
@@ -52,15 +55,15 @@ pub enum Condition {
     /// If `start` is `None`, the task is active before `end`.
     /// If `end` is `None`, the task is active after `start`.
     DateTime {
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         start: Option<NaiveDateTime>,
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         end: Option<NaiveDateTime>,
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "TimeOffset::is_local")]
         timezone: TimeOffset,
     },
     OnSideStory {
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "ClientType::is_official")]
         client: ClientType,
     },
     /// The task is active if all the sub-conditions are met
@@ -72,8 +75,12 @@ pub enum Condition {
     Not { condition: Box<Condition> },
 }
 
+fn is_zero_u32(value: &u32) -> bool {
+    *value == 0
+}
+
 #[cfg_attr(test, derive(PartialEq, Debug))]
-#[derive(Clone, Copy, Default, Deserialize)]
+#[derive(Clone, Copy, Default, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum TimeOffset {
     Client(ClientType),
@@ -83,6 +90,10 @@ pub enum TimeOffset {
 }
 
 impl TimeOffset {
+    const fn is_local(&self) -> bool {
+        matches!(self, Self::Local)
+    }
+
     /// Get the current date time in given time zone
     fn naive_now(self) -> NaiveDateTime {
         self.date_time(Utc::now())

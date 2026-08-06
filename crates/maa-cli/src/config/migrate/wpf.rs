@@ -3,17 +3,14 @@ use std::{io::BufReader, num::NonZero, path::Path};
 use anyhow::{Context, Result, bail, ensure};
 use log::trace;
 use maa_value::{
-    map::StringMap,
     prelude::*,
     userinput::{SelectD, UserInput},
 };
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::MigrationSummary;
 use crate::config::Filetype;
-
-/// Meta / structural keys that are never reported as skipped fields.
-const META_FIELDS: &[&str] = &["$type", "TaskType", "Name", "IsEnable"];
 
 /// Migrate a MAA WPF GUI profile into a maa-cli task config.
 ///
@@ -41,8 +38,8 @@ pub(crate) fn wpf(file: &Path, out: Option<&Path>, config: Option<String>) -> Re
         use maa_dirs::Ensure;
         dir.ensure()?;
     }
-    ft.write(&out, &value)
-        .with_context(|| format!("Failed to write migrated file {}", out.display()));
+    ft.write(out, &value)
+        .with_context(|| format!("Failed to write migrated file {}", out.display()))?;
 
     summary.print();
     Ok(())
@@ -55,7 +52,11 @@ pub(crate) fn wpf(file: &Path, out: Option<&Path>, config: Option<String>) -> Re
 /// When multiple configurations exist, `config_name` can be
 /// used to select one without an interactive prompt.
 pub(super) fn select_configuration(mut input: Value, config_name: Option<String>) -> Result<Value> {
-    let current = input.get("Current").and_then(|v| v.as_str()).map(str::to_string).unwrap_or_default();
+    let current = input
+        .get("Current")
+        .and_then(|v| v.as_str())
+        .map(str::to_string)
+        .unwrap_or_default();
     let Some(configurations) = input.get_mut("Configurations") else {
         bail!("GUI profile missing Configurations");
     };
@@ -69,7 +70,7 @@ pub(super) fn select_configuration(mut input: Value, config_name: Option<String>
             match object.len() {
                 0 => bail!("GUI profile has no configuration"),
                 1 => object.keys().next().unwrap().to_string(),
-                _ => resolve_configuration_name(object, current)?
+                _ => resolve_configuration_name(object, current)?,
             }
         }
     };
@@ -97,151 +98,75 @@ fn resolve_configuration_name(
         .context("Failed to select GUI configuration")
 }
 
-/// Migrate a GUI profile `MAAValue` into maa-cli task config shape.
-pub(super) fn migrate(
-    input: Value,
-) -> Result<(MAAValue, MigrationSummary)> {
-    let summary = MigrationSummary::default();
-    
-    unimplemented!()
+/// Migrate a GUI profile into maa-cli task config shape.
+pub(super) fn migrate(input: Value) -> Result<(MAAValue, MigrationSummary)> {
+    let mut summary = MigrationSummary::default();
+    let config: Configuration =
+        serde_json::from_value(input).context("Failed to deserialize GUI configuration")?;
+    let value = config
+        .migrate_tasks(&mut summary)?
+        .context("GUI configuration produced no CLI config")?;
+    Ok((value, summary))
 }
 
+/// Serialize a typed CLI config prototype into [`MAAValue`].
+fn serialize_to_maa_value<T: Serialize>(value: &T) -> Result<MAAValue> {
+    let json = serde_json::to_value(value).context("Failed to serialize CLI config prototype")?;
+    serde_json::from_value(json).context("Failed to convert CLI config prototype to MAAValue")
+}
+
+#[derive(Debug, Serialize)]
+struct CliConfig {
+    tasks: Vec<MAAValue>,
+}
+
+#[derive(Debug, Deserialize)]
 struct Configuration {
+    #[serde(rename = "TaskQueue")]
     task_queue: Vec<WpfTask>,
+    #[serde(rename = "Gui")]
+    #[allow(dead_code)]
     gui: GuiSettings,
 }
 
-enum WpfTask {
-    StartUpTask(start_up::StartUpTask),
-    // FightTask(FightTask),
-    // InfrastTask(InfrastTask),
-    // RecruitTask(RecruitTask),
-    // MallTask(MallTask),
-    // AwardTask(AwardTask),
-    // RoguelikeTask(RoguelikeTask),
-    // ReclamationTask(ReclamationTask),
-    Unsupported {
-        type_tag: String,
-        raw: serde_json::Value,
-    },
+impl Configuration {
+    fn migrate_tasks(&self, summary: &mut MigrationSummary) -> Result<Option<MAAValue>> {
+        let mut tasks = Vec::new();
+        for task in &self.task_queue {
+            if let Some(item) = task.migrate_task(summary)? {
+                tasks.push(item);
+            }
+        }
+        Ok(Some(serialize_to_maa_value(&CliConfig { tasks })?))
+    }
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(tag = "$type")]
+enum WpfTask {
+    FightTask(fight::FightTask),
+    /// Unknown `$type` values are skipped during migration.
+    #[serde(other)]
+    Unsupported,
+}
+
+impl WpfTask {
+    fn migrate_task(&self, summary: &mut MigrationSummary) -> Result<Option<MAAValue>> {
+        match self {
+            Self::FightTask(fight) => {
+                fight.report_disabled(summary);
+                Ok(Some(MAAValue::try_from(fight)?))
+            }
+            Self::Unsupported => {
+                summary.skip_task("Unsupported", None);
+                Ok(None)
+            }
+        }
+    }
+}
+
+#[derive(Debug, Default, Deserialize)]
 struct GuiSettings {}
-
-// fn migrate_task(
-//     task: &MAAValue,
-//     config: &MAAValue,
-//     summary: &mut MigrationSummary,
-// ) -> Result<Option<MAAValue>> {
-//     let type_tag = task
-//         .get("$type")
-//         .and_then(|v| v.as_str())
-//         .context("GUI task missing $type")?;
-//     let name = task_name(task);
-//     let disabled = matches!(
-//         task.get("IsEnable"),
-//         Some(MAAValue::Primitive(MAAPrimitive::Bool(false)))
-//     );
-
-//     let mut item = match type_tag {
-//         "StartUpTask" => start_up::migrate_start_up_task(task, config, summary)?,
-//         "FightTask" => fight::migrate_fight_task(task, summary)?,
-//         "InfrastTask" => infrast::migrate_infrast_task(task, summary)?,
-//         "RecruitTask" => recruit::migrate_recruit_task(task, summary)?,
-//         "MallTask" => mall::migrate_mall_task(task, summary)?,
-//         "AwardTask" => award::migrate_award_task(task, summary)?,
-//         "RoguelikeTask" => roguelike::migrate_roguelike_task(task, summary)?,
-//         "ReclamationTask" => reclamation::migrate_reclamation_task(task, summary)?,
-//         type_tag => {
-//             summary.skip_task(type_tag, name);
-//             return Ok(None);
-//         }
-//     };
-
-//     if disabled && let Some(item) = item.as_mut() {
-//         apply_disabled_condition(item);
-//         summary.disable_task(type_tag, name);
-//     }
-
-//     Ok(item)
-// }
-
-// fn task_name(task: &MAAValue) -> Option<String> {
-//     task.get("Name")
-//         .and_then(|v| v.as_str())
-//         .filter(|name| !name.is_empty())
-//         .map(str::to_string)
-// }
-
-// /// Keep a disabled GUI task in the output, but ensure it never becomes active.
-// fn apply_disabled_condition(item: &mut MAAValue) {
-//     let never = never_condition();
-
-//     if let Some(MAAValue::Array(variants)) = item.get_mut("variants") {
-//         for variant in variants.iter_mut() {
-//             let new_cond = match variant.get("condition") {
-//                 Some(cond) => object!(
-//                     "type" => "And",
-//                     "conditions" => vec![cond.clone(), never.clone()]??
-//                 ),
-//                 None => never.clone(),
-//             };
-//             variant.insert("condition", new_cond);
-//         }
-//         return;
-//     }
-
-//     let params = item.get("params").cloned().unwrap_or_default();
-//     if let Some(map) = item.as_mut_map() {
-//         map.shift_remove("params");
-//     }
-//     item.insert(
-//         "variants",
-//         MAAValue::Array(vec![object!(
-//             "condition" => never,
-//             "params" => params
-//         )]),
-//     );
-// }
-
-// fn never_condition() -> MAAValue {
-//     object!(
-//         "type" => "Not",
-//         "condition" => object!("type" => "Always")
-//     )
-// }
-
-// fn report_unhandled_fields(
-//     summary: &mut MigrationSummary,
-//     task: &MAAValue,
-//     task_type: &str,
-//     handled: &[&str],
-// ) {
-//     let name = task_name(task);
-//     let Some(map) = task.as_map() else {
-//         return;
-//     };
-//     for (key, value) in map {
-//         if META_FIELDS.contains(&key.as_str()) || handled.contains(&key.as_str()) {
-//             continue;
-//         }
-//         if is_meaningful_unhandled(value) {
-//             summary.skip_field(task_type, name.clone(), key.clone());
-//         }
-//     }
-// }
-
-// /// Whether an unhandled GUI field likely affects runtime behavior if dropped.
-// fn is_meaningful_unhandled(value: &MAAValue) -> bool {
-//     match value {
-//         MAAValue::Primitive(MAAPrimitive::Bool(v)) => *v,
-//         MAAValue::Primitive(MAAPrimitive::String(s)) => !s.is_empty(),
-//         MAAValue::Primitive(MAAPrimitive::Int(i)) => *i != 0 && *i != i32::MAX,
-//         MAAValue::Primitive(MAAPrimitive::Float(f)) => *f != 0.0,
-//         MAAValue::Array(items) => !items.is_empty(),
-//         MAAValue::Object(map) => !map.is_empty(),
-//     }
-// }
 
 mod start_up {
     // use anyhow::Result;
@@ -255,6 +180,7 @@ mod start_up {
     //     "Official", "Bilibili", "txwy", "YoStarEN", "YoStarJP", "YoStarKR",
     // ];
 
+    #[allow(dead_code)]
     pub(super) struct StartUpTask {}
 
     // pub(super) fn migrate_start_up_task(
@@ -278,8 +204,8 @@ mod start_up {
     //         }
     //         None => {
     //             insert!(params, "client_type" => object!(
-    //                 "alternatives" => VALID_CLIENT_TYPES.iter().map(|s| s.to_string()).collect::<Vec<_>>()??,
-    //             ));
+    //                 "alternatives" => VALID_CLIENT_TYPES.iter().map(|s|
+    // s.to_string()).collect::<Vec<_>>()??,             ));
     //         }
     //     }
 
@@ -315,299 +241,376 @@ mod start_up {
 }
 
 mod fight {
-//     use anyhow::{Result, bail};
-//     use log::warn;
-//     use maa_value::prelude::*;
+    use anyhow::{Context, Result, bail};
+    use chrono::Weekday;
+    use log::warn;
+    use maa_types::TaskType;
+    use maa_value::prelude::*;
+    use serde::{Deserialize, Serialize};
+    use serde_json::{Map, Value};
 
-//     use super::{MigrationSummary, report_unhandled_fields};
-//     use crate::config::task::ClientType;
+    use super::{MigrationSummary, serialize_to_maa_value};
+    use crate::config::task::{ClientType, Condition, TimeOffset};
 
-//     pub(super) fn migrate_fight_task(
-//         task: &MAAValue,
-//         summary: &mut MigrationSummary,
-//     ) -> Result<Option<MAAValue>> {
-//         let mut item = object!("type" => "Fight");
-//         // -> task name
-//         if let Some(MAAValue::Primitive(MAAPrimitive::String(name))) = task.get("Name") {
-//             insert!(item, "name" => name.as_str());
-//         }
+    /// maa-cli Fight task shape written by migration.
+    #[derive(Debug, Serialize)]
+    struct FightCliTask {
+        #[serde(rename = "type")]
+        task_type: TaskType,
+        name: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        params: Option<FightParams>,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        variants: Vec<FightVariant>,
+    }
 
-//         let shared_params = shared_fight_params(task);
+    #[derive(Debug, Serialize)]
+    struct FightVariant {
+        condition: Condition,
+        params: FightParams,
+    }
 
-//         let use_weekly = flag(task, "UseWeeklySchedule");
-//         let use_optional = flag(task, "UseOptionalStage");
+    /// Fight params; field order matches historical `object!` / `insert!` output for parity.
+    #[derive(Clone, Debug, Default, Serialize)]
+    struct FightParams {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        medicine: Option<i32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        stone: Option<i32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        times: Option<i32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        drops: Option<maa_value::map::StringMap<i32>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        series: Option<i32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        medicine_expire_days: Option<i32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        stage: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        enable: Option<bool>,
+    }
 
-//         match (use_weekly, use_optional) {
-//             // No variants: StagePlan must be a single stage.
-//             (false, false) => {
-//                 let stage = stage_plan_single(task)?;
-//                 let mut params = shared_params;
-//                 insert!(params, "stage" => stage);
-//                 insert!(item, "params" => params);
-//             }
-//             // One variant gated by weekly schedule; StagePlan must be a single stage.
-//             (true, false) => {
-//                 let stage = stage_plan_single(task)?;
-//                 let weekly = weekly_schedule_condition(task)?;
-//                 let mut params = shared_params;
-//                 insert!(params, "stage" => stage);
-//                 insert!(
-//                     item,
-//                     "variants" => vec![object!(
-//                         "condition" => weekly,
-//                         "params" => params
-//                     )]??
-//                 );
-//             }
-//             // One variant per optional stage, each with its own open-condition.
-//             (false, true) => {
-//                 let stages = stage_plan_array(task)?;
-//                 let mut variants = Vec::with_capacity(stages.len());
-//                 for stage in stages {
-//                     let mut params = shared_params.clone();
-//                     insert!(params, "stage" => stage);
-//                     variants.push(object!(
-//                         "condition" => stage_condition(stage),
-//                         "params" => params
-//                     ));
-//                 }
-//                 insert!(item, "variants" => variants??);
-//             }
-//             // Weekly schedule AND each stage's open-condition.
-//             (true, true) => {
-//                 let stages = stage_plan_array(task)?;
-//                 let weekly = weekly_schedule_condition(task)?;
-//                 let mut variants = Vec::with_capacity(stages.len());
-//                 for stage in stages {
-//                     let mut params = shared_params.clone();
-//                     insert!(params, "stage" => stage);
-//                     variants.push(object!(
-//                         "condition" => object!(
-//                             "type" => "And",
-//                             "conditions" => vec![
-//                                 weekly.clone(),
-//                                 stage_condition(stage)
-//                             ]??
-//                         ),
-//                         "params" => params
-//                     ));
-//                 }
-//                 insert!(item, "variants" => variants??);
-//             }
-//         }
+    /// WPF GUI `FightTask` (`$type = "FightTask"`).
+    ///
+    /// Deserialized from the GUI task queue; converts into [`FightCliTask`] /
+    /// [`MAAValue`] via [`TryFrom`]. Unmapped keys are collected in `unknown`.
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub(super) struct FightTask {
+        name: String,
+        is_enable: bool,
 
-//         report_unhandled_fields(summary, task, "FightTask", &[
-//             "UseWeeklySchedule",
-//             "WeeklySchedule",
-//             "UseOptionalStage",
-//             "StagePlan",
-//             "UseMedicine",
-//             "MedicineCount",
-//             "UseStone",
-//             "StoneCount",
-//             "EnableTimesLimit",
-//             "TimesLimit",
-//             "EnableTargetDrop",
-//             "DropId",
-//             "DropCount",
-//             "Series",
-//             "UseExpiringMedicine",
-//             "MedicineExpireDays",
-//         ]);
+        use_weekly_schedule: bool,
+        /// Absent when `UseWeeklySchedule` is false in typical GUI exports.
+        #[serde(default)]
+        weekly_schedule: Option<WeeklySchedule>,
+        use_optional_stage: bool,
+        stage_plan: StagePlan,
 
-//         Ok(Some(item))
-//     }
+        use_medicine: bool,
+        medicine_count: i32,
+        use_stone: bool,
+        stone_count: i32,
+        enable_times_limit: bool,
+        times_limit: i32,
+        enable_target_drop: bool,
+        drop_id: String,
+        drop_count: i32,
+        series: i32,
+        use_expiring_medicine: bool,
+        medicine_expire_days: i32,
 
-//     fn flag(task: &MAAValue, key: &str) -> bool {
-//         matches!(
-//             task.get(key),
-//             Some(MAAValue::Primitive(MAAPrimitive::Bool(true)))
-//         )
-//     }
+        #[serde(flatten)]
+        #[allow(dead_code)]
+        unknown: Map<String, Value>,
+    }
 
-//     /// Shared Fight params that do not depend on stage / condition branching.
-//     fn shared_fight_params(task: &MAAValue) -> MAAValue {
-//         let mut params = MAAValue::default();
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    struct WeeklySchedule {
+        sunday: bool,
+        monday: bool,
+        tuesday: bool,
+        wednesday: bool,
+        thursday: bool,
+        friday: bool,
+        saturday: bool,
+    }
 
-//         // UseMedicine + MedicineCount -> medicine
-//         if flag(task, "UseMedicine")
-//             && let Some(MAAValue::Primitive(MAAPrimitive::Int(count))) = task.get("MedicineCount")
-//         {
-//             insert!(params, "medicine" => *count);
-//         }
+    #[derive(Debug, Deserialize)]
+    #[serde(untagged)]
+    enum StagePlan {
+        Single(String),
+        Many(Vec<String>),
+    }
 
-//         // UseStone + StoneCount -> stone
-//         if flag(task, "UseStone")
-//             && let Some(MAAValue::Primitive(MAAPrimitive::Int(count))) = task.get("StoneCount")
-//         {
-//             warn!(
-//                 "FightTask enables stone={count}; this setting may consume Originite Prime (源石)"
-//             );
-//             insert!(params, "stone" => *count);
-//         }
+    impl FightTask {
+        pub(super) fn report_disabled(&self, summary: &mut MigrationSummary) {
+            if !self.is_enable {
+                summary.disable_task("FightTask", Some(self.name.clone()));
+            }
+        }
 
-//         // EnableTimesLimit + TimesLimit -> times
-//         if flag(task, "EnableTimesLimit")
-//             && let Some(MAAValue::Primitive(MAAPrimitive::Int(times))) = task.get("TimesLimit")
-//         {
-//             insert!(params, "times" => *times);
-//         }
+        /// Build the open-condition for a fight stage name.
+        ///
+        /// - Resource stages with a weekly rotation → `Weekday` (server timezone Official)
+        /// - Permanent stages (mainline, annihilation, LS-6, OF-*) → `Always`
+        /// - Side-story stages listed in `StageActivityV2.json` → `OnSideStory`
+        fn stage_condition(stage: &str) -> Condition {
+            use Weekday::*;
+            match stage {
+                // 资源本 / 芯片本（同开放日合并）
+                "CE-6" => Condition::Weekday {
+                    weekdays: vec![Tue, Thu, Sat, Sun],
+                    timezone: TimeOffset::Client(ClientType::Official),
+                },
+                "AP-5" => Condition::Weekday {
+                    weekdays: vec![Mon, Thu, Sat, Sun],
+                    timezone: TimeOffset::Client(ClientType::Official),
+                },
+                "CA-5" => Condition::Weekday {
+                    weekdays: vec![Tue, Wed, Fri, Sun],
+                    timezone: TimeOffset::Client(ClientType::Official),
+                },
+                "SK-5" => Condition::Weekday {
+                    weekdays: vec![Mon, Wed, Fri, Sat],
+                    timezone: TimeOffset::Client(ClientType::Official),
+                },
+                "PR-A-1" | "PR-A-2" => Condition::Weekday {
+                    weekdays: vec![Mon, Thu, Fri, Sun],
+                    timezone: TimeOffset::Client(ClientType::Official),
+                },
+                "PR-B-1" | "PR-B-2" => Condition::Weekday {
+                    weekdays: vec![Mon, Tue, Fri, Sat],
+                    timezone: TimeOffset::Client(ClientType::Official),
+                },
+                "PR-C-1" | "PR-C-2" => Condition::Weekday {
+                    weekdays: vec![Wed, Thu, Sat, Sun],
+                    timezone: TimeOffset::Client(ClientType::Official),
+                },
+                "PR-D-1" | "PR-D-2" => Condition::Weekday {
+                    weekdays: vec![Tue, Wed, Sat, Sun],
+                    timezone: TimeOffset::Client(ClientType::Official),
+                },
+                // 永久开启
+                "LS-6" | "Annihilation" | "OF-1" | "OF-F3" => Condition::Always,
+                _ => {
+                    let side_story = crate::activity::side_story_stages(ClientType::Official);
+                    if side_story.iter().any(|code| code == stage) {
+                        return Condition::OnSideStory {
+                            client: ClientType::Official,
+                        };
+                    }
+                    warn!(
+                        "FightTask stage `{stage}` has no known open schedule; treating as Always"
+                    );
+                    Condition::Always
+                }
+            }
+        }
+    }
 
-//         // EnableTargetDrop + DropId/DropCount -> drops = { <DropId> = <DropCount> }
-//         if flag(task, "EnableTargetDrop")
-//             && let (
-//                 Some(MAAValue::Primitive(MAAPrimitive::String(drop_id))),
-//                 Some(MAAValue::Primitive(MAAPrimitive::Int(drop_count))),
-//             ) = (task.get("DropId"), task.get("DropCount"))
-//         {
-//             let mut drop_map = maa_value::map::StringMap::new();
-//             drop_map.insert(drop_id.clone(), (*drop_count).into());
-//             insert!(params, "drops" => MAAValue::Object(drop_map));
-//         }
+    impl From<&FightTask> for FightParams {
+        fn from(task: &FightTask) -> Self {
+            FightParams {
+                medicine: task.use_medicine.then_some(task.medicine_count),
+                stone: task.use_stone.then(|| {
+                    let count = task.stone_count;
+                    warn!(
+                        "FightTask enables stone={count}; this setting may consume Originite Prime (源石)"
+                    );
+                    count
+                }),
+                times: task.enable_times_limit.then_some(task.times_limit),
+                drops: task.enable_target_drop.then(|| {
+                    let mut drops = maa_value::map::StringMap::new();
+                    drops.insert(task.drop_id.clone(), task.drop_count);
+                    drops
+                }),
+                series: (task.series != 0).then_some(task.series),
+                medicine_expire_days: task
+                    .use_expiring_medicine
+                    .then_some(task.medicine_expire_days),
+                stage: None,
+                enable: None,
+            }
+        }
+    }
 
-//         // Series -> series (only when non-zero)
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Int(series))) = task.get("Series")
-//             && *series != 0
-//         {
-//             insert!(params, "series" => *series);
-//         }
+    impl From<&WeeklySchedule> for Condition {
+        fn from(schedule: &WeeklySchedule) -> Self {
+            let days = [
+                (schedule.sunday, Weekday::Sun),
+                (schedule.monday, Weekday::Mon),
+                (schedule.tuesday, Weekday::Tue),
+                (schedule.wednesday, Weekday::Wed),
+                (schedule.thursday, Weekday::Thu),
+                (schedule.friday, Weekday::Fri),
+                (schedule.saturday, Weekday::Sat),
+            ];
 
-//         // UseExpiringMedicine + MedicineExpireDays -> medicine_expire_days
-//         if flag(task, "UseExpiringMedicine")
-//             && let Some(MAAValue::Primitive(MAAPrimitive::Int(days))) =
-//                 task.get("MedicineExpireDays")
-//         {
-//             insert!(params, "medicine_expire_days" => *days);
-//         }
+            let weekdays: Vec<Weekday> = days
+                .into_iter()
+                .filter_map(|(enabled, day)| enabled.then_some(day))
+                .collect();
 
-//         params
-//     }
+            Condition::Weekday {
+                weekdays,
+                timezone: TimeOffset::Local,
+            }
+        }
+    }
 
-//     /// `UseWeeklySchedule` + `WeeklySchedule` -> `Weekday` condition.
-//     fn weekly_schedule_condition(task: &MAAValue) -> Result<MAAValue> {
-//         let Some(MAAValue::Object(map)) = task.get("WeeklySchedule") else {
-//             bail!("FightTask UseWeeklySchedule is true but WeeklySchedule is missing or invalid");
-//         };
+    impl<'a> TryFrom<&'a StagePlan> for &'a str {
+        type Error = anyhow::Error;
 
-//         const DAYS: [(&str, &str); 7] = [
-//             ("Sunday", "Sun"),
-//             ("Monday", "Mon"),
-//             ("Tuesday", "Tue"),
-//             ("Wednesday", "Wed"),
-//             ("Thursday", "Thu"),
-//             ("Friday", "Fri"),
-//             ("Saturday", "Sat"),
-//         ];
+        fn try_from(plan: &'a StagePlan) -> Result<&'a str> {
+            match plan {
+                StagePlan::Single(stage) => Ok(stage.as_str()),
+                StagePlan::Many(stages) if stages.len() == 1 => Ok(stages[0].as_str()),
+                StagePlan::Many(_) => {
+                    bail!(
+                        "FightTask StagePlan must be a single stage string when UseOptionalStage is false, \
+                         got a string array; enable UseOptionalStage for multiple stages"
+                    )
+                }
+            }
+        }
+    }
 
-//         let mut weekdays = Vec::new();
-//         for (gui_day, cli_day) in DAYS {
-//             if let Some(MAAValue::Primitive(MAAPrimitive::Bool(true))) = map.get(gui_day) {
-//                 weekdays.push(cli_day);
-//             }
-//         }
+    impl<'a> TryFrom<&'a StagePlan> for Vec<&'a str> {
+        type Error = anyhow::Error;
 
-//         Ok(object!(
-//             "type" => "Weekday",
-//             "weekdays" => weekdays??
-//         ))
-//     }
+        fn try_from(plan: &'a StagePlan) -> Result<Vec<&'a str>> {
+            match plan {
+                StagePlan::Many(stages) => {
+                    if stages.is_empty() {
+                        bail!(
+                            "FightTask StagePlan must be a non-empty string array when UseOptionalStage is true"
+                        );
+                    }
+                    Ok(stages.iter().map(String::as_str).collect())
+                }
+                StagePlan::Single(_) => {
+                    bail!(
+                        "FightTask StagePlan must be a string array when UseOptionalStage is true, got a string"
+                    )
+                }
+            }
+        }
+    }
 
-//     /// Parse `StagePlan` as a single stage name.
-//     ///
-//     /// GUI usually stores a single stage as a one-element array (`["CE-6"]`).
-//     /// A multi-element array is rejected when `UseOptionalStage` is false.
-//     fn stage_plan_single(task: &MAAValue) -> Result<&str> {
-//         match task.get("StagePlan") {
-//             Some(MAAValue::Primitive(MAAPrimitive::String(stage))) => Ok(stage.as_str()),
-//             Some(MAAValue::Array(stages)) if stages.len() == 1 => match &stages[0] {
-//                 MAAValue::Primitive(MAAPrimitive::String(stage)) => Ok(stage.as_str()),
-//                 _ => bail!("FightTask StagePlan must be a string when UseOptionalStage is false"),
-//             },
-//             Some(MAAValue::Array(_)) => {
-//                 bail!(
-//                     "FightTask StagePlan must be a single stage string when UseOptionalStage is false, \
-//                      got a string array; enable UseOptionalStage for multiple stages"
-//                 )
-//             }
-//             Some(_) => bail!("FightTask StagePlan must be a string when UseOptionalStage is false"),
-//             None => bail!("FightTask missing StagePlan"),
-//         }
-//     }
+    impl TryFrom<&FightTask> for FightCliTask {
+        type Error = anyhow::Error;
 
-//     /// Parse `StagePlan` as a non-empty string array (optional-stage mode).
-//     fn stage_plan_array(task: &MAAValue) -> Result<Vec<&str>> {
-//         match task.get("StagePlan") {
-//             Some(MAAValue::Array(stages)) => {
-//                 let mut stage_list = Vec::with_capacity(stages.len());
-//                 for stage in stages {
-//                     match stage {
-//                         MAAValue::Primitive(MAAPrimitive::String(stage)) => {
-//                             stage_list.push(stage.as_str());
-//                         }
-//                         _ => bail!(
-//                             "FightTask StagePlan array elements must be strings when UseOptionalStage is true"
-//                         ),
-//                     }
-//                 }
-//                 if stage_list.is_empty() {
-//                     bail!(
-//                         "FightTask StagePlan must be a non-empty string array when UseOptionalStage is true"
-//                     );
-//                 }
-//                 Ok(stage_list)
-//             }
-//             Some(MAAValue::Primitive(MAAPrimitive::String(_))) => {
-//                 bail!(
-//                     "FightTask StagePlan must be a string array when UseOptionalStage is true, got a string"
-//                 )
-//             }
-//             Some(_) => {
-//                 bail!("FightTask StagePlan must be a string array when UseOptionalStage is true")
-//             }
-//             None => bail!("FightTask missing StagePlan"),
-//         }
-//     }
+        fn try_from(task: &FightTask) -> Result<Self> {
+            let shared_params = FightParams::from(task);
 
-//     /// Build the open-condition for a fight stage name.
-//     ///
-//     /// - Resource stages with a weekly rotation → `Weekday` (server timezone Official)
-//     /// - Permanent stages (mainline, annihilation, LS-6, OF-*) → `Always`
-//     /// - Side-story stages listed in `StageActivityV2.json` → `OnSideStory`
-//     fn stage_condition(stage: &str) -> MAAValue {
-//         match stage {
-//             // 资源本 / 芯片本（同开放日合并）
-//             "CE-6" => weekday_condition(&["Tue", "Thu", "Sat", "Sun"]),
-//             "AP-5" => weekday_condition(&["Mon", "Thu", "Sat", "Sun"]),
-//             "CA-5" => weekday_condition(&["Tue", "Wed", "Fri", "Sun"]),
-//             "SK-5" => weekday_condition(&["Mon", "Wed", "Fri", "Sat"]),
-//             "PR-A-1" | "PR-A-2" => weekday_condition(&["Mon", "Thu", "Fri", "Sun"]),
-//             "PR-B-1" | "PR-B-2" => weekday_condition(&["Mon", "Tue", "Fri", "Sat"]),
-//             "PR-C-1" | "PR-C-2" => weekday_condition(&["Wed", "Thu", "Sat", "Sun"]),
-//             "PR-D-1" | "PR-D-2" => weekday_condition(&["Tue", "Wed", "Sat", "Sun"]),
-//             // 永久开启
-//             "LS-6" | "Annihilation" | "OF-1" | "OF-F3" => always_condition(),
-//             _ => {
-//                 let side_story = crate::activity::side_story_stages(ClientType::Official);
-//                 if side_story.iter().any(|code| code == stage) {
-//                     return object!("type" => "OnSideStory");
-//                 }
-//                 warn!("FightTask stage `{stage}` has no known open schedule; treating as Always");
-//                 always_condition()
-//             }
-//         }
-//     }
+            let mut item = match (task.use_weekly_schedule, task.use_optional_stage) {
+                // No variants: StagePlan must be a single stage.
+                (false, false) => {
+                    let stage: &str = (&task.stage_plan).try_into()?;
+                    let mut params = shared_params;
+                    params.stage = Some(stage.to_string());
+                    FightCliTask {
+                        task_type: TaskType::Fight,
+                        name: task.name.clone(),
+                        params: Some(params),
+                        variants: Vec::new(),
+                    }
+                }
+                // One variant gated by weekly schedule; StagePlan must be a single stage.
+                (true, false) => {
+                    let stage: &str = (&task.stage_plan).try_into()?;
+                    let weekly = Condition::from(
+                        task.weekly_schedule.as_ref().context(
+                            "FightTask UseWeeklySchedule is true but WeeklySchedule is missing or invalid",
+                        )?,
+                    );
+                    let mut params = shared_params;
+                    params.stage = Some(stage.to_string());
+                    FightCliTask {
+                        task_type: TaskType::Fight,
+                        name: task.name.clone(),
+                        params: None,
+                        variants: vec![FightVariant {
+                            condition: weekly,
+                            params,
+                        }],
+                    }
+                }
+                // One variant per optional stage, each with its own open-condition.
+                (false, true) => {
+                    let stages: Vec<&str> = (&task.stage_plan).try_into()?;
+                    let mut variants = Vec::with_capacity(stages.len());
+                    for stage in stages {
+                        let mut params = shared_params.clone();
+                        params.stage = Some(stage.to_string());
+                        variants.push(FightVariant {
+                            condition: FightTask::stage_condition(stage),
+                            params,
+                        });
+                    }
+                    FightCliTask {
+                        task_type: TaskType::Fight,
+                        name: task.name.clone(),
+                        params: None,
+                        variants,
+                    }
+                }
+                // Weekly schedule AND each stage's open-condition.
+                (true, true) => {
+                    let stages: Vec<&str> = (&task.stage_plan).try_into()?;
+                    let weekly = Condition::from(
+                        task.weekly_schedule.as_ref().context(
+                            "FightTask UseWeeklySchedule is true but WeeklySchedule is missing or invalid",
+                        )?,
+                    );
+                    let mut variants = Vec::with_capacity(stages.len());
+                    for stage in stages {
+                        let mut params = shared_params.clone();
+                        params.stage = Some(stage.to_string());
+                        variants.push(FightVariant {
+                            condition: Condition::And {
+                                conditions: vec![weekly.clone(), FightTask::stage_condition(stage)],
+                            },
+                            params,
+                        });
+                    }
+                    FightCliTask {
+                        task_type: TaskType::Fight,
+                        name: task.name.clone(),
+                        params: None,
+                        variants,
+                    }
+                }
+            };
 
-//     fn always_condition() -> MAAValue {
-//         object!("type" => "Always")
-//     }
+            // MaaCore common switch: params.enable=false disables the task.
+            if !task.is_enable {
+                match &mut item.params {
+                    Some(params) => params.enable = Some(false),
+                    None => {
+                        item.params = Some(FightParams {
+                            enable: Some(false),
+                            ..FightParams::default()
+                        });
+                    }
+                }
+            }
 
-//     fn weekday_condition(weekdays: &[&str]) -> MAAValue {
-//         object!(
-//             "type" => "Weekday",
-//             "weekdays" => weekdays.to_vec()??,
-//             "timezone" => "Official"
-//         )
-//     }
+            Ok(item)
+        }
+    }
+
+    impl TryFrom<&FightTask> for MAAValue {
+        type Error = anyhow::Error;
+
+        fn try_from(task: &FightTask) -> Result<Self> {
+            serialize_to_maa_value(&FightCliTask::try_from(task)?)
+        }
+    }
 }
 
 // mod infrast {
@@ -671,8 +674,8 @@ mod fight {
 //             let mut facility = Vec::new();
 //             for room in rooms {
 //                 if let MAAValue::Object(map) = room
-//                     && let Some(MAAValue::Primitive(MAAPrimitive::String(room))) = map.get("Room")
-//                 {
+//                     && let Some(MAAValue::Primitive(MAAPrimitive::String(room))) =
+// map.get("Room")                 {
 //                     facility.push(room.as_str());
 //                 }
 //             }
@@ -681,13 +684,13 @@ mod fight {
 //             }
 //         }
 //         // UsesOfDrones -> drones
-//         if let Some(MAAValue::Primitive(MAAPrimitive::String(drones))) = task.get("UsesOfDrones") {
-//             insert!(params, "drones" => drones.as_str());
+//         if let Some(MAAValue::Primitive(MAAPrimitive::String(drones))) = task.get("UsesOfDrones")
+// {             insert!(params, "drones" => drones.as_str());
 //         }
 //         // DormThreshold -> threshold
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Int(threshold))) = task.get("DormThreshold") {
-//             insert!(params, "threshold" => *threshold as f32 / 100.0);
-//         }
+//         if let Some(MAAValue::Primitive(MAAPrimitive::Int(threshold))) =
+// task.get("DormThreshold") {             insert!(params, "threshold" => *threshold as f32 /
+// 100.0);         }
 //         // OriginiumShardAutoReplenishment -> replenish
 //         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(replenish))) =
 //             task.get("OriginiumShardAutoReplenishment")
@@ -701,8 +704,8 @@ mod fight {
 //             insert!(params, "dorm_notstationed_enabled" => *enabled);
 //         }
 //         // DormTrustEnabled -> dorm_trust_enabled
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(enabled))) = task.get("DormTrustEnabled")
-//         {
+//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(enabled))) =
+// task.get("DormTrustEnabled")         {
 //             insert!(params, "dorm_trust_enabled" => *enabled);
 //         }
 //         // ReceptionMessageBoard -> reception_message_board
@@ -754,12 +757,12 @@ mod fight {
 //             insert!(params, "extra_tags_mode" => *mode);
 //         }
 //         // RefreshLevel3 -> refresh
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(refresh))) = task.get("RefreshLevel3") {
-//             insert!(params, "refresh" => *refresh);
+//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(refresh))) = task.get("RefreshLevel3")
+// {             insert!(params, "refresh" => *refresh);
 //         }
 //         // ForceRefresh -> expedite
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(expedite))) = task.get("ForceRefresh") {
-//             insert!(params, "expedite" => *expedite);
+//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(expedite))) = task.get("ForceRefresh")
+// {             insert!(params, "expedite" => *expedite);
 //         }
 //         // LevelXChoose -> select / confirm
 //         let mut select = Vec::new();
@@ -802,9 +805,9 @@ mod fight {
 //             }
 //         }
 //         // PreserveTagEnabled + PreserveTagList -> preserve_tags
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(true))) = task.get("PreserveTagEnabled")
-//             && let Some(MAAValue::Array(tags)) = task.get("PreserveTagList")
-//         {
+//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(true))) =
+// task.get("PreserveTagEnabled")             && let Some(MAAValue::Array(tags)) =
+// task.get("PreserveTagList")         {
 //             let mut preserve_tags = Vec::new();
 //             for tag in tags {
 //                 if let MAAValue::Primitive(MAAPrimitive::String(tag)) = tag {
@@ -861,8 +864,8 @@ mod fight {
 //             insert!(params, "shopping" => *shopping);
 //         }
 //         // CreditFight -> credit_fight
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(credit_fight))) = task.get("CreditFight")
-//         {
+//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(credit_fight))) =
+// task.get("CreditFight")         {
 //             insert!(params, "credit_fight" => *credit_fight);
 //         }
 //         // CreditFightFormation -> formation_index
@@ -904,8 +907,8 @@ mod fight {
 //             insert!(params, "only_buy_discount" => *only_discount);
 //         }
 //         // ReserveMaxCredit -> reserve_max_credit
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(reserve))) = task.get("ReserveMaxCredit")
-//         {
+//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(reserve))) =
+// task.get("ReserveMaxCredit")         {
 //             insert!(params, "reserve_max_credit" => *reserve);
 //         }
 
@@ -1048,12 +1051,12 @@ mod fight {
 //             insert!(params, "roles" => roles.as_str());
 //         }
 //         // CoreChar -> core_char
-//         if let Some(MAAValue::Primitive(MAAPrimitive::String(core_char))) = task.get("CoreChar") {
-//             insert!(params, "core_char" => core_char.as_str());
+//         if let Some(MAAValue::Primitive(MAAPrimitive::String(core_char))) = task.get("CoreChar")
+// {             insert!(params, "core_char" => core_char.as_str());
 //         }
 //         // StartCount -> starts_count
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Int(starts_count))) = task.get("StartCount") {
-//             insert!(params, "starts_count" => *starts_count);
+//         if let Some(MAAValue::Primitive(MAAPrimitive::Int(starts_count))) =
+// task.get("StartCount") {             insert!(params, "starts_count" => *starts_count);
 //         }
 //         // Difficulty -> difficulty
 //         if let Some(MAAValue::Primitive(MAAPrimitive::Int(difficulty))) = task.get("Difficulty")
@@ -1098,8 +1101,8 @@ mod fight {
 //             insert!(params, "stop_at_max_level" => *stop_at_max_level);
 //         }
 //         // UseSupport -> use_support
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(use_support))) = task.get("UseSupport") {
-//             insert!(params, "use_support" => *use_support);
+//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(use_support))) =
+// task.get("UseSupport") {             insert!(params, "use_support" => *use_support);
 //         }
 //         // UseSupportNonFriend -> use_nonfriend_support
 //         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(use_nonfriend_support))) =

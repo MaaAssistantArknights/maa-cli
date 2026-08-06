@@ -13,7 +13,7 @@ pub(crate) use wpf::wpf;
 pub struct MigrationSummary {
     /// Unsupported task types that were not written.
     pub skipped_tasks: Vec<SkippedTask>,
-    /// Tasks with `IsEnable = false`, kept inactive in the output.
+    /// Tasks with `IsEnable = false`, written with `params.enable = false`.
     pub disabled_tasks: Vec<SkippedTask>,
     /// Fields present on a supported task that were not mapped.
     pub skipped_fields: Vec<SkippedField>,
@@ -39,21 +39,22 @@ impl MigrationSummary {
             && self.skipped_fields.is_empty()
     }
 
-    fn skip_task(&mut self, type_tag: impl Into<String>, name: Option<String>) {
+    pub(super) fn skip_task(&mut self, type_tag: impl Into<String>, name: Option<String>) {
         self.skipped_tasks.push(SkippedTask {
             type_tag: type_tag.into(),
             name,
         });
     }
 
-    fn disable_task(&mut self, type_tag: impl Into<String>, name: Option<String>) {
+    pub(super) fn disable_task(&mut self, type_tag: impl Into<String>, name: Option<String>) {
         self.disabled_tasks.push(SkippedTask {
             type_tag: type_tag.into(),
             name,
         });
     }
 
-    fn skip_field(
+    #[expect(dead_code, reason = "used when reporting unmapped GUI fields")]
+    pub(super) fn skip_field(
         &mut self,
         task_type: impl Into<String>,
         task_name: Option<String>,
@@ -82,7 +83,7 @@ impl MigrationSummary {
         }
 
         if !self.disabled_tasks.is_empty() {
-            eprintln!("  Disabled tasks (kept inactive with never-true condition; will not run):");
+            eprintln!("  Disabled tasks (kept with params.enable=false; will not run):");
             for task in &self.disabled_tasks {
                 eprintln!("    - {}", format_task_ref(task));
             }

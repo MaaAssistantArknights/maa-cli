@@ -130,15 +130,8 @@ specialaccess = true
 type = "Roguelike"
 name = ""
 
-[[tasks.variants]]
-
-[tasks.variants.condition]
-type = "Not"
-
-[tasks.variants.condition.condition]
-type = "Always"
-
-[tasks.variants.params]
+[tasks.params]
+enable = false
 theme = "JieGarden"
 mode = 1
 squad = "指挥分队"
@@ -161,15 +154,8 @@ only_start_with_elite_two = false
 type = "Reclamation"
 name = ""
 
-[[tasks.variants]]
-
-[tasks.variants.condition]
-type = "Not"
-
-[tasks.variants.condition.condition]
-type = "Always"
-
-[tasks.variants.params]
+[tasks.params]
+enable = false
 theme = "Tales"
 mode = 1
 increment_mode = 0

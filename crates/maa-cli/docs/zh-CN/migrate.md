@@ -27,7 +27,7 @@ maa migrate wpf <input> [output] [-f toml|yaml|json] [--config <name>]
 
 如果文件中有多套配置，可用 `--config` 或环境变量 `MAA_GUI_CONFIG` 指定名称；未指定时会交互选择，默认使用文件中的当前配置（`Current`）。
 
-迁移可能不完整：不支持的任务类型会被跳过；GUI 中已关闭的任务会保留在结果里，但默认不会执行；未能对应的参数会出现在迁移摘要中。命令结束后会输出这些汇总，方便你对照检查。
+迁移可能不完整：不支持的任务类型会被跳过；GUI 中已关闭的任务（`IsEnable = false`）会保留，并写入 `params.enable = false`；未能对应的参数会出现在迁移摘要中。命令结束后会输出这些汇总，方便你对照检查。
 
 ### StartUp
 
@@ -49,6 +49,7 @@ TODO：`account_name` 的转换**我没有测试过**（未做实机账号切换
 | GUI 字段 | maa-cli 字段 | 规则 |
 | --- | --- | --- |
 | `Name` | `name` | 有值时写入 |
+| `IsEnable` | `params.enable` | 为 `false` 时写入 `enable = false`（MaaCore 通用开关；默认不写，等同于 `true`） |
 | `UseMedicine` + `MedicineCount` | `params.medicine` | 仅当 `UseMedicine` 为 `true` 时写入 `MedicineCount` |
 | `UseStone` + `StoneCount` | `params.stone` | 仅当 `UseStone` 为 `true` 时写入 `StoneCount`；迁移时会警告该设置可能消耗源石 |
 | `EnableTimesLimit` + `TimesLimit` | `params.times` | 仅当 `EnableTimesLimit` 为 `true` 时写入 `TimesLimit` |
