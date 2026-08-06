@@ -6,12 +6,7 @@
 
 mod wpf;
 
-use std::path::Path;
-
-use anyhow::{Context, Result, bail};
-use maa_value::value::MAAValue;
-
-use super::{Filetype, FromFile};
+pub(crate) use wpf::wpf;
 
 /// Summary of lossy choices made during migration.
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -114,55 +109,4 @@ fn format_task_ref(task: &SkippedTask) -> String {
         Some(name) if !name.is_empty() => format!("{} \"{name}\"", task.type_tag),
         _ => task.type_tag.clone(),
     }
-}
-
-/// Migrate a MAA WPF GUI profile into a maa-cli task config.
-///
-/// ```text
-/// maa migrate wpf <input> [output]
-/// ```
-pub fn wpf(
-    file: &Path,
-    out: Option<&Path>,
-    ft: Option<Filetype>,
-    config_name: Option<&str>,
-) -> Result<()> {
-    use maa_dirs::Ensure;
-
-    if !matches!(Filetype::parse_filetype(file), Some(Filetype::Json)) {
-        log::warn!(
-            "`maa migrate wpf` expects a MAA WPF GUI profile (typically JSON); \
-             input {} is not JSON",
-            file.display()
-        );
-    }
-
-    let ft = ft.or_else(|| {
-        out.and_then(|path| path.extension())
-            .and_then(|ext| ext.to_str())
-            .and_then(Filetype::parse_extension)
-    });
-
-    let value = MAAValue::from_file(file)?;
-    let value = wpf::select_configuration(value, config_name)?;
-    let (value, summary) = wpf::migrate(value)?;
-
-    let Some(format) = ft else {
-        bail!("Format not given")
-    };
-
-    if let Some(file) = out {
-        let file = file.with_extension(format.to_str());
-        if let Some(dir) = file.parent() {
-            dir.ensure()?;
-        }
-        format
-            .write(&file, &value)
-            .with_context(|| format!("Failed to write migrated file {}", file.display()))?;
-    } else {
-        format.write_to(std::io::stdout().lock(), &value)?;
-    }
-
-    summary.print();
-    Ok(())
 }

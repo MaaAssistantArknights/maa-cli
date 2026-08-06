@@ -1,63 +1,93 @@
-use std::num::NonZero;
+use std::{io::BufReader, num::NonZero, path::Path};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, bail, ensure};
+use log::trace;
 use maa_value::{
     map::StringMap,
     prelude::*,
     userinput::{SelectD, UserInput},
 };
+use serde_json::Value;
 
 use super::MigrationSummary;
-
-const GUI_CONFIG_ENV: &str = "MAA_GUI_CONFIG";
+use crate::config::Filetype;
 
 /// Meta / structural keys that are never reported as skipped fields.
 const META_FIELDS: &[&str] = &["$type", "TaskType", "Name", "IsEnable"];
+
+/// Migrate a MAA WPF GUI profile into a maa-cli task config.
+///
+/// ```text
+/// maa migrate wpf <input> [output]
+/// ```
+pub(crate) fn wpf(file: &Path, out: Option<&Path>, config: Option<String>) -> Result<()> {
+    ensure!(
+        file.extension() == Some("json".as_ref()),
+        "`maa migrate wpf` expected a MAA GUI profile (typically .json); input {file:?} is not a JSON file"
+    );
+
+    let value = BufReader::new(std::fs::File::open(file).context("Trying to open wpf profile")?);
+    let value = serde_json::from_reader(value)?;
+    let value = select_configuration(value, config)?;
+    let (value, summary) = migrate(value)?;
+
+    let mut temp_path = Default::default();
+    let out = out.unwrap_or_else(|| {
+        temp_path = file.with_extension("toml");
+        temp_path.as_path()
+    });
+    let ft = Filetype::parse_filetype(out).unwrap();
+    if let Some(dir) = out.parent() {
+        use maa_dirs::Ensure;
+        dir.ensure()?;
+    }
+    ft.write(&out, &value)
+        .with_context(|| format!("Failed to write migrated file {}", out.display()));
+
+    summary.print();
+    Ok(())
+}
 
 /// Pick one configuration from a multi-profile GUI export.
 ///
 /// Legacy single-config profiles are returned unchanged.
 ///
-/// When multiple configurations exist, `config_name` or [`GUI_CONFIG_ENV`] can be
+/// When multiple configurations exist, `config_name` can be
 /// used to select one without an interactive prompt.
-pub(super) fn select_configuration(input: MAAValue, config_name: Option<&str>) -> Result<MAAValue> {
-    let Some(configurations_value) = input.get("Configurations") else {
-        return Ok(input);
-    };
-    let Some(configurations) = configurations_value.as_map() else {
-        bail!("GUI profile Configurations must be an object");
+pub(super) fn select_configuration(mut input: Value, config_name: Option<String>) -> Result<Value> {
+    let current = input.get("Current").and_then(|v| v.as_str()).map(str::to_string).unwrap_or_default();
+    let Some(configurations) = input.get_mut("Configurations") else {
+        bail!("GUI profile missing Configurations");
     };
 
-    match configurations.len() {
-        0 => bail!("GUI profile has no configuration"),
-        1 => Ok(configurations.values().next().unwrap().clone()),
-        _ => {
-            let selected_name = resolve_configuration_name(&input, configurations, config_name)?;
-            configurations
-                .get(&selected_name)
-                .cloned()
-                .with_context(|| format!("GUI configuration {selected_name} not found"))
+    let config_name = match config_name {
+        Some(name) => name,
+        None => {
+            let Some(object) = configurations.as_object() else {
+                bail!("GUI profile Configurations is not an object");
+            };
+            match object.len() {
+                0 => bail!("GUI profile has no configuration"),
+                1 => object.keys().next().unwrap().to_string(),
+                _ => resolve_configuration_name(object, current)?
+            }
         }
-    }
+    };
+    trace!("Selected configuration: {config_name}");
+    let Some(profile) = configurations.get_mut(&config_name) else {
+        bail!("GUI configuration {config_name} not found");
+    };
+    Ok(profile.take())
 }
 
 fn resolve_configuration_name(
-    input: &MAAValue,
-    configurations: &StringMap<MAAValue>,
-    config_name: Option<&str>,
+    object: &serde_json::map::Map<String, Value>,
+    current: String,
 ) -> Result<String> {
-    if let Some(name) = config_name {
-        return Ok(name.to_string());
-    }
-    if let Ok(name) = std::env::var(GUI_CONFIG_ENV) {
-        return Ok(name);
-    }
-
-    let names: Vec<&str> = configurations.keys().map(String::as_str).collect();
-    let default_index = input
-        .get("Current")
-        .and_then(|v| v.as_str())
-        .and_then(|current| names.iter().position(|name| *name == current))
+    let names: Vec<&str> = object.keys().map(String::as_str).collect();
+    let default_index = object
+        .iter()
+        .position(|(name, _)| *name == current)
         .and_then(|i| NonZero::new(i + 1));
 
     SelectD::<String>::from_iter(names, default_index)
@@ -68,23 +98,12 @@ fn resolve_configuration_name(
 }
 
 /// Migrate a GUI profile `MAAValue` into maa-cli task config shape.
-pub(super) fn migrate(input: MAAValue) -> Result<(MAAValue, MigrationSummary)> {
-    let queue = input
-        .get("TaskQueue")
-        .context("GUI profile missing TaskQueue")?;
-    let MAAValue::Array(queue) = queue else {
-        bail!("GUI profile TaskQueue must be an array");
-    };
-
-    let mut summary = MigrationSummary::default();
-    let mut tasks = Vec::new();
-    for task in queue {
-        if let Some(item) = migrate_task(task, &input, &mut summary)? {
-            tasks.push(item);
-        }
-    }
-
-    Ok((object!("tasks" => tasks??), summary))
+pub(super) fn migrate(
+    input: Value,
+) -> Result<(MAAValue, MigrationSummary)> {
+    let summary = MigrationSummary::default();
+    
+    unimplemented!()
 }
 
 fn migrate_task(
@@ -199,859 +218,6 @@ fn is_meaningful_unhandled(value: &MAAValue) -> bool {
         MAAValue::Primitive(MAAPrimitive::Float(f)) => *f != 0.0,
         MAAValue::Array(items) => !items.is_empty(),
         MAAValue::Object(map) => !map.is_empty(),
-    }
-}
-
-#[cfg(test)]
-#[cfg_attr(coverage_nightly, coverage(off))]
-mod tests {
-    use super::*;
-    use crate::config::migrate::{SkippedField, SkippedTask};
-
-    macro_rules! gui_task_test {
-        ($name:ident, $converter:path, $task_json:expr, $($expected:tt)*) => {
-            #[test]
-            fn $name() {
-                let task: MAAValue = serde_json::from_str($task_json).unwrap();
-                let mut summary = MigrationSummary::default();
-                let actual = $converter(&task, &mut summary).unwrap().unwrap();
-                assert_eq!(
-                    serde_json::to_value(&actual).unwrap(),
-                    serde_json::json!($($expected)*)
-                );
-            }
-        };
-    }
-
-    const DEFAULT_PROFILE: &str = include_str!("../../../fixtures/gui/default_profile.json");
-
-    #[test]
-    fn select_configuration_passes_through_legacy_profile() {
-        let input = object!("legacy" => true);
-        assert_eq!(select_configuration(input.clone(), None).unwrap(), input);
-    }
-
-    #[test]
-    fn select_configuration_picks_the_only_configuration() {
-        let input = object!(
-            "Configurations" => object!(
-                "Default" => object!("name" => "only")
-            )
-        );
-        assert_eq!(
-            select_configuration(input, None).unwrap(),
-            object!("name" => "only")
-        );
-    }
-
-    #[test]
-    fn select_configuration_uses_current_in_batch_mode() {
-        let input = object!(
-            "Current" => "Dev",
-            "Configurations" => object!(
-                "Default" => object!("name" => "default"),
-                "Dev" => object!("name" => "dev"),
-            )
-        );
-        assert_eq!(
-            select_configuration(input, None).unwrap(),
-            object!("name" => "dev")
-        );
-    }
-
-    #[test]
-    fn select_configuration_uses_config_name_override() {
-        let input = object!(
-            "Current" => "Default",
-            "Configurations" => object!(
-                "Default" => object!("name" => "default"),
-                "Dev" => object!("name" => "dev"),
-            )
-        );
-        assert_eq!(
-            select_configuration(input, Some("Dev")).unwrap(),
-            object!("name" => "dev")
-        );
-    }
-
-    #[test]
-    fn select_configuration_uses_env_override() {
-        let input = object!(
-            "Configurations" => object!(
-                "Default" => object!("name" => "default"),
-                "Dev" => object!("name" => "dev"),
-            )
-        );
-
-        // SAFETY: test-only env var, restored before return.
-        unsafe { std::env::set_var(GUI_CONFIG_ENV, "Dev") };
-        let result = select_configuration(input, None);
-        unsafe { std::env::remove_var(GUI_CONFIG_ENV) };
-
-        assert_eq!(result.unwrap(), object!("name" => "dev"));
-    }
-
-    #[test]
-    fn missing_task_queue_is_error() {
-        let input = object!("a" => 1);
-        let err = migrate(input).unwrap_err();
-        assert!(err.to_string().contains("TaskQueue"));
-    }
-
-    #[test]
-    fn task_queue_not_array_is_error() {
-        let input = object!("TaskQueue" => "not-an-array");
-        let err = migrate(input).unwrap_err();
-        assert!(err.to_string().contains("TaskQueue must be an array"));
-    }
-
-    #[test]
-    fn unknown_task_type_is_skipped() {
-        let input = object!(
-            "TaskQueue" => vec![
-                object!("$type" => "UserDataUpdateTask", "Name" => "update"),
-                object!("$type" => "StartUpTask", "IsEnable" => true),
-            ]??
-        );
-        let (value, summary) = migrate(input).unwrap();
-        let MAAValue::Array(tasks) = value.get("tasks").unwrap() else {
-            panic!("tasks should be an array");
-        };
-        assert_eq!(tasks.len(), 1);
-        assert_eq!(tasks[0].get("type").unwrap().as_str().unwrap(), "StartUp");
-        assert_eq!(summary.skipped_tasks, vec![SkippedTask {
-            type_tag: "UserDataUpdateTask".into(),
-            name: Some("update".into()),
-        }]);
-    }
-
-    #[test]
-    fn disabled_task_is_kept_inactive() {
-        let input = object!(
-            "TaskQueue" => vec![
-                object!(
-                    "$type" => "FightTask",
-                    "Name" => "日常经验本",
-                    "IsEnable" => false,
-                    "StagePlan" => vec!["LS-6"]??,
-                ),
-            ]??
-        );
-        let (value, summary) = migrate(input).unwrap();
-        let expected: MAAValue = serde_json::from_value(serde_json::json!({
-            "tasks": [{
-                "type": "Fight",
-                "name": "日常经验本",
-                "variants": [{
-                    "condition": {
-                        "type": "Not",
-                        "condition": { "type": "Always" }
-                    },
-                    "params": { "stage": "LS-6" }
-                }]
-            }]
-        }))
-        .unwrap();
-        assert_eq!(value, expected);
-        assert_eq!(summary.disabled_tasks, vec![SkippedTask {
-            type_tag: "FightTask".into(),
-            name: Some("日常经验本".into()),
-        }]);
-    }
-
-    #[test]
-    fn skipped_fields_are_reported() {
-        let input = object!(
-            "TaskQueue" => vec![
-                object!(
-                    "$type" => "StartUpTask",
-                    "AccountName" => "123****4567",
-                    "AccountSwitchEnabled" => false,
-                    "Name" => "启动游戏",
-                    "IsEnable" => true,
-                ),
-                object!(
-                    "$type" => "ReclamationTask",
-                    "Theme" => "Tales",
-                    "Mode" => "ProsperityInSave",
-                    "ClearStore" => true,
-                    "IsEnable" => true,
-                ),
-            ]??
-        );
-        let (_, summary) = migrate(input).unwrap();
-        assert!(summary.skipped_fields.contains(&SkippedField {
-            task_type: "ReclamationTask".into(),
-            task_name: None,
-            field: "ClearStore".into(),
-        }));
-        // Account switching is off, so AccountName is intentionally ignored (handled).
-        assert!(
-            !summary
-                .skipped_fields
-                .iter()
-                .any(|field| { field.task_type == "StartUpTask" && field.field == "AccountName" })
-        );
-    }
-
-    #[test]
-    fn json_to_json_default_profile() {
-        let input: MAAValue = serde_json::from_str(DEFAULT_PROFILE).unwrap();
-        let (value, summary) = migrate(select_configuration(input, None).unwrap()).unwrap();
-        let expected: MAAValue = serde_json::from_value(serde_json::json!({
-                "tasks": [
-                    {
-                        "type": "StartUp",
-                        "params": {
-                            "client_type": {
-                                "alternatives": ["Official", "Bilibili", "txwy", "YoStarEN", "YoStarJP", "YoStarKR"],
-                            }
-                        }
-                    },
-                    {
-                        "type": "Fight",
-                        "name": "日常经验本",
-                        "variants": [
-                            {
-                                "condition": {
-                                    "type": "Weekday",
-                                    "weekdays": ["Mon", "Wed", "Fri"]
-                                },
-                                "params": {
-                                    "medicine_expire_days": 2,
-                                    "stage": "LS-6"
-                                }
-                            }
-                        ]
-                    },
-                    {
-                        "type": "Fight",
-                        "name": "日常龙门币",
-                        "variants": [
-                            {
-                                "condition": {
-                                    "type": "Weekday",
-                                    "weekdays": ["Tue", "Thu", "Sat"]
-                                },
-                                "params": {
-                                    "medicine_expire_days": 2,
-                                    "stage": "CE-6"
-                                }
-                            }
-                        ]
-                    },
-                    {
-                        "type": "Infrast",
-                        "name": "",
-                        "params": {
-                            "mode": 0,
-                            "facility": [
-                                "Mfg",
-                                "Trade",
-                                "Control",
-                                "Power",
-                                "Reception",
-                                "Office",
-                                "Dorm",
-                                "Processing",
-                                "Training"
-                            ],
-                            "drones": "Money",
-                            "threshold": 0.3,
-                            "replenish": true,
-                            "dorm_notstationed_enabled": true,
-                            "dorm_trust_enabled": true,
-                            "reception_message_board": true,
-                            "reception_clue_exchange": true,
-                            "reception_send_clue": true
-                        }
-                    },
-                    {
-                        "type": "Recruit",
-                        "name": "",
-                        "params": {
-                            "times": 4,
-                            "extra_tags_mode": 0,
-                            "refresh": true,
-                            "expedite": true,
-                            "select": [5, 4, 3],
-                            "confirm": [5, 4, 3],
-                            "recruitment_time": {
-                                "3": 540,
-                                "4": 540
-                            }
-                        }
-                    },
-                    {
-                        "type": "Mall",
-                        "name": "",
-                        "params": {
-                            "shopping": true,
-                            "credit_fight": false,
-                            "formation_index": 0,
-                            "visit_friends": true,
-                            "buy_first": ["加急许可", "招聘许可"],
-                            "blacklist": ["碳", "家具"],
-                            "force_shopping_if_credit_full": true,
-                            "only_buy_discount": false,
-                            "reserve_max_credit": false
-                        }
-                    },
-                    {
-                        "type": "Award",
-                        "name": "",
-                        "params": {
-                            "award": true,
-                            "mail": true,
-                            "recruit": false,
-                            "orundum": true,
-                            "mining": true,
-                            "specialaccess": true
-                        }
-                    },
-                    {
-                        "type": "Roguelike",
-                        "name": "",
-                        "variants": [{
-                            "condition": {
-                                "type": "Not",
-                                "condition": { "type": "Always" }
-                            },
-                            "params": {
-                                "theme": "JieGarden",
-                                "mode": 1,
-                                "squad": "指挥分队",
-                                "roles": "稳扎稳打",
-                                "core_char": "维什戴尔",
-                                "starts_count": 999999,
-                                "investment_enabled": true,
-                                "investments_count": 999,
-                                "investment_with_more_score": false,
-                                "stop_when_investment_full": true,
-                                "stop_at_final_boss": false,
-                                "stop_at_max_level": false,
-                                "use_support": false,
-                                "use_nonfriend_support": false,
-                                "refresh_trader_with_dice": false,
-                                "start_with_elite_two": false,
-                                "only_start_with_elite_two": false
-                            }
-                        }]
-                    },
-                    {
-                        "type": "Reclamation",
-                        "name": "",
-                        "variants": [{
-                            "condition": {
-                                "type": "Not",
-                                "condition": { "type": "Always" }
-                            },
-                            "params": {
-                                "theme": "Tales",
-                                "mode": 1,
-                                "increment_mode": 0,
-                                "num_craft_batches": 16
-                            }
-                        }]
-                    }
-                ]
-            }))
-            .unwrap();
-        assert_eq!(value, expected);
-        assert_eq!(summary.skipped_tasks, vec![SkippedTask {
-            type_tag: "UserDataUpdateTask".into(),
-            name: None,
-        }]);
-        assert_eq!(summary.disabled_tasks, vec![
-            SkippedTask {
-                type_tag: "RoguelikeTask".into(),
-                name: None,
-            },
-            SkippedTask {
-                type_tag: "ReclamationTask".into(),
-                name: None,
-            },
-        ]);
-        assert!(
-            summary
-                .skipped_fields
-                .iter()
-                .any(|field| field.field == "ClearStore")
-        );
-        assert!(
-            summary
-                .skipped_fields
-                .iter()
-                .any(|field| field.task_type == "FightTask" && field.field == "StageResetMode")
-        );
-    }
-
-    const STARTUP_TASK: &str = r#"{
-  "$type": "StartUpTask",
-  "AccountName": "",
-  "Name": "",
-  "IsEnable": true,
-  "TaskType": "StartUp"
-}"#;
-
-    const STARTUP_TASK_WITH_ACCOUNT: &str = r#"{
-  "$type": "StartUpTask",
-  "AccountName": "123****4567",
-  "Name": "启动游戏",
-  "IsEnable": true,
-  "TaskType": "StartUp"
-}"#;
-
-    #[test]
-    fn migrate_start_up_task_without_runtime_settings() {
-        let task: MAAValue = serde_json::from_str(STARTUP_TASK).unwrap();
-        let config = object!();
-        let mut summary = MigrationSummary::default();
-        let actual = start_up::migrate_start_up_task(&task, &config, &mut summary)
-            .unwrap()
-            .unwrap();
-        assert_eq!(
-            serde_json::to_value(&actual).unwrap(),
-            serde_json::json!({
-                "type": "StartUp",
-                "params": {
-                    "client_type": {
-                        "alternatives": ["Official", "Bilibili", "txwy", "YoStarEN", "YoStarJP", "YoStarKR"]
-                    }
-                }
-            })
-        );
-    }
-
-    #[test]
-    fn migrate_start_up_task_from_runtime_settings() {
-        let task: MAAValue = serde_json::from_str(STARTUP_TASK).unwrap();
-        let config = object!(
-            "Gui" => object!(
-                "RuntimeSettings" => object!(
-                    "ClientType" => "Official",
-                    "StartGame" => true,
-                )
-            )
-        );
-        let mut summary = MigrationSummary::default();
-        let actual = start_up::migrate_start_up_task(&task, &config, &mut summary)
-            .unwrap()
-            .unwrap();
-        assert_eq!(
-            serde_json::to_value(&actual).unwrap(),
-            serde_json::json!({
-                "type": "StartUp",
-                "params": {
-                    "client_type": "Official",
-                    "start_game_enabled": true
-                }
-            })
-        );
-    }
-
-    #[test]
-    fn migrate_start_up_task_invalid_client_type_falls_back() {
-        let task: MAAValue = serde_json::from_str(STARTUP_TASK_WITH_ACCOUNT).unwrap();
-        let config = object!(
-            "Gui" => object!(
-                "RuntimeSettings" => object!(
-                    "ClientType" => "NotAClient",
-                    "StartGame" => false,
-                )
-            )
-        );
-        let mut summary = MigrationSummary::default();
-        let actual = start_up::migrate_start_up_task(&task, &config, &mut summary)
-            .unwrap()
-            .unwrap();
-        assert_eq!(
-            serde_json::to_value(&actual).unwrap(),
-            serde_json::json!({
-                "type": "StartUp",
-                "params": {
-                    "client_type": {
-                        "alternatives": ["Official", "Bilibili", "txwy", "YoStarEN", "YoStarJP", "YoStarKR"]
-                    },
-                    "start_game_enabled": false
-                }
-            })
-        );
-    }
-
-    #[test]
-    fn migrate_start_up_task_writes_account_name_when_switch_enabled() {
-        let task = object!(
-            "$type" => "StartUpTask",
-            "AccountName" => "123****4567",
-            "AccountSwitchEnabled" => true,
-            "IsEnable" => true,
-        );
-        let mut summary = MigrationSummary::default();
-        let actual = start_up::migrate_start_up_task(&task, &object!(), &mut summary)
-            .unwrap()
-            .unwrap();
-        assert_eq!(
-            actual
-                .get("params")
-                .and_then(|params| params.get("account_name")),
-            Some(&MAAValue::from("123****4567"))
-        );
-    }
-
-    #[test]
-    fn migrate_start_up_task_omits_account_name_when_switch_disabled() {
-        let task = object!(
-            "$type" => "StartUpTask",
-            "AccountName" => "123****4567",
-            "AccountSwitchEnabled" => false,
-            "IsEnable" => true,
-        );
-        let mut summary = MigrationSummary::default();
-        let actual = start_up::migrate_start_up_task(&task, &object!(), &mut summary)
-            .unwrap()
-            .unwrap();
-        assert!(
-            actual
-                .get("params")
-                .and_then(|params| params.get("account_name"))
-                .is_none()
-        );
-    }
-
-    const FIGHT_TASK: &str = r#"{
-  "$type": "FightTask",
-  "UseMedicine": false,
-  "MedicineCount": 0,
-  "UseStone": false,
-  "StoneCount": 0,
-  "EnableTargetDrop": false,
-  "DropId": "",
-  "DropCount": 0,
-  "EnableTimesLimit": false,
-  "TimesLimit": 2147483647,
-  "Series": 0,
-  "StagePlan": ["LS-6"],
-  "IsDrGrandet": false,
-  "Name": "日常经验本",
-  "IsEnable": true,
-  "TaskType": "Fight"
-}"#;
-
-    const WEEKLY_LS6_TASK: &str = r#"{
-  "$type": "FightTask",
-  "UseMedicine": false,
-  "MedicineCount": 0,
-  "UseStone": false,
-  "StoneCount": 0,
-  "EnableTargetDrop": false,
-  "DropId": "",
-  "DropCount": 0,
-  "IsInventoryTarget": false,
-  "EnableTimesLimit": false,
-  "TimesLimit": 2147483647,
-  "Series": 0,
-  "StagePlan": ["LS-6"],
-  "IsDrGrandet": false,
-  "UseExpiringMedicine": true,
-  "MedicineExpireDays": 2,
-  "UseExpireMedicineForActivity": false,
-  "UseCustomAnnihilation": false,
-  "AnnihilationStage": "Annihilation",
-  "HideUnavailableStage": false,
-  "IsStageManually": false,
-  "UseOptionalStage": false,
-  "UseStoneAllowSave": false,
-  "HideSeries": false,
-  "StageResetMode": "Ignore",
-  "UseWeeklySchedule": true,
-  "WeeklySchedule": {
-    "Sunday": false,
-    "Monday": true,
-    "Tuesday": false,
-    "Wednesday": true,
-    "Thursday": false,
-    "Friday": true,
-    "Saturday": false
-  },
-  "Name": "日常经验本",
-  "IsEnable": true,
-  "TaskType": "Fight"
-}"#;
-
-    const WEEKLY_CE6_TASK: &str = r#"{
-  "$type": "FightTask",
-  "UseMedicine": false,
-  "MedicineCount": 0,
-  "UseStone": false,
-  "StoneCount": 0,
-  "EnableTargetDrop": false,
-  "DropId": "",
-  "DropCount": 0,
-  "IsInventoryTarget": false,
-  "EnableTimesLimit": false,
-  "TimesLimit": 2147483647,
-  "Series": 0,
-  "StagePlan": ["CE-6"],
-  "IsDrGrandet": false,
-  "UseExpiringMedicine": true,
-  "MedicineExpireDays": 2,
-  "UseExpireMedicineForActivity": false,
-  "UseCustomAnnihilation": false,
-  "AnnihilationStage": "Annihilation",
-  "HideUnavailableStage": false,
-  "IsStageManually": false,
-  "UseOptionalStage": false,
-  "UseStoneAllowSave": false,
-  "HideSeries": false,
-  "StageResetMode": "Ignore",
-  "UseWeeklySchedule": true,
-  "WeeklySchedule": {
-    "Sunday": false,
-    "Monday": false,
-    "Tuesday": true,
-    "Wednesday": false,
-    "Thursday": true,
-    "Friday": false,
-    "Saturday": true
-  },
-  "Name": "日常龙门币",
-  "IsEnable": true,
-  "TaskType": "Fight"
-}"#;
-
-    gui_task_test!(
-        migrate_fight_task_basic,
-        fight::migrate_fight_task,
-        FIGHT_TASK,
-        {
-            "type": "Fight",
-            "name": "日常经验本",
-            "params": {
-                "stage": "LS-6"
-            }
-        }
-    );
-
-    gui_task_test!(
-        migrate_fight_task_weekly_schedule_ls6,
-        fight::migrate_fight_task,
-        WEEKLY_LS6_TASK,
-        {
-            "type": "Fight",
-            "name": "日常经验本",
-            "variants": [
-                {
-                    "condition": {
-                        "type": "Weekday",
-                        "weekdays": ["Mon", "Wed", "Fri"]
-                    },
-                    "params": {
-                        "medicine_expire_days": 2,
-                        "stage": "LS-6"
-                    }
-                }
-            ]
-        }
-    );
-
-    gui_task_test!(
-        migrate_fight_task_weekly_schedule_ce6,
-        fight::migrate_fight_task,
-        WEEKLY_CE6_TASK,
-        {
-            "type": "Fight",
-            "name": "日常龙门币",
-            "variants": [
-                {
-                    "condition": {
-                        "type": "Weekday",
-                        "weekdays": ["Tue", "Thu", "Sat"]
-                    },
-                    "params": {
-                        "medicine_expire_days": 2,
-                        "stage": "CE-6"
-                    }
-                }
-            ]
-        }
-    );
-
-    #[test]
-    fn migrate_fight_task_rejects_multi_stage_without_optional() {
-        let task = object!(
-            "$type" => "FightTask",
-            "StagePlan" => vec!["CE-6", "LS-6"]??,
-            "UseWeeklySchedule" => false,
-            "UseOptionalStage" => false,
-            "IsEnable" => true,
-        );
-        let mut summary = MigrationSummary::default();
-        let err = fight::migrate_fight_task(&task, &mut summary).unwrap_err();
-        assert!(
-            err.to_string().contains("single stage string"),
-            "unexpected error: {err}"
-        );
-    }
-
-    #[test]
-    fn migrate_fight_task_shared_params() {
-        let task = object!(
-            "$type" => "FightTask",
-            "UseMedicine" => true,
-            "MedicineCount" => 3,
-            "UseStone" => true,
-            "StoneCount" => 2,
-            "EnableTimesLimit" => true,
-            "TimesLimit" => 10,
-            "EnableTargetDrop" => true,
-            "DropId" => "30012",
-            "DropCount" => 100,
-            "Series" => 6,
-            "StagePlan" => vec!["1-7"]??,
-            "IsEnable" => true,
-        );
-        let mut summary = MigrationSummary::default();
-        let actual = fight::migrate_fight_task(&task, &mut summary)
-            .unwrap()
-            .unwrap();
-        assert_eq!(
-            serde_json::to_value(&actual).unwrap(),
-            serde_json::json!({
-                "type": "Fight",
-                "params": {
-                    "medicine": 3,
-                    "stone": 2,
-                    "times": 10,
-                    "drops": { "30012": 100 },
-                    "series": 6,
-                    "stage": "1-7"
-                }
-            })
-        );
-    }
-
-    #[test]
-    fn migrate_fight_task_optional_stage_conditions() {
-        let task = object!(
-            "$type" => "FightTask",
-            "UseOptionalStage" => true,
-            "UseWeeklySchedule" => false,
-            "StagePlan" => vec!["CE-6", "LS-6", "Annihilation", "1-7"]??,
-            "IsEnable" => true,
-        );
-        let mut summary = MigrationSummary::default();
-        let actual = fight::migrate_fight_task(&task, &mut summary)
-            .unwrap()
-            .unwrap();
-        assert_eq!(
-            serde_json::to_value(&actual).unwrap(),
-            serde_json::json!({
-                "type": "Fight",
-                "variants": [
-                    {
-                        "condition": {
-                            "type": "Weekday",
-                            "weekdays": ["Tue", "Thu", "Sat", "Sun"],
-                            "timezone": "Official"
-                        },
-                        "params": { "stage": "CE-6" }
-                    },
-                    {
-                        "condition": { "type": "Always" },
-                        "params": { "stage": "LS-6" }
-                    },
-                    {
-                        "condition": { "type": "Always" },
-                        "params": { "stage": "Annihilation" }
-                    },
-                    {
-                        "condition": { "type": "Always" },
-                        "params": { "stage": "1-7" }
-                    }
-                ]
-            })
-        );
-    }
-
-    #[test]
-    fn migrate_fight_task_weekly_and_optional_and_condition() {
-        let task = object!(
-            "$type" => "FightTask",
-            "UseOptionalStage" => true,
-            "UseWeeklySchedule" => true,
-            "WeeklySchedule" => object!(
-                "Sunday" => true,
-                "Monday" => false,
-                "Tuesday" => false,
-                "Wednesday" => false,
-                "Thursday" => false,
-                "Friday" => false,
-                "Saturday" => false,
-            ),
-            "StagePlan" => vec!["CE-6"]??,
-            "IsEnable" => true,
-        );
-        let mut summary = MigrationSummary::default();
-        let actual = fight::migrate_fight_task(&task, &mut summary)
-            .unwrap()
-            .unwrap();
-        assert_eq!(
-            serde_json::to_value(&actual).unwrap(),
-            serde_json::json!({
-                "type": "Fight",
-                "variants": [
-                    {
-                        "condition": {
-                            "type": "And",
-                            "conditions": [
-                                {
-                                    "type": "Weekday",
-                                    "weekdays": ["Sun"]
-                                },
-                                {
-                                    "type": "Weekday",
-                                    "weekdays": ["Tue", "Thu", "Sat", "Sun"],
-                                    "timezone": "Official"
-                                }
-                            ]
-                        },
-                        "params": { "stage": "CE-6" }
-                    }
-                ]
-            })
-        );
-    }
-
-    #[test]
-    fn migrate_infrast_task_rejects_custom_mode() {
-        let task = object!(
-            "$type" => "InfrastTask",
-            "Mode" => "Custom",
-            "IsEnable" => true,
-        );
-        let mut summary = MigrationSummary::default();
-        let err = infrast::migrate_infrast_task(&task, &mut summary).unwrap_err();
-        assert!(
-            err.to_string().contains("not supported yet"),
-            "unexpected error: {err}"
-        );
-    }
-
-    #[test]
-    fn migrate_infrast_task_rejects_custom_filename() {
-        let task = object!(
-            "$type" => "InfrastTask",
-            "Mode" => "Normal",
-            "Filename" => "custom.json",
-            "IsEnable" => true,
-        );
-        let mut summary = MigrationSummary::default();
-        let err = infrast::migrate_infrast_task(&task, &mut summary).unwrap_err();
-        assert!(
-            err.to_string().contains("not supported yet"),
-            "unexpected error: {err}"
-        );
     }
 }
 

@@ -269,15 +269,7 @@ pub(crate) enum MigrateCommand {
         input: PathBuf,
         /// Path of the output file, if not specified, the output will be printed to stdout
         output: Option<PathBuf>,
-        /// Format of the output file, can be one of "toml", "yaml" and "json"
-        ///
-        /// If not specified, the format will be guessed from the file extension of the output
-        /// file. If output file is not specified, the output will be default to "json".
-        #[arg(short, long)]
-        format: Option<config::Filetype>,
         /// Select a named configuration when migrating a multi-profile GUI export
-        ///
-        /// Can also be set with the `MAA_GUI_CONFIG` environment variable.
         #[arg(long)]
         config: Option<String>,
     },
@@ -625,7 +617,6 @@ mod test {
             Command::Migrate(MigrateCommand::Wpf {
                 input,
                 output: None,
-                format: None,
                 config: None,
             }) if input == Path::new("profile.json")
         );
@@ -644,19 +635,10 @@ mod test {
             Command::Migrate(MigrateCommand::Wpf {
                 input,
                 output: Some(output),
-                format: None,
                 config: Some(config),
             }) if input == Path::new("profile.json")
                 && output == Path::new("tasks.toml")
                 && config == "Default"
-        );
-
-        assert_matches!(
-            parse_from(["maa", "migrate", "wpf", "profile.json", "-f", "yaml"]).command,
-            Command::Migrate(MigrateCommand::Wpf {
-                format: Some(config::Filetype::Yaml),
-                ..
-            })
         );
     }
 
