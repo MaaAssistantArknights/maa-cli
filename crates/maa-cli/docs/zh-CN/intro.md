@@ -13,6 +13,7 @@
 - [安装及编译](install.md)
 - [使用](usage.md)
 - [配置](config.md)
+- [从 WPF GUI 迁移配置](wpf.md)
 - [常见问题](faq.md)
 
 [maa-home]: https://github.com/MaaAssistantArknights/MaaAssistantArknights/

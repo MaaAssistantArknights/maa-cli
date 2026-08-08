@@ -281,7 +281,7 @@ mod start_up {
     use serde::{Deserialize, Serialize};
     use serde_json::{Map, Value};
 
-    use super::{WpfGuiSettings, MigrationSummary, serialize_to_maa_value};
+    use super::{MigrationSummary, WpfGuiSettings, serialize_to_maa_value};
     use crate::config::task::ClientType;
 
     /// maa-cli StartUp task shape written by migration.
@@ -436,6 +436,26 @@ mod fight {
         stage: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         enable: Option<bool>,
+    }
+
+    impl CliFightParams {
+        fn is_empty(&self) -> bool {
+            self.medicine.is_none()
+                && self.stone.is_none()
+                && self.times.is_none()
+                && self.drops.is_none()
+                && self.series.is_none()
+                && self.medicine_expire_days.is_none()
+                && self.stage.is_none()
+                && self.enable.is_none()
+        }
+
+        fn stage_only(stage: &str) -> Self {
+            Self {
+                stage: Some(stage.to_string()),
+                ..Self::default()
+            }
+        }
     }
 
     /// WPF GUI `FightTask` (`$type = "FightTask"`).
@@ -652,6 +672,8 @@ mod fight {
         type Error = anyhow::Error;
 
         fn try_from(task: &WpfFightTask) -> Result<Self> {
+            // Shared fight options (medicine, stone, expire days, ...) belong on the task.
+            // Variants only carry stage selection / open-condition params.
             let shared_params = CliFightParams::from(task);
 
             let mut item = match (task.use_weekly_schedule, task.use_optional_stage) {
@@ -675,34 +697,30 @@ mod fight {
                             "FightTask UseWeeklySchedule is true but WeeklySchedule is missing or invalid",
                         )?,
                     );
-                    let mut params = shared_params;
-                    params.stage = Some(stage.to_string());
                     CliFightTask {
                         task_type: TaskType::Fight,
                         name: task.name.clone(),
-                        params: None,
+                        params: (!shared_params.is_empty()).then_some(shared_params),
                         variants: vec![CliFightVariant {
                             condition: weekly,
-                            params,
+                            params: CliFightParams::stage_only(stage),
                         }],
                     }
                 }
                 // One variant per optional stage, each with its own open-condition.
                 (false, true) => {
                     let stages: Vec<&str> = (&task.stage_plan).try_into()?;
-                    let mut variants = Vec::with_capacity(stages.len());
-                    for stage in stages {
-                        let mut params = shared_params.clone();
-                        params.stage = Some(stage.to_string());
-                        variants.push(CliFightVariant {
+                    let variants = stages
+                        .into_iter()
+                        .map(|stage| CliFightVariant {
                             condition: WpfFightTask::stage_condition(stage),
-                            params,
-                        });
-                    }
+                            params: CliFightParams::stage_only(stage),
+                        })
+                        .collect();
                     CliFightTask {
                         task_type: TaskType::Fight,
                         name: task.name.clone(),
-                        params: None,
+                        params: (!shared_params.is_empty()).then_some(shared_params),
                         variants,
                     }
                 }
@@ -714,21 +732,22 @@ mod fight {
                             "FightTask UseWeeklySchedule is true but WeeklySchedule is missing or invalid",
                         )?,
                     );
-                    let mut variants = Vec::with_capacity(stages.len());
-                    for stage in stages {
-                        let mut params = shared_params.clone();
-                        params.stage = Some(stage.to_string());
-                        variants.push(CliFightVariant {
+                    let variants = stages
+                        .into_iter()
+                        .map(|stage| CliFightVariant {
                             condition: Condition::And {
-                                conditions: vec![weekly.clone(), WpfFightTask::stage_condition(stage)],
+                                conditions: vec![
+                                    weekly.clone(),
+                                    WpfFightTask::stage_condition(stage),
+                                ],
                             },
-                            params,
-                        });
-                    }
+                            params: CliFightParams::stage_only(stage),
+                        })
+                        .collect();
                     CliFightTask {
                         task_type: TaskType::Fight,
                         name: task.name.clone(),
-                        params: None,
+                        params: (!shared_params.is_empty()).then_some(shared_params),
                         variants,
                     }
                 }
@@ -759,7 +778,6 @@ mod fight {
         }
     }
 }
-
 
 mod infrast {
     use anyhow::{Result, bail};
@@ -912,6 +930,7 @@ mod infrast {
 
 mod recruit {
     use anyhow::Result;
+    use log::warn;
     use maa_types::TaskType;
     use maa_value::prelude::*;
     use serde::{Deserialize, Serialize};
@@ -955,8 +974,6 @@ mod recruit {
         extra_tags_mode: Option<i32>,
         #[serde(skip_serializing_if = "Option::is_none")]
         refresh: Option<bool>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        expedite: Option<bool>,
         #[serde(skip_serializing_if = "Vec::is_empty")]
         select: Vec<i32>,
         #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -1008,6 +1025,18 @@ mod recruit {
             if !self.is_enable {
                 summary.disable_task("RecruitTask", Some(self.name.clone()));
             }
+            // GUI ForceRefresh is not maa-cli/MaaCore `expedite`; maa-cli does not support it.
+            if self.force_refresh {
+                summary.skip_field("RecruitTask", Some(self.name.clone()), "ForceRefresh");
+                warn!(
+                    "RecruitTask ForceRefresh is not supported by maa-cli; this setting has no effect"
+                );
+            }
+            if self.level6_choose {
+                warn!(
+                    "RecruitTask Level6Choose is enabled; recruitment will auto-confirm 6★ operators (dangerous)"
+                );
+            }
             report_unknown_fields(
                 summary,
                 "RecruitTask",
@@ -1058,7 +1087,6 @@ mod recruit {
                     times: Some(task.max_times),
                     extra_tags_mode: Some(task.extra_tag_mode),
                     refresh: Some(task.refresh_level3),
-                    expedite: Some(task.force_refresh),
                     select,
                     confirm,
                     recruitment_time: (!recruitment_time.is_empty()).then_some(recruitment_time),
@@ -1078,9 +1106,7 @@ mod mall {
     use serde::{Deserialize, Serialize};
     use serde_json::{Map, Value};
 
-    use super::{
-        MigrationSummary, report_unknown_fields, serialize_to_maa_value, split_semi_list,
-    };
+    use super::{MigrationSummary, report_unknown_fields, serialize_to_maa_value, split_semi_list};
 
     const HANDLED: &[&str] = &[
         "Shopping",

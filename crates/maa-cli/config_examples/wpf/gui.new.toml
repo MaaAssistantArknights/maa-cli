@@ -6,8 +6,18 @@ client_type = "Official"
 start_game_enabled = true
 
 [[tasks]]
+name = "剿灭"
 type = "Fight"
+
+[tasks.params]
+stage = "Annihilation"
+
+[[tasks]]
 name = "理智作战"
+type = "Fight"
+
+[tasks.params]
+medicine_expire_days = 2
 
 [[tasks.variants]]
 
@@ -15,12 +25,12 @@ name = "理智作战"
 type = "OnSideStory"
 
 [tasks.variants.params]
-medicine_expire_days = 2
 stage = "TO-5"
 
 [[tasks.variants]]
 
 [tasks.variants.condition]
+timezone = "Official"
 type = "Weekday"
 weekdays = [
     "Tue",
@@ -28,10 +38,8 @@ weekdays = [
     "Sat",
     "Sun",
 ]
-timezone = "Official"
 
 [tasks.variants.params]
-medicine_expire_days = 2
 stage = "CE-6"
 
 [[tasks.variants]]
@@ -40,15 +48,37 @@ stage = "CE-6"
 type = "Always"
 
 [tasks.variants.params]
-medicine_expire_days = 2
 stage = "LS-6"
 
 [[tasks]]
-type = "Infrast"
-name = ""
+type = "Recruit"
 
 [tasks.params]
-mode = 0
+confirm = [
+    5,
+    4,
+    3,
+]
+extra_tags_mode = 0
+refresh = true
+select = [
+    5,
+    4,
+    3,
+]
+times = 4
+
+[tasks.params.recruitment_time]
+3 = 540
+4 = 540
+
+[[tasks]]
+type = "Infrast"
+
+[tasks.params]
+dorm_notstationed_enabled = true
+dorm_trust_enabled = true
+drones = "Money"
 facility = [
     "Mfg",
     "Trade",
@@ -60,103 +90,73 @@ facility = [
     "Processing",
     "Training",
 ]
-drones = "Money"
-threshold = 0.3
-replenish = true
-dorm_notstationed_enabled = true
-dorm_trust_enabled = true
-reception_message_board = true
+mode = 0
 reception_clue_exchange = true
+reception_message_board = true
 reception_send_clue = true
-
-[[tasks]]
-type = "Recruit"
-name = ""
-
-[tasks.params]
-times = 4
-extra_tags_mode = 0
-refresh = true
-expedite = true
-select = [
-    5,
-    4,
-    3,
-]
-confirm = [
-    5,
-    4,
-    3,
-]
-
-[tasks.params.recruitment_time]
-4 = 540
-3 = 540
+replenish = true
+threshold = 0.3
 
 [[tasks]]
 type = "Mall"
-name = ""
 
 [tasks.params]
-shopping = true
-credit_fight = false
-formation_index = 0
-visit_friends = true
-buy_first = [
-    "加急许可",
-    "招聘许可",
-]
 blacklist = [
     "碳",
     "家具",
 ]
+buy_first = [
+    "加急许可",
+    "招聘许可",
+]
+credit_fight = false
 force_shopping_if_credit_full = true
+formation_index = 0
 only_buy_discount = false
 reserve_max_credit = false
+shopping = true
+visit_friends = true
 
 [[tasks]]
 type = "Award"
-name = ""
 
 [tasks.params]
 award = true
 mail = true
-recruit = false
-orundum = true
 mining = true
+orundum = true
+recruit = false
 specialaccess = true
 
 [[tasks]]
 type = "Roguelike"
-name = ""
 
 [tasks.params]
-enable = false
-theme = "JieGarden"
-mode = 1
-squad = "指挥分队"
-roles = "稳扎稳打"
 core_char = "维什戴尔"
-starts_count = 999999
+enable = false
 investment_enabled = true
-investments_count = 999
 investment_with_more_score = false
-stop_when_investment_full = true
+investments_count = 999
+mode = 1
+only_start_with_elite_two = false
+refresh_trader_with_dice = false
+roles = "稳扎稳打"
+squad = "指挥分队"
+start_with_elite_two = false
+starts_count = 999999
 stop_at_final_boss = false
 stop_at_max_level = false
-use_support = false
+stop_when_investment_full = true
+theme = "JieGarden"
 use_nonfriend_support = false
-refresh_trader_with_dice = false
-start_with_elite_two = false
-only_start_with_elite_two = false
+use_support = false
 
 [[tasks]]
 type = "Reclamation"
-name = ""
 
 [tasks.params]
 enable = false
-theme = "Tales"
-mode = 1
 increment_mode = 0
+mode = 1
 num_craft_batches = 16
+theme = "Tales"
