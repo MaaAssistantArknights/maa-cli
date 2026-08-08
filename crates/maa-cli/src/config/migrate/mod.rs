@@ -53,7 +53,6 @@ impl MigrationSummary {
         });
     }
 
-    #[expect(dead_code, reason = "used when reporting unmapped GUI fields")]
     pub(super) fn skip_field(
         &mut self,
         task_type: impl Into<String>,

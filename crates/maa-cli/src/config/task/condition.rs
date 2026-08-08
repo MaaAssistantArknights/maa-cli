@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 use super::client_type::ClientType;
 use crate::activity::has_side_story_open;
 
-#[cfg_attr(test, derive(PartialEq, Debug))]
-#[derive(Clone, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[cfg_attr(test, derive(PartialEq))]
 #[serde(tag = "type")]
 pub enum Condition {
     /// The task is always active
@@ -79,8 +79,8 @@ fn is_zero_u32(value: &u32) -> bool {
     *value == 0
 }
 
-#[cfg_attr(test, derive(PartialEq, Debug))]
-#[derive(Clone, Copy, Default, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
+#[cfg_attr(test, derive(PartialEq))]
 #[serde(untagged)]
 pub enum TimeOffset {
     Client(ClientType),

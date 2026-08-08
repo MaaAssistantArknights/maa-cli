@@ -101,7 +101,7 @@ fn resolve_configuration_name(
 /// Migrate a GUI profile into maa-cli task config shape.
 pub(super) fn migrate(input: Value) -> Result<(MAAValue, MigrationSummary)> {
     let mut summary = MigrationSummary::default();
-    let config: Configuration =
+    let config: WpfConfiguration =
         serde_json::from_value(input).context("Failed to deserialize GUI configuration")?;
     let value = config
         .migrate_tasks(&mut summary)?
@@ -115,25 +115,70 @@ fn serialize_to_maa_value<T: Serialize>(value: &T) -> Result<MAAValue> {
     serde_json::from_value(json).context("Failed to convert CLI config prototype to MAAValue")
 }
 
+/// Meta / structural keys that are never reported as skipped fields.
+const META_FIELDS: &[&str] = &["$type", "TaskType", "Name", "IsEnable"];
+
+fn report_unknown_fields(
+    summary: &mut MigrationSummary,
+    type_tag: &str,
+    name: Option<String>,
+    unknown: &serde_json::Map<String, Value>,
+    handled: &[&str],
+) {
+    for (key, value) in unknown {
+        if META_FIELDS.contains(&key.as_str()) || handled.contains(&key.as_str()) {
+            continue;
+        }
+        if is_meaningful_json(value) {
+            summary.skip_field(type_tag, name.clone(), key.clone());
+        }
+    }
+}
+
+fn is_meaningful_json(value: &Value) -> bool {
+    match value {
+        Value::Bool(v) => *v,
+        Value::String(s) => !s.is_empty(),
+        Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                i != 0 && i != i64::from(i32::MAX)
+            } else if let Some(f) = n.as_f64() {
+                f != 0.0
+            } else {
+                true
+            }
+        }
+        Value::Array(items) => !items.is_empty(),
+        Value::Object(map) => !map.is_empty(),
+        Value::Null => false,
+    }
+}
+
+fn split_semi_list(list: &str) -> Vec<String> {
+    list.split(';')
+        .filter(|item| !item.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
 #[derive(Debug, Serialize)]
 struct CliConfig {
     tasks: Vec<MAAValue>,
 }
 
 #[derive(Debug, Deserialize)]
-struct Configuration {
+struct WpfConfiguration {
     #[serde(rename = "TaskQueue")]
     task_queue: Vec<WpfTask>,
     #[serde(rename = "Gui")]
-    #[allow(dead_code)]
-    gui: GuiSettings,
+    gui: WpfGuiSettings,
 }
 
-impl Configuration {
+impl WpfConfiguration {
     fn migrate_tasks(&self, summary: &mut MigrationSummary) -> Result<Option<MAAValue>> {
         let mut tasks = Vec::new();
         for task in &self.task_queue {
-            if let Some(item) = task.migrate_task(summary)? {
+            if let Some(item) = task.migrate_task(&self.gui, summary)? {
                 tasks.push(item);
             }
         }
@@ -144,18 +189,57 @@ impl Configuration {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "$type")]
 enum WpfTask {
-    FightTask(fight::FightTask),
+    StartUpTask(start_up::WpfStartUpTask),
+    FightTask(fight::WpfFightTask),
+    InfrastTask(infrast::WpfInfrastTask),
+    RecruitTask(recruit::WpfRecruitTask),
+    MallTask(mall::WpfMallTask),
+    AwardTask(award::WpfAwardTask),
+    RoguelikeTask(roguelike::WpfRoguelikeTask),
+    ReclamationTask(reclamation::WpfReclamationTask),
     /// Unknown `$type` values are skipped during migration.
     #[serde(other)]
     Unsupported,
 }
 
 impl WpfTask {
-    fn migrate_task(&self, summary: &mut MigrationSummary) -> Result<Option<MAAValue>> {
+    fn migrate_task(
+        &self,
+        gui: &WpfGuiSettings,
+        summary: &mut MigrationSummary,
+    ) -> Result<Option<MAAValue>> {
         match self {
+            Self::StartUpTask(start_up) => {
+                start_up.report_to(summary);
+                Ok(Some(start_up.to_maa_value(gui)?))
+            }
             Self::FightTask(fight) => {
                 fight.report_disabled(summary);
                 Ok(Some(MAAValue::try_from(fight)?))
+            }
+            Self::InfrastTask(task) => {
+                task.report_to(summary);
+                Ok(Some(task.to_maa_value()?))
+            }
+            Self::RecruitTask(task) => {
+                task.report_to(summary);
+                Ok(Some(task.to_maa_value()?))
+            }
+            Self::MallTask(task) => {
+                task.report_to(summary);
+                Ok(Some(task.to_maa_value()?))
+            }
+            Self::AwardTask(task) => {
+                task.report_to(summary);
+                Ok(Some(task.to_maa_value()?))
+            }
+            Self::RoguelikeTask(task) => {
+                task.report_to(summary);
+                Ok(Some(task.to_maa_value()?))
+            }
+            Self::ReclamationTask(task) => {
+                task.report_to(summary);
+                Ok(Some(task.to_maa_value()?))
             }
             Self::Unsupported => {
                 summary.skip_task("Unsupported", None);
@@ -165,79 +249,142 @@ impl WpfTask {
     }
 }
 
+/// WPF GUI `Gui` object for the selected configuration.
 #[derive(Debug, Default, Deserialize)]
-struct GuiSettings {}
+#[serde(rename_all = "PascalCase")]
+struct WpfGuiSettings {
+    #[serde(default)]
+    runtime_settings: Option<WpfRuntimeSettings>,
+    #[serde(flatten)]
+    #[allow(dead_code)]
+    unknown: serde_json::Map<String, Value>,
+}
+
+/// `Gui.RuntimeSettings` fields used by StartUp migration.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct WpfRuntimeSettings {
+    #[serde(default)]
+    client_type: Option<String>,
+    #[serde(default)]
+    start_game: Option<bool>,
+    #[serde(flatten)]
+    #[allow(dead_code)]
+    unknown: serde_json::Map<String, Value>,
+}
 
 mod start_up {
-    // use anyhow::Result;
-    // use log::warn;
-    // use maa_value::prelude::*;
+    use anyhow::Result;
+    use log::warn;
+    use maa_types::TaskType;
+    use maa_value::prelude::*;
+    use serde::{Deserialize, Serialize};
+    use serde_json::{Map, Value};
 
-    // use super::MigrationSummary;
+    use super::{WpfGuiSettings, MigrationSummary, serialize_to_maa_value};
+    use crate::config::task::ClientType;
 
-    // /// Valid GUI / maa-cli client type strings.
-    // const VALID_CLIENT_TYPES: &[&str] = &[
-    //     "Official", "Bilibili", "txwy", "YoStarEN", "YoStarJP", "YoStarKR",
-    // ];
+    /// maa-cli StartUp task shape written by migration.
+    #[derive(Debug, Serialize)]
+    struct CliStartUpTask {
+        #[serde(rename = "type")]
+        task_type: TaskType,
+        #[serde(skip_serializing_if = "str::is_empty")]
+        name: String,
+        params: CliStartUpParams,
+    }
 
-    #[allow(dead_code)]
-    pub(super) struct StartUpTask {}
+    #[derive(Debug, Serialize)]
+    struct CliStartUpParams {
+        client_type: CliClientTypeParam,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        start_game_enabled: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        account_name: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        enable: Option<bool>,
+    }
 
-    // pub(super) fn migrate_start_up_task(
-    //     task: &MAAValue,
-    //     config: &MAAValue,
-    //     summary: &mut MigrationSummary,
-    // ) -> Result<Option<MAAValue>> {
-    //     let runtime = config.get("Gui").and_then(|gui| gui.get("RuntimeSettings"));
+    /// Fixed client type string, or an interactive select prompt.
+    #[derive(Debug, Serialize)]
+    #[serde(untagged)]
+    enum CliClientTypeParam {
+        Fixed(ClientType),
+        Prompt {
+            alternatives: &'static [&'static str],
+        },
+    }
 
-    //     let mut params = MAAValue::default();
+    /// WPF GUI `StartUpTask` (`$type = "StartUpTask"`).
+    ///
+    /// Task-queue fields combine with [`WpfGuiSettings::runtime_settings`] when
+    /// converting to [`CliStartUpTask`] / [`MAAValue`].
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub(super) struct WpfStartUpTask {
+        name: String,
+        is_enable: bool,
+        account_switch_enabled: bool,
+        /// Absent when the GUI export omits the key.
+        #[serde(default)]
+        account_name: Option<String>,
+        #[serde(flatten)]
+        #[allow(dead_code)]
+        unknown: Map<String, Value>,
+    }
 
-    //     // Gui.RuntimeSettings.ClientType -> client_type
-    //     // Missing / invalid values fall back to an interactive prompt.
-    //     match runtime
-    //         .and_then(|settings| settings.get("ClientType"))
-    //         .and_then(|value| value.as_str())
-    //         .filter(|value| VALID_CLIENT_TYPES.contains(value))
-    //     {
-    //         Some(client_type) => {
-    //             insert!(params, "client_type" => client_type);
-    //         }
-    //         None => {
-    //             insert!(params, "client_type" => object!(
-    //                 "alternatives" => VALID_CLIENT_TYPES.iter().map(|s|
-    // s.to_string()).collect::<Vec<_>>()??,             ));
-    //         }
-    //     }
+    impl WpfStartUpTask {
+        pub(super) fn report_to(&self, summary: &mut MigrationSummary) {
+            if !self.is_enable {
+                summary.disable_task("StartUpTask", Some(self.name.clone()));
+            }
+            if self.account_switch_enabled && self.account_name.is_none() {
+                summary.skip_field("StartUpTask", Some(self.name.clone()), "AccountName");
+                warn!("AccountName is missing, but GUI enable account switching");
+            }
+        }
 
-    //     // Gui.RuntimeSettings.StartGame -> start_game_enabled
-    //     if let Some(MAAValue::Primitive(MAAPrimitive::Bool(start_game))) =
-    //         runtime.and_then(|settings| settings.get("StartGame"))
-    //     {
-    //         insert!(params, "start_game_enabled" => *start_game);
-    //     }
+        pub(super) fn to_maa_value(&self, gui: &WpfGuiSettings) -> Result<MAAValue> {
+            serialize_to_maa_value(&CliStartUpTask::try_from((self, gui))?)
+        }
+    }
 
-    //     // AccountSwitchEnabled + AccountName -> account_name
-    //     // Only emit account_name when account switching is enabled.
-    //     if let Some(MAAValue::Primitive(MAAPrimitive::Bool(true))) =
-    //         task.get("AccountSwitchEnabled")
-    //     {
-    //         if let Some(MAAValue::Primitive(MAAPrimitive::String(account_name))) =
-    //             task.get("AccountName")
-    //         {
-    //             insert!(params, "account_name" => account_name.as_str());
-    //         } else {
-    //             summary.skip_field("StartUpTask", None, "AccountName");
-    //             warn!("AccountName is missing, but GUI enable account switching");
-    //         }
-    //     }
+    impl TryFrom<(&WpfStartUpTask, &WpfGuiSettings)> for CliStartUpTask {
+        type Error = anyhow::Error;
 
-    //     let item = object!(
-    //         "type" => "StartUp",
-    //         "params" => params
-    //     );
+        fn try_from((task, gui): (&WpfStartUpTask, &WpfGuiSettings)) -> Result<Self> {
+            let runtime = gui.runtime_settings.as_ref();
 
-    //     Ok(Some(item))
-    // }
+            let client_type = match runtime.and_then(|r| r.client_type.as_deref()) {
+                Some(s) if !s.is_empty() => match s.parse::<ClientType>() {
+                    Ok(client) => CliClientTypeParam::Fixed(client),
+                    Err(_) => CliClientTypeParam::Prompt {
+                        alternatives: &ClientType::NAMES,
+                    },
+                },
+                _ => CliClientTypeParam::Prompt {
+                    alternatives: &ClientType::NAMES,
+                },
+            };
+
+            let account_name = if task.account_switch_enabled {
+                task.account_name.clone()
+            } else {
+                None
+            };
+
+            Ok(CliStartUpTask {
+                task_type: TaskType::StartUp,
+                name: task.name.clone(),
+                params: CliStartUpParams {
+                    client_type,
+                    start_game_enabled: runtime.and_then(|r| r.start_game),
+                    account_name,
+                    enable: (!task.is_enable).then_some(false),
+                },
+            })
+        }
+    }
 }
 
 mod fight {
@@ -254,25 +401,25 @@ mod fight {
 
     /// maa-cli Fight task shape written by migration.
     #[derive(Debug, Serialize)]
-    struct FightCliTask {
+    struct CliFightTask {
         #[serde(rename = "type")]
         task_type: TaskType,
         name: String,
         #[serde(skip_serializing_if = "Option::is_none")]
-        params: Option<FightParams>,
+        params: Option<CliFightParams>,
         #[serde(skip_serializing_if = "Vec::is_empty")]
-        variants: Vec<FightVariant>,
+        variants: Vec<CliFightVariant>,
     }
 
     #[derive(Debug, Serialize)]
-    struct FightVariant {
+    struct CliFightVariant {
         condition: Condition,
-        params: FightParams,
+        params: CliFightParams,
     }
 
     /// Fight params; field order matches historical `object!` / `insert!` output for parity.
     #[derive(Clone, Debug, Default, Serialize)]
-    struct FightParams {
+    struct CliFightParams {
         #[serde(skip_serializing_if = "Option::is_none")]
         medicine: Option<i32>,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -293,20 +440,20 @@ mod fight {
 
     /// WPF GUI `FightTask` (`$type = "FightTask"`).
     ///
-    /// Deserialized from the GUI task queue; converts into [`FightCliTask`] /
+    /// Deserialized from the GUI task queue; converts into [`CliFightTask`] /
     /// [`MAAValue`] via [`TryFrom`]. Unmapped keys are collected in `unknown`.
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "PascalCase")]
-    pub(super) struct FightTask {
+    pub(super) struct WpfFightTask {
         name: String,
         is_enable: bool,
 
         use_weekly_schedule: bool,
         /// Absent when `UseWeeklySchedule` is false in typical GUI exports.
         #[serde(default)]
-        weekly_schedule: Option<WeeklySchedule>,
+        weekly_schedule: Option<WpfWeeklySchedule>,
         use_optional_stage: bool,
-        stage_plan: StagePlan,
+        stage_plan: WpfStagePlan,
 
         use_medicine: bool,
         medicine_count: i32,
@@ -328,7 +475,7 @@ mod fight {
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "PascalCase")]
-    struct WeeklySchedule {
+    struct WpfWeeklySchedule {
         sunday: bool,
         monday: bool,
         tuesday: bool,
@@ -340,12 +487,12 @@ mod fight {
 
     #[derive(Debug, Deserialize)]
     #[serde(untagged)]
-    enum StagePlan {
+    enum WpfStagePlan {
         Single(String),
         Many(Vec<String>),
     }
 
-    impl FightTask {
+    impl WpfFightTask {
         pub(super) fn report_disabled(&self, summary: &mut MigrationSummary) {
             if !self.is_enable {
                 summary.disable_task("FightTask", Some(self.name.clone()));
@@ -411,9 +558,9 @@ mod fight {
         }
     }
 
-    impl From<&FightTask> for FightParams {
-        fn from(task: &FightTask) -> Self {
-            FightParams {
+    impl From<&WpfFightTask> for CliFightParams {
+        fn from(task: &WpfFightTask) -> Self {
+            CliFightParams {
                 medicine: task.use_medicine.then_some(task.medicine_count),
                 stone: task.use_stone.then(|| {
                     let count = task.stone_count;
@@ -438,8 +585,8 @@ mod fight {
         }
     }
 
-    impl From<&WeeklySchedule> for Condition {
-        fn from(schedule: &WeeklySchedule) -> Self {
+    impl From<&WpfWeeklySchedule> for Condition {
+        fn from(schedule: &WpfWeeklySchedule) -> Self {
             let days = [
                 (schedule.sunday, Weekday::Sun),
                 (schedule.monday, Weekday::Mon),
@@ -462,14 +609,14 @@ mod fight {
         }
     }
 
-    impl<'a> TryFrom<&'a StagePlan> for &'a str {
+    impl<'a> TryFrom<&'a WpfStagePlan> for &'a str {
         type Error = anyhow::Error;
 
-        fn try_from(plan: &'a StagePlan) -> Result<&'a str> {
+        fn try_from(plan: &'a WpfStagePlan) -> Result<&'a str> {
             match plan {
-                StagePlan::Single(stage) => Ok(stage.as_str()),
-                StagePlan::Many(stages) if stages.len() == 1 => Ok(stages[0].as_str()),
-                StagePlan::Many(_) => {
+                WpfStagePlan::Single(stage) => Ok(stage.as_str()),
+                WpfStagePlan::Many(stages) if stages.len() == 1 => Ok(stages[0].as_str()),
+                WpfStagePlan::Many(_) => {
                     bail!(
                         "FightTask StagePlan must be a single stage string when UseOptionalStage is false, \
                          got a string array; enable UseOptionalStage for multiple stages"
@@ -479,12 +626,12 @@ mod fight {
         }
     }
 
-    impl<'a> TryFrom<&'a StagePlan> for Vec<&'a str> {
+    impl<'a> TryFrom<&'a WpfStagePlan> for Vec<&'a str> {
         type Error = anyhow::Error;
 
-        fn try_from(plan: &'a StagePlan) -> Result<Vec<&'a str>> {
+        fn try_from(plan: &'a WpfStagePlan) -> Result<Vec<&'a str>> {
             match plan {
-                StagePlan::Many(stages) => {
+                WpfStagePlan::Many(stages) => {
                     if stages.is_empty() {
                         bail!(
                             "FightTask StagePlan must be a non-empty string array when UseOptionalStage is true"
@@ -492,7 +639,7 @@ mod fight {
                     }
                     Ok(stages.iter().map(String::as_str).collect())
                 }
-                StagePlan::Single(_) => {
+                WpfStagePlan::Single(_) => {
                     bail!(
                         "FightTask StagePlan must be a string array when UseOptionalStage is true, got a string"
                     )
@@ -501,11 +648,11 @@ mod fight {
         }
     }
 
-    impl TryFrom<&FightTask> for FightCliTask {
+    impl TryFrom<&WpfFightTask> for CliFightTask {
         type Error = anyhow::Error;
 
-        fn try_from(task: &FightTask) -> Result<Self> {
-            let shared_params = FightParams::from(task);
+        fn try_from(task: &WpfFightTask) -> Result<Self> {
+            let shared_params = CliFightParams::from(task);
 
             let mut item = match (task.use_weekly_schedule, task.use_optional_stage) {
                 // No variants: StagePlan must be a single stage.
@@ -513,7 +660,7 @@ mod fight {
                     let stage: &str = (&task.stage_plan).try_into()?;
                     let mut params = shared_params;
                     params.stage = Some(stage.to_string());
-                    FightCliTask {
+                    CliFightTask {
                         task_type: TaskType::Fight,
                         name: task.name.clone(),
                         params: Some(params),
@@ -530,11 +677,11 @@ mod fight {
                     );
                     let mut params = shared_params;
                     params.stage = Some(stage.to_string());
-                    FightCliTask {
+                    CliFightTask {
                         task_type: TaskType::Fight,
                         name: task.name.clone(),
                         params: None,
-                        variants: vec![FightVariant {
+                        variants: vec![CliFightVariant {
                             condition: weekly,
                             params,
                         }],
@@ -547,12 +694,12 @@ mod fight {
                     for stage in stages {
                         let mut params = shared_params.clone();
                         params.stage = Some(stage.to_string());
-                        variants.push(FightVariant {
-                            condition: FightTask::stage_condition(stage),
+                        variants.push(CliFightVariant {
+                            condition: WpfFightTask::stage_condition(stage),
                             params,
                         });
                     }
-                    FightCliTask {
+                    CliFightTask {
                         task_type: TaskType::Fight,
                         name: task.name.clone(),
                         params: None,
@@ -571,14 +718,14 @@ mod fight {
                     for stage in stages {
                         let mut params = shared_params.clone();
                         params.stage = Some(stage.to_string());
-                        variants.push(FightVariant {
+                        variants.push(CliFightVariant {
                             condition: Condition::And {
-                                conditions: vec![weekly.clone(), FightTask::stage_condition(stage)],
+                                conditions: vec![weekly.clone(), WpfFightTask::stage_condition(stage)],
                             },
                             params,
                         });
                     }
-                    FightCliTask {
+                    CliFightTask {
                         task_type: TaskType::Fight,
                         name: task.name.clone(),
                         params: None,
@@ -592,9 +739,9 @@ mod fight {
                 match &mut item.params {
                     Some(params) => params.enable = Some(false),
                     None => {
-                        item.params = Some(FightParams {
+                        item.params = Some(CliFightParams {
                             enable: Some(false),
-                            ..FightParams::default()
+                            ..CliFightParams::default()
                         });
                     }
                 }
@@ -604,598 +751,825 @@ mod fight {
         }
     }
 
-    impl TryFrom<&FightTask> for MAAValue {
+    impl TryFrom<&WpfFightTask> for MAAValue {
         type Error = anyhow::Error;
 
-        fn try_from(task: &FightTask) -> Result<Self> {
-            serialize_to_maa_value(&FightCliTask::try_from(task)?)
+        fn try_from(task: &WpfFightTask) -> Result<Self> {
+            serialize_to_maa_value(&CliFightTask::try_from(task)?)
         }
     }
 }
 
-// mod infrast {
-//     use anyhow::{Result, bail};
-//     use maa_value::prelude::*;
 
-//     use super::{MigrationSummary, report_unhandled_fields};
+mod infrast {
+    use anyhow::{Result, bail};
+    use maa_types::TaskType;
+    use maa_value::prelude::*;
+    use serde::{Deserialize, Serialize};
+    use serde_json::{Map, Value};
 
-//     pub(super) fn migrate_infrast_task(
-//         task: &MAAValue,
-//         summary: &mut MigrationSummary,
-//     ) -> Result<Option<MAAValue>> {
-//         // Custom infrastructure plans are not migrated yet.
-//         if let Some(MAAValue::Primitive(MAAPrimitive::String(mode))) = task.get("Mode")
-//             && mode == "Custom"
-//         {
-//             bail!("InfrastTask custom mode is not supported yet");
-//         }
-//         if let Some(MAAValue::Primitive(MAAPrimitive::String(filename))) = task.get("Filename")
-//             && !filename.is_empty()
-//         {
-//             bail!("InfrastTask custom plan (Filename) is not supported yet");
-//         }
+    use super::{MigrationSummary, report_unknown_fields, serialize_to_maa_value};
 
-//         let mut item = object!("type" => "Infrast");
-//         // -> task name
-//         if let Some(MAAValue::Primitive(MAAPrimitive::String(name))) = task.get("Name") {
-//             insert!(item, "name" => name.as_str());
-//         }
+    const HANDLED: &[&str] = &[
+        "Mode",
+        "RoomList",
+        "UsesOfDrones",
+        "DormThreshold",
+        "OriginiumShardAutoReplenishment",
+        "DormFilterNotStationed",
+        "DormTrustEnabled",
+        "ReceptionMessageBoard",
+        "ReceptionClueExchange",
+        "SendClue",
+        "Filename",
+        "PlanSelect",
+    ];
 
-//         let mut params = MAAValue::default();
-//         let mut handled = vec![
-//             "Mode",
-//             "RoomList",
-//             "UsesOfDrones",
-//             "DormThreshold",
-//             "OriginiumShardAutoReplenishment",
-//             "DormFilterNotStationed",
-//             "DormTrustEnabled",
-//             "ReceptionMessageBoard",
-//             "ReceptionClueExchange",
-//             "SendClue",
-//             // Custom plan fields: rejected above when set; keep handled so defaults are quiet.
-//             "Filename",
-//             "PlanSelect",
-//         ];
-//         // Mode -> mode (Custom is rejected above)
-//         if let Some(MAAValue::Primitive(MAAPrimitive::String(mode))) = task.get("Mode") {
-//             if let Some(mode) = match mode.as_str() {
-//                 "Normal" => Some(0),
-//                 "Rotation" => Some(20000),
-//                 _ => None,
-//             } {
-//                 insert!(params, "mode" => mode);
-//             } else {
-//                 handled.retain(|field| *field != "Mode");
-//             }
-//         }
-//         // RoomList -> facility
-//         if let Some(MAAValue::Array(rooms)) = task.get("RoomList") {
-//             let mut facility = Vec::new();
-//             for room in rooms {
-//                 if let MAAValue::Object(map) = room
-//                     && let Some(MAAValue::Primitive(MAAPrimitive::String(room))) =
-// map.get("Room")                 {
-//                     facility.push(room.as_str());
-//                 }
-//             }
-//             if !facility.is_empty() {
-//                 insert!(params, "facility" => facility??);
-//             }
-//         }
-//         // UsesOfDrones -> drones
-//         if let Some(MAAValue::Primitive(MAAPrimitive::String(drones))) = task.get("UsesOfDrones")
-// {             insert!(params, "drones" => drones.as_str());
-//         }
-//         // DormThreshold -> threshold
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Int(threshold))) =
-// task.get("DormThreshold") {             insert!(params, "threshold" => *threshold as f32 /
-// 100.0);         }
-//         // OriginiumShardAutoReplenishment -> replenish
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(replenish))) =
-//             task.get("OriginiumShardAutoReplenishment")
-//         {
-//             insert!(params, "replenish" => *replenish);
-//         }
-//         // DormFilterNotStationed -> dorm_notstationed_enabled
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(enabled))) =
-//             task.get("DormFilterNotStationed")
-//         {
-//             insert!(params, "dorm_notstationed_enabled" => *enabled);
-//         }
-//         // DormTrustEnabled -> dorm_trust_enabled
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(enabled))) =
-// task.get("DormTrustEnabled")         {
-//             insert!(params, "dorm_trust_enabled" => *enabled);
-//         }
-//         // ReceptionMessageBoard -> reception_message_board
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(enabled))) =
-//             task.get("ReceptionMessageBoard")
-//         {
-//             insert!(params, "reception_message_board" => *enabled);
-//         }
-//         // ReceptionClueExchange -> reception_clue_exchange
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(enabled))) =
-//             task.get("ReceptionClueExchange")
-//         {
-//             insert!(params, "reception_clue_exchange" => *enabled);
-//         }
-//         // SendClue -> reception_send_clue
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(enabled))) = task.get("SendClue") {
-//             insert!(params, "reception_send_clue" => *enabled);
-//         }
+    #[derive(Debug, Serialize)]
+    struct CliInfrastTask {
+        #[serde(rename = "type")]
+        task_type: TaskType,
+        #[serde(skip_serializing_if = "str::is_empty")]
+        name: String,
+        params: CliInfrastParams,
+    }
 
-//         insert!(item, "params" => params);
-//         report_unhandled_fields(summary, task, "InfrastTask", &handled);
-//         Ok(Some(item))
-//     }
-// }
+    #[derive(Debug, Serialize)]
+    struct CliInfrastParams {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        mode: Option<i32>,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        facility: Vec<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        drones: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        threshold: Option<f32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        replenish: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        dorm_notstationed_enabled: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        dorm_trust_enabled: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        reception_message_board: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        reception_clue_exchange: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        reception_send_clue: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        enable: Option<bool>,
+    }
 
-// mod recruit {
-//     use anyhow::Result;
-//     use maa_value::prelude::*;
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    struct WpfInfrastRoom {
+        room: String,
+    }
 
-//     use super::{MigrationSummary, report_unhandled_fields};
+    /// WPF GUI `InfrastTask` (`$type = "InfrastTask"`).
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub(super) struct WpfInfrastTask {
+        name: String,
+        is_enable: bool,
+        mode: String,
+        #[serde(default)]
+        filename: String,
+        room_list: Vec<WpfInfrastRoom>,
+        uses_of_drones: String,
+        dorm_threshold: i32,
+        originium_shard_auto_replenishment: bool,
+        dorm_filter_not_stationed: bool,
+        dorm_trust_enabled: bool,
+        reception_message_board: bool,
+        reception_clue_exchange: bool,
+        send_clue: bool,
+        #[serde(flatten)]
+        unknown: Map<String, Value>,
+    }
 
-//     pub(super) fn migrate_recruit_task(
-//         task: &MAAValue,
-//         summary: &mut MigrationSummary,
-//     ) -> Result<Option<MAAValue>> {
-//         let mut item = object!("type" => "Recruit");
-//         // -> task name
-//         if let Some(MAAValue::Primitive(MAAPrimitive::String(name))) = task.get("Name") {
-//             insert!(item, "name" => name.as_str());
-//         }
+    impl WpfInfrastTask {
+        fn mapped_mode(&self) -> Option<i32> {
+            match self.mode.as_str() {
+                "Normal" => Some(0),
+                "Rotation" => Some(20000),
+                _ => None,
+            }
+        }
 
-//         let mut params = MAAValue::default();
-//         // MaxTimes -> times
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Int(times))) = task.get("MaxTimes") {
-//             insert!(params, "times" => *times);
-//         }
-//         // ExtraTagMode -> extra_tags_mode
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Int(mode))) = task.get("ExtraTagMode") {
-//             insert!(params, "extra_tags_mode" => *mode);
-//         }
-//         // RefreshLevel3 -> refresh
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(refresh))) = task.get("RefreshLevel3")
-// {             insert!(params, "refresh" => *refresh);
-//         }
-//         // ForceRefresh -> expedite
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(expedite))) = task.get("ForceRefresh")
-// {             insert!(params, "expedite" => *expedite);
-//         }
-//         // LevelXChoose -> select / confirm
-//         let mut select = Vec::new();
-//         let mut confirm = Vec::new();
-//         let mut recruitment_time = MAAValue::default();
-//         const LEVELS: [(&str, &str, i32); 4] = [
-//             ("Level6Choose", "Level6Time", 6),
-//             ("Level5Choose", "Level5Time", 5),
-//             ("Level4Choose", "Level4Time", 4),
-//             ("Level3Choose", "Level3Time", 3),
-//         ];
-//         for (choose_key, time_key, level) in LEVELS {
-//             if let Some(MAAValue::Primitive(MAAPrimitive::Bool(true))) = task.get(choose_key) {
-//                 select.push(level);
-//                 confirm.push(level);
-//             }
-//             if let Some(MAAValue::Primitive(MAAPrimitive::Int(minutes))) = task.get(time_key) {
-//                 recruitment_time.insert(level.to_string(), (*minutes).into());
-//             }
-//         }
-//         if !select.is_empty() {
-//             insert!(params, "select" => select??);
-//             insert!(params, "confirm" => confirm??);
-//         }
-//         if recruitment_time.as_map().is_some_and(|map| !map.is_empty()) {
-//             insert!(params, "recruitment_time" => recruitment_time);
-//         }
-//         // PreferTagEnabled + Level3PreferTags -> first_tags
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(true))) = task.get("PreferTagEnabled")
-//             && let Some(MAAValue::Array(tags)) = task.get("Level3PreferTags")
-//         {
-//             let mut first_tags = Vec::new();
-//             for tag in tags {
-//                 if let MAAValue::Primitive(MAAPrimitive::String(tag)) = tag {
-//                     first_tags.push(tag.as_str());
-//                 }
-//             }
-//             if !first_tags.is_empty() {
-//                 insert!(params, "first_tags" => first_tags??);
-//             }
-//         }
-//         // PreserveTagEnabled + PreserveTagList -> preserve_tags
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(true))) =
-// task.get("PreserveTagEnabled")             && let Some(MAAValue::Array(tags)) =
-// task.get("PreserveTagList")         {
-//             let mut preserve_tags = Vec::new();
-//             for tag in tags {
-//                 if let MAAValue::Primitive(MAAPrimitive::String(tag)) = tag {
-//                     preserve_tags.push(tag.as_str());
-//                 }
-//             }
-//             if !preserve_tags.is_empty() {
-//                 insert!(params, "preserve_tags" => preserve_tags??);
-//             }
-//         }
+        pub(super) fn report_to(&self, summary: &mut MigrationSummary) {
+            if !self.is_enable {
+                summary.disable_task("InfrastTask", Some(self.name.clone()));
+            }
+            if self.mode != "Custom" && self.mapped_mode().is_none() {
+                summary.skip_field("InfrastTask", Some(self.name.clone()), "Mode");
+            }
+            report_unknown_fields(
+                summary,
+                "InfrastTask",
+                Some(self.name.clone()),
+                &self.unknown,
+                HANDLED,
+            );
+        }
 
-//         insert!(item, "params" => params);
-//         report_unhandled_fields(summary, task, "RecruitTask", &[
-//             "MaxTimes",
-//             "ExtraTagMode",
-//             "RefreshLevel3",
-//             "ForceRefresh",
-//             "Level6Choose",
-//             "Level6Time",
-//             "Level5Choose",
-//             "Level5Time",
-//             "Level4Choose",
-//             "Level4Time",
-//             "Level3Choose",
-//             "Level3Time",
-//             "PreferTagEnabled",
-//             "Level3PreferTags",
-//             "PreserveTagEnabled",
-//             "PreserveTagList",
-//         ]);
-//         Ok(Some(item))
-//     }
-// }
+        pub(super) fn to_maa_value(&self) -> Result<MAAValue> {
+            serialize_to_maa_value(&CliInfrastTask::try_from(self)?)
+        }
+    }
 
-// mod mall {
-//     use anyhow::Result;
-//     use maa_value::prelude::*;
+    impl TryFrom<&WpfInfrastTask> for CliInfrastTask {
+        type Error = anyhow::Error;
 
-//     use super::{MigrationSummary, report_unhandled_fields};
+        fn try_from(task: &WpfInfrastTask) -> Result<Self> {
+            if task.mode == "Custom" {
+                bail!("InfrastTask custom mode is not supported yet");
+            }
+            if !task.filename.is_empty() {
+                bail!("InfrastTask custom plan (Filename) is not supported yet");
+            }
 
-//     pub(super) fn migrate_mall_task(
-//         task: &MAAValue,
-//         summary: &mut MigrationSummary,
-//     ) -> Result<Option<MAAValue>> {
-//         let mut item = object!("type" => "Mall");
-//         // -> task name
-//         if let Some(MAAValue::Primitive(MAAPrimitive::String(name))) = task.get("Name") {
-//             insert!(item, "name" => name.as_str());
-//         }
+            Ok(CliInfrastTask {
+                task_type: TaskType::Infrast,
+                name: task.name.clone(),
+                params: CliInfrastParams {
+                    mode: task.mapped_mode(),
+                    facility: task.room_list.iter().map(|r| r.room.clone()).collect(),
+                    drones: Some(task.uses_of_drones.clone()),
+                    threshold: Some(task.dorm_threshold as f32 / 100.0),
+                    replenish: Some(task.originium_shard_auto_replenishment),
+                    dorm_notstationed_enabled: Some(task.dorm_filter_not_stationed),
+                    dorm_trust_enabled: Some(task.dorm_trust_enabled),
+                    reception_message_board: Some(task.reception_message_board),
+                    reception_clue_exchange: Some(task.reception_clue_exchange),
+                    reception_send_clue: Some(task.send_clue),
+                    enable: (!task.is_enable).then_some(false),
+                },
+            })
+        }
+    }
+}
 
-//         let mut params = MAAValue::default();
-//         // Shopping -> shopping
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(shopping))) = task.get("Shopping") {
-//             insert!(params, "shopping" => *shopping);
-//         }
-//         // CreditFight -> credit_fight
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(credit_fight))) =
-// task.get("CreditFight")         {
-//             insert!(params, "credit_fight" => *credit_fight);
-//         }
-//         // CreditFightFormation -> formation_index
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Int(formation_index))) =
-//             task.get("CreditFightFormation")
-//         {
-//             insert!(params, "formation_index" => *formation_index);
-//         }
-//         // VisitFriends -> visit_friends
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(visit_friends))) =
-//             task.get("VisitFriends")
-//         {
-//             insert!(params, "visit_friends" => *visit_friends);
-//         }
-//         // FirstList -> buy_first
-//         if let Some(MAAValue::Primitive(MAAPrimitive::String(list))) = task.get("FirstList") {
-//             let buy_first: Vec<_> = list.split(';').filter(|item| !item.is_empty()).collect();
-//             if !buy_first.is_empty() {
-//                 insert!(params, "buy_first" => buy_first??);
-//             }
-//         }
-//         // BlackList -> blacklist
-//         if let Some(MAAValue::Primitive(MAAPrimitive::String(list))) = task.get("BlackList") {
-//             let blacklist: Vec<_> = list.split(';').filter(|item| !item.is_empty()).collect();
-//             if !blacklist.is_empty() {
-//                 insert!(params, "blacklist" => blacklist??);
-//             }
-//         }
-//         // ShoppingIgnoreBlackListWhenFull -> force_shopping_if_credit_full
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(force))) =
-//             task.get("ShoppingIgnoreBlackListWhenFull")
-//         {
-//             insert!(params, "force_shopping_if_credit_full" => *force);
-//         }
-//         // OnlyBuyDiscount -> only_buy_discount
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(only_discount))) =
-//             task.get("OnlyBuyDiscount")
-//         {
-//             insert!(params, "only_buy_discount" => *only_discount);
-//         }
-//         // ReserveMaxCredit -> reserve_max_credit
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(reserve))) =
-// task.get("ReserveMaxCredit")         {
-//             insert!(params, "reserve_max_credit" => *reserve);
-//         }
+mod recruit {
+    use anyhow::Result;
+    use maa_types::TaskType;
+    use maa_value::prelude::*;
+    use serde::{Deserialize, Serialize};
+    use serde_json::{Map, Value};
 
-//         insert!(item, "params" => params);
-//         report_unhandled_fields(summary, task, "MallTask", &[
-//             "Shopping",
-//             "CreditFight",
-//             "CreditFightFormation",
-//             "VisitFriends",
-//             "FirstList",
-//             "BlackList",
-//             "ShoppingIgnoreBlackListWhenFull",
-//             "OnlyBuyDiscount",
-//             "ReserveMaxCredit",
-//         ]);
-//         Ok(Some(item))
-//     }
-// }
+    use super::{MigrationSummary, report_unknown_fields, serialize_to_maa_value};
 
-// mod award {
-//     use anyhow::Result;
-//     use maa_value::prelude::*;
+    const HANDLED: &[&str] = &[
+        "MaxTimes",
+        "ExtraTagMode",
+        "RefreshLevel3",
+        "ForceRefresh",
+        "Level6Choose",
+        "Level6Time",
+        "Level5Choose",
+        "Level5Time",
+        "Level4Choose",
+        "Level4Time",
+        "Level3Choose",
+        "Level3Time",
+        "PreferTagEnabled",
+        "Level3PreferTags",
+        "PreserveTagEnabled",
+        "PreserveTagList",
+    ];
 
-//     use super::{MigrationSummary, report_unhandled_fields};
+    #[derive(Debug, Serialize)]
+    struct CliRecruitTask {
+        #[serde(rename = "type")]
+        task_type: TaskType,
+        #[serde(skip_serializing_if = "str::is_empty")]
+        name: String,
+        params: CliRecruitParams,
+    }
 
-//     pub(super) fn migrate_award_task(
-//         task: &MAAValue,
-//         summary: &mut MigrationSummary,
-//     ) -> Result<Option<MAAValue>> {
-//         let mut item = object!("type" => "Award");
-//         // -> task name
-//         if let Some(MAAValue::Primitive(MAAPrimitive::String(name))) = task.get("Name") {
-//             insert!(item, "name" => name.as_str());
-//         }
+    #[derive(Debug, Serialize)]
+    struct CliRecruitParams {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        times: Option<i32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        extra_tags_mode: Option<i32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        refresh: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        expedite: Option<bool>,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        select: Vec<i32>,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        confirm: Vec<i32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        recruitment_time: Option<maa_value::map::StringMap<i32>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        first_tags: Option<Vec<String>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        preserve_tags: Option<Vec<String>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        enable: Option<bool>,
+    }
 
-//         let mut params = MAAValue::default();
-//         // Award -> award
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(award))) = task.get("Award") {
-//             insert!(params, "award" => *award);
-//         }
-//         // Mail -> mail
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(mail))) = task.get("Mail") {
-//             insert!(params, "mail" => *mail);
-//         }
-//         // FreeGacha -> recruit
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(recruit))) = task.get("FreeGacha") {
-//             insert!(params, "recruit" => *recruit);
-//         }
-//         // Orundum -> orundum
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(orundum))) = task.get("Orundum") {
-//             insert!(params, "orundum" => *orundum);
-//         }
-//         // Mining -> mining
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(mining))) = task.get("Mining") {
-//             insert!(params, "mining" => *mining);
-//         }
-//         // SpecialAccess -> specialaccess
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(specialaccess))) =
-//             task.get("SpecialAccess")
-//         {
-//             insert!(params, "specialaccess" => *specialaccess);
-//         }
+    /// WPF GUI `RecruitTask` (`$type = "RecruitTask"`).
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub(super) struct WpfRecruitTask {
+        name: String,
+        is_enable: bool,
+        max_times: i32,
+        extra_tag_mode: i32,
+        refresh_level3: bool,
+        force_refresh: bool,
+        level3_choose: bool,
+        #[serde(default)]
+        level3_time: Option<i32>,
+        level4_choose: bool,
+        #[serde(default)]
+        level4_time: Option<i32>,
+        level5_choose: bool,
+        #[serde(default)]
+        level5_time: Option<i32>,
+        level6_choose: bool,
+        #[serde(default)]
+        level6_time: Option<i32>,
+        prefer_tag_enabled: bool,
+        #[serde(default)]
+        level3_prefer_tags: Vec<String>,
+        preserve_tag_enabled: bool,
+        #[serde(default)]
+        preserve_tag_list: Vec<String>,
+        #[serde(flatten)]
+        unknown: Map<String, Value>,
+    }
 
-//         insert!(item, "params" => params);
-//         report_unhandled_fields(summary, task, "AwardTask", &[
-//             "Award",
-//             "Mail",
-//             "FreeGacha",
-//             "Orundum",
-//             "Mining",
-//             "SpecialAccess",
-//         ]);
-//         Ok(Some(item))
-//     }
-// }
+    impl WpfRecruitTask {
+        pub(super) fn report_to(&self, summary: &mut MigrationSummary) {
+            if !self.is_enable {
+                summary.disable_task("RecruitTask", Some(self.name.clone()));
+            }
+            report_unknown_fields(
+                summary,
+                "RecruitTask",
+                Some(self.name.clone()),
+                &self.unknown,
+                HANDLED,
+            );
+        }
 
-// mod roguelike {
-//     use anyhow::Result;
-//     use maa_value::prelude::*;
+        pub(super) fn to_maa_value(&self) -> Result<MAAValue> {
+            serialize_to_maa_value(&CliRecruitTask::try_from(self)?)
+        }
+    }
 
-//     use super::{MigrationSummary, report_unhandled_fields};
+    impl TryFrom<&WpfRecruitTask> for CliRecruitTask {
+        type Error = anyhow::Error;
 
-//     pub(super) fn migrate_roguelike_task(
-//         task: &MAAValue,
-//         summary: &mut MigrationSummary,
-//     ) -> Result<Option<MAAValue>> {
-//         let mut item = object!("type" => "Roguelike");
-//         // -> task name
-//         if let Some(MAAValue::Primitive(MAAPrimitive::String(name))) = task.get("Name") {
-//             insert!(item, "name" => name.as_str());
-//         }
+        fn try_from(task: &WpfRecruitTask) -> Result<Self> {
+            let levels = [
+                (task.level6_choose, task.level6_time, 6),
+                (task.level5_choose, task.level5_time, 5),
+                (task.level4_choose, task.level4_time, 4),
+                (task.level3_choose, task.level3_time, 3),
+            ];
 
-//         let mut params = MAAValue::default();
-//         let mut handled = vec![
-//             "Theme",
-//             "Mode",
-//             "Squad",
-//             "Roles",
-//             "CoreChar",
-//             "StartCount",
-//             "Difficulty",
-//             "Investment",
-//             "InvestCount",
-//             "InvestWithMoreScore",
-//             "StopWhenDepositFull",
-//             "StopAtFinalBoss",
-//             "StopWhenLevelMax",
-//             "UseSupport",
-//             "UseSupportNonFriend",
-//             "RefreshTraderWithDice",
-//             "StartWithEliteTwo",
-//             "StartWithEliteTwoOnly",
-//         ];
-//         // Theme -> theme
-//         if let Some(MAAValue::Primitive(MAAPrimitive::String(theme))) = task.get("Theme") {
-//             insert!(params, "theme" => theme.as_str());
-//         }
-//         // Mode -> mode
-//         if let Some(MAAValue::Primitive(MAAPrimitive::String(mode))) = task.get("Mode") {
-//             if let Some(mode) = match mode.as_str() {
-//                 "Exp" => Some(0),
-//                 "Investment" => Some(1),
-//                 "Collect" => Some(4),
-//                 "CollapsalParadigms" => Some(5),
-//                 "MonthlySquad" => Some(6),
-//                 "DeepExploration" => Some(7),
-//                 _ => None,
-//             } {
-//                 insert!(params, "mode" => mode);
-//             } else {
-//                 handled.retain(|field| *field != "Mode");
-//             }
-//         }
-//         // Squad -> squad
-//         if let Some(MAAValue::Primitive(MAAPrimitive::String(squad))) = task.get("Squad") {
-//             insert!(params, "squad" => squad.as_str());
-//         }
-//         // Roles -> roles
-//         if let Some(MAAValue::Primitive(MAAPrimitive::String(roles))) = task.get("Roles") {
-//             insert!(params, "roles" => roles.as_str());
-//         }
-//         // CoreChar -> core_char
-//         if let Some(MAAValue::Primitive(MAAPrimitive::String(core_char))) = task.get("CoreChar")
-// {             insert!(params, "core_char" => core_char.as_str());
-//         }
-//         // StartCount -> starts_count
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Int(starts_count))) =
-// task.get("StartCount") {             insert!(params, "starts_count" => *starts_count);
-//         }
-//         // Difficulty -> difficulty
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Int(difficulty))) = task.get("Difficulty")
-//             && *difficulty != i32::MAX
-//         {
-//             insert!(params, "difficulty" => *difficulty);
-//         }
-//         // Investment -> investment_enabled
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(investment_enabled))) =
-//             task.get("Investment")
-//         {
-//             insert!(params, "investment_enabled" => *investment_enabled);
-//         }
-//         // InvestCount -> investments_count
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Int(investments_count))) =
-//             task.get("InvestCount")
-//         {
-//             insert!(params, "investments_count" => *investments_count);
-//         }
-//         // InvestWithMoreScore -> investment_with_more_score
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(investment_with_more_score))) =
-//             task.get("InvestWithMoreScore")
-//         {
-//             insert!(params, "investment_with_more_score" => *investment_with_more_score);
-//         }
-//         // StopWhenDepositFull -> stop_when_investment_full
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(stop_when_investment_full))) =
-//             task.get("StopWhenDepositFull")
-//         {
-//             insert!(params, "stop_when_investment_full" => *stop_when_investment_full);
-//         }
-//         // StopAtFinalBoss -> stop_at_final_boss
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(stop_at_final_boss))) =
-//             task.get("StopAtFinalBoss")
-//         {
-//             insert!(params, "stop_at_final_boss" => *stop_at_final_boss);
-//         }
-//         // StopWhenLevelMax -> stop_at_max_level
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(stop_at_max_level))) =
-//             task.get("StopWhenLevelMax")
-//         {
-//             insert!(params, "stop_at_max_level" => *stop_at_max_level);
-//         }
-//         // UseSupport -> use_support
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(use_support))) =
-// task.get("UseSupport") {             insert!(params, "use_support" => *use_support);
-//         }
-//         // UseSupportNonFriend -> use_nonfriend_support
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(use_nonfriend_support))) =
-//             task.get("UseSupportNonFriend")
-//         {
-//             insert!(params, "use_nonfriend_support" => *use_nonfriend_support);
-//         }
-//         // RefreshTraderWithDice -> refresh_trader_with_dice
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(refresh_trader_with_dice))) =
-//             task.get("RefreshTraderWithDice")
-//         {
-//             insert!(params, "refresh_trader_with_dice" => *refresh_trader_with_dice);
-//         }
-//         // StartWithEliteTwo -> start_with_elite_two
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(start_with_elite_two))) =
-//             task.get("StartWithEliteTwo")
-//         {
-//             insert!(params, "start_with_elite_two" => *start_with_elite_two);
-//         }
-//         // StartWithEliteTwoOnly -> only_start_with_elite_two
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Bool(only_start_with_elite_two))) =
-//             task.get("StartWithEliteTwoOnly")
-//         {
-//             insert!(params, "only_start_with_elite_two" => *only_start_with_elite_two);
-//         }
+            let mut select = Vec::new();
+            let mut confirm = Vec::new();
+            let mut recruitment_time = maa_value::map::StringMap::new();
+            for (choose, minutes, level) in levels {
+                if choose {
+                    select.push(level);
+                    confirm.push(level);
+                }
+                if let Some(minutes) = minutes {
+                    recruitment_time.insert(level.to_string(), minutes);
+                }
+            }
 
-//         insert!(item, "params" => params);
-//         report_unhandled_fields(summary, task, "RoguelikeTask", &handled);
-//         Ok(Some(item))
-//     }
-// }
+            let first_tags = (task.prefer_tag_enabled && !task.level3_prefer_tags.is_empty())
+                .then(|| task.level3_prefer_tags.clone());
+            let preserve_tags = (task.preserve_tag_enabled && !task.preserve_tag_list.is_empty())
+                .then(|| task.preserve_tag_list.clone());
 
-// mod reclamation {
-//     use anyhow::Result;
-//     use maa_value::prelude::*;
+            Ok(CliRecruitTask {
+                task_type: TaskType::Recruit,
+                name: task.name.clone(),
+                params: CliRecruitParams {
+                    times: Some(task.max_times),
+                    extra_tags_mode: Some(task.extra_tag_mode),
+                    refresh: Some(task.refresh_level3),
+                    expedite: Some(task.force_refresh),
+                    select,
+                    confirm,
+                    recruitment_time: (!recruitment_time.is_empty()).then_some(recruitment_time),
+                    first_tags,
+                    preserve_tags,
+                    enable: (!task.is_enable).then_some(false),
+                },
+            })
+        }
+    }
+}
 
-//     use super::{MigrationSummary, report_unhandled_fields};
+mod mall {
+    use anyhow::Result;
+    use maa_types::TaskType;
+    use maa_value::prelude::*;
+    use serde::{Deserialize, Serialize};
+    use serde_json::{Map, Value};
 
-//     pub(super) fn migrate_reclamation_task(
-//         task: &MAAValue,
-//         summary: &mut MigrationSummary,
-//     ) -> Result<Option<MAAValue>> {
-//         let mut item = object!("type" => "Reclamation");
-//         // -> task name
-//         if let Some(MAAValue::Primitive(MAAPrimitive::String(name))) = task.get("Name") {
-//             insert!(item, "name" => name.as_str());
-//         }
+    use super::{
+        MigrationSummary, report_unknown_fields, serialize_to_maa_value, split_semi_list,
+    };
 
-//         let mut params = MAAValue::default();
-//         let mut handled = vec![
-//             "Theme",
-//             "Mode",
-//             "ToolToCraft",
-//             "IncrementMode",
-//             "MaxCraftCountPerRound",
-//         ];
-//         // Theme -> theme
-//         if let Some(MAAValue::Primitive(MAAPrimitive::String(theme))) = task.get("Theme") {
-//             insert!(params, "theme" => theme.as_str());
-//         }
-//         // Mode -> mode
-//         if let Some(MAAValue::Primitive(MAAPrimitive::String(mode))) = task.get("Mode") {
-//             if let Some(mode) = match mode.as_str() {
-//                 "ProsperityNoSave" => Some(0),
-//                 "ProsperityInSave" => Some(1),
-//                 _ => None,
-//             } {
-//                 insert!(params, "mode" => mode);
-//             } else {
-//                 handled.retain(|field| *field != "Mode");
-//             }
-//         }
-//         // ToolToCraft -> tools_to_craft
-//         if let Some(MAAValue::Primitive(MAAPrimitive::String(tool))) = task.get("ToolToCraft")
-//             && !tool.is_empty()
-//         {
-//             insert!(params, "tools_to_craft" => vec![tool.as_str()]??);
-//         }
-//         // IncrementMode -> increment_mode
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Int(increment_mode))) =
-//             task.get("IncrementMode")
-//         {
-//             insert!(params, "increment_mode" => *increment_mode);
-//         }
-//         // MaxCraftCountPerRound -> num_craft_batches
-//         if let Some(MAAValue::Primitive(MAAPrimitive::Int(num_craft_batches))) =
-//             task.get("MaxCraftCountPerRound")
-//         {
-//             insert!(params, "num_craft_batches" => *num_craft_batches);
-//         }
+    const HANDLED: &[&str] = &[
+        "Shopping",
+        "CreditFight",
+        "CreditFightFormation",
+        "VisitFriends",
+        "FirstList",
+        "BlackList",
+        "ShoppingIgnoreBlackListWhenFull",
+        "OnlyBuyDiscount",
+        "ReserveMaxCredit",
+    ];
 
-//         insert!(item, "params" => params);
-//         report_unhandled_fields(summary, task, "ReclamationTask", &handled);
-//         Ok(Some(item))
-//     }
-// }
+    #[derive(Debug, Serialize)]
+    struct CliMallTask {
+        #[serde(rename = "type")]
+        task_type: TaskType,
+        #[serde(skip_serializing_if = "str::is_empty")]
+        name: String,
+        params: CliMallParams,
+    }
+
+    #[derive(Debug, Serialize)]
+    struct CliMallParams {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        shopping: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        credit_fight: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        formation_index: Option<i32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        visit_friends: Option<bool>,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        buy_first: Vec<String>,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        blacklist: Vec<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        force_shopping_if_credit_full: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        only_buy_discount: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        reserve_max_credit: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        enable: Option<bool>,
+    }
+
+    /// WPF GUI `MallTask` (`$type = "MallTask"`).
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub(super) struct WpfMallTask {
+        name: String,
+        is_enable: bool,
+        shopping: bool,
+        credit_fight: bool,
+        credit_fight_formation: i32,
+        visit_friends: bool,
+        first_list: String,
+        black_list: String,
+        shopping_ignore_black_list_when_full: bool,
+        only_buy_discount: bool,
+        reserve_max_credit: bool,
+        #[serde(flatten)]
+        unknown: Map<String, Value>,
+    }
+
+    impl WpfMallTask {
+        pub(super) fn report_to(&self, summary: &mut MigrationSummary) {
+            if !self.is_enable {
+                summary.disable_task("MallTask", Some(self.name.clone()));
+            }
+            report_unknown_fields(
+                summary,
+                "MallTask",
+                Some(self.name.clone()),
+                &self.unknown,
+                HANDLED,
+            );
+        }
+
+        pub(super) fn to_maa_value(&self) -> Result<MAAValue> {
+            serialize_to_maa_value(&CliMallTask::try_from(self)?)
+        }
+    }
+
+    impl TryFrom<&WpfMallTask> for CliMallTask {
+        type Error = anyhow::Error;
+
+        fn try_from(task: &WpfMallTask) -> Result<Self> {
+            Ok(CliMallTask {
+                task_type: TaskType::Mall,
+                name: task.name.clone(),
+                params: CliMallParams {
+                    shopping: Some(task.shopping),
+                    credit_fight: Some(task.credit_fight),
+                    formation_index: Some(task.credit_fight_formation),
+                    visit_friends: Some(task.visit_friends),
+                    buy_first: split_semi_list(&task.first_list),
+                    blacklist: split_semi_list(&task.black_list),
+                    force_shopping_if_credit_full: Some(task.shopping_ignore_black_list_when_full),
+                    only_buy_discount: Some(task.only_buy_discount),
+                    reserve_max_credit: Some(task.reserve_max_credit),
+                    enable: (!task.is_enable).then_some(false),
+                },
+            })
+        }
+    }
+}
+
+mod award {
+    use anyhow::Result;
+    use maa_types::TaskType;
+    use maa_value::prelude::*;
+    use serde::{Deserialize, Serialize};
+    use serde_json::{Map, Value};
+
+    use super::{MigrationSummary, report_unknown_fields, serialize_to_maa_value};
+
+    const HANDLED: &[&str] = &[
+        "Award",
+        "Mail",
+        "FreeGacha",
+        "Orundum",
+        "Mining",
+        "SpecialAccess",
+    ];
+
+    #[derive(Debug, Serialize)]
+    struct CliAwardTask {
+        #[serde(rename = "type")]
+        task_type: TaskType,
+        #[serde(skip_serializing_if = "str::is_empty")]
+        name: String,
+        params: CliAwardParams,
+    }
+
+    #[derive(Debug, Serialize)]
+    struct CliAwardParams {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        award: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        mail: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        recruit: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        orundum: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        mining: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        specialaccess: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        enable: Option<bool>,
+    }
+
+    /// WPF GUI `AwardTask` (`$type = "AwardTask"`).
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub(super) struct WpfAwardTask {
+        name: String,
+        is_enable: bool,
+        award: bool,
+        mail: bool,
+        free_gacha: bool,
+        orundum: bool,
+        mining: bool,
+        special_access: bool,
+        #[serde(flatten)]
+        unknown: Map<String, Value>,
+    }
+
+    impl WpfAwardTask {
+        pub(super) fn report_to(&self, summary: &mut MigrationSummary) {
+            if !self.is_enable {
+                summary.disable_task("AwardTask", Some(self.name.clone()));
+            }
+            report_unknown_fields(
+                summary,
+                "AwardTask",
+                Some(self.name.clone()),
+                &self.unknown,
+                HANDLED,
+            );
+        }
+
+        pub(super) fn to_maa_value(&self) -> Result<MAAValue> {
+            serialize_to_maa_value(&CliAwardTask::try_from(self)?)
+        }
+    }
+
+    impl TryFrom<&WpfAwardTask> for CliAwardTask {
+        type Error = anyhow::Error;
+
+        fn try_from(task: &WpfAwardTask) -> Result<Self> {
+            Ok(CliAwardTask {
+                task_type: TaskType::Award,
+                name: task.name.clone(),
+                params: CliAwardParams {
+                    award: Some(task.award),
+                    mail: Some(task.mail),
+                    recruit: Some(task.free_gacha),
+                    orundum: Some(task.orundum),
+                    mining: Some(task.mining),
+                    specialaccess: Some(task.special_access),
+                    enable: (!task.is_enable).then_some(false),
+                },
+            })
+        }
+    }
+}
+
+mod roguelike {
+    use anyhow::Result;
+    use maa_types::TaskType;
+    use maa_value::prelude::*;
+    use serde::{Deserialize, Serialize};
+    use serde_json::{Map, Value};
+
+    use super::{MigrationSummary, report_unknown_fields, serialize_to_maa_value};
+
+    const HANDLED: &[&str] = &[
+        "Theme",
+        "Mode",
+        "Squad",
+        "Roles",
+        "CoreChar",
+        "StartCount",
+        "Difficulty",
+        "Investment",
+        "InvestCount",
+        "InvestWithMoreScore",
+        "StopWhenDepositFull",
+        "StopAtFinalBoss",
+        "StopWhenLevelMax",
+        "UseSupport",
+        "UseSupportNonFriend",
+        "RefreshTraderWithDice",
+        "StartWithEliteTwo",
+        "StartWithEliteTwoOnly",
+    ];
+
+    #[derive(Debug, Serialize)]
+    struct CliRoguelikeTask {
+        #[serde(rename = "type")]
+        task_type: TaskType,
+        #[serde(skip_serializing_if = "str::is_empty")]
+        name: String,
+        params: CliRoguelikeParams,
+    }
+
+    #[derive(Debug, Serialize)]
+    struct CliRoguelikeParams {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        theme: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        mode: Option<i32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        squad: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        roles: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        core_char: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        starts_count: Option<i32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        difficulty: Option<i32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        investment_enabled: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        investments_count: Option<i32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        investment_with_more_score: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        stop_when_investment_full: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        stop_at_final_boss: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        stop_at_max_level: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        use_support: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        use_nonfriend_support: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        refresh_trader_with_dice: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        start_with_elite_two: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        only_start_with_elite_two: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        enable: Option<bool>,
+    }
+
+    /// WPF GUI `RoguelikeTask` (`$type = "RoguelikeTask"`).
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub(super) struct WpfRoguelikeTask {
+        name: String,
+        is_enable: bool,
+        theme: String,
+        mode: String,
+        squad: String,
+        roles: String,
+        core_char: String,
+        start_count: i32,
+        difficulty: i32,
+        investment: bool,
+        invest_count: i32,
+        invest_with_more_score: bool,
+        stop_when_deposit_full: bool,
+        stop_at_final_boss: bool,
+        stop_when_level_max: bool,
+        use_support: bool,
+        use_support_non_friend: bool,
+        refresh_trader_with_dice: bool,
+        start_with_elite_two: bool,
+        start_with_elite_two_only: bool,
+        #[serde(flatten)]
+        unknown: Map<String, Value>,
+    }
+
+    impl WpfRoguelikeTask {
+        fn mapped_mode(&self) -> Option<i32> {
+            match self.mode.as_str() {
+                "Exp" => Some(0),
+                "Investment" => Some(1),
+                "Collect" => Some(4),
+                "CollapsalParadigms" => Some(5),
+                "MonthlySquad" => Some(6),
+                "DeepExploration" => Some(7),
+                _ => None,
+            }
+        }
+
+        pub(super) fn report_to(&self, summary: &mut MigrationSummary) {
+            if !self.is_enable {
+                summary.disable_task("RoguelikeTask", Some(self.name.clone()));
+            }
+            if self.mapped_mode().is_none() {
+                summary.skip_field("RoguelikeTask", Some(self.name.clone()), "Mode");
+            }
+            report_unknown_fields(
+                summary,
+                "RoguelikeTask",
+                Some(self.name.clone()),
+                &self.unknown,
+                HANDLED,
+            );
+        }
+
+        pub(super) fn to_maa_value(&self) -> Result<MAAValue> {
+            serialize_to_maa_value(&CliRoguelikeTask::try_from(self)?)
+        }
+    }
+
+    impl TryFrom<&WpfRoguelikeTask> for CliRoguelikeTask {
+        type Error = anyhow::Error;
+
+        fn try_from(task: &WpfRoguelikeTask) -> Result<Self> {
+            Ok(CliRoguelikeTask {
+                task_type: TaskType::Roguelike,
+                name: task.name.clone(),
+                params: CliRoguelikeParams {
+                    theme: Some(task.theme.clone()),
+                    mode: task.mapped_mode(),
+                    squad: Some(task.squad.clone()),
+                    roles: Some(task.roles.clone()),
+                    core_char: Some(task.core_char.clone()),
+                    starts_count: Some(task.start_count),
+                    difficulty: (task.difficulty != i32::MAX).then_some(task.difficulty),
+                    investment_enabled: Some(task.investment),
+                    investments_count: Some(task.invest_count),
+                    investment_with_more_score: Some(task.invest_with_more_score),
+                    stop_when_investment_full: Some(task.stop_when_deposit_full),
+                    stop_at_final_boss: Some(task.stop_at_final_boss),
+                    stop_at_max_level: Some(task.stop_when_level_max),
+                    use_support: Some(task.use_support),
+                    use_nonfriend_support: Some(task.use_support_non_friend),
+                    refresh_trader_with_dice: Some(task.refresh_trader_with_dice),
+                    start_with_elite_two: Some(task.start_with_elite_two),
+                    only_start_with_elite_two: Some(task.start_with_elite_two_only),
+                    enable: (!task.is_enable).then_some(false),
+                },
+            })
+        }
+    }
+}
+
+mod reclamation {
+    use anyhow::Result;
+    use maa_types::TaskType;
+    use maa_value::prelude::*;
+    use serde::{Deserialize, Serialize};
+    use serde_json::{Map, Value};
+
+    use super::{MigrationSummary, report_unknown_fields, serialize_to_maa_value};
+
+    const HANDLED: &[&str] = &[
+        "Theme",
+        "Mode",
+        "ToolToCraft",
+        "IncrementMode",
+        "MaxCraftCountPerRound",
+    ];
+
+    #[derive(Debug, Serialize)]
+    struct CliReclamationTask {
+        #[serde(rename = "type")]
+        task_type: TaskType,
+        #[serde(skip_serializing_if = "str::is_empty")]
+        name: String,
+        params: CliReclamationParams,
+    }
+
+    #[derive(Debug, Serialize)]
+    struct CliReclamationParams {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        theme: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        mode: Option<i32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tools_to_craft: Option<Vec<String>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        increment_mode: Option<i32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        num_craft_batches: Option<i32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        enable: Option<bool>,
+    }
+
+    /// WPF GUI `ReclamationTask` (`$type = "ReclamationTask"`).
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    pub(super) struct WpfReclamationTask {
+        name: String,
+        is_enable: bool,
+        theme: String,
+        mode: String,
+        tool_to_craft: String,
+        increment_mode: i32,
+        max_craft_count_per_round: i32,
+        #[serde(flatten)]
+        unknown: Map<String, Value>,
+    }
+
+    impl WpfReclamationTask {
+        fn mapped_mode(&self) -> Option<i32> {
+            match self.mode.as_str() {
+                "ProsperityNoSave" => Some(0),
+                "ProsperityInSave" => Some(1),
+                _ => None,
+            }
+        }
+
+        pub(super) fn report_to(&self, summary: &mut MigrationSummary) {
+            if !self.is_enable {
+                summary.disable_task("ReclamationTask", Some(self.name.clone()));
+            }
+            if self.mapped_mode().is_none() {
+                summary.skip_field("ReclamationTask", Some(self.name.clone()), "Mode");
+            }
+            report_unknown_fields(
+                summary,
+                "ReclamationTask",
+                Some(self.name.clone()),
+                &self.unknown,
+                HANDLED,
+            );
+        }
+
+        pub(super) fn to_maa_value(&self) -> Result<MAAValue> {
+            serialize_to_maa_value(&CliReclamationTask::try_from(self)?)
+        }
+    }
+
+    impl TryFrom<&WpfReclamationTask> for CliReclamationTask {
+        type Error = anyhow::Error;
+
+        fn try_from(task: &WpfReclamationTask) -> Result<Self> {
+            Ok(CliReclamationTask {
+                task_type: TaskType::Reclamation,
+                name: task.name.clone(),
+                params: CliReclamationParams {
+                    theme: Some(task.theme.clone()),
+                    mode: task.mapped_mode(),
+                    tools_to_craft: (!task.tool_to_craft.is_empty())
+                        .then(|| vec![task.tool_to_craft.clone()]),
+                    increment_mode: Some(task.increment_mode),
+                    num_craft_batches: Some(task.max_craft_count_per_round),
+                    enable: (!task.is_enable).then_some(false),
+                },
+            })
+        }
+    }
+}
