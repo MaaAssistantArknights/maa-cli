@@ -428,8 +428,7 @@ mod fight {
         times: Option<i32>,
         #[serde(skip_serializing_if = "Option::is_none")]
         drops: Option<maa_value::map::StringMap<i32>>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        series: Option<i32>,
+        series: i32,
         #[serde(skip_serializing_if = "Option::is_none")]
         medicine_expire_days: Option<i32>,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -444,7 +443,7 @@ mod fight {
                 && self.stone.is_none()
                 && self.times.is_none()
                 && self.drops.is_none()
-                && self.series.is_none()
+                && self.series == i32::default()
                 && self.medicine_expire_days.is_none()
                 && self.stage.is_none()
                 && self.enable.is_none()
@@ -595,7 +594,7 @@ mod fight {
                     drops.insert(task.drop_id.clone(), task.drop_count);
                     drops
                 }),
-                series: (task.series != 0).then_some(task.series),
+                series: task.series,
                 medicine_expire_days: task
                     .use_expiring_medicine
                     .then_some(task.medicine_expire_days),
