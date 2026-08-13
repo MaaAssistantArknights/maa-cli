@@ -86,11 +86,27 @@ pub struct ConnectionConfig {
     pub(super) address: Option<String>,
     #[serde(default)]
     pub(super) config: Option<String>,
+    /// Target X11 window title for the `Window` preset (e.g. "Arknights").
+    #[serde(default)]
+    pub(super) window_name: Option<String>,
+    /// Whether to move input focus to the game window before sending keys.
+    #[serde(default)]
+    pub(super) focus_for_keys: Option<bool>,
 }
 
 impl ConnectionConfig {
     pub fn preset(&self) -> Preset {
         self.preset
+    }
+
+    /// Window title used by the `Window` preset; defaults to "Arknights".
+    pub fn window_name(&self) -> &str {
+        self.window_name.as_deref().unwrap_or("Arknights")
+    }
+
+    /// Whether to focus the target window before sending keys.
+    pub fn focus_for_keys(&self) -> bool {
+        self.focus_for_keys.unwrap_or(false)
     }
 
     pub fn set_address(&mut self, address: impl Into<String>) -> &mut Self {
@@ -146,6 +162,9 @@ pub enum Preset {
     PlayCover,
     Waydroid,
     Androws,
+    /// Bind to an X11 window by title (Linux).
+    #[cfg(not(target_os = "windows"))]
+    Window,
     #[default]
     Adb,
 }
@@ -174,6 +193,8 @@ impl<'de> Deserialize<'de> for Preset {
                     "ADB" | "Adb" | "adb" => Ok(Preset::Adb),
                     "Waydroid" | "waydroid" => Ok(Preset::Waydroid),
                     "Androws" | "androws" => Ok(Preset::Androws),
+                    #[cfg(not(target_os = "windows"))]
+                    "Window" | "window" => Ok(Preset::Window),
                     _ => {
                         warn!("Unknown connection preset: {value}, ignoring");
                         Ok(Preset::Adb)
@@ -194,6 +215,8 @@ impl Preset {
             ),
             Preset::PlayCover => Cow::Borrowed(""),
             Preset::Waydroid | Preset::Adb => Cow::Borrowed("adb"),
+            #[cfg(not(target_os = "windows"))]
+            Preset::Window => Cow::Borrowed(""),
             Preset::Androws => {
                 #[cfg(windows)]
                 if let Some(path) = get_androws_adb_path() {
@@ -210,6 +233,8 @@ impl Preset {
             Preset::PlayCover => "127.0.0.1:1717".into(),
             Preset::Androws => "127.0.0.1:5555".into(),
             Preset::Waydroid => "waydroid".into(),
+            #[cfg(not(target_os = "windows"))]
+            Preset::Window => "".into(),
             Preset::Adb => std::process::Command::new(adb_path)
                 .arg("devices")
                 .output()
@@ -230,6 +255,8 @@ impl Preset {
             Preset::Androws => "Androws",
             // May be preset specific in the future
             Preset::MuMuPro | Preset::PlayCover | Preset::Adb => config_based_on_os(),
+            #[cfg(not(target_os = "windows"))]
+            Preset::Window => "General",
         }
     }
 }

@@ -217,8 +217,20 @@ where
 
         let address = runtime_address.as_deref().unwrap_or(&address);
 
-        // Connect to game or emulator
-        asst.async_connect(adb_path.as_ref(), address, config, true)?;
+        // Connect to game or emulator / bind to an X11 window
+        match asst_config.connection.preset() {
+            #[cfg(not(target_os = "windows"))]
+            crate::config::asst::Preset::Window => {
+                asst.async_attach_window_by_name(
+                    asst_config.connection.window_name(),
+                    asst_config.connection.focus_for_keys(),
+                    true,
+                )?;
+            }
+            _ => {
+                asst.async_connect(adb_path.as_ref(), address, config, true)?;
+            }
+        }
 
         debug!("Starting MAA...");
         asst.start()?;

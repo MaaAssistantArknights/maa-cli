@@ -52,6 +52,14 @@ link! {
     ) -> AsstAsyncCallId;
     pub fn AsstSetConnectionExtras(name: *const c_char, extras: *const c_char);
 
+    #[cfg(not(target_os = "windows"))]
+    pub fn AsstAsyncAttachWindowByName(
+        handle: AsstHandle,
+        window_name: *const c_char,
+        focus_for_keys: AsstBool,
+        block: AsstBool,
+    ) -> AsstAsyncCallId;
+
     #[cfg(target_os = "windows")]
     pub fn AsstAsyncAttachWindow(
         handle: AsstHandle,

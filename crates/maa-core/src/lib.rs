@@ -232,6 +232,26 @@ impl Assistant {
         .to_maa_result()
     }
 
+    /// Bind to an X11 window by its title (Linux), asynchronously.
+    #[cfg(not(target_os = "windows"))]
+    pub fn async_attach_window_by_name(
+        &self,
+        window_name: impl ToCString,
+        focus_for_keys: bool,
+        block: bool,
+    ) -> Result<AsstAsyncCallId> {
+        let window_name = window_name.to_cstring()?;
+        unsafe {
+            maa_sys::binding::AsstAsyncAttachWindowByName(
+                self.handle,
+                window_name.as_ptr(),
+                focus_for_keys.into(),
+                block.into(),
+            )
+        }
+        .to_maa_result()
+    }
+
     /// Click the screen at the given position.
     pub fn async_click(&self, x: i32, y: i32, block: bool) -> Result<AsstAsyncCallId> {
         unsafe { maa_sys::binding::AsstAsyncClick(self.handle, x, y, block.into()) }.to_maa_result()
