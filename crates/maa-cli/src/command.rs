@@ -272,6 +272,12 @@ pub(crate) enum MigrateCommand {
         /// Select a named configuration when migrating a multi-profile GUI export
         #[arg(long)]
         config: Option<String>,
+        /// Override the custom infrastructure schedule JSON path in the WPF profile
+        ///
+        /// The WPF InfrastTask must already use custom scheduling (`Mode = Custom`
+        /// or a non-empty `Filename`). Otherwise the command exits with an error.
+        #[arg(long, value_name = "JSON")]
+        custom_schedule: Option<PathBuf>,
     },
 }
 
@@ -618,6 +624,7 @@ mod test {
                 input,
                 output: None,
                 config: None,
+                custom_schedule: None,
             }) if input == Path::new("profile.json")
         );
 
@@ -636,9 +643,26 @@ mod test {
                 input,
                 output: Some(output),
                 config: Some(config),
+                custom_schedule: None,
             }) if input == Path::new("profile.json")
                 && output == Path::new("tasks.toml")
                 && config == "Default"
+        );
+
+        assert_matches!(
+            parse_from([
+                "maa",
+                "migrate",
+                "wpf",
+                "profile.json",
+                "--custom-schedule",
+                "plan.json"
+            ])
+            .command,
+            Command::Migrate(MigrateCommand::Wpf {
+                custom_schedule: Some(schedule),
+                ..
+            }) if schedule == Path::new("plan.json")
         );
     }
 

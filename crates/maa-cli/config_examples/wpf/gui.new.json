@@ -102,7 +102,7 @@
         },
         {
           "$type": "InfrastTask",
-          "Mode": "Normal",
+          "Mode": "Custom",
           "UsesOfDrones": "Money",
           "DormThreshold": 30,
           "DormTrustEnabled": true,
@@ -113,7 +113,7 @@
           "SendClue": true,
           "ContinueTraining": true,
           "CustomFileType": "user_defined",
-          "Filename": "",
+          "Filename": "~/一图流-153-一天两换-MAA.json",
           "PlanSelect": -1,
           "RoomList": [
             {

@@ -16,9 +16,14 @@ maa migrate wpf gui.new.json tasks/daily.toml
 
 # 多配置导出时，用 --config 选择配置名
 maa migrate wpf gui.new.json --config Default
+
+# GUI 是自定义排班时，用本机排班 JSON 覆盖其中的 Filename
+maa migrate wpf gui.new.json --custom-schedule ~/一图流-153-一天两换-MAA.json
 ```
 
 如果导出文件里只有一个配置，会自动选择该配置；有多个配置且未指定 `--config` 时，会交互式提示你选择。
+
+`--custom-schedule` 只在 GUI 基建任务已经是自定义排班（`Mode = Custom` 或填写了 `Filename`）时生效，用来覆盖排班文件路径。若 GUI 不是自定义排班，传入该选项会报错退出。
 
 迁移完成后，把生成的任务文件放到 `$MAA_CONFIG_DIR/tasks` 中，即可通过 `maa run <task>` 运行。配置目录可用 `maa dir config` 查看。
 
@@ -94,7 +99,13 @@ params = { stage = "LS-6" }
 ### 基建换班（Infrast）
 
 普通模式（`Normal` / `Rotation`）会迁移设施顺序、无人机用途、宿舍阈值等常见参数。
-自定义基建计划（`Mode = Custom` 或填写了 `Filename`）目前不支持，迁移会直接报错。
+自定义基建计划（`Mode = Custom` 或填写了 `Filename`）会尝试读取排班 JSON：
+
+- 读到 `plans` 且各班有 `period`、GUI 为时间轮换（`PlanSelect = -1`）时，写出 `mode = 10000`、`filename`，以及按时段（跨天时加上 `DayMod`）选择 `plan_index` 的变体。
+- 读到排班但没有可用时段（或 GUI 选了固定班次）时，写出自定义模式并带上 `plan_index`。
+- `Filename` 里的 `~` 会展开为用户主目录；写出的 `filename` 是展开后的绝对路径。
+- 可用 `--custom-schedule <json>` 覆盖 GUI 中的排班文件路径；仅当 GUI 已是自定义排班时有效，否则报错退出。覆盖后若文件读失败，也会报错退出，而不会回退到默认基建。
+- 未指定 `--custom-schedule` 时，文件不存在、无法解析或没有 `plans` 会跳过 `Mode` / `Filename`，按默认基建模式（`mode = 0`）写出其余参数，并在迁移摘要中说明。
 
 ### 其他任务
 
