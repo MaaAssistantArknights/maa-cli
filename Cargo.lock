@@ -1043,6 +1043,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
 
 [[package]]
+name = "maa-atomic-fs"
+version = "0.1.0"
+dependencies = [
+ "tempfile",
+]
+
+[[package]]
 name = "maa-cli"
 version = "0.7.5"
 dependencies = [
@@ -1057,6 +1064,7 @@ dependencies = [
  "git2",
  "indicatif",
  "log",
+ "maa-atomic-fs",
  "maa-core",
  "maa-dirs",
  "maa-installer",
@@ -1129,6 +1137,7 @@ dependencies = [
  "flate2",
  "indicatif",
  "log",
+ "maa-atomic-fs",
  "semver",
  "sha2",
  "tar",
@@ -2529,6 +2538,7 @@ dependencies = [
  "clap",
  "digest-io",
  "flate2",
+ "maa-atomic-fs",
  "maa-dirs",
  "maa-version",
  "semver",

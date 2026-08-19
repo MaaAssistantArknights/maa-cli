@@ -7,7 +7,7 @@ use anyhow::{Context, Result, bail};
 use maa_dirs::Ensure;
 
 use super::{Filetype, SUPPORTED_EXTENSION};
-use crate::{atomic_fs, state::AGENT};
+use crate::state::AGENT;
 
 /// Represents the source of a configuration file to import
 #[cfg_attr(test, derive(PartialEq))]
@@ -65,11 +65,12 @@ impl<'a> ImportSource<'a> {
         match self {
             ImportSource::Remote(url) => {
                 let response = AGENT.get(url).call()?;
-                atomic_fs::write_from(target, &mut response.into_body().as_reader()).with_context(
-                    || format!("Failed to write imported file to {}", target.display()),
-                )
+                maa_atomic_fs::write_from(target, &mut response.into_body().as_reader())
+                    .with_context(|| {
+                        format!("Failed to write imported file to {}", target.display())
+                    })
             }
-            ImportSource::Local(path) => atomic_fs::copy(path, target).with_context(|| {
+            ImportSource::Local(path) => maa_atomic_fs::copy(path, target).with_context(|| {
                 format!(
                     "Failed to copy file from {} to {}",
                     path.display(),

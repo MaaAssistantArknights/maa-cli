@@ -13,6 +13,7 @@ base16ct = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 digest-io = { workspace = true }
 flate2 = { workspace = true }
+maa-atomic-fs = { workspace = true }
 maa-dirs.workspace = true
 maa-version = { workspace = true }
 semver = { workspace = true }

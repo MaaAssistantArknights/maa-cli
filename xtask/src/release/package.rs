@@ -128,41 +128,38 @@ fn read_or_create_manifest(file: &str) -> Result<VersionManifest<Details>> {
 }
 
 fn write_manifest(file: &str, manifest: &VersionManifest<Details>) -> Result<()> {
-    let content = serde_json::to_string_pretty(manifest).context("Failed to serialize manifest")?;
-
-    fs::write(file, content).with_context(|| format!("Failed to write {file}"))
+    maa_atomic_fs::write_with(file, |writer| -> Result<()> {
+        serde_json::to_writer_pretty(writer, manifest)?;
+        Ok(())
+    })
+    .with_context(|| format!("Failed to write {file}"))
 }
 
 fn write_shell_format(file: &str, manifest: &VersionManifest<Details>) -> Result<()> {
     // Write a shell-friendly .txt format alongside the JSON
     let txt_path = PathBuf::from(file).with_extension("txt");
-    let txt_path_str = txt_path.to_str().unwrap();
 
     use std::io::Write;
 
-    let mut txt_file = std::fs::File::create(&txt_path)
-        .with_context(|| format!("Failed to create {txt_path_str}"))?;
-
-    writeln!(txt_file, "VERSION={}", manifest.version)?;
-    writeln!(txt_file, "TAG={}", manifest.details.tag)?;
-    writeln!(txt_file, "COMMIT={}", manifest.details.commit)?;
-    writeln!(txt_file)?;
-
-    // Write assets in a shell-friendly format
-    for (target, asset) in &manifest.details.assets {
-        let target_upper = target.to_uppercase().replace('-', "_");
-        writeln!(txt_file, "# {target}")?;
-        writeln!(txt_file, "{target_upper}_NAME={}", asset.name)?;
-        writeln!(txt_file, "{target_upper}_SIZE={}", asset.size)?;
-        writeln!(txt_file, "{target_upper}_SHA256={}", asset.sha256sum)?;
+    maa_atomic_fs::write_with(&txt_path, |txt_file| -> Result<()> {
+        writeln!(txt_file, "VERSION={}", manifest.version)?;
+        writeln!(txt_file, "TAG={}", manifest.details.tag)?;
+        writeln!(txt_file, "COMMIT={}", manifest.details.commit)?;
         writeln!(txt_file)?;
-    }
 
-    txt_file
-        .sync_all()
-        .with_context(|| format!("Failed to sync {txt_path_str}"))?;
+        // Write assets in a shell-friendly format
+        for (target, asset) in &manifest.details.assets {
+            let target_upper = target.to_uppercase().replace('-', "_");
+            writeln!(txt_file, "# {target}")?;
+            writeln!(txt_file, "{target_upper}_NAME={}", asset.name)?;
+            writeln!(txt_file, "{target_upper}_SIZE={}", asset.size)?;
+            writeln!(txt_file, "{target_upper}_SHA256={}", asset.sha256sum)?;
+            writeln!(txt_file)?;
+        }
 
-    Ok(())
+        Ok(())
+    })
+    .with_context(|| format!("Failed to write {}", txt_path.display()))
 }
 
 fn create_archive(target: &str, version: &str, dir: &str) -> Result<(String, String)> {
@@ -190,4 +187,51 @@ fn create_archive(target: &str, version: &str, dir: &str) -> Result<(String, Str
     ])?;
 
     Ok((archive_name, checksum_hash))
+}
+
+#[cfg(test)]
+mod tests {
+    use tempfile::tempdir;
+
+    use super::*;
+
+    #[test]
+    fn release_metadata_replaces_existing_files() {
+        let temp_dir = tempdir().unwrap();
+        let json_path = temp_dir.path().join("stable.json");
+        let txt_path = temp_dir.path().join("stable.txt");
+        fs::write(&json_path, "stale json").unwrap();
+        fs::write(&txt_path, "stale text").unwrap();
+
+        let manifest = VersionManifest {
+            version: Version::new(1, 2, 3),
+            details: Details {
+                tag: "v1.2.3".to_string(),
+                commit: "0123456789abcdef".to_string(),
+                assets: BTreeMap::from([("aarch64-apple-darwin".to_string(), Asset {
+                    name: "maa_cli-v1.2.3-aarch64-apple-darwin.tar.gz".to_string(),
+                    size: 42,
+                    sha256sum: "deadbeef".to_string(),
+                })]),
+            },
+        };
+
+        let json_path = json_path.to_string_lossy();
+        write_manifest(&json_path, &manifest).unwrap();
+        write_shell_format(&json_path, &manifest).unwrap();
+
+        let persisted: VersionManifest<Details> =
+            serde_json::from_reader(fs::File::open(&*json_path).unwrap()).unwrap();
+        assert_eq!(persisted.version, Version::new(1, 2, 3));
+        assert_eq!(persisted.details.tag, "v1.2.3");
+        assert_eq!(persisted.details.commit, "0123456789abcdef");
+
+        let shell = fs::read_to_string(txt_path).unwrap();
+        assert!(shell.starts_with("VERSION=1.2.3\nTAG=v1.2.3\nCOMMIT=0123456789abcdef\n\n"));
+        assert!(
+            shell
+                .contains("AARCH64_APPLE_DARWIN_NAME=maa_cli-v1.2.3-aarch64-apple-darwin.tar.gz\n")
+        );
+        assert!(!shell.contains("stale text"));
+    }
 }
