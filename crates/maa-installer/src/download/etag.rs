@@ -83,7 +83,7 @@ pub fn download_with_etag(
         StatusCode::NOT_MODIFIED => {
             log::trace!("File {} is up to date", dest.display());
             if set_modified(&etag_file, time::SystemTime::now()).is_ok() {
-                log::trace!("Touched {}", dest.display());
+                log::trace!("Touched {}", etag_file.display());
             }
             Ok(())
         }
