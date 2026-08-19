@@ -386,12 +386,11 @@ impl CopilotFile {
 
         if let Some(code) = trimmed.strip_prefix("prts://") {
             if let Some(code) = code.strip_prefix('s') {
-                return Ok(Self::RemoteSet(parse_code(code)?));
+                Ok(Self::RemoteSet(parse_code(code)?))
+            } else {
+                Ok(Self::Remote(parse_code(code)?))
             }
-            return Ok(Self::Remote(parse_code(code)?));
-        }
-
-        if let Some(code) = trimmed.strip_prefix("maa://") {
+        } else if let Some(code) = trimmed.strip_prefix("maa://") {
             LEGACY_URI_WARNING.call_once(|| {
                 warn!(
                     "The maa:// URI format is deprecated; use prts://<id> or prts://s<id> instead"
@@ -399,13 +398,15 @@ impl CopilotFile {
             });
 
             if let Some(code) = code.strip_suffix('s') {
-                return Ok(Self::RemoteSet(parse_code(code)?));
+                Ok(Self::RemoteSet(parse_code(code)?))
+            } else {
+                Ok(Self::Remote(parse_code(code)?))
             }
-            return Ok(Self::Remote(parse_code(code)?));
+        } else if let Some(path) = trimmed.strip_prefix("file://") {
+            Ok(Self::Local(PathBuf::from(path)))
+        } else {
+            Ok(Self::Local(PathBuf::from(trimmed)))
         }
-
-        let path = trimmed.strip_prefix("file://").unwrap_or(trimmed);
-        Ok(Self::Local(PathBuf::from(path)))
     }
 
     pub fn push_path_into<T>(
