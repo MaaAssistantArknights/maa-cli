@@ -84,7 +84,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
       - name: Install cargo-deny
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.85.5
         with:
           tool: cargo-deny
       - name: Check
@@ -182,7 +182,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.85.5
         with:
           tool: cargo-llvm-cov
       - name: Coverage
@@ -213,7 +213,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.85.5
         with:
           tool: cargo-llvm-cov
       - name: Coverage
@@ -235,7 +235,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.85.5
         with:
           tool: cargo-llvm-cov
       - name: Coverage
