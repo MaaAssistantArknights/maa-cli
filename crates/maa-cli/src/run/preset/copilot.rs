@@ -377,19 +377,18 @@ enum CopilotFile {
 }
 
 impl CopilotFile {
-    fn parse_code(code: &str) -> Result<u64> {
-        code.parse::<u64>().context("Invalid code")
-    }
-
     fn from_uri(uri: &str) -> Result<Self> {
-        let trimmed = uri.trim();
-
-        if let Some(code) = trimmed.strip_prefix("prts://s") {
-            return Ok(Self::RemoteSet(Self::parse_code(code)?));
+        fn parse_code(code: &str) -> Result<u64> {
+            code.parse::<u64>().context("Invalid code")
         }
 
+        let trimmed = uri.trim();
+
         if let Some(code) = trimmed.strip_prefix("prts://") {
-            return Ok(Self::Remote(Self::parse_code(code)?));
+            if let Some(code) = code.strip_prefix('s') {
+                return Ok(Self::RemoteSet(parse_code(code)?));
+            }
+            return Ok(Self::Remote(parse_code(code)?));
         }
 
         if let Some(code) = trimmed.strip_prefix("maa://") {
@@ -400,9 +399,9 @@ impl CopilotFile {
             });
 
             if let Some(code) = code.strip_suffix('s') {
-                return Ok(Self::RemoteSet(Self::parse_code(code)?));
+                return Ok(Self::RemoteSet(parse_code(code)?));
             }
-            return Ok(Self::Remote(Self::parse_code(code)?));
+            return Ok(Self::Remote(parse_code(code)?));
         }
 
         let path = trimmed.strip_prefix("file://").unwrap_or(trimmed);
