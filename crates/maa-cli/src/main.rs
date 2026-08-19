@@ -20,7 +20,7 @@ mod tasks;
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser};
 
-use crate::command::{Cli, Command, Component, Dir};
+use crate::command::{Cli, Command, Component, ConnectionCommand, Dir};
 
 fn main() -> Result<()> {
     CompleteEnv::with_factory(Cli::command)
@@ -94,6 +94,7 @@ fn main() -> Result<()> {
                 _ => {}
             }
         }
+        Command::Connection(ConnectionCommand::Test(args)) => run::test_connection(args)?,
         Command::Run { task, common } => run::run_custom(task, common)?,
         Command::StartUp { params, common } => run::run_preset(params, common)?,
         Command::CloseDown { params, common } => run::run_preset(params, common)?,

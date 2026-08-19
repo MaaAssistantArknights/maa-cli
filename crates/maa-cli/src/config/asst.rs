@@ -32,6 +32,9 @@ impl AsstConfig {
             info!("Detected connection with PlayTools");
             instance_options.force_playtools();
             resource.use_platform_diff_resource("iOS");
+        } else if matches!(connection.preset, Preset::Win32) {
+            info!("Detected native Windows client connection");
+            resource.use_platform_diff_resource("PC");
         }
 
         Self {
@@ -86,6 +89,43 @@ pub struct ConnectionConfig {
     pub(super) address: Option<String>,
     #[serde(default)]
     pub(super) config: Option<String>,
+    #[serde(default)]
+    pub(super) window_title: Option<String>,
+    #[serde(default)]
+    pub(super) window_process_id: Option<u32>,
+    #[serde(default)]
+    pub(super) window_executable: Option<PathBuf>,
+    #[serde(default)]
+    pub(super) screencap_method: Option<u64>,
+    #[serde(default)]
+    pub(super) mouse_method: Option<u64>,
+    #[serde(default)]
+    pub(super) keyboard_method: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WindowSelector<'a> {
+    pub title: &'a str,
+    pub process_id: Option<u32>,
+    pub executable: Option<&'a Path>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Win32ConnectArgs<'a> {
+    pub selector: WindowSelector<'a>,
+    pub screencap_method: u64,
+    pub mouse_method: u64,
+    pub keyboard_method: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConnectionArgs<'a> {
+    Adb {
+        adb_path: Cow<'static, str>,
+        address: Cow<'a, str>,
+        config: &'a str,
+    },
+    Win32(Win32ConnectArgs<'a>),
 }
 
 impl ConnectionConfig {
@@ -96,6 +136,37 @@ impl ConnectionConfig {
     pub fn set_address(&mut self, address: impl Into<String>) -> &mut Self {
         self.address = Some(address.into());
         self
+    }
+
+    pub fn win32_args(&self) -> Result<Win32ConnectArgs<'_>> {
+        let title = self
+            .window_title
+            .as_deref()
+            .filter(|title| !title.is_empty())
+            .context("Win32 connection requires a non-empty window_title")?;
+        Ok(Win32ConnectArgs {
+            selector: WindowSelector {
+                title,
+                process_id: self.window_process_id,
+                executable: self.window_executable.as_deref(),
+            },
+            screencap_method: self.screencap_method.unwrap_or(2),
+            mouse_method: self.mouse_method.unwrap_or(32),
+            keyboard_method: self.keyboard_method.unwrap_or(2),
+        })
+    }
+
+    pub fn connection_args(&self) -> Result<ConnectionArgs<'_>> {
+        if matches!(self.preset, Preset::Win32) {
+            Ok(ConnectionArgs::Win32(self.win32_args()?))
+        } else {
+            let (adb_path, address, config) = self.connect_args();
+            Ok(ConnectionArgs::Adb {
+                adb_path,
+                address,
+                config,
+            })
+        }
     }
 
     pub fn connect_args(&self) -> (Cow<'static, str>, Cow<'_, str>, &str) {
@@ -146,6 +217,7 @@ pub enum Preset {
     PlayCover,
     Waydroid,
     Androws,
+    Win32,
     #[default]
     Adb,
 }
@@ -174,6 +246,7 @@ impl<'de> Deserialize<'de> for Preset {
                     "ADB" | "Adb" | "adb" => Ok(Preset::Adb),
                     "Waydroid" | "waydroid" => Ok(Preset::Waydroid),
                     "Androws" | "androws" => Ok(Preset::Androws),
+                    "Win32" | "win32" | "PC" | "pc" => Ok(Preset::Win32),
                     _ => {
                         warn!("Unknown connection preset: {value}, ignoring");
                         Ok(Preset::Adb)
@@ -201,6 +274,7 @@ impl Preset {
                 }
                 Cow::Borrowed("adb")
             }
+            Preset::Win32 => Cow::Borrowed(""),
         }
     }
 
@@ -221,6 +295,7 @@ impl Preset {
                     warn!("Failed to detect device address, using emulator-5554");
                     "emulator-5554".into()
                 }),
+            Preset::Win32 => "".into(),
         }
     }
 
@@ -229,7 +304,9 @@ impl Preset {
             Preset::Waydroid => "Waydroid",
             Preset::Androws => "Androws",
             // May be preset specific in the future
-            Preset::MuMuPro | Preset::PlayCover | Preset::Adb => config_based_on_os(),
+            Preset::MuMuPro | Preset::PlayCover | Preset::Adb | Preset::Win32 => {
+                config_based_on_os()
+            }
         }
     }
 }
@@ -674,6 +751,7 @@ mod tests {
                     adb_path: Some(String::from("adb")),
                     address: Some(String::from("emulator-5554")),
                     config: Some(String::from("CompatMac")),
+                    ..Default::default()
                 },
                 resource: ResourceConfig {
                     resource_base_dirs: {
@@ -751,6 +829,7 @@ mod tests {
                     adb_path: Some(String::from("/path/to/adb")),
                     address: Some(String::from("127.0.0.1:5555")),
                     config: Some(String::from("SomeConfig")),
+                    ..Default::default()
                 },
                 &[
                     Token::Map { len: Some(4) },
@@ -948,10 +1027,121 @@ mod tests {
                 ],
             );
         }
+
+        #[test]
+        fn win32_automatically_loads_pc_platform_resources() {
+            let config: AsstConfig = toml::from_str(
+                r#"
+                    [connection]
+                    preset = "Win32"
+                    window_title = "Arknights"
+                "#,
+            )
+            .unwrap();
+
+            assert_eq!(
+                config.resource.platform_diff_resource,
+                Some(PathBuf::from("PC"))
+            );
+        }
     }
 
     mod connection_config {
         use super::*;
+
+        #[test]
+        fn schema_declares_win32_connection_fields() {
+            let schema: serde_json::Value =
+                serde_json::from_str(include_str!("../../schemas/asst.schema.json")).unwrap();
+            let connection = &schema["properties"]["connection"]["properties"];
+            let presets = connection["preset"]["enum"].as_array().unwrap();
+            assert!(presets.iter().any(|value| value == "Win32"));
+            assert_eq!(connection["window_title"]["type"], "string");
+            assert_eq!(connection["window_process_id"]["type"], "integer");
+            assert_eq!(connection["window_executable"]["format"], "path");
+            assert_eq!(connection["screencap_method"]["default"], 2);
+            assert_eq!(connection["mouse_method"]["default"], 32);
+            assert_eq!(connection["keyboard_method"]["default"], 2);
+        }
+
+        #[test]
+        fn parses_win32_window_selector_and_method_defaults() {
+            let config: ConnectionConfig = toml::from_str(
+                r#"
+                    preset = "Win32"
+                    window_title = "Arknights"
+                    window_process_id = 4242
+                    window_executable = "C:\\Games\\Arknights.exe"
+                "#,
+            )
+            .unwrap();
+
+            assert_eq!(config.preset(), Preset::Win32);
+            let args = config.win32_args().unwrap();
+            assert_eq!(args.selector.title, "Arknights");
+            assert_eq!(args.selector.process_id, Some(4242));
+            assert_eq!(
+                args.selector.executable,
+                Some(Path::new(r"C:\Games\Arknights.exe"))
+            );
+            assert_eq!(args.screencap_method, 2);
+            assert_eq!(args.mouse_method, 32);
+            assert_eq!(args.keyboard_method, 2);
+        }
+
+        #[test]
+        fn win32_requires_an_exact_window_title() {
+            let config: ConnectionConfig = toml::from_str(
+                r#"
+                    preset = "Win32"
+                    window_executable = "C:\\Games\\Arknights.exe"
+                "#,
+            )
+            .unwrap();
+
+            assert!(
+                config
+                    .win32_args()
+                    .unwrap_err()
+                    .to_string()
+                    .contains("window_title")
+            );
+        }
+
+        #[test]
+        fn win32_accepts_explicit_control_methods() {
+            let config: ConnectionConfig = toml::from_str(
+                r#"
+                    preset = "Win32"
+                    window_title = "Arknights"
+                    screencap_method = 4
+                    mouse_method = 8
+                    keyboard_method = 16
+                "#,
+            )
+            .unwrap();
+
+            let args = config.win32_args().unwrap();
+            assert_eq!(args.screencap_method, 4);
+            assert_eq!(args.mouse_method, 8);
+            assert_eq!(args.keyboard_method, 16);
+        }
+
+        #[test]
+        fn win32_connection_args_never_construct_an_adb_request() {
+            let config: ConnectionConfig = toml::from_str(
+                r#"
+                    preset = "Win32"
+                    window_title = "Arknights"
+                "#,
+            )
+            .unwrap();
+
+            assert!(matches!(
+                config.connection_args().unwrap(),
+                ConnectionArgs::Win32(_)
+            ));
+        }
 
         #[test]
         fn default() {
@@ -960,6 +1150,12 @@ mod tests {
                 adb_path: None,
                 address: None,
                 config: None,
+                window_title: None,
+                window_process_id: None,
+                window_executable: None,
+                screencap_method: None,
+                mouse_method: None,
+                keyboard_method: None,
             });
         }
 
@@ -1019,6 +1215,7 @@ mod tests {
                     adb_path: None,
                     address: None,
                     config: None,
+                    ..Default::default()
                 }
                 .connect_args(),
                 (
@@ -1034,6 +1231,7 @@ mod tests {
                     adb_path: None,
                     address: None,
                     config: None,
+                    ..Default::default()
                 }
                 .connect_args(),
                 ("", "127.0.0.1:1717", config_based_on_os()),
@@ -1045,6 +1243,7 @@ mod tests {
                     adb_path: None,
                     address: None,
                     config: None,
+                    ..Default::default()
                 }
                 .connect_args(),
                 ("adb", "waydroid", "Waydroid"),
@@ -1056,6 +1255,7 @@ mod tests {
                     adb_path: None,
                     address: Some("127.0.0.1:11111".to_owned()),
                     config: None,
+                    ..Default::default()
                 }
                 .connect_args(),
                 ("adb", "waydroid", "Waydroid"),
@@ -1067,6 +1267,7 @@ mod tests {
                     adb_path: None,
                     address: None,
                     config: None,
+                    ..Default::default()
                 }
                 .connect_args(),
                 (
@@ -1082,6 +1283,7 @@ mod tests {
                     adb_path: Some("/path/to/adb".to_owned()),
                     address: Some("127.0.0.1:11111".to_owned()),
                     config: Some("SomeConfig".to_owned()),
+                    ..Default::default()
                 }
                 .connect_args(),
                 ("/path/to/adb", "127.0.0.1:11111", "SomeConfig"),

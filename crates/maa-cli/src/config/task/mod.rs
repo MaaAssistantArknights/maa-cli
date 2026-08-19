@@ -308,6 +308,16 @@ impl TaskConfig {
             }),
         }
     }
+
+    /// Disable package-based game launching when the already-running Windows client is attached.
+    pub fn prepare_for_win32(&mut self) {
+        self.start_app = false;
+        for task in &mut self.tasks {
+            if task.task_type == TaskType::StartUp {
+                insert!(task.params, "start_game_enabled" => false);
+            }
+        }
+    }
 }
 
 fn determine_start_app(params: &MAAValue) -> bool {
@@ -1284,6 +1294,30 @@ mod tests {
                     ),
                 ))
                 .is_err()
+            );
+        }
+
+        #[test]
+        fn win32_preparation_disables_package_launch() {
+            let mut task_config = TaskConfig::new_with_task(Task::new(
+                StartUp,
+                object!(
+                    "start_game_enabled" => true,
+                    "client_type" => "Official",
+                ),
+            ))
+            .unwrap();
+
+            assert!(task_config.start_app);
+            task_config.prepare_for_win32();
+
+            assert!(!task_config.start_app);
+            assert_eq!(
+                task_config.tasks[0]
+                    .params
+                    .get("start_game_enabled")
+                    .and_then(|value| value.as_bool()),
+                Some(false)
             );
         }
     }

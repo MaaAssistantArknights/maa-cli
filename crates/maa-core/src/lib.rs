@@ -41,6 +41,24 @@ pub struct Assistant {
     _callback: Option<Box<dyn Callback>>,
 }
 
+/// A non-null native top-level window handle accepted by MaaCore's Win32 controller.
+#[cfg(windows)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WindowHandle(std::ptr::NonNull<c_void>);
+
+#[cfg(windows)]
+impl WindowHandle {
+    /// Create a typed window handle from a native HWND value.
+    pub fn new(handle: *mut c_void) -> Option<Self> {
+        std::ptr::NonNull::new(handle).map(Self)
+    }
+
+    /// Return the native HWND value.
+    pub fn as_ptr(self) -> *mut c_void {
+        self.0.as_ptr()
+    }
+}
+
 impl Drop for Assistant {
     fn drop(&mut self) {
         // Destroy the handle before the callback is dropped to make sure the callback is not used
@@ -232,6 +250,32 @@ impl Assistant {
         .to_maa_result()
     }
 
+    /// Attach to a native Windows game window asynchronously.
+    ///
+    /// MaaCore owns neither the window nor its lifetime. Callers must select a valid visible
+    /// top-level window and keep the owning process alive while tasks are running.
+    #[cfg(windows)]
+    pub fn async_attach_window(
+        &self,
+        window: WindowHandle,
+        screencap_method: u64,
+        mouse_method: u64,
+        keyboard_method: u64,
+        block: bool,
+    ) -> Result<AsstAsyncCallId> {
+        unsafe {
+            maa_sys::binding::AsstAsyncAttachWindow(
+                self.handle,
+                window.as_ptr(),
+                screencap_method,
+                mouse_method,
+                keyboard_method,
+                block.into(),
+            )
+        }
+        .to_maa_result()
+    }
+
     /// Click the screen at the given position.
     pub fn async_click(&self, x: i32, y: i32, block: bool) -> Result<AsstAsyncCallId> {
         unsafe { maa_sys::binding::AsstAsyncClick(self.handle, x, y, block.into()) }.to_maa_result()
@@ -350,5 +394,12 @@ mod tests {
         assert!(Assistant::loaded());
         assert!(Assistant::unload().is_ok());
         assert!(Assistant::loaded());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn async_attach_window_has_a_safe_typed_signature() {
+        let _method: fn(&Assistant, WindowHandle, u64, u64, u64, bool) -> Result<AsstAsyncCallId> =
+            Assistant::async_attach_window;
     }
 }

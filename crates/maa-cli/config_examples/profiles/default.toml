@@ -17,6 +17,18 @@ config = "CompatMac"     # connect config name
 # address = "localhost:1717" # PlayTools address
 # config = "CompatMac"       # connect config name
 
+# 3. Attach to the official Windows PC client (Windows only, no ADB)
+# The title is matched exactly against visible top-level windows. Set a PID or executable path
+# when more than one window has the same title. The control method values below are defaults.
+# [connection]
+# preset = "Win32"
+# window_title = "Arknights"
+# window_process_id = 1234                         # optional disambiguator
+# window_executable = "C:\\Games\\Arknights.exe" # optional canonical path match
+# screencap_method = 2                             # FramePool
+# mouse_method = 32                                # SendMessageWithCursorPos
+# keyboard_method = 2                             # SendMessage
+
 
 # Resource options for MAA Core
 [resource]

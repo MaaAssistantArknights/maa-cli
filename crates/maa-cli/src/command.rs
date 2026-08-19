@@ -88,6 +88,9 @@ pub(crate) enum Command {
         #[arg(default_value = "all")]
         component: Component,
     },
+    /// Test a configured MaaCore connection without running tasks
+    #[command(subcommand)]
+    Connection(ConnectionCommand),
     /// Run a custom task
     ///
     /// All arguments will be passed to maa-run,
@@ -244,6 +247,12 @@ pub(crate) enum Command {
         #[arg(long)]
         path: PathBuf,
     },
+}
+
+#[derive(Subcommand)]
+pub(crate) enum ConnectionCommand {
+    /// Connect or attach to the configured client and optionally capture one screenshot
+    Test(run::ConnectionTestArgs),
 }
 
 #[cfg(feature = "cli_installer")]
@@ -542,6 +551,28 @@ mod test {
                 ..
             } if task == "task"
         ));
+    }
+
+    #[test]
+    fn connection_test() {
+        assert_matches!(
+            parse_from([
+                "maa",
+                "connection",
+                "test",
+                "--profile",
+                "arkconsole",
+                "--screencap",
+                "--json",
+            ])
+            .command,
+            Command::Connection(ConnectionCommand::Test(run::ConnectionTestArgs {
+                profile: Some(profile),
+                screencap: true,
+                json: true,
+                ..
+            })) if profile == "arkconsole"
+        );
     }
 
     #[test]
