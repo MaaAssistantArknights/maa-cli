@@ -11,7 +11,7 @@ type = "Fight"
 
 [tasks.params]
 series = 0
-stage = "Annihilation"
+stage = "LungmenDowntown@Annihilation"
 
 [[tasks]]
 name = "理智作战"
@@ -24,7 +24,9 @@ series = 0
 [[tasks.variants]]
 
 [tasks.variants.condition]
-type = "OnSideStory"
+end = "2026-08-22T03:59:59"
+timezone = 8
+type = "DateTime"
 
 [tasks.variants.params]
 series = 0

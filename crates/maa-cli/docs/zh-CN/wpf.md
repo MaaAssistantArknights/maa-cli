@@ -14,14 +14,14 @@ maa migrate wpf gui.new.json
 # 指定输出路径与格式（由扩展名决定，支持 toml / yaml / json）
 maa migrate wpf gui.new.json tasks/daily.toml
 
-# 多配置导出时，用 --config 选择配置名
-maa migrate wpf gui.new.json --config Default
+# 多配置导出时，用 --profile-name 选择配置名
+maa migrate wpf gui.new.json --profile-name Default
 
 # GUI 是自定义排班时，用本机排班 JSON 覆盖其中的 Filename
 maa migrate wpf gui.new.json --custom-schedule ~/一图流-153-一天两换-MAA.json
 ```
 
-如果导出文件里只有一个配置，会自动选择该配置；有多个配置且未指定 `--config` 时，会交互式提示你选择。
+如果导出文件里只有一个配置，会自动选择该配置；有多个配置且未指定 `--profile-name` 时，会交互式提示你选择。
 
 `--custom-schedule` 只在 GUI 基建任务已经是自定义排班（`Mode = Custom` 或填写了 `Filename`）时生效，用来覆盖排班文件路径。若 GUI 不是自定义排班，传入该选项会报错退出。
 
@@ -51,7 +51,7 @@ GUI 里 `IsEnable = false` 的任务仍会写出，但会带上 `params.enable =
 
 - 资源本 / 芯片本：`Weekday`（官服服务器时区）
 - 永久关卡（如主线、剿灭、`LS-6`）：`Always`
-- 活动关卡：`OnSideStory`
+- 活动关卡：若能在热更新资源 `StageActivityV2.json` 中查到对应活动，则写入 `DateTime`（使用该活动的截止时间与时区）；查不到则回退为 `Always` 并告警
 
 例如 GUI 中同时启用过期理智药与多关卡备选时，迁移结果类似：
 
@@ -64,7 +64,7 @@ type = "Fight"
 medicine_expire_days = 2
 
 [[tasks.variants]]
-condition = { type = "OnSideStory" }
+condition = { type = "DateTime", end = "2026-08-22T03:59:59", timezone = 8 }
 params = { stage = "TO-5" }
 
 [[tasks.variants]]
@@ -77,6 +77,7 @@ params = { stage = "LS-6" }
 ```
 
 这里的 `medicine_expire_days` 对应 GUI 的 `MedicineExpireDays`（在 `UseExpiringMedicine = true` 时写入），表示使用多少天内将过期的理智药。
+活动关卡的 `end` 来自迁移时本地的 `StageActivityV2.json`，之后不会随热更新自动刷新；活动换档后需重新迁移或手动改条件。
 若同时启用 `UseWeeklySchedule`，周计划会与关卡开放条件用 `And` 组合。
 
 **注意**：启用源石（`UseStone`）时会发出警告，因为这可能消耗源石。

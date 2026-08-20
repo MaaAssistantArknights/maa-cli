@@ -261,7 +261,7 @@ pub(crate) enum MigrateCommand {
     /// Migrate a MAA WPF GUI profile TaskQueue into maa-cli task config
     ///
     /// The input is typically a GUI-exported JSON profile. When multiple
-    /// configurations exist, use `--config` or `MAA_GUI_CONFIG` to select one.
+    /// configurations exist, use `--profile-name` to select one.
     /// Disabled GUI tasks are kept with `params.enable = false` so they will
     /// not run until re-enabled manually.
     Wpf {
@@ -270,8 +270,8 @@ pub(crate) enum MigrateCommand {
         /// Path of the output file, if not specified, the output will be printed to stdout
         output: Option<PathBuf>,
         /// Select a named configuration when migrating a multi-profile GUI export
-        #[arg(long)]
-        config: Option<String>,
+        #[arg(long = "profile-name")]
+        profile_name: Option<String>,
         /// Override the custom infrastructure schedule JSON path in the WPF profile
         ///
         /// The WPF InfrastTask must already use custom scheduling (`Mode = Custom`
@@ -623,7 +623,7 @@ mod test {
             Command::Migrate(MigrateCommand::Wpf {
                 input,
                 output: None,
-                config: None,
+                profile_name: None,
                 custom_schedule: None,
             }) if input == Path::new("profile.json")
         );
@@ -635,14 +635,14 @@ mod test {
                 "wpf",
                 "profile.json",
                 "tasks.toml",
-                "--config",
+                "--profile-name",
                 "Default"
             ])
             .command,
             Command::Migrate(MigrateCommand::Wpf {
                 input,
                 output: Some(output),
-                config: Some(config),
+                profile_name: Some(config),
                 custom_schedule: None,
             }) if input == Path::new("profile.json")
                 && output == Path::new("tasks.toml")

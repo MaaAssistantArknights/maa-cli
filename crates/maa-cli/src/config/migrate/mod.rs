@@ -4,6 +4,8 @@
 //! data structure, migration may select profiles, remap fields, and drop unsupported
 //! content. Results are therefore potentially lossy and always accompanied by a summary.
 
+use std::fmt;
+
 mod wpf;
 
 pub(crate) use wpf::wpf;
@@ -65,42 +67,48 @@ impl MigrationSummary {
             field: field.into(),
         });
     }
+}
 
-    /// Print a user-facing summary of lossy migration decisions to stderr.
-    pub fn print(&self) {
+impl fmt::Display for MigrationSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_empty() {
-            return;
+            return Ok(());
         }
 
-        eprintln!("Migration summary (lossy):");
+        writeln!(f, "Migration summary (lossy):")?;
 
         if !self.skipped_tasks.is_empty() {
-            eprintln!("  Skipped tasks (unsupported type):");
+            writeln!(f, "  Skipped tasks (unsupported type):")?;
             for task in &self.skipped_tasks {
-                eprintln!("    - {}", format_task_ref(task));
+                writeln!(f, "    - {}", format_task_ref(task))?;
             }
         }
 
         if !self.disabled_tasks.is_empty() {
-            eprintln!("  Disabled tasks (kept with params.enable=false; will not run):");
+            writeln!(
+                f,
+                "  Disabled tasks (kept with params.enable=false; will not run):"
+            )?;
             for task in &self.disabled_tasks {
-                eprintln!("    - {}", format_task_ref(task));
+                writeln!(f, "    - {}", format_task_ref(task))?;
             }
         }
 
         if !self.skipped_fields.is_empty() {
-            eprintln!("  Skipped fields (not migrated):");
+            writeln!(f, "  Skipped fields (not migrated):")?;
             for field in &self.skipped_fields {
                 match &field.task_name {
                     Some(name) if !name.is_empty() => {
-                        eprintln!("    - {} \"{}\": {}", field.task_type, name, field.field);
+                        writeln!(f, "    - {} \"{name}\": {}", field.task_type, field.field)?;
                     }
                     _ => {
-                        eprintln!("    - {}: {}", field.task_type, field.field);
+                        writeln!(f, "    - {}: {}", field.task_type, field.field)?;
                     }
                 }
             }
         }
+
+        Ok(())
     }
 }
 
@@ -108,5 +116,30 @@ fn format_task_ref(task: &SkippedTask) -> String {
     match &task.name {
         Some(name) if !name.is_empty() => format!("{} \"{name}\"", task.type_tag),
         _ => task.type_tag.clone(),
+    }
+}
+
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_formats_skipped_task_with_name() {
+        let summary = MigrationSummary {
+            skipped_tasks: vec![SkippedTask {
+                type_tag: "UserDataUpdateTask".into(),
+                name: Some("sync".into()),
+            }],
+            ..Default::default()
+        };
+        let text = summary.to_string();
+        assert!(text.starts_with("Migration summary (lossy):\n"));
+        assert!(text.contains("UserDataUpdateTask \"sync\""));
+    }
+
+    #[test]
+    fn display_is_empty_for_empty_summary() {
+        assert!(MigrationSummary::default().to_string().is_empty());
     }
 }
