@@ -124,6 +124,7 @@ graph TD
 - One paragraph per line; use `<br>` for line breaks only when needed; no trailing spaces.
 - Markdown is linted by `markdownlint-cli2`.
 - End-user / agent usage of the installed `maa` CLI lives in `skills/maa-cli/` (`SKILL.md`, `setup.md`, `reference.md`). This file is for contributing to the crates.
+- Unimplemented product designs live in `docs/design/`. Do not describe them in `skills/maa-cli/` as if the commands exist; the skill may link to a design to say they do not.
 - When changing commands, task types, connection presets, or installer behavior, update `skills/maa-cli/` in the same change. When the task is to install, connect, or run maa-cli, read `skills/maa-cli/SKILL.md` instead of this file.
 
 ## MISC

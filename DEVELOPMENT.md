@@ -159,3 +159,4 @@ graph TD
 - 文档以简体中文为主，英文为辅，其他语言（繁体、韩文、日文）尽量翻译，无法翻译时可用简体中文占位。
 - 所有文档为 Markdown 格式，使用 [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2) 检查。
 - 段落内不换行，每段仅一行，段落间空行分隔。非段落换行请用 `<br>`，不要用尾随空格。
+- 尚未实现、需要跨 MaaCore / maa-cli 讨论的方案放在 [`docs/design/`](docs/design/)（例如 [信息查询面](docs/design/query-surface.md)），不要写进用户手册或 `skills/maa-cli/` 当成已有命令。
