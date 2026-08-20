@@ -2,7 +2,7 @@
 
 在用户本机把 maa-cli 接到能打的明日方舟客户端。
 命令示例写 `maa`；winget 安装后改成 `maa-cli`。
-技能未写到的安装细节以 [install.md](https://github.com/MaaAssistantArknights/maa-cli/blob/main/crates/maa-cli/docs/zh-CN/install.md) 和 [config.md](https://github.com/MaaAssistantArknights/maa-cli/blob/main/crates/maa-cli/docs/zh-CN/config.md) 为准。
+技能未写到的安装细节以 [install.md](../../crates/maa-cli/docs/zh-CN/install.md) 和 [config.md](../../crates/maa-cli/docs/zh-CN/config.md) 为准。
 
 完成标准：`maa version` 含 Core；`maa dir library` 下能找到 MaaCore 动态库；profile 的 `preset` / 地址与当前客户端一致；目标任务 `--dry-run` 通过。
 
@@ -57,7 +57,7 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/MaaAssistantArknights/
 
 Rust 开发者：`cargo install maa-cli --git https://github.com/MaaAssistantArknights/maa-cli.git --bin maa --tag stable --locked`
 
-国内访问 GitHub 失败时，让用户改 `$MAA_CONFIG_DIR/cli.toml` 里的 `api_url` / `download_url` 镜像；镜像字段说明在 config.md 的「CLI 相关配置」。
+国内访问 GitHub 失败时，让用户改 `$MAA_CONFIG_DIR/cli.toml` 里的 `api_url` / `download_url` 镜像；镜像字段说明在 [config.md](../../crates/maa-cli/docs/zh-CN/config.md) 的「CLI 相关配置」。
 
 ## 2. 安装 MaaCore 与资源
 
@@ -149,6 +149,8 @@ PlayCover 不是唯一路径。macOS 也可以 ADB 连模拟器，此时用 `ADB
 Linux 上跑 MAA 桌面 GUI（Wine）与 maa-cli 是两条线；命令行任务走 maa-cli + 原生 Core。
 
 ## 4. 写连接 profile
+
+选哪个 `preset` 见 [SKILL.md · 连接怎么选](SKILL.md#连接怎么选)。本节只写文件模板和触控等字段。
 
 目录：`$(maa dir config)/profiles/`。默认名 `default`，扩展名 json/toml/yaml 均可。本次运行换文件：`--profile 名字`。
 

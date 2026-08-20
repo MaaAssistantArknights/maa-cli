@@ -26,7 +26,7 @@
 
 自定义任务文件：`$MAA_CONFIG_DIR/tasks/`，`maa run <stem>`。
 基建计划 JSON：`$MAA_CONFIG_DIR/infrast/`（必须 JSON）。maa-cli 不按时段读计划文件，要用任务 `condition` 配 `plan_index`。
-Schema：<https://github.com/MaaAssistantArknights/maa-cli/blob/main/crates/maa-cli/schemas/task.schema.json>
+Schema：[task.schema.json](../../crates/maa-cli/schemas/task.schema.json)
 参数权威：[集成文档 · 任务类型](https://maa.plus/docs/zh-cn/protocol/integration.html)
 
 `maa fight --help` 给出作战旗标。`--stone` 先确认；`-D<物品ID>=件数` 的 ID 来自 `item_index.json`（`maa dir resource`）。

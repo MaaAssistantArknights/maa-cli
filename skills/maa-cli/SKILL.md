@@ -8,7 +8,7 @@ description: >-
 license: AGPL-3.0-only
 metadata:
   author: MaaAssistantArknights
-  version: "0.2.1"
+  version: "0.2.2"
   tags: arknights maa-cli maacore
 ---
 
@@ -42,6 +42,8 @@ maa-cli 只服务《明日方舟》。它把任务交给已安装的 MaaCore，�
 
 ## 连接怎么选
 
+选 `preset` 用下表。写入文件的完整模板、分平台依赖、排错见 [setup.md](setup.md) 对应平台小节和「写连接 profile」。
+
 |本机|游戏怎么跑|`connection.preset`|默认地址|
 |---|---|---|---|
 |macOS|PlayCover 安装的 iOS 包|`PlayCover`|`127.0.0.1:1717`（以窗口标题 `[host:port]` 为准）|
@@ -52,24 +54,6 @@ maa-cli 只服务《明日方舟》。它把任务交给已安装的 MaaCore，�
 
 PlayCover 预设强制 `MacPlayTools`，并加载 iOS 资源。窗口保持可见。B 服没有 iOS 包。
 本次运行覆盖地址：`maa fight 1-7 --addr 127.0.0.1:1717`。
-完整模板、分平台依赖、排错：读 [setup.md](setup.md) 对应平台小节。
-
-最小 PlayCover profile：
-
-```toml
-[connection]
-preset = "PlayCover"
-address = "127.0.0.1:1717"
-```
-
-最小 ADB profile：
-
-```toml
-[connection]
-preset = "ADB"
-adb_path = "adb"
-address = "emulator-5554"
-```
 
 ## 命令怎么路由
 
@@ -91,11 +75,11 @@ address = "emulator-5554"
 - 缺 cli / Core、要写 profile、连不上：读 [setup.md](setup.md) 里对应当前 OS 的那一节。
 - 自定义 `type`、URI、仓库/干员箱能扫到什么：读 [reference.md](reference.md) 对应小节。
 
-官方文档：
+仓库内用户手册：
 
-- 安装：<https://github.com/MaaAssistantArknights/maa-cli/blob/main/crates/maa-cli/docs/zh-CN/install.md>
-- 使用：<https://github.com/MaaAssistantArknights/maa-cli/blob/main/crates/maa-cli/docs/zh-CN/usage.md>
-- 配置：<https://github.com/MaaAssistantArknights/maa-cli/blob/main/crates/maa-cli/docs/zh-CN/config.md>
+- 安装：[install.md](../../crates/maa-cli/docs/zh-CN/install.md)
+- 使用：[usage.md](../../crates/maa-cli/docs/zh-CN/usage.md)
+- 配置：[config.md](../../crates/maa-cli/docs/zh-CN/config.md)
 
 ## 常见错误
 
