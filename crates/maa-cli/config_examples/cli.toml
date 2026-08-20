@@ -1,5 +1,11 @@
 "$schema" = "../schemas/cli.schema.json"
 
+# GitHub proxy prefix for accelerating downloads
+# When set, all GitHub releases download URLs (github.com/*/releases/download/*)
+# will be transparently rewritten through this proxy via ureq middleware.
+# This affects maa-core, maa-cli self-update, and hot-update downloads.
+# github_proxy = "https://gh-proxy.org/"
+
 # Configurations for MaaCore installation and update
 [core]
 # Update channel of MaaCore, can be "Alpha", "Beta" or "Stable"
