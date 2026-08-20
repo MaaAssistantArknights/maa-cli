@@ -14,5 +14,6 @@
 - [使用](usage.md)
 - [配置](config.md)
 - [常见问题](faq.md)
+- [Agent 技能](../../../../skills/maa-cli/SKILL.md)
 
 [maa-home]: https://github.com/MaaAssistantArknights/MaaAssistantArknights/

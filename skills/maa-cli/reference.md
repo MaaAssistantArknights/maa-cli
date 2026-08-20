@@ -1,10 +1,58 @@
 # maa-cli 参考
 
-SKILL.md 的补充。只在需要物品 ID、OCR 边界或商店建议时再读。
+任务类型和识别边界。旗标以 `maa help` 为准。
 
-## 物品 ID（俗称）
+## Contents
 
-来自已安装的 MaaResource `item_index.json`（`maa dir resource`）。
+- [子命令 vs 任务类型](#子命令-vs-任务类型)
+- [Copilot URI](#copilot-uri)
+- [客户端](#客户端)
+- [物品 ID 与 Depot](#物品-id-与-depot)
+- [OperBox / Mall](#operbox--mall)
+- [安装资源里有什么](#安装资源里有什么)
+- [条件与 batch](#条件与-batch)
+
+## 子命令 vs 任务类型
+
+|能力|有子命令|自定义任务 `type`|
+|---|---|---|
+|启动/关闭|`startup` / `closedown`|`StartUp` / `CloseDown`|
+|作战|`fight`|`Fight`|
+|作业|`copilot` / `ssscopilot` / `paradoxcopilot`|`Copilot` / `SSSCopilot` / `ParadoxCopilot`|
+|肉鸽|`roguelike`|`Roguelike`|
+|生息演算|`reclamation`|`Reclamation`|
+|基建 / 公招 / 信用商店 / 领奖 / 仓库 / 干员箱|无|`Infrast` / `Recruit` / `Mall` / `Award` / `Depot` / `OperBox`|
+|其它|无|`Custom` / `SingleStep` / `VideoRecognition`|
+
+自定义任务文件：`$MAA_CONFIG_DIR/tasks/`，`maa run <stem>`。
+基建计划 JSON：`$MAA_CONFIG_DIR/infrast/`（必须 JSON）。maa-cli 不按时段读计划文件，要用任务 `condition` 配 `plan_index`。
+Schema：<https://github.com/MaaAssistantArknights/maa-cli/blob/main/crates/maa-cli/schemas/task.schema.json>
+参数权威：[集成文档 · 任务类型](https://maa.plus/docs/zh-cn/protocol/integration.html)
+
+`maa fight --help` 给出作战旗标。`--stone` 先确认；`-D<物品ID>=件数` 的 ID 来自 `item_index.json`（`maa dir resource`）。
+
+未知 `connection.preset` 会被当成 `ADB` 并打警告。PlayCover 的别名是 `PlayTools`。
+
+## Copilot URI
+
+优先 `prts://<id>`（单份作业）或 `prts://s<id>`（作业集）。
+也接受本地路径或 `file://`。
+`maa://<id>` / `maa://<id>s` 仍能用，但会告警弃用。
+
+## 客户端
+
+|值|说明|PlayCover bundle|Android 包名|
+|---|---|---|---|
+|`Official`|官服|`com.hypergryph.arknights`|`com.hypergryph.arknights`|
+|`Bilibili`|B 服|无|`com.hypergryph.arknights.bilibili`|
+|`txwy`|台服|`tw.txwy.ios.arknights`|`tw.txwy.and.arknights`|
+|`YoStarEN`|国际服|`com.YoStarEN.Arknights`|同左|
+|`YoStarJP`|日服|`com.YoStarJP.Arknights`|同左|
+|`YoStarKR`|韩服|`com.YoStarKR.Arknights`|同左|
+
+## 物品 ID 与 Depot
+
+票和货币的常用 ID（其余查 `item_index.json`）：
 
 |ID|名称|classifyType|备注|
 |---|---|---|---|
@@ -15,79 +63,30 @@ SKILL.md 的补充。只在需要物品 ID、OCR 边界或商店建议时再读�
 |`4005`|资质凭证|NORMAL|绿票|
 |`4006`|采购凭证|NORMAL|红票|
 |`REP_COIN`|情报凭证|NORMAL||
-|`3003`|赤金|NORMAL||
-|`7001`|招聘许可|NORMAL||
-|`7002`|加急许可|NORMAL||
-|`7003`|寻访凭证|NORMAL||
-|`7004`|十连寻访凭证|NORMAL||
-|`classic_gacha`|中坚寻访凭证|NORMAL||
-|`30012`|固源岩|MATERIAL||
+|`30012`|固源岩|MATERIAL|`-D` 示例常用|
 
-`classifyType == MATERIAL` 才是 Depot 材料页模板白名单（芯片、精英材料、技能书、作战记录、模组数据块等）。票和货币是 `NORMAL`，不进该白名单。
+`classifyType == MATERIAL` 才是 Depot 材料页模板白名单。票和货币是 `NORMAL`。
 
-## Depot / OperBox
+Depot 是自定义任务 `type = "Depot"`，截图模板匹配 + 数量 OCR。结果打在日志里，不落盘。
+部分 Core 会再扫「全部」页的源石/合成玉/龙门币/赤金/红票；黄票、绿票、情报凭证、寻访凭证、招聘许可以当前日志为准。
+理智在战斗 callback `SanityBeforeStage`。信用点走 `Mall`。
 
-两者都是 MaaCore 任务类型，maa-cli 只在 callback 里把 JSON 打到日志，**不落盘、没有 `maa query`。**
-自定义任务示例：
+## OperBox / Mall
 
-```toml
-[[tasks]]
-type = "Depot"
-```
+OperBox 日志字段：`id` / `name` / `own` / `elite` / `level` / `potential` / `rarity`。技能等级、专精、模组、信赖不在结果里。
 
-Depot 是截图模板匹配 + 数量 OCR，不是读游戏内存，也不是「屏幕上有什么就扫什么」。
+`Mall` 只自动买信用商店，会真实点击购买。红/绿/黄票店和情报凭证店没有扫描或自动购买子命令。
+凭证店「库存」是本号本周期限购余量。没扫到的票余量和限购次数不当成已经读到。
 
-### Depot 实际覆盖
+## 安装资源里有什么
 
-- 默认在仓库**材料**页滑动，只匹配 `MATERIAL` 模板。
-- 较新的 MaaCore（自 v6.14.2 起部分版本）会再点「全部」，硬编码再扫：`4002` `4003` `4001` `3003` `4006`（源石、合成玉、龙门币、赤金、红票）。
-- **默认不扫**：黄票 `4004`、绿票 `4005`、情报凭证、寻访/中坚寻访/十连、招聘许可、加急许可。这些多在消耗品或其它分页。
-- 理智在战斗 callback `SanityBeforeStage`，不在 Depot。
-- 信用点走 `Mall`，不是仓库。
+`maa install` 装的资源够识别图标和跑作业：物品名、关卡掉落种类、干员职业/射程、基建技能文案与排班效率、公招 tags。
+养成数值（攻防 HP、技能各等级、专精/模组材料）查游戏数据或 wiki。掉率查企鹅物流。
 
-### OperBox
+## 条件与 batch
 
-- 有：`id` / `name` / `own` / `elite` / `level` / `potential` / `rarity`。
-- 无：技能等级、专精、模组、信赖、基建技能解锁。
+自定义任务可用 `Time` / `DateTime` / `Weekday` / `DayMod` / `OnSideStory` 以及 `And`/`Or`/`Not`。
+`timezone = "Official"` 用游戏日界（官服 UTC+4），不是东八区 0 点。
+当天 `DayMod` 余数：`maa remainder <divisor>`。
 
-## Mall 与凭证店
-
-`Mall` 只自动买**信用商店**，会真实点击购买。
-红/绿/黄票店、情报凭证店：**没有**预设扫描或自动购买。
-
-凭证店「库存」是**本号本周期限购余量**，不是全服抢货。
-购买建议（只输出、不代买）需要：
-
-1. catalog：货盘与价格（GameData `shop_client_table` 等，红绿票店货盘相对稳定）。
-2. account：票余量（需扩 Depot 或商店顶栏 OCR，**现成命令没有**）。
-3. account：材料缺口（现有 Depot 材料页）。
-4. 限购余量：商店页 OCR 或自行记账（现成命令没有）。
-
-不要声称已经根据黄/绿票余量给过精确可买清单，除非用户提供了这些数字或另有扫描结果。
-
-## MaaResource vs GameData
-
-MaaResource（`maa install` 装的）够 OCR 和作业，不够养成 wiki：
-
-- 有：物品名、关卡掉落**种类**、干员职业/射程、基建技能**文案与排班效率**、公招 tags。
-- 无：攻防 HP、战斗技能各等级数值、天赋、专精/模组材料与解锁条件。
-
-完整表用 ArknightsGameData（`character_table` / `skill_table` / `building_data` / `item_table` / `stage_table` / `uniequip_table`），适合 ingest 成 SQLite 再查。
-掉率用企鹅物流，不要写进 GameData。
-
-## 常用 Fight 参数
-
-- `-m/--medicine`：理智药数量。
-- `--stone`：源石；`--dr-grandet` 等 1 理智再确认。
-- `--times`：次数上限。
-- `-D30012=100`：指定掉落件数后停止，可重复。
-- `--series`：连战次数，`-1`～`6`。
-
-日志：`MAA_LOG`，`-v`/`-q`，`--log-file`；任务总结可用 `--no-summary` 关掉。
-
-## 自定义任务位置
-
-- 任务：`$MAA_CONFIG_DIR/tasks/`
-- 基建计划 JSON：`$MAA_CONFIG_DIR/infrast/`（必须 JSON，maa-cli 不按时段读计划文件，要用 `condition` + `plan_index`）
-- 示例：`crates/maa-cli/config_examples/tasks/daily.json`
-- Schema：`crates/maa-cli/schemas/task.schema.json`
+任务参数里的 `Input`/`Select` 在交互运行时会提问。`--batch` 用默认值；没有默认值就失败。
