@@ -174,3 +174,137 @@ impl TryFrom<&WpfRoguelikeTask> for CliRoguelikeTask {
         })
     }
 }
+
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+mod tests {
+    use serde_json::json;
+
+    use super::super::migrate;
+
+    fn roguelike_task(mode: &str, difficulty: i32, enabled: bool) -> serde_json::Value {
+        json!({
+            "$type": "RoguelikeTask",
+            "Name": "肉鸽",
+            "IsEnable": enabled,
+            "Theme": "JieGarden",
+            "Mode": mode,
+            "Squad": "指挥分队",
+            "Roles": "稳扎稳打",
+            "CoreChar": "",
+            "StartCount": 999,
+            "Difficulty": difficulty,
+            "Investment": true,
+            "InvestCount": 999,
+            "InvestWithMoreScore": false,
+            "StopWhenDepositFull": false,
+            "StopAtFinalBoss": false,
+            "StopWhenLevelMax": false,
+            "UseSupport": false,
+            "UseSupportNonFriend": false,
+            "RefreshTraderWithDice": false,
+            "StartWithEliteTwo": false,
+            "StartWithEliteTwoOnly": false,
+        })
+    }
+
+    #[test]
+    fn maps_roguelike_and_omits_max_difficulty() {
+        let (config, summary) = migrate(
+            serde_json::from_value(json!({
+                "TaskQueue": [roguelike_task("Investment", i32::MAX, false)],
+                "Gui": {},
+            }))
+            .unwrap(),
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(summary.disabled_tasks.len(), 1);
+        assert_eq!(summary.disabled_tasks[0].type_tag, "RoguelikeTask");
+        assert_eq!(
+            serde_json::to_value(config).unwrap(),
+            json!({
+                "tasks": [{
+                    "type": "Roguelike",
+                    "name": "肉鸽",
+                    "params": {
+                        "theme": "JieGarden",
+                        "mode": 1,
+                        "squad": "指挥分队",
+                        "roles": "稳扎稳打",
+                        "core_char": "",
+                        "starts_count": 999,
+                        "investment_enabled": true,
+                        "investments_count": 999,
+                        "investment_with_more_score": false,
+                        "stop_when_investment_full": false,
+                        "stop_at_final_boss": false,
+                        "stop_at_max_level": false,
+                        "use_support": false,
+                        "use_nonfriend_support": false,
+                        "refresh_trader_with_dice": false,
+                        "start_with_elite_two": false,
+                        "only_start_with_elite_two": false,
+                        "enable": false,
+                    }
+                }]
+            })
+        );
+    }
+
+    #[test]
+    fn maps_known_roguelike_modes() {
+        for (mode, expected) in [
+            ("Exp", 0),
+            ("Collect", 4),
+            ("CollapsalParadigms", 5),
+            ("MonthlySquad", 6),
+            ("DeepExploration", 7),
+        ] {
+            let (config, summary) = migrate(
+                serde_json::from_value(json!({
+                    "TaskQueue": [roguelike_task(mode, 3, true)],
+                    "Gui": {},
+                }))
+                .unwrap(),
+                None,
+            )
+            .unwrap();
+            assert!(summary.is_empty(), "{mode}");
+            assert_eq!(
+                config.tasks[0].pointer("/params/mode"),
+                Some(&json!(expected)),
+                "{mode}"
+            );
+            assert_eq!(
+                config.tasks[0].pointer("/params/difficulty"),
+                Some(&json!(3)),
+                "{mode}"
+            );
+        }
+    }
+
+    #[test]
+    fn unknown_roguelike_mode_is_skipped() {
+        let (config, summary) = migrate(
+            serde_json::from_value(json!({
+                "TaskQueue": [roguelike_task("FutureMode", 1, true)],
+                "Gui": {},
+            }))
+            .unwrap(),
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(
+            summary
+                .skipped_fields
+                .iter()
+                .map(|f| f.field.as_str())
+                .collect::<Vec<_>>(),
+            ["Mode"]
+        );
+        assert!(config.tasks[0].pointer("/params/mode").is_none());
+    }
+}

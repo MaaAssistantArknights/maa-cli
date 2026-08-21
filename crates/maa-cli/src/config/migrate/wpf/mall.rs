@@ -114,3 +114,115 @@ impl TryFrom<&WpfMallTask> for CliMallTask {
         })
     }
 }
+
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+mod tests {
+    use serde_json::json;
+
+    use super::super::migrate;
+
+    #[test]
+    fn maps_mall_fields_and_splits_semi_lists() {
+        let (config, summary) = migrate(
+            serde_json::from_value(json!({
+                "TaskQueue": [{
+                    "$type": "MallTask",
+                    "Name": "",
+                    "IsEnable": true,
+                    "Shopping": true,
+                    "CreditFight": false,
+                    "CreditFightFormation": 0,
+                    "VisitFriends": true,
+                    "FirstList": "加急许可;招聘许可",
+                    "BlackList": "碳;家具;",
+                    "ShoppingIgnoreBlackListWhenFull": true,
+                    "OnlyBuyDiscount": false,
+                    "ReserveMaxCredit": false,
+                    "CreditFightLastTime": "2026/06/08 00:00:00",
+                    "IsCreditFightAvailable": false,
+                }],
+                "Gui": {},
+            }))
+            .unwrap(),
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(
+            summary
+                .skipped_fields
+                .iter()
+                .map(|f| f.field.as_str())
+                .collect::<Vec<_>>(),
+            ["CreditFightLastTime"]
+        );
+        assert_eq!(
+            serde_json::to_value(config).unwrap(),
+            json!({
+                "tasks": [{
+                    "type": "Mall",
+                    "params": {
+                        "shopping": true,
+                        "credit_fight": false,
+                        "formation_index": 0,
+                        "visit_friends": true,
+                        "buy_first": ["加急许可", "招聘许可"],
+                        "blacklist": ["碳", "家具"],
+                        "force_shopping_if_credit_full": true,
+                        "only_buy_discount": false,
+                        "reserve_max_credit": false,
+                    }
+                }]
+            })
+        );
+    }
+
+    #[test]
+    fn empty_semi_lists_omit_arrays() {
+        let (config, summary) = migrate(
+            serde_json::from_value(json!({
+                "TaskQueue": [{
+                    "$type": "MallTask",
+                    "Name": "信用",
+                    "IsEnable": false,
+                    "Shopping": false,
+                    "CreditFight": false,
+                    "CreditFightFormation": 1,
+                    "VisitFriends": false,
+                    "FirstList": "",
+                    "BlackList": "",
+                    "ShoppingIgnoreBlackListWhenFull": false,
+                    "OnlyBuyDiscount": true,
+                    "ReserveMaxCredit": true,
+                }],
+                "Gui": {},
+            }))
+            .unwrap(),
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(summary.disabled_tasks.len(), 1);
+        assert_eq!(summary.disabled_tasks[0].type_tag, "MallTask");
+        assert_eq!(
+            serde_json::to_value(config).unwrap(),
+            json!({
+                "tasks": [{
+                    "type": "Mall",
+                    "name": "信用",
+                    "params": {
+                        "shopping": false,
+                        "credit_fight": false,
+                        "formation_index": 1,
+                        "visit_friends": false,
+                        "force_shopping_if_credit_full": false,
+                        "only_buy_discount": true,
+                        "reserve_max_credit": true,
+                        "enable": false,
+                    }
+                }]
+            })
+        );
+    }
+}

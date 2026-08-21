@@ -108,3 +108,140 @@ impl TryFrom<(&WpfStartUpTask, &WpfGuiSettings)> for CliStartUpTask {
         })
     }
 }
+
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+mod tests {
+    use serde_json::json;
+
+    use super::super::migrate;
+    use crate::config::task::ClientType;
+
+    #[test]
+    fn startup_uses_runtime_settings() {
+        let (config, summary) = migrate(
+            serde_json::from_value(json!({
+                "TaskQueue": [{
+                    "$type": "StartUpTask",
+                    "Name": "",
+                    "IsEnable": true,
+                    "AccountSwitchEnabled": false,
+                }],
+                "Gui": {
+                    "RuntimeSettings": {
+                        "ClientType": "Official",
+                        "StartGame": true,
+                    }
+                },
+            }))
+            .unwrap(),
+            None,
+        )
+        .unwrap();
+
+        assert!(summary.is_empty());
+        assert_eq!(
+            serde_json::to_value(config).unwrap(),
+            json!({
+                "tasks": [{
+                    "type": "StartUp",
+                    "params": {
+                        "client_type": "Official",
+                        "start_game_enabled": true,
+                    }
+                }]
+            })
+        );
+    }
+
+    #[test]
+    fn missing_or_invalid_client_type_uses_prompt() {
+        for client_type in [json!(null), json!(""), json!("NotAClient")] {
+            let mut gui = json!({ "Gui": { "RuntimeSettings": {} } });
+            if !client_type.is_null() {
+                gui["Gui"]["RuntimeSettings"]["ClientType"] = client_type.clone();
+            }
+            let (config, _) = migrate(
+                serde_json::from_value(json!({
+                    "TaskQueue": [{
+                        "$type": "StartUpTask",
+                        "Name": "启动",
+                        "IsEnable": true,
+                        "AccountSwitchEnabled": false,
+                    }],
+                    "Gui": gui["Gui"],
+                }))
+                .unwrap(),
+                None,
+            )
+            .unwrap();
+
+            assert_eq!(
+                config.tasks[0].pointer("/params/client_type"),
+                Some(&json!({ "alternatives": ClientType::NAMES })),
+                "{client_type}"
+            );
+        }
+    }
+
+    #[test]
+    fn account_switch_maps_name_or_reports_missing() {
+        let (with_name, summary_ok) = migrate(
+            serde_json::from_value(json!({
+                "TaskQueue": [{
+                    "$type": "StartUpTask",
+                    "Name": "",
+                    "IsEnable": true,
+                    "AccountSwitchEnabled": true,
+                    "AccountName": "main",
+                }],
+                "Gui": {
+                    "RuntimeSettings": { "ClientType": "Bilibili", "StartGame": false }
+                },
+            }))
+            .unwrap(),
+            None,
+        )
+        .unwrap();
+        assert!(summary_ok.is_empty());
+        assert_eq!(
+            with_name.tasks[0].pointer("/params/account_name"),
+            Some(&json!("main"))
+        );
+
+        let (without_name, summary_skip) = migrate(
+            serde_json::from_value(json!({
+                "TaskQueue": [{
+                    "$type": "StartUpTask",
+                    "Name": "",
+                    "IsEnable": false,
+                    "AccountSwitchEnabled": true,
+                }],
+                "Gui": {
+                    "RuntimeSettings": { "ClientType": "Official" }
+                },
+            }))
+            .unwrap(),
+            None,
+        )
+        .unwrap();
+        assert_eq!(summary_skip.disabled_tasks.len(), 1);
+        assert_eq!(
+            summary_skip
+                .skipped_fields
+                .iter()
+                .map(|f| f.field.as_str())
+                .collect::<Vec<_>>(),
+            ["AccountName"]
+        );
+        assert!(
+            without_name.tasks[0]
+                .pointer("/params/account_name")
+                .is_none()
+        );
+        assert_eq!(
+            without_name.tasks[0].pointer("/params/enable"),
+            Some(&json!(false))
+        );
+    }
+}

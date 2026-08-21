@@ -169,3 +169,163 @@ impl TryFrom<&WpfRecruitTask> for CliRecruitTask {
         })
     }
 }
+
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+mod tests {
+    use serde_json::json;
+
+    use super::super::migrate;
+
+    #[test]
+    fn maps_recruit_fields_and_skips_force_refresh() {
+        let (config, summary) = migrate(
+            serde_json::from_value(json!({
+                "TaskQueue": [{
+                    "$type": "RecruitTask",
+                    "Name": "",
+                    "IsEnable": true,
+                    "MaxTimes": 4,
+                    "ExtraTagMode": 0,
+                    "RefreshLevel3": true,
+                    "ForceRefresh": true,
+                    "Level3Choose": true,
+                    "Level4Choose": true,
+                    "Level5Choose": true,
+                    "Level6Choose": false,
+                    "Level3Time": 540,
+                    "Level4Time": 540,
+                    "PreferTagEnabled": true,
+                    "Level3PreferTags": [],
+                    "PreserveTagList": ["支援机械"],
+                    "PreserveTagEnabled": false,
+                }],
+                "Gui": {},
+            }))
+            .unwrap(),
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(
+            summary
+                .skipped_fields
+                .iter()
+                .map(|f| f.field.as_str())
+                .collect::<Vec<_>>(),
+            ["ForceRefresh"]
+        );
+        assert_eq!(
+            serde_json::to_value(config).unwrap(),
+            json!({
+                "tasks": [{
+                    "type": "Recruit",
+                    "params": {
+                        "times": 4,
+                        "extra_tags_mode": 0,
+                        "refresh": true,
+                        "select": [5, 4, 3],
+                        "confirm": [5, 4, 3],
+                        "recruitment_time": { "3": 540, "4": 540 },
+                    }
+                }]
+            })
+        );
+    }
+
+    #[test]
+    fn prefer_and_preserve_tags_when_enabled() {
+        let (config, summary) = migrate(
+            serde_json::from_value(json!({
+                "TaskQueue": [{
+                    "$type": "RecruitTask",
+                    "Name": "公招",
+                    "IsEnable": true,
+                    "MaxTimes": 1,
+                    "ExtraTagMode": 0,
+                    "RefreshLevel3": false,
+                    "ForceRefresh": false,
+                    "Level3Choose": true,
+                    "Level4Choose": false,
+                    "Level5Choose": false,
+                    "Level6Choose": false,
+                    "Level3Time": 460,
+                    "PreferTagEnabled": true,
+                    "Level3PreferTags": ["快速复活"],
+                    "PreserveTagEnabled": true,
+                    "PreserveTagList": ["支援机械"],
+                }],
+                "Gui": {},
+            }))
+            .unwrap(),
+            None,
+        )
+        .unwrap();
+
+        assert!(summary.is_empty());
+        assert_eq!(
+            serde_json::to_value(config).unwrap(),
+            json!({
+                "tasks": [{
+                    "type": "Recruit",
+                    "name": "公招",
+                    "params": {
+                        "times": 1,
+                        "extra_tags_mode": 0,
+                        "refresh": false,
+                        "select": [3],
+                        "confirm": [3],
+                        "recruitment_time": { "3": 460 },
+                        "first_tags": ["快速复活"],
+                        "preserve_tags": ["支援机械"],
+                    }
+                }]
+            })
+        );
+    }
+
+    #[test]
+    fn disabled_recruit_sets_enable_false() {
+        let (config, summary) = migrate(
+            serde_json::from_value(json!({
+                "TaskQueue": [{
+                    "$type": "RecruitTask",
+                    "Name": "公招",
+                    "IsEnable": false,
+                    "MaxTimes": 1,
+                    "ExtraTagMode": 0,
+                    "RefreshLevel3": false,
+                    "ForceRefresh": false,
+                    "Level3Choose": false,
+                    "Level4Choose": false,
+                    "Level5Choose": false,
+                    "Level6Choose": false,
+                    "PreferTagEnabled": false,
+                    "PreserveTagEnabled": false,
+                }],
+                "Gui": {},
+            }))
+            .unwrap(),
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(summary.disabled_tasks.len(), 1);
+        assert_eq!(summary.disabled_tasks[0].type_tag, "RecruitTask");
+        assert_eq!(
+            serde_json::to_value(config).unwrap(),
+            json!({
+                "tasks": [{
+                    "type": "Recruit",
+                    "name": "公招",
+                    "params": {
+                        "times": 1,
+                        "extra_tags_mode": 0,
+                        "refresh": false,
+                        "enable": false,
+                    }
+                }]
+            })
+        );
+    }
+}

@@ -571,4 +571,216 @@ mod tests {
             "{err}"
         );
     }
+
+    #[test]
+    fn simple_single_stage_with_shared_params() {
+        let config = fight_profile(serde_json::json!({
+            "Name": "理智",
+            "StagePlan": "CE-6",
+            "UseMedicine": true,
+            "MedicineCount": 999,
+            "UseStone": true,
+            "StoneCount": 1,
+            "EnableTimesLimit": true,
+            "TimesLimit": 5,
+            "EnableTargetDrop": true,
+            "DropId": "30012",
+            "DropCount": 9,
+            "Series": 1,
+            "UseExpiringMedicine": true,
+            "MedicineExpireDays": 2,
+        }));
+        let (cli, summary) = migrate(config, None).unwrap();
+        assert!(summary.is_empty());
+        assert_eq!(
+            serde_json::to_value(&cli.tasks[0]).unwrap(),
+            serde_json::json!({
+                "type": "Fight",
+                "name": "理智",
+                "params": {
+                    "medicine": 999,
+                    "stone": 1,
+                    "times": 5,
+                    "drops": { "30012": 9 },
+                    "series": 1,
+                    "medicine_expire_days": 2,
+                    "stage": "CE-6",
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn optional_stages_use_weekday_and_always() {
+        let config = fight_profile(serde_json::json!({
+            "UseOptionalStage": true,
+            "StagePlan": ["CE-6", "LS-6"],
+        }));
+        let (cli, summary) = migrate(config, None).unwrap();
+        assert!(summary.is_empty());
+        assert_eq!(
+            serde_json::to_value(&cli.tasks[0]).unwrap(),
+            serde_json::json!({
+                "type": "Fight",
+                "name": "剿灭",
+                "variants": [
+                    {
+                        "condition": {
+                            "type": "Weekday",
+                            "weekdays": ["Tue", "Thu", "Sat", "Sun"],
+                            "timezone": "Official",
+                        },
+                        "params": { "series": 0, "stage": "CE-6" },
+                    },
+                    {
+                        "condition": { "type": "Always" },
+                        "params": { "series": 0, "stage": "LS-6" },
+                    },
+                ]
+            })
+        );
+    }
+
+    #[test]
+    fn weekly_schedule_single_stage() {
+        let config = fight_profile(serde_json::json!({
+            "UseWeeklySchedule": true,
+            "WeeklySchedule": {
+                "Sunday": false,
+                "Monday": true,
+                "Tuesday": false,
+                "Wednesday": true,
+                "Thursday": false,
+                "Friday": true,
+                "Saturday": false,
+            },
+            "StagePlan": "LS-6",
+        }));
+        let (cli, _) = migrate(config, None).unwrap();
+        assert_eq!(
+            serde_json::to_value(&cli.tasks[0]).unwrap(),
+            serde_json::json!({
+                "type": "Fight",
+                "name": "剿灭",
+                "variants": [{
+                    "condition": {
+                        "type": "Weekday",
+                        "weekdays": ["Mon", "Wed", "Fri"],
+                    },
+                    "params": { "series": 0, "stage": "LS-6" },
+                }]
+            })
+        );
+    }
+
+    #[test]
+    fn weekly_and_optional_combined() {
+        let config = fight_profile(serde_json::json!({
+            "UseWeeklySchedule": true,
+            "UseOptionalStage": true,
+            "WeeklySchedule": {
+                "Sunday": true,
+                "Monday": false,
+                "Tuesday": false,
+                "Wednesday": false,
+                "Thursday": false,
+                "Friday": false,
+                "Saturday": false,
+            },
+            "StagePlan": ["CE-6", "LS-6"],
+            "Series": 2,
+        }));
+        let (cli, _) = migrate(config, None).unwrap();
+        assert_eq!(
+            serde_json::to_value(&cli.tasks[0]).unwrap(),
+            serde_json::json!({
+                "type": "Fight",
+                "name": "剿灭",
+                "params": { "series": 2 },
+                "variants": [
+                    {
+                        "condition": {
+                            "type": "And",
+                            "conditions": [
+                                { "type": "Weekday", "weekdays": ["Sun"] },
+                                {
+                                    "type": "Weekday",
+                                    "weekdays": ["Tue", "Thu", "Sat", "Sun"],
+                                    "timezone": "Official",
+                                },
+                            ],
+                        },
+                        "params": { "series": 0, "stage": "CE-6" },
+                    },
+                    {
+                        "condition": {
+                            "type": "And",
+                            "conditions": [
+                                { "type": "Weekday", "weekdays": ["Sun"] },
+                                { "type": "Always" },
+                            ],
+                        },
+                        "params": { "series": 0, "stage": "LS-6" },
+                    },
+                ]
+            })
+        );
+    }
+
+    #[test]
+    fn disabled_fight_sets_enable_false() {
+        let config = fight_profile(serde_json::json!({
+            "IsEnable": false,
+            "StagePlan": "LS-6",
+        }));
+        let (cli, summary) = migrate(config, None).unwrap();
+        assert_eq!(summary.disabled_tasks.len(), 1);
+        assert_eq!(
+            cli.tasks[0].pointer("/params/enable"),
+            Some(&serde_json::json!(false))
+        );
+    }
+
+    #[test]
+    fn stage_plan_validation_errors() {
+        let err = migrate(
+            fight_profile(serde_json::json!({
+                "UseOptionalStage": false,
+                "StagePlan": ["A", "B"],
+            })),
+            None,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("string array"), "{err}");
+
+        let err = migrate(
+            fight_profile(serde_json::json!({
+                "UseOptionalStage": true,
+                "StagePlan": "CE-6",
+            })),
+            None,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("string array"), "{err}");
+
+        let err = migrate(
+            fight_profile(serde_json::json!({
+                "UseOptionalStage": true,
+                "StagePlan": [],
+            })),
+            None,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("non-empty"), "{err}");
+
+        let err = migrate(
+            fight_profile(serde_json::json!({
+                "UseWeeklySchedule": true,
+                "StagePlan": "LS-6",
+            })),
+            None,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("WeeklySchedule"), "{err}");
+    }
 }

@@ -106,3 +106,131 @@ impl TryFrom<&WpfReclamationTask> for CliReclamationTask {
         })
     }
 }
+
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+mod tests {
+    use serde_json::json;
+
+    use super::super::migrate;
+
+    #[test]
+    fn maps_reclamation_and_skips_clear_store() {
+        let (config, summary) = migrate(
+            serde_json::from_value(json!({
+                "TaskQueue": [{
+                    "$type": "ReclamationTask",
+                    "Name": "",
+                    "Theme": "Tales",
+                    "Mode": "ProsperityInSave",
+                    "ToolToCraft": "",
+                    "IncrementMode": 0,
+                    "MaxCraftCountPerRound": 16,
+                    "ClearStore": true,
+                    "IsEnable": false,
+                }],
+                "Gui": {},
+            }))
+            .unwrap(),
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(summary.disabled_tasks.len(), 1);
+        assert_eq!(
+            summary
+                .skipped_fields
+                .iter()
+                .map(|f| f.field.as_str())
+                .collect::<Vec<_>>(),
+            ["ClearStore"]
+        );
+        assert_eq!(
+            serde_json::to_value(config).unwrap(),
+            json!({
+                "tasks": [{
+                    "type": "Reclamation",
+                    "params": {
+                        "theme": "Tales",
+                        "mode": 1,
+                        "increment_mode": 0,
+                        "num_craft_batches": 16,
+                        "enable": false,
+                    }
+                }]
+            })
+        );
+    }
+
+    #[test]
+    fn maps_tool_to_craft_and_prosperity_no_save() {
+        let (config, summary) = migrate(
+            serde_json::from_value(json!({
+                "TaskQueue": [{
+                    "$type": "ReclamationTask",
+                    "Name": "生息",
+                    "Theme": "Tales",
+                    "Mode": "ProsperityNoSave",
+                    "ToolToCraft": "手电钻",
+                    "IncrementMode": 1,
+                    "MaxCraftCountPerRound": 8,
+                    "IsEnable": true,
+                }],
+                "Gui": {},
+            }))
+            .unwrap(),
+            None,
+        )
+        .unwrap();
+
+        assert!(summary.is_empty());
+        assert_eq!(
+            serde_json::to_value(config).unwrap(),
+            json!({
+                "tasks": [{
+                    "type": "Reclamation",
+                    "name": "生息",
+                    "params": {
+                        "theme": "Tales",
+                        "mode": 0,
+                        "tools_to_craft": ["手电钻"],
+                        "increment_mode": 1,
+                        "num_craft_batches": 8,
+                    }
+                }]
+            })
+        );
+    }
+
+    #[test]
+    fn unknown_reclamation_mode_is_skipped() {
+        let (config, summary) = migrate(
+            serde_json::from_value(json!({
+                "TaskQueue": [{
+                    "$type": "ReclamationTask",
+                    "Name": "",
+                    "Theme": "Tales",
+                    "Mode": "UnknownMode",
+                    "ToolToCraft": "",
+                    "IncrementMode": 0,
+                    "MaxCraftCountPerRound": 1,
+                    "IsEnable": true,
+                }],
+                "Gui": {},
+            }))
+            .unwrap(),
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(
+            summary
+                .skipped_fields
+                .iter()
+                .map(|f| f.field.as_str())
+                .collect::<Vec<_>>(),
+            ["Mode"]
+        );
+        assert!(config.tasks[0].pointer("/params/mode").is_none());
+    }
+}

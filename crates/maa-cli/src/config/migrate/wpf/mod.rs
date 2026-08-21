@@ -398,4 +398,94 @@ mod tests {
             "{err}"
         );
     }
+
+    #[test]
+    fn split_semi_list_filters_empty_items() {
+        assert_eq!(split_semi_list("加急许可;招聘许可;"), vec![
+            "加急许可".to_string(),
+            "招聘许可".to_string()
+        ]);
+        assert!(split_semi_list("").is_empty());
+        assert!(split_semi_list(";;;").is_empty());
+    }
+
+    #[test]
+    fn select_configuration_picks_named_or_sole_profile() {
+        let sole: WpfProfile = serde_json::from_value(serde_json::json!({
+            "ConfigVersion": 1,
+            "Configurations": {
+                "Only": {
+                    "TaskQueue": [{
+                        "$type": "AwardTask",
+                        "Name": "",
+                        "IsEnable": true,
+                        "Award": true,
+                        "Mail": false,
+                        "FreeGacha": false,
+                        "Orundum": false,
+                        "Mining": false,
+                        "SpecialAccess": false,
+                    }],
+                    "Gui": {},
+                }
+            }
+        }))
+        .unwrap();
+        let cfg = select_configuration(sole, None).unwrap();
+        assert_eq!(cfg.task_queue.len(), 1);
+
+        let multi: WpfProfile = serde_json::from_value(serde_json::json!({
+            "ConfigVersion": 1,
+            "Current": "Default",
+            "Configurations": {
+                "Default": { "TaskQueue": [], "Gui": {} },
+                "Alt": { "TaskQueue": [], "Gui": {} },
+            }
+        }))
+        .unwrap();
+        select_configuration(multi, Some("Alt".into())).unwrap();
+
+        let missing: WpfProfile = serde_json::from_value(serde_json::json!({
+            "ConfigVersion": 1,
+            "Configurations": {
+                "Default": { "TaskQueue": [], "Gui": {} },
+            }
+        }))
+        .unwrap();
+        let err = select_configuration(missing, Some("Nope".into())).unwrap_err();
+        assert!(err.to_string().contains("not found"), "{err}");
+
+        let empty: WpfProfile = serde_json::from_value(serde_json::json!({
+            "ConfigVersion": 1,
+            "Configurations": {},
+        }))
+        .unwrap();
+        let err = select_configuration(empty, None).unwrap_err();
+        assert!(err.to_string().contains("no configuration"), "{err}");
+    }
+
+    #[test]
+    fn report_unknown_fields_ignores_non_meaningful_values() {
+        let mut summary = MigrationSummary::default();
+        let unknown = serde_json::json!({
+            "FutureFlag": true,
+            "EmptyString": "",
+            "Zero": 0,
+            "MaxInt": 2147483647,
+            "EmptyArray": [],
+            "NullField": null,
+        })
+        .as_object()
+        .unwrap()
+        .clone();
+        report_unknown_fields(&mut summary, "DemoTask", Some("x".into()), &unknown, &[]);
+        assert_eq!(
+            summary
+                .skipped_fields
+                .iter()
+                .map(|f| f.field.as_str())
+                .collect::<Vec<_>>(),
+            ["FutureFlag"]
+        );
+    }
 }
