@@ -50,9 +50,11 @@ pub(crate) fn format_event_line(
 ) -> Option<String> {
     let event = Event {
         kind,
-        // RFC 3339 with millisecond precision and a local UTC offset: parses
-        // unambiguously in every consumer, and keeps events emitted within the
-        // same second orderable by timestamp alone.
+        // RFC 3339 with millisecond precision and a local UTC offset, which
+        // parses unambiguously in every consumer. It records an approximate
+        // emission time, not an ordering key: callbacks arriving within the
+        // same millisecond share a timestamp, and a wall-clock adjustment can
+        // make successive events tie or move backwards.
         time: time.to_rfc3339_opts(chrono::SecondsFormat::Millis, false),
         message,
     };
@@ -71,6 +73,10 @@ pub(crate) fn emit_json_event(kind: &str, message: &Value) {
         // drop the line rather than propagate an error up through a MaaCore
         // callback thread or the task-registration loop.
         let _ = writeln!(out, "{line}");
+        // `Stdout` is only documented to be line-buffered when connected to a
+        // terminal, so on a pipe the flush is what actually gets the event out
+        // now rather than whenever the buffer happens to fill.
+        let _ = out.flush();
     }
 }
 
