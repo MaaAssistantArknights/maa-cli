@@ -51,7 +51,7 @@ GUI 里 `IsEnable = false` 的任务仍会写出，但会带上 `params.enable =
 
 - 资源本 / 芯片本：`Weekday`（官服服务器时区）
 - 永久关卡（如主线、剿灭、`LS-6`）：`Always`
-- 活动关卡：若能在热更新资源 `StageActivityV2.json` 中查到对应活动，则写入 `DateTime`（使用该活动的截止时间与时区）；查不到则回退为 `Always` 并告警
+- 活动关卡：若能在热更新资源 `StageActivityV2.json` 中查到对应活动，则写入 `DateTime`（使用该活动的开始时间、截止时间与时区）；查不到则回退为 `Always` 并告警
 
 例如 GUI 中同时启用过期理智药与多关卡备选时，迁移结果类似：
 
@@ -64,7 +64,7 @@ type = "Fight"
 medicine_expire_days = 2
 
 [[tasks.variants]]
-condition = { type = "DateTime", end = "2026-08-22T03:59:59", timezone = 8 }
+condition = { type = "DateTime", start = "2026-08-08T16:00:00", end = "2026-08-22T03:59:59", timezone = 8 }
 params = { stage = "TO-5" }
 
 [[tasks.variants]]
@@ -77,7 +77,7 @@ params = { stage = "LS-6" }
 ```
 
 这里的 `medicine_expire_days` 对应 GUI 的 `MedicineExpireDays`（在 `UseExpiringMedicine = true` 时写入），表示使用多少天内将过期的理智药。
-活动关卡的 `end` 来自迁移时本地的 `StageActivityV2.json`，之后不会随热更新自动刷新；活动换档后需重新迁移或手动改条件。
+活动关卡的 `start` 和 `end` 来自迁移时本地的 `StageActivityV2.json`，之后不会随热更新自动刷新；活动换档后需重新迁移或手动改条件。
 若同时启用 `UseWeeklySchedule`，周计划会与关卡开放条件用 `And` 组合。
 
 **注意**：启用源石（`UseStone`）时会发出警告，因为这可能消耗源石。

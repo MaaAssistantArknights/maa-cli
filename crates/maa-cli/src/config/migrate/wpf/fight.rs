@@ -192,8 +192,8 @@ impl WpfFightTask {
     ///
     /// - Resource stages with a weekly rotation → `Weekday` (server timezone Official)
     /// - Permanent stages (mainline, annihilation, LS-6, OF-*) → `Always`
-    /// - Side-story stages listed in `StageActivityV2.json` → `DateTime` with that activity's
-    ///   expire time (and timezone) from the resource file
+    /// - Side-story stages listed in `StageActivityV2.json` → `DateTime` with that activity's open
+    ///   window (and timezone) from the resource file
     ///
     /// If the activity resource cannot be read (even after a hot-update attempt), migration
     /// fails instead of inventing a condition. Stages absent from a readable activity file
@@ -243,11 +243,7 @@ impl WpfFightTask {
             | "LungmenOutskirts@Annihilation"
             | "LungmenDowntown@Annihilation" => Condition::Always,
             _ => match Self::activity_stage_schedule(stage)? {
-                Some(schedule) => Condition::DateTime {
-                    start: None,
-                    end: Some(schedule.end),
-                    timezone: TimeOffset::TimeZone(schedule.timezone),
-                },
+                Some(schedule) => Self::activity_schedule_condition(schedule),
                 None => {
                     warn!(
                         "FightTask stage `{stage}` has no known open schedule; treating as Always"
@@ -258,7 +254,15 @@ impl WpfFightTask {
         })
     }
 
-    /// Resolve expire window for an activity stage from `StageActivityV2.json`.
+    fn activity_schedule_condition(schedule: crate::activity::SideStorySchedule) -> Condition {
+        Condition::DateTime {
+            start: Some(schedule.start),
+            end: Some(schedule.end),
+            timezone: TimeOffset::TimeZone(schedule.timezone),
+        }
+    }
+
+    /// Resolve the open window for an activity stage from `StageActivityV2.json`.
     ///
     /// On read failure, attempts a hot update once and reloads. Persistent read failure
     /// is an error so migration does not invent dates.
@@ -489,7 +493,10 @@ impl TryFrom<&WpfFightTask> for Value {
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
-    use super::super::{WpfConfig, migrate};
+    use super::{
+        super::{WpfConfig, migrate},
+        *,
+    };
 
     fn fight_profile(extra: serde_json::Value) -> WpfConfig {
         let mut task = serde_json::json!({
@@ -524,6 +531,24 @@ mod tests {
             "Gui": {},
         }))
         .unwrap()
+    }
+
+    #[test]
+    fn activity_schedule_condition_keeps_start_and_end() {
+        let schedule = crate::activity::SideStorySchedule {
+            start: chrono::NaiveDateTime::MIN,
+            end: chrono::NaiveDateTime::MAX,
+            timezone: 8,
+        };
+
+        assert_eq!(
+            WpfFightTask::activity_schedule_condition(schedule),
+            Condition::DateTime {
+                start: Some(schedule.start),
+                end: Some(schedule.end),
+                timezone: TimeOffset::TimeZone(schedule.timezone),
+            }
+        );
     }
 
     #[test]
