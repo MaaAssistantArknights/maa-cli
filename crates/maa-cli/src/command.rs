@@ -267,7 +267,8 @@ pub(crate) enum MigrateCommand {
     Wpf {
         /// Path of the input GUI profile
         input: PathBuf,
-        /// Path of the output file, if not specified, the output will be printed to stdout
+        /// Path of the output file; defaults to the input path with its extension replaced by
+        /// .toml
         output: Option<PathBuf>,
         /// Select a named configuration when migrating a multi-profile GUI export
         #[arg(long = "profile-name")]
@@ -664,6 +665,20 @@ mod test {
                 ..
             }) if schedule == Path::new("plan.json")
         );
+    }
+
+    #[test]
+    fn migrate_wpf_help_describes_default_output_path() {
+        let help = match Cli::try_parse_from(["maa", "migrate", "wpf", "--help"]) {
+            Err(error) => {
+                assert_eq!(error.kind(), clap::error::ErrorKind::DisplayHelp);
+                error.to_string()
+            }
+            Ok(_) => panic!("--help should stop argument parsing"),
+        };
+
+        assert!(help.contains("defaults to the input path"), "{help}");
+        assert!(!help.contains("printed to stdout"), "{help}");
     }
 
     #[test]
