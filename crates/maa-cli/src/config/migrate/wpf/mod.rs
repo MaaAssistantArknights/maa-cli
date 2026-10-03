@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, num::NonZero, path::Path};
+use std::{collections::BTreeMap, io::BufReader, num::NonZero, path::Path};
 
 use anyhow::{Context, Result, bail, ensure};
 use log::trace;
@@ -93,8 +93,8 @@ pub(crate) fn wpf(
         "`maa migrate wpf` expected a MAA GUI profile (typically .json); input {file:?} is not a JSON file"
     );
 
-    let profile: WpfProfile =
-        serde_json::from_reader(std::fs::File::open(file).context("Trying to open wpf profile")?)?;
+    let profile_file = std::fs::File::open(file).context("Trying to open wpf profile")?;
+    let profile: WpfProfile = serde_json::from_reader(BufReader::new(profile_file))?;
     ensure!(
         profile.config_version == SUPPORTED_CONFIG_VERSION,
         "Unsupported WPF ConfigVersion {} (expected {SUPPORTED_CONFIG_VERSION})",
