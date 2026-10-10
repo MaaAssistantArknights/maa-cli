@@ -11,6 +11,7 @@ const HANDLED: &[&str] = &[
     "Squad",
     "Roles",
     "CoreChar",
+    "StartingOpers",
     "StartCount",
     "Difficulty",
     "Investment",
@@ -77,6 +78,16 @@ struct CliRoguelikeParams {
     enable: Option<bool>,
 }
 
+/// Newer GUI exports list starting operators here instead of flat `CoreChar` /
+/// `UseSupport`. Only the first entry maps to maa-cli / MaaCore params.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct WpfStartingOper {
+    name: String,
+    #[serde(default)]
+    use_support: bool,
+}
+
 /// WPF GUI `RoguelikeTask` (`$type = "RoguelikeTask"`).
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -87,7 +98,11 @@ pub(super) struct WpfRoguelikeTask {
     mode: String,
     squad: String,
     roles: String,
-    core_char: String,
+    /// Older exports; newer ones omit this in favor of [`Self::starting_opers`].
+    #[serde(default)]
+    core_char: Option<String>,
+    #[serde(default)]
+    starting_opers: Vec<WpfStartingOper>,
     start_count: i32,
     difficulty: i32,
     investment: bool,
@@ -96,7 +111,9 @@ pub(super) struct WpfRoguelikeTask {
     stop_when_deposit_full: bool,
     stop_at_final_boss: bool,
     stop_when_level_max: bool,
-    use_support: bool,
+    /// Older exports; newer ones put support on each [`WpfStartingOper`].
+    #[serde(default)]
+    use_support: Option<bool>,
     use_support_non_friend: bool,
     refresh_trader_with_dice: bool,
     start_with_elite_two: bool,
@@ -118,12 +135,30 @@ impl WpfRoguelikeTask {
         }
     }
 
+    /// Prefer `StartingOpers[0]`, then legacy `CoreChar` / `UseSupport`.
+    fn starting_oper(&self) -> (Option<String>, bool) {
+        if let Some(oper) = self.starting_opers.first() {
+            let name = (!oper.name.is_empty()).then(|| oper.name.clone());
+            return (name, oper.use_support);
+        }
+        (
+            self.core_char
+                .as_deref()
+                .filter(|name| !name.is_empty())
+                .map(str::to_string),
+            self.use_support.unwrap_or(false),
+        )
+    }
+
     pub(super) fn report_to(&self, summary: &mut MigrationSummary) {
         if !self.is_enable {
             summary.disable_task("RoguelikeTask", Some(self.name.clone()));
         }
         if self.mapped_mode().is_none() {
             summary.skip_field("RoguelikeTask", Some(self.name.clone()), "Mode");
+        }
+        if self.starting_opers.len() > 1 {
+            summary.skip_field("RoguelikeTask", Some(self.name.clone()), "StartingOpers");
         }
         report_unknown_fields(
             summary,
@@ -147,6 +182,7 @@ impl TryFrom<&WpfRoguelikeTask> for CliRoguelikeTask {
     type Error = anyhow::Error;
 
     fn try_from(task: &WpfRoguelikeTask) -> Result<Self> {
+        let (core_char, use_support) = task.starting_oper();
         Ok(CliRoguelikeTask {
             task_type: TaskType::Roguelike,
             name: task.name.clone(),
@@ -155,7 +191,7 @@ impl TryFrom<&WpfRoguelikeTask> for CliRoguelikeTask {
                 mode: task.mapped_mode(),
                 squad: Some(task.squad.clone()),
                 roles: Some(task.roles.clone()),
-                core_char: Some(task.core_char.clone()),
+                core_char,
                 starts_count: Some(task.start_count),
                 difficulty: (task.difficulty != i32::MAX).then_some(task.difficulty),
                 investment_enabled: Some(task.investment),
@@ -164,7 +200,7 @@ impl TryFrom<&WpfRoguelikeTask> for CliRoguelikeTask {
                 stop_when_investment_full: Some(task.stop_when_deposit_full),
                 stop_at_final_boss: Some(task.stop_at_final_boss),
                 stop_at_max_level: Some(task.stop_when_level_max),
-                use_support: Some(task.use_support),
+                use_support: Some(use_support),
                 use_nonfriend_support: Some(task.use_support_non_friend),
                 refresh_trader_with_dice: Some(task.refresh_trader_with_dice),
                 start_with_elite_two: Some(task.start_with_elite_two),
@@ -191,7 +227,7 @@ mod tests {
             "Mode": mode,
             "Squad": "指挥分队",
             "Roles": "稳扎稳打",
-            "CoreChar": "",
+            "CoreChar": "维什戴尔",
             "StartCount": 999,
             "Difficulty": difficulty,
             "Investment": true,
@@ -233,7 +269,7 @@ mod tests {
                         "mode": 1,
                         "squad": "指挥分队",
                         "roles": "稳扎稳打",
-                        "core_char": "",
+                        "core_char": "维什戴尔",
                         "starts_count": 999,
                         "investment_enabled": true,
                         "investments_count": 999,
@@ -250,6 +286,86 @@ mod tests {
                     }
                 }]
             })
+        );
+    }
+
+    #[test]
+    fn maps_starting_opers_when_core_char_absent() {
+        let (config, summary) = migrate(
+            serde_json::from_value(json!({
+                "TaskQueue": [{
+                    "$type": "RoguelikeTask",
+                    "Name": "黑流树海-刷源石锭",
+                    "IsEnable": true,
+                    "Theme": "BlackFlow",
+                    "Mode": "Investment",
+                    "Squad": "特勤分队",
+                    "Roles": "稳扎稳打",
+                    "StartCount": 99999,
+                    "StartingOpers": [
+                        { "Name": "机械师", "UseSupport": true },
+                        { "Name": "额外干员", "UseSupport": false },
+                    ],
+                    "Difficulty": i32::MAX,
+                    "Investment": true,
+                    "InvestCount": 999,
+                    "InvestWithMoreScore": false,
+                    "StopWhenDepositFull": true,
+                    "StopAtFinalBoss": false,
+                    "StopWhenLevelMax": false,
+                    "UseSupportNonFriend": false,
+                    "RefreshTraderWithDice": false,
+                    "StartWithEliteTwo": false,
+                    "StartWithEliteTwoOnly": false,
+                }],
+                "Gui": {},
+            }))
+            .unwrap(),
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(
+            summary
+                .skipped_fields
+                .iter()
+                .map(|f| f.field.as_str())
+                .collect::<Vec<_>>(),
+            ["StartingOpers"]
+        );
+        assert_eq!(
+            config.tasks[0].pointer("/params/core_char"),
+            Some(&json!("机械师"))
+        );
+        assert_eq!(
+            config.tasks[0].pointer("/params/use_support"),
+            Some(&json!(true))
+        );
+        assert_eq!(
+            config.tasks[0].pointer("/params/theme"),
+            Some(&json!("BlackFlow"))
+        );
+    }
+
+    #[test]
+    fn accepts_roguelike_without_core_char_or_starting_opers() {
+        let mut task = roguelike_task("Exp", 1, true);
+        task.as_object_mut().unwrap().remove("CoreChar");
+        task.as_object_mut().unwrap().remove("UseSupport");
+        let (config, summary) = migrate(
+            serde_json::from_value(json!({
+                "TaskQueue": [task],
+                "Gui": {},
+            }))
+            .unwrap(),
+            None,
+        )
+        .unwrap();
+        assert!(summary.is_empty());
+        assert!(config.tasks[0].pointer("/params/core_char").is_none());
+        assert_eq!(
+            config.tasks[0].pointer("/params/use_support"),
+            Some(&json!(false))
         );
     }
 

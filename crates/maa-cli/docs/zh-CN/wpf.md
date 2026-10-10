@@ -113,6 +113,7 @@ params = { stage = "LS-6" }
 - `Mall`：信用商店、信用作战、访问好友、黑白名单等会映射到对应参数。
 - `Award`：日常奖励、邮件、源石锭等；GUI 的 `FreeGacha` 对应 `recruit`。
 - `Roguelike` / `Reclamation`：主题、模式与常见选项会迁移；无法识别的模式字段会记入跳过摘要。
+- 较新的 GUI 用 `StartingOpers` 代替 `CoreChar` / `UseSupport` 时，会取列表首项映射为 `core_char` 与 `use_support`；多余开局干员会记入跳过摘要。
 - 未识别的 `$type` 会整项跳过，并出现在迁移摘要的「跳过任务」列表中。
 
 各任务类型的完整参数含义请参考 [MAA 集成文档][task-types]。迁移后若要继续用条件变体精细控制执行逻辑，请参阅 [任务条件](config.md#任务条件)。

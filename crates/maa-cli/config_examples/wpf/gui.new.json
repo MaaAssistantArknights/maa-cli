@@ -30,8 +30,8 @@
           "UseExpiringMedicine": false,
           "MedicineExpireDays": 2,
           "UseExpireMedicineForActivity": false,
-          "UseCustomAnnihilation": true,
-          "AnnihilationStage": "LungmenDowntown@Annihilation",
+          "UseCustomAnnihilation": false,
+          "AnnihilationStage": "Chernobog@Annihilation",
           "HideUnavailableStage": false,
           "IsStageManually": false,
           "UseOptionalStage": false,
@@ -57,7 +57,7 @@
           "TimesLimit": 2147483647,
           "Series": 0,
           "StagePlan": [
-            "TO-5",
+            "YW-8",
             "CE-6",
             "LS-6"
           ],
@@ -83,7 +83,7 @@
           "MaxTimes": 4,
           "ExtraTagMode": 0,
           "Level3PreferTags": [],
-          "PreferTagEnabled": true,
+          "PreferTagEnabled": false,
           "PreserveTagList": [
             "支援机械"
           ],
@@ -91,6 +91,8 @@
           "RefreshLevel3": true,
           "ForceRefresh": true,
           "Level3Choose": true,
+          "Level3RecruitmentPermitReserveEnabled": false,
+          "Level3RecruitmentPermitReserve": 8,
           "Level4Choose": true,
           "Level5Choose": true,
           "Level6Choose": false,
@@ -112,8 +114,16 @@
           "ReceptionClueExchange": true,
           "SendClue": true,
           "ContinueTraining": true,
+          "FiammettaTarget1": "清流",
+          "FiammettaTarget2": "可露希尔",
+          "FiammettaTarget3": "但书",
+          "FiammettaRecoveryEnabled": false,
+          "UsePinusSylvestris": false,
+          "UsePerceptionInformation": false,
+          "UseWorldlyPlight": false,
+          "UseAbyssalHunter": false,
           "CustomFileType": "user_defined",
-          "Filename": "~/一图流-153-一天两换-MAA.json",
+          "Filename": "/Users/nan/Library/Application Support/com.loong.maa/config/tasks/一图流-153-一天两换-MAA.json",
           "PlanSelect": -1,
           "RoomList": [
             {
@@ -177,60 +187,10 @@
           "Orundum": true,
           "Mining": true,
           "SpecialAccess": true,
+          "SignInEvent": false,
           "Name": "",
           "IsEnable": true,
           "TaskType": "Award"
-        },
-        {
-          "$type": "RoguelikeTask",
-          "Theme": "JieGarden",
-          "Difficulty": 2147483647,
-          "Mode": "Investment",
-          "Squad": "指挥分队",
-          "SquadCollectible": "指挥分队",
-          "Roles": "稳扎稳打",
-          "StartCount": 999999,
-          "CoreChar": "维什戴尔",
-          "Investment": true,
-          "InvestCount": 999,
-          "InvestWithMoreScore": false,
-          "CollectibleStartAwards": "HotWater",
-          "CollectibleShopping": false,
-          "StartWithEliteTwo": false,
-          "StartWithEliteTwoOnly": false,
-          "ExpectedCollapsalParadigms": "",
-          "MonthlySquadAutoIterate": true,
-          "MonthlySquadCheckComms": true,
-          "DeepExplorationAutoIterate": true,
-          "FindPlaytimeTarget": "Ling",
-          "UseSupport": false,
-          "UseSupportNonFriend": false,
-          "RefreshTraderWithDice": false,
-          "SquadIsFoldartal": false,
-          "SamiFirstFloorFoldartal": false,
-          "SamiFirstFloorFoldartals": "",
-          "SamiNewSquad2StartingFoldartal": false,
-          "SamiNewSquad2StartingFoldartals": "",
-          "StopWhenDepositFull": true,
-          "StopAtFinalBoss": false,
-          "StopWhenLevelMax": false,
-          "StartWithSeed": false,
-          "Seed": "",
-          "Name": "",
-          "IsEnable": false,
-          "TaskType": "Roguelike"
-        },
-        {
-          "$type": "ReclamationTask",
-          "Theme": "Tales",
-          "Mode": "ProsperityInSave",
-          "ToolToCraft": "",
-          "IncrementMode": 0,
-          "MaxCraftCountPerRound": 16,
-          "ClearStore": true,
-          "Name": "",
-          "IsEnable": false,
-          "TaskType": "Reclamation"
         },
         {
           "$type": "UserDataUpdateTask",
@@ -239,7 +199,7 @@
           "TriggerInterval": "EveryTime",
           "IsTriggered": true,
           "Name": "",
-          "IsEnable": false,
+          "IsEnable": true,
           "TaskType": "UserDataUpdate"
         }
       ],
@@ -256,22 +216,22 @@
           ],
           "Extras": {
             "LDPlayer": {
+              "IsEnabled": false,
               "EmulatorPath": "",
               "ManualSetIndex": false,
-              "InstanceIndex": 0,
-              "IsEnabled": false
+              "InstanceIndex": 0
             },
             "MuMuEmulator12": {
+              "IsEnabled": true,
               "EmulatorPath": "C:\\Program Files\\NetEase\\MuMuPlayer",
               "EnableBridgeConnection": false,
-              "EnableTouch": true,
-              "InstanceIndex": 0,
-              "IsEnabled": true
+              "InstanceIndex": 0
             },
             "Win32Extra": {
               "ScreencapMethod": "FramePool",
-              "MouseMethod": "SendMessageWithCursorPos",
-              "KeyboardMethod": "SendMessage"
+              "MouseMethod": "PostMessageWithCursorPos",
+              "KeyboardMethod": "SendMessage",
+              "MuteWhileRunning": false
             },
             "BluestacksExtra": {
               "ConfigKeyword": "",
@@ -308,7 +268,6 @@
           "ClientType": "Official",
           "StartGame": true,
           "DeployWithPause": false,
-          "AutoRestartOnDrop": true,
           "RoguelikeDelayAbortUntilCombatComplete": false,
           "PreRunScript": "",
           "PostRunScript": "",
@@ -316,12 +275,19 @@
           "ExecuteScriptOnManualStop": false,
           "BlockSleep": false,
           "BlockSleepWithScreenOn": true,
+          "EnableStallTimeout": true,
+          "StallTimeoutReminderIntervalMinutes": 30,
+          "StallTimeoutMinutes": 25,
+          "EnableRunDurationLimit": false,
+          "RunDurationLimitMinutes": 240,
+          "RunDurationLimitExecutePostActions": true
+        },
+        "ThirdParty": {
           "ReportToPenguin": true,
           "PenguinId": "482853894",
           "ReportToYituliu": true,
-          "EnableStallTimeout": true,
-          "StallTimeoutReminderIntervalMinutes": 30,
-          "StallTimeoutMinutes": 25
+          "YituliuOpenApiToken": "",
+          "OperBoxUseYituliuApi": false
         },
         "StartUpSettings": {
           "RunDirectly": false,
@@ -333,12 +299,12 @@
           "EmulatorWaitSeconds": 60
         },
         "WindowTitlePrefix": "",
-        "PostActions": "ExitArknights, ExitSelf",
+        "PostActions": "None",
         "AchievementPopupDisabled": false,
         "AchievementPopupAutoClose": false
       },
       "Toolbox": {
-        "OperBoxExportFormat": "Clipboard",
+        "OperBoxExportFormat": "Json",
         "GachaShowDisclaimerNoMore": false,
         "PeepTargetFps": 20,
         "ChooseLevel3": true,
@@ -348,89 +314,510 @@
         "ChooseLevel5": true,
         "ChooseLevel6": true,
         "AutoSetTime": true,
-        "ShowPotential": true
+        "ShowPotential": true,
+        "OperBoxAvatarMode": true,
+        "EventShopBlackListDataSupplementInstrument": false,
+        "EventShopBlackListDataSupplementStick": false,
+        "EventShopBlackListLmd": false,
+        "EventShopBlackListFurniturePart": false,
+        "EventShopBlackListOther": true,
+        "EventShopBlackList": ""
       },
       "Copilot": {
         "TaskList": [
           {
-            "Name": "TO-1",
-            "FilePath": "config\\copilot\\TO-1.json",
-            "CopilotId": 98585,
+            "Name": "TO-EX-1",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-1.json",
+            "CopilotId": 99410,
             "IsRaid": false,
             "IsChecked": false,
             "Index": 0
           },
           {
-            "Name": "TO-TR-1",
-            "FilePath": "config\\copilot\\TO-TR-1.json",
-            "CopilotId": 98593,
-            "IsRaid": false,
+            "Name": "TO-EX-1",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-1.json",
+            "CopilotId": 99410,
+            "IsRaid": true,
             "IsChecked": false,
             "Index": 1
           },
           {
-            "Name": "TO-2",
-            "FilePath": "config\\copilot\\TO-2.json",
-            "CopilotId": 98591,
+            "Name": "TO-EX-2",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-2.json",
+            "CopilotId": 99425,
             "IsRaid": false,
-            "IsChecked": false,
+            "IsChecked": true,
             "Index": 2
           },
           {
-            "Name": "TO-3",
-            "FilePath": "config\\copilot\\TO-3.json",
-            "CopilotId": 98592,
-            "IsRaid": false,
-            "IsChecked": false,
+            "Name": "TO-EX-2",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-2.json",
+            "CopilotId": 99425,
+            "IsRaid": true,
+            "IsChecked": true,
             "Index": 3
           },
           {
-            "Name": "TO-4",
-            "FilePath": "config\\copilot\\TO-4.json",
-            "CopilotId": 98597,
+            "Name": "TO-EX-3",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-3.json",
+            "CopilotId": 99448,
             "IsRaid": false,
-            "IsChecked": false,
+            "IsChecked": true,
             "Index": 4
           },
           {
-            "Name": "TO-5",
-            "FilePath": "config\\copilot\\TO-5.json",
-            "CopilotId": 98606,
-            "IsRaid": false,
-            "IsChecked": false,
+            "Name": "TO-EX-3",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-3.json",
+            "CopilotId": 99448,
+            "IsRaid": true,
+            "IsChecked": true,
             "Index": 5
           },
           {
-            "Name": "TO-6",
-            "FilePath": "config\\copilot\\TO-6.json",
-            "CopilotId": 98608,
+            "Name": "TO-EX-4",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-4.json",
+            "CopilotId": 99485,
             "IsRaid": false,
-            "IsChecked": false,
+            "IsChecked": true,
             "Index": 6
           },
           {
-            "Name": "TO-7",
-            "FilePath": "config\\copilot\\TO-7.json",
-            "CopilotId": 98632,
-            "IsRaid": false,
-            "IsChecked": false,
+            "Name": "TO-EX-4",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-4.json",
+            "CopilotId": 99485,
+            "IsRaid": true,
+            "IsChecked": true,
             "Index": 7
           },
           {
-            "Name": "TO-8",
-            "FilePath": "config\\copilot\\TO-8.json",
-            "CopilotId": 98634,
+            "Name": "TO-EX-5",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-5.json",
+            "CopilotId": 99487,
             "IsRaid": false,
-            "IsChecked": false,
+            "IsChecked": true,
             "Index": 8
           },
           {
-            "Name": "TO-9",
-            "FilePath": "config\\copilot\\TO-9.json",
-            "CopilotId": 98636,
+            "Name": "TO-EX-5",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-5.json",
+            "CopilotId": 99487,
+            "IsRaid": true,
+            "IsChecked": true,
+            "Index": 9
+          },
+          {
+            "Name": "TO-EX-6",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-6.json",
+            "CopilotId": 99491,
+            "IsRaid": false,
+            "IsChecked": true,
+            "Index": 10
+          },
+          {
+            "Name": "TO-EX-6",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-6.json",
+            "CopilotId": 99491,
+            "IsRaid": true,
+            "IsChecked": true,
+            "Index": 11
+          },
+          {
+            "Name": "TO-EX-7",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-7.json",
+            "CopilotId": 99505,
+            "IsRaid": false,
+            "IsChecked": true,
+            "Index": 12
+          },
+          {
+            "Name": "TO-EX-7",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-7.json",
+            "CopilotId": 99505,
+            "IsRaid": true,
+            "IsChecked": true,
+            "Index": 13
+          }
+        ],
+        "EnableUserAdditional": false,
+        "UserAdditional": [],
+        "SupportMode": "WhenNeeded",
+        "SelectFormation": 1,
+        "LoopTimes": 1
+      },
+      "TaskSelectedIndex": 2
+    },
+    "肉鸽": {
+      "TaskQueue": [
+        {
+          "$type": "StartUpTask",
+          "AccountName": "",
+          "AccountSwitchEnabled": false,
+          "Name": "",
+          "IsEnable": false,
+          "TaskType": "StartUp"
+        },
+        {
+          "$type": "RoguelikeTask",
+          "Theme": "BlackFlow",
+          "Difficulty": 2147483647,
+          "Mode": "Investment",
+          "Squad": "特勤分队",
+          "SquadCollectible": "指挥分队",
+          "Roles": "稳扎稳打",
+          "StartCount": 99999,
+          "StartingOpers": [
+            {
+              "Name": "机械师",
+              "UseSupport": false
+            }
+          ],
+          "UseAdditionalStartingOpers": false,
+          "Investment": true,
+          "InvestCount": 999,
+          "InvestWithMoreScore": false,
+          "CollectibleStartAwards": "HotWater",
+          "CollectibleShopping": false,
+          "StartWithEliteTwo": false,
+          "StartWithEliteTwoOnly": false,
+          "ExpectedCollapsalParadigms": "",
+          "MonthlySquadAutoIterate": true,
+          "MonthlySquadCheckComms": true,
+          "DeepExplorationAutoIterate": true,
+          "FindPlaytimeTarget": "Ling",
+          "BlackFlowCultivationTarget": "Cat",
+          "UseSupportNonFriend": false,
+          "RefreshTraderWithDice": false,
+          "SquadIsFoldartal": false,
+          "SamiFirstFloorFoldartal": false,
+          "SamiFirstFloorFoldartals": "",
+          "SamiNewSquad2StartingFoldartal": false,
+          "SamiNewSquad2StartingFoldartals": "",
+          "StopWhenDepositFull": true,
+          "StopAtFinalBoss": false,
+          "StopWhenLevelMax": false,
+          "StartWithSeed": false,
+          "Seed": "",
+          "Name": "黑流树海-刷源石锭",
+          "IsEnable": false,
+          "TaskType": "Roguelike"
+        },
+        {
+          "$type": "RoguelikeTask",
+          "Theme": "BlackFlow",
+          "Difficulty": 2147483647,
+          "Mode": "BlackFlowBabyAnimal",
+          "Squad": "堡垒战术分队",
+          "SquadCollectible": "指挥分队",
+          "Roles": "坚不可摧",
+          "StartCount": 99999,
+          "StartingOpers": [
+            {
+              "Name": "机械师",
+              "UseSupport": false
+            }
+          ],
+          "UseAdditionalStartingOpers": false,
+          "Investment": true,
+          "InvestCount": 999,
+          "InvestWithMoreScore": false,
+          "CollectibleStartAwards": "HotWater",
+          "CollectibleShopping": false,
+          "StartWithEliteTwo": false,
+          "StartWithEliteTwoOnly": false,
+          "ExpectedCollapsalParadigms": "",
+          "MonthlySquadAutoIterate": true,
+          "MonthlySquadCheckComms": true,
+          "DeepExplorationAutoIterate": true,
+          "FindPlaytimeTarget": "Ling",
+          "BlackFlowCultivationTarget": "Cerberus",
+          "UseSupportNonFriend": false,
+          "RefreshTraderWithDice": false,
+          "SquadIsFoldartal": false,
+          "SamiFirstFloorFoldartal": false,
+          "SamiFirstFloorFoldartals": "",
+          "SamiNewSquad2StartingFoldartal": false,
+          "SamiNewSquad2StartingFoldartals": "",
+          "StopWhenDepositFull": true,
+          "StopAtFinalBoss": false,
+          "StopWhenLevelMax": false,
+          "StartWithSeed": false,
+          "Seed": "",
+          "Name": "黑流树海-刷襁褓",
+          "IsEnable": true,
+          "TaskType": "Roguelike"
+        },
+        {
+          "$type": "UserDataUpdateTask",
+          "UpdateOperBox": true,
+          "UpdateDepot": true,
+          "TriggerInterval": "EveryTime",
+          "IsTriggered": true,
+          "Name": "",
+          "IsEnable": false,
+          "TaskType": "UserDataUpdate"
+        }
+      ],
+      "Gui": {
+        "ConnectSettings": {
+          "AutoDetect": false,
+          "AlwaysAutoDetect": false,
+          "Config": "MuMuEmulator12",
+          "AdbPath": "C:\\Program Files\\Netease\\MuMuPlayer\\nx_main\\adb.exe",
+          "AdbReplaced": false,
+          "Address": "127.0.0.1:16384",
+          "AddressHistory": [
+            "127.0.0.1:16384"
+          ],
+          "Extras": {
+            "LDPlayer": {
+              "IsEnabled": false,
+              "EmulatorPath": "",
+              "ManualSetIndex": false,
+              "InstanceIndex": 0
+            },
+            "MuMuEmulator12": {
+              "IsEnabled": true,
+              "EmulatorPath": "C:\\Program Files\\NetEase\\MuMuPlayer",
+              "EnableBridgeConnection": false,
+              "InstanceIndex": 0
+            },
+            "Win32Extra": {
+              "ScreencapMethod": "FramePool",
+              "MouseMethod": "PostMessageWithCursorPos",
+              "KeyboardMethod": "SendMessage",
+              "MuteWhileRunning": false
+            },
+            "BluestacksExtra": {
+              "ConfigKeyword": "",
+              "ConfigPath": ""
+            }
+          },
+          "AllowAdbRestart": true,
+          "AllowAdbHardRestart": true,
+          "TouchMode": "MumuExtras",
+          "EnableAdbLite": false,
+          "KillAdbOnExit": false
+        },
+        "Performance": {
+          "UseGpu": true,
+          "GpuDescription": "NVIDIA GeForce RTX 3050 Laptop GPU",
+          "GpuInstancePath": "",
+          "AllowDeprecatedGpu": false
+        },
+        "ExternalNotification": {
+          "Configs": [],
+          "SendWhenComplete": true,
+          "ShowWhenCompleteWithDetails": false,
+          "SendWhenError": true,
+          "SendWhenStalled": false
+        },
+        "RemoteControl": {
+          "RemoteControlGetTaskEndpointUri": "",
+          "RemoteControlReportStatusUri": "",
+          "RemoteControlUserIdentity": "",
+          "RemoteControlDeviceIdentity": "",
+          "RemoteControlPollIntervalMs": 1000
+        },
+        "RuntimeSettings": {
+          "ClientType": "Official",
+          "StartGame": true,
+          "DeployWithPause": false,
+          "RoguelikeDelayAbortUntilCombatComplete": false,
+          "PreRunScript": "",
+          "PostRunScript": "",
+          "ExecuteScriptOnCopilot": false,
+          "ExecuteScriptOnManualStop": false,
+          "BlockSleep": false,
+          "BlockSleepWithScreenOn": true,
+          "EnableStallTimeout": true,
+          "StallTimeoutReminderIntervalMinutes": 30,
+          "StallTimeoutMinutes": 25,
+          "EnableRunDurationLimit": false,
+          "RunDurationLimitMinutes": 240,
+          "RunDurationLimitExecutePostActions": true
+        },
+        "ThirdParty": {
+          "ReportToPenguin": true,
+          "PenguinId": "482853894",
+          "ReportToYituliu": true,
+          "YituliuOpenApiToken": "",
+          "OperBoxUseYituliuApi": false
+        },
+        "StartUpSettings": {
+          "RunDirectly": false,
+          "SkipStartupAutoRunAfterUpdate": true,
+          "StartEmulator": false,
+          "RestartEmulatorWhenAdbFailed": false,
+          "EmulatorPath": "",
+          "EmulatorAddCommand": "",
+          "EmulatorWaitSeconds": 60
+        },
+        "WindowTitlePrefix": "",
+        "PostActions": "None",
+        "AchievementPopupDisabled": false,
+        "AchievementPopupAutoClose": false
+      },
+      "Toolbox": {
+        "OperBoxExportFormat": "Json",
+        "GachaShowDisclaimerNoMore": false,
+        "PeepTargetFps": 20,
+        "ChooseLevel3": true,
+        "ChooseLevel3Time": 540,
+        "ChooseLevel4": true,
+        "ChooseLevel4Time": 540,
+        "ChooseLevel5": true,
+        "ChooseLevel6": true,
+        "AutoSetTime": true,
+        "ShowPotential": true,
+        "OperBoxAvatarMode": false,
+        "EventShopBlackListDataSupplementInstrument": false,
+        "EventShopBlackListDataSupplementStick": false,
+        "EventShopBlackListLmd": false,
+        "EventShopBlackListFurniturePart": false,
+        "EventShopBlackListOther": true,
+        "EventShopBlackList": ""
+      },
+      "Copilot": {
+        "TaskList": [
+          {
+            "Name": "TO-EX-1",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-1.json",
+            "CopilotId": 99410,
             "IsRaid": false,
             "IsChecked": false,
+            "Index": 0
+          },
+          {
+            "Name": "TO-EX-1",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-1.json",
+            "CopilotId": 99410,
+            "IsRaid": true,
+            "IsChecked": false,
+            "Index": 1
+          },
+          {
+            "Name": "TO-EX-2",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-2.json",
+            "CopilotId": 99425,
+            "IsRaid": false,
+            "IsChecked": true,
+            "Index": 2
+          },
+          {
+            "Name": "TO-EX-2",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-2.json",
+            "CopilotId": 99425,
+            "IsRaid": true,
+            "IsChecked": true,
+            "Index": 3
+          },
+          {
+            "Name": "TO-EX-3",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-3.json",
+            "CopilotId": 99448,
+            "IsRaid": false,
+            "IsChecked": true,
+            "Index": 4
+          },
+          {
+            "Name": "TO-EX-3",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-3.json",
+            "CopilotId": 99448,
+            "IsRaid": true,
+            "IsChecked": true,
+            "Index": 5
+          },
+          {
+            "Name": "TO-EX-4",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-4.json",
+            "CopilotId": 99485,
+            "IsRaid": false,
+            "IsChecked": true,
+            "Index": 6
+          },
+          {
+            "Name": "TO-EX-4",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-4.json",
+            "CopilotId": 99485,
+            "IsRaid": true,
+            "IsChecked": true,
+            "Index": 7
+          },
+          {
+            "Name": "TO-EX-5",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-5.json",
+            "CopilotId": 99487,
+            "IsRaid": false,
+            "IsChecked": true,
+            "Index": 8
+          },
+          {
+            "Name": "TO-EX-5",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-5.json",
+            "CopilotId": 99487,
+            "IsRaid": true,
+            "IsChecked": true,
             "Index": 9
+          },
+          {
+            "Name": "TO-EX-6",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-6.json",
+            "CopilotId": 99491,
+            "IsRaid": false,
+            "IsChecked": true,
+            "Index": 10
+          },
+          {
+            "Name": "TO-EX-6",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-6.json",
+            "CopilotId": 99491,
+            "IsRaid": true,
+            "IsChecked": true,
+            "Index": 11
+          },
+          {
+            "Name": "TO-EX-7",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-7.json",
+            "CopilotId": 99505,
+            "IsRaid": false,
+            "IsChecked": true,
+            "Index": 12
+          },
+          {
+            "Name": "TO-EX-7",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TO-EX-7.json",
+            "CopilotId": 99505,
+            "IsRaid": true,
+            "IsChecked": true,
+            "Index": 13
           }
         ],
         "EnableUserAdditional": false,
@@ -508,14 +895,14 @@
   "ConfigVersion": 1,
   "Current": "Default",
   "Update": {
-    "Name": "v6.16.5",
+    "Name": "v6.19.0-beta.1",
     "UpdatePackage": "",
     "IsFirstBoot": false,
     "DoNotShowUpdate": false,
     "VersionType": "Beta",
     "AllowNightlyUpdates": false,
     "HasAcknowledgedNightlyWarning": false,
-    "UpdateSource": "Github",
+    "UpdateSource": "GitHub",
     "ForceGithubGlobalSource": false,
     "MirrorChyanCdk": "",
     "MirrorChyanCdkExpiredTime": 0,
@@ -529,13 +916,14 @@
     "ShowUpdaterProgress": true
   },
   "AnnouncementInfo": {
-    "DoNotShowAgain": true,
+    "DoNotShowAgain": false,
     "DoNotShow": false
   },
   "Gui": {
     "DarkMode": "SyncWithOs",
     "UseNotify": true,
     "MainTasksInvertNullFunction": false,
+    "HideHoverActionButtons": false,
     "Localization": "zh-cn",
     "OperNameLanguage": "OperNameLanguageMAA",
     "UseTray": true,
@@ -558,15 +946,16 @@
         "Y": -1
       },
       "NormalPosition": {
-        "Left": 442,
-        "Top": 229,
-        "Right": 1882,
-        "Bottom": 1329
+        "Left": 49,
+        "Top": 192,
+        "Right": 1489,
+        "Bottom": 1292
       }
     },
     "LoadWindowPlacement": true,
     "SaveWindowPlacement": true,
     "InverseClearMode": "Clear",
+    "TransitionSpeed": "Normal",
     "TaskQueueInverseMode": false,
     "UseCardLog": true,
     "MaxNumberOfLogThumbnails": 100,
@@ -594,7 +983,8 @@
       "UpdateSettings",
       "AchievementSettings",
       "IssueReport",
-      "AboutUs"
+      "AboutUs",
+      "ThirdPartyServiceSettings"
     ],
     "CollapesStates": [],
     "HotKeys": {
@@ -617,6 +1007,7 @@
     "BackgroundMonetEnabled": false,
     "BackgroundMonetMode": "Auto",
     "BackgroundMonetCustomColor": "#326CF3",
-    "BackgroundMonetCachedColor": ""
+    "BackgroundMonetCachedColor": "",
+    "BackgroundMonetKeepMaskNeutral": false
   }
 }
