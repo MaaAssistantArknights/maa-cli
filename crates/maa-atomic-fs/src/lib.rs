@@ -6,15 +6,18 @@
 //! and then atomically moved into place. A failure before the final replacement
 //! leaves the destination unchanged.
 //!
-//! On Unix, write operations preserve the permission bits of an existing
-//! destination, while a new destination uses normal file creation permissions
-//! (`0o666` filtered by the process umask). Other file metadata is not
-//! preserved.
+//! If the destination is a symbolic link, the file it points to is replaced and
+//! the link itself is kept, matching [`fs::write`].
+//!
+//! On Unix, an existing destination keeps its permission bits, while a new
+//! destination uses normal file creation permissions (`0o666` filtered by the
+//! process umask). Other file metadata is not preserved.
 //!
 //! These operations do not provide multi-file or directory transactions, file
 //! locking, or parent-directory synchronization for power-loss durability.
 
 use std::{
+    borrow::Cow,
     fs::{self, File},
     io::{self, Read, Write},
     path::Path,
@@ -23,28 +26,21 @@ use std::{
 use tempfile::NamedTempFile;
 
 /// Atomically replaces `path` with `content`.
-///
-/// On Unix, the replacement preserves an existing destination's permission
-/// bits, while a new destination uses normal file creation permissions.
 pub fn write(path: impl AsRef<Path>, content: impl AsRef<[u8]>) -> io::Result<()> {
     write_with(path, |file| file.write_all(content.as_ref()))
 }
 
 /// Atomically replaces `path` with all bytes read from `reader`.
-///
-/// On Unix, the replacement preserves an existing destination's permission
-/// bits, while a new destination uses normal file creation permissions.
 pub fn write_from(path: impl AsRef<Path>, reader: &mut impl Read) -> io::Result<u64> {
     write_with(path, |file| io::copy(reader, file))
 }
 
-/// Atomically replaces `to` with a copy of `from`.
+/// Atomically replaces `to` with the content of `from`.
 ///
-/// On Unix, the replacement inherits the source file's permission bits through
-/// [`fs::copy`].
+/// Permissions follow the same rules as [`write`], not those of `from`.
 pub fn copy(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<u64> {
-    let from = from.as_ref();
-    write_with_temp(to.as_ref(), |temp| fs::copy(from, temp.path()))
+    let mut source = File::open(from)?;
+    write_from(to, &mut source)
 }
 
 /// Atomically replaces `path` after `fill` populates a staging file.
@@ -52,71 +48,60 @@ pub fn copy(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<u64> {
 /// `fill` may return any error type that can absorb [`io::Error`]. The
 /// destination remains unchanged if filling, synchronizing, or replacing the
 /// file fails.
-///
-/// On Unix, the replacement preserves an existing destination's permission
-/// bits, while a new destination uses normal file creation permissions.
 pub fn write_with<P, F, T, E>(path: P, fill: F) -> Result<T, E>
 where
     P: AsRef<Path>,
     F: FnOnce(&mut File) -> Result<T, E>,
     E: From<io::Error>,
 {
-    let path = path.as_ref();
-    let (mut temp, final_permissions) = new_write_temp(path)?;
+    let path = resolve_symlink(path.as_ref())?;
+    let mut temp = create_temp(&path)?;
     let result = fill(temp.as_file_mut())?;
-    if let Some(permissions) = final_permissions {
-        temp.as_file().set_permissions(permissions)?;
-    }
-    commit_temp(temp, path, result)
-}
-
-fn write_with_temp<T, E>(
-    path: &Path,
-    fill: impl FnOnce(&mut NamedTempFile) -> Result<T, E>,
-) -> Result<T, E>
-where
-    E: From<io::Error>,
-{
-    let mut temp = NamedTempFile::new_in(parent_dir(path)?)?;
-    let result = fill(&mut temp)?;
-    commit_temp(temp, path, result)
-}
-
-fn commit_temp<T, E>(mut temp: NamedTempFile, path: &Path, result: T) -> Result<T, E>
-where
-    E: From<io::Error>,
-{
-    temp.as_file_mut().sync_all()?;
+    temp.as_file().sync_all()?;
     temp.into_temp_path()
-        .persist(path)
+        .persist(&path)
         .map_err(|error| error.error)?;
     Ok(result)
 }
 
-fn new_write_temp(path: &Path) -> io::Result<(NamedTempFile, Option<fs::Permissions>)> {
-    let final_permissions = match fs::metadata(path) {
-        Ok(metadata) => Some(metadata.permissions()),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
-        Err(error) => return Err(error),
-    };
+/// Returns the file a symbolic link points to, so that the link is kept.
+///
+/// A dangling link is returned unchanged and is replaced by a regular file.
+fn resolve_symlink(path: &Path) -> io::Result<Cow<'_, Path>> {
+    if !path.is_symlink() {
+        return Ok(Cow::Borrowed(path));
+    }
+    match fs::canonicalize(path) {
+        Ok(target) => Ok(Cow::Owned(target)),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(Cow::Borrowed(path)),
+        Err(error) => Err(error),
+    }
+}
+
+fn create_temp(path: &Path) -> io::Result<NamedTempFile> {
     let parent = parent_dir(path)?;
 
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
 
-        if final_permissions.is_none() {
-            let temp = tempfile::Builder::new()
-                .permissions(fs::Permissions::from_mode(0o666))
-                .tempfile_in(parent)?;
-            let permissions = temp.as_file().metadata()?.permissions();
-            temp.as_file()
-                .set_permissions(fs::Permissions::from_mode(0o600))?;
-            return Ok((temp, Some(permissions)));
+        let existing = match fs::metadata(path) {
+            Ok(metadata) => Some(metadata.permissions()),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+            Err(error) => return Err(error),
+        };
+        // The creation mode is filtered by the umask, like a regular new file.
+        let temp = tempfile::Builder::new()
+            .permissions(fs::Permissions::from_mode(0o666))
+            .tempfile_in(parent)?;
+        if let Some(permissions) = existing {
+            temp.as_file().set_permissions(permissions)?;
         }
+        Ok(temp)
     }
 
-    Ok((NamedTempFile::new_in(parent)?, final_permissions))
+    #[cfg(not(unix))]
+    NamedTempFile::new_in(parent)
 }
 
 fn parent_dir(path: &Path) -> io::Result<&Path> {
@@ -210,21 +195,44 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn copy_uses_source_permissions() {
+    fn copy_preserves_destination_permissions() {
         let temp_dir = tempdir().unwrap();
         let source = temp_dir.path().join("source.json");
         let target = temp_dir.path().join("target.json");
         fs::write(&source, "new").unwrap();
-        fs::set_permissions(&source, fs::Permissions::from_mode(0o640)).unwrap();
+        fs::set_permissions(&source, fs::Permissions::from_mode(0o644)).unwrap();
         fs::write(&target, "old").unwrap();
         fs::set_permissions(&target, fs::Permissions::from_mode(0o600)).unwrap();
 
         copy(&source, &target).unwrap();
 
+        assert_eq!(fs::read_to_string(&target).unwrap(), "new");
         assert_eq!(
             fs::metadata(target).unwrap().permissions().mode() & 0o777,
-            0o640
+            0o600
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn write_through_symlink_keeps_link() {
+        let temp_dir = tempdir().unwrap();
+        let target_dir = temp_dir.path().join("store");
+        fs::create_dir(&target_dir).unwrap();
+        let target = target_dir.join("config.json");
+        let link = temp_dir.path().join("config.json");
+        fs::write(&target, "old").unwrap();
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+
+        write(&link, "new").unwrap();
+
+        assert!(
+            fs::symlink_metadata(&link)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+        assert_eq!(fs::read_to_string(&target).unwrap(), "new");
     }
 
     #[test]
