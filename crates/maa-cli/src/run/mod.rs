@@ -217,6 +217,14 @@ where
 
         let address = runtime_address.as_deref().unwrap_or(&address);
 
+        let extra_connection_config = asst_config.connection.get_extra_connection_config()?;
+        if let Some(extra_config) = extra_connection_config {
+            Assistant::set_connection_extras(
+                extra_config.name(),
+                serde_json::to_string(&extra_config)?,
+            )?
+        }
+
         // Connect to game or emulator
         asst.async_connect(adb_path.as_ref(), address, config, true)?;
 
