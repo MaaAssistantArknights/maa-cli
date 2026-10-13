@@ -1115,6 +1115,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "maa-executor"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "maa-core",
+ "maa-types",
+ "maa-value",
+ "serde_json",
+ "thiserror 2.0.19",
+]
+
+[[package]]
 name = "maa-ffi-string"
 version = "0.1.0"
 dependencies = [
