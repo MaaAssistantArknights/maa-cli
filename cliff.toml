@@ -117,7 +117,6 @@ commit_parsers = [
   { message = "^doc", group = "<!-- 4 -->Documentation" },
   { message = "^test", group = "<!-- 5 -->Testing" },
 
-  { body = ".*security", group = "<!-- 6 --> Security" },
   { message = "^[Rr]evert", group = "<!-- 7 --> Revert" },
 
   # skip code style changes
@@ -141,6 +140,9 @@ commit_parsers = [
 
   # skip changelog commits
   { message = "(?i)^chore(?:\\(changelog\\))?: update changelog(?: for \\S+)?$", skip = true },
+
+  # after the skip rules, so dependency bumps mentioning security stay skipped
+  { body = ".*security", group = "<!-- 6 --> Security" },
 
   # chore should be the last one to avoid overriding above rules
   { message = "^chore", group = "<!-- 99 -->Miscellaneous" },

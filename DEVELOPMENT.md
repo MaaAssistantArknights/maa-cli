@@ -80,7 +80,7 @@ cargo test <测试名称>
 
 1. 在 Actions 中从 `main` 运行 `Prepare Stable Release`，选择版本。
 2. git-cliff 生成并 prepend changelog，Cargo 更新 lockfile；工作流创建或更新 `release-prep/vX.Y.Z` PR，并添加 `release` 标签。如果版本已通过普通 PR 更新，本次 PR 可以只修改 changelog。
-3. 批准自动创建 PR 的 workflow runs，检查普通 CI 和 `Release Readiness`。准备后若 main 有新变更，重新运行 Prepare 刷新 PR；版本选择变化时应关闭旧的准备 PR，避免误合并。
+3. 批准自动创建 PR 的 workflow runs，检查普通 CI 和 `Release Readiness`。准备后若 main 有新变更，重新运行 Prepare 刷新 PR；版本选择变化时，Prepare 会自动关闭其他打开的 `release-prep/*` PR 并删除其分支。
 4. 合并带 `release` 标签的 PR。工作流使用实际合并 commit 和已确认的 Cargo 版本，在创建任何 tag 前检查一次最终候选 changelog，然后保存发布计划和说明。
 5. 编译并保存打包产物，创建正式 tag 和 GitHub Release，再由独立 job 更新 `version` 分支。Stable tag、Homebrew、AUR 和 WinGet 的后续任务在索引更新成功后运行。
 
@@ -92,6 +92,8 @@ cargo test <测试名称>
 
 Beta 在 Actions 中从 `main` 手动运行 `Release`，选择 `channel=beta`，设置基础版本，并在真正发布时勾选 `publish`。默认不勾选，仅构建预览。Nightly 每日自动运行，也可以选择 `channel=alpha` 手动运行。
 
+Nightly 会构建每个新提交：自最近正式 tag 以来没有 `feat`、`fix` 或 breaking change 时，以下一个 patch 版本为基础，例如 `0.8.0` 之后为 `0.8.1-alpha.1`；正式 tag 之后没有新提交时跳过。Beta 在没有触发 bump 的变更时跳过，需要发布时显式选择版本。
+
 基础版本不变时 Beta 编号递增，例如 `0.8.0-beta.2` → `0.8.0-beta.3`；基础版本变化时从 `beta.1` 开始。相同 commit 和基础版本已经发布过该通道时跳过。预发布通过 `MAA_VERSION` 注入编译，不修改 main 的 `Cargo.toml`、`Cargo.lock` 或 `CHANGELOG.md`，也不需要版本 PR。
 
 Beta 发布后更新 `version` 分支的 `beta.json`、`alpha.json` 及对应 `.txt`；Nightly 只更新 alpha；Stable 更新三个通道。若 Beta tag 或已发布的 Nightly 超前于索引，先恢复前一次发布的索引 job，再分配新编号。Alpha 分配前会通过 GitHub API 核对 Nightly 的版本和 tag commit；已有 Nightly 无法读取时也会停止，本地运行需提供已认证的 `gh`。
@@ -100,9 +102,9 @@ Beta 发布后更新 `version` 分支的 `beta.json`、`alpha.json` 及对应 `.
 
 同一次 workflow run 的版本、commit 和发布说明保存为 `release-plan` artifact，打包结果和索引清单保存为 `release-bundle` artifact。重跑全部 jobs 或只重跑失败 jobs 都复用已保存的内容，不重新分配版本或改写已生成的产物。版本索引更新失败时，重跑 `Update Version Index` 及其失败的后续任务即可，不需要重新编译。
 
-这些 artifacts 保留 90 天；过期时工作流停止，不能把重新推导和编译当作原发布的重试。不要提前删除恢复所需的 artifacts。正式 tag 已存在时必须指向同一 commit；旧 run 不能覆盖更新的通道版本。
+编译产物只保留 7 天：若 `Publish Release` 在生成 `release-bundle` 前失败且已超过 7 天，需要选择「Re-run all jobs」重新编译，「Re-run failed jobs」会因找不到编译产物而失败。plan 和 bundle 这些 artifacts 保留 90 天；过期时工作流停止，不能把重新推导和编译当作原发布的重试。不要提前删除恢复所需的 artifacts。正式 tag 已存在时必须指向同一 commit；旧 run 不能覆盖更新的通道版本。
 
-Homebrew、AUR 和 WinGet 在每次发布任务执行时重新读取 stable 索引，核对版本和 commit；新版已经发布后，旧任务重试会失败并停止写入。手动运行这些下游工作流也只允许发布当前 stable 版本；Homebrew 和 AUR 的 dry-run 仍可预览其他版本。
+Homebrew、AUR 和 WinGet 在每次发布任务执行时重新读取 stable 索引，核对版本和 commit；新版已经发布后，旧任务重试会失败并停止写入。手动运行这些下游工作流也只允许发布当前 stable 版本，AUR 非 dry-run 时必须填写 `pkgver`；Homebrew 和 AUR 的 dry-run 仍可预览其他版本。
 
 `Prepare Stable Release` 使用内置 `GITHUB_TOKEN`，以 `github-actions[bot]` 身份创建 PR。仓库需要在 Settings → Actions → General 中启用 `Allow GitHub Actions to create and approve pull requests`。具有 write 权限的维护者批准 PR 的 workflow runs 后，检查才会运行。合并操作应由维护者完成，不使用 `GITHUB_TOKEN` 自动合并，否则不会产生所需的后续发布事件。
 

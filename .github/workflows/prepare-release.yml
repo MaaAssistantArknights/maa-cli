@@ -113,3 +113,13 @@ jobs:
               --title "chore(release): prepare for v$VERSION" \
               --body-file "$body" --label release
           fi
+
+          # A different version selection supersedes older preparation PRs.
+          gh pr list --base main --state open --json number,headRefName,isCrossRepository \
+            --jq ".[] | select(.isCrossRepository | not)
+                      | select(.headRefName | startswith(\"release-prep/\"))
+                      | select(.headRefName != \"$branch\") | .number" |
+            while IFS= read -r number; do
+              gh pr close "$number" --delete-branch \
+                --comment "Superseded by the v$VERSION release preparation."
+            done

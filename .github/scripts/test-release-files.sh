@@ -39,6 +39,7 @@ git commit -q --allow-empty -m 'fix: repair A'
 # Unconventional subjects must not block version selection or changelogs.
 git commit -q --allow-empty -m 'Revert "feat: experiment"' -m 'This reverts commit 1234567.'
 git commit -q --allow-empty -m 'Update README.md'
+git commit -q --allow-empty -m 'chore(deps): bump example' -m 'Includes upstream security fixes.'
 select_version auto
 [[ "$VERSION" == 0.7.6 ]]
 git checkout -qb release-prep/v0.7.6
@@ -48,6 +49,10 @@ git add .
 git commit -qm 'chore(release): prepare for v0.7.6'
 prepared_sha=$(git rev-parse HEAD)
 grep -q '^- Feat: experiment$' CHANGELOG.md
+if grep -qi 'bump example' CHANGELOG.md; then
+  echo 'Dependency bumps mentioning security must stay out of the changelog' >&2
+  exit 1
+fi
 
 readiness() {
   EVENT_NAME=$1 LABELED=${2:-} HEAD_REF=${3:-} BASE_SHA=$(git rev-parse main) HEAD_SHA=$(git rev-parse HEAD) \

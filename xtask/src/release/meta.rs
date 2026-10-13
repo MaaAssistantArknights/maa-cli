@@ -21,14 +21,19 @@ pub fn run(options: ReleaseVersionOptions) -> Result<()> {
         selection::cargo_version()?
     } else {
         let (candidate, previous_tag) = selection::select(&options.version)?;
+        let commits_since = Command::new("git")
+            .args(["rev-list", "--count", &format!("{previous_tag}..HEAD")])
+            .read()?
+            .parse()
+            .context("Failed to count commits since the latest stable tag")?;
         // A stable tag can be published before the index job completes. Do not
         // create an older prerelease just because stable.json still lags behind.
-        if previous_tag == format!("v{candidate}") {
+        let Some(base) = prerelease_base(channel, candidate, &previous_tag, commits_since) else {
             println!("No releasable changes since {previous_tag}");
             github::set_output("skip", "true")?;
             return Ok(());
-        }
-        candidate
+        };
+        base
     };
     selection::ensure_stable(&candidate)?;
 
@@ -103,6 +108,24 @@ pub fn run(options: ReleaseVersionOptions) -> Result<()> {
     ])?;
 
     Ok(())
+}
+
+/// Choose the base version of a prerelease, or `None` to skip it.
+///
+/// Without a version-bumping change since the latest stable tag, beta has
+/// nothing to release, while nightly still builds every new commit against
+/// the next patch version.
+fn prerelease_base(
+    channel: Channel,
+    candidate: Version,
+    previous_tag: &str,
+    commits_since: u64,
+) -> Option<Version> {
+    if previous_tag != format!("v{candidate}") {
+        return Some(candidate);
+    }
+    (channel == Channel::Alpha && commits_since > 0)
+        .then(|| Version::new(candidate.major, candidate.minor, candidate.patch + 1))
 }
 
 fn get_commit_sha() -> Result<String> {
@@ -375,6 +398,27 @@ fn parse_counter(value: &str, name: &str) -> Result<NonZeroU16> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn nightly_builds_new_commits_without_a_version_bump() {
+        let stable = Version::new(0, 8, 0);
+        assert_eq!(
+            prerelease_base(Channel::Alpha, stable.clone(), "v0.8.0", 2),
+            Some(Version::new(0, 8, 1))
+        );
+        assert_eq!(
+            prerelease_base(Channel::Alpha, stable.clone(), "v0.8.0", 0),
+            None
+        );
+        assert_eq!(
+            prerelease_base(Channel::Beta, stable.clone(), "v0.8.0", 2),
+            None
+        );
+        assert_eq!(
+            prerelease_base(Channel::Beta, Version::new(0, 9, 0), "v0.8.0", 2),
+            Some(Version::new(0, 9, 0))
+        );
+    }
 
     #[test]
     fn beta_uses_the_derived_stable_version_without_changing_it() -> Result<()> {
