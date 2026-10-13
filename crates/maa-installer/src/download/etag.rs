@@ -92,20 +92,68 @@ pub fn download_with_etag(
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
-    #[cfg(unix)]
-    use std::os::unix::fs::PermissionsExt;
     use std::{
         fs,
         io::{Read, Write},
         net::TcpListener,
+        path::PathBuf,
         thread,
     };
 
-    use tempfile::tempdir;
+    use tempfile::{TempDir, tempdir};
 
     use super::*;
 
-    fn serve_once(response: &'static [u8]) -> (String, thread::JoinHandle<Vec<u8>>) {
+    /// A cached body and its ETag sidecar in a temporary directory.
+    struct Cache {
+        _dir: TempDir,
+        dest: PathBuf,
+        etag_file: PathBuf,
+    }
+
+    impl Cache {
+        fn new(body: &str, etag: &str) -> Self {
+            let dir = tempdir().unwrap();
+            let dest = dir.path().join("manifest.json");
+            let etag_file = dest.with_added_extension("etag");
+            fs::write(&dest, body).unwrap();
+            fs::write(&etag_file, etag).unwrap();
+            Self {
+                _dir: dir,
+                dest,
+                etag_file,
+            }
+        }
+
+        fn download(&self, url: &str, check_interval: Option<time::Duration>) -> Result<()> {
+            download_with_etag(
+                &ureq::Agent::new_with_defaults(),
+                url,
+                &self.dest,
+                check_interval,
+            )
+        }
+
+        fn body(&self) -> String {
+            fs::read_to_string(&self.dest).unwrap()
+        }
+
+        fn etag(&self) -> String {
+            fs::read_to_string(&self.etag_file).unwrap()
+        }
+    }
+
+    fn ok_response(body: &str, etag: Option<&str>) -> Vec<u8> {
+        let etag = etag.map_or_else(String::new, |etag| format!("ETag: {etag}\r\n"));
+        format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n{etag}Connection: close\r\n\r\n{body}",
+            body.len()
+        )
+        .into_bytes()
+    }
+
+    /// Serves `response` to a single request and returns the raw request.
+    fn serve_once(response: Vec<u8>) -> (String, thread::JoinHandle<Vec<u8>>) {
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let address = listener.local_addr().unwrap();
         let handle = thread::spawn(move || {
@@ -122,126 +170,115 @@ mod tests {
                     break;
                 }
             }
-            stream.write_all(response).unwrap();
+            stream.write_all(&response).unwrap();
             request
         });
         (format!("http://{address}/manifest"), handle)
     }
 
     #[test]
-    fn interrupted_download_preserves_cached_file_and_etag() {
-        let temp_dir = tempdir().unwrap();
-        let dest = temp_dir.path().join("manifest.json");
-        let etag_file = dest.with_added_extension("etag");
-        fs::write(&dest, "old manifest").unwrap();
-        fs::write(&etag_file, "\"old\"").unwrap();
-        let (url, server) = serve_once(
-            b"HTTP/1.1 200 OK\r\nContent-Length: 20\r\nETag: \"new\"\r\nConnection: close\r\n\r\npartial",
-        );
+    fn successful_download_replaces_body_and_etag() {
+        let cache = Cache::new("old manifest", "\"old\"");
+        let (url, server) = serve_once(ok_response("new manifest", Some("\"new\"")));
 
-        let result = download_with_etag(&ureq::Agent::new_with_defaults(), &url, &dest, None);
-        drop(server.join().unwrap());
+        cache.download(&url, None).unwrap();
+        server.join().unwrap();
 
-        assert!(result.is_err());
-        assert_eq!(fs::read_to_string(&dest).unwrap(), "old manifest");
-        assert_eq!(fs::read_to_string(&etag_file).unwrap(), "\"old\"");
+        assert_eq!(cache.body(), "new manifest");
+        assert_eq!(cache.etag(), "\"new\"");
     }
 
     #[test]
-    fn successful_download_replaces_cached_file_and_etag() {
-        let temp_dir = tempdir().unwrap();
-        let dest = temp_dir.path().join("manifest.json");
-        let etag_file = dest.with_added_extension("etag");
-        fs::write(&dest, "old manifest").unwrap();
-        fs::write(&etag_file, "\"old\"").unwrap();
+    fn interrupted_download_keeps_body_and_etag() {
+        let cache = Cache::new("old manifest", "\"old\"");
+        // The header promises 20 bytes but the connection closes after 7.
         let (url, server) = serve_once(
-            b"HTTP/1.1 200 OK\r\nContent-Length: 12\r\nETag: \"new\"\r\nConnection: close\r\n\r\nnew manifest",
+            b"HTTP/1.1 200 OK\r\nContent-Length: 20\r\nETag: \"new\"\r\nConnection: close\r\n\r\npartial"
+                .to_vec(),
         );
 
-        download_with_etag(&ureq::Agent::new_with_defaults(), &url, &dest, None).unwrap();
-        drop(server.join().unwrap());
+        let result = cache.download(&url, None);
+        server.join().unwrap();
 
-        assert_eq!(fs::read_to_string(&dest).unwrap(), "new manifest");
-        assert_eq!(fs::read_to_string(&etag_file).unwrap(), "\"new\"");
+        assert!(result.is_err());
+        assert_eq!(cache.body(), "old manifest");
+        assert_eq!(cache.etag(), "\"old\"");
     }
 
     #[test]
-    fn etag_failure_occurs_after_file_commit() {
-        let temp_dir = tempdir().unwrap();
-        let dest = temp_dir.path().join("manifest.json");
-        let etag_file = dest.with_added_extension("etag");
-        fs::write(&dest, "old manifest").unwrap();
-        fs::create_dir(&etag_file).unwrap();
-        let (url, server) = serve_once(
-            b"HTTP/1.1 200 OK\r\nContent-Length: 12\r\nETag: \"new\"\r\nConnection: close\r\n\r\nnew manifest",
-        );
+    fn body_is_committed_before_etag() {
+        let cache = Cache::new("old manifest", "\"old\"");
+        // A directory at the ETag path makes only the ETag write fail.
+        fs::remove_file(&cache.etag_file).unwrap();
+        fs::create_dir(&cache.etag_file).unwrap();
+        let (url, server) = serve_once(ok_response("new manifest", Some("\"new\"")));
 
-        let result = download_with_etag(&ureq::Agent::new_with_defaults(), &url, &dest, None);
-        drop(server.join().unwrap());
+        let result = cache.download(&url, None);
+        server.join().unwrap();
 
         assert!(result.is_err());
-        assert_eq!(fs::read_to_string(&dest).unwrap(), "new manifest");
+        assert_eq!(cache.body(), "new manifest");
     }
 
     #[test]
     fn response_without_etag_removes_stale_etag() {
-        let temp_dir = tempdir().unwrap();
-        let dest = temp_dir.path().join("manifest.json");
-        let etag_file = dest.with_added_extension("etag");
-        fs::write(&dest, "old manifest").unwrap();
-        fs::write(&etag_file, "\"old\"").unwrap();
-        let (url, server) = serve_once(
-            b"HTTP/1.1 200 OK\r\nContent-Length: 12\r\nConnection: close\r\n\r\nnew manifest",
+        let cache = Cache::new("old manifest", "\"old\"");
+        let (url, server) = serve_once(ok_response("new manifest", None));
+
+        cache.download(&url, None).unwrap();
+        server.join().unwrap();
+
+        assert_eq!(cache.body(), "new manifest");
+        assert!(!cache.etag_file.exists());
+    }
+
+    #[test]
+    fn request_sends_cached_etag() {
+        let cache = Cache::new("cached manifest", "\"current\"");
+        let (url, server) =
+            serve_once(b"HTTP/1.1 304 Not Modified\r\nConnection: close\r\n\r\n".to_vec());
+
+        cache.download(&url, None).unwrap();
+        let request = String::from_utf8(server.join().unwrap()).unwrap();
+
+        assert!(
+            request
+                .to_ascii_lowercase()
+                .contains("if-none-match: \"current\"\r\n")
         );
-
-        download_with_etag(&ureq::Agent::new_with_defaults(), &url, &dest, None).unwrap();
-        drop(server.join().unwrap());
-
-        assert_eq!(fs::read_to_string(&dest).unwrap(), "new manifest");
-        assert!(!etag_file.exists());
     }
 
     #[test]
-    fn not_modified_uses_etag_preserves_cache_and_refreshes_timestamp() {
-        let temp_dir = tempdir().unwrap();
-        let dest = temp_dir.path().join("manifest.json");
-        let etag_file = dest.with_added_extension("etag");
-        fs::write(&dest, "cached manifest").unwrap();
-        fs::write(&etag_file, "\"current\"").unwrap();
-        let old_modified = time::SystemTime::UNIX_EPOCH;
-        set_modified(&etag_file, old_modified).unwrap();
-        #[cfg(unix)]
-        fs::set_permissions(&etag_file, fs::Permissions::from_mode(0o444)).unwrap();
-        let (url, server) = serve_once(b"HTTP/1.1 304 Not Modified\r\nConnection: close\r\n\r\n");
+    fn not_modified_keeps_cache_and_refreshes_check_time() {
+        let cache = Cache::new("cached manifest", "\"current\"");
+        // The ETag mtime records the last check; start from a known old time.
+        set_modified(&cache.etag_file, time::SystemTime::UNIX_EPOCH).unwrap();
+        let (url, server) =
+            serve_once(b"HTTP/1.1 304 Not Modified\r\nConnection: close\r\n\r\n".to_vec());
 
-        download_with_etag(&ureq::Agent::new_with_defaults(), &url, &dest, None).unwrap();
-        let request = String::from_utf8(server.join().unwrap())
-            .unwrap()
-            .to_ascii_lowercase();
+        cache.download(&url, None).unwrap();
+        server.join().unwrap();
 
-        assert!(request.contains("if-none-match: \"current\"\r\n"));
-        assert_eq!(fs::read_to_string(&dest).unwrap(), "cached manifest");
-        assert_eq!(fs::read_to_string(&etag_file).unwrap(), "\"current\"");
-        assert!(fs::metadata(etag_file).unwrap().modified().unwrap() > old_modified);
+        assert_eq!(cache.body(), "cached manifest");
+        assert_eq!(cache.etag(), "\"current\"");
+        let checked = fs::metadata(&cache.etag_file).unwrap().modified().unwrap();
+        assert!(checked > time::SystemTime::UNIX_EPOCH);
     }
 
     #[test]
-    fn check_interval_skips_request() {
-        let temp_dir = tempdir().unwrap();
-        let dest = temp_dir.path().join("manifest.json");
-        let etag_file = dest.with_added_extension("etag");
-        fs::write(&dest, "cached manifest").unwrap();
-        fs::write(&etag_file, "\"current\"").unwrap();
+    fn recent_check_skips_request() {
+        // The ETag file was just written, so the last check is within the interval.
+        let cache = Cache::new("cached manifest", "\"current\"");
 
-        download_with_etag(
-            &ureq::Agent::new_with_defaults(),
-            "not a valid URL",
-            &dest,
-            Some(time::Duration::from_secs(24 * 60 * 60)),
-        )
-        .unwrap();
+        // No server is running: any request would fail.
+        cache
+            .download(
+                "not a valid URL",
+                Some(time::Duration::from_secs(24 * 60 * 60)),
+            )
+            .unwrap();
 
-        assert_eq!(fs::read_to_string(&dest).unwrap(), "cached manifest");
-        assert_eq!(fs::read_to_string(&etag_file).unwrap(), "\"current\"");
+        assert_eq!(cache.body(), "cached manifest");
+        assert_eq!(cache.etag(), "\"current\"");
     }
 }
