@@ -25,7 +25,7 @@ pub enum TouchMode {
 }
 
 impl TouchMode {
-    impl_enum_utils!(TouchMode, 5, TouchMode::Adb);
+    impl_enum_utils!(TouchMode, 6, TouchMode::Adb);
 
     impl_from_str_opt!();
 
