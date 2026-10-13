@@ -39,6 +39,7 @@ impl AsstConfig {
             Preset::LinuxGamescope => {
                 info!("Detected connection with Gamescope");
                 instance_options.force_gamescope();
+                resource.use_platform_diff_resource("PC");
             }
             _ => {}
         }
