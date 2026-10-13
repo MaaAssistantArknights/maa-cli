@@ -43,6 +43,11 @@ pub fn write_from(path: impl AsRef<Path>, reader: &mut impl Read) -> io::Result<
 /// Atomically replaces `to` with the content of `from`.
 ///
 /// Permissions follow the same rules as [`write()`], not those of `from`.
+///
+/// The content is copied with [`io::copy`], which uses `copy_file_range` on
+/// Linux, so filesystems such as Btrfs and XFS may share extents instead of
+/// duplicating data. Platform clone APIs such as `clonefile` on macOS are not
+/// used, as this is meant for small files like configs.
 pub fn copy(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<u64> {
     let mut source = File::open(from)?;
     write_from(to, &mut source)
