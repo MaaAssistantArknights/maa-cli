@@ -46,7 +46,7 @@ jobs:
        github.event.pull_request.merged == true &&
        contains(github.event.pull_request.labels.*.name, 'release') &&
        github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event_name != 'pull_request' && github.ref == 'refs/heads/main')
+      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.plan.outputs.version }}
@@ -65,13 +65,28 @@ jobs:
         id: source
         env:
           EVENT_NAME: ${{ github.event_name }}
+          SOURCE_REF: ${{ github.ref }}
           SOURCE_SHA: ${{ github.sha }}
+          # Stable always publishes from main; beta and nightly follow this branch.
+          PRERELEASE_BRANCH: ${{ vars.PRERELEASE_BRANCH || 'main' }}
         run: |
-          if [[ "$EVENT_NAME" == pull_request ]]; then
-            commit=$(jq -r '.pull_request.merge_commit_sha' "$GITHUB_EVENT_PATH")
-          else
-            commit="$SOURCE_SHA"
-          fi
+          case "$EVENT_NAME" in
+            pull_request)
+              commit=$(jq -r '.pull_request.merge_commit_sha' "$GITHUB_EVENT_PATH")
+              ;;
+            schedule)
+              # Scheduled runs always start on main; build the prerelease branch head.
+              commit=$(gh api "repos/$GH_REPO/commits/$PRERELEASE_BRANCH" --jq .sha)
+              ;;
+            workflow_dispatch)
+              if [[ "$SOURCE_REF" != "refs/heads/$PRERELEASE_BRANCH" ]]; then
+                echo "Prereleases are published from $PRERELEASE_BRANCH, not $SOURCE_REF." >&2
+                exit 1
+              fi
+              commit="$SOURCE_SHA"
+              ;;
+            *) exit 1 ;;
+          esac
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7
         with:
@@ -128,8 +143,8 @@ jobs:
               bash .github/scripts/release-files.sh notes "$version" > "$RUNNER_TEMP/release-plan/notes.md"
             else
               VERSION="$version" TAG="$(sed -n 's/^tag=//p' "$RUNNER_TEMP/release-plan/outputs")" \
-                git-cliff --config cliff.toml --unreleased --strip all \
-                --output "$RUNNER_TEMP/release-plan/notes.md"
+                bash .github/scripts/release-files.sh prerelease-notes \
+                > "$RUNNER_TEMP/release-plan/notes.md"
             fi
           fi
       - name: Freeze plan before any publication

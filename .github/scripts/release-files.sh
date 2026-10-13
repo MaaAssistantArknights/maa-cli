@@ -15,7 +15,7 @@ release_notes() {
   ' CHANGELOG.md
 }
 
-case "${1:?expected prepare, check, or notes}" in
+case "${1:?expected prepare, check, notes, or prerelease-notes}" in
   prepare)
     : "${VERSION:?}" "${PREVIOUS_TAG:?}"
     current_version=$(package_version)
@@ -65,6 +65,18 @@ case "${1:?expected prepare, check, or notes}" in
     ;;
   notes)
     release_notes "${2:?expected version}"
+    ;;
+  prerelease-notes)
+    : "${VERSION:?}" "${TAG:?}"
+    # Use an explicit range: on a dev branch that merges main, git-cliff's
+    # --unreleased also lists fixes already published in the merged stable tags.
+    previous=$(git tag --merged HEAD --list 'v*' |
+      awk '/^v[0-9]+\.[0-9]+\.[0-9]+$/' | sort -V | tail -n 1)
+    if [[ -z "$previous" ]]; then
+      echo 'No reachable stable vX.Y.Z tag found' >&2
+      exit 1
+    fi
+    git-cliff --config cliff.toml --strip all "$previous..$(git rev-parse HEAD)"
     ;;
   *) echo "Unknown operation: $1" >&2; exit 1 ;;
 esac

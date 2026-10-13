@@ -2,11 +2,11 @@ name: Lint Markdown files
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "dev-*"]
   pull_request:
-    branches: ["main"]
+    branches: ["main", "dev-*"]
   merge_group:
-    branches: ["main"]
+    branches: ["main", "dev-*"]
     types: [checks_requested]
   schedule:
     - cron: "44 7 * * 2"

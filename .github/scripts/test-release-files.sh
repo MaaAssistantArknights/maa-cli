@@ -227,4 +227,32 @@ asset=$(jq -r '.details.assets["x86_64-unknown-linux-gnu"].name' release-bundle/
 [[ -f "release-bundle/$asset" && ! -f "$asset" ]]
 [[ -f release-bundle/version/alpha.txt ]]
 tar -tzf "release-bundle/$asset" | grep -qx maa
+# Prerelease notes on a dev branch that merges main must skip fixes already
+# published in the merged stable tag.
+mkdir "$test_root/dev"
+cd "$test_root/dev"
+git init -q -b main
+git config user.name 'Release Test'
+git config user.email 'release@example.invalid'
+git config commit.gpgsign false
+cp "$repo/cliff.toml" .
+git add cliff.toml
+git commit -qm 'chore: initial'
+git tag v0.7.5
+git checkout -qb dev-0.8
+git commit -q --allow-empty -m 'feat: dev change one'
+git checkout -q main
+git commit -q --allow-empty -m 'fix: stable fix'
+git tag v0.7.6
+git checkout -q dev-0.8
+git merge -q --no-ff main -m 'Merge branch main into dev-0.8'
+git commit -q --allow-empty -m 'feat: dev change two'
+VERSION=0.8.0-beta.1 TAG=v0.8.0-beta.1 bash "$files" prerelease-notes > "$RUNNER_TEMP/dev-notes.md"
+grep -q 'compare/v0.7.6...v0.8.0-beta.1>' "$RUNNER_TEMP/dev-notes.md"
+grep -q '^- Dev change one$' "$RUNNER_TEMP/dev-notes.md"
+grep -q '^- Dev change two$' "$RUNNER_TEMP/dev-notes.md"
+if grep -q 'Stable fix' "$RUNNER_TEMP/dev-notes.md"; then
+  echo 'Prerelease notes repeated a fix from a published stable tag' >&2
+  exit 1
+fi
 echo "Release file, prerelease recovery and packaging checks passed (fixtures: $test_root)"

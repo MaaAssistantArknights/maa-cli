@@ -64,7 +64,7 @@ cargo test <测试名称>
 
 ## 发布流程
 
-`main` 是发布源码分支。Stable 的发布意图由 PR 的 `release` 标签表示：同仓库的 PR 带此标签合入 `main` 才会发布。普通 PR 可以单独更新 Cargo 版本；修改 `Cargo.toml` 本身不会触发发布。
+`main` 是 Stable 的发布源码分支，应始终保持可发布。Stable 的发布意图由 PR 的 `release` 标签表示：同仓库的 PR 带此标签合入 `main` 才会发布。普通 PR 可以单独更新 Cargo 版本；修改 `Cargo.toml` 本身不会触发发布。
 
 ### 选择版本
 
@@ -90,13 +90,23 @@ cargo test <测试名称>
 
 ### Beta 和 Nightly
 
-Beta 在 Actions 中从 `main` 手动运行 `Release`，选择 `channel=beta`，设置基础版本，并在真正发布时勾选 `publish`。默认不勾选，仅构建预览。Nightly 每日自动运行，也可以选择 `channel=alpha` 手动运行。
+Beta 和 Nightly 从仓库变量 `PRERELEASE_BRANCH` 指定的分支发布，未设置时为 `main`。Beta 在 Actions 中从该分支手动运行 `Release`（从其他分支运行会直接失败），选择 `channel=beta`，设置基础版本，并在真正发布时勾选 `publish`。默认不勾选，仅构建预览。Nightly 每日自动运行；定时任务总在 `main` 上触发，但会构建 `PRERELEASE_BRANCH` 的最新提交。也可以从该分支选择 `channel=alpha` 手动运行。预发布说明只包含最近正式 tag 之后的提交，不会重复列出已发布的 Stable 修复。
 
 Nightly 会构建每个新提交：自最近正式 tag 以来没有 `feat`、`fix` 或 breaking change 时，以下一个 patch 版本为基础，例如 `0.8.0` 之后为 `0.8.1-alpha.1`；正式 tag 之后没有新提交时跳过。Beta 在没有触发 bump 的变更时跳过，需要发布时显式选择版本。
 
 基础版本不变时 Beta 编号递增，例如 `0.8.0-beta.2` → `0.8.0-beta.3`；基础版本变化时从 `beta.1` 开始。相同 commit 和基础版本已经发布过该通道时跳过。预发布通过 `MAA_VERSION` 注入编译，不修改 main 的 `Cargo.toml`、`Cargo.lock` 或 `CHANGELOG.md`，也不需要版本 PR。
 
 Beta 发布后更新 `version` 分支的 `beta.json`、`alpha.json` 及对应 `.txt`；Nightly 只更新 alpha；Stable 更新三个通道。若 Beta tag 或已发布的 Nightly 超前于索引，先恢复前一次发布的索引 job，再分配新编号。Alpha 分配前会通过 GitHub API 核对 Nightly 的版本和 tag commit；已有 Nightly 无法读取时也会停止，本地运行需提供已认证的 `gh`。
+
+### 分支模型
+
+大型或破坏性更新（如 0.8）在 `dev-X.Y` 分支上集成，避免打断 `main`。期间 `main` 只合入修复和小改动并发布 Stable，`PRERELEASE_BRANCH` 设为 `dev-X.Y`，Beta 和 Nightly 从 dev 分支发布。CI 同样在 `dev-*` 分支的 PR 和 merge queue 上运行。
+
+- 将 `dev-X.Y` 的 `crates/maa-cli/Cargo.toml` 版本设为 `X.Y.0`，预发布版本即为 `X.Y.0-beta.N`。
+- 定期把 `main` 合入 dev 分支，不要反向合并。`main` 每次发布 Stable 后，合并时 `Cargo.toml` 和 `Cargo.lock` 的版本号会冲突，保留 dev 分支的版本；dev 分支不修改 `CHANGELOG.md`。
+- Stable 发布不会把 Homebrew `maa-cli-beta` 或 `version` 分支中更新的预发布版本回退到较旧的 Stable。
+- 合回 `main` 前，先将 `main` 最后一次合入 dev 分支并发布一个 Beta 验证。然后用 merge commit 合并 dev → `main` 的 PR（merge queue 若只允许 squash，需临时改为 merge commit），不要 squash 或 rebase，以保留每个提交和已发布 Beta tag 的历史。
+- 合并后在 `main` 运行 `Prepare Stable Release` 发布 `X.Y.0`，将 `PRERELEASE_BRANCH` 改回 `main`，把仍指向 dev 分支的 PR 改为指向 `main`，再删除 dev 分支。
 
 ### 重试与验证
 

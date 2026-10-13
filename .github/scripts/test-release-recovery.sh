@@ -108,4 +108,12 @@ if TAG=nightly COMMIT='' bash "$scripts/release-current.sh" 2> "$RUNNER_TEMP/err
 fi
 TEST_CASE=denied
 if bash "$scripts/release-current.sh" 2> "$RUNNER_TEMP/error"; then exit 1; fi
+# A stable release must not move the beta package back to an older version.
+newer="$scripts/release-is-newer.sh"
+bash "$newer" 0.7.6 0.7.5
+bash "$newer" 0.8.0 0.8.0-beta.3
+bash "$newer" 0.10.0 0.9.1
+if bash "$newer" 0.7.6 0.8.0-beta.1; then exit 1; fi
+if bash "$newer" 0.8.0 0.8.0; then exit 1; fi
+if bash "$newer" 0.9.1 0.10.0; then exit 1; fi
 echo "Release recovery checks passed (fixtures: $RUNNER_TEMP)"

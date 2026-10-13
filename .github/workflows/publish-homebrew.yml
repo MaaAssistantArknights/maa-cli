@@ -61,8 +61,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/release-current.sh
       - name: Bump Formulae and Casks
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
           for formula in maa-cli maa-cli-beta; do
+            current=$(brew info --json=v2 "$formula" | jq -r '.formulae[0].versions.stable')
+            if [[ "$formula" == maa-cli-beta ]] &&
+              ! bash .github/scripts/release-is-newer.sh "$VERSION" "$current"; then
+              echo "Keeping $formula at newer prerelease $current"
+              continue
+            fi
             brew bump-formula-pr "$formula" \
               ${{ inputs.dryrun && '--dry-run' || '' }} \
               --no-browse \
