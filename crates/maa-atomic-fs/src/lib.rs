@@ -13,6 +13,11 @@
 //! destination uses normal file creation permissions (`0o666` filtered by the
 //! process umask). Other file metadata is not preserved.
 //!
+//! On Windows, the replaced file inherits its ACL from the parent directory and
+//! loses other attributes of the old file. Replacing a read-only file fails, as
+//! does replacing a file that another process holds open without
+//! `FILE_SHARE_DELETE`.
+//!
 //! These operations do not provide multi-file or directory transactions, file
 //! locking, or parent-directory synchronization for power-loss durability.
 
@@ -37,7 +42,7 @@ pub fn write_from(path: impl AsRef<Path>, reader: &mut impl Read) -> io::Result<
 
 /// Atomically replaces `to` with the content of `from`.
 ///
-/// Permissions follow the same rules as [`write`], not those of `from`.
+/// Permissions follow the same rules as [`write()`], not those of `from`.
 pub fn copy(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<u64> {
     let mut source = File::open(from)?;
     write_from(to, &mut source)
@@ -67,6 +72,8 @@ where
 /// Returns the file a symbolic link points to, so that the link is kept.
 ///
 /// A dangling link is returned unchanged and is replaced by a regular file.
+/// Regular paths are returned as is; only links go through
+/// [`fs::canonicalize`], which yields a `\\?\` path on Windows.
 fn resolve_symlink(path: &Path) -> io::Result<Cow<'_, Path>> {
     if !path.is_symlink() {
         return Ok(Cow::Borrowed(path));
@@ -81,6 +88,9 @@ fn resolve_symlink(path: &Path) -> io::Result<Cow<'_, Path>> {
 fn create_temp(path: &Path) -> io::Result<NamedTempFile> {
     let parent = parent_dir(path)?;
 
+    // tempfile creates files with mode 0o600 on Unix, which would make the
+    // replaced file private. Use regular creation permissions instead and
+    // carry over the mode of an existing destination.
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -100,6 +110,9 @@ fn create_temp(path: &Path) -> io::Result<NamedTempFile> {
         Ok(temp)
     }
 
+    // Elsewhere the default already matches a regular new file: on Windows the
+    // ACL is inherited from the parent directory, and the read-only flag is the
+    // only portable permission, which tempfile refuses to set.
     #[cfg(not(unix))]
     NamedTempFile::new_in(parent)
 }
