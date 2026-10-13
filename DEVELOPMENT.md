@@ -120,7 +120,6 @@ graph TD
     
     XTASK --> DIRS
     XTASK --> VERSION
-    XTASK --> ATOMICFS
     X -.shells out to.-> XTASK
 ```
 

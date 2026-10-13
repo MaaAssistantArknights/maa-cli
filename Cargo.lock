@@ -2525,7 +2525,6 @@ dependencies = [
  "clap",
  "digest-io",
  "flate2",
- "maa-atomic-fs",
  "maa-dirs",
  "maa-version",
  "semver",

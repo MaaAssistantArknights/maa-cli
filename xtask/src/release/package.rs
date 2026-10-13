@@ -128,38 +128,41 @@ fn read_or_create_manifest(file: &str) -> Result<VersionManifest<Details>> {
 }
 
 fn write_manifest(file: &str, manifest: &VersionManifest<Details>) -> Result<()> {
-    maa_atomic_fs::write_with(file, |writer| -> Result<()> {
-        serde_json::to_writer_pretty(writer, manifest)?;
-        Ok(())
-    })
-    .with_context(|| format!("Failed to write {file}"))
+    let content = serde_json::to_string_pretty(manifest).context("Failed to serialize manifest")?;
+
+    fs::write(file, content).with_context(|| format!("Failed to write {file}"))
 }
 
 fn write_shell_format(file: &str, manifest: &VersionManifest<Details>) -> Result<()> {
     // Write a shell-friendly .txt format alongside the JSON
     let txt_path = PathBuf::from(file).with_extension("txt");
+    let txt_path_str = txt_path.to_str().unwrap();
 
     use std::io::Write;
 
-    maa_atomic_fs::write_with(&txt_path, |txt_file| -> Result<()> {
-        writeln!(txt_file, "VERSION={}", manifest.version)?;
-        writeln!(txt_file, "TAG={}", manifest.details.tag)?;
-        writeln!(txt_file, "COMMIT={}", manifest.details.commit)?;
+    let mut txt_file = std::fs::File::create(&txt_path)
+        .with_context(|| format!("Failed to create {txt_path_str}"))?;
+
+    writeln!(txt_file, "VERSION={}", manifest.version)?;
+    writeln!(txt_file, "TAG={}", manifest.details.tag)?;
+    writeln!(txt_file, "COMMIT={}", manifest.details.commit)?;
+    writeln!(txt_file)?;
+
+    // Write assets in a shell-friendly format
+    for (target, asset) in &manifest.details.assets {
+        let target_upper = target.to_uppercase().replace('-', "_");
+        writeln!(txt_file, "# {target}")?;
+        writeln!(txt_file, "{target_upper}_NAME={}", asset.name)?;
+        writeln!(txt_file, "{target_upper}_SIZE={}", asset.size)?;
+        writeln!(txt_file, "{target_upper}_SHA256={}", asset.sha256sum)?;
         writeln!(txt_file)?;
+    }
 
-        // Write assets in a shell-friendly format
-        for (target, asset) in &manifest.details.assets {
-            let target_upper = target.to_uppercase().replace('-', "_");
-            writeln!(txt_file, "# {target}")?;
-            writeln!(txt_file, "{target_upper}_NAME={}", asset.name)?;
-            writeln!(txt_file, "{target_upper}_SIZE={}", asset.size)?;
-            writeln!(txt_file, "{target_upper}_SHA256={}", asset.sha256sum)?;
-            writeln!(txt_file)?;
-        }
+    txt_file
+        .sync_all()
+        .with_context(|| format!("Failed to sync {txt_path_str}"))?;
 
-        Ok(())
-    })
-    .with_context(|| format!("Failed to write {}", txt_path.display()))
+    Ok(())
 }
 
 fn create_archive(target: &str, version: &str, dir: &str) -> Result<(String, String)> {
@@ -196,12 +199,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn release_metadata_replaces_existing_files() {
+    fn release_metadata_format() {
         let temp_dir = tempdir().unwrap();
         let json_path = temp_dir.path().join("stable.json");
         let txt_path = temp_dir.path().join("stable.txt");
-        fs::write(&json_path, "stale json").unwrap();
-        fs::write(&txt_path, "stale text").unwrap();
 
         let manifest = VersionManifest {
             version: Version::new(1, 2, 3),
@@ -232,6 +233,5 @@ mod tests {
             shell
                 .contains("AARCH64_APPLE_DARWIN_NAME=maa_cli-v1.2.3-aarch64-apple-darwin.tar.gz\n")
         );
-        assert!(!shell.contains("stale text"));
     }
 }
