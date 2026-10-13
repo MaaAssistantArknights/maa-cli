@@ -83,8 +83,9 @@ footer = """
 """
 
 [bump]
-# Features always advance the minor version, including while the project is 0.x.
-features_always_bump_minor = true
+# While the project is 0.x, features only advance the patch version; use an
+# explicit `minor` selection (or a breaking change) to start a new minor series.
+features_always_bump_minor = false
 # Breaking changes remain within 0.x until the project explicitly declares 1.0.
 breaking_always_bump_major = false
 

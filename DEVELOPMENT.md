@@ -74,7 +74,7 @@ cargo test <测试名称>
 - `patch`、`minor`、`major`：由 git-cliff 相对最近正式 tag 计算指定级别的版本。
 - `X.Y.Z`：直接指定稳定版本号，必须高于最近正式 tag；预发布不接受在这里输入 `beta.N`。
 
-自动推导只有 `fix`、`feat` 或 breaking change 会触发新版本：`fix` 推进 patch，`feat` 推进 minor，breaking change 在 `0.x` 阶段推进 minor。文档、重构等其他变更仍可出现在 changelog 中，但不单独触发自动 bump；需要发布时可以显式选择版本。
+自动推导只有 `fix`、`feat` 或 breaking change 会触发新版本：`0.x` 阶段 `fix` 和 `feat` 都推进 patch，breaking change 推进 minor；进入新的 minor 系列（例如 0.8）需要显式选择 `minor` 或指定版本。文档、重构等其他变更仍可出现在 changelog 中，但不单独触发自动 bump；需要发布时可以显式选择版本。
 
 ### Stable
 

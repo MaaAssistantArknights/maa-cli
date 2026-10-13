@@ -35,6 +35,12 @@ select_version() {
 git commit -q --allow-empty -m 'docs: clarify usage'
 select_version auto
 [[ "$VERSION" == 0.7.5 ]]
+# Before 1.0, features only advance the patch version.
+git commit -q --allow-empty -m 'feat: add option A'
+select_version auto
+[[ "$VERSION" == 0.7.6 ]]
+select_version minor
+[[ "$VERSION" == 0.8.0 ]]
 git commit -q --allow-empty -m 'fix: repair A'
 # Unconventional subjects must not block version selection or changelogs.
 git commit -q --allow-empty -m 'Revert "feat: experiment"' -m 'This reverts commit 1234567.'
