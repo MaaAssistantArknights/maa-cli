@@ -56,16 +56,13 @@ pub fn download_with_etag(
     match response.status() {
         StatusCode::OK => {
             log::trace!("Downloaded file {}", dest.display());
-            let etag = response
-                .headers()
-                .get("ETag")
-                .and_then(|v| v.to_str().ok())
-                .map(str::to_owned);
+            // Split the response so the ETag can borrow the headers while the
+            // body is consumed first; the ETag is only written after the body.
+            let (parts, body) = response.into_parts();
+            let etag = parts.headers.get("ETag").and_then(|v| v.to_str().ok());
 
-            maa_atomic_fs::write_with(dest, |file| {
-                io::copy(&mut response.into_body().as_reader(), file)
-            })
-            .then_with_desc(|| format!("Failed to update file at {}", dest.display()))?;
+            maa_atomic_fs::write_with(dest, |file| io::copy(&mut body.into_reader(), file))
+                .then_with_desc(|| format!("Failed to update file at {}", dest.display()))?;
 
             if let Some(etag) = etag {
                 log::trace!("Updated ETag {}", etag_file.display());
