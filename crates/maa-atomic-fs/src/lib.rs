@@ -235,6 +235,19 @@ mod tests {
         assert_eq!(fs::read_to_string(&target).unwrap(), "new");
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn write_through_dangling_symlink_replaces_link() {
+        let temp_dir = tempdir().unwrap();
+        let link = temp_dir.path().join("config.json");
+        std::os::unix::fs::symlink(temp_dir.path().join("missing.json"), &link).unwrap();
+
+        write(&link, "new").unwrap();
+
+        assert!(fs::symlink_metadata(&link).unwrap().file_type().is_file());
+        assert_eq!(fs::read_to_string(&link).unwrap(), "new");
+    }
+
     #[test]
     fn failed_fill_leaves_original_intact() {
         let temp_dir = tempdir().unwrap();
