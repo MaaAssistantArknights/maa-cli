@@ -142,38 +142,19 @@ mod tests {
 
     use super::*;
 
-    /// Each public function replaces the destination with the new content.
-    mod api {
-        use std::io::Cursor;
+    #[cfg(unix)]
+    fn mode(path: &Path) -> u32 {
+        use std::os::unix::fs::PermissionsExt;
 
+        fs::metadata(path).unwrap().permissions().mode() & 0o777
+    }
+
+    /// Shared behavior of every public function, which all delegate here.
+    mod write_with {
         use super::*;
 
         #[test]
-        fn write_replaces_existing_content() {
-            let temp_dir = tempdir().unwrap();
-            let path = temp_dir.path().join("config.json");
-            fs::write(&path, "old").unwrap();
-
-            write(&path, "new").unwrap();
-
-            assert_eq!(fs::read_to_string(&path).unwrap(), "new");
-        }
-
-        #[test]
-        fn write_from_replaces_existing_content() {
-            let temp_dir = tempdir().unwrap();
-            let path = temp_dir.path().join("config.json");
-            fs::write(&path, "old").unwrap();
-            let mut reader = Cursor::new(br#"{"foo":"bar"}"#);
-
-            let written = write_from(&path, &mut reader).unwrap();
-
-            assert_eq!(written, 13);
-            assert_eq!(fs::read(&path).unwrap(), br#"{"foo":"bar"}"#);
-        }
-
-        #[test]
-        fn write_with_returns_fill_result() {
+        fn returns_fill_result() {
             let temp_dir = tempdir().unwrap();
             let path = temp_dir.path().join("config.json");
             fs::write(&path, "old").unwrap();
@@ -189,24 +170,6 @@ mod tests {
         }
 
         #[test]
-        fn copy_replaces_existing_content() {
-            let temp_dir = tempdir().unwrap();
-            let source = temp_dir.path().join("source.json");
-            let target = temp_dir.path().join("target.json");
-            fs::write(&source, "new").unwrap();
-            fs::write(&target, "old").unwrap();
-
-            copy(&source, &target).unwrap();
-
-            assert_eq!(fs::read_to_string(&target).unwrap(), "new");
-        }
-    }
-
-    /// A failure before the final replacement leaves the destination unchanged.
-    mod failure {
-        use super::*;
-
-        #[test]
         fn failed_fill_leaves_original_intact() {
             let temp_dir = tempdir().unwrap();
             let path = temp_dir.path().join("config.json");
@@ -219,11 +182,6 @@ mod tests {
             assert!(result.is_err());
             assert_eq!(fs::read_to_string(&path).unwrap(), "original");
         }
-    }
-
-    /// The staging file is created in the destination's parent directory.
-    mod parent {
-        use super::*;
 
         #[test]
         fn rejects_root_path() {
@@ -239,44 +197,134 @@ mod tests {
                 Path::new(".")
             );
         }
-    }
 
-    #[cfg(unix)]
-    mod permissions {
-        use std::os::unix::fs::PermissionsExt;
+        #[cfg(unix)]
+        mod permissions {
+            use std::os::unix::fs::PermissionsExt;
 
-        use super::*;
+            use super::*;
 
-        fn mode(path: &Path) -> u32 {
-            fs::metadata(path).unwrap().permissions().mode() & 0o777
+            #[test]
+            fn existing_file_keeps_its_mode() {
+                let temp_dir = tempdir().unwrap();
+                let path = temp_dir.path().join("config.json");
+                fs::write(&path, "old").unwrap();
+                fs::set_permissions(&path, fs::Permissions::from_mode(0o640)).unwrap();
+
+                write(&path, "new").unwrap();
+
+                assert_eq!(mode(&path), 0o640);
+            }
+
+            #[test]
+            fn new_file_uses_regular_creation_mode() {
+                let temp_dir = tempdir().unwrap();
+                let regular = temp_dir.path().join("regular.json");
+                let atomic = temp_dir.path().join("atomic.json");
+                File::create(&regular).unwrap();
+
+                write(&atomic, "new").unwrap();
+
+                assert_eq!(mode(&atomic), mode(&regular));
+            }
         }
 
+        #[cfg(unix)]
+        mod symlink {
+            use std::os::unix::fs::symlink;
+
+            use super::*;
+
+            #[test]
+            fn replaces_target_and_keeps_link() {
+                let temp_dir = tempdir().unwrap();
+                let target_dir = temp_dir.path().join("store");
+                fs::create_dir(&target_dir).unwrap();
+                let target = target_dir.join("config.json");
+                let link = temp_dir.path().join("config.json");
+                fs::write(&target, "old").unwrap();
+                symlink(&target, &link).unwrap();
+
+                write(&link, "new").unwrap();
+
+                assert!(
+                    fs::symlink_metadata(&link)
+                        .unwrap()
+                        .file_type()
+                        .is_symlink()
+                );
+                assert_eq!(fs::read_to_string(&target).unwrap(), "new");
+            }
+
+            #[test]
+            fn dangling_link_is_replaced_by_file() {
+                let temp_dir = tempdir().unwrap();
+                let link = temp_dir.path().join("config.json");
+                symlink(temp_dir.path().join("missing.json"), &link).unwrap();
+
+                write(&link, "new").unwrap();
+
+                assert!(fs::symlink_metadata(&link).unwrap().file_type().is_file());
+                assert_eq!(fs::read_to_string(&link).unwrap(), "new");
+            }
+        }
+    }
+
+    mod write {
+        use super::*;
+
         #[test]
-        fn existing_file_keeps_its_mode() {
+        fn replaces_existing_content() {
             let temp_dir = tempdir().unwrap();
             let path = temp_dir.path().join("config.json");
             fs::write(&path, "old").unwrap();
-            fs::set_permissions(&path, fs::Permissions::from_mode(0o640)).unwrap();
 
             write(&path, "new").unwrap();
 
-            assert_eq!(mode(&path), 0o640);
+            assert_eq!(fs::read_to_string(&path).unwrap(), "new");
         }
+    }
+
+    mod write_from {
+        use std::io::Cursor;
+
+        use super::*;
 
         #[test]
-        fn new_file_uses_regular_creation_mode() {
+        fn replaces_existing_content() {
             let temp_dir = tempdir().unwrap();
-            let regular = temp_dir.path().join("regular.json");
-            let atomic = temp_dir.path().join("atomic.json");
-            File::create(&regular).unwrap();
+            let path = temp_dir.path().join("config.json");
+            fs::write(&path, "old").unwrap();
+            let mut reader = Cursor::new(br#"{"foo":"bar"}"#);
 
-            write(&atomic, "new").unwrap();
+            let written = write_from(&path, &mut reader).unwrap();
 
-            assert_eq!(mode(&atomic), mode(&regular));
+            assert_eq!(written, 13);
+            assert_eq!(fs::read(&path).unwrap(), br#"{"foo":"bar"}"#);
         }
+    }
+
+    mod copy {
+        use super::*;
 
         #[test]
-        fn copy_keeps_destination_mode() {
+        fn replaces_existing_content() {
+            let temp_dir = tempdir().unwrap();
+            let source = temp_dir.path().join("source.json");
+            let target = temp_dir.path().join("target.json");
+            fs::write(&source, "new").unwrap();
+            fs::write(&target, "old").unwrap();
+
+            copy(&source, &target).unwrap();
+
+            assert_eq!(fs::read_to_string(&target).unwrap(), "new");
+        }
+
+        #[cfg(unix)]
+        #[test]
+        fn keeps_destination_mode() {
+            use std::os::unix::fs::PermissionsExt;
+
             let temp_dir = tempdir().unwrap();
             let source = temp_dir.path().join("source.json");
             let target = temp_dir.path().join("target.json");
@@ -289,46 +337,6 @@ mod tests {
 
             assert_eq!(fs::read_to_string(&target).unwrap(), "new");
             assert_eq!(mode(&target), 0o600);
-        }
-    }
-
-    #[cfg(unix)]
-    mod symlink {
-        use std::os::unix::fs::symlink;
-
-        use super::*;
-
-        #[test]
-        fn replaces_target_and_keeps_link() {
-            let temp_dir = tempdir().unwrap();
-            let target_dir = temp_dir.path().join("store");
-            fs::create_dir(&target_dir).unwrap();
-            let target = target_dir.join("config.json");
-            let link = temp_dir.path().join("config.json");
-            fs::write(&target, "old").unwrap();
-            symlink(&target, &link).unwrap();
-
-            write(&link, "new").unwrap();
-
-            assert!(
-                fs::symlink_metadata(&link)
-                    .unwrap()
-                    .file_type()
-                    .is_symlink()
-            );
-            assert_eq!(fs::read_to_string(&target).unwrap(), "new");
-        }
-
-        #[test]
-        fn dangling_link_is_replaced_by_file() {
-            let temp_dir = tempdir().unwrap();
-            let link = temp_dir.path().join("config.json");
-            symlink(temp_dir.path().join("missing.json"), &link).unwrap();
-
-            write(&link, "new").unwrap();
-
-            assert!(fs::symlink_metadata(&link).unwrap().file_type().is_file());
-            assert_eq!(fs::read_to_string(&link).unwrap(), "new");
         }
     }
 }
