@@ -228,6 +228,32 @@ mod tests {
             Toml.write(&test_toml, &value).unwrap();
             assert_eq!(MAAValue::from_file(&test_toml).unwrap(), value);
         }
+
+        #[test]
+        fn yaml_errors() {
+            struct FailingWriter;
+
+            impl std::io::Write for FailingWriter {
+                fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+                    Err(std::io::Error::other("write failed"))
+                }
+
+                fn flush(&mut self) -> std::io::Result<()> {
+                    Ok(())
+                }
+            }
+
+            let dir = tempfile::tempdir().unwrap();
+            let missing = dir.path().join("missing.yaml");
+            assert!(Filetype::Yaml.read::<MAAValue>(&missing).is_err());
+
+            let invalid = dir.path().join("invalid.yaml");
+            fs::write(&invalid, "a: [unclosed").unwrap();
+            assert!(Filetype::Yaml.read::<MAAValue>(&invalid).is_err());
+
+            let value = object!("a" => 1);
+            assert!(Filetype::Yaml.write_to(FailingWriter, &value).is_err());
+        }
     }
 
     mod find_file {
