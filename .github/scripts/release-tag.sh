@@ -20,3 +20,19 @@ else
   cat "$RUNNER_TEMP/nightly-error" >&2
   exit 1
 fi
+
+# Recreating a release while GitHub still sees the old tag can leave it as a draft.
+for _ in {1..20}; do
+  status=0
+  git ls-remote --exit-code --tags origin "refs/tags/$TAG" > /dev/null || status=$?
+  case "$status" in
+    2)
+      sleep "${TAG_SETTLE_SECONDS:-5}"
+      exit 0
+      ;;
+    0) sleep "${TAG_POLL_SECONDS:-3}" ;;
+    *) exit "$status" ;;
+  esac
+done
+echo "Tag $TAG is still visible after deleting it" >&2
+exit 1

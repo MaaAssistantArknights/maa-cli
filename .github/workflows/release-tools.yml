@@ -7,6 +7,7 @@ on:
       - .github/scripts/release-*.sh
       - .github/scripts/test-release-*.sh
       - .github/workflows/release.yml
+      - .github/workflows/release-readiness.yml
       - .github/workflows/prepare-release.yml
       - .github/workflows/release-tools.yml
       - .github/workflows/publish-homebrew.yml

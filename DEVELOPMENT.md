@@ -84,7 +84,9 @@ cargo test <测试名称>
 4. 合并带 `release` 标签的 PR。工作流使用实际合并 commit 和已确认的 Cargo 版本，在创建任何 tag 前检查一次最终候选 changelog，然后保存发布计划和说明。
 5. 编译并保存打包产物，创建正式 tag 和 GitHub Release，再由独立 job 更新 `version` 分支。Stable tag、Homebrew、AUR 和 WinGet 的后续任务在索引更新成功后运行。
 
-准备检查仅针对 release PR；普通 CI 不承担版本推导或 changelog 一致性检查。最终合并校验若发现过期内容，会在发布前停止；即使 Cargo 版本已合入，也可以重新运行 Prepare 创建修复 changelog 的 release PR。
+`Release Readiness` 是独立的 workflow，需要加入 `main` 的 required checks。普通 PR 直接通过；带 `release` 标签的 PR 只能修改 `CHANGELOG.md`、`Cargo.lock` 和 `crates/maa-cli/Cargo.toml`，并且 changelog 必须与候选合并一致；`release-prep/` 分支缺少 `release` 标签时检查失败，因为合并它不会发布。在 merge queue 中，检查只针对落入 release 提交的队列项，在其队列 head 上重新核对 changelog；若前面排队的 PR 带来了新的 changelog 条目，release PR 会在入队阶段被拒绝，此时重新运行 Prepare 刷新 PR。最终合并校验仍会在发布前再检查一次；即使 Cargo 版本已合入，也可以重新运行 Prepare 创建修复 changelog 的 release PR。
+
+不符合约定式提交格式的 commit（如网页编辑生成的 `Update README.md`）不会阻止版本推导或发布，只是不出现在 changelog 中，也不会触发自动 bump；GitHub Revert 按钮生成的 `Revert "..."` 会被归入 Revert 分组。
 
 ### Beta 和 Nightly
 

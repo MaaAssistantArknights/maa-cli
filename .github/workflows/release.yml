@@ -2,7 +2,7 @@ name: Release
 on:
   pull_request:
     branches: [main]
-    types: [opened, reopened, synchronize, labeled, unlabeled, closed]
+    types: [closed]
   workflow_dispatch:
     inputs:
       channel:
@@ -27,9 +27,10 @@ defaults:
   run:
     shell: bash
 
-# PR checks must not hold up publishing; publishing and preparation share a queue.
+# Publishing and preparation share a queue. Closed PRs that cannot publish
+# get a throwaway group so they never wait behind a release build.
 concurrency:
-  group: ${{ github.event_name == 'pull_request' && github.event.action != 'closed' && format('release-check-{0}', github.event.pull_request.number) || 'release-state' }}
+  group: ${{ github.event_name == 'pull_request' && !(github.event.pull_request.merged && contains(github.event.pull_request.labels.*.name, 'release')) && format('release-skip-{0}', github.run_id) || 'release-state' }}
   queue: max
 
 permissions:
@@ -37,40 +38,6 @@ permissions:
   actions: read
 
 jobs:
-  readiness:
-    name: Release Readiness
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.action != 'closed' &&
-      (contains(github.event.pull_request.labels.*.name, 'release') ||
-       startsWith(github.event.pull_request.head.ref, 'release-prep/')) &&
-      github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: git-cliff@2.13.1
-      - name: Select candidate
-        id: candidate
-        run: cargo x -- release select-version
-      - name: Verify release files against the candidate merge
-        env:
-          PREVIOUS_TAG: ${{ steps.candidate.outputs.previous_tag }}
-          GITHUB_TOKEN: ${{ github.token }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          git diff --name-only "$BASE_SHA...$HEAD_SHA" | while IFS= read -r file; do
-            case "$file" in
-              CHANGELOG.md|Cargo.lock|crates/maa-cli/Cargo.toml) ;;
-              *) echo "Unexpected file in release PR: $file"; exit 1 ;;
-            esac
-          done
-          bash .github/scripts/release-files.sh check
-
   meta:
     name: Release Plan
     if: >-

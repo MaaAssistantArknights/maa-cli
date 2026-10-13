@@ -93,13 +93,13 @@ breaking_always_bump_major = false
 conventional_commits = true
 # filter out the commits that are not conventional
 filter_unconventional = true
-# fail instead of silently deriving a version from an incomplete commit set
-require_conventional = true
 # process each line of a commit as an individual commit
 split_commits = false
 # replace the patterns in the commit message
 commit_preprocessors = [
   { pattern = ' \(#([0-9]+)\)', replace = "" }, # remove pr references
+  # GitHub's revert button creates `Revert "<original subject>"`
+  { pattern = '^Revert "(.+)"', replace = "revert: $1" },
 ]
 # regex for parsing and grouping commits
 commit_parsers = [
@@ -149,8 +149,6 @@ commit_parsers = [
 protect_breaking_commits = true
 # filter out the commits that are not matched by commit parsers
 filter_commits = false
-# fail if a conventional commit type has no explicit changelog policy
-fail_on_unmatched_commit = true
 # glob pattern for matching git tags
 tag_pattern = "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
 # regex for skipping tags

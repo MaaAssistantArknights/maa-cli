@@ -36,6 +36,9 @@ git commit -q --allow-empty -m 'docs: clarify usage'
 select_version auto
 [[ "$VERSION" == 0.7.5 ]]
 git commit -q --allow-empty -m 'fix: repair A'
+# Unconventional subjects must not block version selection or changelogs.
+git commit -q --allow-empty -m 'Revert "feat: experiment"' -m 'This reverts commit 1234567.'
+git commit -q --allow-empty -m 'Update README.md'
 select_version auto
 [[ "$VERSION" == 0.7.6 ]]
 git checkout -qb release-prep/v0.7.6
@@ -44,6 +47,47 @@ bash "$files" check
 git add .
 git commit -qm 'chore(release): prepare for v0.7.6'
 prepared_sha=$(git rev-parse HEAD)
+grep -q '^- Feat: experiment$' CHANGELOG.md
+
+readiness() {
+  EVENT_NAME=$1 LABELED=${2:-} HEAD_REF=${3:-} BASE_SHA=$(git rev-parse main) HEAD_SHA=$(git rev-parse HEAD) \
+    XTASK="$xtask" bash "$repo/.github/scripts/release-readiness.sh" > "$RUNNER_TEMP/readiness.log" 2>&1
+}
+readiness pull_request true release-prep/v0.7.6
+if readiness pull_request false release-prep/v0.7.6; then
+  echo 'Expected an unlabeled release-prep PR to fail' >&2
+  exit 1
+fi
+grep -q 'no release label' "$RUNNER_TEMP/readiness.log"
+readiness pull_request false feature/other
+git checkout -q --detach
+printf 'unrelated\n' > unrelated.txt
+git add unrelated.txt
+git commit -qm 'chore(release): prepare for v0.7.6'
+if readiness pull_request true release-prep/v0.7.6; then
+  echo 'Expected an unrelated file in a release PR to fail' >&2
+  exit 1
+fi
+grep -q 'Unexpected file in release PR: unrelated.txt' "$RUNNER_TEMP/readiness.log"
+# Merge queue entries: the squashed release is checked; entries behind it are not.
+git checkout -q --detach main
+git merge -q --squash "$prepared_sha" > /dev/null
+git commit -qm 'chore(release): prepare for v0.7.6 (#9)'
+readiness merge_group
+git commit -q --allow-empty -m 'fix: queued behind release'
+readiness merge_group
+grep -q 'Not a release queue entry' "$RUNNER_TEMP/readiness.log"
+# A releasable change queued ahead of the release makes it stale.
+git checkout -q --detach main
+git commit -q --allow-empty -m 'fix: queued ahead of release'
+git merge -q --squash "$prepared_sha" > /dev/null
+git commit -qm 'chore(release): prepare for v0.7.6 (#9)'
+if readiness merge_group; then
+  echo 'Expected a release behind newer fixes to fail in the merge queue' >&2
+  exit 1
+fi
+grep -q 'Release PR is stale' "$RUNNER_TEMP/readiness.log"
+git checkout -q release-prep/v0.7.6
 bash "$files" notes 0.7.6 > "$RUNNER_TEMP/before-tag.md"
 git tag v0.7.6
 bash "$files" notes 0.7.6 > "$RUNNER_TEMP/after-tag.md"

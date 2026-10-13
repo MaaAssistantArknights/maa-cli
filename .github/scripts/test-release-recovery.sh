@@ -7,8 +7,15 @@ RUNNER_TEMP=$(mktemp -d)
 export GITHUB_OUTPUT="$RUNNER_TEMP/outputs"
 export GH_REPO=example/repo GITHUB_RUN_ID=123 COMMIT=new TAG=nightly
 export GH_CALLS="$RUNNER_TEMP/calls" TEST_CASE=orphan
+export TAG_SETTLE_SECONDS=0 TAG_POLL_SECONDS=0 TAG_DELETED="$RUNNER_TEMP/tag-deleted"
 
-git() { printf 'old\trefs/tags/%s\n' "$TAG"; }
+git() {
+  if [[ -f "$TAG_DELETED" ]]; then return 2; fi
+  printf 'old\trefs/tags/%s\n' "$TAG"
+}
+mark_deleted() {
+  if [[ "$TEST_CASE" != sticky ]]; then touch "$TAG_DELETED"; fi
+}
 gh() {
   echo "$*" >> "$GH_CALLS"
   case "$*" in
@@ -20,25 +27,31 @@ gh() {
         denied) echo 'HTTP 403' >&2; return 1 ;;
       esac
       ;;
-    'api --method DELETE '*) ;;
+    'api --method DELETE '*) mark_deleted ;;
     *releases/tags/nightly*)
       case "$TEST_CASE" in
         orphan) echo 'gh: Not Found (HTTP 404)' >&2; return 1 ;;
         denied) echo 'gh: Forbidden (HTTP 403)' >&2; return 1 ;;
       esac
       ;;
-    'release delete nightly --yes --cleanup-tag') ;;
+    'release delete nightly --yes --cleanup-tag') mark_deleted ;;
     *) echo "Unexpected gh call: $*" >&2; return 1 ;;
   esac
 }
-export -f git gh
+export -f git gh mark_deleted
 
 bash "$scripts/release-tag.sh"
 grep -q '^api --method DELETE .*git/refs/tags/nightly$' "$GH_CALLS"
+rm "$TAG_DELETED"
 TEST_CASE=exists
 : > "$GH_CALLS"
 bash "$scripts/release-tag.sh"
 grep -qx 'release delete nightly --yes --cleanup-tag' "$GH_CALLS"
+rm "$TAG_DELETED"
+# The new release must not be created while the old tag is still visible.
+TEST_CASE=sticky
+if bash "$scripts/release-tag.sh" 2> "$RUNNER_TEMP/error"; then exit 1; fi
+grep -q 'still visible' "$RUNNER_TEMP/error"
 TEST_CASE=denied
 : > "$GH_CALLS"
 if bash "$scripts/release-tag.sh" 2> "$RUNNER_TEMP/error"; then exit 1; fi

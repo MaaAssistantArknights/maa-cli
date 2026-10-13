@@ -1,0 +1,45 @@
+name: Release Readiness
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+  merge_group:
+    branches: [main]
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-readiness-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  readiness:
+    name: Release Readiness
+    # Fork PRs cannot publish; a skipped job still satisfies the required check.
+    if: >-
+      github.event_name == 'merge_group' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff@2.13.1
+      - name: Verify release files
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          LABELED: ${{ contains(github.event.pull_request.labels.*.name, 'release') }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/release-readiness.sh
