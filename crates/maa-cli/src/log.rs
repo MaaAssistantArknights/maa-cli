@@ -1,4 +1,7 @@
-use std::{io::Write, path::PathBuf};
+use std::{
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -27,17 +30,9 @@ pub struct Args {
 }
 
 impl Args {
-    fn log_level(&self) -> u8 {
-        let default_level = std::env::var_os("MAA_LOG")
-            .and_then(|s| s.to_str().and_then(|s| s.parse().ok()))
-            .unwrap_or(log::Level::Warn);
-
-        (default_level as u8 + self.verbose).saturating_sub(self.quiet)
-    }
-
-    fn to_filter(&self) -> log::LevelFilter {
+    fn to_filter(&self, default_level: log::Level) -> log::LevelFilter {
         use log::LevelFilter::*;
-        match self.log_level() {
+        match (default_level as u8 + self.verbose).saturating_sub(self.quiet) {
             0 => Off,
             1 => Error,
             2 => Warn,
@@ -47,38 +42,55 @@ impl Args {
         }
     }
 
-    // Accessors only used in tests
-    // this function consumes entire self, while in init_logger()
-    // we need to use self.log_file, which only consumes part of self
-    #[cfg(test)]
-    fn log_file(self) -> Option<PathBuf> {
-        log_path(self.log_file)
+    /// Configure the logger without installing it, so the configuration can be tested.
+    fn into_builder(
+        self,
+        default_level: log::Level,
+        prefix: LogPrefix,
+    ) -> std::io::Result<env_logger::Builder> {
+        let level = self.to_filter(default_level);
+        let mut builder = env_logger::Builder::new();
+        builder
+            .filter_level(level)
+            // At trace level ureq-proto hex-dumps all HTTP traffic, including query
+            // strings, headers and bodies, which can leak credentials. Module filters
+            // match by prefix, so `ureq` also covers `ureq_proto`. They override the
+            // global level, so never raise it here.
+            .filter_module("ureq", level.min(log::LevelFilter::Debug));
+
+        let log_file = log_path(self.log_file);
+        let formatter = prefix.formatter(log_file.is_some());
+        builder.format(move |buf, record| formatter.format(buf, record));
+
+        if let Some(path) = log_file {
+            builder.target(env_logger::Target::Pipe(Box::new(open_log_file(&path)?)));
+        }
+
+        Ok(builder)
     }
 
     pub fn init_logger(self) -> anyhow::Result<()> {
-        let mut builder = env_logger::Builder::new();
-
-        apply_level_filters(&mut builder, self.to_filter());
-
-        let formatter = LogPrefix::from_env().formatter(self.log_file.is_some());
-        builder.format(move |buf, record| formatter.format(buf, record));
-
-        if let Some(path) = log_path(self.log_file) {
-            if let Some(dir) = path.parent() {
-                use crate::dirs::Ensure;
-                dir.ensure()?;
-            }
-            let file = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(path)?;
-            builder.target(env_logger::Target::Pipe(Box::new(file)));
-        }
-
-        builder.init();
-
+        self.into_builder(default_level(), LogPrefix::from_env())?
+            .init();
         Ok(())
     }
+}
+
+fn default_level() -> log::Level {
+    std::env::var_os("MAA_LOG")
+        .and_then(|s| s.to_str().and_then(|s| s.parse().ok()))
+        .unwrap_or(log::Level::Warn)
+}
+
+fn open_log_file(path: &Path) -> std::io::Result<std::fs::File> {
+    if let Some(dir) = path.parent() {
+        use crate::dirs::Ensure;
+        dir.ensure()?;
+    }
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
 }
 
 fn log_path(path: Option<Option<PathBuf>>) -> Option<PathBuf> {
@@ -170,137 +182,124 @@ impl LogFormatter {
     }
 }
 
-/// Modules whose trace output dumps raw HTTP traffic.
-///
-/// ureq-proto hex-dumps every byte sent and received at trace level, including
-/// query strings, headers and whole bodies, which can leak credentials and flood
-/// the log. At debug level ureq already redacts URI paths and sensitive headers.
-const HTTP_MODULES: [&str; 2] = ["ureq", "ureq_proto"];
-
-fn apply_level_filters(builder: &mut env_logger::Builder, level: log::LevelFilter) {
-    builder.filter_level(level);
-    for module in HTTP_MODULES {
-        // Module filters override the global level, so never raise it here.
-        builder.filter_module(module, level.min(log::LevelFilter::Debug));
-    }
-}
-
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
 
     mod level_filters {
-        use log::{Level, LevelFilter, Log, Metadata};
+        use log::{Level, Log, Metadata};
 
         use super::*;
+        use crate::command::parse_from;
 
-        fn enabled(level: LevelFilter, target: &str, record_level: Level) -> bool {
-            let mut builder = env_logger::Builder::new();
-            apply_level_filters(&mut builder, level);
-            builder.build().enabled(
-                &Metadata::builder()
-                    .target(target)
-                    .level(record_level)
-                    .build(),
-            )
+        fn enabled(args: &[&str], target: &str, level: Level) -> bool {
+            parse_from(args)
+                .log
+                .into_builder(Level::Warn, LogPrefix::Never)
+                .expect("no log file is opened without --log-file")
+                .build()
+                .enabled(&Metadata::builder().target(target).level(level).build())
         }
 
         #[test]
         fn http_trace_is_capped_at_debug() {
-            assert!(enabled(LevelFilter::Trace, "maa", Level::Trace));
+            let trace = ["maa", "list", "-vvv"];
+            assert!(enabled(&trace, "maa", Level::Trace));
             for target in ["ureq", "ureq::util", "ureq_proto::util"] {
-                assert!(!enabled(LevelFilter::Trace, target, Level::Trace));
-                assert!(enabled(LevelFilter::Trace, target, Level::Debug));
+                assert!(!enabled(&trace, target, Level::Trace));
+                assert!(enabled(&trace, target, Level::Debug));
             }
         }
 
         #[test]
         fn http_modules_never_exceed_global_level() {
-            assert!(!enabled(LevelFilter::Warn, "ureq", Level::Info));
-            assert!(enabled(LevelFilter::Warn, "ureq", Level::Warn));
-            assert!(!enabled(LevelFilter::Error, "ureq_proto", Level::Warn));
-            assert!(!enabled(LevelFilter::Off, "ureq", Level::Error));
+            assert!(!enabled(&["maa", "list"], "ureq", Level::Info));
+            assert!(enabled(&["maa", "list"], "ureq", Level::Warn));
+            assert!(!enabled(&["maa", "list", "-q"], "ureq_proto", Level::Warn));
+            assert!(!enabled(&["maa", "list", "-qq"], "ureq", Level::Error));
         }
     }
 
     mod cmd_args {
         use std::env;
 
+        use super::*;
         use crate::command::parse_from;
 
         #[test]
         fn to_filter() {
-            // Safety: MAA_LOG is only modify and read in this test
-            unsafe { std::env::remove_var("MAA_LOG") };
+            use log::{Level, LevelFilter::*};
 
-            use log::LevelFilter::*;
-            assert_eq!(parse_from(["maa", "list"]).log.to_filter(), Warn);
-            assert_eq!(parse_from(["maa", "-v", "list"]).log.to_filter(), Info);
-            assert_eq!(parse_from(["maa", "list", "-v"]).log.to_filter(), Info);
+            let filter = |args: &[&str]| parse_from(args).log.to_filter(Level::Warn);
+            assert_eq!(filter(&["maa", "list"]), Warn);
+            assert_eq!(filter(&["maa", "-v", "list"]), Info);
+            assert_eq!(filter(&["maa", "list", "-v"]), Info);
+            assert_eq!(filter(&["maa", "list", "--verbose"]), Info);
+            assert_eq!(filter(&["maa", "--verbose", "list"]), Info);
+            assert_eq!(filter(&["maa", "list", "--quiet"]), Error);
+            assert_eq!(filter(&["maa", "list", "-vvvv"]), Trace);
+            assert_eq!(filter(&["maa", "list", "-vvv"]), Trace);
+            assert_eq!(filter(&["maa", "list", "-vv"]), Debug);
+            assert_eq!(filter(&["maa", "list", "-vq"]), Warn);
+            assert_eq!(filter(&["maa", "list", "-q"]), Error);
+            assert_eq!(filter(&["maa", "list", "-qq"]), Off);
+            assert_eq!(filter(&["maa", "list", "-qqq"]), Off);
 
-            assert_eq!(
-                parse_from(["maa", "list", "--verbose"]).log.to_filter(),
-                Info
-            );
-            assert_eq!(
-                parse_from(["maa", "--verbose", "list"]).log.to_filter(),
-                Info
-            );
-            assert_eq!(
-                parse_from(["maa", "list", "--quiet"]).log.to_filter(),
-                Error
-            );
+            let args = parse_from(["maa", "list", "-v"]).log;
+            assert_eq!(args.to_filter(Level::Error), Warn);
+            assert_eq!(args.to_filter(Level::Debug), Trace);
+        }
 
-            assert_eq!(parse_from(["maa", "list", "-vvvv"]).log.to_filter(), Trace);
-            assert_eq!(parse_from(["maa", "list", "-vvv"]).log.to_filter(), Trace);
-            assert_eq!(parse_from(["maa", "list", "-vv"]).log.to_filter(), Debug);
-            assert_eq!(parse_from(["maa", "list", "-v"]).log.to_filter(), Info);
-            assert_eq!(parse_from(["maa", "list"]).log.to_filter(), Warn);
-            assert_eq!(parse_from(["maa", "list", "-vq"]).log.to_filter(), Warn);
-            assert_eq!(parse_from(["maa", "list", "-q"]).log.to_filter(), Error);
-            assert_eq!(parse_from(["maa", "list", "-qq"]).log.to_filter(), Off);
-            assert_eq!(parse_from(["maa", "list", "-qqq"]).log.to_filter(), Off);
+        #[test]
+        fn default_level_from_env() {
+            use log::Level;
 
-            assert_eq!(parse_from(["maa", "list", "-vv"]).log.to_filter(), Debug);
-
-            assert_eq!(parse_from(["maa", "list", "-q"]).log.to_filter(), Error);
-
+            // Safety: MAA_LOG is only modified and read in this test
             unsafe {
-                env::set_var("MAA_LOG", "Info");
-                assert_eq!(parse_from(["maa", "list"]).log.to_filter(), Info);
+                env::remove_var("MAA_LOG");
+                assert_eq!(default_level(), Level::Warn);
                 env::set_var("MAA_LOG", "Debug");
-                assert_eq!(parse_from(["maa", "list"]).log.to_filter(), Debug);
-                env::set_var("MAA_LOG", "Trace");
-                assert_eq!(parse_from(["maa", "list"]).log.to_filter(), Trace);
+                assert_eq!(default_level(), Level::Debug);
+                env::set_var("MAA_LOG", "unknown");
+                assert_eq!(default_level(), Level::Warn);
                 env::remove_var("MAA_LOG");
             }
         }
 
         #[test]
-        fn log_path() {
+        fn log_path_from_args() {
             use std::path::Path;
-            assert!(parse_from(["maa", "list"]).log.log_file().is_none());
-            assert!(
-                parse_from(["maa", "list", "--log-file"])
-                    .log
-                    .log_file()
-                    .is_some_and(|x| {
-                        let now = chrono::Local::now();
-                        let dir = crate::dirs::log()
-                            .join(now.format("%Y").to_string())
-                            .join(now.format("%m").to_string())
-                            .join(now.format("%d").to_string());
+            let log_file = |args: &[&str]| log_path(parse_from(args).log.log_file);
+            assert!(log_file(&["maa", "list"]).is_none());
+            assert!(log_file(&["maa", "list", "--log-file"]).is_some_and(|x| {
+                let now = chrono::Local::now();
+                let dir = crate::dirs::log()
+                    .join(now.format("%Y").to_string())
+                    .join(now.format("%m").to_string())
+                    .join(now.format("%d").to_string());
 
-                        // the file name is dependent on the current time, it's hard to test
-                        x.starts_with(dir)
-                    })
-            );
+                // the file name is dependent on the current time, it's hard to test
+                x.starts_with(dir)
+            }));
             assert!(
-                parse_from(["maa", "list", "--log-file=path"])
-                    .log
-                    .log_file()
+                log_file(&["maa", "list", "--log-file=path"])
                     .is_some_and(|x| x == Path::new("path"))
+            );
+        }
+
+        #[test]
+        fn log_file_is_created_and_appended() {
+            let dir = tempfile::tempdir().expect("create temp dir");
+            let path = dir.path().join("a").join("b.log");
+            for content in ["first\n", "second\n"] {
+                open_log_file(&path)
+                    .and_then(|mut file| file.write_all(content.as_bytes()))
+                    .expect("write log file");
+            }
+            assert_eq!(
+                std::fs::read_to_string(&path).expect("read log file"),
+                "first\nsecond\n"
             );
         }
     }
