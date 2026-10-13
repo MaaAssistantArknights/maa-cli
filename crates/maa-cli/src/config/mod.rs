@@ -57,7 +57,7 @@ impl Filetype {
         use Filetype::*;
         Ok(match self {
             Json => serde_json::from_reader(File::open(path)?)?,
-            Yaml => serde_yaml::from_reader(File::open(path)?)?,
+            Yaml => yaml_serde::from_reader(File::open(path)?)?,
             Toml => toml::from_str(&fs::read_to_string(path)?)?,
         })
     }
@@ -77,7 +77,7 @@ impl Filetype {
         use Filetype::*;
         match self {
             Json => serde_json::to_writer_pretty(writer, value)?,
-            Yaml => serde_yaml::to_writer(writer, value)?,
+            Yaml => yaml_serde::to_writer(writer, value)?,
             Toml => writer.write_all(toml::to_string_pretty(value)?.as_bytes())?,
         }
         Ok(())

@@ -669,7 +669,7 @@ mod tests {
 
             #[test]
             fn yaml() {
-                let task_config: TaskConfigTemplate = serde_yaml::from_reader(
+                let task_config: TaskConfigTemplate = yaml_serde::from_reader(
                     std::fs::File::open("./config_examples/tasks/daily.yml").unwrap(),
                 )
                 .unwrap();
