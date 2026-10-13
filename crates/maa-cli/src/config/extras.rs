@@ -35,8 +35,8 @@ impl ExtraConnectionConfig {
 
         Ok(Self::MaaFw(ExtraConnectionConfigMaaFw {
             library_name: MaaFwControlUnitLibraryName::Linux,
-            screencap_method: LinuxScreencapMethod::PipeWire as u32,
-            input_method: LinuxInputMethod::Libei as u32,
+            screencap_method: MaaFwLinuxScreencapMethod::PipeWire as u32,
+            input_method: MaaFwLinuxInputMethod::Libei as u32,
             pw_node_id: Some(pw_node_id),
             eis_socket_path: Some(eis_socket_path),
             ..Default::default()
@@ -104,23 +104,23 @@ impl serde::Serialize for MaaFwControlUnitLibraryName {
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Serialize, Clone)]
+#[derive(Clone, Serialize)]
 pub struct ScreenResolution {
     width: u32,
     height: u32,
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Clone, Copy, Default)]
-pub enum LinuxScreencapMethod {
+#[derive(Clone, Default)]
+pub enum MaaFwLinuxScreencapMethod {
     #[default]
     Wlr = 1,
     PipeWire = 4,
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Clone, Copy, Default)]
-pub enum LinuxInputMethod {
+#[derive(Clone, Default)]
+pub enum MaaFwLinuxInputMethod {
     #[default]
     Wlr = 1,
     #[allow(unused)]
