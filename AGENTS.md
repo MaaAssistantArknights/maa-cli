@@ -33,6 +33,7 @@ graph TD
 
     subgraph Utils
         STREXT["maa-str-ext"]
+        ATOMICFS["maa-atomic-fs"]
     end
     
     subgraph Xtask
@@ -47,6 +48,7 @@ graph TD
     CLI --> VALUE
     CLI --> VALMACRO
     CLI --> VERSION
+    CLI --> ATOMICFS
 
     CORE --> SYS
     CORE --> TYPES
@@ -59,6 +61,7 @@ graph TD
     FFISTR --> STREXT
     VALUE --> STREXT
     VALUE --> VALMACRO
+    INSTALLER --> ATOMICFS
     
     XTASK --> DIRS
     XTASK --> VERSION
@@ -88,6 +91,7 @@ graph TD
 **Utils Layer:**
 
 - `maa-str-ext`: UTF-8 conversion for `OsStr`/`Path`/bytes. **Use when**: Dealing with strings that might not be UTF-8. This is a generic utility crate, not a MaaCore-specific abstraction.
+- `maa-atomic-fs`: Atomic single-file replacement (same-directory staging, fsync, rename). **Use when**: Writing or replacing a file that must never be left partially written, such as configs, caches, or release metadata.
 
 **Tooling Layer:**
 
@@ -99,6 +103,7 @@ graph TD
 - **Paths**: Always use `maa-dirs` for directory resolution. Never hardcode paths like `/usr/local/share` or `C:\Program Files`. The crate handles platform differences and environment overrides (`MAA_CONFIG_DIR`, etc.).
 - **FFI Boundary**: Keep `unsafe` confined to `maa-sys`. `maa-core` is the safe wrapper layer. Other crates should never call MaaCore directly.
 - **Error Handling**: `maa-cli` uses `anyhow::Result` for application errors. Libraries use `thiserror` for structured errors. Never use `unwrap()` without a safety comment.
+- **File Replacement**: Use `maa-atomic-fs` instead of `fs::write`/`File::create` when overwriting configs, caches, or other files that readers rely on. It does not lock or coordinate multiple files.
 - **String Conversions**: Use `maa-str-ext` for `OsStr`/`Path` ↔ UTF-8, and `maa-ffi-string` for MaaCore FFI `CString` conversion. Handle non-UTF-8 gracefully.
 - **String Formatting**: When using `format!` and related macros (`write!`, `log::info!`, `bail!`, etc.), always inline variables into `{}` placeholders. Example: use `format!("Error: {error}")` instead of `format!("Error: {}", error)`.
 

@@ -66,7 +66,7 @@ impl Filetype {
     where
         T: serde::Serialize,
     {
-        crate::atomic_fs::write_with(path, |temp| self.write_to(temp, value))
+        maa_atomic_fs::write_with(path, |file| self.write_to(file, value))
     }
 
     fn write_to<W, T>(&self, mut writer: W, value: &T) -> Result<()>

@@ -12,6 +12,7 @@ digest = { workspace = true, optional = true }
 flate2 = { workspace = true, optional = true }
 indicatif = { workspace = true }
 log = { workspace = true }
+maa-atomic-fs = { workspace = true }
 semver = { workspace = true }
 tar = { workspace = true, optional = true }
 thiserror = { workspace = true }

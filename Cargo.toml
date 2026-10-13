@@ -30,6 +30,7 @@ indexmap = "2.13.1"
 indicatif = "0.18"
 libloading = "0.9"
 log = "0.4.20"
+maa-atomic-fs = { path = "crates/maa-atomic-fs", version = "0.1" }
 maa-core = { path = "crates/maa-core", version = "0.1", default-features = false }
 maa-dirs = { path = "crates/maa-dirs", version = "0.3" }
 maa-ffi-string = { path = "crates/maa-ffi-string", version = "0.1" }
