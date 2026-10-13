@@ -73,9 +73,6 @@ unexpected_cfgs = { level = "warn", check-cfg = [
   "cfg(coverage,coverage_nightly)",
 ] }
 
-[workspace.metadata.typos.files]
-extend-exclude = ["CHANGELOG.md"]
-
 [profile.release-lto]
 inherits = "release"
 strip = "symbols"
