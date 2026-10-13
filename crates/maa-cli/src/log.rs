@@ -272,16 +272,18 @@ mod tests {
             use std::path::Path;
             let log_file = |args: &[&str]| log_path(parse_from(args).log.log_file);
             assert!(log_file(&["maa", "list"]).is_none());
-            assert!(log_file(&["maa", "list", "--log-file"]).is_some_and(|x| {
-                let now = chrono::Local::now();
-                let dir = crate::dirs::log()
+            // The default path depends on the current date; read the clock before and
+            // after so the test also passes when it runs across midnight.
+            let day_dir = |now: chrono::DateTime<chrono::Local>| {
+                crate::dirs::log()
                     .join(now.format("%Y").to_string())
                     .join(now.format("%m").to_string())
-                    .join(now.format("%d").to_string());
-
-                // the file name is dependent on the current time, it's hard to test
-                x.starts_with(dir)
-            }));
+                    .join(now.format("%d").to_string())
+            };
+            let before = chrono::Local::now();
+            let path = log_file(&["maa", "list", "--log-file"]).expect("default log path");
+            let after = chrono::Local::now();
+            assert!(path.starts_with(day_dir(before)) || path.starts_with(day_dir(after)));
             assert!(
                 log_file(&["maa", "list", "--log-file=path"])
                     .is_some_and(|x| x == Path::new("path"))
