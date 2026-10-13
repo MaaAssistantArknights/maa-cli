@@ -1,7 +1,7 @@
 use std::{path::PathBuf, process::Command};
 
 use anyhow::{Context as _, Result, bail};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Serialize, Clone)]
@@ -34,7 +34,7 @@ impl ExtraConnectionConfig {
         let eis_socket_path = "/run/user/1000/gamescope-0-ei".into();
 
         Ok(Self::MaaFw(ExtraConnectionConfigMaaFw {
-            library_name: "MaaLinuxControlUnit".into(),
+            library_name: MaaFwControlUnitLibraryName::Linux,
             screencap_method: LinuxScreencapMethod::PipeWire as u32,
             input_method: LinuxInputMethod::Libei as u32,
             pw_node_id: Some(pw_node_id),
@@ -45,35 +45,10 @@ impl ExtraConnectionConfig {
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Serialize, Deserialize, Clone)]
-pub struct ScreenResolution {
-    width: u32,
-    height: u32,
-}
-
-#[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Clone, Copy, Default)]
-pub enum LinuxScreencapMethod {
-    #[default]
-    Wlr = 1,
-    PipeWire = 4,
-}
-
-#[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(Clone, Copy, Default)]
-pub enum LinuxInputMethod {
-    #[default]
-    Wlr = 1,
-    #[allow(unused)]
-    UInput = 2,
-    Libei = 4,
-}
-
-#[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Serialize, Clone, Default)]
 pub struct ExtraConnectionConfigMaaFw {
     // Used by MaaCore's MaaFwController::connect_with_extras
-    library_name: String,
+    library_name: MaaFwControlUnitLibraryName,
     #[serde(skip_serializing_if = "Option::is_none")]
     screen_resolution: Option<ScreenResolution>,
 
@@ -97,6 +72,60 @@ pub struct ExtraConnectionConfigMaaFw {
     eis_socket_path: Option<PathBuf>,
     #[serde(skip_serializing_if = "Option::is_none")]
     use_win32_vk_code: Option<u32>,
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone, Default)]
+pub enum MaaFwControlUnitLibraryName {
+    #[default]
+    Adb,
+    Linux,
+    #[allow(unused)]
+    AndroidNative,
+}
+
+impl MaaFwControlUnitLibraryName {
+    const fn to_str(&self) -> &'static str {
+        match self {
+            Self::Adb => "MaaAdbControlUnit",
+            Self::Linux => "MaaLinuxControlUnit",
+            Self::AndroidNative => "MaaAndroidNativeControlUnit",
+        }
+    }
+}
+
+impl serde::Serialize for MaaFwControlUnitLibraryName {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.to_str())
+    }
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Serialize, Clone)]
+pub struct ScreenResolution {
+    width: u32,
+    height: u32,
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone, Copy, Default)]
+pub enum LinuxScreencapMethod {
+    #[default]
+    Wlr = 1,
+    PipeWire = 4,
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone, Copy, Default)]
+pub enum LinuxInputMethod {
+    #[default]
+    Wlr = 1,
+    #[allow(unused)]
+    UInput = 2,
+    Libei = 4,
 }
 
 fn find_gamescope_id(input: &str) -> Option<u32> {
