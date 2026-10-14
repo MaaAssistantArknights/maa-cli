@@ -74,6 +74,9 @@ pub(crate) static CLI_CONFIG: LazyLock<CLIConfig> = LazyLock::new(|| {
         .expect("Failed to load installer config")
 });
 
+/// Release channel of MaaCore.
+///
+/// maa-cli has its own channels, see `maa_cli::Channel`.
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(ValueEnum, Clone, Copy, Default, Deserialize)]
 pub enum Channel {
@@ -189,7 +192,10 @@ mod tests {
                 Token::Str("cli"),
                 Token::Map { len: Some(4) },
                 Token::Str("channel"),
-                Channel::Alpha.to_token(),
+                Token::UnitVariant {
+                    name: "Channel",
+                    variant: "Nightly",
+                },
                 Token::Str("api_url"),
                 Token::Str("https://cdn.jsdelivr.net/gh/MaaAssistantArknights/maa-cli@vversion/"),
                 Token::Str("download_url"),

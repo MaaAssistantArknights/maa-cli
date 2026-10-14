@@ -410,7 +410,17 @@ mod test {
             parse_from(["maa", "self", "update", "beta"]).command,
             Command::SelfC(SelfCommand::Update {
                 common: config::cli::maa_cli::CommonArgs {
-                    channel: Some(Channel::Beta),
+                    channel: Some(config::cli::maa_cli::Channel::Beta),
+                    ..
+                },
+            })
+        );
+
+        assert_matches!(
+            parse_from(["maa", "self", "update", "alpha"]).command,
+            Command::SelfC(SelfCommand::Update {
+                common: config::cli::maa_cli::CommonArgs {
+                    channel: Some(config::cli::maa_cli::Channel::Nightly),
                     ..
                 },
             })
