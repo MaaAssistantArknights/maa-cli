@@ -14,8 +14,8 @@ Why is this change needed? What problem does it solve? Link the issue if there i
 ## 方案 / Solution
 
 <!--
-怎么解决的。重点写从 diff 里看不出来的设计取舍。
-How does this PR solve it? Focus on design choices that are not obvious from the diff.
+怎么解决的。重点写从 diff 里看不出来的设计取舍，以及哪里你不确定。
+How does this PR solve it? Focus on design choices that are not obvious from the diff, and on what you are unsure about.
 -->
 
 ## 变更与影响 / Changes and impact
@@ -39,14 +39,9 @@ Which commands did you actually run, on which platforms? Did you test against a 
 ## AI 辅助 / AI assistance
 
 <!--
-如果用了 AI，请写明工具（harness）、模型和参与程度；没用就写“无”。
-If AI was used, name the tool (harness), the model, and how much it contributed. Write "None" otherwise.
-参与程度 / Extent: 大部分由 AI 生成 / mostly generated; 部分辅助 / partly assisted; 仅用于审查 / review only
-未经作者本人审阅和整理的 AI 生成 PR 可能会被直接关闭。
-AI-generated PRs that the author has not reviewed and cleaned up may be closed without review.
+没用 AI 写“无”。用了请写哪些部分是 AI 写的，如全部代码、只有测试、只有文档；也可以注明工具和模型。
+Write "None" if no AI was used. Otherwise say which parts AI wrote, e.g. all code, tests only, docs only; naming the tool and model is optional.
 -->
 
-- 工具 / Harness:
-- 模型 / Model:
-- 参与程度 / Extent:
+- AI 写的部分 / AI-written parts:
 - [ ] 如果用了 AI，我已亲自审阅并整理全部改动，能解释每一处修改 / If AI was used, I have personally reviewed and cleaned up all changes and can explain each of them
