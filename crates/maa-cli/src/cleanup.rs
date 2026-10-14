@@ -104,17 +104,23 @@ impl PathProvider for CleanupTarget {
     }
 }
 
+/// Targets cleaned up when none are specified
+pub const DEFAULT_TARGETS: &[CleanupTarget] = &[CliCache, CoreCache, Debug];
+
 /// Clean up files and directories
 pub fn cleanup<T>(targets: &[T]) -> Result<()>
 where
     T: PathProvider,
 {
-    // If no targets are specified, clean up all
-    if targets.is_empty() {
-        return cleanup(&[CliCache, CoreCache, Debug]);
-    }
+    remove(collect(targets))
+}
 
-    let target_paths: Vec<PathBuf> = targets
+/// Collect entries in the target directories that should be deleted
+fn collect<T>(targets: &[T]) -> Vec<PathBuf>
+where
+    T: PathProvider,
+{
+    targets
         .iter()
         .flat_map(|target| {
             let target_dir = target.target_dir();
@@ -132,8 +138,11 @@ where
                 Vec::new()
             }
         })
-        .collect();
+        .collect()
+}
 
+/// List the paths, ask for confirmation and delete them
+fn remove(target_paths: Vec<PathBuf>) -> Result<()> {
     if target_paths.is_empty() {
         println!("No files or directories to clean up.");
         return Ok(());
@@ -402,18 +411,18 @@ mod tests {
         std::fs::remove_dir(&test_root).unwrap();
     }
 
-    /// Runs the real cleanup targets against a private directory tree.
+    /// Runs the rules of a real cleanup target against a private directory.
     ///
-    /// Pointing them at the shared `cache()`, `state()` and `log()` directories would
-    /// delete files other tests in the same process are using at the same time.
-    struct Redirect<'a> {
+    /// The real `cache()`, `state()` and `log()` directories are shared with other tests
+    /// running in the same process, so they must not be scanned or cleaned here.
+    struct Redirect {
         target: CleanupTarget,
-        dir: &'a Path,
+        dir: PathBuf,
     }
 
-    impl PathProvider for Redirect<'_> {
+    impl PathProvider for Redirect {
         fn target_dir(&self) -> Cow<'_, Path> {
-            self.dir.into()
+            self.dir.as_path().into()
         }
 
         fn should_delete(&self, entry: &DirEntry) -> bool {
@@ -426,77 +435,63 @@ mod tests {
     }
 
     #[test]
+    fn default_targets() {
+        assert_eq!(DEFAULT_TARGETS, [CliCache, CoreCache, Debug]);
+    }
+
+    #[test]
     #[ignore = "Need installed MaaCore"]
-    fn test_cleanup_real_files() {
+    fn collect_default_targets() {
         let test_root = tempfile::tempdir().unwrap();
-        let cache = join!(test_root.path(), "cache");
-        let core_cache = join!(test_root.path(), "core_cache");
-        let log = join!(test_root.path(), "log");
+        let targets: Vec<Redirect> = DEFAULT_TARGETS
+            .iter()
+            .map(|target| {
+                let dir = join!(test_root.path(), format!("{target:?}"));
+                dir.ensure().unwrap();
+                Redirect {
+                    target: target.clone(),
+                    dir,
+                }
+            })
+            .collect();
+        let [cache, core_cache, log] = [0, 1, 2].map(|i| targets[i].dir.as_path());
 
-        cache.ensure().unwrap();
-        core_cache.ensure().unwrap();
-        log.ensure().unwrap();
+        let file = |path: PathBuf| {
+            std::fs::File::create(&path).unwrap();
+            path
+        };
+        let dir = |path: PathBuf| {
+            std::fs::create_dir(&path).unwrap();
+            path
+        };
 
-        std::fs::File::create(join!(&cache, "test.tar.gz")).unwrap();
+        let mut expected = BTreeSet::from([
+            file(join!(cache, "test.tar.gz")),
+            dir(join!(core_cache, "avatars")),
+            dir(join!(log, "2024")),
+            file(join!(log, "asst.log")),
+            file(join!(log, "asst.bak.log")),
+        ]);
 
         #[cfg(feature = "core_installer")]
-        let (stale_core_package, kept_core_package) = {
+        {
             use semver::Version;
 
             use crate::installer::maa_core::this_asset_name;
 
             // No real MaaCore release has this version, so it is never the installed one
-            let stale = join!(&cache, this_asset_name(&Version::new(0, 0, 1)));
-            std::fs::File::create(&stale).unwrap();
+            expected.insert(file(join!(cache, this_asset_name(&Version::new(0, 0, 1)))));
 
-            let kept = if var_os("SKIP_CORE_TEST").is_none() {
+            // The package of the installed MaaCore is kept
+            if var_os("SKIP_CORE_TEST").is_none() {
                 let version = crate::state::CORE_VERSION.as_ref().unwrap();
-                let path = join!(&cache, this_asset_name(version));
-                std::fs::File::create(&path).unwrap();
-                Some(path)
-            } else {
-                None
-            };
-
-            (stale, kept)
-        };
-
-        std::fs::create_dir_all(join!(&core_cache, "avatars")).unwrap();
-        std::fs::create_dir_all(join!(&log, "2024")).unwrap();
-        std::fs::File::create(join!(&log, "asst.log")).unwrap();
-        std::fs::File::create(join!(&log, "asst.bak.log")).unwrap();
-
-        // Same targets as `cleanup(&[])`
-        let targets = [
-            Redirect {
-                target: CliCache,
-                dir: &cache,
-            },
-            Redirect {
-                target: CoreCache,
-                dir: &core_cache,
-            },
-            Redirect {
-                target: Debug,
-                dir: &log,
-            },
-        ];
-        cleanup(&targets).unwrap();
-
-        assert!(!join!(&cache, "test.tar.gz").exists());
-        assert!(!join!(&core_cache, "avatars").exists());
-        assert!(!join!(&log, "2024").exists());
-        assert!(!join!(&log, "asst.log").exists());
-        assert!(!join!(&log, "asst.bak.log").exists());
-
-        #[cfg(feature = "core_installer")]
-        {
-            assert!(!stale_core_package.exists());
-            if let Some(path) = kept_core_package {
-                assert!(path.exists());
+                file(join!(cache, this_asset_name(version)));
             }
         }
 
-        cleanup(&targets).unwrap(); // Cleanup again to test no files left
+        assert_eq!(
+            collect(&targets).into_iter().collect::<BTreeSet<_>>(),
+            expected
+        );
     }
 }
