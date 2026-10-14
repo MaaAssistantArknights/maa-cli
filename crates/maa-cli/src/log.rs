@@ -58,7 +58,7 @@ impl Args {
     pub fn init_logger(self) -> anyhow::Result<()> {
         let mut builder = env_logger::Builder::new();
 
-        builder.filter_level(self.to_filter());
+        apply_level_filters(&mut builder, self.to_filter());
 
         let formatter = LogPrefix::from_env().formatter(self.log_file.is_some());
         builder.format(move |buf, record| formatter.format(buf, record));
@@ -170,10 +170,59 @@ impl LogFormatter {
     }
 }
 
+/// Modules whose trace output dumps raw HTTP traffic.
+///
+/// ureq-proto hex-dumps every byte sent and received at trace level, including
+/// query strings, headers and whole bodies, which can leak credentials and flood
+/// the log. At debug level ureq already redacts URI paths and sensitive headers.
+const HTTP_MODULES: [&str; 2] = ["ureq", "ureq_proto"];
+
+fn apply_level_filters(builder: &mut env_logger::Builder, level: log::LevelFilter) {
+    builder.filter_level(level);
+    for module in HTTP_MODULES {
+        // Module filters override the global level, so never raise it here.
+        builder.filter_module(module, level.min(log::LevelFilter::Debug));
+    }
+}
+
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
+
+    mod level_filters {
+        use log::{Level, LevelFilter, Log, Metadata};
+
+        use super::*;
+
+        fn enabled(level: LevelFilter, target: &str, record_level: Level) -> bool {
+            let mut builder = env_logger::Builder::new();
+            apply_level_filters(&mut builder, level);
+            builder.build().enabled(
+                &Metadata::builder()
+                    .target(target)
+                    .level(record_level)
+                    .build(),
+            )
+        }
+
+        #[test]
+        fn http_trace_is_capped_at_debug() {
+            assert!(enabled(LevelFilter::Trace, "maa", Level::Trace));
+            for target in ["ureq", "ureq::util", "ureq_proto::util"] {
+                assert!(!enabled(LevelFilter::Trace, target, Level::Trace));
+                assert!(enabled(LevelFilter::Trace, target, Level::Debug));
+            }
+        }
+
+        #[test]
+        fn http_modules_never_exceed_global_level() {
+            assert!(!enabled(LevelFilter::Warn, "ureq", Level::Info));
+            assert!(enabled(LevelFilter::Warn, "ureq", Level::Warn));
+            assert!(!enabled(LevelFilter::Error, "ureq_proto", Level::Warn));
+            assert!(!enabled(LevelFilter::Off, "ureq", Level::Error));
+        }
+    }
 
     mod cmd_args {
         use std::env;

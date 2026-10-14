@@ -146,6 +146,7 @@ graph TD
 
     subgraph Utils
         STREXT["maa-str-ext"]
+        ATOMICFS["maa-atomic-fs"]
     end
     
     subgraph Xtask
@@ -160,6 +161,7 @@ graph TD
     CLI --> VALUE
     CLI --> VALMACRO
     CLI --> VERSION
+    CLI --> ATOMICFS
 
     CORE --> SYS
     CORE --> TYPES
@@ -172,6 +174,7 @@ graph TD
     FFISTR --> STREXT
     VALUE --> STREXT
     VALUE --> VALMACRO
+    INSTALLER --> ATOMICFS
     
     XTASK --> DIRS
     XTASK --> VERSION
@@ -187,6 +190,7 @@ graph TD
 - `maa-ffi-types`：最底层的 FFI primitive aliases，如 `AsstBool`、`AsstId`、`AsstSize` 等。
 - `maa-ffi-string`：面向 MaaCore FFI 的字符串转换层，把 Rust 字符串安全地转成 `CString`。
 - `maa-str-ext`：通用 UTF-8 / `OsStr` / `Path` 字符串工具 crate，属于基础工具层。
+- `maa-atomic-fs`：单文件原子替换工具（同目录暂存、fsync 后 rename），供 CLI、安装器和 xtask 写入配置、缓存与发布元数据。
 - `maa-value`：配置值模型，支持条件参数、用户输入和动态合并，主要服务于任务参数与配置系统。
 - `maa-value-macro`：`maa-value` 的 proc-macro 辅助 crate，用于更方便地在代码中构造复杂值。
 - `maa-dirs`：路径定位层，负责配置目录、缓存目录、资源目录、MaaCore 库目录等平台相关路径逻辑。

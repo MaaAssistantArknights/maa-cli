@@ -20,6 +20,11 @@ use crate::dirs;
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Default)]
 pub struct CLIConfig {
+    /// GitHub proxy prefix for accelerating downloads.
+    ///
+    /// When set, GitHub release download URLs (`github.com/*/releases/download/*`)
+    /// will be transparently rewritten through this proxy via ureq middleware.
+    github_proxy: Option<String>,
     /// MaaCore configuration
     #[cfg(feature = "core_installer")]
     #[serde(default)]
@@ -34,6 +39,17 @@ pub struct CLIConfig {
 }
 
 impl CLIConfig {
+    /// Get the GitHub proxy prefix.
+    ///
+    /// Returns the configured value, if non-empty.
+    /// Trailing slashes are stripped.
+    pub fn github_proxy(&self) -> Option<String> {
+        self.github_proxy
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .map(|s| s.trim_end_matches('/').to_string())
+    }
+
     #[cfg(feature = "core_installer")]
     pub fn core_config(&self) -> maa_core::Config {
         self.core.clone()
@@ -231,6 +247,7 @@ mod tests {
                 .unwrap();
 
         let expect = CLIConfig {
+            github_proxy: None,
             #[cfg(feature = "core_installer")]
             core: maa_core::tests::example_config(),
             #[cfg(feature = "cli_installer")]
@@ -314,5 +331,49 @@ mod tests {
     fn normalize_url_test() {
         assert_eq!(normalize_url("https://foo.bar"), "https://foo.bar");
         assert_eq!(normalize_url("https://foo.bar/"), "https://foo.bar");
+    }
+
+    mod github_proxy {
+        use super::*;
+
+        #[test]
+        fn config_value() {
+            // Config with trailing slash → stripped
+            let config = CLIConfig {
+                github_proxy: Some("https://config.example/".to_string()),
+                ..Default::default()
+            };
+            assert_eq!(
+                config.github_proxy(),
+                Some("https://config.example".to_string())
+            );
+        }
+
+        #[test]
+        fn config_without_trailing_slash() {
+            let config = CLIConfig {
+                github_proxy: Some("https://config.example".to_string()),
+                ..Default::default()
+            };
+            assert_eq!(
+                config.github_proxy(),
+                Some("https://config.example".to_string())
+            );
+        }
+
+        #[test]
+        fn empty_config_is_none() {
+            let config = CLIConfig {
+                github_proxy: Some("".to_string()),
+                ..Default::default()
+            };
+            assert_eq!(config.github_proxy(), None);
+        }
+
+        #[test]
+        fn none_config_is_none() {
+            let config = CLIConfig::default();
+            assert_eq!(config.github_proxy(), None);
+        }
     }
 }
