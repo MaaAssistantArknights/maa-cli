@@ -85,9 +85,11 @@ jobs:
           esac
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
+      # Stable builds this checkout and needs its tags and history; pre-releases
+      # only use it for tooling and build the dev branch checked out below.
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0
+          fetch-depth: ${{ steps.event.outputs.channel == 'stable' && '0' || '1' }}
           ref: ${{ env.TOOLS_REF }}
       - name: Locate this run's frozen plan and bundle
         id: saved

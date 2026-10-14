@@ -123,12 +123,9 @@ pub struct PlanOptions {
 
 #[derive(Args)]
 pub struct PrepareOptions {
-    /// Checkout of the branch to prepare, main or the dev branch
+    /// Checkout of main to prepare
     #[arg(long, default_value = ".")]
     source: PathBuf,
-    /// Branch being prepared
-    #[arg(long, default_value = "main")]
-    branch: String,
     /// auto, patch, minor, major, or an explicit stable X.Y.Z
     #[arg(long, default_value = "auto")]
     version: selection::VersionSelection,

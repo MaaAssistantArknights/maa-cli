@@ -44,16 +44,16 @@
 
 ## 发布 Stable
 
-小改动直接从 `main` 发布：
+Stable 只从 `main` 发布：
 
-1. 在 Actions 中从 `main` 运行 `Prepare Stable Release`，`branch` 保持 `main`，选择 `version`：
+1. 在 Actions 中从 `main` 运行 `Prepare Stable Release`，选择 `version`：
    - `auto`（默认）：Cargo 版本高于最近正式 tag 时沿用，否则由 git-cliff 推导。`0.x` 阶段 `fix` 和 `feat` 都推进 patch，breaking change 推进 minor；只有文档、重构等变更时不会自动 bump。
    - `patch`、`minor`、`major`：由 git-cliff 相对最近正式 tag 计算。
    - `X.Y.Z`：直接指定，必须高于最近正式 tag。
 2. 工作流更新 Cargo 版本和 lockfile，用 git-cliff 生成 changelog，创建或更新带 `release` 标签的 `release-prep/vX.Y.Z` PR，并关闭其他打开的 `release-prep/*` PR。版本已由其他 PR 更新时，本次只修改 changelog。
 3. 批准自动创建 PR 的 workflow runs，检查 CI 后合并。
 
-dev 分支合回时，在 `Prepare Stable Release` 中把 `branch` 设为 `dev-X.Y`：工作流在 dev 分支上提交 `X.Y.0` 的 changelog，并创建或更新 dev → `main` 的 PR、添加 `release` 标签。合并前先把 `main` 最后一次合入 dev 分支。
+dev 分支先通过普通 PR 合回 `main`，必须使用 merge commit，不能 squash 或 rebase，这样 Beta tag 仍在历史中。合并后 `main` 的 Cargo 版本为 `X.Y.0`，再按上面的步骤运行 Prepare，`auto` 会沿用 `X.Y.0`。
 
 合并后、创建任何 tag 前，`Release` 会按实际合并提交重新生成 changelog 并与 `CHANGELOG.md` 比对。若准备之后 `main` 又合入了会进入 changelog 的提交，发布会在这里失败，不会发出错误版本；此时 Cargo 版本已在 `main` 上，再运行一次 Prepare 即可创建只修复 changelog 的 release PR。
 
@@ -71,6 +71,6 @@ Beta：在 Actions 中从 `main` 运行 `Release`，选择 `channel=beta`，真�
 
 ## 仓库设置
 
-`Prepare Stable Release` 使用内置 `GITHUB_TOKEN`，以 `github-actions[bot]` 身份推送分支和创建 PR。需要在 Settings → Actions → General 中启用 `Allow GitHub Actions to create and approve pull requests`；dev 分支若有保护规则，需允许该工作流推送。具有 write 权限的维护者批准 PR 的 workflow runs 后检查才会运行。合并由维护者完成，不使用 `GITHUB_TOKEN` 自动合并，否则不会产生后续发布事件。
+`Prepare Stable Release` 使用内置 `GITHUB_TOKEN`，以 `github-actions[bot]` 身份推送分支和创建 PR。需要在 Settings → Actions → General 中启用 `Allow GitHub Actions to create and approve pull requests`。具有 write 权限的维护者批准 PR 的 workflow runs 后检查才会运行。合并由维护者完成，不使用 `GITHUB_TOKEN` 自动合并，否则不会产生后续发布事件。
 
 修改发布工具后运行 `cargo test -p xtask` 和 `cargo clippy -p xtask --all-targets -- -D warnings`。部分测试会在临时仓库中运行 git 和 Cargo，需要在 PATH 中提供 git-cliff 2.13.1。

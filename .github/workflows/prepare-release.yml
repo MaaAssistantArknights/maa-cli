@@ -3,12 +3,8 @@ name: Prepare Stable Release
 on:
   workflow_dispatch:
     inputs:
-      branch:
-        description: 'main for a small release, or the dev-X.Y branch to merge back'
-        type: string
-        default: main
       version:
-        description: 'auto, patch, minor, major, or an exact stable version (main only)'
+        description: 'auto, patch, minor, major, or an exact stable version'
         type: string
         default: auto
 
@@ -29,22 +25,12 @@ jobs:
     name: Prepare Stable Release
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    env:
-      BRANCH: ${{ inputs.branch }}
     steps:
-      - name: Checkout release tooling
+      # Full history: the version and changelog are derived from tags and commits.
+      - name: Checkout main
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          ref: main
-
-      - name: Checkout dev branch
-        if: inputs.branch != 'main'
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          ref: ${{ inputs.branch }}
-          path: source
 
       - name: Install git-cliff
         uses: taiki-e/install-action@v2
@@ -56,15 +42,9 @@ jobs:
         env:
           VERSION_SELECTION: ${{ inputs.version }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          source=.
-          if [[ "$BRANCH" != main ]]; then source=source; fi
-          echo "source=$source" >> "$GITHUB_OUTPUT"
-          cargo x -- release prepare --source "$source" --branch "$BRANCH" \
-            --version "$VERSION_SELECTION"
+        run: cargo x -- release prepare --version "$VERSION_SELECTION"
 
       - name: Commit release preparation as GitHub Actions
-        working-directory: ${{ steps.release.outputs.source }}
         env:
           VERSION: ${{ steps.release.outputs.version }}
         run: |
@@ -75,29 +55,21 @@ jobs:
           git commit -m "chore(release): prepare for v$VERSION"
 
       - name: Push and create or update the release pull request
-        working-directory: ${{ steps.release.outputs.source }}
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.release.outputs.version }}
         run: |
-          if [[ "$BRANCH" == main ]]; then
-            # A small release: a release-prep branch with only the release files.
-            head="release-prep/v$VERSION"
-            remote_head="$(git ls-remote --heads origin "refs/heads/$head" | cut -f1)"
-            if [[ -n "$remote_head" ]]; then
-              git push origin \
-                --force-with-lease="refs/heads/$head:$remote_head" \
-                "HEAD:refs/heads/$head"
-            else
-              git push origin "HEAD:refs/heads/$head"
-            fi
-            title="chore(release): prepare for v$VERSION"
+          # A release-prep branch with only the release files.
+          head="release-prep/v$VERSION"
+          remote_head="$(git ls-remote --heads origin "refs/heads/$head" | cut -f1)"
+          if [[ -n "$remote_head" ]]; then
+            git push origin \
+              --force-with-lease="refs/heads/$head:$remote_head" \
+              "HEAD:refs/heads/$head"
           else
-            # A dev branch merges back as the release: add the changelog to it directly.
-            head="$BRANCH"
             git push origin "HEAD:refs/heads/$head"
-            title="chore(release): v$VERSION"
           fi
+          title="chore(release): prepare for v$VERSION"
 
           body="$RUNNER_TEMP/release-pr-body.md"
           {
@@ -105,9 +77,6 @@ jobs:
             echo
             echo '- Version and changelog prepared from the exact candidate commit'
             echo '- The release label makes merging this PR into main publish Stable'
-            if [[ "$BRANCH" != main ]]; then
-              echo '- Merge with a merge commit, never squash or rebase, so beta tags stay in history'
-            fi
             echo
             echo 'Approve its workflows, and run Prepare again if main changes before merging.'
           } > "$body"
