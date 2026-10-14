@@ -74,12 +74,8 @@ pub enum ReleaseCommands {
     Plan(PlanOptions),
     /// Prepare the version and changelog for a stable release
     Prepare(PrepareOptions),
-    /// Report which frozen artifacts this workflow run already has
-    Artifacts,
     /// Package archives and index manifests into release-bundle
     Package(PlanFile),
-    /// Check that the planned index updates still apply before publishing
-    CheckPublication(IndexOptions),
     /// Make sure the release tag is free or already points at the release commit
     Tag(PlanFile),
     /// Apply the packaged manifests to the version branch checkout
@@ -133,7 +129,7 @@ pub struct PrepareOptions {
 
 #[derive(Args)]
 pub struct PlanFile {
-    /// Directory of the frozen release plan
+    /// Directory of the release plan
     #[arg(long, default_value = "release-plan")]
     plan: PathBuf,
 }
@@ -152,11 +148,7 @@ pub fn run(command: ReleaseCommands) -> Result<()> {
         ReleaseCommands::Source(options) => plan::source(options),
         ReleaseCommands::Plan(options) => plan::run(options),
         ReleaseCommands::Prepare(options) => changelog::prepare(options),
-        ReleaseCommands::Artifacts => publish::artifacts(),
         ReleaseCommands::Package(options) => package::run(&options.plan),
-        ReleaseCommands::CheckPublication(options) => {
-            package::check_publication(&options.plan.plan, &options.index)
-        }
         ReleaseCommands::Tag(options) => publish::tag(&options.plan),
         ReleaseCommands::Index(options) => package::update_index(
             &options.plan.plan,

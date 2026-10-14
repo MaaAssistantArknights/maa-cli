@@ -1,54 +1,11 @@
-//! GitHub state around a release: frozen run artifacts and the release tag.
+//! The release tag on GitHub.
 
 use std::{path::Path, process::Command, thread::sleep, time::Duration};
 
 use anyhow::{Context, Result, bail, ensure};
 
 use super::{git, plan::Plan};
-use crate::{cmd::CommandExt, env, github};
-
-const PLAN_ARTIFACT: &str = "release-plan";
-const BUNDLE_ARTIFACT: &str = "release-bundle";
-
-/// Report whether this run already froze its plan and bundle.
-///
-/// Queried on every job attempt, including retries that did not rerun the plan job,
-/// so a retry reuses what was frozen instead of recalculating or rebuilding it.
-pub fn artifacts() -> Result<()> {
-    let run_id = env::var("GITHUB_RUN_ID")?;
-    let listing = Command::new("gh")
-        .args(["api", "--paginate"])
-        .arg(format!(
-            "repos/{{owner}}/{{repo}}/actions/runs/{run_id}/artifacts"
-        ))
-        .args([
-            "--jq",
-            ".artifacts[] | [.name, (.expired | tostring)] | @tsv",
-        ])
-        .read()?;
-    let (plan, bundle) = frozen_artifacts(&listing)?;
-    github::set_outputs(&[("plan", &plan.to_string()), ("bundle", &bundle.to_string())])
-}
-
-fn frozen_artifacts(listing: &str) -> Result<(bool, bool)> {
-    let mut found = (false, false);
-    for line in listing.lines() {
-        let (name, expired) = line
-            .split_once('\t')
-            .with_context(|| format!("Unexpected artifact listing: {line}"))?;
-        let slot = match name {
-            PLAN_ARTIFACT => &mut found.0,
-            BUNDLE_ARTIFACT => &mut found.1,
-            _ => continue,
-        };
-        ensure!(
-            expired != "true",
-            "The {name} artifact of this run expired; start a new release run instead of retrying"
-        );
-        *slot = true;
-    }
-    Ok(found)
-}
+use crate::cmd::CommandExt;
 
 /// Make sure the release tag is free or already points at the release commit.
 ///
@@ -156,21 +113,5 @@ mod tests {
             tagged_commit("tagobj\trefs/tags/v0.8.0\ncommit\trefs/tags/v0.8.0^{}"),
             Some("commit".to_owned())
         );
-    }
-
-    #[test]
-    fn frozen_artifacts_are_reused_unless_expired() -> Result<()> {
-        assert_eq!(frozen_artifacts("")?, (false, false));
-        assert_eq!(
-            frozen_artifacts("release-plan\tfalse\nmaa_cli-x86_64\ttrue")?,
-            (true, false)
-        );
-        assert_eq!(
-            frozen_artifacts("release-plan\tfalse\nrelease-bundle\tfalse")?,
-            (true, true)
-        );
-        assert!(frozen_artifacts("release-bundle\ttrue").is_err());
-        assert!(frozen_artifacts("garbage").is_err());
-        Ok(())
     }
 }

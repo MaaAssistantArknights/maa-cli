@@ -38,7 +38,7 @@
 
 `version` 分支保存 `stable.json`、`beta.json`、`nightly.json` 及对应 `.txt`；`alpha.json` 与 `nightly.json` 内容相同：客户端沿用 MaaCore 的通道名 alpha，安装脚本也读取它。发布计划只读 `nightly.json`，它不存在时视为空通道，由第一次 Nightly 创建。
 
-通道从稳定到不稳定依次为 Stable → Beta → Nightly。一次发布会更新它所在的通道，以及更不稳定、且当前版本低于它的通道：例如 dev 分支已有 `0.8.0-beta.1` 时，发布 `0.7.6` 只更新 `stable.json`；发布 `0.8.0` 则三个通道都更新。要更新的通道在发布计划中一次算定；更新索引前若这些通道已被其他发布改动，任务失败而不覆盖。
+通道从稳定到不稳定依次为 Stable → Beta → Nightly。一次发布会更新它所在的通道，以及更不稳定、且当前版本低于它的通道：例如 dev 分支已有 `0.8.0-beta.1` 时，发布 `0.7.6` 只更新 `stable.json`；发布 `0.8.0` 则三个通道都更新。要更新的通道在发布计划中算定；写入索引时，若某个通道已经有更新的版本，就跳过它，索引不会倒退。
 
 下游按同样的结果发布：更新 Stable 时发布 Homebrew `maa-cli`、AUR 和 WinGet，并移动 `stable` tag；更新 Beta 时发布 Homebrew `maa-cli-beta`。新版本发布后不要重跑旧版本的下游任务：Homebrew 会拒绝降级，WinGet 会新增旧版本，AUR 会被回退。
 
@@ -65,9 +65,11 @@ Beta：在 Actions 中从 `main` 运行 `Release`，选择 `channel=beta`，真�
 
 ## 重试与恢复
 
-同一次 workflow run 的发布计划和说明保存为 `release-plan` artifact，打包结果和索引清单保存为 `release-bundle` artifact。重跑全部或失败的 jobs 都复用已保存的内容，不重新分配版本或改写产物。版本索引更新失败时，重跑 `Update Version Index` 及其后续任务即可，不需要重新编译。
+发布失败后只使用「Re-run failed jobs」：GitHub 只重跑失败的 job，并保留之前 job 的输出和 artifact，例如版本索引更新失败时不需要重新编译。
 
-编译产物只保留 7 天：若 `Publish Release` 在生成 `release-bundle` 前失败且已超过 7 天，需要选择「Re-run all jobs」。plan 和 bundle 保留 90 天；过期后工作流停止，应重新发起发布。正式 tag 已存在时必须指向同一提交。
+不要使用「Re-run all jobs」：它会重新编译，二进制的 checksum 会变。GitHub Release 先以草稿创建，上传完所有文件后才正式发布；已正式发布的 Release 不会被覆盖，此时 `Publish Release` 会直接失败。正式 tag 已存在时必须指向同一提交。
+
+编译产物、发布计划和打包结果只保留 7 天，超过后应重新发起发布。
 
 ## 仓库设置
 

@@ -10,11 +10,11 @@ use serde::{Deserialize, Serialize};
 use super::{
     Channel, PlanOptions, SourceOptions, changelog, git,
     selection::{cargo_version, ensure_stable},
-    version::{self, Identity, Target},
+    version::{self, Identity},
 };
 use crate::{cmd::CommandExt, github};
 
-/// The frozen description of one release, shared by every job of a run and its retries.
+/// The description of one release, resolved once and shared by every job of a run.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Plan {
     pub channel: Channel,
@@ -22,7 +22,7 @@ pub struct Plan {
     pub tag: String,
     pub commit: String,
     pub publish: bool,
-    pub targets: Vec<Target>,
+    pub targets: Vec<Channel>,
 }
 
 const PLAN_FILE: &str = "plan.json";
@@ -38,15 +38,8 @@ impl Plan {
             .with_context(|| format!("Failed to parse {}", file.display()))
     }
 
-    pub fn identity(&self) -> Identity {
-        Identity {
-            version: self.version.clone(),
-            commit: self.commit.clone(),
-        }
-    }
-
     fn outputs(&self) -> Vec<(&'static str, String)> {
-        let targets: Vec<&str> = self.targets.iter().map(|t| t.channel.as_str()).collect();
+        let targets: Vec<&str> = self.targets.iter().map(|c| c.as_str()).collect();
         vec![
             ("skip", "false".into()),
             ("channel", self.channel.as_str().into()),
@@ -136,7 +129,7 @@ pub fn run(options: PlanOptions) -> Result<()> {
         plan.tag,
         plan.targets
             .iter()
-            .map(|t| t.channel.as_str())
+            .map(|c| c.as_str())
             .collect::<Vec<_>>()
             .join(", "),
         plan.commit
@@ -305,16 +298,7 @@ mod tests {
             tag: "v0.8.0".into(),
             commit: "abc".into(),
             publish: true,
-            targets: vec![
-                Target {
-                    channel: Channel::Stable,
-                    expected: None,
-                },
-                Target {
-                    channel: Channel::Beta,
-                    expected: None,
-                },
-            ],
+            targets: vec![Channel::Stable, Channel::Beta],
         };
         let outputs = plan.outputs();
         let get = |key: &str| outputs.iter().find(|(k, _)| *k == key).unwrap().1.clone();
@@ -367,8 +351,7 @@ mod tests {
         assert_eq!(beta.version.to_string(), "0.8.0-beta.1");
         assert_eq!(beta.tag, "v0.8.0-beta.1");
         // No nightly was published yet, so the beta also fills that channel.
-        let channels: Vec<Channel> = beta.targets.iter().map(|t| t.channel).collect();
-        assert_eq!(channels, [Channel::Beta, Channel::Nightly]);
+        assert_eq!(beta.targets, [Channel::Beta, Channel::Nightly]);
 
         repo.git(&["tag", "v0.8.0-beta.1"]);
         assert!(plan_in(&repo, index.path(), Channel::Beta, "dev-0.8")?.is_none());

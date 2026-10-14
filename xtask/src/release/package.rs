@@ -12,7 +12,6 @@ use super::{
     archive,
     archive::ArchiveFormat,
     plan::{Index, Plan, read_manifest},
-    version::Target,
 };
 
 pub const BUNDLE: &str = "release-bundle";
@@ -74,8 +73,8 @@ pub fn run(plan_dir: &Path) -> Result<()> {
         });
     }
 
-    for target in &plan.targets {
-        for file in target.channel.index_files() {
+    for channel in &plan.targets {
+        for file in channel.index_files() {
             let path = bundle.join(BUNDLE_INDEX).join(file);
             write_manifest(&path, &manifest)?;
             write_shell_format(&path, &manifest)?;
@@ -85,30 +84,28 @@ pub fn run(plan_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Check, before publishing anything, that the planned index updates still apply.
-pub fn check_publication(plan_dir: &Path, index: &Path) -> Result<()> {
-    let plan = Plan::load(plan_dir)?;
-    let index = Index::read(index)?;
-    for target in &plan.targets {
-        check_target(&plan, &index, target)?;
-    }
-    Ok(())
-}
-
 /// Apply the bundle's manifests to the version branch checkout.
 ///
-/// Each target channel must still hold the entry seen when the plan was
-/// made, or already hold this release. Anything else means another release
-/// was published in between, and nothing is written.
+/// A channel that already holds a newer release is left alone, so a late retry
+/// never moves the index backwards.
 pub fn update_index(plan_dir: &Path, bundle: &Path, index_root: &Path) -> Result<()> {
     let plan = Plan::load(plan_dir)?;
     let index = Index::read(index_root)?;
     let bundle = bundle.join(BUNDLE_INDEX);
 
     let mut updates = Vec::new();
-    for target in &plan.targets {
-        check_target(&plan, &index, target)?;
-        for file in target.channel.index_files() {
+    for &channel in &plan.targets {
+        if let Some(current) = index.head(channel)
+            && current.version.cmp_precedence(&plan.version).is_gt()
+        {
+            println!(
+                "Leaving {} at the newer {}",
+                channel.as_str(),
+                current.version
+            );
+            continue;
+        }
+        for file in channel.index_files() {
             let source = bundle.join(file);
             let manifest = read_manifest(&source)?
                 .with_context(|| format!("{} is missing", source.display()))?;
@@ -128,26 +125,6 @@ pub fn update_index(plan_dir: &Path, bundle: &Path, index_root: &Path) -> Result
         write_shell_format(&destination, &manifest)?;
     }
     Ok(())
-}
-
-fn check_target(plan: &Plan, index: &Index, target: &Target) -> Result<()> {
-    let current = index.head(target.channel);
-    let release = plan.identity();
-    ensure!(
-        current == target.expected.as_ref() || current == Some(&release),
-        "The {} index changed since this release was planned (expected {}, found {}); plan a new release instead of retrying this one",
-        target.channel.as_str(),
-        describe(target.expected.as_ref()),
-        describe(current),
-    );
-    Ok(())
-}
-
-fn describe(identity: Option<&super::version::Identity>) -> String {
-    identity.map_or_else(
-        || "nothing".into(),
-        |id| format!("{} at {}", id.version, id.commit),
-    )
 }
 
 fn write_manifest(file: impl AsRef<Path>, manifest: &VersionManifest<Details>) -> Result<()> {
@@ -225,7 +202,7 @@ mod tests {
     use semver::Version;
 
     use super::*;
-    use crate::release::{Channel, version::Identity};
+    use crate::release::Channel;
 
     fn manifest(version: &str, commit: &str) -> VersionManifest<Details> {
         VersionManifest {
@@ -239,13 +216,6 @@ mod tests {
                     sha256sum: "a".repeat(64),
                 })]),
             },
-        }
-    }
-
-    fn id(version: &str, commit: &str) -> Identity {
-        Identity {
-            version: Version::parse(version).unwrap(),
-            commit: commit.into(),
         }
     }
 
@@ -266,8 +236,8 @@ mod tests {
             let bundle = dir.path().join(BUNDLE).join(BUNDLE_INDEX);
             fs::create_dir_all(&bundle)?;
             let incoming = manifest(&plan.version.to_string(), &plan.commit);
-            for target in &plan.targets {
-                for file in target.channel.index_files() {
+            for channel in &plan.targets {
+                for file in channel.index_files() {
                     write_manifest(bundle.join(file), &incoming)?;
                 }
             }
@@ -289,19 +259,12 @@ mod tests {
             )
         }
 
-        fn check(&self) -> Result<()> {
-            check_publication(
-                &self.dir.path().join("plan"),
-                &self.dir.path().join("version"),
-            )
-        }
-
         fn read(&self, file: &str) -> Result<Option<String>> {
             Ok(fs::read_to_string(self.dir.path().join("version").join(file)).ok())
         }
     }
 
-    fn plan(channel: Channel, version: &str, targets: Vec<Target>) -> Plan {
+    fn plan(channel: Channel, version: &str, targets: Vec<Channel>) -> Plan {
         Plan {
             channel,
             version: Version::parse(version).unwrap(),
@@ -315,20 +278,13 @@ mod tests {
     #[test]
     fn index_writes_targets_and_replays_idempotently() -> Result<()> {
         let fixture = Fixture::new(plan(Channel::Stable, "0.8.0", vec![
-            Target {
-                channel: Channel::Stable,
-                expected: Some(id("0.7.6", "old")),
-            },
-            Target {
-                channel: Channel::Nightly,
-                expected: None,
-            },
+            Channel::Stable,
+            Channel::Nightly,
         ]))?;
         fixture.publish("stable.json", "0.7.6", "old")?;
         fixture.publish("beta.json", "0.8.0-beta.1", "beta")?;
         fs::write(fixture.dir.path().join("version/unrelated.txt"), "keep")?;
 
-        fixture.check()?;
         fixture.update()?;
         let stable = fixture.read("stable.json")?.unwrap();
         assert!(stable.contains("\"version\": \"0.8.0\""));
@@ -346,7 +302,6 @@ mod tests {
 
         // A retry after the index was written changes nothing and succeeds.
         fs::write(fixture.dir.path().join("version/stable.txt"), "interrupted")?;
-        fixture.check()?;
         fixture.update()?;
         assert_eq!(fixture.read("stable.json")?.unwrap(), stable);
         assert!(
@@ -359,31 +314,31 @@ mod tests {
     }
 
     #[test]
-    fn index_refuses_to_write_after_another_release() -> Result<()> {
-        let fixture = Fixture::new(plan(Channel::Beta, "0.8.0-beta.2", vec![Target {
-            channel: Channel::Beta,
-            expected: Some(id("0.8.0-beta.1", "b1")),
-        }]))?;
+    fn index_never_moves_backwards() -> Result<()> {
+        let fixture = Fixture::new(plan(Channel::Beta, "0.8.0-beta.2", vec![
+            Channel::Beta,
+            Channel::Nightly,
+        ]))?;
+        // Published by another run before this late retry.
         fixture.publish("beta.json", "0.8.0-beta.3", "b3")?;
         let before = fixture.read("beta.json")?;
 
-        assert!(fixture.check().is_err());
-        assert!(fixture.update().is_err());
+        fixture.update()?;
         assert_eq!(fixture.read("beta.json")?, before);
+        assert!(
+            fixture
+                .read("nightly.json")?
+                .unwrap()
+                .contains("0.8.0-beta.2")
+        );
         Ok(())
     }
 
     #[test]
     fn index_validates_the_whole_bundle_before_writing() -> Result<()> {
         let fixture = Fixture::new(plan(Channel::Stable, "0.8.0", vec![
-            Target {
-                channel: Channel::Stable,
-                expected: None,
-            },
-            Target {
-                channel: Channel::Beta,
-                expected: None,
-            },
+            Channel::Stable,
+            Channel::Beta,
         ]))?;
         write_manifest(
             fixture

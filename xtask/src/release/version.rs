@@ -20,13 +20,6 @@ pub struct Identity {
     pub commit: String,
 }
 
-/// An index channel this release will update, with the entry expected there at plan time.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Target {
-    pub channel: Channel,
-    pub expected: Option<Identity>,
-}
-
 /// Version declared by a `dev-X.Y` branch name.
 pub fn dev_branch_version(branch: &str) -> Option<Version> {
     let (major, minor) = branch.strip_prefix("dev-")?.split_once('.')?;
@@ -130,7 +123,7 @@ pub fn targets(
     channel: Channel,
     release: &Identity,
     head: impl Fn(Channel) -> Option<Identity>,
-) -> Result<Vec<Target>> {
+) -> Result<Vec<Channel>> {
     let mut targets = Vec::new();
     for candidate in Channel::ALL.into_iter().filter(|c| *c >= channel) {
         let current = head(candidate);
@@ -140,10 +133,7 @@ pub fn targets(
             Some(current) => release.version.cmp_precedence(&current.version).is_gt(),
         };
         if update {
-            targets.push(Target {
-                channel: candidate,
-                expected: current,
-            });
+            targets.push(candidate);
         } else if candidate == channel {
             let current = current.expect("an empty channel is always updated");
             bail!(
@@ -159,10 +149,10 @@ pub fn targets(
 }
 
 /// Homebrew formulae to bump for the given index targets.
-pub fn homebrew_formulae(targets: &[Target]) -> Vec<&'static str> {
+pub fn homebrew_formulae(targets: &[Channel]) -> Vec<&'static str> {
     targets
         .iter()
-        .filter_map(|target| match target.channel {
+        .filter_map(|channel| match channel {
             Channel::Stable => Some("maa-cli"),
             Channel::Beta => Some("maa-cli-beta"),
             Channel::Nightly => None,
@@ -179,10 +169,6 @@ mod tests {
             version: Version::parse(version).unwrap(),
             commit: commit.into(),
         }
-    }
-
-    fn channels(targets: &[Target]) -> Vec<Channel> {
-        targets.iter().map(|t| t.channel).collect()
     }
 
     #[test]
@@ -271,8 +257,7 @@ mod tests {
             Channel::Nightly => Some(id("0.8.0-nightly.120+sha.c", "c")),
         };
         let targets = targets(Channel::Stable, &release, heads)?;
-        assert_eq!(channels(&targets), [Channel::Stable]);
-        assert_eq!(targets[0].expected, Some(id("0.7.5", "a")));
+        assert_eq!(targets, [Channel::Stable]);
         assert_eq!(homebrew_formulae(&targets), ["maa-cli"]);
         Ok(())
     }
@@ -286,7 +271,7 @@ mod tests {
             Channel::Nightly => None,
         };
         let targets = targets(Channel::Stable, &release, heads)?;
-        assert_eq!(channels(&targets), Channel::ALL);
+        assert_eq!(targets, Channel::ALL);
         assert_eq!(homebrew_formulae(&targets), ["maa-cli", "maa-cli-beta"]);
         Ok(())
     }
@@ -300,11 +285,11 @@ mod tests {
             Channel::Nightly => Some(id("0.8.0-nightly.125+sha.c", "c")),
         };
         let beta = targets(Channel::Beta, &release, heads)?;
-        assert_eq!(channels(&beta), [Channel::Beta]);
+        assert_eq!(beta, [Channel::Beta]);
         assert_eq!(homebrew_formulae(&beta), ["maa-cli-beta"]);
 
         let release = id("0.8.0-nightly.130+sha.d", "d");
-        assert_eq!(channels(&targets(Channel::Nightly, &release, heads)?), [
+        assert_eq!(targets(Channel::Nightly, &release, heads)?, [
             Channel::Nightly
         ]);
         Ok(())
@@ -316,7 +301,7 @@ mod tests {
         let replay = targets(Channel::Stable, &release, |c| {
             (c == Channel::Stable).then(|| release.clone())
         })?;
-        assert_eq!(replay[0].expected, Some(release.clone()));
+        assert_eq!(replay, Channel::ALL);
 
         for head in [id("0.8.0", "other"), id("0.8.1", "x")] {
             let head = head.clone();
