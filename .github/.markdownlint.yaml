@@ -1,0 +1,3 @@
+# PR/issue templates do not start with a top-level heading
+extends: ../.markdownlint.yaml
+MD041: false
