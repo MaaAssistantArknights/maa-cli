@@ -428,10 +428,10 @@ mod tests {
     #[test]
     #[ignore = "Need installed MaaCore"]
     fn test_cleanup_real_files() {
-        let test_root = join!(temp_dir(), "maa-cli-test-cleanup-real-files");
-        let cache = join!(&test_root, "cache");
-        let core_cache = join!(&test_root, "core_cache");
-        let log = join!(&test_root, "log");
+        let test_root = tempfile::tempdir().unwrap();
+        let cache = join!(test_root.path(), "cache");
+        let core_cache = join!(test_root.path(), "core_cache");
+        let log = join!(test_root.path(), "log");
 
         cache.ensure().unwrap();
         core_cache.ensure().unwrap();
@@ -440,21 +440,25 @@ mod tests {
         std::fs::File::create(join!(&cache, "test.tar.gz")).unwrap();
 
         #[cfg(feature = "core_installer")]
-        let kept_core_package = {
+        let (stale_core_package, kept_core_package) = {
             use semver::Version;
 
             use crate::installer::maa_core::this_asset_name;
 
-            std::fs::File::create(cache.join(this_asset_name(&Version::new(5, 16, 1)))).unwrap();
+            // No real MaaCore release has this version, so it is never the installed one
+            let stale = join!(&cache, this_asset_name(&Version::new(0, 0, 1)));
+            std::fs::File::create(&stale).unwrap();
 
-            if var_os("SKIP_CORE_TEST").is_none() {
+            let kept = if var_os("SKIP_CORE_TEST").is_none() {
                 let version = crate::state::CORE_VERSION.as_ref().unwrap();
                 let path = join!(&cache, this_asset_name(version));
                 std::fs::File::create(&path).unwrap();
                 Some(path)
             } else {
                 None
-            }
+            };
+
+            (stale, kept)
         };
 
         std::fs::create_dir_all(join!(&core_cache, "avatars")).unwrap();
@@ -486,12 +490,13 @@ mod tests {
         assert!(!join!(&log, "asst.bak.log").exists());
 
         #[cfg(feature = "core_installer")]
-        if let Some(path) = kept_core_package {
-            assert!(path.exists());
+        {
+            assert!(!stale_core_package.exists());
+            if let Some(path) = kept_core_package {
+                assert!(path.exists());
+            }
         }
 
         cleanup(&targets).unwrap(); // Cleanup again to test no files left
-
-        std::fs::remove_dir_all(&test_root).unwrap();
     }
 }
