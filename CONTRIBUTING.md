@@ -1,39 +1,39 @@
 # 贡献指南 / Contributing
 
-感谢你愿意为 maa-cli 贡献代码！开发环境、代码规范和提交流程请看 [开发文档](DEVELOPMENT.md)。这里说的是提交 PR 时我们希望你注意的几件事，不管有没有用 AI 工具都一样。
+感谢你对 maa-cli 的贡献。开发环境、代码规范和提交流程见 [开发文档](DEVELOPMENT.md)，本文说明提交 PR 时需要注意的事项，无论是否使用 AI 工具均适用。
 
-maa-cli 的维护者人手很少，review 的时间往往比写代码的时间更紧张。下面这些约定，都是为了让你的改动能更快、更顺利地合并。
+本项目维护者人手有限，review 往往是合并的瓶颈。以下约定的目的是让改动能够更快地被审阅和合并。
 
 ## 提交 PR 前
 
-1. **先在 issue 里聊聊方案。** 如果要加新功能、新命令、新配置项，或者改配置格式，或者改动预计会超过 500 行左右，请先开一个 issue，和维护者对一下思路再动手，免得写完才发现方向不对，白费功夫。修 bug、改文档和小改进可以直接提 PR。开始之前也可以搜一下，看看有没有人已经在做同样的事。
-2. **一个 PR 只做一件事。** 顺手发现的其他问题或者想做的重构，欢迎另开 PR。小而专注的 PR 更容易 review，也更快能合并。
-3. **用 AI 没问题，但请自己先看一遍。** 提交之前，请亲自读一遍所有改动，确认每一处都是需要的，并且你能说清楚为什么这么改。AI 常常会多加一些没人要的功能、大段注释或者用不上的防御性代码，请顺手删掉。如果用 agent 写代码，记得让它先读 [AGENTS.md](AGENTS.md)。
-4. **PR 描述简短就好。** 按 PR 模板写清楚为什么改、怎么改、实际是怎么验证的，有不确定的地方也请写出来。不需要粘贴工具生成的长篇总结。
-5. **review 时请用自己的话回复。** 直接转贴 AI 的回答，我们很难判断你是不是同意、哪里有疑问。
+1. **先在 issue 中讨论方案。** 新功能、新命令、新配置项、配置格式的变更，以及预计超过约 500 行的改动，请先开 issue 与维护者确认方案，再开始实现，以免方向不一致导致返工。bug 修复、文档和小幅改进可以直接提交 PR。开始之前，请先搜索是否已有相同主题的 issue 或 PR。
+2. **每个 PR 只解决一个问题。** 开发过程中发现的其他问题或希望进行的重构，请另开 PR。范围集中的 PR 更容易审阅，也能更快合并。
+3. **使用 AI 生成的改动需要经过作者本人审阅。** 提交前请完整阅读所有改动，确认每一处都是必要的，并能说明修改的理由。AI 生成的代码常包含未被要求的功能、冗长的注释或不必要的防御性代码，请在提交前删除。使用 agent 开发时，请让它先阅读 [AGENTS.md](AGENTS.md)。
+4. **PR 描述应简洁。** 请按照 PR 模板说明修改的原因、实现方式和实际的验证方法，如有不确定之处也请注明。不需要附上工具生成的长篇摘要。
+5. **请用自己的语言回复 review。** 直接转贴 AI 的输出，会让维护者难以判断你是否认同修改意见，以及有哪些疑问。
 
-## 如果 PR 不太符合上面的约定
+## 不符合约定的 PR
 
-我们会在 PR 里说明原因，一般会这样处理：
+维护者会在 PR 中说明原因，并视情况处理：
 
-- 需要先讨论方案的：请你先开 issue，PR 可能会暂时关闭，方案确定后欢迎重新提交。
-- 改动太多、混了不相关内容的：请你拆分成几个 PR。
-- 明显没有经过作者本人检查的 AI 生成 PR：我们可能会直接关闭，不再逐行 review。
-- review 之后 30 天没有回应的：可能会关闭，你之后随时可以重新打开。
+- 需要先讨论方案的：请先开 issue，PR 可能会暂时关闭，方案确定后可以重新提交。
+- 改动过大或包含无关内容的：请拆分为多个 PR。
+- 明显未经作者本人审阅的 AI 生成 PR：可能会直接关闭，不进行逐行 review。
+- review 后 30 天内没有回应的：可能会关闭，之后可以随时重新打开。
 
 ## English
 
-Thanks for contributing to maa-cli! See [DEVELOPMENT.md](DEVELOPMENT.md) for the development setup, code conventions and workflow. Below is what we ask of every PR, whether or not you used AI tools. We have very few maintainers and review time is usually the bottleneck, so these help your change get merged faster.
+Thank you for contributing to maa-cli. See [DEVELOPMENT.md](DEVELOPMENT.md) for the development setup, code conventions and workflow. This document describes what we expect from a PR, whether or not AI tools were used. The project has few maintainers and review is often the bottleneck; these conventions help changes get reviewed and merged sooner.
 
-1. **Talk about the design in an issue first.** For a new feature, command, config option, config format change, or anything likely to exceed roughly 500 lines, please open an issue and agree on the approach with a maintainer before writing code, so you don't spend effort in the wrong direction. Bug fixes, docs and small improvements can go straight to a PR. It's also worth searching for existing issues and PRs on the same topic.
-2. **One PR, one purpose.** Other problems you notice or refactors you'd like to do are welcome as separate PRs. Small, focused PRs are easier to review and get merged sooner.
-3. **AI is fine, but please review it yourself.** Before submitting, read through every change, make sure each one is needed, and that you can explain why it is there. AI tends to add features nobody asked for, long comments and unneeded defensive code; please remove them. If you use an agent, have it read [AGENTS.md](AGENTS.md) first.
-4. **Keep the description short.** Follow the PR template: why, how, how you actually verified it, and anything you are unsure about. No need to paste long generated summaries.
-5. **Reply to reviews in your own words.** When AI output is pasted as a reply, it is hard for us to tell whether you agree or what you are unsure about.
+1. **Discuss the design in an issue first.** For a new feature, command, config option, config format change, or a change expected to exceed roughly 500 lines, open an issue and agree on the approach with a maintainer before implementing it, to avoid rework. Bug fixes, docs and small improvements can be submitted as a PR directly. Search for existing issues and PRs on the same topic before starting.
+2. **One PR, one purpose.** Submit other problems you find or refactors you want to make as separate PRs. Focused PRs are easier to review and merge.
+3. **AI-generated changes must be reviewed by the author.** Before submitting, read every change, make sure each one is necessary, and be able to explain it. AI-generated code often includes features nobody asked for, verbose comments and unnecessary defensive code; remove them before submitting. If you use an agent, have it read [AGENTS.md](AGENTS.md) first.
+4. **Keep the description concise.** Follow the PR template: why, how, how you actually verified it, and anything you are unsure about. Do not include long tool-generated summaries.
+5. **Reply to reviews in your own words.** Pasted AI output makes it hard for maintainers to tell whether you agree with the feedback and what questions you have.
 
-If a PR doesn't follow these, we will explain why in the PR. Usually:
+PRs that do not follow these conventions: maintainers will explain why in the PR and, depending on the case:
 
-- Needs design discussion first: we will ask you to open an issue; the PR may be closed for now and you are welcome to resubmit once the design is agreed.
-- Too large or mixes unrelated changes: we will ask you to split it.
+- Needs design discussion first: you will be asked to open an issue; the PR may be closed for now and can be resubmitted once the design is agreed.
+- Too large or contains unrelated changes: you will be asked to split it into several PRs.
 - AI-generated PRs clearly not reviewed by their author: may be closed without a line-by-line review.
-- No response for 30 days after a review: may be closed; you can reopen it at any time.
+- No response within 30 days after a review: may be closed; it can be reopened at any time.
