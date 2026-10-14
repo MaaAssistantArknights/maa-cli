@@ -122,7 +122,7 @@ commit_parsers = [
 
   # reverting a change that never reached the changelog stays out of it too
   { message = "^revert: (ci|build|style|chore\\((deps|xtask|style|format)\\)|[Bb]ump)", skip = true },
-  { message = "^[Rr]evert", group = "<!-- 7 --> Revert" },
+  { message = "^revert(\\(.+\\))?!?:", group = "<!-- 7 --> Revert" },
 
   # skip code style changes
   { message = "^style", skip = true },
