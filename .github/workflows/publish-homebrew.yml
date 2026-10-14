@@ -7,6 +7,10 @@ on:
         description: Package version
         required: true
         type: string
+      formulae:
+        description: Space-separated formulae to bump
+        required: true
+        type: string
       dryrun:
         description: Do not create PR
         required: true
@@ -19,6 +23,11 @@ on:
     inputs:
       version:
         description: Package version
+        required: true
+        type: string
+      formulae:
+        description: Space-separated formulae to bump (maa-cli, maa-cli-beta)
+        default: maa-cli
         required: true
         type: string
       dryrun:
@@ -49,10 +58,15 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
       - name: Bump Formulae and Casks
+        env:
+          VERSION: ${{ inputs.version }}
+          FORMULAE: ${{ inputs.formulae }}
+          DRYRUN: ${{ inputs.dryrun }}
         run: |
-          for formula in maa-cli maa-cli-beta; do
-            brew bump-formula-pr "$formula" \
-              ${{ inputs.dryrun && '--dry-run' || '' }} \
-              --no-browse \
-              --version='${{ inputs.version }}'
+          # The release plan only lists formulae whose channel this release updates.
+          read -ra formulae <<< "$FORMULAE"
+          for formula in "${formulae[@]}"; do
+            args=(--no-browse "--version=$VERSION")
+            if [[ "$DRYRUN" == true ]]; then args+=(--dry-run); fi
+            brew bump-formula-pr "$formula" "${args[@]}"
           done

@@ -1,110 +1,169 @@
 name: Release
 on:
-  push:
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
-  # Just used for testing
   pull_request:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/release.yml"
+    branches: [main]
+    types: [closed]
   workflow_dispatch:
     inputs:
       channel:
-        description: The release channel
+        description: Pre-release channel, built from the dev-X.Y branch
         default: beta
         required: true
         type: choice
-        options:
-          - alpha
-          - beta
-          - stable
+        options: [beta, nightly]
       publish:
-        description: Whether to publish a new release
+        description: Publish the release instead of building a preview
         default: false
         required: true
         type: boolean
   schedule:
-    # Release alpha every day at 20:00 UTC (4:00 AM UTC+8)
     - cron: "0 20 * * *"
 
 defaults:
   run:
     shell: bash
 
+# Publishing and preparation share a queue. Closed PRs that cannot publish
+# get a throwaway group so they never wait behind a release build.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && !(github.event.pull_request.merged && contains(github.event.pull_request.labels.*.name, 'release')) && format('release-skip-{0}', github.run_id) || 'release-state' }}
+  queue: max
+
 permissions:
   contents: read
+  actions: read
+
+env:
+  # Release tooling always comes from main: the merged commit for stable,
+  # the triggering main commit for pre-releases built from the dev branch.
+  TOOLS_REF: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
 
 jobs:
   meta:
-    name: Meta
+    name: Release Plan
+    if: >-
+      (github.event_name == 'pull_request' &&
+       github.event.action == 'closed' &&
+       github.event.pull_request.merged == true &&
+       contains(github.event.pull_request.labels.*.name, 'release') &&
+       github.event.pull_request.head.repo.full_name == github.repository) ||
+      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.meta.outputs.version }}
-      tag: ${{ steps.meta.outputs.tag }}
-      commit: ${{ steps.meta.outputs.commit }}
-      channel: ${{ steps.meta.outputs.channel }}
-      profile: ${{ steps.meta.outputs.profile }}
-      publish: ${{ steps.meta.outputs.publish }}
-      skip: ${{ steps.meta.outputs.skip }}
+      version: ${{ steps.plan.outputs.version }}
+      tag: ${{ steps.plan.outputs.tag }}
+      commit: ${{ steps.plan.outputs.commit }}
+      channel: ${{ steps.plan.outputs.channel }}
+      profile: ${{ steps.plan.outputs.profile }}
+      publish: ${{ steps.plan.outputs.publish }}
+      targets: ${{ steps.plan.outputs.targets }}
+      homebrew: ${{ steps.plan.outputs.homebrew }}
+      skip: ${{ steps.plan.outputs.skip }}
+      packaged: ${{ steps.saved.outputs.bundle }}
+    env:
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Checkout
+      - name: Select channel
+        id: event
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SOURCE_REF: ${{ github.ref }}
+          CHANNEL_INPUT: ${{ inputs.channel }}
+          PUBLISH_INPUT: ${{ inputs.publish }}
+        run: |
+          case "$EVENT_NAME" in
+            pull_request) channel=stable; publish=true ;;
+            schedule) channel=nightly; publish=true ;;
+            workflow_dispatch)
+              if [[ "$SOURCE_REF" != refs/heads/main ]]; then
+                echo 'Run Release from main; pre-releases are built from the dev-X.Y branch.' >&2
+                exit 1
+              fi
+              channel="$CHANNEL_INPUT"; publish="$PUBLISH_INPUT" ;;
+            *) exit 1 ;;
+          esac
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ env.TOOLS_REF }}
+      - name: Locate this run's frozen plan and bundle
+        id: saved
+        run: cargo x -- release artifacts
+      - name: Restore frozen plan
+        if: steps.saved.outputs.plan == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: release-plan
+          path: ${{ runner.temp }}/release-plan
+      - name: Select source commit
+        id: source
+        if: steps.saved.outputs.plan != 'true'
+        env:
+          CHANNEL: ${{ steps.event.outputs.channel }}
+          MERGE_COMMIT: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          args=(--channel "$CHANNEL")
+          if [[ "$CHANNEL" == stable ]]; then args+=(--commit "$MERGE_COMMIT"); fi
+          cargo x -- release source "${args[@]}"
+      - name: Checkout dev branch
+        if: steps.saved.outputs.plan != 'true' && steps.source.outputs.skip != 'true' && steps.event.outputs.channel != 'stable'
         uses: actions/checkout@v7
-      - name: Checkout Version Branch
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.source.outputs.commit }}
+          path: source
+      - name: Checkout version index
+        if: steps.saved.outputs.plan != 'true' && steps.source.outputs.skip != 'true'
         uses: actions/checkout@v7
         with:
           ref: version
           path: version
-      - name: Meta
-        id: meta
-        run: |
-          cargo x -- release meta
-
-  release-note:
-    name: Generate Release Notes
-    if: ${{ !fromJson(needs.meta.outputs.skip) }}
-    runs-on: ubuntu-latest
-    needs: [meta]
-    env:
-      CLIFF_SHORT_USERNAME: true
-    outputs:
-      content: ${{ steps.git_cliff.outputs.content }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
+      - name: Install git-cliff
+        if: steps.saved.outputs.plan != 'true' && steps.source.outputs.skip != 'true'
+        uses: taiki-e/install-action@v2
         with:
-          fetch-depth: 0
-      - name: Generate Release Notes
-        id: git_cliff
-        uses: orhun/git-cliff-action@v4
+          tool: git-cliff@2.13.1
+      - name: Resolve plan once
+        if: steps.saved.outputs.plan != 'true'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ needs.meta.outputs.version }}
-          TAG: ${{ needs.meta.outputs.tag }}
-        with:
-          config: cliff.toml
-          # If the release is triggered by a tag, process commits starting
-          # from the latest tag, otherwise tag will be create later, so use
-          # unreleased commits
-          args: >
-            -v
-            ${{ github.event_name == 'push' && '-l' || '-u' }}
-            ${{ needs.meta.outputs.channel != 'stable' && '--tag-pattern="^v"' || '' }}
-
-      - name: Preview Release Notes
-        if: ${{ !fromJson(needs.meta.outputs.publish) }}
+          CHANNEL: ${{ steps.event.outputs.channel }}
+          PUBLISH: ${{ steps.event.outputs.publish }}
+          SKIP: ${{ steps.source.outputs.skip }}
+          COMMIT: ${{ steps.source.outputs.commit }}
+          BRANCH: ${{ steps.source.outputs.branch }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          {
-            echo '```markdown'
-            cat '${{ steps.git_cliff.outputs.changelog }}'
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          plan="$RUNNER_TEMP/release-plan"
+          mkdir -p "$plan"
+          if [[ "$SKIP" == true ]]; then
+            echo 'skip=true' > "$plan/outputs"
+            exit 0
+          fi
+          source=.
+          if [[ "$CHANNEL" != stable ]]; then source=source; fi
+          args=(--channel "$CHANNEL" --commit "$COMMIT" --branch "$BRANCH"
+                --source "$source" --index version --out "$plan")
+          if [[ "$PUBLISH" == true ]]; then args+=(--publish); fi
+          cargo x -- release plan "${args[@]}"
+      - name: Freeze plan before any publication
+        if: steps.saved.outputs.plan != 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-plan
+          path: ${{ runner.temp }}/release-plan
+          retention-days: 90
+          if-no-files-found: error
+      - name: Output frozen plan
+        id: plan
+        run: cat "$RUNNER_TEMP/release-plan/outputs" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build
     needs: meta
-    if: ${{ !fromJson(needs.meta.outputs.skip) }}
+    if: needs.meta.outputs.skip != 'true' && needs.meta.outputs.packaged != 'true'
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -119,6 +178,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.meta.outputs.commit }}
       - name: Build
         id: build
         env:
@@ -131,13 +192,14 @@ jobs:
         with:
           name: maa_cli-${{ steps.build.outputs.host_triplet }}
           path: ${{ steps.build.outputs.host_triplet }}.tar
-          retention-days: 1
+          retention-days: 7
+          overwrite: true
           if-no-files-found: error
 
   build-winget:
     name: Build for Winget
     needs: meta
-    if: ${{ !fromJson(needs.meta.outputs.skip) }}
+    if: needs.meta.outputs.skip != 'true' && needs.meta.outputs.packaged != 'true'
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -148,6 +210,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.meta.outputs.commit }}
       - name: Build
         id: build
         env:
@@ -162,126 +226,187 @@ jobs:
         with:
           name: maa_cli-${{ steps.build.outputs.host_triplet }}-winget
           path: ${{ steps.build.outputs.host_triplet }}.tar
-          retention-days: 1
+          retention-days: 7
+          overwrite: true
           if-no-files-found: error
 
   release:
-    name: Release
-    if: ${{ !fromJson(needs.meta.outputs.skip) }}
+    name: Publish Release
+    needs: [meta, build, build-winget]
+    if: >-
+      !cancelled() && needs.meta.result == 'success' &&
+      needs.meta.outputs.skip != 'true' &&
+      (needs.meta.outputs.packaged == 'true' ||
+       (needs.build.result == 'success' && needs.build-winget.result == 'success'))
     runs-on: ubuntu-latest
-    needs: [meta, build, build-winget, release-note]
     permissions:
       contents: write
+      actions: read
     env:
       GH_REPO: ${{ github.repository }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      CHANNEL: ${{ needs.meta.outputs.channel }}
-      VERSION: ${{ needs.meta.outputs.version }}
-      TAG: ${{ needs.meta.outputs.tag }}
-      COMMIT: ${{ needs.meta.outputs.commit }}
+      GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-      - name: Checkout version branch
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TOOLS_REF }}
+      - uses: actions/checkout@v7
         with:
           ref: version
           path: version
-      - name: Download Artifacts
+      - name: Restore release plan
         uses: actions/download-artifact@v8
+        with:
+          name: release-plan
+          path: release-plan
+      - name: Locate immutable bundle on every job attempt
+        id: bundle
+        run: cargo x -- release artifacts
+      - name: Restore packaged artifacts
+        if: steps.bundle.outputs.bundle == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: release-bundle
+          path: release-bundle
+      - name: Checkout release commit for its licenses
+        if: steps.bundle.outputs.bundle != 'true'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.meta.outputs.commit }}
+          path: source
+      - name: Download build artifacts
+        if: steps.bundle.outputs.bundle != 'true'
+        uses: actions/download-artifact@v8
+        with:
+          pattern: maa_cli-*
       - name: Install cargo-about
+        if: steps.bundle.outputs.bundle != 'true'
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-about
-      - name: Generate Third-Party Licenses Information
-        run: cargo about generate about.hbs -o licenses.md
-      - name: Package Release Artifacts and Update Version Files
-        run: cargo x --release -- release package
-      - name: Check existing release
-        if: ${{ fromJson(needs.meta.outputs.publish) }}
+      - name: Package artifacts
+        if: steps.bundle.outputs.bundle != 'true'
         run: |
-          if gh release view "$TAG" &> /dev/null; then
-            if [ "$TAG" == "nightly" ]; then
-              echo "Release as nightly, clear existing release and tag"
-              gh release delete "$TAG" --yes  --cleanup-tag
-            else
-              echo "Release $TAG already exists, abort"
-              exit 1
-            fi
-          fi
-          sleep 5 # wait to avoid the release becomes draft
-      - name: Create Release
+          (cd source && cargo about generate about.hbs -o ../licenses.md)
+          cargo x -- release package
+      - name: Freeze bundle before publication
+        if: steps.bundle.outputs.bundle != 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-bundle
+          path: release-bundle
+          retention-days: 90
+          if-no-files-found: error
+      - name: Verify the planned index updates still apply
+        if: needs.meta.outputs.publish == 'true'
+        run: cargo x -- release check-publication
+      - name: Check existing tag
+        if: needs.meta.outputs.publish == 'true'
+        run: cargo x -- release tag
+      - name: Create or finish release with the same artifacts
+        if: needs.meta.outputs.publish == 'true'
         uses: softprops/action-gh-release@v3
-        if: ${{ fromJson(needs.meta.outputs.publish) }}
         with:
           name: v${{ needs.meta.outputs.version }}
           tag_name: ${{ needs.meta.outputs.tag }}
           target_commitish: ${{ needs.meta.outputs.commit }}
           prerelease: ${{ needs.meta.outputs.channel != 'stable' }}
-          body: ${{ needs.release-note.outputs.content }}
+          body_path: release-plan/notes.md
           fail_on_unmatched_files: true
           files: |
-            maa_cli-*-unknown-linux-gnu.tar.gz
-            maa_cli-*-apple-darwin.tar.gz
-            maa_cli-*-pc-windows-msvc.zip
-            maa_cli-*-pc-windows-msvc-winget.zip
-      - name: Commit version files and Push
+            release-bundle/maa_cli-*-unknown-linux-gnu.tar.gz
+            release-bundle/maa_cli-*-apple-darwin.tar.gz
+            release-bundle/maa_cli-*-pc-windows-msvc.zip
+            release-bundle/maa_cli-*-pc-windows-msvc-winget.zip
+      - name: Preview
+        if: needs.meta.outputs.publish != 'true'
+        run: cat release-plan/notes.md >> "$GITHUB_STEP_SUMMARY"
+
+  update-index:
+    name: Update Version Index
+    needs: [meta, release]
+    if: >-
+      !cancelled() && needs.release.result == 'success' &&
+      needs.meta.outputs.publish == 'true' && needs.meta.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TOOLS_REF }}
+      - uses: actions/checkout@v7
+        with:
+          ref: version
+          path: version
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-plan
+          path: release-plan
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-bundle
+          path: release-bundle
+      - name: Apply published manifests
+        run: cargo x -- release index
+      - name: Commit index
         working-directory: version
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
         run: |
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          {
-            echo "Commit changes to version files"
-            echo '```diff'
-            git diff ./*.json ./*.txt
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          git commit ./*.json ./*.txt -m 'chore: bump version to v${{ needs.meta.outputs.version }}'
-          git push --verbose ${{ !fromJson(needs.meta.outputs.publish) && '--dry-run' || ''}}
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ./*.json ./*.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: release v$VERSION"
+            git push origin HEAD:refs/heads/version
+          fi
 
   update-stable:
     name: Update Stable Tag
-    if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'stable' }}
-    needs: [meta, release]
+    needs: [meta, update-index]
+    if: ${{ !cancelled() && needs.update-index.result == 'success' && contains(needs.meta.outputs.targets, 'stable') }}
     permissions:
       contents: write
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.meta.outputs.commit }}
+      - uses: actions/checkout@v7
+        with:
+          ref: version
+          path: version
       - name: Update Stable Tag
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
+          COMMIT: ${{ needs.meta.outputs.commit }}
         run: |
-          git tag -f stable ${{ needs.meta.outputs.commit }}
+          # A retried job must not move the tag back after a newer stable release.
+          if ! jq -e --arg version "$VERSION" --arg commit "$COMMIT" \
+            '.version == $version and .details.commit == $commit' version/stable.json > /dev/null; then
+            echo 'A newer stable release is indexed; leave the stable tag unchanged.'
+            exit 0
+          fi
+          git tag -f stable "$COMMIT"
           git push --verbose --force origin stable
-
-  update-changelog:
-    name: Update Changelog
-    needs: [meta, release]
-    permissions:
-      contents: write
-    if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'stable' }}
-    uses: ./.github/workflows/publish-changelog.yml
-    with:
-      version: ${{ needs.meta.outputs.version }}
-      dryrun: false
 
   publish-homebrew:
     name: Publish Homebrew Formulae
-    needs: [meta, release]
-    if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'stable' }}
+    needs: [meta, update-index]
+    if: ${{ !cancelled() && needs.update-index.result == 'success' && needs.meta.outputs.homebrew != '' }}
     uses: ./.github/workflows/publish-homebrew.yml
     with:
       version: ${{ needs.meta.outputs.version }}
+      formulae: ${{ needs.meta.outputs.homebrew }}
       dryrun: false
     secrets:
       MAA_HOMEBREW_BUMP_PR: ${{ secrets.MAA_HOMEBREW_BUMP_PR }}
 
   publish-aur:
     name: Publish AUR Package
-    needs: [meta, release]
-    if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'stable' }}
+    needs: [meta, update-index]
+    if: ${{ !cancelled() && needs.update-index.result == 'success' && contains(needs.meta.outputs.targets, 'stable') }}
     uses: ./.github/workflows/publish-aur.yml
     with:
       pkgver: ${{ needs.meta.outputs.version }}
@@ -291,8 +416,8 @@ jobs:
 
   publish-winget:
     name: Publish Winget Package
-    needs: [meta, release]
-    if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'stable' }}
+    needs: [meta, update-index]
+    if: ${{ !cancelled() && needs.update-index.result == 'success' && contains(needs.meta.outputs.targets, 'stable') }}
     uses: ./.github/workflows/publish-winget.yml
     with:
       version: ${{ needs.meta.outputs.version }}

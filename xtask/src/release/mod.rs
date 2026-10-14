@@ -1,23 +1,31 @@
-use std::str::FromStr;
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+    str::FromStr,
+};
 
 use anyhow::{Result, bail};
-use clap::Subcommand;
-use serde::Deserialize;
+use clap::{Args, Subcommand};
+use serde::{Deserialize, Serialize};
 
 pub mod archive;
-mod meta;
+mod changelog;
 mod package;
+mod plan;
+mod publish;
+mod selection;
+mod version;
 
-/// Release channel for maa-cli.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+/// Release channel for maa-cli, ordered from the most to the least stable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Channel {
-    /// Stable release
+    /// Stable release from main
     Stable,
-    /// Beta pre-release
+    /// Beta pre-release from the dev branch
     Beta,
-    /// Alpha pre-release (nightly)
-    Alpha,
+    /// Nightly snapshot of the dev branch
+    Nightly,
 }
 
 impl FromStr for Channel {
@@ -27,57 +35,224 @@ impl FromStr for Channel {
         match s {
             "stable" => Ok(Channel::Stable),
             "beta" => Ok(Channel::Beta),
-            "alpha" => Ok(Channel::Alpha),
+            "nightly" => Ok(Channel::Nightly),
             _ => bail!("Unknown channel: {s}"),
         }
     }
 }
 
 impl Channel {
+    pub const ALL: [Channel; 3] = [Channel::Stable, Channel::Beta, Channel::Nightly];
+
     /// Get the channel name as a string.
     pub fn as_str(&self) -> &'static str {
         match self {
             Channel::Stable => "stable",
             Channel::Beta => "beta",
-            Channel::Alpha => "alpha",
+            Channel::Nightly => "nightly",
         }
     }
 
-    /// Get the version file name for this channel.
-    pub fn version_file(&self) -> String {
-        let channel = self.as_str();
-        format!("version/{channel}.json")
-    }
-
-    /// Get the list of version files to update for this channel.
+    /// Index files of this channel, relative to the version branch checkout.
     ///
-    /// - Alpha: updates alpha.json
-    /// - Beta: updates alpha.json and beta.json
-    /// - Stable: updates all three (alpha.json, beta.json, stable.json)
-    pub fn version_files(&self) -> &[&'static str] {
+    /// The client and install scripts read `alpha.json`, so it mirrors nightly. The first
+    /// file is the one release planning reads.
+    pub fn index_files(&self) -> &'static [&'static str] {
         match self {
-            Channel::Alpha => &["version/alpha.json"],
-            Channel::Beta => &["version/alpha.json", "version/beta.json"],
-            Channel::Stable => &[
-                "version/alpha.json",
-                "version/beta.json",
-                "version/stable.json",
-            ],
+            Channel::Stable => &["stable.json"],
+            Channel::Beta => &["beta.json"],
+            Channel::Nightly => &["nightly.json", "alpha.json"],
         }
     }
 }
 
 #[derive(Subcommand)]
 pub enum ReleaseCommands {
-    /// Parse version and determine release metadata
-    Meta,
-    /// Update version.json files with release information
-    Package,
+    /// Find the commit a release is built from
+    Source(SourceOptions),
+    /// Resolve the release plan, its index targets and release notes
+    Plan(PlanOptions),
+    /// Prepare the version and changelog for a stable release
+    Prepare(PrepareOptions),
+    /// Report which frozen artifacts this workflow run already has
+    Artifacts,
+    /// Package archives and index manifests into release-bundle
+    Package(PlanFile),
+    /// Check that the planned index updates still apply before publishing
+    CheckPublication(IndexOptions),
+    /// Make sure the release tag is free or already points at the release commit
+    Tag(PlanFile),
+    /// Apply the packaged manifests to the version branch checkout
+    Index(IndexOptions),
+}
+
+#[derive(Args)]
+pub struct SourceOptions {
+    /// Channel to release
+    #[arg(long)]
+    channel: Channel,
+    /// Merged commit of the release PR (stable only)
+    #[arg(long)]
+    commit: Option<String>,
+}
+
+#[derive(Args)]
+pub struct PlanOptions {
+    /// Channel to release
+    #[arg(long)]
+    channel: Channel,
+    /// Commit selected by `release source`
+    #[arg(long)]
+    commit: String,
+    /// Development branch selected by `release source` (beta and nightly)
+    #[arg(long)]
+    branch: Option<String>,
+    /// Checkout of the release commit
+    #[arg(long, default_value = ".")]
+    source: PathBuf,
+    /// Checkout of the version branch
+    #[arg(long, default_value = "version")]
+    index: PathBuf,
+    /// Directory to write the plan, its outputs and the release notes into
+    #[arg(long)]
+    out: PathBuf,
+    /// Publish an optimized release instead of building a preview
+    #[arg(long)]
+    publish: bool,
+}
+
+#[derive(Args)]
+pub struct PrepareOptions {
+    /// Checkout of the branch to prepare, main or the dev branch
+    #[arg(long, default_value = ".")]
+    source: PathBuf,
+    /// Branch being prepared
+    #[arg(long, default_value = "main")]
+    branch: String,
+    /// auto, patch, minor, major, or an explicit stable X.Y.Z
+    #[arg(long, default_value = "auto")]
+    version: selection::VersionSelection,
+}
+
+#[derive(Args)]
+pub struct PlanFile {
+    /// Directory of the frozen release plan
+    #[arg(long, default_value = "release-plan")]
+    plan: PathBuf,
+}
+
+#[derive(Args)]
+pub struct IndexOptions {
+    #[command(flatten)]
+    plan: PlanFile,
+    /// Checkout of the version branch
+    #[arg(long, default_value = "version")]
+    index: PathBuf,
 }
 
 pub fn run(command: ReleaseCommands) -> Result<()> {
     match command {
-        ReleaseCommands::Meta => meta::run(),
-        ReleaseCommands::Package => package::run(),
+        ReleaseCommands::Source(options) => plan::source(options),
+        ReleaseCommands::Plan(options) => plan::run(options),
+        ReleaseCommands::Prepare(options) => changelog::prepare(options),
+        ReleaseCommands::Artifacts => publish::artifacts(),
+        ReleaseCommands::Package(options) => package::run(&options.plan),
+        ReleaseCommands::CheckPublication(options) => {
+            package::check_publication(&options.plan.plan, &options.index)
+        }
+        ReleaseCommands::Tag(options) => publish::tag(&options.plan),
+        ReleaseCommands::Index(options) => package::update_index(
+            &options.plan.plan,
+            Path::new(package::BUNDLE),
+            &options.index,
+        ),
+    }
+}
+
+/// The changelog configuration of the release tooling, applied to any source checkout.
+fn cliff_config() -> PathBuf {
+    Path::new(crate::workspace_root()).join("cliff.toml")
+}
+
+/// A git command running inside `dir`.
+fn git(dir: &Path) -> Command {
+    let mut command = Command::new("git");
+    command.current_dir(dir);
+    command
+}
+
+/// Throwaway git repositories shaped like this workspace, for release tests.
+#[cfg(test)]
+mod test_repo {
+    use std::{fs, path::Path};
+
+    use crate::cmd::CommandExt;
+
+    pub struct Repo {
+        dir: tempfile::TempDir,
+    }
+
+    impl Repo {
+        /// A repository on `main` whose maa-cli package is released as `v{version}`.
+        pub fn released(version: &str) -> Self {
+            let repo = Self {
+                dir: tempfile::tempdir().unwrap(),
+            };
+            repo.git(&["init", "-q", "-b", "main"]);
+            repo.git(&["config", "user.name", "Release Test"]);
+            repo.git(&["config", "user.email", "release@example.invalid"]);
+            repo.git(&["config", "commit.gpgsign", "false"]);
+            repo.git(&["config", "tag.gpgsign", "false"]);
+            let root = repo.path();
+            fs::create_dir_all(root.join("crates/maa-cli/src")).unwrap();
+            fs::write(
+                root.join("Cargo.toml"),
+                "[workspace]\nmembers = [\"crates/maa-cli\"]\nresolver = \"2\"\n",
+            )
+            .unwrap();
+            repo.write_version(version);
+            fs::write(
+                root.join("crates/maa-cli/src/lib.rs"),
+                "pub fn example() {}\n",
+            )
+            .unwrap();
+            fs::write(
+                root.join("CHANGELOG.md"),
+                format!("# Release Notes\n\n## Release {version}\n\nPrevious release\n"),
+            )
+            .unwrap();
+            std::process::Command::new("cargo")
+                .current_dir(root)
+                .args(["generate-lockfile", "--offline"])
+                .run()
+                .unwrap();
+            repo.git(&["add", "."]);
+            repo.git(&["commit", "-qm", "chore: initial"]);
+            repo.git(&["tag", &format!("v{version}")]);
+            repo
+        }
+
+        pub fn path(&self) -> &Path {
+            self.dir.path()
+        }
+
+        pub fn git(&self, args: &[&str]) -> String {
+            super::git(self.path()).args(args).read().unwrap()
+        }
+
+        pub fn commit(&self, message: &str) -> String {
+            self.git(&["commit", "-q", "--allow-empty", "-m", message]);
+            self.git(&["rev-parse", "HEAD"])
+        }
+
+        pub fn write_version(&self, version: &str) {
+            fs::write(
+                self.path().join("crates/maa-cli/Cargo.toml"),
+                format!(
+                    "[package]\nname = \"maa-cli\"\nversion = \"{version}\"\nedition = \"2024\"\n"
+                ),
+            )
+            .unwrap();
+        }
     }
 }

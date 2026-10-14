@@ -1,0 +1,30 @@
+name: Test Release Tools
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/release.yml
+      - .github/workflows/prepare-release.yml
+      - .github/workflows/release-tools.yml
+      - .github/workflows/publish-homebrew.yml
+      - .github/workflows/publish-aur.yml
+      - .github/workflows/publish-winget.yml
+      - cliff.toml
+      - xtask/**
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Release Tool Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # The release tests run git-cliff and Cargo on throwaway repositories.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff@2.13.1
+      - run: cargo test -p xtask --locked
+      - run: cargo clippy -p xtask --all-targets --locked -- -D warnings

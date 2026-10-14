@@ -63,6 +63,10 @@ cargo test -p maa-cli
 cargo test <测试名称>
 ```
 
+## 发布流程
+
+发布由维护者负责，分支规范、通道和操作步骤见 [发布流程](RELEASE.md)。
+
 ## Workspace 架构
 
 ### 分层概览

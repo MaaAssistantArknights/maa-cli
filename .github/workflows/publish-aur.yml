@@ -45,6 +45,12 @@ jobs:
       image: archlinux:base-devel
 
     steps:
+    - name: Require an explicit version for real publication
+      if: ${{ !inputs.dryrun && !inputs.pkgver }}
+      run: |
+        echo 'pkgver is required unless dryrun is enabled.' >&2
+        exit 1
+
     - name: Upgrade system
       run: |
         pacman -Syu --needed --noconfirm git openssh pacman-contrib namcap
