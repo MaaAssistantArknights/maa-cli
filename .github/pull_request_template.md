@@ -1,4 +1,3 @@
-<!-- markdownlint-disable-file MD041 -->
 <!--
 提交前请先阅读贡献指南 / Please read the contributing guide first:
 https://github.com/MaaAssistantArknights/maa-cli/blob/main/CONTRIBUTING.md
