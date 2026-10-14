@@ -98,8 +98,6 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/MaaAssistantArknights/
 | Windows ARM64       | `aarch64-pc-windows-msvc`   | Tier 2 |
 | macOS Intel         | `x86_64-apple-darwin`       | Tier 3 |
 
-macOS 另外提供同时包含两种架构的通用二进制文件（`universal-apple-darwin`）。
-
 ## 编译安装
 
 Rust 开发者可以通过 `cargo` 自行编译安装 maa-cli：

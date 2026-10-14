@@ -78,8 +78,6 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/MaaAssistantArknights/
 | Windows ARM64       | `aarch64-pc-windows-msvc`   | Tier 2 |
 | macOS Intel         | `x86_64-apple-darwin`       | Tier 3 |
 
-macOS용으로 두 아키텍처를 모두 포함하는 유니버설 바이너리(`universal-apple-darwin`)도 제공됩니다.
-
 ## 컴파일 설치
 
 Rust 개발자는 `cargo`를 통해 maa-cli를 직접 컴파일하여 설치할 수 있습니다:

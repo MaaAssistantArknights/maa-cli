@@ -74,8 +74,6 @@ Precompiled binaries are grouped into three tiers by how thoroughly they are tes
 | Windows ARM64       | `aarch64-pc-windows-msvc`   | Tier 2 |
 | macOS Intel         | `x86_64-apple-darwin`       | Tier 3 |
 
-A universal binary containing both architectures (`universal-apple-darwin`) is also provided for macOS.
-
 ## Build from Source
 
 Rust developers can compile and install maa-cli themselves via `cargo`:
