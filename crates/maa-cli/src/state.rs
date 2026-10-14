@@ -87,12 +87,13 @@ impl Middleware for GitHubProxyMiddleware {
 }
 
 pub static AGENT: LazyLock<Agent> = LazyLock::new(|| {
+    #[cfg(target_os = "android")]
+    let root_certs = RootCerts::WebPki;
+    #[cfg(not(target_os = "android"))]
+    let root_certs = RootCerts::PlatformVerifier;
+
     let mut config = Agent::config_builder()
-        .tls_config(
-            TlsConfig::builder()
-                .root_certs(RootCerts::PlatformVerifier)
-                .build(),
-        )
+        .tls_config(TlsConfig::builder().root_certs(root_certs).build())
         .user_agent(format!("maa-cli/{CLI_VERSION_STR}"));
 
     if GITHUB_PROXY.is_some() {

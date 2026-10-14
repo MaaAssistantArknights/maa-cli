@@ -17,6 +17,12 @@ maa install # 安装 MaaCore 及资源
 maa update # 更新 MaaCore 及资源
 ```
 
+::: warning
+
+Android/Termux 用户请不要执行上述命令，包内已包含适配的 MaaCore 及资源，具体原因见[安装及编译](install.md)。
+
+:::
+
 ## 更新 maa-cli 自身
 
 maa-cli 可以更新自身，只需运行以下命令：
