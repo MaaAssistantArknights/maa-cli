@@ -24,7 +24,7 @@ resource = true  # Whether to install resources of MaaCore
 
 # Configurations for maa-cli self update
 [cli]
-# Update channel of maa-cli, can be "Nightly", "Beta" or "Stable" ("Alpha" is an old name of "Nightly").
+# Update channel of maa-cli, can be "Nightly", "Beta" or "Stable"
 channel = "Nightly"
 # URL of the maa-cli version API, used to get the latest version of maa-cli.
 api_url = "https://cdn.jsdelivr.net/gh/MaaAssistantArknights/maa-cli@vversion/"

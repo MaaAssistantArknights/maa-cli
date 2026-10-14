@@ -12,7 +12,8 @@ pub enum Channel {
     Stable,
     #[serde(alias = "beta")]
     Beta,
-    /// Daily builds of the dev branch, formerly named alpha.
+    /// Daily builds of the dev branch.
+    // `alpha` is the former name, kept so existing configs keep working.
     #[serde(alias = "nightly", alias = "Alpha", alias = "alpha")]
     #[value(alias = "alpha")]
     Nightly,
@@ -104,7 +105,6 @@ pub struct CommonArgs {
     /// Channel to download prebuilt CLI binary
     ///
     /// There are three channels of maa-cli prebuilt binary: stable, beta and nightly.
-    /// `alpha` is accepted as the former name of nightly.
     pub channel: Option<Channel>,
     /// Url of api to get version information
     ///

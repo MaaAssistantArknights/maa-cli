@@ -58,7 +58,7 @@
     },
     "cli_channel": {
       "type": "string",
-      "enum": ["Stable", "Beta", "Nightly", "Alpha"]
+      "enum": ["Stable", "Beta", "Nightly"]
     },
     "passphrase": {
       "oneOf": [
