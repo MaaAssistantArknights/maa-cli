@@ -160,7 +160,7 @@ mod tests {
 
     #[test]
     fn task_lowered_params_use_first_override() {
-        let task: TaskTemplate = serde_yaml::from_str(
+        let task: TaskTemplate = yaml_serde::from_str(
             r#"
 type: Fight
 params:
@@ -189,7 +189,7 @@ overrides:
 
     #[test]
     fn task_lowered_params_merge_matching_overrides() {
-        let task: TaskTemplate = serde_yaml::from_str(
+        let task: TaskTemplate = yaml_serde::from_str(
             r#"
 type: Fight
 params:
@@ -223,7 +223,7 @@ overrides:
 
     #[test]
     fn inactive_task_has_no_lowered_params() {
-        let task: TaskTemplate = serde_yaml::from_str(
+        let task: TaskTemplate = yaml_serde::from_str(
             r#"
 type: Fight
 if:

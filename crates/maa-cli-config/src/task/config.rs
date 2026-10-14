@@ -115,13 +115,13 @@ mod tests {
     use super::*;
 
     fn expect_task_config_error(content: &str, expected: &str) {
-        let err = serde_yaml::from_str::<TaskConfigTemplate>(content).unwrap_err();
+        let err = yaml_serde::from_str::<TaskConfigTemplate>(content).unwrap_err();
         assert!(err.to_string().contains(expected), "{err}");
     }
 
     #[test]
     fn deserialize_tasks_mode() {
-        let task_config: TaskConfigTemplate = serde_yaml::from_str(
+        let task_config: TaskConfigTemplate = yaml_serde::from_str(
             r#"
 version: 2
 account_name: main
@@ -144,7 +144,7 @@ tasks:
 
     #[test]
     fn deserialize_sessions_mode() {
-        let task_config: TaskConfigTemplate = serde_yaml::from_str(
+        let task_config: TaskConfigTemplate = yaml_serde::from_str(
             r#"
 version: 2
 sessions:
@@ -163,7 +163,7 @@ sessions:
 
     #[test]
     fn reject_conflicting_task_modes() {
-        let err = serde_yaml::from_str::<TaskConfigTemplate>(
+        let err = yaml_serde::from_str::<TaskConfigTemplate>(
             r#"
 version: 2
 tasks:
@@ -187,7 +187,7 @@ sessions:
 
     #[test]
     fn reject_account_name_with_sessions() {
-        let err = serde_yaml::from_str::<TaskConfigTemplate>(
+        let err = yaml_serde::from_str::<TaskConfigTemplate>(
             r#"
 version: 2
 account_name: main
@@ -208,7 +208,7 @@ sessions:
 
     #[test]
     fn reject_empty_tasks() {
-        let err = serde_yaml::from_str::<TaskConfigTemplate>(
+        let err = yaml_serde::from_str::<TaskConfigTemplate>(
             r#"
 version: 2
 tasks: []
@@ -221,7 +221,7 @@ tasks: []
 
     #[test]
     fn reject_empty_sessions() {
-        let err = serde_yaml::from_str::<TaskConfigTemplate>(
+        let err = yaml_serde::from_str::<TaskConfigTemplate>(
             r#"
 version: 2
 sessions: []
@@ -257,7 +257,7 @@ sessions: []
     #[test]
     fn deserialize_sessions_mode_from_yaml_fixture() {
         let task_config: TaskConfigTemplate =
-            serde_yaml::from_str(include_str!("../../fixtures/task/sessions.yaml")).unwrap();
+            yaml_serde::from_str(include_str!("../../fixtures/task/sessions.yaml")).unwrap();
 
         assert!(task_config.manage_environment_lifecycle);
         assert!(task_config.manage_game_lifecycle);
@@ -283,7 +283,7 @@ sessions: []
     #[test]
     fn deserialize_tasks_with_additional_condition_paths() {
         let task_config: TaskConfigTemplate =
-            serde_yaml::from_str(include_str!("../../fixtures/task/conditions.yaml")).unwrap();
+            yaml_serde::from_str(include_str!("../../fixtures/task/conditions.yaml")).unwrap();
 
         assert_eq!(task_config.sessions.len(), 1);
         assert_eq!(task_config.sessions[0].tasks.len(), 5);
@@ -380,7 +380,7 @@ sessions: []
     #[cfg(feature = "schema")]
     #[test]
     fn reject_invalid_version_fixture() {
-        let err = serde_yaml::from_str::<VersionedTaskConfig>(include_str!(
+        let err = yaml_serde::from_str::<VersionedTaskConfig>(include_str!(
             "../../fixtures/invalid/version.yaml"
         ))
         .unwrap_err();
