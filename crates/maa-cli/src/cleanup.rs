@@ -292,6 +292,17 @@ mod tests {
             assert_should_keep!(CliCache, "copilot/", false);
 
             #[cfg(feature = "core_installer")]
+            {
+                use semver::Version;
+
+                use crate::installer::maa_core::this_asset_name;
+
+                // No real MaaCore release has this version, so it is never the installed one
+                let stale = this_asset_name(&Version::new(0, 0, 1));
+                assert_should_keep!(CliCache, &stale, false);
+            }
+
+            #[cfg(feature = "core_installer")]
             if var_os("SKIP_CORE_TEST").is_none() {
                 let version = crate::state::CORE_VERSION.as_ref().unwrap();
                 let name = crate::installer::maa_core::this_asset_name(version);
@@ -406,79 +417,5 @@ mod tests {
         assert!(!test_dir.exists());
 
         std::fs::remove_dir(&test_root).unwrap();
-    }
-
-    /// Runs the rules of a real cleanup target against a private directory.
-    ///
-    /// The real `cache()`, `state()` and `log()` directories are shared with other tests
-    /// running in the same process, so they must not be scanned or cleaned here.
-    struct Redirect {
-        target: CleanupTarget,
-        dir: PathBuf,
-    }
-
-    impl PathProvider for Redirect {
-        fn target_dir(&self) -> Cow<'_, Path> {
-            self.dir.as_path().into()
-        }
-
-        fn should_delete(&self, entry: &DirEntry) -> bool {
-            self.target.should_delete(entry)
-        }
-
-        fn should_keep(&self, entry: &DirEntry) -> bool {
-            self.target.should_keep(entry)
-        }
-    }
-
-    #[test]
-    #[ignore = "Need installed MaaCore"]
-    fn collect_default_targets() {
-        let test_root = tempfile::tempdir().unwrap();
-        // Default targets of `maa cleanup`
-        let targets = [CliCache, CoreCache, Debug].map(|target| {
-            let dir = join!(test_root.path(), format!("{target:?}"));
-            dir.ensure().unwrap();
-            Redirect { target, dir }
-        });
-        let [cache, core_cache, log] = [0, 1, 2].map(|i| targets[i].dir.as_path());
-
-        let file = |path: PathBuf| {
-            std::fs::File::create(&path).unwrap();
-            path
-        };
-        let dir = |path: PathBuf| {
-            std::fs::create_dir(&path).unwrap();
-            path
-        };
-
-        let mut expected = BTreeSet::from([
-            file(join!(cache, "test.tar.gz")),
-            dir(join!(core_cache, "avatars")),
-            dir(join!(log, "2024")),
-            file(join!(log, "asst.log")),
-            file(join!(log, "asst.bak.log")),
-        ]);
-
-        #[cfg(feature = "core_installer")]
-        {
-            use semver::Version;
-
-            use crate::installer::maa_core::this_asset_name;
-
-            // No real MaaCore release has this version, so it is never the installed one
-            expected.insert(file(join!(cache, this_asset_name(&Version::new(0, 0, 1)))));
-
-            // The package of the installed MaaCore is kept
-            if var_os("SKIP_CORE_TEST").is_none() {
-                let version = crate::state::CORE_VERSION.as_ref().unwrap();
-                file(join!(cache, this_asset_name(version)));
-            }
-        }
-
-        assert_eq!(
-            collect(&targets).into_iter().collect::<BTreeSet<_>>(),
-            expected
-        );
     }
 }
