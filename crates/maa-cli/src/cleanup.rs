@@ -402,48 +402,96 @@ mod tests {
         std::fs::remove_dir(&test_root).unwrap();
     }
 
-    #[test]
-    #[ignore = "Need installed MaaCore and write to user directories"]
-    fn test_cleanup_real_files() {
-        // Create some files for testing
-        cache().ensure().unwrap();
-        state().ensure().unwrap();
-        log().ensure().unwrap();
+    /// Runs the real cleanup targets against a private directory tree.
+    ///
+    /// Pointing them at the shared `cache()`, `state()` and `log()` directories would
+    /// delete files other tests in the same process are using at the same time.
+    struct Redirect<'a> {
+        target: CleanupTarget,
+        dir: &'a Path,
+    }
 
-        std::fs::File::create(join!(cache(), "test.tar.gz")).unwrap();
+    impl PathProvider for Redirect<'_> {
+        fn target_dir(&self) -> Cow<'_, Path> {
+            self.dir.into()
+        }
+
+        fn should_delete(&self, entry: &DirEntry) -> bool {
+            self.target.should_delete(entry)
+        }
+
+        fn should_keep(&self, entry: &DirEntry) -> bool {
+            self.target.should_keep(entry)
+        }
+    }
+
+    #[test]
+    #[ignore = "Need installed MaaCore"]
+    fn test_cleanup_real_files() {
+        let test_root = join!(temp_dir(), "maa-cli-test-cleanup-real-files");
+        let cache = join!(&test_root, "cache");
+        let core_cache = join!(&test_root, "core_cache");
+        let log = join!(&test_root, "log");
+
+        cache.ensure().unwrap();
+        core_cache.ensure().unwrap();
+        log.ensure().unwrap();
+
+        std::fs::File::create(join!(&cache, "test.tar.gz")).unwrap();
 
         #[cfg(feature = "core_installer")]
-        {
+        let kept_core_package = {
             use semver::Version;
 
             use crate::installer::maa_core::this_asset_name;
 
-            std::fs::File::create(cache().join(this_asset_name(&Version::new(5, 16, 1)))).unwrap();
+            std::fs::File::create(cache.join(this_asset_name(&Version::new(5, 16, 1)))).unwrap();
 
             if var_os("SKIP_CORE_TEST").is_none() {
                 let version = crate::state::CORE_VERSION.as_ref().unwrap();
-                let name = this_asset_name(version);
-                std::fs::File::create(join!(cache(), &name)).unwrap();
+                let path = join!(&cache, this_asset_name(version));
+                std::fs::File::create(&path).unwrap();
+                Some(path)
+            } else {
+                None
             }
-        }
-
-        let core_cache = join!(state(), "cache");
-        core_cache.ensure().unwrap();
+        };
 
         std::fs::create_dir_all(join!(&core_cache, "avatars")).unwrap();
-        std::fs::create_dir_all(join!(log(), "2024")).unwrap();
-        std::fs::File::create(join!(log(), "asst.log")).unwrap();
-        std::fs::File::create(join!(log(), "asst.bak.log")).unwrap();
+        std::fs::create_dir_all(join!(&log, "2024")).unwrap();
+        std::fs::File::create(join!(&log, "asst.log")).unwrap();
+        std::fs::File::create(join!(&log, "asst.bak.log")).unwrap();
 
-        let target: Vec<CleanupTarget> = Vec::new();
-        cleanup(&target).unwrap();
+        // Same targets as `cleanup(&[])`
+        let targets = [
+            Redirect {
+                target: CliCache,
+                dir: &cache,
+            },
+            Redirect {
+                target: CoreCache,
+                dir: &core_cache,
+            },
+            Redirect {
+                target: Debug,
+                dir: &log,
+            },
+        ];
+        cleanup(&targets).unwrap();
 
-        assert!(!join!(cache(), "test.tar.gz").exists());
-        assert!(!join!(core_cache, "avatars").exists());
-        assert!(!join!(log(), "2024").exists());
-        assert!(!join!(log(), "asst.log").exists());
-        assert!(!join!(log(), "asst.bak.log").exists());
+        assert!(!join!(&cache, "test.tar.gz").exists());
+        assert!(!join!(&core_cache, "avatars").exists());
+        assert!(!join!(&log, "2024").exists());
+        assert!(!join!(&log, "asst.log").exists());
+        assert!(!join!(&log, "asst.bak.log").exists());
 
-        cleanup(&target).unwrap(); // Cleanup again to test no files left
+        #[cfg(feature = "core_installer")]
+        if let Some(path) = kept_core_package {
+            assert!(path.exists());
+        }
+
+        cleanup(&targets).unwrap(); // Cleanup again to test no files left
+
+        std::fs::remove_dir_all(&test_root).unwrap();
     }
 }
