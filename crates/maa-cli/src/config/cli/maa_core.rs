@@ -1,7 +1,32 @@
-use clap::Args;
+use clap::{Args, ValueEnum};
 use serde::Deserialize;
 
-use super::{Channel, normalize_url, return_true};
+use super::{normalize_url, return_true};
+
+/// Release channel of MaaCore.
+///
+/// maa-cli has its own channels, see `maa_cli::Channel`.
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(ValueEnum, Clone, Copy, Default, Deserialize)]
+pub enum Channel {
+    #[default]
+    #[serde(alias = "stable")]
+    Stable,
+    #[serde(alias = "beta")]
+    Beta,
+    #[serde(alias = "alpha")]
+    Alpha,
+}
+
+impl std::fmt::Display for Channel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Channel::Stable => write!(f, "stable"),
+            Channel::Beta => write!(f, "beta"),
+            Channel::Alpha => write!(f, "alpha"),
+        }
+    }
+}
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Clone)]
@@ -160,7 +185,36 @@ pub struct CommonArgs {
 pub mod tests {
     use std::sync::LazyLock;
 
+    use serde_test::{Token, assert_de_tokens};
+
     use super::*;
+
+    // The serde_de_token cannot deserialize "beta" to Channel::Beta
+    // But it works in real implementation (serde_json::from_str)
+    // So we have to use this workaround
+    impl Channel {
+        pub fn to_token(self) -> Token {
+            Token::UnitVariant {
+                name: "Channel",
+                variant: match self {
+                    Channel::Stable => "Stable",
+                    Channel::Beta => "Beta",
+                    Channel::Alpha => "Alpha",
+                },
+            }
+        }
+    }
+
+    #[test]
+    fn deserialize_channel() {
+        let channels: [Channel; 3] =
+            serde_json::from_str(r#"["stable", "beta", "alpha"]"#).unwrap();
+        assert_eq!(channels, [Channel::Stable, Channel::Beta, Channel::Alpha],);
+
+        assert_de_tokens(&Channel::Stable, &[Channel::Stable.to_token()]);
+        assert_de_tokens(&Channel::Beta, &[Channel::Beta.to_token()]);
+        assert_de_tokens(&Channel::Alpha, &[Channel::Alpha.to_token()]);
+    }
 
     pub fn example_config() -> Config {
         Config {
