@@ -177,6 +177,13 @@ pub mod tests {
         }
 
         #[test]
+        fn display_channel() {
+            assert_eq!(Channel::Stable.to_string(), "stable");
+            assert_eq!(Channel::Beta.to_string(), "beta");
+            assert_eq!(Channel::Nightly.to_string(), "nightly");
+        }
+
+        #[test]
         fn deserialize_cli_components() {
             assert_de_tokens(&CLIComponents { binary: true }, &[
                 Token::Map { len: Some(0) },
