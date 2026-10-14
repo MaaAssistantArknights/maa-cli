@@ -34,7 +34,6 @@ Which commands did you actually run, on which platforms? Did you test against a 
 
 - [ ] 本 PR 只包含实现上述目的所需的改动，无关的修复或重构已拆出 / This PR only contains changes needed for the purpose above; unrelated fixes and refactors are split out
 - [ ] 改了用户可见行为的话，已同步更新 `crates/maa-cli/docs/` 下所有语言的文档 / User-visible behavior changed: docs under `crates/maa-cli/docs/` are updated for every language
-- [ ] 如果是 breaking change，目标分支是 `dev-0.8` 而不是 `main` / Breaking change: this PR targets `dev-0.8`, not `main`
 
 ## AI 辅助 / AI assistance
 
