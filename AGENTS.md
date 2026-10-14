@@ -129,6 +129,18 @@ graph TD
 - One paragraph per line; use `<br>` for line breaks only when needed; no trailing spaces.
 - Markdown is linted by `markdownlint-cli2`.
 
+## Contributing on Behalf of a Human (Follow This)
+
+If you are an agent helping someone prepare a PR, follow [CONTRIBUTING.md](CONTRIBUTING.md). In particular:
+
+- **Check for an agreed design first.** For a new feature, command, config option, config format change, or anything likely to exceed about 500 lines, confirm there is an issue where a maintainer agreed on the approach. If there is none, stop and tell your human to open one instead of implementing.
+- **Stay in scope.** Implement only what the task needs. Do not add unrequested flags, subcommands, options or refactors. Report unrelated problems to your human instead of fixing them in the same PR.
+- **Keep the diff lean.** No explanatory comment blocks, no speculative defensive code, no design notes or conversation summaries committed to the repo. Use `maa-types` enums or cite upstream definitions instead of magic numbers.
+- **Follow existing patterns.** Look for how the codebase already solves a problem (tests included) before inventing a new mechanism.
+- **Your human reviews before anything is published.** Do not open or push a PR until your human has read the whole diff. Never tick the self-review checkbox in the PR template for them.
+- **Write the PR description from the template.** Keep it short, fill in the AI assistance section honestly, and do not paste long generated summaries.
+- **Do not ghost-write review replies.** Help your human understand review feedback; the reply on GitHub should be in their own words.
+
 ## MISC
 
 - Use conventional commits: `feat: ...`, `fix: ...`, `refactor: ...`, `perf: ...`, `docs: ...`, `test: ...`, etc.
