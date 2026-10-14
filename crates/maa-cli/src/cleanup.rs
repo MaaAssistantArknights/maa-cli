@@ -398,6 +398,18 @@ mod tests {
         cleanup(&[All]).unwrap();
 
         std::fs::remove_dir(&test_root).unwrap();
+
+        // A missing target directory leaves nothing to clean up
+        struct Missing(PathBuf);
+
+        impl PathProvider for Missing {
+            fn target_dir(&self) -> Cow<'_, Path> {
+                self.0.as_path().into()
+            }
+        }
+
+        let missing_root = tempfile::tempdir().unwrap();
+        cleanup(&[Missing(join!(missing_root.path(), "missing"))]).unwrap();
     }
 
     #[test]
