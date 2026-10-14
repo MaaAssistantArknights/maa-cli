@@ -23,15 +23,12 @@ How does this PR solve it? Focus on design choices that are not obvious from the
 
 <!--
 用户能感受到什么变化：命令行行为、配置格式、平台支持等。breaking change 请明确写出。纯内部改动写“无”。
+涉及设备连接或平台相关的改动，请说明在哪些平台或设备上实际测试过。
 What will users notice: CLI behavior, config format, platform support? Call out breaking changes explicitly. Write "None" for internal-only changes.
+For changes involving device connections or platform-specific behavior, say which platforms or devices you tested on.
 -->
 
-## 验证 / Testing
-
-<!--
-实际运行了哪些命令，在什么平台上验证过，是否连接真实设备或客户端测试过。不用贴测试通过的数量。
-Which commands did you actually run, on which platforms? Did you test against a real device or client? No need to paste test counts.
--->
+## 检查项 / Checklist
 
 - [ ] 本 PR 只包含实现上述目的所需的改动，无关的修复或重构已拆出 / This PR only contains changes needed for the purpose above; unrelated fixes and refactors are split out
 - [ ] 改了用户可见行为的话，已同步更新 `crates/maa-cli/docs/` 下所有语言的文档 / User-visible behavior changed: docs under `crates/maa-cli/docs/` are updated for every language
