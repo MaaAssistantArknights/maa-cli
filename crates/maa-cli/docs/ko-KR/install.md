@@ -61,6 +61,23 @@ curl -fsSL https://raw.githubusercontent.com/MaaAssistantArknights/maa-cli/main/
 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/MaaAssistantArknights/maa-cli/main/install.ps1" -OutFile install.ps1; .\install.ps1
 ```
 
+### 지원 플랫폼
+
+사전 컴파일된 바이너리는 테스트 수준에 따라 세 등급으로 나뉩니다:
+
+- Tier 1: 모든 PR에서 빌드되며, MaaCore가 필요한 테스트를 포함한 전체 테스트를 실행합니다;
+- Tier 2: 모든 PR에서 빌드 및 테스트되지만, MaaCore가 필요한 테스트는 실행하지 않습니다;
+- Tier 3: 릴리스 시에만 빌드되며, 테스트 통과를 보장하지 않습니다.
+
+| 플랫폼              | Target                      | 등급   |
+| ------------------- | --------------------------- | ------ |
+| Linux x86_64        | `x86_64-unknown-linux-gnu`  | Tier 1 |
+| Linux aarch64       | `aarch64-unknown-linux-gnu` | Tier 1 |
+| macOS Apple Silicon | `aarch64-apple-darwin`      | Tier 1 |
+| Windows x86_64      | `x86_64-pc-windows-msvc`    | Tier 1 |
+| Windows ARM64       | `aarch64-pc-windows-msvc`   | Tier 2 |
+| macOS Intel         | `x86_64-apple-darwin`       | Tier 3 |
+
 ## 컴파일 설치
 
 Rust 개발자는 `cargo`를 통해 maa-cli를 직접 컴파일하여 설치할 수 있습니다:
