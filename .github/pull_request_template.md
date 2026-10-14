@@ -40,9 +40,10 @@ Which commands did you actually run, on which platforms? Did you test against a 
 ## AI 辅助 / AI assistance
 
 <!--
-没用 AI 写“无”。用了请写哪些部分是 AI 写的，如全部代码、只有测试、只有文档；也可以注明工具和模型。
-Write "None" if no AI was used. Otherwise say which parts AI wrote, e.g. all code, tests only, docs only; naming the tool and model is optional.
+勾选其中一项。使用了 AI 时，请写明哪些部分由 AI 编写，如全部代码、只有测试、只有文档；也可以注明工具和模型。
+Check one. If AI was used, say which parts it wrote, e.g. all code, tests only, docs only; naming the tool and model is optional.
 -->
 
-- AI 写的部分 / AI-written parts:
-- [ ] 如果用了 AI，我已亲自审阅并整理全部改动，能解释每一处修改 / If AI was used, I have personally reviewed and cleaned up all changes and can explain each of them
+- [ ] 未使用 AI / No AI used
+- [ ] 使用了 AI，我已亲自审阅并整理全部改动，能解释每一处修改 / AI was used, and I have personally reviewed and cleaned up all changes and can explain each of them
+  - AI 编写的部分 / AI-written parts:
