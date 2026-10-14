@@ -18,6 +18,7 @@
 
 - 同一时间最多一个 dev 分支；存在多个 `dev-*` 时 Beta 和 Nightly 都会失败。分支名与 Cargo 版本不一致，或 `X.Y.0` 已不高于最新 Stable 时，Beta 失败、Nightly 跳过。
 - 定期把 `main` 合入 dev 分支，不要反向合并。`main` 每次发布 Stable 后，合并时 `Cargo.toml` 和 `Cargo.lock` 的版本行会冲突，保留 dev 分支的 `X.Y.0`。CI 同样在 `dev-*` 的 PR 和 merge queue 上运行。
+- 不要改写 dev 分支的历史（rebase、force-push）。Nightly 编号来自提交数，改写后编号可能不高于已发布的 Nightly，此时 Nightly 会失败而不是发布更低的版本，直到提交数超过已发布的编号。
 - dev 分支完成后，它合回 `main` 的 PR 本身就是 release PR（见下文），必须用 merge commit 合并，不要 squash 或 rebase，以保留每个提交和 Beta tag 的历史。merge queue 若只允许 squash，需临时改为 merge commit。发布后删除 dev 分支，并把仍指向它的 PR 改为指向 `main`。
 
 ## 通道
