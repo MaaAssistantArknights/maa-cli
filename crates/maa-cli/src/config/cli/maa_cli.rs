@@ -1,7 +1,33 @@
-use clap::Args;
+use clap::{Args, ValueEnum};
 use serde::Deserialize;
 
-use super::{Channel, normalize_url, return_true};
+use super::{normalize_url, return_true};
+
+/// Release channel of maa-cli itself, independent of MaaCore's channels.
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(ValueEnum, Clone, Copy, Default, Deserialize)]
+pub enum Channel {
+    #[default]
+    #[serde(alias = "stable")]
+    Stable,
+    #[serde(alias = "beta")]
+    Beta,
+    /// Daily builds of the dev branch.
+    // `alpha` is the former name, kept so existing configs keep working.
+    #[serde(alias = "nightly", alias = "Alpha", alias = "alpha")]
+    #[value(alias = "alpha")]
+    Nightly,
+}
+
+impl std::fmt::Display for Channel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Channel::Stable => write!(f, "stable"),
+            Channel::Beta => write!(f, "beta"),
+            Channel::Nightly => write!(f, "nightly"),
+        }
+    }
+}
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Clone)]
@@ -78,8 +104,7 @@ impl Config {
 pub struct CommonArgs {
     /// Channel to download prebuilt CLI binary
     ///
-    /// There are two channels of maa-cli prebuilt binary,
-    /// stable and alpha (which means nightly).
+    /// There are three channels of maa-cli prebuilt binary: stable, beta and nightly.
     pub channel: Option<Channel>,
     /// Url of api to get version information
     ///
@@ -123,7 +148,7 @@ pub mod tests {
 
     pub fn example_config() -> Config {
         Config {
-            channel: Channel::Alpha,
+            channel: Channel::Nightly,
             api_url: "https://cdn.jsdelivr.net/gh/MaaAssistantArknights/maa-cli@vversion/"
                 .to_string(),
             download_url: "https://github.com/MaaAssistantArknights/maa-cli/releases/download/"
@@ -136,6 +161,27 @@ pub mod tests {
         use serde_test::{Token, assert_de_tokens};
 
         use super::*;
+
+        #[test]
+        fn deserialize_channel() {
+            let channels: [Channel; 5] =
+                serde_json::from_str(r#"["stable", "beta", "nightly", "alpha", "Alpha"]"#).unwrap();
+            assert_eq!(channels, [
+                Channel::Stable,
+                Channel::Beta,
+                Channel::Nightly,
+                Channel::Nightly,
+                Channel::Nightly,
+            ]);
+            assert_eq!(Channel::from_str("alpha", true), Ok(Channel::Nightly));
+        }
+
+        #[test]
+        fn display_channel() {
+            assert_eq!(Channel::Stable.to_string(), "stable");
+            assert_eq!(Channel::Beta.to_string(), "beta");
+            assert_eq!(Channel::Nightly.to_string(), "nightly");
+        }
 
         #[test]
         fn deserialize_cli_components() {
@@ -155,7 +201,7 @@ pub mod tests {
         fn deserialize_config() {
             assert_de_tokens(
                 &Config {
-                    channel: Channel::Alpha,
+                    channel: Channel::Nightly,
                     api_url: "https://foo.bar/api/".to_owned(),
                     download_url: "https://foo.bar/download/".to_owned(),
                     components: CLIComponents { binary: false },
@@ -163,7 +209,10 @@ pub mod tests {
                 &[
                     Token::Map { len: Some(4) },
                     Token::Str("channel"),
-                    Channel::Alpha.to_token(),
+                    Token::UnitVariant {
+                        name: "Channel",
+                        variant: "Nightly",
+                    },
                     Token::Str("api_url"),
                     Token::Str("https://foo.bar/api/"),
                     Token::Str("download_url"),
@@ -191,8 +240,8 @@ pub mod tests {
         fn channel() {
             assert_eq!(Config::default().channel(), Default::default());
             assert_eq!(
-                Config::default().set_channel(Channel::Alpha).channel(),
-                Channel::Alpha,
+                Config::default().set_channel(Channel::Nightly).channel(),
+                Channel::Nightly,
             );
         }
 
@@ -212,12 +261,12 @@ pub mod tests {
 
             assert_eq!(
                 Config {
-                    channel: Channel::Alpha,
+                    channel: Channel::Nightly,
                     api_url: "https://foo.bar/cli/".to_string(),
                     ..Default::default()
                 }
                 .api_url(),
-                "https://foo.bar/cli/alpha.json",
+                "https://foo.bar/cli/nightly.json",
             );
         }
 
@@ -265,12 +314,12 @@ pub mod tests {
 
             assert_eq!(
                 Config::default().with_args(&CommonArgs {
-                    channel: Some(Channel::Alpha),
+                    channel: Some(Channel::Nightly),
                     api_url: Some("https://foo.bar/api/".to_string()),
                     download_url: Some("https://foo.bar/download/".to_string()),
                 }),
                 Config {
-                    channel: Channel::Alpha,
+                    channel: Channel::Nightly,
                     api_url: "https://foo.bar/api/".to_string(),
                     download_url: "https://foo.bar/download/".to_string(),
                     ..Default::default()

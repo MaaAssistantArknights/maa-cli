@@ -21,7 +21,7 @@
     "cli": {
       "type": "object",
       "properties": {
-        "channel": { "$ref": "#/definitions/channel" },
+        "channel": { "$ref": "#/definitions/cli_channel" },
         "api_url": { "type": "string", "format": "uri" },
         "download_url": { "type": "string", "format": "uri" },
         "components": {
@@ -55,6 +55,10 @@
     "channel": {
       "type": "string",
       "enum": ["Stable", "Beta", "Alpha"]
+    },
+    "cli_channel": {
+      "type": "string",
+      "enum": ["Stable", "Beta", "Nightly"]
     },
     "passphrase": {
       "oneOf": [

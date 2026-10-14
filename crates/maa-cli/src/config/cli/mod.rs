@@ -10,7 +10,6 @@ pub mod hot_update;
 
 use std::sync::LazyLock;
 
-use clap::ValueEnum;
 use serde::Deserialize;
 
 use super::FindFileOrDefault;
@@ -74,28 +73,6 @@ pub(crate) static CLI_CONFIG: LazyLock<CLIConfig> = LazyLock::new(|| {
         .expect("Failed to load installer config")
 });
 
-#[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(ValueEnum, Clone, Copy, Default, Deserialize)]
-pub enum Channel {
-    #[default]
-    #[serde(alias = "stable")]
-    Stable,
-    #[serde(alias = "beta")]
-    Beta,
-    #[serde(alias = "alpha")]
-    Alpha,
-}
-
-impl std::fmt::Display for Channel {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Channel::Stable => write!(f, "stable"),
-            Channel::Beta => write!(f, "beta"),
-            Channel::Alpha => write!(f, "alpha"),
-        }
-    }
-}
-
 fn return_true() -> bool {
     true
 }
@@ -108,38 +85,10 @@ fn normalize_url(url: &str) -> &str {
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
-    use serde_json;
     use serde_test::{Token, assert_de_tokens};
     use toml;
 
     use super::{resource::GitBackend, *};
-
-    // The serde_de_token cannot deserialize "beta" to Channel::Beta
-    // But it works in real implementation (serde_json::from_str)
-    // So we have to use this workaround
-    impl Channel {
-        pub fn to_token(self) -> Token {
-            Token::UnitVariant {
-                name: "Channel",
-                variant: match self {
-                    Channel::Stable => "Stable",
-                    Channel::Beta => "Beta",
-                    Channel::Alpha => "Alpha",
-                },
-            }
-        }
-    }
-
-    #[test]
-    fn deserialize_channel() {
-        let channels: [Channel; 3] =
-            serde_json::from_str(r#"["stable", "beta", "alpha"]"#).unwrap();
-        assert_eq!(channels, [Channel::Stable, Channel::Beta, Channel::Alpha],);
-
-        assert_de_tokens(&Channel::Stable, &[Channel::Stable.to_token()]);
-        assert_de_tokens(&Channel::Beta, &[Channel::Beta.to_token()]);
-        assert_de_tokens(&Channel::Alpha, &[Channel::Alpha.to_token()]);
-    }
 
     #[test]
     fn deserialize_installer_config() {
@@ -159,7 +108,7 @@ mod tests {
                 Token::Str("core"),
                 Token::Map { len: Some(4) },
                 Token::Str("channel"),
-                Channel::Beta.to_token(),
+                maa_core::Channel::Beta.to_token(),
                 Token::Str("test_time"),
                 Token::I64(0),
                 Token::Str("api_url"),
@@ -189,7 +138,10 @@ mod tests {
                 Token::Str("cli"),
                 Token::Map { len: Some(4) },
                 Token::Str("channel"),
-                Channel::Alpha.to_token(),
+                Token::UnitVariant {
+                    name: "Channel",
+                    variant: "Nightly",
+                },
                 Token::Str("api_url"),
                 Token::Str("https://cdn.jsdelivr.net/gh/MaaAssistantArknights/maa-cli@vversion/"),
                 Token::Str("download_url"),
@@ -271,13 +223,13 @@ mod tests {
             &CLIConfig {
                 core: {
                     let mut config = maa_core::Config::default();
-                    config.set_channel(Channel::Beta);
+                    config.set_channel(maa_core::Channel::Beta);
                     config
                 },
                 ..Default::default()
             }
             .core_config(),
-            maa_core::Config::default().set_channel(Channel::Beta)
+            maa_core::Config::default().set_channel(maa_core::Channel::Beta)
         );
     }
 

@@ -306,7 +306,6 @@ mod test {
     use std::path::Path;
 
     use super::*;
-    use crate::config::cli::Channel;
 
     #[macro_export]
     macro_rules! assert_matches {
@@ -333,7 +332,7 @@ mod test {
             parse_from(["maa", "install", "beta"]).command,
             Command::Install {
                 common: config::cli::maa_core::CommonArgs {
-                    channel: Some(Channel::Beta),
+                    channel: Some(config::cli::maa_core::Channel::Beta),
                     ..
                 },
                 ..
@@ -410,7 +409,17 @@ mod test {
             parse_from(["maa", "self", "update", "beta"]).command,
             Command::SelfC(SelfCommand::Update {
                 common: config::cli::maa_cli::CommonArgs {
-                    channel: Some(Channel::Beta),
+                    channel: Some(config::cli::maa_cli::Channel::Beta),
+                    ..
+                },
+            })
+        );
+
+        assert_matches!(
+            parse_from(["maa", "self", "update", "alpha"]).command,
+            Command::SelfC(SelfCommand::Update {
+                common: config::cli::maa_cli::CommonArgs {
+                    channel: Some(config::cli::maa_cli::Channel::Nightly),
                     ..
                 },
             })
