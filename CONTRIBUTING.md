@@ -12,7 +12,7 @@
 
 1. **先在 issue 中讨论方案。** 新功能、新命令、新配置项、配置格式的变更，以及预计超过约 500 行的改动，请先开 issue 与维护者确认方案，再开始实现，以免方向不一致导致返工。bug 修复、文档和小幅改进可以直接提交 PR。开始之前，请先搜索是否已有相同主题的 issue 或 PR。
 2. **每个 PR 只解决一个问题。** 开发过程中发现的其他问题或希望进行的重构，请另开 PR。范围集中的 PR 更容易审阅，也能更快合并。
-3. **使用 AI 生成的改动需要经过作者本人审阅。** 提交前请完整阅读所有改动，确认每一处都是必要的，并能说明修改的理由。AI 生成的代码常包含未被要求的功能、冗长的注释或不必要的防御性代码，请在提交前删除。使用 agent 开发时，请让它先阅读 [AGENTS.md](AGENTS.md)。
+3. **欢迎使用 AI 工具，但改动需要经过作者本人审阅。** 提交前请完整阅读所有改动，确认每一处都是必要的，并能说明修改的理由。AI 生成的代码常包含未被要求的功能、冗长的注释或不必要的防御性代码，请在提交前删除。使用 agent 开发时，请让它先阅读 [AGENTS.md](AGENTS.md)。
 4. **PR 描述应简洁。** 请按照 PR 模板说明修改的原因、实现方式和实际的验证方法，如有不确定之处也请注明。不需要附上工具生成的长篇摘要。
 5. **请用自己的语言回复 review。** 直接转贴 AI 的输出，会让维护者难以判断你是否认同修改意见，以及有哪些疑问。
 
@@ -33,7 +33,7 @@ Thank you for your interest in maa-cli. Contributions of all kinds are welcome, 
 
 1. **Discuss the design in an issue first.** For a new feature, command, config option, config format change, or a change expected to exceed roughly 500 lines, open an issue and agree on the approach with a maintainer before implementing it, to avoid rework. Bug fixes, docs and small improvements can be submitted as a PR directly. Search for existing issues and PRs on the same topic before starting.
 2. **One PR, one purpose.** Submit other problems you find or refactors you want to make as separate PRs. Focused PRs are easier to review and merge.
-3. **AI-generated changes must be reviewed by the author.** Before submitting, read every change, make sure each one is necessary, and be able to explain it. AI-generated code often includes features nobody asked for, verbose comments and unnecessary defensive code; remove them before submitting. If you use an agent, have it read [AGENTS.md](AGENTS.md) first.
+3. **AI tools are welcome, but changes must be reviewed by the author.** Before submitting, read every change, make sure each one is necessary, and be able to explain it. AI-generated code often includes features nobody asked for, verbose comments and unnecessary defensive code; remove them before submitting. If you use an agent, have it read [AGENTS.md](AGENTS.md) first.
 4. **Keep the description concise.** Follow the PR template: why, how, how you actually verified it, and anything you are unsure about. Do not include long tool-generated summaries.
 5. **Reply to reviews in your own words.** Pasted AI output makes it hard for maintainers to tell whether you agree with the feedback and what questions you have.
 
