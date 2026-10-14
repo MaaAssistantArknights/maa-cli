@@ -23,3 +23,15 @@ What will users notice: CLI behavior, config format, platform support? Call out 
 
 - [ ] 改了用户可见行为的话，已同步更新 `crates/maa-cli/docs/` 下所有语言的文档 / User-visible behavior changed: docs under `crates/maa-cli/docs/` are updated for every language
 - [ ] 如果是 breaking change，目标分支是 `dev-0.8` 而不是 `main` / Breaking change: this PR targets `dev-0.8`, not `main`
+
+## AI 辅助 / AI assistance
+
+<!--
+如果用了 AI，请写明工具（harness）、模型和参与程度；没用就写“无”。
+If AI was used, name the tool (harness), the model, and how much it contributed. Write "None" otherwise.
+参与程度 / Extent: 大部分由 AI 生成 / mostly generated; 部分辅助 / partly assisted; 仅用于审查 / review only
+-->
+
+- 工具 / Harness:
+- 模型 / Model:
+- 参与程度 / Extent:
