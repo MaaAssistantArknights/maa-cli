@@ -129,8 +129,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+      - name: Setup Dev Drive
+        uses: samypr100/setup-dev-drive@v4
+        with:
+          drive-size: 12GB
+          trusted-dev-drive: true
+          env-mapping: |
+            CARGO_TARGET_DIR,{{ DEV_DRIVE }}/target
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> ${{ env.CARGO_TARGET_DIR }}"
       - name: Test
         run: cargo x test --clippy --install-core
 
@@ -240,6 +249,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+      - name: Setup Dev Drive
+        uses: samypr100/setup-dev-drive@v4
+        with:
+          drive-size: 12GB
+          trusted-dev-drive: true
+          env-mapping: |
+            CARGO_TARGET_DIR,{{ DEV_DRIVE }}/target
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2
         with:
