@@ -4,7 +4,7 @@
 
 ## 中文
 
-感谢你对 maa-cli 的贡献。开发环境、代码规范和提交流程见 [开发文档](DEVELOPMENT.md)，本文说明提交 PR 时需要注意的事项，无论是否使用 AI 工具均适用。
+感谢你对 maa-cli 的关注。我们欢迎任何形式的贡献，包括 bug 报告、功能建议、文档改进和代码。开发环境、代码规范和提交流程见 [开发文档](DEVELOPMENT.md)，本文说明提交 PR 时需要注意的事项，无论是否使用 AI 工具均适用。
 
 本项目维护者人手有限，review 往往是合并的瓶颈。以下约定的目的是让改动能够更快地被审阅和合并。
 
@@ -27,7 +27,7 @@
 
 ## English
 
-Thank you for contributing to maa-cli. See [DEVELOPMENT.md](DEVELOPMENT.md) for the development setup, code conventions and workflow. This document describes what we expect from a PR, whether or not AI tools were used. The project has few maintainers and review is often the bottleneck; these conventions help changes get reviewed and merged sooner.
+Thank you for your interest in maa-cli. Contributions of all kinds are welcome, including bug reports, feature suggestions, documentation improvements and code. See [DEVELOPMENT.md](DEVELOPMENT.md) for the development setup, code conventions and workflow. This document describes what we expect from a PR, whether or not AI tools were used. The project has few maintainers and review is often the bottleneck; these conventions help changes get reviewed and merged sooner.
 
 ### Before submitting a PR
 

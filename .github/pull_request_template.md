@@ -2,6 +2,8 @@
 <!--
 提交前请先阅读贡献指南 / Please read the contributing guide first:
 https://github.com/MaaAssistantArknights/maa-cli/blob/main/CONTRIBUTING.md
+如果是较小的改动，填写「动机」一节即可，其余部分可以按需删除。
+For small changes, filling in the Motivation section is enough; feel free to remove the rest.
 -->
 
 ## 动机 / Motivation
