@@ -22,21 +22,16 @@ pub fn run() -> Result<()> {
     // Determine which version files to update
     let version_files = channel.version_files();
 
-    // Read existing manifests to preserve asset data structure
-    let mut manifests: Vec<VersionManifest<Details>> = version_files
-        .iter()
-        .map(|file| {
-            let manifest = read_or_create_manifest(file)?;
-            Ok(manifest)
-        })
-        .collect::<Result<Vec<_>>>()?;
-
-    // Update target-independent version info
-    for manifest in &mut manifests {
-        manifest.version = version.clone();
-        manifest.details.tag = tag.clone();
-        manifest.details.commit = commit.clone();
-    }
+    // Build manifests from this release's artifacts only, so targets that are no
+    // longer built (e.g. universal-apple-darwin) don't keep pointing at an old release
+    let mut manifest = VersionManifest {
+        version,
+        details: Details {
+            tag,
+            commit,
+            assets: BTreeMap::new(),
+        },
+    };
 
     // Process each artifact directory
     let entries = fs::read_dir(".")
@@ -84,47 +79,21 @@ pub fn run() -> Result<()> {
         }
 
         // Update version files with target-specific info
-        let asset = Asset {
+        manifest.details.assets.insert(target.to_string(), Asset {
             name: archive_name,
             size,
             sha256sum: checksum_hash,
-        };
-
-        for manifest in &mut manifests {
-            manifest
-                .details
-                .assets
-                .insert(target.to_string(), asset.clone());
-        }
+        });
     }
 
-    // Write updated manifests back to files
-    for (file, manifest) in version_files.iter().zip(&manifests) {
-        write_manifest(file, manifest)?;
-        write_shell_format(file, manifest)?;
+    // Write the manifest to every version file of this channel
+    for file in version_files {
+        write_manifest(file, &manifest)?;
+        write_shell_format(file, &manifest)?;
     }
 
     println!("Version JSON files updated successfully");
     Ok(())
-}
-
-fn read_or_create_manifest(file: &str) -> Result<VersionManifest<Details>> {
-    if fs::metadata(file).is_ok() {
-        let content =
-            fs::read_to_string(file).with_context(|| format!("Failed to read {}", file))?;
-
-        serde_json::from_str(&content).with_context(|| format!("Failed to parse {}", file))
-    } else {
-        // Create a new manifest with empty data
-        Ok(VersionManifest {
-            version: Version::new(0, 0, 0),
-            details: Details {
-                tag: String::new(),
-                commit: String::new(),
-                assets: BTreeMap::new(),
-            },
-        })
-    }
 }
 
 fn write_manifest(file: &str, manifest: &VersionManifest<Details>) -> Result<()> {
