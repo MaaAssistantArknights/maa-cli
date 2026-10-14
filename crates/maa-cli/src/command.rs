@@ -208,6 +208,7 @@ pub(crate) enum Command {
     /// Clearing the caches of maa-cli and maa core
     Cleanup {
         /// Specify the path for deletion
+        #[arg(default_values = ["cli-cache", "core-cache", "debug"])]
         targets: Vec<cleanup::CleanupTarget>,
     },
     /// List all available tasks
@@ -619,7 +620,7 @@ mod test {
         use cleanup::CleanupTarget::*;
         assert_matches!(
             parse_from(["maa", "cleanup"]).command,
-            Command::Cleanup { .. }
+            Command::Cleanup { targets } if targets == vec![CliCache, CoreCache, Debug]
         );
 
         assert_matches!(

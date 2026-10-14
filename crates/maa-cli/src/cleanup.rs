@@ -104,18 +104,6 @@ impl PathProvider for CleanupTarget {
     }
 }
 
-/// Targets cleaned up when none are specified
-pub const DEFAULT_TARGETS: &[CleanupTarget] = &[CliCache, CoreCache, Debug];
-
-/// The given targets, or [`DEFAULT_TARGETS`] if none are given
-pub fn or_default(targets: &[CleanupTarget]) -> &[CleanupTarget] {
-    if targets.is_empty() {
-        DEFAULT_TARGETS
-    } else {
-        targets
-    }
-}
-
 /// Clean up files and directories
 pub fn cleanup<T>(targets: &[T]) -> Result<()>
 where
@@ -444,27 +432,15 @@ mod tests {
     }
 
     #[test]
-    fn default_targets() {
-        assert_eq!(DEFAULT_TARGETS, [CliCache, CoreCache, Debug]);
-        assert_eq!(or_default(&[]), DEFAULT_TARGETS);
-        assert_eq!(or_default(&[Log]), [Log]);
-    }
-
-    #[test]
     #[ignore = "Need installed MaaCore"]
     fn collect_default_targets() {
         let test_root = tempfile::tempdir().unwrap();
-        let targets: Vec<Redirect> = DEFAULT_TARGETS
-            .iter()
-            .map(|target| {
-                let dir = join!(test_root.path(), format!("{target:?}"));
-                dir.ensure().unwrap();
-                Redirect {
-                    target: target.clone(),
-                    dir,
-                }
-            })
-            .collect();
+        // Default targets of `maa cleanup`
+        let targets = [CliCache, CoreCache, Debug].map(|target| {
+            let dir = join!(test_root.path(), format!("{target:?}"));
+            dir.ensure().unwrap();
+            Redirect { target, dir }
+        });
         let [cache, core_cache, log] = [0, 1, 2].map(|i| targets[i].dir.as_path());
 
         let file = |path: PathBuf| {

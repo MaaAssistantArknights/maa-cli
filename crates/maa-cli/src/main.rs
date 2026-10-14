@@ -118,7 +118,7 @@ fn main() -> Result<()> {
                 )
             );
         }
-        Command::Cleanup { targets } => cleanup::cleanup(cleanup::or_default(&targets))?,
+        Command::Cleanup { targets } => cleanup::cleanup(&targets)?,
         Command::List => {
             print!("{}", tasks::Tasks::new()?)
         }
