@@ -61,6 +61,25 @@ curl -fsSL https://raw.githubusercontent.com/MaaAssistantArknights/maa-cli/main/
 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/MaaAssistantArknights/maa-cli/main/install.ps1" -OutFile install.ps1; .\install.ps1
 ```
 
+### 支持平台
+
+预编译二进制文件按测试程度分为三个等级：
+
+- Tier 1：每个 PR 都会构建并运行完整测试，包括依赖 MaaCore 的测试；
+- Tier 2：每个 PR 都会构建并测试，但不运行依赖 MaaCore 的测试；
+- Tier 3：仅在发布时构建，不保证测试通过。
+
+| 平台                | Target                      | 等级   |
+| ------------------- | --------------------------- | ------ |
+| Linux x86_64        | `x86_64-unknown-linux-gnu`  | Tier 1 |
+| Linux aarch64       | `aarch64-unknown-linux-gnu` | Tier 1 |
+| macOS Apple Silicon | `aarch64-apple-darwin`      | Tier 1 |
+| Windows x86_64      | `x86_64-pc-windows-msvc`    | Tier 1 |
+| Windows ARM64       | `aarch64-pc-windows-msvc`   | Tier 2 |
+| macOS Intel         | `x86_64-apple-darwin`       | Tier 3 |
+
+macOS 另外提供同时包含两种架构的通用二进制文件（`universal-apple-darwin`）。
+
 ## 编译安装
 
 Rust 开发者可以通过 `cargo` 自行编译安装 maa-cli：

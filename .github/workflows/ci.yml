@@ -143,7 +143,6 @@ jobs:
       fail-fast: false
       matrix:
         runner:
-          - macos-15-intel
           - windows-11-arm
     steps:
       - name: Checkout
@@ -151,9 +150,7 @@ jobs:
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
       - name: Test
-        run: |
-          # TODO: Re-enable macOS Core-backed tests once beta releases ship macOS MaaCore assets again.
-          cargo x test --clippy --no-core-tests
+        run: cargo x test --clippy --no-core-tests
 
   build-no-default-features:
     name: Build and Test (feature=${{ matrix.feature }})

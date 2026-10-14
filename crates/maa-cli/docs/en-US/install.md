@@ -57,6 +57,25 @@ curl -fsSL https://raw.githubusercontent.com/MaaAssistantArknights/maa-cli/main/
 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/MaaAssistantArknights/maa-cli/main/install.ps1" -OutFile install.ps1; .\install.ps1
 ```
 
+### Supported Platforms
+
+Precompiled binaries are grouped into three tiers by how thoroughly they are tested:
+
+- Tier 1: built and fully tested on every PR, including tests that require MaaCore;
+- Tier 2: built and tested on every PR, but without tests that require MaaCore;
+- Tier 3: only built for releases, tests are not guaranteed to pass.
+
+| Platform            | Target                      | Tier   |
+| ------------------- | --------------------------- | ------ |
+| Linux x86_64        | `x86_64-unknown-linux-gnu`  | Tier 1 |
+| Linux aarch64       | `aarch64-unknown-linux-gnu` | Tier 1 |
+| macOS Apple Silicon | `aarch64-apple-darwin`      | Tier 1 |
+| Windows x86_64      | `x86_64-pc-windows-msvc`    | Tier 1 |
+| Windows ARM64       | `aarch64-pc-windows-msvc`   | Tier 2 |
+| macOS Intel         | `x86_64-apple-darwin`       | Tier 3 |
+
+A universal binary containing both architectures (`universal-apple-darwin`) is also provided for macOS.
+
 ## Build from Source
 
 Rust developers can compile and install maa-cli themselves via `cargo`:
