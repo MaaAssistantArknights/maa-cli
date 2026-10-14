@@ -1,16 +1,25 @@
 <!-- markdownlint-disable-file MD041 -->
 
-## Motivation
+## 动机 / Motivation
 
-<!-- Why is this change needed? What problem does it solve? Link the issue if there is one, e.g. `Closes #123`. -->
+<!--
+为什么要改，解决什么问题。有相关 issue 请写 `Closes #123`。
+Why is this change needed? What problem does it solve? Link the issue if there is one, e.g. `Closes #123`.
+-->
 
-## Solution
+## 方案 / Solution
 
-<!-- How does this PR solve it? Focus on design choices that are not obvious from the diff. -->
+<!--
+怎么解决的。重点写从 diff 里看不出来的设计取舍。
+How does this PR solve it? Focus on design choices that are not obvious from the diff.
+-->
 
-## Changes and impact
+## 变更与影响 / Changes and impact
 
-<!-- What will users notice: CLI behavior, config format, platform support? Call out breaking changes explicitly. Write "None" for internal-only changes. -->
+<!--
+用户能感受到什么变化：命令行行为、配置格式、平台支持等。breaking change 请明确写出。纯内部改动写“无”。
+What will users notice: CLI behavior, config format, platform support? Call out breaking changes explicitly. Write "None" for internal-only changes.
+-->
 
-- [ ] User-visible behavior changed: docs under `crates/maa-cli/docs/` are updated for every language
-- [ ] Breaking change: this PR targets `dev-0.8`, not `main`
+- [ ] 改了用户可见行为的话，已同步更新 `crates/maa-cli/docs/` 下所有语言的文档 / User-visible behavior changed: docs under `crates/maa-cli/docs/` are updated for every language
+- [ ] 如果是 breaking change，目标分支是 `dev-0.8` 而不是 `main` / Breaking change: this PR targets `dev-0.8`, not `main`
