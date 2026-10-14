@@ -13,6 +13,12 @@ env:
   RUST_BACKTRACE: full
   CARGO_TERM_COLOR: always
 
+# Cancel superseded runs when a PR gets new commits. Other events get a group
+# per run, so runs on main and in the merge queue never cancel each other.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   pull-requests: read
@@ -131,7 +137,7 @@ jobs:
   build-tier2:
     name: Build and Test (Tier 2, ${{ matrix.runner }})
     needs: [changes, build]
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && github.event_name != 'merge_group'
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -201,7 +207,7 @@ jobs:
   coverage:
     name: Coverage
     needs: [changes, build]
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && github.event_name != 'merge_group'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -229,7 +235,7 @@ jobs:
   coverage-windows:
     name: Coverage (Windows)
     needs: [changes, build-windows]
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && github.event_name != 'merge_group'
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -266,6 +272,7 @@ jobs:
     steps:
       - name: Verify required jobs
         env:
+          EVENT_NAME: ${{ github.event_name }}
           CODE_CHANGED: ${{ needs.changes.outputs.code }}
           CHANGES_RESULT: ${{ needs.changes.result }}
           TYPOS_RESULT: ${{ needs.typos.result }}
@@ -295,13 +302,23 @@ jobs:
             "$DENY_RESULT" \
             "$BUILD_RESULT" \
             "$BUILD_WINDOWS_RESULT" \
-            "$BUILD_TIER2_RESULT" \
             "$BUILD_FEATURES_RESULT" \
-            "$BUILD_CORE_RESULT" \
-            "$COVERAGE_RESULT" \
-            "$COVERAGE_WINDOWS_RESULT"; do
+            "$BUILD_CORE_RESULT"; do
             if [[ "$result" != "success" ]]; then
               echo "A required CI job did not succeed: $result"
               exit 1
             fi
           done
+
+          # The merge queue skips Tier 2 and coverage: PR CI already ran them.
+          if [[ "$EVENT_NAME" != "merge_group" ]]; then
+            for result in \
+              "$BUILD_TIER2_RESULT" \
+              "$COVERAGE_RESULT" \
+              "$COVERAGE_WINDOWS_RESULT"; do
+              if [[ "$result" != "success" ]]; then
+                echo "A required CI job did not succeed: $result"
+                exit 1
+              fi
+            done
+          fi
