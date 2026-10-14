@@ -118,10 +118,7 @@ fn main() -> Result<()> {
                 )
             );
         }
-        Command::Cleanup { targets } if targets.is_empty() => {
-            cleanup::cleanup(cleanup::DEFAULT_TARGETS)?
-        }
-        Command::Cleanup { targets } => cleanup::cleanup(&targets)?,
+        Command::Cleanup { targets } => cleanup::cleanup(cleanup::or_default(&targets))?,
         Command::List => {
             print!("{}", tasks::Tasks::new()?)
         }

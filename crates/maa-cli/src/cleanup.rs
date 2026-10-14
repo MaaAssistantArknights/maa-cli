@@ -107,6 +107,15 @@ impl PathProvider for CleanupTarget {
 /// Targets cleaned up when none are specified
 pub const DEFAULT_TARGETS: &[CleanupTarget] = &[CliCache, CoreCache, Debug];
 
+/// The given targets, or [`DEFAULT_TARGETS`] if none are given
+pub fn or_default(targets: &[CleanupTarget]) -> &[CleanupTarget] {
+    if targets.is_empty() {
+        DEFAULT_TARGETS
+    } else {
+        targets
+    }
+}
+
 /// Clean up files and directories
 pub fn cleanup<T>(targets: &[T]) -> Result<()>
 where
@@ -437,6 +446,8 @@ mod tests {
     #[test]
     fn default_targets() {
         assert_eq!(DEFAULT_TARGETS, [CliCache, CoreCache, Debug]);
+        assert_eq!(or_default(&[]), DEFAULT_TARGETS);
+        assert_eq!(or_default(&[Log]), [Log]);
     }
 
     #[test]
