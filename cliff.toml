@@ -110,6 +110,8 @@ commit_parsers = [
   # skip commits with `[no changelog]` marker
   { message = "\\[(no|skip) changelog\\]", skip = true },
 
+  # security fixes are marked in the title, e.g. `fix(security): bump rustls`
+  { message = "^(security|fix\\(security\\))", group = "<!-- 6 --> Security" },
   { message = "^feat", group = "<!-- 0 -->Features" },
   { message = "^fix", group = "<!-- 1 -->Bug Fixes" },
   { message = "^perf", group = "<!-- 2 -->Performance" },
@@ -143,9 +145,6 @@ commit_parsers = [
 
   # skip changelog commits
   { message = "(?i)^chore(?:\\(changelog\\))?: update changelog(?: for \\S+)?$", skip = true },
-
-  # after the skip rules, so dependency bumps mentioning security stay skipped
-  { body = ".*security", group = "<!-- 6 --> Security" },
 
   # chore should be the last one to avoid overriding above rules
   { message = "^chore", group = "<!-- 99 -->Miscellaneous" },
