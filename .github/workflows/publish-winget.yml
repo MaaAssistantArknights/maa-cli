@@ -82,31 +82,15 @@ jobs:
         if: steps.asset.outputs.exists != 'true'
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-about@0.9.2
+          tool: cargo-about
       - name: Build
         if: steps.asset.outputs.exists != 'true'
-        id: build
         env:
           MAA_VERSION: ${{ inputs.version }}
         run: |
-          cargo x build --tar --vendored-deps \
+          cargo x build --output-dir "$RUNNER_TEMP/winget" --vendored-deps \
             --profile release-lto --rename maa-cli.exe -- \
             --no-default-features --features core_installer,git2
-      - name: Package
-        if: steps.asset.outputs.exists != 'true'
-        env:
-          TARGET: ${{ steps.build.outputs.host_triplet }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/winget"
-          tar -xf "$TARGET.tar" -C "$RUNNER_TEMP/winget"
-          # Older release tags build tars without licenses.md.
-          if [[ ! -f "$RUNNER_TEMP/winget/licenses.md" ]]; then
-            cargo about generate about.hbs --manifest-path crates/maa-cli/Cargo.toml \
-              --config about.toml --target "$TARGET" --locked \
-              --no-default-features \
-              --features 'core_installer git2 git2?/vendored-libgit2 git2?/vendored-openssl' \
-              -o "$RUNNER_TEMP/winget/licenses.md"
-          fi
       - name: Create Zip
         if: steps.asset.outputs.exists != 'true'
         shell: pwsh

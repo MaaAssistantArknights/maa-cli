@@ -122,14 +122,18 @@ jobs:
       - name: Install cargo-about
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-about@0.9.2
+          tool: cargo-about
       - name: Build
         id: build
         env:
           MAA_VERSION: ${{ needs.meta.outputs.version }}
         run: |
-          cargo x build --tar --vendored-deps \
+          cargo x build --output-dir "$RUNNER_TEMP/maa-cli" --vendored-deps \
             --profile ${{ needs.meta.outputs.profile }}
+      - name: Archive Build
+        env:
+          TARGET: ${{ steps.build.outputs.host_triplet }}
+        run: tar -cf "$TARGET.tar" -C "$RUNNER_TEMP/maa-cli" .
       - name: Upload Artifact
         uses: actions/upload-artifact@v7
         with:

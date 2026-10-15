@@ -1,6 +1,6 @@
 //! Build automation for maa-cli.
 
-use std::{env, fs::File, path::Path, process::Command};
+use std::{env, fs, path::Path, process::Command};
 
 use anyhow::{Context, Result};
 
@@ -58,7 +58,7 @@ pub fn run(opts: BuildOptions) -> Result<()> {
             .context("Failed to check binary version")
     })?;
 
-    if opts.tar {
+    if let Some(output_dir) = opts.output_dir {
         let temp = tempfile::tempdir().context("Failed to create license directory")?;
         let licenses = temp.path().join("licenses.md");
         Group::new("Generate Licenses").run(|| {
@@ -66,15 +66,9 @@ pub fn run(opts: BuildOptions) -> Result<()> {
                 .run()
                 .context("Failed to generate licenses.md")
         })?;
-        Group::new("Create Tar Package").run(|| {
-            let tar_name = format!("{HOST_TRIPLET}.tar");
-            let archive_name = opts.rename.unwrap_or(exe);
-            create_tar(
-                Path::new(&tar_name),
-                Path::new(&binary),
-                Path::new(&archive_name),
-                &licenses,
-            )
+        Group::new("Prepare Output Directory").run(|| {
+            let name = opts.rename.unwrap_or(exe);
+            prepare_output_dir(&output_dir, Path::new(&binary), Path::new(&name), &licenses)
         })?;
     }
 
@@ -124,21 +118,29 @@ fn license_command(build_args: &[String], output: &Path) -> Result<Command> {
     Ok(cmd)
 }
 
-fn create_tar(output: &Path, binary: &Path, name: &Path, licenses: &Path) -> Result<()> {
-    let file = File::create(output)
-        .with_context(|| format!("Failed to create tar file: {}", output.display()))?;
-    let mut tar = tar::Builder::new(file);
-    tar.append_path_with_name(binary, name)
-        .context("Failed to add binary to tar archive")?;
-    tar.append_path_with_name(licenses, "licenses.md")
-        .context("Failed to add licenses.md to tar archive")?;
-    tar.finish().context("Failed to finalize tar archive")
+fn prepare_output_dir(output: &Path, binary: &Path, name: &Path, licenses: &Path) -> Result<()> {
+    fs::create_dir_all(output)
+        .with_context(|| format!("Failed to create output directory: {}", output.display()))?;
+    let destination = output.join(name);
+    let same_binary = match destination.canonicalize() {
+        Ok(path) => {
+            path == binary
+                .canonicalize()
+                .context("Failed to resolve binary path")?
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+        Err(error) => return Err(error).context("Failed to resolve output binary path"),
+    };
+    if !same_binary {
+        fs::copy(binary, destination).context("Failed to copy binary to output directory")?;
+    }
+    fs::copy(licenses, output.join("licenses.md"))
+        .context("Failed to copy licenses.md to output directory")?;
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, io::Read};
-
     use super::*;
 
     #[test]
@@ -207,27 +209,38 @@ mod tests {
     }
 
     #[test]
-    fn tar_contains_renamed_binary_and_licenses() -> Result<()> {
+    fn output_directory_contains_renamed_binary_and_licenses() -> Result<()> {
         let temp = tempfile::tempdir()?;
         let binary = temp.path().join("maa.exe");
         let licenses = temp.path().join("licenses.md");
-        let output = temp.path().join("build.tar");
+        let output = temp.path().join("artifacts").join("winget");
         fs::write(&binary, b"binary")?;
         fs::write(&licenses, b"target-specific licenses")?;
-        create_tar(&output, &binary, Path::new("maa-cli.exe"), &licenses)?;
-        let mut archive = tar::Archive::new(File::open(output)?);
-        let mut entries = Vec::new();
-        for entry in archive.entries()? {
-            let mut entry = entry?;
-            let name = entry.path()?.into_owned();
-            let mut content = String::new();
-            entry.read_to_string(&mut content)?;
-            entries.push((name, content));
-        }
-        assert_eq!(entries, vec![
-            ("maa-cli.exe".into(), "binary".into()),
-            ("licenses.md".into(), "target-specific licenses".into()),
-        ]);
+        prepare_output_dir(&output, &binary, Path::new("maa-cli.exe"), &licenses)?;
+        assert_eq!(fs::read(output.join("maa-cli.exe"))?, b"binary");
+        assert_eq!(
+            fs::read(output.join("licenses.md"))?,
+            b"target-specific licenses"
+        );
+        assert_eq!(fs::read_dir(&output)?.count(), 2);
+        assert_eq!(fs::read(&binary)?, b"binary");
+        Ok(())
+    }
+    #[test]
+    fn output_directory_can_be_the_build_directory() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let output = temp.path().join("target").join("debug");
+        fs::create_dir_all(&output)?;
+        let binary = output.join("maa");
+        let licenses = temp.path().join("licenses.md");
+        fs::write(&binary, b"existing binary")?;
+        fs::write(&licenses, b"target-specific licenses")?;
+        prepare_output_dir(&output.join("."), &binary, Path::new("maa"), &licenses)?;
+        assert_eq!(fs::read(&binary)?, b"existing binary");
+        assert_eq!(
+            fs::read(output.join("licenses.md"))?,
+            b"target-specific licenses"
+        );
         Ok(())
     }
 }

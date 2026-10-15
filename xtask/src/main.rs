@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
@@ -51,9 +53,9 @@ struct BuildOptions {
     #[arg(long)]
     pub vendored_deps: bool,
 
-    /// Create tar package with binary and licenses (requires cargo-about)
+    /// Copy binary and licenses into this directory (requires cargo-about)
     #[arg(long)]
-    pub tar: bool,
+    pub output_dir: Option<PathBuf>,
 
     /// Rename the binary to a different name
     #[arg(long)]
