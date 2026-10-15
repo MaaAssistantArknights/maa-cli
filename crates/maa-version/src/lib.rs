@@ -26,8 +26,12 @@ pub mod cli {
     use super::*;
 
     /// Release channel of maa-cli itself, independent of MaaCore's channels.
+    ///
+    /// Ordered from the most to the least stable.
     #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
-    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(
+        Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize,
+    )]
     #[serde(rename_all = "lowercase")]
     pub enum Channel {
         #[default]
@@ -215,6 +219,7 @@ mod tests {
                 Channel::Nightly,
             ]);
             assert_eq!(Channel::default(), Channel::Stable);
+            assert!(Channel::Stable < Channel::Beta && Channel::Beta < Channel::Nightly);
         }
 
         #[test]
