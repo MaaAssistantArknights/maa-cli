@@ -8,12 +8,16 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
+clap = { workspace = true, features = ["derive"], optional = true }
 semver = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
 serde_json = { workspace = true }
 serde_test = { workspace = true }
+
+[features]
+clap = ["dep:clap"]
 
 [lints]
 workspace = true
