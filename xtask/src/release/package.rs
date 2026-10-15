@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fs, path::PathBuf};
+use std::{collections::BTreeMap, fs};
 
 use anyhow::{Context, Result};
 use maa_version::{
@@ -83,7 +83,7 @@ pub fn run() -> Result<()> {
     }
 
     write_manifest("manifest.json", &manifest)?;
-    write_shell_format("manifest.json", &manifest)?;
+    write_shell_format("manifest.txt", &manifest)?;
 
     println!("Release manifests written successfully");
     Ok(())
@@ -96,14 +96,10 @@ fn write_manifest(file: &str, manifest: &VersionManifest<Details>) -> Result<()>
 }
 
 fn write_shell_format(file: &str, manifest: &VersionManifest<Details>) -> Result<()> {
-    // Write a shell-friendly .txt format alongside the JSON
-    let txt_path = PathBuf::from(file).with_extension("txt");
-    let txt_path_str = txt_path.to_str().unwrap();
-
     use std::io::Write;
 
-    let mut txt_file = std::fs::File::create(&txt_path)
-        .with_context(|| format!("Failed to create {txt_path_str}"))?;
+    let mut txt_file =
+        std::fs::File::create(file).with_context(|| format!("Failed to create {file}"))?;
 
     writeln!(txt_file, "VERSION={}", manifest.version)?;
     writeln!(txt_file, "TAG={}", manifest.details.tag)?;
@@ -122,7 +118,7 @@ fn write_shell_format(file: &str, manifest: &VersionManifest<Details>) -> Result
 
     txt_file
         .sync_all()
-        .with_context(|| format!("Failed to sync {txt_path_str}"))?;
+        .with_context(|| format!("Failed to sync {file}"))?;
 
     Ok(())
 }
