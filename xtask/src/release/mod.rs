@@ -48,30 +48,13 @@ impl Channel {
         let channel = self.as_str();
         format!("version/{channel}.json")
     }
-
-    /// Get the list of version files to update for this channel.
-    ///
-    /// - Alpha: updates alpha.json
-    /// - Beta: updates alpha.json and beta.json
-    /// - Stable: updates all three (alpha.json, beta.json, stable.json)
-    pub fn version_files(&self) -> &[&'static str] {
-        match self {
-            Channel::Alpha => &["version/alpha.json"],
-            Channel::Beta => &["version/alpha.json", "version/beta.json"],
-            Channel::Stable => &[
-                "version/alpha.json",
-                "version/beta.json",
-                "version/stable.json",
-            ],
-        }
-    }
 }
 
 #[derive(Subcommand)]
 pub enum ReleaseCommands {
     /// Parse version and determine release metadata
     Meta,
-    /// Update version.json files with release information
+    /// Package release archives and write manifest.json and manifest.txt
     Package,
 }
 

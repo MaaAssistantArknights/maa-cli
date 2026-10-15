@@ -7,20 +7,16 @@ use maa_version::{
 };
 use semver::Version;
 
-use super::{Channel, archive, archive::ArchiveFormat};
+use super::{archive, archive::ArchiveFormat};
 use crate::env;
 
 pub fn run() -> Result<()> {
-    let channel: Channel = env::var("CHANNEL")?.parse()?;
     let version_str = env::var("VERSION")?;
     let tag = env::var("TAG")?;
     let commit = env::var("COMMIT")?;
 
     let version = Version::parse(&version_str)
         .with_context(|| format!("Failed to parse version: {}", version_str))?;
-
-    // Determine which version files to update
-    let version_files = channel.version_files();
 
     // Build manifests from this release's artifacts only, so targets that are no
     // longer built (e.g. universal-apple-darwin) don't keep pointing at an old release
@@ -78,7 +74,7 @@ pub fn run() -> Result<()> {
             continue;
         }
 
-        // Update version files with target-specific info
+        // Add target-specific info to the manifest
         manifest.details.assets.insert(target.to_string(), Asset {
             name: archive_name,
             size,
@@ -86,13 +82,10 @@ pub fn run() -> Result<()> {
         });
     }
 
-    // Write the manifest to every version file of this channel
-    for file in version_files {
-        write_manifest(file, &manifest)?;
-        write_shell_format(file, &manifest)?;
-    }
+    write_manifest("manifest.json", &manifest)?;
+    write_shell_format("manifest.json", &manifest)?;
 
-    println!("Version JSON files updated successfully");
+    println!("Release manifests written successfully");
     Ok(())
 }
 
