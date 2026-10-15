@@ -280,7 +280,7 @@ jobs:
   update-stable:
     name: Update Stable Tag
     if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'stable' }}
-    needs: [meta, update-index]
+    needs: [meta, release]
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -296,7 +296,7 @@ jobs:
 
   update-changelog:
     name: Update Changelog
-    needs: [meta, update-index]
+    needs: [meta, release]
     permissions:
       contents: write
     if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'stable' }}
