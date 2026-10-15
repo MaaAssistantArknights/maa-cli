@@ -3,9 +3,10 @@ name: Prepare Stable Release
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'auto, patch, minor, major, or an exact stable version'
-        type: string
+      bump:
+        description: Version bump to release
+        type: choice
+        options: [auto, minor, major]
         default: auto
 
 permissions:
@@ -40,9 +41,9 @@ jobs:
       - name: Prepare release files
         id: release
         env:
-          VERSION_SELECTION: ${{ inputs.version }}
+          BUMP: ${{ inputs.bump }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: cargo x -- release prepare --version "$VERSION_SELECTION"
+        run: cargo x -- release prepare --bump "$BUMP"
 
       - name: Commit release preparation as GitHub Actions
         env:

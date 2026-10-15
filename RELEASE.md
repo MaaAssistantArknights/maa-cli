@@ -46,10 +46,9 @@
 
 Stable 只从 `main` 发布：
 
-1. 在 Actions 中从 `main` 运行 `Prepare Stable Release`，选择 `version`：
-   - `auto`（默认）：Cargo 版本高于最近正式 tag 时沿用，否则由 git-cliff 推导。`0.x` 阶段 `fix` 和 `feat` 都推进 patch，breaking change 推进 minor；只有文档、重构等变更时不会自动 bump。
-   - `patch`、`minor`、`major`：由 git-cliff 相对最近正式 tag 计算。
-   - `X.Y.Z`：直接指定，必须高于最近正式 tag。
+1. 在 Actions 中从 `main` 运行 `Prepare Stable Release`，选择 `bump`：
+   - `auto`（默认）：Cargo 版本高于最近正式 tag 时沿用，否则由 git-cliff 推导。`0.x` 阶段 `fix` 和 `feat` 都推进 patch，breaking change 推进 minor；只有文档、重构等变更时不会发布。
+   - `minor`、`major`：由 git-cliff 相对最近正式 tag 计算，用于不经 dev 分支直接开始新的 minor 或 major。
 2. 工作流更新 Cargo 版本和 lockfile，用 git-cliff 生成 changelog，创建或更新带 `release` 标签的 `release-prep/vX.Y.Z` PR，并关闭其他打开的 `release-prep/*` PR。版本已由其他 PR 更新时，本次只修改 changelog。
 3. 批准自动创建 PR 的 workflow runs，检查 CI 后合并。
 

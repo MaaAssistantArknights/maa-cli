@@ -1,49 +1,30 @@
-use std::{path::Path, process::Command, str::FromStr};
+use std::{path::Path, process::Command};
 
 use anyhow::{Context, Result, ensure};
+use clap::ValueEnum;
 use semver::Version;
 use serde::Deserialize;
 
 use super::git;
 use crate::cmd::CommandExt;
 
-#[derive(Debug, Clone)]
-pub enum VersionSelection {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum Bump {
+    /// Keep a newer Cargo version, otherwise infer the bump from the commits
     Auto,
-    Patch,
     Minor,
     Major,
-    Explicit(Version),
-}
-
-impl FromStr for VersionSelection {
-    type Err = anyhow::Error;
-
-    fn from_str(value: &str) -> Result<Self> {
-        Ok(match value {
-            "auto" => Self::Auto,
-            "patch" => Self::Patch,
-            "minor" => Self::Minor,
-            "major" => Self::Major,
-            _ => {
-                let version = Version::parse(value)
-                    .context("Expected auto, patch, minor, major, or X.Y.Z")?;
-                ensure_stable(&version)?;
-                Self::Explicit(version)
-            }
-        })
-    }
 }
 
 /// Select the next stable version of `source` and the latest stable tag it builds on.
-pub fn select(source: &Path, selection: &VersionSelection) -> Result<(Version, String)> {
+pub fn select(source: &Path, bump: Bump) -> Result<(Version, String)> {
     let (latest, previous_tag) = previous_stable_tag(source, None)?;
     let cargo = cargo_version(source)?;
-    let version = choose(selection, &cargo, &latest, |bump| {
+    let version = choose(bump, &cargo, &latest, |level| {
         let range = format!("{previous_tag}..HEAD");
         let config = super::cliff_config();
         let config = config.to_str().context("cliff.toml path is not UTF-8")?;
-        if bump.is_none() {
+        if level.is_none() {
             let context = Command::new("git-cliff")
                 .current_dir(source)
                 .args(["--config", config, "--offline", &range, "--context"])
@@ -59,10 +40,9 @@ pub fn select(source: &Path, selection: &VersionSelection) -> Result<(Version, S
             "--offline",
             &range,
             "--bumped-version",
-            "--bump",
         ]);
-        if let Some(bump) = bump {
-            command.arg(bump);
+        if let Some(level) = level {
+            command.args(["--bump", level]);
         }
         let output = command.read()?;
         let version = Version::parse(output.strip_prefix('v').unwrap_or(&output))
@@ -74,7 +54,7 @@ pub fn select(source: &Path, selection: &VersionSelection) -> Result<(Version, S
         version >= latest,
         "Selected version {version} is older than published stable {latest}"
     );
-    if !matches!(selection, VersionSelection::Auto) {
+    if bump != Bump::Auto {
         ensure!(
             version > latest,
             "Requested bump must produce a version newer than published stable {latest}"
@@ -84,25 +64,17 @@ pub fn select(source: &Path, selection: &VersionSelection) -> Result<(Version, S
 }
 
 fn choose(
-    selection: &VersionSelection,
+    bump: Bump,
     cargo: &Version,
     latest: &Version,
     infer: impl FnOnce(Option<&str>) -> Result<Version>,
 ) -> Result<Version> {
     ensure_stable(cargo)?;
-    match selection {
-        VersionSelection::Explicit(version) => {
-            ensure!(
-                version > latest,
-                "Requested version {version} must be newer than published stable {latest}"
-            );
-            Ok(version.clone())
-        }
-        VersionSelection::Auto if cargo > latest => Ok(cargo.clone()),
-        VersionSelection::Auto => infer(None),
-        VersionSelection::Patch => infer(Some("patch")),
-        VersionSelection::Minor => infer(Some("minor")),
-        VersionSelection::Major => infer(Some("major")),
+    match bump {
+        Bump::Auto if cargo > latest => Ok(cargo.clone()),
+        Bump::Auto => infer(None),
+        Bump::Minor => infer(Some("minor")),
+        Bump::Major => infer(Some("major")),
     }
 }
 
@@ -184,55 +156,35 @@ mod tests {
     use super::*;
 
     #[test]
-    fn explicit_version_overrides_pending_cargo_and_requires_new_stable() -> Result<()> {
-        let latest = Version::new(0, 7, 5);
-        let cargo = Version::new(0, 9, 0);
-        let requested = VersionSelection::from_str("0.8.0")?;
-        let result = choose(&requested, &cargo, &latest, |_| {
+    fn auto_keeps_a_newer_cargo_version() -> Result<()> {
+        let cargo = Version::new(0, 8, 0);
+        let version = choose(Bump::Auto, &cargo, &Version::new(0, 7, 5), |_| {
             anyhow::bail!("must not infer")
         })?;
-        assert_eq!(result, Version::new(0, 8, 0));
-        assert!(
-            choose(
-                &VersionSelection::Explicit(latest.clone()),
-                &cargo,
-                &latest,
-                |_| Ok(cargo.clone())
-            )
-            .is_err()
-        );
-        assert!(VersionSelection::from_str("0.8.0-beta.1").is_err());
+        assert_eq!(version, cargo);
         Ok(())
     }
 
     #[test]
-    fn auto_preserves_pending_cargo_version() -> Result<()> {
-        let cargo = Version::new(0, 8, 0);
-        assert_eq!(
-            choose(
-                &VersionSelection::Auto,
-                &cargo,
-                &Version::new(0, 7, 5),
-                |_| anyhow::bail!("must not infer")
-            )?,
-            cargo
-        );
+    fn auto_infers_when_cargo_is_released() -> Result<()> {
+        let latest = Version::new(0, 7, 5);
+        let version = choose(Bump::Auto, &latest, &latest, |level| {
+            assert_eq!(level, None);
+            Ok(Version::new(0, 7, 6))
+        })?;
+        assert_eq!(version, Version::new(0, 7, 6));
         Ok(())
     }
 
     #[test]
-    fn bump_levels_override_cargo_and_are_delegated_to_git_cliff() -> Result<()> {
-        for (selection, expected) in [
-            (VersionSelection::Patch, "patch"),
-            (VersionSelection::Minor, "minor"),
-            (VersionSelection::Major, "major"),
-        ] {
+    fn explicit_bumps_are_delegated_to_git_cliff() -> Result<()> {
+        for (bump, expected) in [(Bump::Minor, "minor"), (Bump::Major, "major")] {
             let version = choose(
-                &selection,
+                bump,
                 &Version::new(0, 9, 0),
                 &Version::new(0, 7, 5),
-                |bump| {
-                    assert_eq!(bump, Some(expected));
+                |level| {
+                    assert_eq!(level, Some(expected));
                     Ok(Version::new(1, 0, 0))
                 },
             )?;

@@ -7,7 +7,7 @@ use semver::Version;
 
 use super::{
     PrepareOptions, cliff_config, git,
-    selection::{self, CARGO_MANIFEST, VersionSelection},
+    selection::{self, Bump, CARGO_MANIFEST},
 };
 use crate::{cmd::CommandExt, github};
 
@@ -17,15 +17,15 @@ const RELEASE_FILES: [&str; 3] = [CHANGELOG, "Cargo.lock", CARGO_MANIFEST];
 
 /// Bump the Cargo version if needed and regenerate this version's changelog section.
 pub fn prepare(options: PrepareOptions) -> Result<()> {
-    let version = prepare_files(&options.source, &options.version)?;
+    let version = prepare_files(&options.source, options.bump)?;
     github::set_output("version", &version.to_string())
 }
 
-fn prepare_files(source: &Path, selection: &VersionSelection) -> Result<Version> {
-    let (version, previous_tag) = selection::select(source, selection)?;
+fn prepare_files(source: &Path, bump: Bump) -> Result<Version> {
+    let (version, previous_tag) = selection::select(source, bump)?;
     ensure!(
         previous_tag != format!("v{version}"),
-        "No changes require an automatic release since {previous_tag}; specify a version to release anyway"
+        "No changes require an automatic release since {previous_tag}; choose minor or major to release anyway"
     );
 
     let current = selection::cargo_version(source)?;
@@ -210,14 +210,14 @@ mod tests {
         let repo = Repo::released("0.7.5");
         let source = repo.path();
         repo.commit("docs: clarify usage");
-        assert!(prepare_files(source, &VersionSelection::Auto).is_err());
+        assert!(prepare_files(source, Bump::Auto).is_err());
 
         // Before 1.0, features only advance the patch version.
         repo.commit("feat: add option A");
         repo.commit("Update README.md");
         repo.commit("chore(deps): bump example\n\nIncludes upstream security fixes.");
         let v076 = Version::new(0, 7, 6);
-        assert_eq!(prepare_files(source, &VersionSelection::Auto)?, v076);
+        assert_eq!(prepare_files(source, Bump::Auto)?, v076);
         assert_eq!(selection::cargo_version(source)?, v076);
         let log = fs::read_to_string(source.join(CHANGELOG))?;
         assert!(log.contains("## Release 0.7.6"), "{log}");
@@ -233,7 +233,7 @@ mod tests {
         repo.commit("fix: repair B");
         assert!(check(source, &v076).is_err());
         // Preparing again refreshes the section without bumping the version twice.
-        assert_eq!(prepare_files(source, &VersionSelection::Auto)?, v076);
+        assert_eq!(prepare_files(source, Bump::Auto)?, v076);
         repo.git(&["commit", "-qam", "chore(release): prepare for v0.7.6"]);
         check(source, &v076)?;
         let log = fs::read_to_string(source.join(CHANGELOG))?;
@@ -256,10 +256,7 @@ mod tests {
         repo.commit("feat: config v2");
         repo.git(&["checkout", "-q", "main"]);
         repo.git(&["merge", "-q", "--no-ff", "dev-0.8", "-m", "Merge dev-0.8"]);
-        assert_eq!(
-            prepare_files(source, &VersionSelection::Auto)?,
-            Version::new(0, 8, 0)
-        );
+        assert_eq!(prepare_files(source, Bump::Auto)?, Version::new(0, 8, 0));
         let changed = repo.git(&["diff", "--name-only"]);
         assert_eq!(changed, CHANGELOG);
         let log = fs::read_to_string(source.join(CHANGELOG))?;

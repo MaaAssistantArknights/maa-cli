@@ -122,9 +122,9 @@ pub struct PrepareOptions {
     /// Checkout of main to prepare
     #[arg(long, default_value = ".")]
     source: PathBuf,
-    /// auto, patch, minor, major, or an explicit stable X.Y.Z
-    #[arg(long, default_value = "auto")]
-    version: selection::VersionSelection,
+    /// Version bump to release
+    #[arg(long, value_enum, default_value_t = selection::Bump::Auto)]
+    bump: selection::Bump,
 }
 
 #[derive(Args)]
