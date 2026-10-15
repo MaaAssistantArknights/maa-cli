@@ -72,14 +72,12 @@ jobs:
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
-            commit="$(gh api "repos/$GH_REPO/commits/refs/tags/$RELEASE_TAG" --jq .sha)"
-            echo "commit=$commit" >> "$GITHUB_OUTPUT"
           fi
-      - name: Checkout Release Commit
+      - name: Checkout Release Tag
         if: steps.asset.outputs.exists != 'true'
         uses: actions/checkout@v7
         with:
-          ref: ${{ steps.asset.outputs.commit }}
+          ref: refs/tags/${{ env.RELEASE_TAG }}
       - name: Install cargo-about
         if: steps.asset.outputs.exists != 'true'
         uses: taiki-e/install-action@v2
