@@ -273,7 +273,6 @@ jobs:
     if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'stable' }}
     uses: ./.github/workflows/publish-homebrew.yml
     with:
-      version: ${{ needs.meta.outputs.version }}
       dryrun: false
     secrets:
       MAA_HOMEBREW_BUMP_PR: ${{ secrets.MAA_HOMEBREW_BUMP_PR }}
