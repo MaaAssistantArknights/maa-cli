@@ -3,10 +3,6 @@ name: Publish Homebrew
 on:
   workflow_call:
     inputs:
-      version:
-        description: Package version
-        required: true
-        type: string
       dryrun:
         description: Do not create PR
         required: true
@@ -17,10 +13,6 @@ on:
         required: true
   workflow_dispatch:
     inputs:
-      version:
-        description: Package version
-        required: true
-        type: string
       dryrun:
         description: Do not create PR
         default: true
@@ -49,10 +41,11 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
       - name: Bump Formulae and Casks
+        env:
+          DRYRUN: ${{ inputs.dryrun }}
         run: |
-          for formula in maa-cli maa-cli-beta; do
-            brew bump-formula-pr "$formula" \
-              ${{ inputs.dryrun && '--dry-run' || '' }} \
-              --no-browse \
-              --version='${{ inputs.version }}'
-          done
+          # Each formula's livecheck picks its version: maa-cli follows stable tags,
+          # maa-cli-beta also follows beta and rc tags. Up-to-date formulae are skipped.
+          args=(--formula maaassistantarknights/tap/maa-cli maaassistantarknights/tap/maa-cli-beta)
+          if [[ "$DRYRUN" != true ]]; then args+=(--open-pr); fi
+          brew bump "${args[@]}"
