@@ -158,10 +158,10 @@ where
 
         // Check if we need update
         if let Some(current_version) = self.current_version
-            && let Some(message) =
-                skip_message(current_version, manifest.version(), self.allow_downgrade)
+            && !should_update(current_version, manifest.version(), self.allow_downgrade)
         {
-            fetching_ui.finish_with_message(message);
+            fetching_ui
+                .finish_with_message(format_skipped_message(current_version, manifest.version()));
             return Ok(());
         }
 
@@ -207,19 +207,25 @@ where
     }
 }
 
-fn skip_message(
+fn should_update(
     current_version: &Version,
     latest_version: &Version,
     allow_downgrade: bool,
-) -> Option<String> {
-    if current_version == latest_version {
-        Some("Fetched version manifest, already up-to-date!".to_owned())
-    } else if current_version > latest_version && !allow_downgrade {
-        Some(format!(
-            "Fetched version manifest, current v{current_version} is newer than v{latest_version}, skipping"
-        ))
+) -> bool {
+    if allow_downgrade {
+        current_version != latest_version
     } else {
-        None
+        current_version < latest_version
+    }
+}
+
+fn format_skipped_message(current_version: &Version, latest_version: &Version) -> String {
+    if current_version == latest_version {
+        "Fetched version manifest, already up-to-date!".to_owned()
+    } else {
+        format!(
+            "Fetched version manifest, current v{current_version} is newer than v{latest_version}, skipping"
+        )
     }
 }
 
@@ -270,25 +276,31 @@ mod tests {
     }
 
     #[test]
-    fn test_skip_message() {
+    fn test_should_update() {
         let older = Version::new(0, 7, 0);
         let newer = Version::parse("0.8.0-nightly.1").expect("valid version");
 
         for allow_downgrade in [false, true] {
-            assert_eq!(
-                skip_message(&older, &older, allow_downgrade).as_deref(),
-                Some("Fetched version manifest, already up-to-date!")
-            );
-            assert_eq!(skip_message(&older, &newer, allow_downgrade), None);
+            assert!(!should_update(&older, &older, allow_downgrade));
+            assert!(should_update(&older, &newer, allow_downgrade));
         }
+        assert!(!should_update(&newer, &older, false));
+        assert!(should_update(&newer, &older, true));
+    }
+
+    #[test]
+    fn test_skipped_message() {
+        let older = Version::new(0, 7, 0);
+        let newer = Version::parse("0.8.0-nightly.1").expect("valid version");
 
         assert_eq!(
-            skip_message(&newer, &older, false).as_deref(),
-            Some(
-                "Fetched version manifest, current v0.8.0-nightly.1 is newer than v0.7.0, skipping"
-            )
+            format_skipped_message(&older, &older),
+            "Fetched version manifest, already up-to-date!"
         );
-        assert_eq!(skip_message(&newer, &older, true), None);
+        assert_eq!(
+            format_skipped_message(&newer, &older),
+            "Fetched version manifest, current v0.8.0-nightly.1 is newer than v0.7.0, skipping"
+        );
     }
 
     // Test helper types
