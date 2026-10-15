@@ -307,7 +307,7 @@ jobs:
 
   publish-homebrew:
     name: Publish Homebrew Formulae
-    needs: [meta, update-index]
+    needs: [meta, release]
     if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'stable' }}
     uses: ./.github/workflows/publish-homebrew.yml
     with:
@@ -317,7 +317,7 @@ jobs:
 
   publish-aur:
     name: Publish AUR Package
-    needs: [meta, update-index]
+    needs: [meta, release]
     if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'stable' }}
     uses: ./.github/workflows/publish-aur.yml
     with:
@@ -328,7 +328,7 @@ jobs:
 
   publish-winget:
     name: Publish Winget Package
-    needs: [meta, update-index]
+    needs: [meta, release]
     if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'stable' }}
     uses: ./.github/workflows/publish-winget.yml
     with:
