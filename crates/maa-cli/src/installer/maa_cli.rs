@@ -79,7 +79,7 @@ impl Asset for AssetWithBaseUrl<'_> {
     }
 }
 
-pub fn update(args: &CommonArgs) -> Result<()> {
+pub fn update(args: &CommonArgs, force: bool) -> Result<()> {
     let config = CLI_CONFIG.cli_config().with_args(args);
 
     // Check if binary component should be installed
@@ -118,6 +118,7 @@ pub fn update(args: &CommonArgs) -> Result<()> {
         },
     )
     .with_current_version(&CLI_VERSION)
+    .with_allow_downgrade(force)
     .with_post_install_hook(|| {
         // Perform self-replacement
         self_replace::self_replace(&tmp_exe).with_desc("Failed to replace maa-cli binary")

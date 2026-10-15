@@ -258,6 +258,14 @@ pub(crate) enum SelfCommand {
     Update {
         #[command(flatten)]
         common: config::cli::maa_cli::CommonArgs,
+        /// Install the version of the selected channel even if it is older
+        ///
+        /// By default, maa-cli is only updated when the channel has a newer version.
+        /// With this flag, an older version is installed as well (downgrade),
+        /// e.g. to switch from nightly back to stable.
+        /// Nothing is done if the versions are the same.
+        #[arg(long)]
+        force: bool,
     },
 }
 
@@ -412,6 +420,7 @@ mod test {
                     channel: Some(config::cli::maa_cli::Channel::Beta),
                     ..
                 },
+                ..
             })
         );
 
@@ -422,6 +431,23 @@ mod test {
                     channel: Some(config::cli::maa_cli::Channel::Nightly),
                     ..
                 },
+                ..
+            })
+        );
+
+        assert_matches!(
+            parse_from(["maa", "self", "update"]).command,
+            Command::SelfC(SelfCommand::Update { force: false, .. })
+        );
+
+        assert_matches!(
+            parse_from(["maa", "self", "update", "stable", "--force"]).command,
+            Command::SelfC(SelfCommand::Update {
+                common: config::cli::maa_cli::CommonArgs {
+                    channel: Some(config::cli::maa_cli::Channel::Stable),
+                    ..
+                },
+                force: true,
             })
         );
 
@@ -432,7 +458,8 @@ mod test {
                     common: config::cli::maa_cli::CommonArgs {
                         api_url: Some(url),
                         ..
-                    }
+                    },
+                    ..
                 }
             ) if url == "url"
         );
