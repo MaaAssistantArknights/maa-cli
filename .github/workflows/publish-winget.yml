@@ -33,13 +33,94 @@ defaults:
 permissions:
   contents: read
 
+concurrency:
+  group: publish-winget-${{ inputs.tag || format('v{0}', inputs.version) }}
+  cancel-in-progress: false
+
+env:
+  GH_REPO: ${{ github.repository }}
+  RELEASE_TAG: ${{ inputs.tag || format('v{0}', inputs.version) }}
+  RELEASE_VERSION: ${{ inputs.version }}
+
 jobs:
+  build:
+    name: Build for Winget
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ASSET_NAME: maa_cli-v${{ inputs.version }}-${{ matrix.target }}-winget.zip
+    steps:
+      - name: Check Release Asset
+        id: asset
+        run: |
+          release="$(gh release view "$RELEASE_TAG" --json isDraft,isPrerelease,assets)"
+          if [[ "$(jq '.isDraft or .isPrerelease' <<< "$release")" != false ]]; then
+            echo "::error::WinGet requires a published Stable release"
+            exit 1
+          fi
+          if jq -e --arg name "$ASSET_NAME" 'any(.assets[]; .name == $name)' <<< "$release" > /dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            commit="$(gh api "repos/$GH_REPO/commits/refs/tags/$RELEASE_TAG" --jq .sha)"
+            echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Checkout Release Commit
+        if: steps.asset.outputs.exists != 'true'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.asset.outputs.commit }}
+      - name: Install cargo-about
+        if: steps.asset.outputs.exists != 'true'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about
+      - name: Build
+        if: steps.asset.outputs.exists != 'true'
+        id: build
+        env:
+          MAA_VERSION: ${{ inputs.version }}
+        run: |
+          cargo x build --tar --vendored-deps \
+            --profile release-lto --rename maa-cli.exe -- \
+            --no-default-features --features core_installer,git2
+      - name: Generate Third-Party Licenses Information
+        if: steps.asset.outputs.exists != 'true'
+        run: cargo about generate about.hbs -o licenses.md
+      - name: Package
+        if: steps.asset.outputs.exists != 'true'
+        env:
+          TARGET: ${{ steps.build.outputs.host_triplet }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/winget"
+          tar -xf "$TARGET.tar" -C "$RUNNER_TEMP/winget"
+          cp licenses.md "$RUNNER_TEMP/winget/licenses.md"
+      - name: Create Zip
+        if: steps.asset.outputs.exists != 'true'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "$env:RUNNER_TEMP/winget/maa-cli.exe", "$env:RUNNER_TEMP/winget/licenses.md" `
+            -DestinationPath "$env:RUNNER_TEMP/$env:ASSET_NAME"
+      - name: Upload Release Asset
+        if: steps.asset.outputs.exists != 'true'
+        run: gh release upload "$RELEASE_TAG" "$RUNNER_TEMP/$ASSET_NAME"
+
   publish:
     name: Publish to Winget
+    needs: build
     runs-on: windows-latest
     env:
-      RELEASE_REPOSITORY: ${{ github.repository }}
-      RELEASE_TAG: ${{ inputs.tag || format('v{0}', inputs.version) }}
+      GH_TOKEN: ${{ github.token }}
       WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.MAABOT_WINGET_TOKEN }}
       WINGET_CREATE_VERSION: "v1.12.8.0"
       WINGET_CREATE_SHA256: "8BD738851B524885410112678E3771B341C5C716DE60FBBECB88AB0A363ED85D"
@@ -56,20 +137,19 @@ jobs:
 
           $headers = @{
             Accept                 = "application/vnd.github+json"
-            Authorization          = "Bearer $env:WINGET_CREATE_GITHUB_TOKEN"
+            Authorization          = "Bearer $env:GH_TOKEN"
             "X-GitHub-Api-Version" = "2026-03-10"
           }
 
           $release = Invoke-RestMethod `
-            -Uri "https://api.github.com/repos/$env:RELEASE_REPOSITORY/releases/tags/$env:RELEASE_TAG" `
+            -Uri "https://api.github.com/repos/$env:GH_REPO/releases/tags/$env:RELEASE_TAG" `
             -Headers $headers
 
-          $escapedReleaseTag = [regex]::Escape($env:RELEASE_TAG)
           $urlX64 = $release.assets |
-            Where-Object { $_.name -match "^maa_cli-$escapedReleaseTag-x86_64-pc-windows-msvc-winget\.zip$" } |
+            Where-Object { $_.name -eq "maa_cli-v$env:RELEASE_VERSION-x86_64-pc-windows-msvc-winget.zip" } |
             Select-Object -First 1 -ExpandProperty browser_download_url
           $urlArm64 = $release.assets |
-            Where-Object { $_.name -match "^maa_cli-$escapedReleaseTag-aarch64-pc-windows-msvc-winget\.zip$" } |
+            Where-Object { $_.name -eq "maa_cli-v$env:RELEASE_VERSION-aarch64-pc-windows-msvc-winget.zip" } |
             Select-Object -First 1 -ExpandProperty browser_download_url
 
           if (-not $urlX64 -or -not $urlArm64) {
@@ -86,6 +166,6 @@ jobs:
           }
 
           .\wingetcreate.exe update MaaAssistantArknights.maa-cli `
-            --version "${{ inputs.version }}" `
+            --version "$env:RELEASE_VERSION" `
             --urls "$urlX64|x64" "$urlArm64|arm64" `
             --submit
