@@ -51,7 +51,7 @@ struct BuildOptions {
     #[arg(long)]
     pub vendored_deps: bool,
 
-    /// Create tar package after build
+    /// Create tar package with binary and licenses (requires cargo-about)
     #[arg(long)]
     pub tar: bool,
 

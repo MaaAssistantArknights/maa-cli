@@ -82,7 +82,7 @@ jobs:
         if: steps.asset.outputs.exists != 'true'
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-about
+          tool: cargo-about@0.9.2
       - name: Build
         if: steps.asset.outputs.exists != 'true'
         id: build
@@ -92,9 +92,6 @@ jobs:
           cargo x build --tar --vendored-deps \
             --profile release-lto --rename maa-cli.exe -- \
             --no-default-features --features core_installer,git2
-      - name: Generate Third-Party Licenses Information
-        if: steps.asset.outputs.exists != 'true'
-        run: cargo about generate about.hbs -o licenses.md
       - name: Package
         if: steps.asset.outputs.exists != 'true'
         env:
@@ -102,7 +99,14 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/winget"
           tar -xf "$TARGET.tar" -C "$RUNNER_TEMP/winget"
-          cp licenses.md "$RUNNER_TEMP/winget/licenses.md"
+          # Older release tags build tars without licenses.md.
+          if [[ ! -f "$RUNNER_TEMP/winget/licenses.md" ]]; then
+            cargo about generate about.hbs --manifest-path crates/maa-cli/Cargo.toml \
+              --config about.toml --target "$TARGET" --locked \
+              --no-default-features \
+              --features 'core_installer git2 git2?/vendored-libgit2 git2?/vendored-openssl' \
+              -o "$RUNNER_TEMP/winget/licenses.md"
+          fi
       - name: Create Zip
         if: steps.asset.outputs.exists != 'true'
         shell: pwsh

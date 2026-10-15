@@ -50,6 +50,8 @@ cargo build --release
 cargo build -p maa-cli
 ```
 
+`cargo x build --tar` 会将二进制和按宿主目标、构建 feature 生成的 `licenses.md` 一起打包，需要先安装 `cargo-about`；许可证筛选沿用 `about.toml`。
+
 ### 运行测试
 
 ```bash

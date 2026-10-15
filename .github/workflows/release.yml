@@ -119,6 +119,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+      - name: Install cargo-about
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about@0.9.2
       - name: Build
         id: build
         env:
@@ -154,12 +158,6 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           pattern: maa_cli-*
-      - name: Install cargo-about
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-about
-      - name: Generate Third-Party Licenses Information
-        run: cargo about generate about.hbs -o licenses.md
       - name: Package Release Artifacts
         run: cargo x --release -- release package
       - name: Upload Release Manifest
