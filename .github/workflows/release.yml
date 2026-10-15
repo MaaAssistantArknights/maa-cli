@@ -175,28 +175,34 @@ jobs:
     env:
       GH_REPO: ${{ github.repository }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      CHANNEL: ${{ needs.meta.outputs.channel }}
       VERSION: ${{ needs.meta.outputs.version }}
       TAG: ${{ needs.meta.outputs.tag }}
       COMMIT: ${{ needs.meta.outputs.commit }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-      - name: Checkout version branch
-        uses: actions/checkout@v7
-        with:
-          ref: version
-          path: version
       - name: Download Artifacts
         uses: actions/download-artifact@v8
+        with:
+          pattern: maa_cli-*
       - name: Install cargo-about
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-about
       - name: Generate Third-Party Licenses Information
         run: cargo about generate about.hbs -o licenses.md
-      - name: Package Release Artifacts and Update Version Files
+      - name: Package Release Artifacts
         run: cargo x --release -- release package
+      - name: Upload Release Manifest
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-manifest
+          overwrite: true
+          path: |
+            manifest.json
+            manifest.txt
+          retention-days: 1
+          if-no-files-found: error
       - name: Check existing release
         if: ${{ fromJson(needs.meta.outputs.publish) }}
         run: |
@@ -225,6 +231,38 @@ jobs:
             maa_cli-*-apple-darwin.tar.gz
             maa_cli-*-pc-windows-msvc.zip
             maa_cli-*-pc-windows-msvc-winget.zip
+
+  update-index:
+    name: Update Version Index
+    needs: [meta, release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      CHANNEL: ${{ needs.meta.outputs.channel }}
+    steps:
+      - name: Checkout version branch
+        uses: actions/checkout@v7
+        with:
+          ref: version
+          path: version
+      - name: Download Release Manifest
+        uses: actions/download-artifact@v8
+        with:
+          name: release-manifest
+          path: release-manifest
+      - name: Update Version Files
+        run: |
+          case "$CHANNEL" in
+            stable) channels=(stable beta alpha) ;;
+            beta) channels=(beta alpha) ;;
+            alpha) channels=(alpha) ;;
+            *) echo "Unknown channel: $CHANNEL" >&2; exit 1 ;;
+          esac
+          for channel in "${channels[@]}"; do
+            cp release-manifest/manifest.json "version/$channel.json"
+            cp release-manifest/manifest.txt "version/$channel.txt"
+          done
       - name: Commit version files and Push
         working-directory: version
         run: |
