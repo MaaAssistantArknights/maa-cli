@@ -1,33 +1,8 @@
-use clap::{Args, ValueEnum};
+use clap::Args;
+pub use maa_version::cli::Channel;
 use serde::Deserialize;
 
 use super::{normalize_url, return_true};
-
-/// Release channel of maa-cli itself, independent of MaaCore's channels.
-#[cfg_attr(test, derive(Debug, PartialEq))]
-#[derive(ValueEnum, Clone, Copy, Default, Deserialize)]
-pub enum Channel {
-    #[default]
-    #[serde(alias = "stable")]
-    Stable,
-    #[serde(alias = "beta")]
-    Beta,
-    /// Daily builds of the dev branch.
-    // `alpha` is the former name, kept so existing configs keep working.
-    #[serde(alias = "nightly", alias = "Alpha", alias = "alpha")]
-    #[value(alias = "alpha")]
-    Nightly,
-}
-
-impl std::fmt::Display for Channel {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Channel::Stable => write!(f, "stable"),
-            Channel::Beta => write!(f, "beta"),
-            Channel::Nightly => write!(f, "nightly"),
-        }
-    }
-}
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Clone)]
@@ -64,7 +39,9 @@ impl Config {
     }
 
     pub fn api_url(&self) -> String {
-        format!("{}/{}.json", normalize_url(&self.api_url), self.channel())
+        let api_url = normalize_url(&self.api_url);
+        let index_file = self.channel().index_file();
+        format!("{api_url}/{index_file}")
     }
 
     pub fn set_api_url(&mut self, api_url: impl ToString) -> &mut Self {
@@ -161,27 +138,6 @@ pub mod tests {
         use serde_test::{Token, assert_de_tokens};
 
         use super::*;
-
-        #[test]
-        fn deserialize_channel() {
-            let channels: [Channel; 5] =
-                serde_json::from_str(r#"["stable", "beta", "nightly", "alpha", "Alpha"]"#).unwrap();
-            assert_eq!(channels, [
-                Channel::Stable,
-                Channel::Beta,
-                Channel::Nightly,
-                Channel::Nightly,
-                Channel::Nightly,
-            ]);
-            assert_eq!(Channel::from_str("alpha", true), Ok(Channel::Nightly));
-        }
-
-        #[test]
-        fn display_channel() {
-            assert_eq!(Channel::Stable.to_string(), "stable");
-            assert_eq!(Channel::Beta.to_string(), "beta");
-            assert_eq!(Channel::Nightly.to_string(), "nightly");
-        }
 
         #[test]
         fn deserialize_cli_components() {

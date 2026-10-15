@@ -25,6 +25,48 @@ pub mod cli {
 
     use super::*;
 
+    /// Release channel of maa-cli itself, independent of MaaCore's channels.
+    #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[serde(rename_all = "lowercase")]
+    pub enum Channel {
+        #[default]
+        #[serde(alias = "Stable")]
+        Stable,
+        #[serde(alias = "Beta")]
+        Beta,
+        /// Daily builds of the dev branch.
+        // `alpha` is the former name, kept so existing configs keep working.
+        #[serde(alias = "Nightly", alias = "alpha", alias = "Alpha")]
+        #[cfg_attr(feature = "clap", value(alias = "alpha"))]
+        Nightly,
+    }
+
+    impl Channel {
+        pub fn as_str(self) -> &'static str {
+            match self {
+                Channel::Stable => "stable",
+                Channel::Beta => "beta",
+                Channel::Nightly => "nightly",
+            }
+        }
+
+        /// Name of the version index file of this channel under the version api url.
+        pub fn index_file(self) -> &'static str {
+            match self {
+                Channel::Stable => "stable.json",
+                Channel::Beta => "beta.json",
+                Channel::Nightly => "nightly.json",
+            }
+        }
+    }
+
+    impl std::fmt::Display for Channel {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str(self.as_str())
+        }
+    }
+
     #[cfg_attr(test, derive(PartialEq, Eq))]
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct Details {
@@ -144,6 +186,36 @@ mod tests {
     mod cli {
         use super::*;
         use crate::cli::*;
+
+        #[test]
+        fn channel() {
+            for (channel, name) in [
+                (Channel::Stable, "stable"),
+                (Channel::Beta, "beta"),
+                (Channel::Nightly, "nightly"),
+            ] {
+                assert_tokens(&channel, &[Token::UnitVariant {
+                    name: "Channel",
+                    variant: name,
+                }]);
+                assert_eq!(channel.to_string(), name);
+                assert_eq!(channel.index_file(), format!("{name}.json"));
+            }
+
+            let channels: [Channel; 6] = serde_json::from_str(
+                r#"["Stable", "Beta", "Nightly", "alpha", "Alpha", "nightly"]"#,
+            )
+            .unwrap();
+            assert_eq!(channels, [
+                Channel::Stable,
+                Channel::Beta,
+                Channel::Nightly,
+                Channel::Nightly,
+                Channel::Nightly,
+                Channel::Nightly,
+            ]);
+            assert_eq!(Channel::default(), Channel::Stable);
+        }
 
         #[test]
         fn asset() {
