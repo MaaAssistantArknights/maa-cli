@@ -27,6 +27,7 @@ pub struct Installer<'a, M, MP, E> {
     manifest_processor: MP,
     test_duration: u64,
     current_version: Option<&'a Version>,
+    allow_downgrade: bool,
     extractor: E,
     progress_style: InstallerStyle,
     pre_install_hook: Option<Box<dyn FnOnce() -> Result<()> + 'a>>,
@@ -92,6 +93,7 @@ where
             extractor,
             test_duration: 0,
             current_version: None,
+            allow_downgrade: false,
             progress_style: InstallerStyle::default(),
             pre_install_hook: None,
             post_install_hook: None,
@@ -125,6 +127,12 @@ where
         self
     }
 
+    /// Install the manifest version even if it is older than the current version.
+    pub fn with_allow_downgrade(mut self, allow_downgrade: bool) -> Self {
+        self.allow_downgrade = allow_downgrade;
+        self
+    }
+
     pub fn with_min_check_interval(mut self, interval: Duration) -> Self {
         self.min_check_interval = Some(interval);
         self
@@ -150,9 +158,10 @@ where
 
         // Check if we need update
         if let Some(current_version) = self.current_version
-            && current_version == manifest.version()
+            && !should_update(current_version, manifest.version(), self.allow_downgrade)
         {
-            fetching_ui.finish_with_message("Fetched version manifest, already up-to-date!");
+            fetching_ui
+                .finish_with_message(format_skipped_message(current_version, manifest.version()));
             return Ok(());
         }
 
@@ -195,6 +204,28 @@ where
         extract_ui.finish_with_message("Installation completed successfully!");
 
         Ok(())
+    }
+}
+
+fn should_update(
+    current_version: &Version,
+    latest_version: &Version,
+    allow_downgrade: bool,
+) -> bool {
+    if allow_downgrade {
+        current_version != latest_version
+    } else {
+        current_version < latest_version
+    }
+}
+
+fn format_skipped_message(current_version: &Version, latest_version: &Version) -> String {
+    if current_version == latest_version {
+        "Fetched version manifest, already up-to-date!".to_owned()
+    } else {
+        format!(
+            "Fetched version manifest, current v{current_version} is newer than v{latest_version}, skipping"
+        )
     }
 }
 
@@ -241,6 +272,34 @@ mod tests {
         assert_eq!(
             format_fetched_message(None, &latest_version),
             "Fetched version manifest, found v2.0.0"
+        );
+    }
+
+    #[test]
+    fn test_should_update() {
+        let older = Version::new(0, 7, 0);
+        let newer = Version::parse("0.8.0-nightly.1").expect("valid version");
+
+        for allow_downgrade in [false, true] {
+            assert!(!should_update(&older, &older, allow_downgrade));
+            assert!(should_update(&older, &newer, allow_downgrade));
+        }
+        assert!(!should_update(&newer, &older, false));
+        assert!(should_update(&newer, &older, true));
+    }
+
+    #[test]
+    fn test_skipped_message() {
+        let older = Version::new(0, 7, 0);
+        let newer = Version::parse("0.8.0-nightly.1").expect("valid version");
+
+        assert_eq!(
+            format_skipped_message(&older, &older),
+            "Fetched version manifest, already up-to-date!"
+        );
+        assert_eq!(
+            format_skipped_message(&newer, &older),
+            "Fetched version manifest, current v0.8.0-nightly.1 is newer than v0.7.0, skipping"
         );
     }
 
@@ -299,6 +358,7 @@ mod tests {
         );
         assert_eq!(installer.test_duration, 0);
         assert_eq!(installer.current_version, None);
+        assert!(!installer.allow_downgrade);
         assert!(installer.min_check_interval.is_none());
 
         // Test with_test_duration sets the correct value
@@ -356,6 +416,7 @@ mod tests {
         )
         .with_test_duration(5)
         .with_current_version(&version_2_0_0)
+        .with_allow_downgrade(true)
         .with_progress_style(InstallerStyle::default())
         .with_min_check_interval(Duration::from_secs(300))
         .with_pre_install_hook(|| Ok(()))
@@ -364,6 +425,7 @@ mod tests {
         assert_eq!(installer.test_duration, 5);
         assert_eq!(installer.current_version, Some(&version_2_0_0));
         assert_eq!(installer.current_version.unwrap(), &Version::new(2, 0, 0));
+        assert!(installer.allow_downgrade);
         assert_eq!(installer.min_check_interval, Some(Duration::from_secs(300)));
     }
 }
