@@ -106,7 +106,7 @@ graph TD
 
 **Tooling Layer:**
 
-- `x-lib`: Shared argument, environment, command, log grouping, and workspace path helpers.
+- `x-lib`: Shared environment, command, log grouping, and workspace path helpers.
 - `x-build`: Build automation. **Use when**: Changing builds or license generation.
 - `x-test`: Test automation. **Use when**: Changing workspace test orchestration.
 - `x-channel`: Release index channel selection using SemVer. **Use when**: Changing channel promotion rules.

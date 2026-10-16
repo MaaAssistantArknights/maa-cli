@@ -12,6 +12,7 @@ use crate::{BuildOptions, HOST_TRIPLET, github::set_output};
 
 /// Build maa-cli and prepare the release binary and licenses.
 pub fn run(opts: BuildOptions) -> Result<()> {
+    let profile = opts.profile.as_deref().unwrap_or("dev");
     // Set GitHub output for use in subsequent steps
     set_output("host_triplet", HOST_TRIPLET).ok();
 
@@ -32,18 +33,14 @@ pub fn run(opts: BuildOptions) -> Result<()> {
     Group::new("Build").run(|| {
         let mut cmd = cargo();
         cmd.args(["build", "--package", "maa-cli", "--locked"]);
-        cmd.args(["--profile", &opts.profile]);
+        cmd.args(["--profile", profile]);
 
         cmd.args(&build_args);
 
         cmd.run().context("Failed to build maa-cli")
     })?;
 
-    let profile_dir = if opts.profile == "dev" {
-        "debug"
-    } else {
-        &opts.profile
-    };
+    let profile_dir = if profile == "dev" { "debug" } else { profile };
 
     let target_dir = x_lib::workspace::root().join("target").join(profile_dir);
     let exe = format!("maa{}", std::env::consts::EXE_SUFFIX);

@@ -9,12 +9,13 @@ use x_lib::{
     group::Group,
 };
 
-use crate::TestOptions;
+use crate::{CoverageMode, TestOptions};
 
 const LLVM_COV_ARGS: &[&str] = &["+nightly", "llvm-cov"];
 
 /// Run tests with optional core installation and coverage.
 pub fn run_tests(opts: TestOptions) -> Result<()> {
+    let coverage = opts.coverage.unwrap_or(CoverageMode::None);
     // Build environment variables map
     let mut env_vars = EnvVars::new();
     let test_root = TempDir::new().context("Failed to create isolated test directory")?;
@@ -40,7 +41,7 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
             .run(|| rustup_up("stable").run().context("Failed to update Rust"))?;
     }
 
-    if opts.coverage.report() && env::var_os("CI").is_some() {
+    if coverage.report() && env::var_os("CI").is_some() {
         Group::new("Install Nightly Toolchain").run(|| {
             rustup_up("nightly")
                 .args(["--profile=minimal", "-cllvm-tools"])
@@ -52,7 +53,7 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
     if opts.install_core {
         Group::new("Install MaaCore").run(|| {
             let mut cmd = cargo();
-            if opts.coverage.coverage_run() {
+            if coverage.coverage_run() {
                 cmd.args(LLVM_COV_ARGS);
                 cmd.arg("--no-report");
             }
@@ -115,7 +116,7 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
     // Run tests
     Group::new("Tests").run(|| {
         let mut cmd = cargo();
-        if opts.coverage.coverage_test() {
+        if coverage.coverage_test() {
             cmd.args(LLVM_COV_ARGS);
             cmd.arg("--no-report");
         }
@@ -133,7 +134,7 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
     })?;
 
     // Collect coverage data
-    if opts.coverage.report() {
+    if coverage.report() {
         Group::new("Coverage").run(|| {
             cargo()
                 .args(LLVM_COV_ARGS)

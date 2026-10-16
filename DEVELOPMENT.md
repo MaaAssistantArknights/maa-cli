@@ -63,6 +63,8 @@ cargo test -p maa-cli
 cargo test <测试名称>
 ```
 
+`cargo x test` 的额外 Cargo 参数放在 `--` 后，例如 `cargo x test --no-core-tests -- --no-default-features`。选项和值以空格分隔，例如 `--package maa-cli`；使用 `--help` 查看选项。
+
 ## Workspace 架构
 
 ### 分层概览
@@ -150,7 +152,7 @@ graph TD
 - `maa-dirs`：路径定位层，负责配置目录、缓存目录、资源目录、MaaCore 库目录等平台相关路径逻辑。
 - `maa-installer`：下载、解压、校验、安装等通用能力，主要服务于 CLI 的安装与更新流程。
 - `maa-version`：版本号与 manifest 解析、比较逻辑。
-- `x-lib`：共享的参数、环境变量、命令执行、日志分组和工作区路径工具。
+- `x-lib`：共享的环境变量、命令执行、日志分组和工作区路径工具。
 - `x-build`：构建二进制并生成许可证到指定目录。
 - `x-test`：运行测试、准备 MaaCore 环境及收集覆盖率；默认 workspace 测试通过 `--exclude x --exclude 'x-*'` 排除全部工具包，仍可用 `--package <包名>` 单独指定。
 - `x-channel`：通过 SemVer 比较选择发布索引渠道。

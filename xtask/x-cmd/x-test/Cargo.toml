@@ -12,6 +12,7 @@ publish = false
 anyhow.workspace = true
 tempfile.workspace = true
 x-lib.workspace = true
+xflags.workspace = true
 maa-dirs.workspace = true
 
 [lints]
