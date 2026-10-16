@@ -169,7 +169,7 @@ jobs:
       - name: Test
         run: |
           cargo x test --no-all-features --no-core-tests \
-            --no-default-features --features '${{ matrix.feature }}' \
+            -- --no-default-features --features '${{ matrix.feature }}' \
 
   build-core:
     name: Build and Test (core binding, dynamic, ${{ matrix.os }})

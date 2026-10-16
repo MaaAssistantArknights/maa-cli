@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/*", "xtask", "xtask/x"]
+members = ["crates/*", "xtask/x-lib", "xtask/x-cmd/*"]
 default-members = ["crates/maa-cli"]
 
 [workspace.package]
@@ -66,6 +66,8 @@ windows-result = "0.4.0"
 windows-strings = "0.5.0"
 windows-sys = "0.61.0"
 winreg = "0.56"
+x-lib = { path = "xtask/x-lib" }
+xflags = "0.3.2"
 yaml_serde = "0.10.7"
 zip = { version = "8", default-features = false, features = ["deflate-flate2"] }
 

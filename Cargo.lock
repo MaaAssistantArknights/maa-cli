@@ -2506,6 +2506,65 @@ checksum = "1ffae5123b2d3fc086436f8834ae3ab053a283cfac8fe0a0b8eaae044768a4c4"
 [[package]]
 name = "x"
 version = "0.1.0"
+dependencies = [
+ "tempfile",
+]
+
+[[package]]
+name = "x-build"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "x-lib",
+ "xflags",
+]
+
+[[package]]
+name = "x-channel"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "semver",
+ "serde_json",
+ "tempfile",
+ "x-lib",
+]
+
+[[package]]
+name = "x-lib"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+]
+
+[[package]]
+name = "x-package"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base16ct",
+ "digest-io",
+ "flate2",
+ "maa-version",
+ "semver",
+ "serde_json",
+ "sha2",
+ "tar",
+ "tempfile",
+ "x-lib",
+ "zip",
+]
+
+[[package]]
+name = "x-test"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "maa-dirs",
+ "tempfile",
+ "x-lib",
+ "xflags",
+]
 
 [[package]]
 name = "xattr"
@@ -2518,23 +2577,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "xtask"
-version = "0.1.0"
+name = "xflags"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d9e15fbb3de55454b0106e314b28e671279009b363e6f1d8e39fdc3bf048944"
 dependencies = [
- "anyhow",
- "base16ct",
- "clap",
- "digest-io",
- "flate2",
- "maa-dirs",
- "maa-version",
- "semver",
- "serde_json",
- "sha2",
- "tar",
- "tempfile",
- "zip",
+ "xflags-macros",
 ]
+
+[[package]]
+name = "xflags-macros"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "672423d4fea7ffa2f6c25ba60031ea13dc6258070556f125cc4d790007d4a155"
 
 [[package]]
 name = "yaml_serde"

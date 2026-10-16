@@ -4,25 +4,25 @@ use std::{env, ffi::OsString, path::Path};
 
 use anyhow::{Context, Result};
 use tempfile::TempDir;
-
-use crate::{
-    TestOptions,
-    cmd::{CommandExt, EnvVars, cargo, rustup_up},
+use x_lib::{
+    command::{CommandExt, EnvVars, cargo, rustup_up},
     group::Group,
-    workspace_root,
 };
+
+use crate::{CoverageMode, TestOptions};
 
 const LLVM_COV_ARGS: &[&str] = &["+nightly", "llvm-cov"];
 
 /// Run tests with optional core installation and coverage.
 pub fn run_tests(opts: TestOptions) -> Result<()> {
+    let coverage = opts.coverage.unwrap_or(CoverageMode::None);
     // Build environment variables map
     let mut env_vars = EnvVars::new();
     let test_root = TempDir::new().context("Failed to create isolated test directory")?;
 
     Group::new("Setup Environment Variables").run(|| {
-        let config_dir = format!("{}/crates/maa-cli/config_examples", workspace_root());
-        env_vars.push("MAA_CONFIG_DIR", config_dir);
+        let config_dir = x_lib::workspace::root().join("crates/maa-cli/config_examples");
+        env_vars.push("MAA_CONFIG_DIR", config_dir.display().to_string());
         env_vars.push(
             "MAA_CACHE_DIR",
             test_root.path().join("cache").display().to_string(),
@@ -32,9 +32,7 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
             test_root.path().join("state").display().to_string(),
         );
         env_vars.push("MAA_EXTRA_SHARE_NAME", "maa-test".to_string());
-
-        Ok(())
-    })?;
+    });
 
     let package_flags = opts.package_flags();
 
@@ -43,7 +41,7 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
             .run(|| rustup_up("stable").run().context("Failed to update Rust"))?;
     }
 
-    if opts.coverage.report() && env::var_os("CI").is_some() {
+    if coverage.report() && env::var_os("CI").is_some() {
         Group::new("Install Nightly Toolchain").run(|| {
             rustup_up("nightly")
                 .args(["--profile=minimal", "-cllvm-tools"])
@@ -55,7 +53,7 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
     if opts.install_core {
         Group::new("Install MaaCore").run(|| {
             let mut cmd = cargo();
-            if opts.coverage.coverage_run() {
+            if coverage.coverage_run() {
                 cmd.args(LLVM_COV_ARGS);
                 cmd.arg("--no-report");
             }
@@ -69,10 +67,9 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
     if opts.no_core_tests {
         Group::new("Skip Core Test").run(|| {
             env_vars.push("SKIP_CORE_TEST", "true".to_owned());
-            Ok(())
-        })?;
+        });
     } else {
-        Group::new("Find MaaCore").run(|| {
+        Group::new("Find MaaCore").run(|| -> Result<()> {
             let core_dir = maa_dirs::find_library()
                 .ok_or_else(|| anyhow::anyhow!("Failed to find MaaCore"))?;
             env_vars.push("MAA_CORE_DIR", core_dir.display().to_string());
@@ -119,7 +116,7 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
     // Run tests
     Group::new("Tests").run(|| {
         let mut cmd = cargo();
-        if opts.coverage.coverage_test() {
+        if coverage.coverage_test() {
             cmd.args(LLVM_COV_ARGS);
             cmd.arg("--no-report");
         }
@@ -127,14 +124,17 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
         cmd.args(&package_flags);
         cmd.args(&opts.test_args);
         if !opts.no_ignored_tests {
-            cmd.args(["--", "--include-ignored"]);
+            if !opts.test_args.iter().any(|arg| arg == "--") {
+                cmd.arg("--");
+            }
+            cmd.arg("--include-ignored");
         }
         cmd.env_vars(&test_env_vars);
         cmd.run().context("Failed to run cargo test")
     })?;
 
     // Collect coverage data
-    if opts.coverage.report() {
+    if coverage.report() {
         Group::new("Coverage").run(|| {
             cargo()
                 .args(LLVM_COV_ARGS)

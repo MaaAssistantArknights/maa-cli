@@ -93,7 +93,11 @@ graph TD
     end
     
     subgraph Xtask
-        XTASK["xtask"]
+        XLIB["x-lib"]
+        BUILD["x-build"]
+        TEST["x-test"]
+        CHANNEL["x-channel"]
+        PACKAGE["x-package"]
         X["x"]
     end
 
@@ -119,9 +123,16 @@ graph TD
     VALUE --> VALMACRO
     INSTALLER --> ATOMICFS
     
-    XTASK --> DIRS
-    XTASK --> VERSION
-    X -.shells out to.-> XTASK
+    BUILD --> XLIB
+    TEST --> XLIB
+    CHANNEL --> XLIB
+    PACKAGE --> XLIB
+    TEST --> DIRS
+    PACKAGE --> VERSION
+    X -.shells out to.-> BUILD
+    X -.shells out to.-> TEST
+    X -.shells out to.-> CHANNEL
+    X -.shells out to.-> PACKAGE
 ```
 
 ### 各 crate 的职责
@@ -139,8 +150,12 @@ graph TD
 - `maa-dirs`：路径定位层，负责配置目录、缓存目录、资源目录、MaaCore 库目录等平台相关路径逻辑。
 - `maa-installer`：下载、解压、校验、安装等通用能力，主要服务于 CLI 的安装与更新流程。
 - `maa-version`：版本号与 manifest 解析、比较逻辑。
-- `xtask`：仓库内部自动化工具，负责 build/test/release/CI 辅助流程。
-- `x`：极薄的启动器，用来把 `cargo x ...` 转发到 `cargo run -p xtask -- ...`。
+- `x-lib`：共享的环境变量、命令执行、日志分组和工作区路径工具。
+- `x-build`：构建二进制并生成许可证到指定目录。
+- `x-test`：运行测试、准备 MaaCore 环境及收集覆盖率；默认 workspace 测试通过 `--exclude x --exclude 'x-*'` 排除全部工具包，仍可用 `--package <包名>` 单独指定。
+- `x-channel`：通过 SemVer 比较选择发布索引渠道。
+- `x-package`：打包发布产物并生成版本清单。
+- `x`：零依赖的启动器，将 `cargo x <command>` 转发到 `cargo run -p x-<command> -- ...`。GitHub Actions 中直接输出编译分组标记，各命令在入口调用 `x_lib::group::finish_prepare()` 结束该分组。
 
 ## 代码规范
 

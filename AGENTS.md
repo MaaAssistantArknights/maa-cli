@@ -37,7 +37,11 @@ graph TD
     end
     
     subgraph Xtask
-        XTASK["xtask"]
+        XLIB["x-lib"]
+        BUILD["x-build"]
+        TEST["x-test"]
+        CHANNEL["x-channel"]
+        PACKAGE["x-package"]
         X["x"]
     end
 
@@ -63,9 +67,16 @@ graph TD
     VALUE --> VALMACRO
     INSTALLER --> ATOMICFS
     
-    XTASK --> DIRS
-    XTASK --> VERSION
-    X -.shells out to.-> XTASK
+    BUILD --> XLIB
+    TEST --> XLIB
+    CHANNEL --> XLIB
+    PACKAGE --> XLIB
+    TEST --> DIRS
+    PACKAGE --> VERSION
+    X -.shells out to.-> BUILD
+    X -.shells out to.-> TEST
+    X -.shells out to.-> CHANNEL
+    X -.shells out to.-> PACKAGE
 ```
 
 **Application Layer:**
@@ -95,8 +106,12 @@ graph TD
 
 **Tooling Layer:**
 
-- `xtask`: Build/test/release automation. **Use when**: Changing CI/local automation, release scripting, or workspace test orchestration.
-- `x`: Thin launcher for `xtask`. **Use when**: Adjusting `cargo x ...` forwarding behavior.
+- `x-lib`: Shared environment, command, log grouping, and workspace path helpers.
+- `x-build`: Build automation. **Use when**: Changing builds or license generation.
+- `x-test`: Test automation. **Use when**: Changing workspace test orchestration.
+- `x-channel`: Release index channel selection using SemVer. **Use when**: Changing channel promotion rules.
+- `x-package`: Release artifact packaging and manifest generation. **Use when**: Changing release archives or manifests.
+- `x`: Dependency-free launcher for the xtask crates. **Use when**: Adjusting `cargo x ...` forwarding behavior.
 
 ## Critical Patterns
 

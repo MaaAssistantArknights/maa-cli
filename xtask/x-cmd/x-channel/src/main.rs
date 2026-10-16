@@ -1,22 +1,26 @@
+//! Read `CHANNEL` and print eligible release index channels to stdout.
+
 use std::{cmp::Ordering, fs, io::ErrorKind, path::Path};
 
 use anyhow::{Context, Result, bail};
 use semver::Version;
 use serde_json::Value;
 
-use crate::{env, github};
-
-pub fn run() -> Result<()> {
-    let channel = env::var("CHANNEL")?;
+fn main() -> Result<()> {
+    x_lib::group::finish_prepare();
+    let channel: String = x_lib::env::read("CHANNEL")?;
     let candidates: &[&str] = match channel.as_str() {
         "stable" => &["stable", "beta", "nightly"],
         "beta" => &["beta"],
         // The rolling Nightly release is always replaced, so its index must follow it.
-        "nightly" => return github::set_output("channels", "nightly"),
+        "nightly" => {
+            println!("nightly");
+            return Ok(());
+        }
         _ => bail!("Unknown release channel: {channel}"),
     };
-    let manifest = env::var("MANIFEST")?;
-    let index_dir = env::var("INDEX_DIR")?;
+    let manifest: String = x_lib::env::read("MANIFEST")?;
+    let index_dir: String = x_lib::env::read("INDEX_DIR")?;
     let new = read_version(Path::new(&manifest))?
         .with_context(|| format!("Manifest {manifest} does not exist"))?;
     let index_dir = Path::new(&index_dir);
@@ -29,7 +33,8 @@ pub fn run() -> Result<()> {
         }
         selected.push(channel);
     }
-    github::set_output("channels", &selected.join(" "))
+    println!("{}", selected.join(" "));
+    Ok(())
 }
 
 fn read_version(path: &Path) -> Result<Option<Version>> {

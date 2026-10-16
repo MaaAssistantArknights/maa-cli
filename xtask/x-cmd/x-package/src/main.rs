@@ -1,22 +1,25 @@
+//! Read `VERSION`, `TAG`, and `COMMIT` to create release packages and manifests in the current
+//! directory.
+
 use std::{collections::BTreeMap, fs};
 
 use anyhow::{Context, Result};
+use archive::ArchiveFormat;
 use maa_version::{
     VersionManifest,
     cli::{Asset, Details},
 };
 use semver::Version;
 
-use super::{archive, archive::ArchiveFormat};
-use crate::env;
+mod archive;
 
-pub fn run() -> Result<()> {
-    let version_str = env::var("VERSION")?;
-    let tag = env::var("TAG")?;
-    let commit = env::var("COMMIT")?;
+fn main() -> Result<()> {
+    x_lib::group::finish_prepare();
+    let version: Version = x_lib::env::read("VERSION")?;
+    let tag = x_lib::env::read("TAG")?;
+    let commit = x_lib::env::read("COMMIT")?;
 
-    let version = Version::parse(&version_str)
-        .with_context(|| format!("Failed to parse version: {}", version_str))?;
+    let version_str = version.to_string();
 
     // Build manifests from this release's artifacts only, so targets that are no
     // longer built (e.g. universal-apple-darwin) don't keep pointing at an old release
@@ -46,7 +49,7 @@ pub fn run() -> Result<()> {
         let dir_str = dir_name.to_str().context("Invalid directory name")?;
         let target = &dir_str[8..]; // Remove "maa_cli-" prefix
 
-        println!("Processing target: {target}");
+        eprintln!("Processing target: {target}");
 
         // Extract tar file
         let tar_file = format!(
@@ -61,9 +64,9 @@ pub fn run() -> Result<()> {
             .context("Failed to get file metadata")?
             .len();
 
-        println!("  Archive: {archive_name}");
-        println!("  Size: {size} bytes");
-        println!("  SHA256: {checksum_hash}");
+        eprintln!("  Archive: {archive_name}");
+        eprintln!("  Size: {size} bytes");
+        eprintln!("  SHA256: {checksum_hash}");
 
         // No need to update manifests for winget
         if target.ends_with("winget") {
@@ -81,7 +84,7 @@ pub fn run() -> Result<()> {
     write_manifest("manifest.json", &manifest)?;
     write_shell_format("manifest.txt", &manifest)?;
 
-    println!("Release manifests written successfully");
+    eprintln!("Release manifests written successfully");
     Ok(())
 }
 
