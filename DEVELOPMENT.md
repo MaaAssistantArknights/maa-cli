@@ -63,8 +63,6 @@ cargo test -p maa-cli
 cargo test <测试名称>
 ```
 
-`cargo x test` 的额外 Cargo 参数放在 `--` 后，例如 `cargo x test --no-core-tests -- --no-default-features`。选项和值以空格分隔，例如 `--package maa-cli`；使用 `--help` 查看选项。
-
 ## Workspace 架构
 
 ### 分层概览
