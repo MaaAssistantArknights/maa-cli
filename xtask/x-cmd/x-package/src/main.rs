@@ -10,6 +10,7 @@ use maa_version::{
     cli::{Asset, Details},
 };
 use semver::Version;
+use x_lib::group::Group;
 
 mod archive;
 
@@ -49,43 +50,48 @@ fn main() -> Result<()> {
         let dir_str = dir_name.to_str().context("Invalid directory name")?;
         let target = &dir_str[8..]; // Remove "maa_cli-" prefix
 
-        eprintln!("Processing target: {target}");
+        Group::new(&format!("Package {target}")).run(|| -> Result<()> {
+            eprintln!("Processing target: {target}");
 
-        // Extract tar file
-        let tar_file = format!(
-            "{dir_str}/{}.tar",
-            target.strip_suffix("-winget").unwrap_or(target)
-        );
-        archive::extract_tar(&tar_file, dir_str)?;
+            // Extract tar file
+            let tar_file = format!(
+                "{dir_str}/{}.tar",
+                target.strip_suffix("-winget").unwrap_or(target)
+            );
+            archive::extract_tar(&tar_file, dir_str)?;
 
-        // Create archive based on platform and get checksum
-        let (archive_name, checksum_hash) = create_archive(target, &version_str, dir_str)?;
-        let size = fs::metadata(&archive_name)
-            .context("Failed to get file metadata")?
-            .len();
+            // Create archive based on platform and get checksum
+            let (archive_name, checksum_hash) = create_archive(target, &version_str, dir_str)?;
+            let size = fs::metadata(&archive_name)
+                .context("Failed to get file metadata")?
+                .len();
 
-        eprintln!("  Archive: {archive_name}");
-        eprintln!("  Size: {size} bytes");
-        eprintln!("  SHA256: {checksum_hash}");
+            eprintln!("  Archive: {archive_name}");
+            eprintln!("  Size: {size} bytes");
+            eprintln!("  SHA256: {checksum_hash}");
 
-        // No need to update manifests for winget
-        if target.ends_with("winget") {
-            continue;
-        }
+            // No need to update manifests for winget
+            if target.ends_with("winget") {
+                return Ok(());
+            }
 
-        // Add target-specific info to the manifest
-        manifest.details.assets.insert(target.to_string(), Asset {
-            name: archive_name,
-            size,
-            sha256sum: checksum_hash,
-        });
+            // Add target-specific info to the manifest
+            manifest.details.assets.insert(target.to_string(), Asset {
+                name: archive_name,
+                size,
+                sha256sum: checksum_hash,
+            });
+            Ok(())
+        })?;
     }
 
-    write_manifest("manifest.json", &manifest)?;
-    write_shell_format("manifest.txt", &manifest)?;
+    Group::new("Write Release Manifests").run(|| {
+        write_manifest("manifest.json", &manifest)?;
+        write_shell_format("manifest.txt", &manifest)?;
 
-    eprintln!("Release manifests written successfully");
-    Ok(())
+        eprintln!("Release manifests written successfully");
+        Ok(())
+    })
 }
 
 fn write_manifest(file: &str, manifest: &VersionManifest<Details>) -> Result<()> {
