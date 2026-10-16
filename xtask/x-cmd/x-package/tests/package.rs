@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, fs, io::Read, path::Path, process::Command};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use flate2::read::GzDecoder;
 use maa_version::{VersionManifest, cli::Details};
 use sha2::{Digest, Sha256};
@@ -18,6 +18,26 @@ fn package_emits_manifests_without_version_checkout() -> Result<()> {
 #[test]
 fn package_does_not_modify_existing_version_indexes() -> Result<()> {
     check_package(true)
+}
+
+#[test]
+fn package_closes_failed_target_group_before_reporting_error() -> Result<()> {
+    let temp = tempfile::tempdir()?;
+    fs::create_dir(temp.path().join("maa_cli-x86_64-unknown-linux-gnu"))?;
+    let output = Command::new(env!("CARGO_BIN_EXE_x-package"))
+        .env("GITHUB_ACTIONS", "true")
+        .env("VERSION", VERSION)
+        .env("TAG", TAG)
+        .env("COMMIT", COMMIT)
+        .current_dir(temp.path())
+        .output()?;
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr)?;
+    assert!(stderr.starts_with(
+        "::endgroup::\n::group::Package x86_64-unknown-linux-gnu\nProcessing target: x86_64-unknown-linux-gnu\n::endgroup::\nError: Failed to open archive:"
+    ));
+    Ok(())
 }
 
 fn check_package(with_version_checkout: bool) -> Result<()> {
@@ -64,6 +84,7 @@ fn check_package(with_version_checkout: bool) -> Result<()> {
 
     let output = Command::new(env!("CARGO_BIN_EXE_x-package"))
         .env_remove("CHANNEL")
+        .env("GITHUB_ACTIONS", "true")
         .env("VERSION", VERSION)
         .env("TAG", TAG)
         .env("COMMIT", COMMIT)
@@ -75,6 +96,14 @@ fn check_package(with_version_checkout: bool) -> Result<()> {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr)?;
+    assert!(stderr.starts_with("::endgroup::\n"));
+    assert_eq!(stderr.matches("::group::").count(), targets.len() + 1);
+    assert_eq!(stderr.matches("::endgroup::").count(), targets.len() + 2);
+    assert!(stderr.ends_with(
+        "::group::Write Release Manifests\nRelease manifests written successfully\n::endgroup::\n"
+    ));
 
     let manifest: VersionManifest<Details> =
         serde_json::from_slice(&fs::read(root.join("manifest.json"))?)?;
@@ -85,6 +114,17 @@ fn check_package(with_version_checkout: bool) -> Result<()> {
     let mut shell_assets = BTreeMap::new();
     for (target, binary, extension) in targets {
         let archive_name = format!("maa_cli-v{VERSION}-{target}.{extension}");
+        let group = stderr
+            .split_once(&format!("::group::Package {target}\n"))
+            .context("Missing package group")?
+            .1
+            .split_once("::endgroup::\n")
+            .context("Package group was not closed")?
+            .0;
+        assert!(group.contains(&format!("Processing target: {target}\n")));
+        assert!(group.contains(&format!("  Archive: {archive_name}\n")));
+        assert!(group.contains("  Size: "));
+        assert!(group.contains("  SHA256: "));
         let archive_path = root.join(&archive_name);
         let files = read_archive(&archive_path, extension)?;
         assert_eq!(
