@@ -63,14 +63,6 @@ cargo test -p maa-cli
 cargo test <测试名称>
 ```
 
-## 准备 Stable 发布
-
-在 GitHub Actions 中手动运行 `Prepare Stable Release`，工作流检出 `main`，由 git-cliff 根据上一个 Stable tag 之后的提交更新版本号、`Cargo.lock` 和 changelog，并创建准备发布的 PR。`auto` 要求存在 `feat`、`fix` 或 breaking change；也可以显式选择 `minor` 或 `major`。仓库的 Actions 设置需允许 GitHub Actions 创建 PR。
-
-重新运行会从最新 `main` 重建准备分支并更新 PR，覆盖该分支上的手工修改；如果选出的版本改变，会关闭旧准备 PR 并删除其分支。合并后在最终的 `main` 提交上推送对应版本 tag，使用现有流程发布 Stable。
-
-也可以手工提交版本和 changelog 更新。Stable 发布后不再自动提交 changelog，因此应在打 tag 前准备好这些内容。
-
 ## Workspace 架构
 
 ### 分层概览
