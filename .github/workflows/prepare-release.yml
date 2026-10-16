@@ -1,0 +1,77 @@
+name: Prepare Stable Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: prepare-stable-release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  prepare:
+    name: Prepare Stable Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Install git-cliff
+        uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff@2.13.1
+
+      - name: Select Version
+        id: version
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if git-cliff --unreleased --use-branch-tags --context | jq -e '[.[].commits[]
+                 | select(.breaking or (.raw_message | test("^(feat|fix)[(:!]")))] | length > 0' > /dev/null; then
+            version="$(git-cliff --unreleased --use-branch-tags --bumped-version)"
+          else
+            echo "::error::No unreleased feat, fix or breaking change."
+            exit 1
+          fi
+          echo "version=${version#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Update Version and Changelog
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          current="$(cargo metadata --no-deps --format-version 1 |
+            jq -r '.packages[] | select(.name == "maa-cli") | .version')"
+          if [[ "$current" != "$VERSION" ]]; then
+            sed -i "0,/^version = \"$current\"$/s//version = \"$VERSION\"/" crates/maa-cli/Cargo.toml
+            cargo update -p maa-cli --precise "$VERSION"
+          fi
+          git-cliff --unreleased --use-branch-tags --tag "v$VERSION" --prepend CHANGELOG.md
+
+      - name: Create Release Pull Request
+        uses: peter-evans/create-pull-request@v8
+        with:
+          branch: release-prep
+          base: main
+          add-paths: |
+            crates/maa-cli/Cargo.toml
+            Cargo.lock
+            CHANGELOG.md
+          commit-message: "chore(release): prepare for v${{ steps.version.outputs.version }}"
+          title: "chore(release): prepare for v${{ steps.version.outputs.version }}"
+          body: |
+            Prepare Stable **v${{ steps.version.outputs.version }}**.
+
+            Review and adjust the version and changelog before merging, then push the version tag on the final main commit.
+
+            Rerunning Prepare rebuilds this branch from main and overwrites manual changes.
