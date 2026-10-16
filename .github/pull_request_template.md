@@ -19,27 +19,20 @@ Why is this change needed? What problem does it solve? Link the issue if there i
 How does this PR solve it? Focus on design choices that are not obvious from the diff, and on what you are unsure about.
 -->
 
-## 变更与影响 / Changes and impact
+## 影响与验证 / Impact and testing
 
 <!--
-用户能感受到什么变化：命令行行为、配置格式、平台支持等。breaking change 请明确写出。纯内部改动写“无”。
-涉及设备连接或平台相关的改动，请说明在哪些平台或设备上实际测试过。
-What will users notice: CLI behavior, config format, platform support? Call out breaking changes explicitly. Write "None" for internal-only changes.
-For changes involving device connections or platform-specific behavior, say which platforms or devices you tested on.
+用户能感受到什么变化：命令行行为、配置格式、平台支持等。breaking change 请明确写出，纯内部改动写“无”。有用户可见变化时，请同步更新 `crates/maa-cli/docs/` 下所有语言的文档。
+可以简要说明 CI 之外做了哪些验证；涉及设备连接或平台相关的改动，请说明在哪些平台或设备上实际测试过。
+What will users notice: CLI behavior, config format, platform support? Call out breaking changes explicitly; write "None" for internal-only changes. Update the docs under `crates/maa-cli/docs/` in every language for user-visible changes.
+Briefly note any verification beyond CI. For changes involving device connections or platform-specific behavior, say which platforms or devices you tested on.
 -->
-
-## 检查项 / Checklist
-
-- [ ] 本 PR 只包含实现上述目的所需的改动，无关的修复或重构已拆出 / This PR only contains changes needed for the purpose above; unrelated fixes and refactors are split out
-- [ ] 改了用户可见行为的话，已同步更新 `crates/maa-cli/docs/` 下所有语言的文档 / User-visible behavior changed: docs under `crates/maa-cli/docs/` are updated for every language
 
 ## AI 辅助 / AI assistance
 
 <!--
-勾选其中一项。使用了 AI 时，请写明哪些部分由 AI 编写，如全部代码、只有测试、只有文档；也可以注明工具和模型。
-Check one. If AI was used, say which parts it wrote, e.g. all code, tests only, docs only; naming the tool and model is optional.
+写明使用的工具，以及哪些部分由 AI 编写，如全部代码、只有测试、只有文档。没有使用 AI 辅助的话，可以直接删掉这一节。
+Name the tool and say which parts AI wrote, e.g. all code, tests only, docs only. If no AI was used, delete this section.
 -->
 
-- [ ] 未使用 AI / No AI used
-- [ ] 使用了 AI，我已亲自审阅并整理全部改动，能解释每一处修改 / AI was used, and I have personally reviewed and cleaned up all changes and can explain each of them
-  - AI 编写的部分 / AI-written parts:
+- [ ] 我已审阅全部改动，能解释每一处修改 / I have reviewed all changes and can explain each of them
