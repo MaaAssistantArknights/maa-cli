@@ -172,7 +172,7 @@ jobs:
             manifest.txt
           retention-days: 1
           if-no-files-found: error
-      - name: Check existing release
+      - name: Remove Previous Nightly Release
         if: ${{ fromJson(needs.meta.outputs.publish) }}
         run: |
           if [[ "$TAG" == nightly ]] && gh release view "$TAG" &> /dev/null; then
