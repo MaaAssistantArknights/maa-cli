@@ -215,7 +215,7 @@ jobs:
         with:
           name: maa_cli-${{ steps.build.outputs.host_triplet }}
           path: ${{ steps.build.outputs.host_triplet }}.tar
-          retention-days: 1
+          retention-days: 7
           if-no-files-found: error
 
   release:
@@ -253,7 +253,7 @@ jobs:
           path: |
             manifest.json
             manifest.txt
-          retention-days: 1
+          retention-days: 7
           if-no-files-found: error
       - name: Remove Previous Nightly Release
         if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'nightly' }}

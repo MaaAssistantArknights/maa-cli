@@ -65,6 +65,6 @@ Nightly 只保留滚动 Release 的最新版，不为每次构建创建永久 ta
 
 `cargo x -- release channels` 从 `CHANNEL`、`MANIFEST`（JSON 文件路径）、`INDEX_DIR` 读取输入，将可更新通道写入 `GITHUB_OUTPUT` 的 `channels`，用于发布后的索引更新。
 
-普通发行包上传到草稿后才正式发布；已发布的版本 Release 不会被覆盖。失败后使用「Re-run failed jobs」，复用成功 job 的版本号和构建产物；重新运行 Meta 会为 Nightly 生成新的时间戳。不要对已经发布的版本使用「Re-run all jobs」，重新编译可能改变 checksum。构建 artifact 和 manifest 保留 1 天。
+普通发行包上传到草稿后才正式发布；已发布的版本 Release 不会被覆盖。失败后使用「Re-run failed jobs」，复用成功 job 的版本号和构建产物；重新运行 Meta 会为 Nightly 生成新的时间戳。不要对已经发布的版本使用「Re-run all jobs」，重新编译可能改变 checksum。构建 artifact 和 manifest 保留 7 天。
 
 较新 Stable 发布后，不要再发布旧版 Stable 或重跑旧版的 AUR、`stable` tag 更新任务，以免使 AUR 或 `stable` tag 回退。手动运行 AUR workflow 也应只用于恢复当前版本。
