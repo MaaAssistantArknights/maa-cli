@@ -37,6 +37,10 @@
   - 安装 nightly 版本的 `rustfmt`：`rustup component add rustfmt --toolchain nightly`
 - **C 编译器**：如需在 Linux 上从源码编译 OpenSSL，或启用 `git2` 功能（默认启用）时需要。建议关闭 `git2` 功能以避免依赖 C 编译器和额外的 OpenSSL 库。待 gix 完全替代 git2 后，将移除该依赖。
 
+### Nix（可选）
+
+仓库提供了 `flake.nix`，`nix develop` 会进入包含 rustup、cargo-deny、cargo-llvm-cov、typos、markdownlint-cli2 以及 OpenSSL 的开发环境。Rust 工具链仍由 rustup 管理，因此 `cargo +nightly fmt` 等命令与 CI 保持一致。已有 Rust 环境时，也可以用 `nix profile add .` 只安装这几个工具。
+
 ### 构建项目
 
 ```bash
