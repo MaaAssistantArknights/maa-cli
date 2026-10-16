@@ -50,8 +50,6 @@ cargo build --release
 cargo build -p maa-cli
 ```
 
-`cargo x build --output-dir artifacts` 会将二进制和按宿主目标、构建 feature 生成的 `licenses.md` 放入指定目录，需要先安装 `cargo-about`；许可证筛选沿用 `about.toml`，可通过 `--rename` 指定输出二进制的名称。不指定 `--output-dir` 时只构建并检查二进制，不生成许可证。
-
 ### 运行测试
 
 ```bash
