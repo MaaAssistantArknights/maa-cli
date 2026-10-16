@@ -1,4 +1,4 @@
-//! 将 `cargo x <cmd>` 转发到 `x-<cmd>`，并折叠 CI 中的工具编译日志。
+//! Forward `cargo x <cmd>` to `x-<cmd>` and group tool compilation logs in CI.
 
 use std::{
     ffi::OsString,

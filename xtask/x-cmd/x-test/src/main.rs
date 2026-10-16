@@ -1,4 +1,5 @@
-//! `cargo x test`：通过 TEST_* 配置测试环境、Clippy 和覆盖率，命令行参数传给 Cargo。
+//! Configure tests, Clippy, and coverage using `TEST_*`, forwarding command-line arguments to
+//! Cargo.
 
 use std::{env, ffi::OsString, path::Path};
 

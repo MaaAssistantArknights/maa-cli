@@ -1,4 +1,4 @@
-//! `cargo x build`：通过 BUILD_* 准备二进制和许可证，命令行参数传给 Cargo。
+//! Prepare binaries and licenses using `BUILD_*`, forwarding command-line arguments to Cargo.
 
 use std::{env, ffi::OsString, fs, path::Path, process::Command};
 

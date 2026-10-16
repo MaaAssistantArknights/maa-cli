@@ -1,4 +1,4 @@
-//! `cargo x channel`：读取 CHANNEL，按渠道规则向 stdout 输出可更新的索引。
+//! Read `CHANNEL` and print eligible release index channels to stdout.
 
 use std::{cmp::Ordering, env, fs, io::ErrorKind, path::Path};
 

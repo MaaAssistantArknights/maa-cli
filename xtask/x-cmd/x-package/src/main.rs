@@ -1,4 +1,5 @@
-//! `cargo x package`：读取 VERSION、TAG、COMMIT，在当前目录生成发行包和版本清单。
+//! Read `VERSION`, `TAG`, and `COMMIT` to create release packages and manifests in the current
+//! directory.
 
 use std::{collections::BTreeMap, fs};
 
