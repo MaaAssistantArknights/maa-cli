@@ -65,23 +65,23 @@ cargo test <测试名称>
 
 ### 自动化测试
 
-`cargo x test` 用环境变量配置测试步骤，命令行参数直接传给 `cargo test`。布尔变量接受 `true` / `false`，未设置时默认为 `false`。
+`cargo x test` 用命令行参数配置测试步骤。遇到首个不属于该命令的参数后，将其及后续参数原样传给 `cargo test`；也可用 `--` 显式开始透传。
 
-| 环境变量 | 含义 |
+| 参数 | 含义 |
 | --- | --- |
-| `TEST_INSTALL_CORE` | 测试前安装 MaaCore |
-| `TEST_NO_CORE_TESTS` | 跳过依赖 MaaCore 的测试 |
-| `TEST_NO_IGNORED_TESTS` | 不额外运行 ignored 测试 |
-| `TEST_COVERAGE` | `none`（默认）、`test-only` 或 `all` |
-| `TEST_CLIPPY` | 测试前构建并运行 Clippy |
-| `TEST_NO_ALL_FEATURES` | 预构建和 Clippy 不启用全部 features |
-| `TEST_RUNTIME_LIBRARY_PATH` | 将 MaaCore 目录加入动态库搜索路径 |
-| `TEST_PACKAGE` | 预构建、Clippy 和测试的包，默认 `workspace`，排除全部 x 工具包 |
+| `--install-core` | 测试前安装 MaaCore |
+| `--no-core-tests` | 跳过依赖 MaaCore 的测试 |
+| `--no-ignored-tests` | 不额外运行 ignored 测试 |
+| `--coverage <模式>` | `none`（默认）、`test-only` 或 `all` |
+| `--clippy` | 测试前构建并运行 Clippy |
+| `--no-all-features` | 预构建和 Clippy 不启用全部 features |
+| `--runtime-library-path` | 将 MaaCore 目录加入动态库搜索路径 |
+| `--package <包名>` | 预构建、Clippy 和测试的包，默认 `workspace`，排除全部 x 工具包 |
 
 ```bash
-TEST_NO_CORE_TESTS=true TEST_NO_IGNORED_TESTS=true TEST_PACKAGE=maa-value cargo x test
-# -- 之后的参数直接传给测试程序
-TEST_NO_CORE_TESTS=true TEST_PACKAGE=maa-value cargo x test -- --nocapture
+cargo x test --no-core-tests --no-ignored-tests --package maa-value
+# 第一个 -- 结束 x-test 参数，第二个 -- 将参数传给测试程序
+cargo x test --no-core-tests --package maa-value -- -- --nocapture
 ```
 
 ## Workspace 架构
@@ -191,7 +191,7 @@ graph TD
 - `x-workspace`：无依赖的工作区路径工具，通过 `root()` 返回仓库根目录。
 - `x-group`：无依赖的 stderr 日志分组工具，供各命令开始、结束分组。
 - `x-build`：构建二进制并生成许可证到指定目录。
-- `x-test`：运行测试、准备 MaaCore 环境及收集覆盖率；默认 workspace 测试通过 `--exclude x --exclude 'x-*'` 排除全部工具包，仍可用 `TEST_PACKAGE` 单独指定。
+- `x-test`：运行测试、准备 MaaCore 环境及收集覆盖率；默认 workspace 测试通过 `--exclude x --exclude 'x-*'` 排除全部工具包，仍可用 `--package <包名>` 单独指定。
 - `x-channel`：通过 SemVer 比较选择发布索引渠道。
 - `x-package`：打包发布产物并生成版本清单。
 - `x`：零依赖的启动器，将 `cargo x <command>` 转发到 `cargo run -p x-<command> -- ...`。GitHub Actions 中直接输出编译分组标记，各命令在入口调用 `x_group::finish_prepare()` 结束该分组。

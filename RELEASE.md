@@ -61,7 +61,7 @@ Nightly 只保留滚动 Release 的最新版，不为每次构建创建永久 ta
 
 ## 构建与恢复
 
-`BUILD_OUTPUT_DIR=<目录> cargo x build` 为发布准备二进制和按目标平台、features 生成的 `licenses.md`，需要安装 `cargo-about`。`BUILD_PROFILE` 默认为 `dev`，`BUILD_VENDORED_DEPS=true` 启用 vendored 依赖，`BUILD_RENAME` 设置输出二进制名称；命令行参数原样传给 `cargo build` 和 `cargo about generate`。workflow 负责跨 job 的 tar，WinGet 直接使用输出目录。`cargo x package` 使用 `VERSION`、`TAG`、`COMMIT` 和构建 artifact 生成发行包、`manifest.json`、`manifest.txt`；不修改版本索引。
+`cargo x build --output-dir <目录>` 为发布准备二进制和按目标平台、features 生成的 `licenses.md`，需要安装 `cargo-about`。`--profile` 默认为 `dev`，`--vendored-deps` 启用 vendored 依赖，`--rename` 设置输出二进制名称；首个未识别参数及其后续参数原样传给 `cargo build` 和 `cargo about generate`，也可用 `--` 显式开始透传。workflow 负责跨 job 的 tar，WinGet 直接使用输出目录。`cargo x package` 使用 `VERSION`、`TAG`、`COMMIT` 和构建 artifact 生成发行包、`manifest.json`、`manifest.txt`；不修改版本索引。
 
 `cargo x channel` 从 `CHANNEL`、`MANIFEST`（JSON 文件路径）、`INDEX_DIR` 读取输入，将可更新通道输出到 stdout；Nightly 只需 `CHANNEL=nightly`。workflow 捕获输出并写入 `GITHUB_OUTPUT` 的 `channels`，用于发布后的索引更新。
 

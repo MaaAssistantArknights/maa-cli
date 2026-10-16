@@ -114,10 +114,7 @@ jobs:
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
       - name: Test
-        env:
-          TEST_CLIPPY: true
-          TEST_INSTALL_CORE: true
-        run: cargo x test
+        run: cargo x test --clippy --install-core
 
   build-windows:
     name: Build and Test (Windows, ${{ matrix.runner }})
@@ -134,10 +131,7 @@ jobs:
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
       - name: Test
-        env:
-          TEST_CLIPPY: true
-          TEST_INSTALL_CORE: true
-        run: cargo x test
+        run: cargo x test --clippy --install-core
 
   build-tier2:
     name: Build and Test (Tier 2, ${{ matrix.runner }})
@@ -155,10 +149,7 @@ jobs:
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
       - name: Test
-        env:
-          TEST_CLIPPY: true
-          TEST_NO_CORE_TESTS: true
-        run: cargo x test
+        run: cargo x test --clippy --no-core-tests
 
   build-no-default-features:
     name: Build and Test (feature=${{ matrix.feature }})
@@ -175,10 +166,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
       - name: Test
-        env:
-          TEST_NO_ALL_FEATURES: true
-          TEST_NO_CORE_TESTS: true
-        run: cargo x test --no-default-features --features '${{ matrix.feature }}'
+        run: cargo x test --no-all-features --no-core-tests --no-default-features --features '${{ matrix.feature }}'
 
   build-core:
     name: Build and Test (core binding, dynamic, ${{ matrix.os }})
@@ -198,12 +186,7 @@ jobs:
         with:
           tool: cargo-llvm-cov
       - name: Coverage
-        env:
-          TEST_INSTALL_CORE: true
-          TEST_RUNTIME_LIBRARY_PATH: true
-          TEST_PACKAGE: maa-core
-          TEST_COVERAGE: test-only
-        run: cargo x test --no-default-features
+        run: cargo x test --install-core --runtime-library-path --package maa-core --coverage test-only --no-default-features
       - name: Upload to Codecov
         uses: codecov/codecov-action@v7
         if: ${{ !startsWith(matrix.os, 'windows') }}
@@ -231,10 +214,7 @@ jobs:
         with:
           tool: cargo-llvm-cov
       - name: Coverage
-        env:
-          TEST_COVERAGE: all
-          TEST_INSTALL_CORE: true
-        run: cargo x test
+        run: cargo x test --coverage all --install-core
       - name: Upload to Codecov
         uses: codecov/codecov-action@v7
         with:
@@ -255,10 +235,7 @@ jobs:
         with:
           tool: cargo-llvm-cov
       - name: Coverage
-        env:
-          TEST_COVERAGE: all
-          TEST_INSTALL_CORE: true
-        run: cargo x test
+        run: cargo x test --coverage all --install-core
       - name: Upload to Codecov
         uses: codecov/codecov-action@v7
         with:

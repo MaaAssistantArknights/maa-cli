@@ -203,10 +203,7 @@ jobs:
         id: build
         env:
           MAA_VERSION: ${{ needs.meta.outputs.version }}
-          BUILD_OUTPUT_DIR: ${{ runner.temp }}/maa-cli
-          BUILD_VENDORED_DEPS: true
-          BUILD_PROFILE: ${{ needs.meta.outputs.profile }}
-        run: cargo x build
+        run: cargo x build --output-dir "$RUNNER_TEMP/maa-cli" --vendored-deps --profile '${{ needs.meta.outputs.profile }}'
       - name: Archive Build
         env:
           TARGET: ${{ steps.build.outputs.host_triplet }}
