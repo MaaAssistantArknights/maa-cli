@@ -33,7 +33,7 @@ Stable/Beta 使用 tag 对应提交中的 workflow、源码和工具。Nightly �
 1. Prepare 固定 checkout `main`，由 git-cliff 对未发布提交自动建议版本。`0.x` 阶段 `feat` 和 `fix` 推进 patch，breaking change 推进 minor；没有未发布的 feat、fix 或 breaking change 时失败。
 2. 工作流更新 `Cargo.toml`、`Cargo.lock` 和 changelog，创建或更新固定 `release-prep` 分支的 PR。需要其他版本时，在这个 PR 中同步修改三者即可。
 3. 审阅版本和说明，批准自动创建 PR 的 workflow runs，检查 CI 后合并。
-4. 在最终准备发布的 `main` 提交上创建并推送 `vX.Y.Z` tag。
+4. 运行 `cargo x tag stable`，在远端 `main` 最新提交上推送 `vX.Y.Z` tag。
 
 Prepare 不发布任何版本。重新运行会从当次 main 重建准备分支，覆盖尚未合入 main 的手工修改；需要保留的修改应重新应用。Prepare 合并后应完成打 tag，再准备下一版。
 
@@ -43,7 +43,7 @@ Prepare 使用内置 `GITHUB_TOKEN`。仓库需要启用 Settings → Actions �
 
 ## Beta 和 Nightly 说明
 
-Beta 在待发布提交上推送 `vX.Y.Z-beta.N` tag，不要求提前准备 changelog。git-cliff 从前一个可达的版本 tag 生成增量说明：通常是同系列前一个 Beta；首次 Beta 通常从分支起点的 Stable 开始。若在同一 dev 历史中直接切换核心版本，之前系列的 Beta 也会成为边界。期间 cherry-pick 的修复会列入说明。
+Beta 在待发布提交上推送 `vX.Y.Z-beta.N` tag，不要求提前准备 changelog。通常运行 `cargo x tag beta`，在远端唯一 `dev-*` 分支的最新提交上推送下一个 Beta tag。git-cliff 从前一个可达的版本 tag 生成增量说明：通常是同系列前一个 Beta；首次 Beta 通常从分支起点的 Stable 开始。若在同一 dev 历史中直接切换核心版本，之前系列的 Beta 也会成为边界。期间 cherry-pick 的修复会列入说明。
 
 Nightly 使用最近可达 Stable tag 之后的提交生成说明。预发布说明由独立 job 获取完整历史生成，与构建并行执行；源码版本和 changelog 不会被改写。
 
@@ -62,6 +62,8 @@ Nightly 只保留滚动 Release 的最新版，不为每次构建创建永久 ta
 ## 构建与恢复
 
 `cargo x build --output-dir <目录>` 为发布准备二进制和按目标平台、features 生成的 `licenses.md`，需要安装 `cargo-about`。额外的 Cargo 参数放在 `--` 后，选项和值以空格分隔。workflow 负责跨 job 的 tar，WinGet 直接使用输出目录。`cargo x package` 使用 `VERSION`、`TAG`、`COMMIT` 和构建 artifact 生成发行包、`manifest.json`、`manifest.txt`；不修改版本索引。
+
+`cargo x tag <stable|beta>` 先拉取远端分支：Stable 使用 `main`，Beta 使用唯一的 `dev-*` 分支。版本取自该提交的 Cargo 版本，Beta 编号为已有同版本 Beta tag 的最大编号加 1，从 1 开始。确认后将 tag 直接推送到 `origin`，不创建本地 tag，也不使用本地未推送的提交；`--yes` 跳过确认。远端已有同名 tag 时推送被拒绝。
 
 `cargo x channel` 从 `CHANNEL`、`MANIFEST`（JSON 文件路径）、`INDEX_DIR` 读取输入，将可更新通道输出到 stdout；workflow 将其写入 `GITHUB_OUTPUT` 的 `channels`，用于发布后的索引更新。
 

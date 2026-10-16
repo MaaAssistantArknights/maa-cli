@@ -42,6 +42,7 @@ graph TD
         TEST["x-test"]
         CHANNEL["x-channel"]
         PACKAGE["x-package"]
+        TAG["x-tag"]
         X["x"]
     end
 
@@ -71,12 +72,14 @@ graph TD
     TEST --> XLIB
     CHANNEL --> XLIB
     PACKAGE --> XLIB
+    TAG --> XLIB
     TEST --> DIRS
     PACKAGE --> VERSION
     X -.shells out to.-> BUILD
     X -.shells out to.-> TEST
     X -.shells out to.-> CHANNEL
     X -.shells out to.-> PACKAGE
+    X -.shells out to.-> TAG
 ```
 
 **Application Layer:**
@@ -111,6 +114,7 @@ graph TD
 - `x-test`: Test automation. **Use when**: Changing workspace test orchestration.
 - `x-channel`: Release index channel selection using SemVer. **Use when**: Changing channel promotion rules.
 - `x-package`: Release artifact packaging and manifest generation. **Use when**: Changing release archives or manifests.
+- `x-tag`: Pushes the next Stable or Beta version tag. **Use when**: Changing how maintainers create release tags.
 - `x`: Dependency-free launcher for the xtask crates. **Use when**: Adjusting `cargo x ...` forwarding behavior.
 
 ## Critical Patterns
