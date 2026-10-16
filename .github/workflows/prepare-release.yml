@@ -24,12 +24,12 @@ defaults:
 jobs:
   prepare:
     name: Prepare Stable Release
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          ref: main
           fetch-depth: 0
 
       - name: Install git-cliff
@@ -43,22 +43,19 @@ jobs:
           BUMP: ${{ inputs.bump }}
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          latest="$(git tag --merged HEAD --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1)"
           if [[ "$BUMP" != auto ]]; then
-            version="$(git-cliff "$latest..HEAD" --bumped-version --bump "$BUMP")"
-          elif git-cliff "$latest..HEAD" --context | jq -e '[.[].commits[]
+            version="$(git-cliff --unreleased --use-branch-tags --bumped-version --bump "$BUMP")"
+          elif git-cliff --unreleased --use-branch-tags --context | jq -e '[.[].commits[]
                  | select(.breaking or (.raw_message | test("^(feat|fix)[(:!]")))] | length > 0' > /dev/null; then
-            version="$(git-cliff "$latest..HEAD" --bumped-version)"
+            version="$(git-cliff --unreleased --use-branch-tags --bumped-version)"
           else
-            echo "::error::No feat, fix or breaking change since $latest; choose minor or major to release anyway."
+            echo "::error::No unreleased feat, fix or breaking change; choose minor or major to release anyway."
             exit 1
           fi
-          echo "previous=$latest" >> "$GITHUB_OUTPUT"
           echo "version=${version#v}" >> "$GITHUB_OUTPUT"
 
       - name: Update Version and Changelog
         env:
-          PREVIOUS: ${{ steps.version.outputs.previous }}
           VERSION: ${{ steps.version.outputs.version }}
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -71,7 +68,7 @@ jobs:
           # Replace the section of an earlier preparation of this version
           awk -v heading="## Release $VERSION" '/^## /{skip = $0 == heading} !skip' CHANGELOG.md > "$RUNNER_TEMP/CHANGELOG.md"
           mv "$RUNNER_TEMP/CHANGELOG.md" CHANGELOG.md
-          git-cliff "$PREVIOUS..HEAD" --tag "v$VERSION" --prepend CHANGELOG.md
+          git-cliff --unreleased --use-branch-tags --tag "v$VERSION" --prepend CHANGELOG.md
 
       - name: Commit Release Preparation
         env:
