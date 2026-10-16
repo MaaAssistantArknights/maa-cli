@@ -62,7 +62,7 @@ pub fn run(opts: BuildOptions) -> Result<()> {
         let temp = tempfile::tempdir().context("Failed to create license directory")?;
         let licenses = temp.path().join("licenses.md");
         Group::new("Generate Licenses").run(|| {
-            license_command(&build_args, &licenses)?
+            license_command(&build_args, &licenses)
                 .run()
                 .context("Failed to generate licenses.md")
         })?;
@@ -75,7 +75,7 @@ pub fn run(opts: BuildOptions) -> Result<()> {
     Ok(())
 }
 
-fn license_command(build_args: &[String], output: &Path) -> Result<Command> {
+fn license_command(build_args: &[String], output: &Path) -> Command {
     let mut cmd = cargo();
     cmd.current_dir(workspace_root()).args([
         "about",
@@ -91,31 +91,8 @@ fn license_command(build_args: &[String], output: &Path) -> Result<Command> {
     ]);
     cmd.arg("--output-file").arg(output);
 
-    let mut args = build_args.iter();
-    while let Some(arg) = args.next() {
-        let arg = arg.as_str();
-        let features = match arg {
-            "--features" | "-F" => Some(args.next().context("Missing feature list")?.as_str()),
-            "--all-features" | "--no-default-features" | "--offline" | "--frozen" => {
-                cmd.arg(arg);
-                None
-            }
-            _ => arg.strip_prefix("--features=").or_else(|| {
-                arg.strip_prefix("-F")
-                    .map(|value| value.trim_start_matches('='))
-            }),
-        };
-        if let Some(features) = features {
-            // cargo-about accepts a space-separated list; Cargo also accepts commas.
-            let features = features
-                .split(|c: char| c == ',' || c.is_whitespace())
-                .filter(|feature| !feature.is_empty())
-                .collect::<Vec<_>>()
-                .join(" ");
-            cmd.args(["--features", &features]);
-        }
-    }
-    Ok(cmd)
+    cmd.args(build_args);
+    cmd
 }
 
 fn prepare_output_dir(output: &Path, binary: &Path, name: &Path, licenses: &Path) -> Result<()> {
@@ -144,24 +121,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn licenses_use_build_features_and_host_target() -> Result<()> {
-        let args = [
+    fn licenses_forward_build_arguments_for_host_target() {
+        let build_args = [
             "--features",
             "git2?/vendored-libgit2,git2?/vendored-openssl",
             "--no-default-features",
-            "--features=core_installer,git2",
-            "-F",
-            "maa-core/runtime",
-            "-Fmaa-core/static",
-            "-F=maa-core/some-feature",
-            "--all-features",
-            "--offline",
-            "--frozen",
-            "--jobs",
-            "2",
+            "--features",
+            "core_installer,git2",
         ]
         .map(String::from);
-        let cmd = license_command(&args, Path::new("licenses.md"))?;
+        let cmd = license_command(&build_args, Path::new("licenses.md"));
         let args: Vec<_> = cmd
             .get_args()
             .map(|arg| arg.to_string_lossy().into_owned())
@@ -174,38 +143,7 @@ mod tests {
             args.windows(2)
                 .any(|pair| pair == ["--manifest-path", "crates/maa-cli/Cargo.toml"])
         );
-        let feature_lists: Vec<_> = args
-            .windows(2)
-            .filter(|pair| pair[0] == "--features")
-            .map(|pair| pair[1].as_str())
-            .collect();
-        assert_eq!(feature_lists, [
-            "git2?/vendored-libgit2 git2?/vendored-openssl",
-            "core_installer git2",
-            "maa-core/runtime",
-            "maa-core/static",
-            "maa-core/some-feature",
-        ]);
-        for flag in [
-            "--no-default-features",
-            "--all-features",
-            "--offline",
-            "--frozen",
-            "--locked",
-        ] {
-            assert!(args.iter().any(|arg| arg == flag));
-        }
-        assert!(!args.iter().any(|arg| arg == "--jobs"));
-        Ok(())
-    }
-
-    #[test]
-    fn default_build_keeps_default_features() -> Result<()> {
-        let cmd = license_command(&[], Path::new("licenses.md"))?;
-        assert!(!cmd.get_args().any(|arg| arg == "--no-default-features"
-            || arg == "--all-features"
-            || arg == "--features"));
-        Ok(())
+        assert!(args.ends_with(&build_args));
     }
 
     #[test]
