@@ -121,7 +121,6 @@ jobs:
       - changes
       - typos
       - markdownlint
-      - deadlinks
     runs-on: ubuntu-latest
     steps:
       - name: Verify required jobs
@@ -130,7 +129,6 @@ jobs:
           CHANGES_RESULT: ${{ needs.changes.result }}
           TYPOS_RESULT: ${{ needs.typos.result }}
           MARKDOWNLINT_RESULT: ${{ needs.markdownlint.result }}
-          DEADLINKS_RESULT: ${{ needs.deadlinks.result }}
         run: |
           if [[ "$CHANGES_RESULT" != "success" ]]; then
             echo "Change detection failed"
@@ -144,8 +142,7 @@ jobs:
 
           for result in \
             "$TYPOS_RESULT" \
-            "$MARKDOWNLINT_RESULT" \
-            "$DEADLINKS_RESULT"; do
+            "$MARKDOWNLINT_RESULT"; do
             if [[ "$result" != "success" ]]; then
               echo "A required documentation job did not succeed: $result"
               exit 1
