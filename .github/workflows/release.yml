@@ -255,27 +255,9 @@ jobs:
             manifest.txt
           retention-days: 1
           if-no-files-found: error
-      - name: Checkout Nightly Index
-        if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'nightly' }}
-        uses: actions/checkout@v7
-        with:
-          ref: version
-          path: version-index
-      - name: Check Nightly Version
-        id: nightly
-        if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'nightly' }}
-        env:
-          CHANNEL: nightly
-          MANIFEST: manifest.json
-          INDEX_DIR: version-index
-        run: cargo x -- release channels
       - name: Remove Previous Nightly Release
         if: ${{ fromJson(needs.meta.outputs.publish) }}
         run: |
-          if [[ "$TAG" == nightly && -z '${{ steps.nightly.outputs.channels }}' ]]; then
-            echo '::error::A newer Nightly index already exists; refusing to replace the rolling release.'
-            exit 1
-          fi
           if [[ "$TAG" == nightly ]] && gh release view "$TAG" &> /dev/null; then
             echo "Release as nightly, clear existing release and tag"
             gh release delete "$TAG" --yes --cleanup-tag

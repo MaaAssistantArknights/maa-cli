@@ -57,13 +57,13 @@ Beta 和 Nightly 只更新各自通道；Stable 分别尝试更新 Stable、Beta
 
 Stable Release 发布成功后，独立更新版本索引、移动 `stable` tag，并触发 AUR 和 WinGet。索引更新不是 tag 或第三方发布的前置条件。Stable 或 Beta 发布后，Homebrew 通过各 formula 的 livecheck 自行判断更新，无需传入版本或渠道。WinGet 从正式 tag 单独构建自己的包，追加到对应 Release；重试复用已有附件。
 
-Nightly 只保留滚动 Release 的最新版，不为每次构建创建永久 tag。替换滚动 Release 前再次比较 Nightly 索引，拒绝较旧版本。发布运行串行排队，PR 预览使用独立并发队列。
+Nightly 只保留滚动 Release 的最新版，不为每次构建创建永久 tag。不要手动重跑已被新版本取代的旧 Nightly 发布，以免覆盖当前滚动 Release。发布运行串行排队，PR 预览使用独立并发队列。
 
 ## 构建与恢复
 
 `cargo x build --output-dir <目录>` 为发布准备二进制和按目标平台、features 生成的 `licenses.md`，需要安装 `cargo-about`。workflow 负责跨 job 的 tar，WinGet 直接使用输出目录。`cargo x --release -- release package` 使用 `VERSION`、`TAG`、`COMMIT` 和构建 artifact 生成发行包、`manifest.json`、`manifest.txt`；不修改版本索引。
 
-`cargo x -- release channels` 从 `CHANNEL`、`MANIFEST`（JSON 文件路径）、`INDEX_DIR` 读取输入，将可更新通道写入 `GITHUB_OUTPUT` 的 `channels`。同一比较用于 Nightly 发布前检查和发布后的索引更新。
+`cargo x -- release channels` 从 `CHANNEL`、`MANIFEST`（JSON 文件路径）、`INDEX_DIR` 读取输入，将可更新通道写入 `GITHUB_OUTPUT` 的 `channels`，用于发布后的索引更新。
 
 普通发行包上传到草稿后才正式发布；已发布的版本 Release 不会被覆盖。失败后使用「Re-run failed jobs」，复用成功 job 的版本号和构建产物；重新运行 Meta 会为 Nightly 生成新的时间戳。不要对已经发布的版本使用「Re-run all jobs」，重新编译可能改变 checksum。构建 artifact 和 manifest 保留 1 天。
 
