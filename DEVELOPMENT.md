@@ -98,6 +98,7 @@ graph TD
         TEST["x-test"]
         CHANNEL["x-channel"]
         PACKAGE["x-package"]
+        TAG["x-tag"]
         X["x"]
     end
 
@@ -127,12 +128,14 @@ graph TD
     TEST --> XLIB
     CHANNEL --> XLIB
     PACKAGE --> XLIB
+    TAG --> XLIB
     TEST --> DIRS
     PACKAGE --> VERSION
     X -.shells out to.-> BUILD
     X -.shells out to.-> TEST
     X -.shells out to.-> CHANNEL
     X -.shells out to.-> PACKAGE
+    X -.shells out to.-> TAG
 ```
 
 ### 各 crate 的职责
@@ -155,6 +158,7 @@ graph TD
 - `x-test`：运行测试、准备 MaaCore 环境及收集覆盖率；默认 workspace 测试通过 `--exclude x --exclude 'x-*'` 排除全部工具包，仍可用 `--package <包名>` 单独指定。
 - `x-channel`：通过 SemVer 比较选择发布索引渠道。
 - `x-package`：打包发布产物并生成版本清单。
+- `x-tag`：为 Stable 或 Beta 推送下一个版本 tag。
 - `x`：零依赖的启动器，将 `cargo x <command>` 转发到 `cargo run -p x-<command> -- ...`。GitHub Actions 中直接输出编译分组标记，各命令在入口调用 `x_lib::group::finish_prepare()` 结束该分组。
 
 ## 代码规范

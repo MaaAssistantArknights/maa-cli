@@ -2556,6 +2556,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "x-tag"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "tempfile",
+ "toml",
+ "x-lib",
+ "xflags",
+]
+
+[[package]]
 name = "x-test"
 version = "0.1.0"
 dependencies = [
