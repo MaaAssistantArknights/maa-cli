@@ -159,6 +159,7 @@ jobs:
           VERSION: ${{ needs.meta.outputs.version }}
           TAG: ${{ needs.meta.outputs.tag }}
         with:
+          version: v2.13.1
           config: cliff.toml
           args: >-
             ${{ needs.meta.outputs.channel == 'beta' && '--latest --tag-pattern="^v"' || '--unreleased' }}
