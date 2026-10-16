@@ -16,12 +16,10 @@ flate2 = { workspace = true }
 maa-dirs.workspace = true
 maa-version = { workspace = true }
 semver = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 tar = { workspace = true }
 tempfile = { workspace = true }
-toml = { workspace = true }
 zip = { workspace = true }
 
 [lints]

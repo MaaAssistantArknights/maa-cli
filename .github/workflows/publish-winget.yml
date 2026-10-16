@@ -82,7 +82,7 @@ jobs:
         if: steps.asset.outputs.exists != 'true'
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-about
+          tool: cargo-about@0.8.4
       - name: Build
         if: steps.asset.outputs.exists != 'true'
         env:
