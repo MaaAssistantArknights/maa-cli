@@ -35,7 +35,9 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Tap MaasistantArknights Tap
-        run: brew tap MaaAssistantArknights/homebrew-tap
+        run: |
+          brew tap MaaAssistantArknights/homebrew-tap
+          brew trust maaassistantarknights/tap
       - name: Configure Git User
         run: |
           git config --global user.name "github-actions[bot]"
