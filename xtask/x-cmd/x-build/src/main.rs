@@ -1,19 +1,22 @@
-//! Release artifact preparation for maa-cli.
+//! `cargo x build`：通过 BUILD_* 准备二进制和许可证，命令行参数传给 Cargo。
 
-use std::{env, fs, path::Path, process::Command};
+use std::{env, ffi::OsString, fs, path::Path, process::Command};
 
 use anyhow::{Context, Result};
+use github::set_output;
+use x_command::{CommandExt, cargo, rustup_up};
+use x_group::Group;
 
-use crate::{
-    BuildOptions, HOST_TRIPLET,
-    cmd::{CommandExt, cargo, rustup_up},
-    github::set_output,
-    group::Group,
-    workspace_root,
-};
+mod github;
 
-/// Build maa-cli and prepare the release binary and licenses.
-pub fn run(opts: BuildOptions) -> Result<()> {
+const HOST_TRIPLET: &str = env!("TARGET");
+
+fn main() -> Result<()> {
+    x_group::finish_prepare();
+    let profile = x_env::read_or("BUILD_PROFILE", "dev".to_owned())?;
+    let vendored_deps = x_env::read_or("BUILD_VENDORED_DEPS", false)?;
+    let output_dir = env::var_os("BUILD_OUTPUT_DIR").context("Missing BUILD_OUTPUT_DIR")?;
+    let rename = env::var_os("BUILD_RENAME");
     // Set GitHub output for use in subsequent steps
     set_output("host_triplet", HOST_TRIPLET).ok();
 
@@ -23,33 +26,29 @@ pub fn run(opts: BuildOptions) -> Result<()> {
     }
 
     let mut build_args = Vec::new();
-    if opts.vendored_deps {
+    if vendored_deps {
         build_args.extend([
-            "--features".to_owned(),
-            "git2?/vendored-libgit2,git2?/vendored-openssl".to_owned(),
+            OsString::from("--features"),
+            OsString::from("git2?/vendored-libgit2,git2?/vendored-openssl"),
         ]);
     }
-    build_args.extend(opts.build_args);
+    build_args.extend(env::args_os().skip(1));
 
     Group::new("Build").run(|| {
         let mut cmd = cargo();
         cmd.args(["build", "--package", "maa-cli", "--locked"]);
-        cmd.args(["--profile", &opts.profile]);
+        cmd.args(["--profile", &profile]);
 
         cmd.args(&build_args);
 
         cmd.run().context("Failed to build maa-cli")
     })?;
 
-    let profile_dir = if opts.profile == "dev" {
-        "debug"
-    } else {
-        &opts.profile
-    };
+    let profile_dir = if profile == "dev" { "debug" } else { &profile };
 
-    let target_dir = format!("{}/target/{profile_dir}", workspace_root());
+    let target_dir = x_workspace::root().join("target").join(profile_dir);
     let exe = format!("maa{}", std::env::consts::EXE_SUFFIX);
-    let binary = format!("{target_dir}/{}", exe);
+    let binary = target_dir.join(&exe);
 
     Group::new("Dry Run").run(|| {
         std::process::Command::new(&binary)
@@ -59,7 +58,7 @@ pub fn run(opts: BuildOptions) -> Result<()> {
     })?;
 
     let output_dir =
-        std::path::absolute(opts.output_dir).context("Failed to resolve output directory")?;
+        std::path::absolute(output_dir).context("Failed to resolve output directory")?;
     fs::create_dir_all(&output_dir).with_context(|| {
         format!(
             "Failed to create output directory: {}",
@@ -68,7 +67,7 @@ pub fn run(opts: BuildOptions) -> Result<()> {
     })?;
     fs::copy(
         &binary,
-        output_dir.join(opts.rename.as_deref().unwrap_or(&exe)),
+        output_dir.join(rename.as_deref().unwrap_or_else(|| exe.as_ref())),
     )
     .context("Failed to copy binary to output directory")?;
     let licenses = output_dir.join("licenses.md");
@@ -81,9 +80,9 @@ pub fn run(opts: BuildOptions) -> Result<()> {
     Ok(())
 }
 
-fn license_command(build_args: &[String], output: &Path) -> Command {
+fn license_command(build_args: &[OsString], output: &Path) -> Command {
     let mut cmd = cargo();
-    cmd.current_dir(workspace_root()).args([
+    cmd.current_dir(x_workspace::root()).args([
         "about",
         "generate",
         "about.hbs",
@@ -114,7 +113,7 @@ mod tests {
             "--features",
             "core_installer,git2",
         ]
-        .map(String::from);
+        .map(OsString::from);
         let cmd = license_command(&build_args, Path::new("licenses.md"));
         let args: Vec<_> = cmd
             .get_args()
@@ -128,6 +127,13 @@ mod tests {
             args.windows(2)
                 .any(|pair| pair == ["--manifest-path", "crates/maa-cli/Cargo.toml"])
         );
-        assert!(args.ends_with(&build_args));
+        assert!(
+            cmd.get_args().collect::<Vec<_>>().ends_with(
+                &build_args
+                    .iter()
+                    .map(OsString::as_os_str)
+                    .collect::<Vec<_>>()
+            )
+        );
     }
 }

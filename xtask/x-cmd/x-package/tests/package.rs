@@ -62,8 +62,7 @@ fn check_package(with_version_checkout: bool) -> Result<()> {
         tar.finish()?;
     }
 
-    let output = Command::new(env!("CARGO_BIN_EXE_xtask"))
-        .args(["release", "package"])
+    let output = Command::new(env!("CARGO_BIN_EXE_x-package"))
         .env_remove("CHANNEL")
         .env("VERSION", VERSION)
         .env("TAG", TAG)

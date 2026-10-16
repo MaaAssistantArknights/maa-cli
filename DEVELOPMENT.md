@@ -63,6 +63,27 @@ cargo test -p maa-cli
 cargo test <测试名称>
 ```
 
+### 自动化测试
+
+`cargo x test` 用环境变量配置测试步骤，命令行参数直接传给 `cargo test`。布尔变量接受 `true` / `false`，未设置时默认为 `false`。
+
+| 环境变量 | 含义 |
+| --- | --- |
+| `TEST_INSTALL_CORE` | 测试前安装 MaaCore |
+| `TEST_NO_CORE_TESTS` | 跳过依赖 MaaCore 的测试 |
+| `TEST_NO_IGNORED_TESTS` | 不额外运行 ignored 测试 |
+| `TEST_COVERAGE` | `none`（默认）、`test-only` 或 `all` |
+| `TEST_CLIPPY` | 测试前构建并运行 Clippy |
+| `TEST_NO_ALL_FEATURES` | 预构建和 Clippy 不启用全部 features |
+| `TEST_RUNTIME_LIBRARY_PATH` | 将 MaaCore 目录加入动态库搜索路径 |
+| `TEST_PACKAGE` | 预构建、Clippy 和测试的包，默认 `workspace`，排除全部 x 工具包 |
+
+```bash
+TEST_NO_CORE_TESTS=true TEST_NO_IGNORED_TESTS=true TEST_PACKAGE=maa-value cargo x test
+# -- 之后的参数直接传给测试程序
+TEST_NO_CORE_TESTS=true TEST_PACKAGE=maa-value cargo x test -- --nocapture
+```
+
 ## Workspace 架构
 
 ### 分层概览
@@ -93,8 +114,19 @@ graph TD
     end
     
     subgraph Xtask
-        XTASK["xtask"]
-        X["x"]
+        subgraph Xlib["x-lib"]
+            COMMAND["x-command"]
+            WORKSPACE["x-workspace"]
+            GROUP["x-group"]
+            ENV["x-env"]
+        end
+        subgraph Xcmd["x-cmd"]
+            BUILD["x-build"]
+            TEST["x-test"]
+            CHANNEL["x-channel"]
+            PACKAGE["x-package"]
+            X["x"]
+        end
     end
 
     CLI --> CORE
@@ -119,9 +151,24 @@ graph TD
     VALUE --> VALMACRO
     INSTALLER --> ATOMICFS
     
-    XTASK --> DIRS
-    XTASK --> VERSION
-    X -.shells out to.-> XTASK
+    BUILD --> GROUP
+    TEST --> GROUP
+    CHANNEL --> GROUP
+    PACKAGE --> GROUP
+    BUILD --> ENV
+    TEST --> ENV
+    CHANNEL --> ENV
+    PACKAGE --> ENV
+    BUILD --> COMMAND
+    TEST --> COMMAND
+    BUILD --> WORKSPACE
+    TEST --> WORKSPACE
+    TEST --> DIRS
+    PACKAGE --> VERSION
+    X -.shells out to.-> BUILD
+    X -.shells out to.-> TEST
+    X -.shells out to.-> CHANNEL
+    X -.shells out to.-> PACKAGE
 ```
 
 ### 各 crate 的职责
@@ -139,8 +186,15 @@ graph TD
 - `maa-dirs`：路径定位层，负责配置目录、缓存目录、资源目录、MaaCore 库目录等平台相关路径逻辑。
 - `maa-installer`：下载、解压、校验、安装等通用能力，主要服务于 CLI 的安装与更新流程。
 - `maa-version`：版本号与 manifest 解析、比较逻辑。
-- `xtask`：仓库内部自动化工具，负责 build/test/release/CI 辅助流程。
-- `x`：极薄的启动器，用来把 `cargo x ...` 转发到 `cargo run -p xtask -- ...`。
+- `x-env`：无依赖的环境变量读取工具，通过 `FromStr` 解析类型，统一必填项、默认值并保留原始错误。
+- `x-command`：build/test 共用的命令构造、执行和环境变量传递工具。
+- `x-workspace`：无依赖的工作区路径工具，通过 `root()` 返回仓库根目录。
+- `x-group`：无依赖的 stderr 日志分组工具，供各命令开始、结束分组。
+- `x-build`：构建二进制并生成许可证到指定目录。
+- `x-test`：运行测试、准备 MaaCore 环境及收集覆盖率；默认 workspace 测试通过 `--exclude x --exclude 'x-*'` 排除全部工具包，仍可用 `TEST_PACKAGE` 单独指定。
+- `x-channel`：通过 SemVer 比较选择发布索引渠道。
+- `x-package`：打包发布产物并生成版本清单。
+- `x`：零依赖的启动器，将 `cargo x <command>` 转发到 `cargo run -p x-<command> -- ...`。GitHub Actions 中直接输出编译分组标记，各命令在入口调用 `x_group::finish_prepare()` 结束该分组。
 
 ## 代码规范
 

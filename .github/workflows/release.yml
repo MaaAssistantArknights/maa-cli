@@ -203,9 +203,10 @@ jobs:
         id: build
         env:
           MAA_VERSION: ${{ needs.meta.outputs.version }}
-        run: |
-          cargo x build --output-dir "$RUNNER_TEMP/maa-cli" --vendored-deps \
-            --profile ${{ needs.meta.outputs.profile }}
+          BUILD_OUTPUT_DIR: ${{ runner.temp }}/maa-cli
+          BUILD_VENDORED_DEPS: true
+          BUILD_PROFILE: ${{ needs.meta.outputs.profile }}
+        run: cargo x build
       - name: Archive Build
         env:
           TARGET: ${{ steps.build.outputs.host_triplet }}
@@ -244,7 +245,7 @@ jobs:
         with:
           pattern: maa_cli-*
       - name: Package Release Artifacts
-        run: cargo x --release -- release package
+        run: cargo x package
       - name: Upload Release Manifest
         uses: actions/upload-artifact@v7
         with:
@@ -319,7 +320,9 @@ jobs:
         env:
           MANIFEST: release-manifest/manifest.json
           INDEX_DIR: version
-        run: cargo x -- release channels
+        run: |
+          channels="$(cargo x channel)"
+          echo "channels=$channels" >> "$GITHUB_OUTPUT"
       - name: Update Version Files
         if: steps.channels.outputs.channels != ''
         env:

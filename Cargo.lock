@@ -2506,6 +2506,83 @@ checksum = "1ffae5123b2d3fc086436f8834ae3ab053a283cfac8fe0a0b8eaae044768a4c4"
 [[package]]
 name = "x"
 version = "0.1.0"
+dependencies = [
+ "tempfile",
+]
+
+[[package]]
+name = "x-build"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "x-command",
+ "x-env",
+ "x-group",
+ "x-workspace",
+]
+
+[[package]]
+name = "x-channel"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "semver",
+ "serde_json",
+ "tempfile",
+ "x-env",
+ "x-group",
+]
+
+[[package]]
+name = "x-command"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+]
+
+[[package]]
+name = "x-env"
+version = "0.1.0"
+
+[[package]]
+name = "x-group"
+version = "0.1.0"
+
+[[package]]
+name = "x-package"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base16ct",
+ "digest-io",
+ "flate2",
+ "maa-version",
+ "semver",
+ "serde_json",
+ "sha2",
+ "tar",
+ "tempfile",
+ "x-env",
+ "x-group",
+ "zip",
+]
+
+[[package]]
+name = "x-test"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "maa-dirs",
+ "tempfile",
+ "x-command",
+ "x-env",
+ "x-group",
+ "x-workspace",
+]
+
+[[package]]
+name = "x-workspace"
+version = "0.1.0"
 
 [[package]]
 name = "xattr"
@@ -2515,25 +2592,6 @@ checksum = "32e45ad4206f6d2479085147f02bc2ef834ac85886624a23575ae137c8aa8156"
 dependencies = [
  "libc",
  "rustix",
-]
-
-[[package]]
-name = "xtask"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "base16ct",
- "clap",
- "digest-io",
- "flate2",
- "maa-dirs",
- "maa-version",
- "semver",
- "serde_json",
- "sha2",
- "tar",
- "tempfile",
- "zip",
 ]
 
 [[package]]

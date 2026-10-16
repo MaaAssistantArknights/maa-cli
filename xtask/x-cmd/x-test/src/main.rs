@@ -1,28 +1,25 @@
-//! Test automation for CI.
+//! `cargo x test`：通过 TEST_* 配置测试环境、Clippy 和覆盖率，命令行参数传给 Cargo。
 
 use std::{env, ffi::OsString, path::Path};
 
 use anyhow::{Context, Result};
 use tempfile::TempDir;
-
-use crate::{
-    TestOptions,
-    cmd::{CommandExt, EnvVars, cargo, rustup_up},
-    group::Group,
-    workspace_root,
-};
+use x_command::{CommandExt, EnvVars, cargo, rustup_up};
+use x_group::Group;
 
 const LLVM_COV_ARGS: &[&str] = &["+nightly", "llvm-cov"];
 
-/// Run tests with optional core installation and coverage.
-pub fn run_tests(opts: TestOptions) -> Result<()> {
+fn main() -> Result<()> {
+    x_group::finish_prepare();
+
+    let opts = TestOptions::from_env()?;
     // Build environment variables map
     let mut env_vars = EnvVars::new();
     let test_root = TempDir::new().context("Failed to create isolated test directory")?;
 
     Group::new("Setup Environment Variables").run(|| {
-        let config_dir = format!("{}/crates/maa-cli/config_examples", workspace_root());
-        env_vars.push("MAA_CONFIG_DIR", config_dir);
+        let config_dir = x_workspace::root().join("crates/maa-cli/config_examples");
+        env_vars.push("MAA_CONFIG_DIR", config_dir.display().to_string());
         env_vars.push(
             "MAA_CACHE_DIR",
             test_root.path().join("cache").display().to_string(),
@@ -32,9 +29,7 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
             test_root.path().join("state").display().to_string(),
         );
         env_vars.push("MAA_EXTRA_SHARE_NAME", "maa-test".to_string());
-
-        Ok(())
-    })?;
+    });
 
     let package_flags = opts.package_flags();
 
@@ -69,10 +64,9 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
     if opts.no_core_tests {
         Group::new("Skip Core Test").run(|| {
             env_vars.push("SKIP_CORE_TEST", "true".to_owned());
-            Ok(())
-        })?;
+        });
     } else {
-        Group::new("Find MaaCore").run(|| {
+        Group::new("Find MaaCore").run(|| -> Result<()> {
             let core_dir = maa_dirs::find_library()
                 .ok_or_else(|| anyhow::anyhow!("Failed to find MaaCore"))?;
             env_vars.push("MAA_CORE_DIR", core_dir.display().to_string());
@@ -127,7 +121,10 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
         cmd.args(&package_flags);
         cmd.args(&opts.test_args);
         if !opts.no_ignored_tests {
-            cmd.args(["--", "--include-ignored"]);
+            if !opts.test_args.iter().any(|arg| arg == "--") {
+                cmd.arg("--");
+            }
+            cmd.arg("--include-ignored");
         }
         cmd.env_vars(&test_env_vars);
         cmd.run().context("Failed to run cargo test")
@@ -174,4 +171,73 @@ fn join_runtime_library_path(core_dir: &Path, current: Option<OsString>) -> Resu
 
     let joined = env::join_paths(paths).context("Failed to join runtime library path")?;
     Ok(joined.to_string_lossy().into_owned())
+}
+
+struct TestOptions {
+    install_core: bool,
+    no_core_tests: bool,
+    no_ignored_tests: bool,
+    coverage: CoverageMode,
+    clippy: bool,
+    no_all_features: bool,
+    runtime_library_path: bool,
+    package: String,
+    test_args: Vec<OsString>,
+}
+
+impl TestOptions {
+    fn from_env() -> Result<Self> {
+        Ok(Self {
+            install_core: x_env::read_or("TEST_INSTALL_CORE", false)?,
+            no_core_tests: x_env::read_or("TEST_NO_CORE_TESTS", false)?,
+            no_ignored_tests: x_env::read_or("TEST_NO_IGNORED_TESTS", false)?,
+            coverage: x_env::read_or("TEST_COVERAGE", CoverageMode::None)?,
+            clippy: x_env::read_or("TEST_CLIPPY", false)?,
+            no_all_features: x_env::read_or("TEST_NO_ALL_FEATURES", false)?,
+            runtime_library_path: x_env::read_or("TEST_RUNTIME_LIBRARY_PATH", false)?,
+            package: x_env::read_or("TEST_PACKAGE", "workspace".to_owned())?,
+            test_args: env::args_os().skip(1).collect(),
+        })
+    }
+
+    fn package_flags(&self) -> Vec<&str> {
+        match self.package.as_str() {
+            "workspace" => vec!["--workspace", "--exclude", "x", "--exclude", "x-*"],
+            _ => vec!["--package", &self.package],
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum CoverageMode {
+    TestOnly,
+    All,
+    None,
+}
+
+impl std::str::FromStr for CoverageMode {
+    type Err = &'static str;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "none" => Ok(Self::None),
+            "test-only" => Ok(Self::TestOnly),
+            "all" => Ok(Self::All),
+            _ => Err("expected none, test-only or all"),
+        }
+    }
+}
+
+impl CoverageMode {
+    fn coverage_run(self) -> bool {
+        matches!(self, Self::All)
+    }
+
+    fn coverage_test(self) -> bool {
+        !matches!(self, Self::None)
+    }
+
+    fn report(self) -> bool {
+        !matches!(self, Self::None)
+    }
 }

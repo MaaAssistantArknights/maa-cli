@@ -61,9 +61,9 @@ Nightly 只保留滚动 Release 的最新版，不为每次构建创建永久 ta
 
 ## 构建与恢复
 
-`cargo x build --output-dir <目录>` 为发布准备二进制和按目标平台、features 生成的 `licenses.md`，需要安装 `cargo-about`。workflow 负责跨 job 的 tar，WinGet 直接使用输出目录。`cargo x --release -- release package` 使用 `VERSION`、`TAG`、`COMMIT` 和构建 artifact 生成发行包、`manifest.json`、`manifest.txt`；不修改版本索引。
+`BUILD_OUTPUT_DIR=<目录> cargo x build` 为发布准备二进制和按目标平台、features 生成的 `licenses.md`，需要安装 `cargo-about`。`BUILD_PROFILE` 默认为 `dev`，`BUILD_VENDORED_DEPS=true` 启用 vendored 依赖，`BUILD_RENAME` 设置输出二进制名称；命令行参数原样传给 `cargo build` 和 `cargo about generate`。workflow 负责跨 job 的 tar，WinGet 直接使用输出目录。`cargo x package` 使用 `VERSION`、`TAG`、`COMMIT` 和构建 artifact 生成发行包、`manifest.json`、`manifest.txt`；不修改版本索引。
 
-`cargo x -- release channels` 从 `CHANNEL`、`MANIFEST`（JSON 文件路径）、`INDEX_DIR` 读取输入，将可更新通道写入 `GITHUB_OUTPUT` 的 `channels`，用于发布后的索引更新。
+`cargo x channel` 从 `CHANNEL`、`MANIFEST`（JSON 文件路径）、`INDEX_DIR` 读取输入，将可更新通道输出到 stdout；Nightly 只需 `CHANNEL=nightly`。workflow 捕获输出并写入 `GITHUB_OUTPUT` 的 `channels`，用于发布后的索引更新。
 
 普通发行包上传到草稿后才正式发布；已发布的版本 Release 不会被覆盖。失败后使用「Re-run failed jobs」，复用成功 job 的版本号和构建产物；重新运行 Meta 会为 Nightly 生成新的时间戳。不要对已经发布的版本使用「Re-run all jobs」，重新编译可能改变 checksum。构建 artifact 和 manifest 保留 1 天。
 

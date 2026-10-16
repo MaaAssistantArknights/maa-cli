@@ -18,7 +18,7 @@ impl CommandExt for Command {
     }
 
     fn run(&mut self) -> Result<()> {
-        println!("Running command: {:?}", self);
+        eprintln!("Running command: {self:?}");
         let status = self.status().context("Failed to execute command")?;
         if !status.success() {
             bail!("Failed to run: {self:?}");
@@ -27,7 +27,7 @@ impl CommandExt for Command {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct EnvVars<'s>(Vec<(&'s str, String)>);
 
 impl<'s> EnvVars<'s> {
@@ -36,7 +36,7 @@ impl<'s> EnvVars<'s> {
     }
 
     pub fn push(&mut self, key: &'s str, value: String) {
-        println!("{key}={value}");
+        eprintln!("{key}={value}");
         self.0.push((key, value));
     }
 }
