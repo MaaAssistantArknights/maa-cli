@@ -87,7 +87,10 @@ jobs:
         if: steps.asset.outputs.exists != 'true'
         env:
           MAA_VERSION: ${{ inputs.version }}
-        run: cargo x build --output-dir "$RUNNER_TEMP/winget" --vendored-deps --profile release-lto --rename maa-cli.exe --no-default-features --features core_installer,git2
+        run: |
+          cargo x build --output-dir "$RUNNER_TEMP/winget" --vendored-deps \
+            --profile release-lto --rename maa-cli.exe -- \
+            --no-default-features --features core_installer,git2
       - name: Create Zip
         if: steps.asset.outputs.exists != 'true'
         shell: pwsh

@@ -35,18 +35,6 @@ pub fn read<T: FromStr>(name: &str) -> Result<T, Error<T::Err>> {
     parse(name, &value)
 }
 
-/// Use the default only when the variable is unset; invalid values are errors.
-pub fn read_or<T: FromStr>(name: &str, default: T) -> Result<T, Error<T::Err>> {
-    match env::var(name) {
-        Ok(value) => parse(name, &value),
-        Err(env::VarError::NotPresent) => Ok(default),
-        Err(source) => Err(Error::Read {
-            name: name.to_owned(),
-            source,
-        }),
-    }
-}
-
 fn parse<T: FromStr>(name: &str, value: &str) -> Result<T, Error<T::Err>> {
     value.parse().map_err(|source| Error::Parse {
         name: name.to_owned(),
@@ -72,7 +60,6 @@ mod tests {
         }
 
         let _ = read::<Value>;
-        let _ = read_or::<Value>;
         assert!(matches!(
             parse::<Value>("VALUE", "invalid"),
             Err(Error::Parse { name, source: ParseError(42) }) if name == "VALUE"

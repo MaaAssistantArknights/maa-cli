@@ -1,6 +1,6 @@
 //! Read `CHANNEL` and print eligible release index channels to stdout.
 
-use std::{cmp::Ordering, env, fs, io::ErrorKind, path::Path};
+use std::{cmp::Ordering, fs, io::ErrorKind, path::Path};
 
 use anyhow::{Context, Result, bail};
 use semver::Version;
@@ -19,10 +19,10 @@ fn main() -> Result<()> {
         }
         _ => bail!("Unknown release channel: {channel}"),
     };
-    let manifest = env::var_os("MANIFEST").context("Missing MANIFEST")?;
-    let index_dir = env::var_os("INDEX_DIR").context("Missing INDEX_DIR")?;
+    let manifest: String = x_lib::env::read("MANIFEST")?;
+    let index_dir: String = x_lib::env::read("INDEX_DIR")?;
     let new = read_version(Path::new(&manifest))?
-        .with_context(|| format!("Manifest {} does not exist", manifest.display()))?;
+        .with_context(|| format!("Manifest {manifest} does not exist"))?;
     let index_dir = Path::new(&index_dir);
     let mut selected = Vec::new();
     for &channel in candidates {

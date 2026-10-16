@@ -37,19 +37,12 @@ graph TD
     end
     
     subgraph Xtask
-        subgraph Xlib["x-lib"]
-            COMMAND["x-command"]
-            WORKSPACE["x-workspace"]
-            GROUP["x-group"]
-            ENV["x-env"]
-        end
-        subgraph Xcmd["x-cmd"]
-            BUILD["x-build"]
-            TEST["x-test"]
-            CHANNEL["x-channel"]
-            PACKAGE["x-package"]
-            X["x"]
-        end
+        XLIB["x-lib"]
+        BUILD["x-build"]
+        TEST["x-test"]
+        CHANNEL["x-channel"]
+        PACKAGE["x-package"]
+        X["x"]
     end
 
     CLI --> CORE
@@ -74,18 +67,10 @@ graph TD
     VALUE --> VALMACRO
     INSTALLER --> ATOMICFS
     
-    BUILD --> GROUP
-    TEST --> GROUP
-    CHANNEL --> GROUP
-    PACKAGE --> GROUP
-    BUILD --> ENV
-    TEST --> ENV
-    CHANNEL --> ENV
-    PACKAGE --> ENV
-    BUILD --> COMMAND
-    TEST --> COMMAND
-    BUILD --> WORKSPACE
-    TEST --> WORKSPACE
+    BUILD --> XLIB
+    TEST --> XLIB
+    CHANNEL --> XLIB
+    PACKAGE --> XLIB
     TEST --> DIRS
     PACKAGE --> VERSION
     X -.shells out to.-> BUILD
@@ -121,10 +106,7 @@ graph TD
 
 **Tooling Layer:**
 
-- `x-env`: Dependency-free typed environment variable parsing with required values and defaults.
-- `x-command`: Shared command construction and execution helpers for build/test automation.
-- `x-workspace`: Dependency-free workspace root lookup for automation commands.
-- `x-group`: Dependency-free stderr log grouping for commands.
+- `x-lib`: Shared argument, environment, command, log grouping, and workspace path helpers.
 - `x-build`: Build automation. **Use when**: Changing builds or license generation.
 - `x-test`: Test automation. **Use when**: Changing workspace test orchestration.
 - `x-channel`: Release index channel selection using SemVer. **Use when**: Changing channel promotion rules.
