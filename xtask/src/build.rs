@@ -1,4 +1,4 @@
-//! Build automation for maa-cli.
+//! Release artifact preparation for maa-cli.
 
 use std::{env, fs, path::Path, process::Command};
 
@@ -12,7 +12,7 @@ use crate::{
     workspace_root,
 };
 
-/// Build maa-cli binary.
+/// Build maa-cli and prepare the release binary and licenses.
 pub fn run(opts: BuildOptions) -> Result<()> {
     // Set GitHub output for use in subsequent steps
     set_output("host_triplet", HOST_TRIPLET).ok();
@@ -58,27 +58,25 @@ pub fn run(opts: BuildOptions) -> Result<()> {
             .context("Failed to check binary version")
     })?;
 
-    if let Some(output_dir) = opts.output_dir {
-        let output_dir =
-            std::path::absolute(output_dir).context("Failed to resolve output directory")?;
-        fs::create_dir_all(&output_dir).with_context(|| {
-            format!(
-                "Failed to create output directory: {}",
-                output_dir.display()
-            )
-        })?;
-        fs::copy(
-            &binary,
-            output_dir.join(opts.rename.as_deref().unwrap_or(&exe)),
+    let output_dir =
+        std::path::absolute(opts.output_dir).context("Failed to resolve output directory")?;
+    fs::create_dir_all(&output_dir).with_context(|| {
+        format!(
+            "Failed to create output directory: {}",
+            output_dir.display()
         )
-        .context("Failed to copy binary to output directory")?;
-        let licenses = output_dir.join("licenses.md");
-        Group::new("Generate Licenses").run(|| {
-            license_command(&build_args, &licenses)
-                .run()
-                .context("Failed to generate licenses.md")
-        })?;
-    }
+    })?;
+    fs::copy(
+        &binary,
+        output_dir.join(opts.rename.as_deref().unwrap_or(&exe)),
+    )
+    .context("Failed to copy binary to output directory")?;
+    let licenses = output_dir.join("licenses.md");
+    Group::new("Generate Licenses").run(|| {
+        license_command(&build_args, &licenses)
+            .run()
+            .context("Failed to generate licenses.md")
+    })?;
 
     Ok(())
 }

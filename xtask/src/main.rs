@@ -32,7 +32,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Build maa-cli binary
+    /// Prepare maa-cli release artifacts (requires cargo-about)
     Build(BuildOptions),
     /// Release automation tasks
     Release {
@@ -53,9 +53,9 @@ struct BuildOptions {
     #[arg(long)]
     pub vendored_deps: bool,
 
-    /// Copy binary and licenses into this directory (requires cargo-about)
+    /// Directory for the release binary and licenses
     #[arg(long)]
-    pub output_dir: Option<PathBuf>,
+    pub output_dir: PathBuf,
 
     /// Rename the binary to a different name
     #[arg(long)]
