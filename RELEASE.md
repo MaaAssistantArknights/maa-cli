@@ -55,7 +55,7 @@ Beta 和 Nightly 只更新各自通道；Stable 分别尝试更新 Stable、Beta
 
 例如发布 `0.7.6` 时，已经指向 `0.8.0` 预发布的 Beta/Nightly 不会被覆盖，但 Stable 仍可更新；发布 `0.8.0` 时则会一并推进较旧的预发布通道。发布较旧 tag 仍可创建独立 Release，但不会回退索引。
 
-Stable 索引允许更新后，才移动 `stable` tag，并触发 AUR 和 WinGet。Stable 或 Beta 发布后，Homebrew 通过各 formula 的 livecheck 自行判断更新，无需传入版本或渠道，也不依赖索引结果。WinGet 从正式 tag 单独构建自己的包，追加到对应 Release；重试复用已有附件。
+Stable Release 发布成功后，独立更新版本索引、移动 `stable` tag，并触发 AUR 和 WinGet。索引更新不是 tag 或第三方发布的前置条件。Stable 或 Beta 发布后，Homebrew 通过各 formula 的 livecheck 自行判断更新，无需传入版本或渠道。WinGet 从正式 tag 单独构建自己的包，追加到对应 Release；重试复用已有附件。
 
 Nightly 只保留滚动 Release 的最新版，不为每次构建创建永久 tag。替换滚动 Release 前再次比较 Nightly 索引，拒绝较旧版本。发布运行串行排队，PR 预览使用独立并发队列。
 
@@ -67,4 +67,4 @@ Nightly 只保留滚动 Release 的最新版，不为每次构建创建永久 ta
 
 普通发行包上传到草稿后才正式发布；已发布的版本 Release 不会被覆盖。失败后使用「Re-run failed jobs」，复用成功 job 的版本号和构建产物；重新运行 Meta 会为 Nightly 生成新的时间戳。不要对已经发布的版本使用「Re-run all jobs」，重新编译可能改变 checksum。构建 artifact 和 manifest 保留 1 天。
 
-较新 Stable 发布后，不要重跑旧版的 AUR 或 `stable` tag 更新任务：成功索引 job 的输出可能被复用，使 AUR 或 `stable` tag 回退。手动运行 AUR workflow 也应只用于恢复当前版本。
+较新 Stable 发布后，不要再发布旧版 Stable 或重跑旧版的 AUR、`stable` tag 更新任务，以免使 AUR 或 `stable` tag 回退。手动运行 AUR workflow 也应只用于恢复当前版本。
