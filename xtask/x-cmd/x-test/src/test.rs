@@ -80,13 +80,6 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
         })?;
     }
 
-    let mut test_env_vars = env_vars.clone();
-    if opts.runtime_library_path && !opts.no_core_tests {
-        let core_dir =
-            maa_dirs::find_library().ok_or_else(|| anyhow::anyhow!("Failed to find MaaCore"))?;
-        push_runtime_library_path(&mut test_env_vars, &core_dir)?;
-    }
-
     if opts.clippy {
         // Build first if we run clippy
         Group::new("Build").run(|| {
@@ -129,7 +122,7 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
             }
             cmd.arg("--include-ignored");
         }
-        cmd.env_vars(&test_env_vars);
+        cmd.env_vars(&env_vars);
         cmd.run().context("Failed to run cargo test")
     })?;
 
