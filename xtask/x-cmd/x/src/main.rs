@@ -16,13 +16,17 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     };
     let mut package = OsString::from("x-");
-    package.push(command);
+    package.push(&command);
 
     if std::env::var_os("GITHUB_ACTIONS").is_some() {
         eprintln!("::group::Prepare {}", package.display());
     }
     let mut cargo = Command::new("cargo");
-    cargo.args(["run", "-p"]).arg(package).arg("--").args(args);
+    cargo.args(["run", "-p"]).arg(package);
+    if command == "package" {
+        cargo.arg("--release");
+    }
+    cargo.arg("--").args(args);
 
     #[cfg(unix)]
     let error = {
