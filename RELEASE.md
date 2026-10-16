@@ -43,7 +43,7 @@ Prepare 使用内置 `GITHUB_TOKEN`。仓库需要启用 Settings → Actions �
 
 ## Beta 和 Nightly 说明
 
-Beta 在待发布提交上推送 `vX.Y.Z-beta.N` tag，不要求提前准备 changelog。git-cliff 从前一个可达的版本 tag 生成增量说明：通常是同系列前一个 Beta；首次 Beta 通常从分支起点的 Stable 开始。若在同一 dev 历史中直接切换核心版本，之前系列的 Beta 也会成为边界。同一提交上的多个 tag 不形成独立提交范围，说明中的版本和链接以本次触发的 tag 为准。期间 cherry-pick 的修复会列入说明。
+Beta 在待发布提交上推送 `vX.Y.Z-beta.N` tag，不要求提前准备 changelog。git-cliff 从前一个可达的版本 tag 生成增量说明：通常是同系列前一个 Beta；首次 Beta 通常从分支起点的 Stable 开始。若在同一 dev 历史中直接切换核心版本，之前系列的 Beta 也会成为边界。期间 cherry-pick 的修复会列入说明。
 
 Nightly 使用最近可达 Stable tag 之后的提交生成说明。预发布说明由独立 job 获取完整历史生成，与构建并行执行；源码版本和 changelog 不会被改写。
 

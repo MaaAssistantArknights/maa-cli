@@ -11,13 +11,15 @@ body = """
 {%- endmacro -%}
 
 {%- macro version_title() -%}
-  {%- set release_version = get_env(name="VERSION", default="") -%}
-  {%- if release_version -%}
-    Release {{ release_version | trim_start_matches(pat="v") }}
-  {%- elif version -%}
+  {%- if version -%}
     Release {{ version | trim_start_matches(pat="v") }}
   {%- else -%}
-    Unreleased
+    {%- set version = get_env(name="VERSION", default="") -%}
+    {%- if version -%}
+      Release {{ version | trim_start_matches(pat="v") }}
+    {%- else -%}
+      Unreleased
+    {%- endif -%}
   {%- endif -%}
 {%- endmacro -%}
 
@@ -46,13 +48,10 @@ body = """
 {%- endmacro -%}
 
 {%- macro current_ref() -%}
-  {%- set release_tag = get_env(name="TAG", default="") -%}
-  {%- if release_tag -%}
-    {{ release_tag }}
-  {%- elif version -%}
+  {%- if version -%}
     {{ version }}
   {%- else -%}
-    main
+    {{ get_env(name="TAG", default="main") }}
   {%- endif -%}
 {%- endmacro -%}
 
