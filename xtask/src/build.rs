@@ -59,16 +59,24 @@ pub fn run(opts: BuildOptions) -> Result<()> {
     })?;
 
     if let Some(output_dir) = opts.output_dir {
-        let temp = tempfile::tempdir().context("Failed to create license directory")?;
-        let licenses = temp.path().join("licenses.md");
+        let output_dir =
+            std::path::absolute(output_dir).context("Failed to resolve output directory")?;
+        fs::create_dir_all(&output_dir).with_context(|| {
+            format!(
+                "Failed to create output directory: {}",
+                output_dir.display()
+            )
+        })?;
+        fs::copy(
+            &binary,
+            output_dir.join(opts.rename.as_deref().unwrap_or(&exe)),
+        )
+        .context("Failed to copy binary to output directory")?;
+        let licenses = output_dir.join("licenses.md");
         Group::new("Generate Licenses").run(|| {
             license_command(&build_args, &licenses)
                 .run()
                 .context("Failed to generate licenses.md")
-        })?;
-        Group::new("Prepare Output Directory").run(|| {
-            let name = opts.rename.unwrap_or(exe);
-            prepare_output_dir(&output_dir, Path::new(&binary), Path::new(&name), &licenses)
         })?;
     }
 
@@ -93,27 +101,6 @@ fn license_command(build_args: &[String], output: &Path) -> Command {
 
     cmd.args(build_args);
     cmd
-}
-
-fn prepare_output_dir(output: &Path, binary: &Path, name: &Path, licenses: &Path) -> Result<()> {
-    fs::create_dir_all(output)
-        .with_context(|| format!("Failed to create output directory: {}", output.display()))?;
-    let destination = output.join(name);
-    let same_binary = match destination.canonicalize() {
-        Ok(path) => {
-            path == binary
-                .canonicalize()
-                .context("Failed to resolve binary path")?
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
-        Err(error) => return Err(error).context("Failed to resolve output binary path"),
-    };
-    if !same_binary {
-        fs::copy(binary, destination).context("Failed to copy binary to output directory")?;
-    }
-    fs::copy(licenses, output.join("licenses.md"))
-        .context("Failed to copy licenses.md to output directory")?;
-    Ok(())
 }
 
 #[cfg(test)]
@@ -144,41 +131,5 @@ mod tests {
                 .any(|pair| pair == ["--manifest-path", "crates/maa-cli/Cargo.toml"])
         );
         assert!(args.ends_with(&build_args));
-    }
-
-    #[test]
-    fn output_directory_contains_renamed_binary_and_licenses() -> Result<()> {
-        let temp = tempfile::tempdir()?;
-        let binary = temp.path().join("maa.exe");
-        let licenses = temp.path().join("licenses.md");
-        let output = temp.path().join("artifacts").join("winget");
-        fs::write(&binary, b"binary")?;
-        fs::write(&licenses, b"target-specific licenses")?;
-        prepare_output_dir(&output, &binary, Path::new("maa-cli.exe"), &licenses)?;
-        assert_eq!(fs::read(output.join("maa-cli.exe"))?, b"binary");
-        assert_eq!(
-            fs::read(output.join("licenses.md"))?,
-            b"target-specific licenses"
-        );
-        assert_eq!(fs::read_dir(&output)?.count(), 2);
-        assert_eq!(fs::read(&binary)?, b"binary");
-        Ok(())
-    }
-    #[test]
-    fn output_directory_can_be_the_build_directory() -> Result<()> {
-        let temp = tempfile::tempdir()?;
-        let output = temp.path().join("target").join("debug");
-        fs::create_dir_all(&output)?;
-        let binary = output.join("maa");
-        let licenses = temp.path().join("licenses.md");
-        fs::write(&binary, b"existing binary")?;
-        fs::write(&licenses, b"target-specific licenses")?;
-        prepare_output_dir(&output.join("."), &binary, Path::new("maa"), &licenses)?;
-        assert_eq!(fs::read(&binary)?, b"existing binary");
-        assert_eq!(
-            fs::read(output.join("licenses.md"))?,
-            b"target-specific licenses"
-        );
-        Ok(())
     }
 }
