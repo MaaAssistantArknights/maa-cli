@@ -8,14 +8,15 @@ use crate::{env, github};
 
 pub fn run() -> Result<()> {
     let channel = env::var("CHANNEL")?;
-    let manifest = env::var("MANIFEST")?;
-    let index_dir = env::var("INDEX_DIR")?;
     let candidates: &[&str] = match channel.as_str() {
         "stable" => &["stable", "beta", "nightly"],
         "beta" => &["beta"],
-        "nightly" => &["nightly"],
+        // The rolling Nightly release is always replaced, so its index must follow it.
+        "nightly" => return github::set_output("channels", "nightly"),
         _ => bail!("Unknown release channel: {channel}"),
     };
+    let manifest = env::var("MANIFEST")?;
+    let index_dir = env::var("INDEX_DIR")?;
     let new = read_version(Path::new(&manifest))?
         .with_context(|| format!("Manifest {manifest} does not exist"))?;
     let index_dir = Path::new(&index_dir);

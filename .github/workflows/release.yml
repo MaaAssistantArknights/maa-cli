@@ -256,11 +256,11 @@ jobs:
           retention-days: 1
           if-no-files-found: error
       - name: Remove Previous Nightly Release
-        if: ${{ fromJson(needs.meta.outputs.publish) }}
+        if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'nightly' }}
         run: |
-          if [[ "$TAG" == nightly ]] && gh release view "$TAG" &> /dev/null; then
+          if gh release view nightly &> /dev/null; then
             echo "Release as nightly, clear existing release and tag"
-            gh release delete "$TAG" --yes --cleanup-tag
+            gh release delete nightly --yes --cleanup-tag
           fi
           sleep 5 # wait to avoid the release becomes draft
       - name: Create Draft Release

@@ -51,7 +51,7 @@ Nightly 使用最近可达 Stable tag 之后的提交生成说明。预发布说
 
 `version` 分支保存 `stable.json`、`beta.json`、`nightly.json` 及对应 `.txt`。更新 Nightly 时同时写入相同内容的 `alpha.json` 和 `alpha.txt`，兼容旧客户端与安装脚本。
 
-Beta 和 Nightly 只更新各自通道；Stable 分别尝试更新 Stable、Beta、Nightly。每个通道独立按 SemVer 比较 manifest 的 `version` 字段，忽略 build metadata：较新版本更新，较旧版本跳过，相同版本允许失败任务重试，缺失索引可以创建。渠道选择不读取 dev 分支，也不比较 manifest 的其他字段。
+Nightly 每次发布都更新 `nightly` 和 `alpha`，不比较版本，保证索引始终指向当前的滚动 Release。Beta 只更新 `beta`；Stable 分别尝试更新 Stable、Beta、Nightly。Stable 和 Beta 按 SemVer 比较 manifest 与索引的 `version` 字段，忽略 build metadata：较新版本更新，较旧版本跳过，相同版本允许失败任务重试，缺失索引可以创建。渠道选择不读取 dev 分支，也不比较 manifest 的其他字段。
 
 例如发布 `0.7.6` 时，已经指向 `0.8.0` 预发布的 Beta/Nightly 不会被覆盖，但 Stable 仍可更新；发布 `0.8.0` 时则会一并推进较旧的预发布通道。发布较旧 tag 仍可创建独立 Release，但不会回退索引。
 

@@ -64,14 +64,12 @@ fn prereleases_only_select_their_own_channel() -> Result<()> {
 }
 
 #[test]
-fn nightly_rejects_older_versions_but_allows_equal_precedence() -> Result<()> {
-    let indexes = [("nightly", "0.8.0-nightly.100+sha.abc")];
+fn nightly_always_updates_its_index() -> Result<()> {
     assert_eq!(
-        select("nightly", "0.8.0-nightly.99+sha.def", &indexes)?,
-        "channels=\n"
-    );
-    assert_eq!(
-        select("nightly", "0.8.0-nightly.100+sha.def", &indexes)?,
+        select("nightly", "0.8.0-nightly.99+sha.def", &[(
+            "nightly",
+            "0.8.0-nightly.100+sha.abc"
+        )])?,
         "channels=nightly\n"
     );
     Ok(())
