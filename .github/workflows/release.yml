@@ -262,17 +262,6 @@ jobs:
           git tag -f stable ${{ needs.meta.outputs.commit }}
           git push --verbose --force origin stable
 
-  update-changelog:
-    name: Update Changelog
-    needs: [meta, release]
-    permissions:
-      contents: write
-    if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'stable' }}
-    uses: ./.github/workflows/publish-changelog.yml
-    with:
-      version: ${{ needs.meta.outputs.version }}
-      dryrun: false
-
   publish-homebrew:
     name: Publish Homebrew Formulae
     needs: [meta, release]

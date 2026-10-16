@@ -1,0 +1,134 @@
+name: Prepare Stable Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump to release
+        type: choice
+        options: [auto, minor, major]
+        default: auto
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: prepare-stable-release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  prepare:
+    name: Prepare Stable Release
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install git-cliff
+        uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff@2.13.1
+
+      - name: Select Version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          latest="$(git tag --merged HEAD --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1)"
+          if [[ "$BUMP" != auto ]]; then
+            version="$(git-cliff "$latest..HEAD" --bumped-version --bump "$BUMP")"
+          elif git-cliff "$latest..HEAD" --context | jq -e '[.[].commits[]
+                 | select(.breaking or (.raw_message | test("^(feat|fix)[(:!]")))] | length > 0' > /dev/null; then
+            version="$(git-cliff "$latest..HEAD" --bumped-version)"
+          else
+            echo "::error::No feat, fix or breaking change since $latest; choose minor or major to release anyway."
+            exit 1
+          fi
+          echo "previous=$latest" >> "$GITHUB_OUTPUT"
+          echo "version=${version#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Update Version and Changelog
+        env:
+          PREVIOUS: ${{ steps.version.outputs.previous }}
+          VERSION: ${{ steps.version.outputs.version }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          current="$(cargo metadata --no-deps --format-version 1 |
+            jq -r '.packages[] | select(.name == "maa-cli") | .version')"
+          if [[ "$current" != "$VERSION" ]]; then
+            sed -i "0,/^version = \"$current\"$/s//version = \"$VERSION\"/" crates/maa-cli/Cargo.toml
+            cargo update -p maa-cli --precise "$VERSION"
+          fi
+          # Replace the section of an earlier preparation of this version
+          awk -v heading="## Release $VERSION" '/^## /{skip = $0 == heading} !skip' CHANGELOG.md > "$RUNNER_TEMP/CHANGELOG.md"
+          mv "$RUNNER_TEMP/CHANGELOG.md" CHANGELOG.md
+          git-cliff "$PREVIOUS..HEAD" --tag "v$VERSION" --prepend CHANGELOG.md
+
+      - name: Commit Release Preparation
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md Cargo.lock crates/maa-cli/Cargo.toml
+          git commit -m "chore(release): prepare for v$VERSION"
+
+      - name: Push and Open Release Pull Request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # A release-prep branch with only the release files.
+          head="release-prep/v$VERSION"
+          remote_head="$(git ls-remote --heads origin "refs/heads/$head" | cut -f1)"
+          if [[ -n "$remote_head" ]]; then
+            git push origin \
+              --force-with-lease="refs/heads/$head:$remote_head" \
+              "HEAD:refs/heads/$head"
+          else
+            git push origin "HEAD:refs/heads/$head"
+          fi
+          title="chore(release): prepare for v$VERSION"
+
+          body="$RUNNER_TEMP/release-pr-body.md"
+          {
+            echo "Release **v$VERSION** from \`$head\`."
+            echo
+            echo '- Version and changelog prepared from the exact candidate commit'
+            echo '- After merging, push the version tag on the final main commit to publish Stable'
+            echo
+            echo 'Approve its workflows and review the changes before merging.'
+            echo
+            echo 'If main changes, update the changelog manually or rerun Prepare.'
+            echo 'Rerunning Prepare rebuilds the preparation branch from main and rewrites the PR title and body; manual commits on the preparation branch are not preserved.'
+            echo 'If Prepare selects a different version, it closes the old preparation PR and deletes its branch; manual edits are not carried over.'
+          } > "$body"
+
+          pr_url="$(gh pr list --base main --head "$head" --state open \
+            --json url --jq '.[0].url')"
+          if [[ -n "$pr_url" ]]; then
+            gh pr edit "$pr_url" --title "$title" --body-file "$body"
+          else
+            gh pr create --base main --head "$head" --title "$title" \
+              --body-file "$body"
+          fi
+
+          # A newer preparation supersedes older release-prep PRs.
+          gh pr list --base main --state open --json number,headRefName,isCrossRepository \
+            --jq ".[] | select(.isCrossRepository | not)
+                      | select(.headRefName | startswith(\"release-prep/\"))
+                      | select(.headRefName != \"$head\") | .number" |
+            while IFS= read -r number; do
+              gh pr close "$number" --delete-branch \
+                --comment "Superseded by the v$VERSION release preparation."
+            done
