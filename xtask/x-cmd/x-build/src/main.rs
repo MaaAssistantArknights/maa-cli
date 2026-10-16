@@ -4,17 +4,19 @@ use std::{env, ffi::OsString, fs, path::Path, process::Command};
 
 use anyhow::{Context, Result};
 use github::set_output;
-use x_command::{CommandExt, cargo, rustup_up};
-use x_group::Group;
+use x_lib::{
+    command::{CommandExt, cargo, rustup_up},
+    group::Group,
+};
 
 mod github;
 
 const HOST_TRIPLET: &str = env!("TARGET");
 
 fn main() -> Result<()> {
-    x_group::finish_prepare();
-    let profile = x_env::read_or("BUILD_PROFILE", "dev".to_owned())?;
-    let vendored_deps = x_env::read_or("BUILD_VENDORED_DEPS", false)?;
+    x_lib::group::finish_prepare();
+    let profile = x_lib::env::read_or("BUILD_PROFILE", "dev".to_owned())?;
+    let vendored_deps = x_lib::env::read_or("BUILD_VENDORED_DEPS", false)?;
     let output_dir = env::var_os("BUILD_OUTPUT_DIR").context("Missing BUILD_OUTPUT_DIR")?;
     let rename = env::var_os("BUILD_RENAME");
     // Set GitHub output for use in subsequent steps
@@ -46,7 +48,7 @@ fn main() -> Result<()> {
 
     let profile_dir = if profile == "dev" { "debug" } else { &profile };
 
-    let target_dir = x_workspace::root().join("target").join(profile_dir);
+    let target_dir = x_lib::workspace::root().join("target").join(profile_dir);
     let exe = format!("maa{}", std::env::consts::EXE_SUFFIX);
     let binary = target_dir.join(&exe);
 
@@ -82,7 +84,7 @@ fn main() -> Result<()> {
 
 fn license_command(build_args: &[OsString], output: &Path) -> Command {
     let mut cmd = cargo();
-    cmd.current_dir(x_workspace::root()).args([
+    cmd.current_dir(x_lib::workspace::root()).args([
         "about",
         "generate",
         "about.hbs",

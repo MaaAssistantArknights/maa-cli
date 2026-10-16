@@ -5,13 +5,15 @@ use std::{env, ffi::OsString, path::Path};
 
 use anyhow::{Context, Result};
 use tempfile::TempDir;
-use x_command::{CommandExt, EnvVars, cargo, rustup_up};
-use x_group::Group;
+use x_lib::{
+    command::{CommandExt, EnvVars, cargo, rustup_up},
+    group::Group,
+};
 
 const LLVM_COV_ARGS: &[&str] = &["+nightly", "llvm-cov"];
 
 fn main() -> Result<()> {
-    x_group::finish_prepare();
+    x_lib::group::finish_prepare();
 
     let opts = TestOptions::from_env()?;
     // Build environment variables map
@@ -19,7 +21,7 @@ fn main() -> Result<()> {
     let test_root = TempDir::new().context("Failed to create isolated test directory")?;
 
     Group::new("Setup Environment Variables").run(|| {
-        let config_dir = x_workspace::root().join("crates/maa-cli/config_examples");
+        let config_dir = x_lib::workspace::root().join("crates/maa-cli/config_examples");
         env_vars.push("MAA_CONFIG_DIR", config_dir.display().to_string());
         env_vars.push(
             "MAA_CACHE_DIR",
@@ -189,14 +191,14 @@ struct TestOptions {
 impl TestOptions {
     fn from_env() -> Result<Self> {
         Ok(Self {
-            install_core: x_env::read_or("TEST_INSTALL_CORE", false)?,
-            no_core_tests: x_env::read_or("TEST_NO_CORE_TESTS", false)?,
-            no_ignored_tests: x_env::read_or("TEST_NO_IGNORED_TESTS", false)?,
-            coverage: x_env::read_or("TEST_COVERAGE", CoverageMode::None)?,
-            clippy: x_env::read_or("TEST_CLIPPY", false)?,
-            no_all_features: x_env::read_or("TEST_NO_ALL_FEATURES", false)?,
-            runtime_library_path: x_env::read_or("TEST_RUNTIME_LIBRARY_PATH", false)?,
-            package: x_env::read_or("TEST_PACKAGE", "workspace".to_owned())?,
+            install_core: x_lib::env::read_or("TEST_INSTALL_CORE", false)?,
+            no_core_tests: x_lib::env::read_or("TEST_NO_CORE_TESTS", false)?,
+            no_ignored_tests: x_lib::env::read_or("TEST_NO_IGNORED_TESTS", false)?,
+            coverage: x_lib::env::read_or("TEST_COVERAGE", CoverageMode::None)?,
+            clippy: x_lib::env::read_or("TEST_CLIPPY", false)?,
+            no_all_features: x_lib::env::read_or("TEST_NO_ALL_FEATURES", false)?,
+            runtime_library_path: x_lib::env::read_or("TEST_RUNTIME_LIBRARY_PATH", false)?,
+            package: x_lib::env::read_or("TEST_PACKAGE", "workspace".to_owned())?,
             test_args: env::args_os().skip(1).collect(),
         })
     }

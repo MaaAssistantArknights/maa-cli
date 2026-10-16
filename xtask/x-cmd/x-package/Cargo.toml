@@ -19,8 +19,7 @@ serde_json.workspace = true
 sha2.workspace = true
 tar.workspace = true
 zip.workspace = true
-x-group.workspace = true
-x-env.workspace = true
+x-lib.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

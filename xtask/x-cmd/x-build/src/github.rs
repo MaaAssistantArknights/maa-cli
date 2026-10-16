@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 
 /// Set a GitHub Actions output variable.
 pub fn set_output(key: &str, value: &str) -> Result<()> {
-    let github_output: String = x_env::read("GITHUB_OUTPUT")?;
+    let github_output: String = x_lib::env::read("GITHUB_OUTPUT")?;
     let mut file = fs::OpenOptions::new()
         .create(true)
         .append(true)

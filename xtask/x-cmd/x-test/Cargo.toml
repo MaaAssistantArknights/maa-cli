@@ -11,10 +11,7 @@ publish = false
 [dependencies]
 anyhow.workspace = true
 tempfile.workspace = true
-x-command.workspace = true
-x-group.workspace = true
-x-env.workspace = true
-x-workspace.workspace = true
+x-lib.workspace = true
 maa-dirs.workspace = true
 
 [lints]

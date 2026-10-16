@@ -7,8 +7,8 @@ use semver::Version;
 use serde_json::Value;
 
 fn main() -> Result<()> {
-    x_group::finish_prepare();
-    let channel: String = x_env::read("CHANNEL")?;
+    x_lib::group::finish_prepare();
+    let channel: String = x_lib::env::read("CHANNEL")?;
     let candidates: &[&str] = match channel.as_str() {
         "stable" => &["stable", "beta", "nightly"],
         "beta" => &["beta"],

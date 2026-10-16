@@ -14,10 +14,10 @@ use semver::Version;
 mod archive;
 
 fn main() -> Result<()> {
-    x_group::finish_prepare();
-    let version: Version = x_env::read("VERSION")?;
-    let tag = x_env::read("TAG")?;
-    let commit = x_env::read("COMMIT")?;
+    x_lib::group::finish_prepare();
+    let version: Version = x_lib::env::read("VERSION")?;
+    let tag = x_lib::env::read("TAG")?;
+    let commit = x_lib::env::read("COMMIT")?;
 
     let version_str = version.to_string();
 

@@ -2515,10 +2515,7 @@ name = "x-build"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "x-command",
- "x-env",
- "x-group",
- "x-workspace",
+ "x-lib",
 ]
 
 [[package]]
@@ -2529,24 +2526,15 @@ dependencies = [
  "semver",
  "serde_json",
  "tempfile",
- "x-env",
- "x-group",
+ "x-lib",
 ]
 
 [[package]]
-name = "x-command"
+name = "x-lib"
 version = "0.1.0"
 dependencies = [
  "anyhow",
 ]
-
-[[package]]
-name = "x-env"
-version = "0.1.0"
-
-[[package]]
-name = "x-group"
-version = "0.1.0"
 
 [[package]]
 name = "x-package"
@@ -2562,8 +2550,7 @@ dependencies = [
  "sha2",
  "tar",
  "tempfile",
- "x-env",
- "x-group",
+ "x-lib",
  "zip",
 ]
 
@@ -2574,15 +2561,8 @@ dependencies = [
  "anyhow",
  "maa-dirs",
  "tempfile",
- "x-command",
- "x-env",
- "x-group",
- "x-workspace",
+ "x-lib",
 ]
-
-[[package]]
-name = "x-workspace"
-version = "0.1.0"
 
 [[package]]
 name = "xattr"

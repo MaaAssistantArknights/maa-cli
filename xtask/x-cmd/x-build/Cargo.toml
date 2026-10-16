@@ -10,10 +10,7 @@ publish = false
 
 [dependencies]
 anyhow.workspace = true
-x-command.workspace = true
-x-group.workspace = true
-x-env.workspace = true
-x-workspace.workspace = true
+x-lib.workspace = true
 
 [lints]
 workspace = true
