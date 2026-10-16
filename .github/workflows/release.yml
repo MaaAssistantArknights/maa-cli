@@ -2,7 +2,7 @@ name: Release
 on:
   push:
     tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v*"
   # Just used for testing
   pull_request:
     branches:
@@ -11,23 +11,18 @@ on:
       - ".github/workflows/release.yml"
   workflow_dispatch:
     inputs:
-      channel:
-        description: The release channel
-        default: beta
-        required: true
-        type: choice
-        options:
-          - alpha
-          - beta
-          - stable
       publish:
-        description: Whether to publish a new release
+        description: Publish Nightly instead of building a preview
         default: false
         required: true
         type: boolean
   schedule:
-    # Release alpha every day at 20:00 UTC (4:00 AM UTC+8)
+    # Release nightly every day at 20:00 UTC (4:00 AM UTC+8)
     - cron: "0 20 * * *"
+
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('release-pr-{0}', github.event.pull_request.number) || 'release-state' }}
+  queue: max
 
 defaults:
   run:
@@ -36,30 +31,88 @@ defaults:
 permissions:
   contents: read
 
+env:
+  # Tag runs use the tagged tooling; Nightly uses the main commit that started the run.
+  TOOLS_REF: ${{ github.sha }}
+
 jobs:
   meta:
     name: Meta
+    if: (github.event_name == 'push' && github.event.deleted == false) || github.event_name == 'pull_request' || github.event_name == 'schedule' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.meta.outputs.version }}
-      tag: ${{ steps.meta.outputs.tag }}
-      commit: ${{ steps.meta.outputs.commit }}
-      channel: ${{ steps.meta.outputs.channel }}
-      profile: ${{ steps.meta.outputs.profile }}
-      publish: ${{ steps.meta.outputs.publish }}
-      skip: ${{ steps.meta.outputs.skip }}
+      version: ${{ steps.tag.outputs.version || steps.nightly.outputs.version }}
+      tag: ${{ steps.tag.outputs.tag || 'nightly' }}
+      ref: ${{ steps.nightly.outputs.ref || github.sha }}
+      channel: ${{ steps.tag.outputs.channel || 'nightly' }}
+      profile: ${{ (github.event_name == 'push' || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.publish)) && 'release-lto' || 'dev' }}
+      publish: ${{ github.event_name == 'push' || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}
+      skip: ${{ steps.nightly.outputs.skip || 'false' }}
     steps:
+      - name: Read Release Tag
+        id: tag
+        if: github.event_name == 'push'
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-beta\.(0|[1-9][0-9]*))?$ ]]; then
+            echo "::error::Expected vX.Y.Z or vX.Y.Z-beta.N, got $RELEASE_TAG"
+            exit 1
+          fi
+          channel=stable
+          if [[ "$RELEASE_TAG" == *-beta.* ]]; then
+            channel=beta
+          fi
+          {
+            echo "version=${RELEASE_TAG#v}"
+            echo "channel=$channel"
+            echo "tag=$RELEASE_TAG"
+          } >> "$GITHUB_OUTPUT"
       - name: Checkout
-        uses: actions/checkout@v7
-      - name: Checkout Version Branch
+        if: github.event_name != 'push'
         uses: actions/checkout@v7
         with:
-          ref: version
-          path: version
-      - name: Meta
-        id: meta
+          ref: ${{ github.sha }}
+      - name: Prepare Nightly
+        id: nightly
+        if: github.event_name != 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          cargo x -- release meta
+          skip() {
+            echo "$1"
+            echo 'skip=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+          error() { echo "::error::$1"; exit 1; }
+
+          commit="$GITHUB_SHA"
+          if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
+            refs="$(git ls-remote --heads origin 'refs/heads/dev-*')"
+            read -ra branches <<< "$(awk '{sub("refs/heads/", "", $2); print $2}' <<< "$refs" | tr '\n' ' ')"
+            if (( ${#branches[@]} > 1 )); then
+              error "Only one dev branch may exist, found: ${branches[*]}"
+            elif (( ${#branches[@]} == 0 )); then
+              skip "No dev branch; there is no nightly to release."
+            fi
+            git fetch --no-tags --depth=1 origin "+refs/heads/${branches[0]}:refs/remotes/origin/${branches[0]}"
+            commit="$(git rev-parse "origin/${branches[0]}")"
+
+            nightly="$(git ls-remote origin refs/tags/nightly 'refs/tags/nightly^{}' | tail -n1 | cut -f1)"
+            if [[ "$nightly" == "$commit" ]] &&
+               [[ "$(gh release view nightly --json isDraft --jq .isDraft 2>/dev/null)" == false ]]; then
+              skip 'Nightly already builds this commit.'
+            fi
+          fi
+          version="$(git show "$commit:crates/maa-cli/Cargo.toml" | awk -F'"' '/^version = /{print $2; exit}')"
+          version="$version-nightly.$(date +%s)+sha.$(git rev-parse --short "$commit")"
+          echo "Release $version (nightly) from $commit"
+
+          {
+            echo 'skip=false'
+            echo "version=$version"
+            echo "ref=$commit"
+          } >> "$GITHUB_OUTPUT"
 
   release-note:
     name: Generate Release Notes
@@ -69,14 +122,32 @@ jobs:
     env:
       CLIFF_SHORT_USERNAME: true
     outputs:
-      content: ${{ steps.git_cliff.outputs.content }}
+      content: ${{ steps.stable.outputs.content || steps.prerelease.outputs.content }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          fetch-depth: 0
+          ref: ${{ needs.meta.outputs.ref }}
+          fetch-depth: ${{ needs.meta.outputs.channel == 'stable' && 1 || 0 }}
+      - name: Read Stable Release Notes
+        id: stable
+        if: needs.meta.outputs.channel == 'stable'
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          if ! grep -qxF "## Release $VERSION" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no section for $VERSION"
+            exit 1
+          fi
+          notes="$(awk -v heading="## Release $VERSION" '/^## /{found = $0 == heading} found' CHANGELOG.md)"
+          {
+            echo 'content<<RELEASE_NOTES'
+            printf '%s\n' "$notes"
+            echo 'RELEASE_NOTES'
+          } >> "$GITHUB_OUTPUT"
       - name: Generate Release Notes
-        id: git_cliff
+        id: prerelease
+        if: needs.meta.outputs.channel != 'stable'
         uses: orhun/git-cliff-action@v4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -84,20 +155,18 @@ jobs:
           TAG: ${{ needs.meta.outputs.tag }}
         with:
           config: cliff.toml
-          # If the release is triggered by a tag, process commits starting
-          # from the latest tag, otherwise tag will be create later, so use
-          # unreleased commits
-          args: >
-            -v
-            ${{ github.event_name == 'push' && '-l' || '-u' }}
-            ${{ needs.meta.outputs.channel != 'stable' && '--tag-pattern="^v"' || '' }}
+          args: >-
+            ${{ needs.meta.outputs.channel == 'beta' && '--latest --tag-pattern="^v"' || '--unreleased' }}
+            --use-branch-tags --strip all
 
       - name: Preview Release Notes
         if: ${{ !fromJson(needs.meta.outputs.publish) }}
+        env:
+          NOTES: ${{ steps.stable.outputs.content || steps.prerelease.outputs.content }}
         run: |
           {
             echo '```markdown'
-            cat '${{ steps.git_cliff.outputs.changelog }}'
+            printf '%s\n' "$NOTES"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -119,6 +188,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.meta.outputs.ref }}
       - name: Install cargo-about
         uses: taiki-e/install-action@v2
         with:
@@ -157,10 +228,12 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       VERSION: ${{ needs.meta.outputs.version }}
       TAG: ${{ needs.meta.outputs.tag }}
-      COMMIT: ${{ needs.meta.outputs.commit }}
+      COMMIT: ${{ needs.meta.outputs.ref }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TOOLS_REF }}
       - name: Download Artifacts
         uses: actions/download-artifact@v8
         with:
@@ -177,9 +250,27 @@ jobs:
             manifest.txt
           retention-days: 1
           if-no-files-found: error
+      - name: Checkout Nightly Index
+        if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'nightly' }}
+        uses: actions/checkout@v7
+        with:
+          ref: version
+          path: version-index
+      - name: Check Nightly Version
+        id: nightly
+        if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'nightly' }}
+        env:
+          CHANNEL: nightly
+          MANIFEST: manifest.json
+          INDEX_DIR: version-index
+        run: cargo x -- release channels
       - name: Remove Previous Nightly Release
         if: ${{ fromJson(needs.meta.outputs.publish) }}
         run: |
+          if [[ "$TAG" == nightly && -z '${{ steps.nightly.outputs.channels }}' ]]; then
+            echo '::error::A newer Nightly index already exists; refusing to replace the rolling release.'
+            exit 1
+          fi
           if [[ "$TAG" == nightly ]] && gh release view "$TAG" &> /dev/null; then
             echo "Release as nightly, clear existing release and tag"
             gh release delete "$TAG" --yes --cleanup-tag
@@ -215,12 +306,19 @@ jobs:
   update-index:
     name: Update Version Index
     needs: [meta, release]
+    if: ${{ fromJson(needs.meta.outputs.publish) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      update_stable: ${{ contains(steps.channels.outputs.channels, 'stable') }}
     env:
       CHANNEL: ${{ needs.meta.outputs.channel }}
     steps:
+      - name: Checkout Release Tooling
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TOOLS_REF }}
       - name: Checkout version branch
         uses: actions/checkout@v7
         with:
@@ -231,20 +329,31 @@ jobs:
         with:
           name: release-manifest
           path: release-manifest
+      - name: Select Index Channels
+        id: channels
+        env:
+          MANIFEST: release-manifest/manifest.json
+          INDEX_DIR: version
+        run: cargo x -- release channels
       - name: Update Version Files
+        if: steps.channels.outputs.channels != ''
+        env:
+          UPDATE_CHANNELS: ${{ steps.channels.outputs.channels }}
         run: |
-          case "$CHANNEL" in
-            stable) channels=(stable beta alpha) ;;
-            beta) channels=(beta alpha) ;;
-            alpha) channels=(alpha) ;;
-            *) echo "Unknown channel: $CHANNEL" >&2; exit 1 ;;
-          esac
+          read -ra channels <<< "$UPDATE_CHANNELS"
           for channel in "${channels[@]}"; do
-            cp release-manifest/manifest.json "version/$channel.json"
-            cp release-manifest/manifest.txt "version/$channel.txt"
+            names=("$channel")
+            if [[ "$channel" == nightly ]]; then names+=(alpha); fi
+            for name in "${names[@]}"; do
+              cp release-manifest/manifest.json "version/$name.json"
+              cp release-manifest/manifest.txt "version/$name.txt"
+            done
           done
       - name: Commit version files and Push
+        if: steps.channels.outputs.channels != ''
         working-directory: version
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -254,13 +363,16 @@ jobs:
             git diff ./*.json ./*.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          git commit ./*.json ./*.txt -m 'chore: bump version to v${{ needs.meta.outputs.version }}'
-          git push --verbose ${{ !fromJson(needs.meta.outputs.publish) && '--dry-run' || ''}}
+          git add ./*.json ./*.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: bump version to v$VERSION"
+            git push --verbose origin HEAD:refs/heads/version
+          fi
 
   update-stable:
     name: Update Stable Tag
-    if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'stable' }}
-    needs: [meta, release]
+    if: ${{ fromJson(needs.update-index.outputs.update_stable) }}
+    needs: [meta, update-index]
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -268,16 +380,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          ref: ${{ needs.meta.outputs.commit }}
+          ref: ${{ needs.meta.outputs.ref }}
       - name: Update Stable Tag
         run: |
-          git tag -f stable ${{ needs.meta.outputs.commit }}
+          git tag -f stable ${{ needs.meta.outputs.ref }}
           git push --verbose --force origin stable
 
   publish-homebrew:
     name: Publish Homebrew Formulae
     needs: [meta, release]
-    if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'stable' }}
+    if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel != 'nightly' }}
     uses: ./.github/workflows/publish-homebrew.yml
     with:
       dryrun: false
@@ -286,8 +398,8 @@ jobs:
 
   publish-aur:
     name: Publish AUR Package
-    needs: [meta, release]
-    if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'stable' }}
+    needs: [meta, update-index]
+    if: ${{ fromJson(needs.update-index.outputs.update_stable) }}
     uses: ./.github/workflows/publish-aur.yml
     with:
       pkgver: ${{ needs.meta.outputs.version }}
@@ -299,8 +411,8 @@ jobs:
     name: Publish Winget Package
     permissions:
       contents: write
-    needs: [meta, release]
-    if: ${{ fromJson(needs.meta.outputs.publish) && needs.meta.outputs.channel == 'stable' }}
+    needs: [meta, update-index]
+    if: ${{ fromJson(needs.update-index.outputs.update_stable) }}
     uses: ./.github/workflows/publish-winget.yml
     with:
       version: ${{ needs.meta.outputs.version }}

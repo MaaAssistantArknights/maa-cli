@@ -8,8 +8,6 @@ pub trait CommandExt {
     fn env_vars(&mut self, env_vars: &EnvVars);
 
     fn run(&mut self) -> Result<()>;
-
-    fn read(&mut self) -> Result<String>;
 }
 
 impl CommandExt for Command {
@@ -26,21 +24,6 @@ impl CommandExt for Command {
             bail!("Failed to run: {self:?}");
         }
         Ok(())
-    }
-
-    fn read(&mut self) -> Result<String> {
-        println!("Running command: {:?}", self);
-        let output = self.output().context("Failed to execute command")?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            bail!("Failed to run: {self:?}\n{stderr}");
-        }
-
-        let stdout =
-            String::from_utf8(output.stdout).context("Command output is not valid UTF-8")?;
-
-        Ok(stdout.trim().to_string())
     }
 }
 
