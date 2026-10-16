@@ -49,6 +49,10 @@ jobs:
       publish: ${{ github.event_name == 'push' || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}
       skip: ${{ steps.nightly.outputs.skip || 'false' }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
       - name: Read Release Tag
         id: tag
         if: github.event_name == 'push'
@@ -59,20 +63,21 @@ jobs:
             echo "::error::Expected vX.Y.Z or vX.Y.Z-beta.N, got $RELEASE_TAG"
             exit 1
           fi
+          version="${RELEASE_TAG#v}"
+          source_version="$(awk -F'"' '/^version = /{print $2; exit}' crates/maa-cli/Cargo.toml)"
+          if [[ "${version%-beta.*}" != "$source_version" ]]; then
+            echo "::error::Tag $RELEASE_TAG does not match Cargo.toml version $source_version"
+            exit 1
+          fi
           channel=stable
           if [[ "$RELEASE_TAG" == *-beta.* ]]; then
             channel=beta
           fi
           {
-            echo "version=${RELEASE_TAG#v}"
+            echo "version=$version"
             echo "channel=$channel"
             echo "tag=$RELEASE_TAG"
           } >> "$GITHUB_OUTPUT"
-      - name: Checkout
-        if: github.event_name != 'push'
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.sha }}
       - name: Prepare Nightly
         id: nightly
         if: github.event_name != 'push'

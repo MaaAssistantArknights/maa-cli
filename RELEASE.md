@@ -10,7 +10,7 @@
 | Beta | 推送 `vX.Y.Z-beta.N` tag | `X.Y.Z-beta.N` | `vX.Y.Z-beta.N` |
 | Nightly | 每日 20:00 UTC 定时或在 `main` 手动运行 `Release` | `X.Y.0-nightly.T+sha.<short>` | `nightly`（滚动更新） |
 
-Stable 和 Beta 的完整版本由 tag 决定，通过 `MAA_VERSION` 注入编译，不从源码推导版本或自动递增 Beta 编号。修改版本、合并 PR 本身不触发发布；其他预发布后缀不接受，删除 tag 不触发发布。版本 tag 不应移动。
+Stable 和 Beta 的完整版本由 tag 决定，tag 的核心版本必须与对应提交的 Cargo 版本一致。完整版本通过 `MAA_VERSION` 注入编译，不从源码推导版本或自动递增 Beta 编号。修改版本、合并 PR 本身不触发发布；其他预发布后缀不接受，删除 tag 不触发发布。版本 tag 不应移动。
 
 Nightly 选择唯一的 `dev-*` 分支，读取其源码版本并添加后缀。没有 dev 分支时跳过，存在多个时失败。`T` 是 Meta job 准备发布时取一次的 Unix 时间戳（秒）；SHA 标识源码提交，编号不依赖提交数。同一核心版本按 SemVer 排序为 `beta.N` < `nightly.T` < Stable。已有正式发布的 Nightly 指向同一源码提交时跳过；仅存在草稿或 tag 不会跳过。
 
