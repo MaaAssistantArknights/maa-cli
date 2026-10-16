@@ -15,24 +15,23 @@ fn main() -> Result<()> {
     x_lib::group::finish_prepare();
     let options = TagOptions::from_env_or_exit();
 
+    git(&["fetch", "--prune", REMOTE])?;
     let branch = match options.channel {
-        Channel::Stable => "main".to_owned(),
+        Channel::Stable => format!("{REMOTE}/main"),
         Channel::Beta => dev_branch()?,
     };
-    git(&["fetch", REMOTE, &branch])?;
-    let commit = git(&["rev-parse", "FETCH_HEAD"])?;
-    let version = cargo_version(&commit)?;
+    let version = cargo_version(&branch)?;
     let tag = match options.channel {
         Channel::Stable => format!("v{version}"),
         Channel::Beta => next_beta(&version)?,
     };
 
-    let subject = git(&["log", "-1", "--format=%h %s", &commit])?;
-    println!("Push {tag} to {REMOTE} on {branch}: {subject}");
+    let subject = git(&["log", "-1", "--format=%h %s", &branch])?;
+    println!("Push {tag} on {branch}: {subject}");
     if !options.yes && !confirm()? {
         bail!("Aborted");
     }
-    git(&["push", REMOTE, &format!("{commit}:refs/tags/{tag}")])?;
+    git(&["push", REMOTE, &format!("{branch}:refs/tags/{tag}")])?;
     Ok(())
 }
 
@@ -55,11 +54,14 @@ impl FromStr for Channel {
 }
 
 fn dev_branch() -> Result<String> {
-    let refs = git(&["ls-remote", "--heads", REMOTE, "refs/heads/dev-*"])?;
-    let branches: Vec<_> = refs
-        .lines()
-        .filter_map(|line| line.split_once("refs/heads/").map(|(_, name)| name))
-        .collect();
+    let refs = git(&[
+        "branch",
+        "-r",
+        "--format=%(refname:short)",
+        "--list",
+        "origin/dev-*",
+    ])?;
+    let branches: Vec<_> = refs.lines().collect();
     match branches.as_slice() {
         [branch] => Ok((*branch).to_owned()),
         [] => bail!("No dev branch on {REMOTE}; Beta is released from dev-*"),
@@ -70,8 +72,8 @@ fn dev_branch() -> Result<String> {
     }
 }
 
-fn cargo_version(commit: &str) -> Result<String> {
-    let manifest = git(&["show", &format!("{commit}:crates/maa-cli/Cargo.toml")])?;
+fn cargo_version(rev: &str) -> Result<String> {
+    let manifest = git(&["show", &format!("{rev}:crates/maa-cli/Cargo.toml")])?;
     let manifest: toml::Table = manifest.parse().context("Parse maa-cli Cargo.toml")?;
     manifest
         .get("package")
@@ -83,17 +85,9 @@ fn cargo_version(commit: &str) -> Result<String> {
 
 fn next_beta(version: &str) -> Result<String> {
     let prefix = format!("v{version}-beta.");
-    let refs = git(&[
-        "ls-remote",
-        "--tags",
-        "--refs",
-        REMOTE,
-        &format!("refs/tags/{prefix}*"),
-    ])?;
-    let last = refs
+    let last = git(&["tag", "--list", &format!("{prefix}*")])?
         .lines()
-        .filter_map(|line| line.split_once(&format!("refs/tags/{prefix}")))
-        .filter_map(|(_, n)| n.parse::<u64>().ok())
+        .filter_map(|tag| tag.strip_prefix(&prefix)?.parse::<u64>().ok())
         .max()
         .unwrap_or(0);
     Ok(format!("{prefix}{}", last + 1))

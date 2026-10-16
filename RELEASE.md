@@ -63,7 +63,7 @@ Nightly 只保留滚动 Release 的最新版，不为每次构建创建永久 ta
 
 `cargo x build --output-dir <目录>` 为发布准备二进制和按目标平台、features 生成的 `licenses.md`，需要安装 `cargo-about`。额外的 Cargo 参数放在 `--` 后，选项和值以空格分隔。workflow 负责跨 job 的 tar，WinGet 直接使用输出目录。`cargo x package` 使用 `VERSION`、`TAG`、`COMMIT` 和构建 artifact 生成发行包、`manifest.json`、`manifest.txt`；不修改版本索引。
 
-`cargo x tag <stable|beta>` 先拉取远端分支：Stable 使用 `main`，Beta 使用唯一的 `dev-*` 分支。版本取自该提交的 Cargo 版本，Beta 编号为远端已有同版本 Beta tag 的最大编号加 1，从 1 开始。确认后将 tag 直接推送到 `origin`，不创建本地 tag，也不使用本地未推送的提交；`--yes` 跳过确认。远端已有同名 tag 时推送被拒绝。
+`cargo x tag <stable|beta>` 先拉取远端分支：Stable 使用 `main`，Beta 使用唯一的 `dev-*` 分支。版本取自该提交的 Cargo 版本，Beta 编号为已有同版本 Beta tag 的最大编号加 1，从 1 开始。确认后将 tag 直接推送到 `origin`，不创建本地 tag，也不使用本地未推送的提交；`--yes` 跳过确认。远端已有同名 tag 时推送被拒绝。
 
 `cargo x channel` 从 `CHANNEL`、`MANIFEST`（JSON 文件路径）、`INDEX_DIR` 读取输入，将可更新通道输出到 stdout；workflow 将其写入 `GITHUB_OUTPUT` 的 `channels`，用于发布后的索引更新。
 
