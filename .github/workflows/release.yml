@@ -193,7 +193,7 @@ jobs:
       - name: Install cargo-about
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-about
+          tool: cargo-about@0.8.4
       - name: Build
         id: build
         env:
