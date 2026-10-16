@@ -5,7 +5,6 @@ use flate2::read::GzDecoder;
 use maa_version::{VersionManifest, cli::Details};
 use sha2::{Digest, Sha256};
 
-const LICENSES: &[u8] = b"third-party licenses\n";
 const BINARY: &[u8] = b"release binary\n";
 const VERSION: &str = "0.7.0-beta.1";
 const TAG: &str = "v0.7.0-beta.1";
@@ -24,7 +23,9 @@ fn package_does_not_modify_existing_version_indexes() -> Result<()> {
 fn check_package(with_version_checkout: bool) -> Result<()> {
     let temp = tempfile::tempdir()?;
     let root = temp.path();
-    fs::write(root.join("licenses.md"), LICENSES)?;
+    if with_version_checkout {
+        fs::write(root.join("licenses.md"), "unrelated root licenses")?;
+    }
     if with_version_checkout {
         fs::create_dir(root.join("version"))?;
         for channel in ["stable", "beta", "alpha"] {
@@ -53,6 +54,11 @@ fn check_package(with_version_checkout: bool) -> Result<()> {
         header.set_mode(0o755);
         header.set_cksum();
         tar.append_data(&mut header, binary, BINARY)?;
+        let licenses = format!("licenses for {target}\n");
+        header.set_size(licenses.len() as u64);
+        header.set_mode(0o644);
+        header.set_cksum();
+        tar.append_data(&mut header, "licenses.md", licenses.as_bytes())?;
         tar.finish()?;
     }
 
@@ -86,7 +92,10 @@ fn check_package(with_version_checkout: bool) -> Result<()> {
             files,
             BTreeMap::from([
                 (binary.to_owned(), BINARY.to_vec()),
-                ("licenses.md".to_owned(), LICENSES.to_vec()),
+                (
+                    "licenses.md".to_owned(),
+                    format!("licenses for {target}\n").into_bytes()
+                ),
             ])
         );
         if target.ends_with("-winget") {

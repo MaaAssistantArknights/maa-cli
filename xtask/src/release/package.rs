@@ -55,10 +55,6 @@ pub fn run() -> Result<()> {
         );
         archive::extract_tar(&tar_file, dir_str)?;
 
-        // Copy licenses.md
-        fs::copy("licenses.md", format!("{dir_str}/licenses.md"))
-            .context("Failed to copy licenses.md")?;
-
         // Create archive based on platform and get checksum
         let (archive_name, checksum_hash) = create_archive(target, &version_str, dir_str)?;
         let size = fs::metadata(&archive_name)

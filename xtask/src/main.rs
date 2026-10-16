@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
@@ -30,7 +32,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Build maa-cli binary
+    /// Prepare maa-cli release artifacts (requires cargo-about)
     Build(BuildOptions),
     /// Release automation tasks
     Release {
@@ -51,9 +53,9 @@ struct BuildOptions {
     #[arg(long)]
     pub vendored_deps: bool,
 
-    /// Create tar package after build
+    /// Directory for the release binary and licenses
     #[arg(long)]
-    pub tar: bool,
+    pub output_dir: PathBuf,
 
     /// Rename the binary to a different name
     #[arg(long)]

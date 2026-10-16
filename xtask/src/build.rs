@@ -1,6 +1,6 @@
-//! Build automation for maa-cli.
+//! Release artifact preparation for maa-cli.
 
-use std::{env, fs::File};
+use std::{env, fs, path::Path, process::Command};
 
 use anyhow::{Context, Result};
 
@@ -12,7 +12,7 @@ use crate::{
     workspace_root,
 };
 
-/// Build maa-cli binary.
+/// Build maa-cli and prepare the release binary and licenses.
 pub fn run(opts: BuildOptions) -> Result<()> {
     // Set GitHub output for use in subsequent steps
     set_output("host_triplet", HOST_TRIPLET).ok();
@@ -22,20 +22,21 @@ pub fn run(opts: BuildOptions) -> Result<()> {
             .run(|| rustup_up("stable").run().context("Failed to update Rust"))?;
     }
 
+    let mut build_args = Vec::new();
+    if opts.vendored_deps {
+        build_args.extend([
+            "--features".to_owned(),
+            "git2?/vendored-libgit2,git2?/vendored-openssl".to_owned(),
+        ]);
+    }
+    build_args.extend(opts.build_args);
+
     Group::new("Build").run(|| {
         let mut cmd = cargo();
         cmd.args(["build", "--package", "maa-cli", "--locked"]);
         cmd.args(["--profile", &opts.profile]);
 
-        if opts.vendored_deps {
-            cmd.args([
-                "--features",
-                "git2?/vendored-libgit2,git2?/vendored-openssl",
-            ]);
-        }
-
-        // Add any additional arguments
-        cmd.args(&opts.build_args);
+        cmd.args(&build_args);
 
         cmd.run().context("Failed to build maa-cli")
     })?;
@@ -57,23 +58,76 @@ pub fn run(opts: BuildOptions) -> Result<()> {
             .context("Failed to check binary version")
     })?;
 
-    if opts.tar {
-        Group::new("Create Tar Package").run(|| {
-            let tar_name = format!("{HOST_TRIPLET}.tar");
-
-            let file = File::create(&tar_name)
-                .with_context(|| format!("Failed to create tar file: {tar_name}"))?;
-
-            let mut tar = tar::Builder::new(file);
-            let archive_name = opts.rename.unwrap_or(exe);
-            tar.append_path_with_name(&binary, archive_name)
-                .with_context(|| format!("Failed to add {binary} to tar archive"))?;
-
-            tar.finish().context("Failed to finalize tar archive")?;
-
-            Ok(())
-        })?;
-    }
+    let output_dir =
+        std::path::absolute(opts.output_dir).context("Failed to resolve output directory")?;
+    fs::create_dir_all(&output_dir).with_context(|| {
+        format!(
+            "Failed to create output directory: {}",
+            output_dir.display()
+        )
+    })?;
+    fs::copy(
+        &binary,
+        output_dir.join(opts.rename.as_deref().unwrap_or(&exe)),
+    )
+    .context("Failed to copy binary to output directory")?;
+    let licenses = output_dir.join("licenses.md");
+    Group::new("Generate Licenses").run(|| {
+        license_command(&build_args, &licenses)
+            .run()
+            .context("Failed to generate licenses.md")
+    })?;
 
     Ok(())
+}
+
+fn license_command(build_args: &[String], output: &Path) -> Command {
+    let mut cmd = cargo();
+    cmd.current_dir(workspace_root()).args([
+        "about",
+        "generate",
+        "about.hbs",
+        "--manifest-path",
+        "crates/maa-cli/Cargo.toml",
+        "--config",
+        "about.toml",
+        "--target",
+        HOST_TRIPLET,
+        "--locked",
+    ]);
+    cmd.arg("--output-file").arg(output);
+
+    cmd.args(build_args);
+    cmd
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn licenses_forward_build_arguments_for_host_target() {
+        let build_args = [
+            "--features",
+            "git2?/vendored-libgit2,git2?/vendored-openssl",
+            "--no-default-features",
+            "--features",
+            "core_installer,git2",
+        ]
+        .map(String::from);
+        let cmd = license_command(&build_args, Path::new("licenses.md"));
+        let args: Vec<_> = cmd
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect();
+        assert!(
+            args.windows(2)
+                .any(|pair| pair == ["--target", HOST_TRIPLET])
+        );
+        assert!(
+            args.windows(2)
+                .any(|pair| pair == ["--manifest-path", "crates/maa-cli/Cargo.toml"])
+        );
+        assert!(args.ends_with(&build_args));
+    }
 }

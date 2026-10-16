@@ -119,13 +119,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+      - name: Install cargo-about
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about
       - name: Build
         id: build
         env:
           MAA_VERSION: ${{ needs.meta.outputs.version }}
         run: |
-          cargo x build --tar --vendored-deps \
+          cargo x build --output-dir "$RUNNER_TEMP/maa-cli" --vendored-deps \
             --profile ${{ needs.meta.outputs.profile }}
+      - name: Archive Build
+        env:
+          TARGET: ${{ steps.build.outputs.host_triplet }}
+        run: tar -cf "$TARGET.tar" -C "$RUNNER_TEMP/maa-cli" .
       - name: Upload Artifact
         uses: actions/upload-artifact@v7
         with:
@@ -157,12 +165,6 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           pattern: maa_cli-*
-      - name: Install cargo-about
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-about
-      - name: Generate Third-Party Licenses Information
-        run: cargo about generate about.hbs -o licenses.md
       - name: Package Release Artifacts
         run: cargo x --release -- release package
       - name: Upload Release Manifest

@@ -85,24 +85,12 @@ jobs:
           tool: cargo-about
       - name: Build
         if: steps.asset.outputs.exists != 'true'
-        id: build
         env:
           MAA_VERSION: ${{ inputs.version }}
         run: |
-          cargo x build --tar --vendored-deps \
+          cargo x build --output-dir "$RUNNER_TEMP/winget" --vendored-deps \
             --profile release-lto --rename maa-cli.exe -- \
             --no-default-features --features core_installer,git2
-      - name: Generate Third-Party Licenses Information
-        if: steps.asset.outputs.exists != 'true'
-        run: cargo about generate about.hbs -o licenses.md
-      - name: Package
-        if: steps.asset.outputs.exists != 'true'
-        env:
-          TARGET: ${{ steps.build.outputs.host_triplet }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/winget"
-          tar -xf "$TARGET.tar" -C "$RUNNER_TEMP/winget"
-          cp licenses.md "$RUNNER_TEMP/winget/licenses.md"
       - name: Create Zip
         if: steps.asset.outputs.exists != 'true'
         shell: pwsh
