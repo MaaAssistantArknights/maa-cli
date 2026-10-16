@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: Publish Nightly instead of building a preview
+        description: Whether to publish a new release
         default: false
         required: true
         type: boolean
