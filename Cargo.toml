@@ -69,7 +69,7 @@ winreg = "0.56"
 x-lib = { path = "xtask/x-lib" }
 xflags = "0.3.2"
 yaml_serde = "0.10.7"
-zip = { version = "8", default-features = false, features = ["deflate-flate2"] }
+zip = { version = "9", default-features = false, features = ["deflate-flate2"] }
 
 [workspace.lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [

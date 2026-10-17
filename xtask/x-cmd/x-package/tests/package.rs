@@ -186,7 +186,7 @@ fn read_archive(path: &Path, extension: &str) -> Result<BTreeMap<String, Vec<u8>
             let mut entry = archive.by_index(index)?;
             let mut bytes = Vec::new();
             entry.read_to_end(&mut bytes)?;
-            files.insert(entry.name().to_owned(), bytes);
+            files.insert(entry.name()?.into_owned(), bytes);
         }
     } else {
         let mut archive = tar::Archive::new(GzDecoder::new(file));
