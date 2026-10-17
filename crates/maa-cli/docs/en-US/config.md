@@ -356,6 +356,22 @@ There are two special presets: `PlayCover` (macOS) and `Waydroid` (Linux)
    session is already running, starts one if needed, and then connects ADB via `waydroid adb connect`.
    See [Waydroid documentation][waydroid-doc] for details.
 
+- `Win32` attaches MaaCore to the official Windows PC client without ADB. It is only available on Windows.
+
+   `window_title` is required and must exactly match a visible top-level window. `window_process_id` and `window_executable` are optional disambiguators; the executable is compared by canonical path. The default control methods are `screencap_method = 2` (`FramePool`), `mouse_method = 32` (`SendMessageWithCursorPos`), and `keyboard_method = 2` (`SendMessage`).
+
+   `MaaWin32ControlUnit.dll` must be installed beside `MaaCore.dll`. The `PC` platform resources are loaded automatically. maa-cli does not launch the PC client, and it disables `StartUp.start_game_enabled` for this preset, so start the selected client before running a task.
+
+```toml
+[connection]
+preset = "Win32"
+window_title = "Arknights"
+window_process_id = 1234 # optional
+window_executable = "C:\\Games\\Arknights.exe" # optional
+```
+
+Use `maa connection test --profile <name> --screencap --json` to attach and verify a non-empty screenshot without running tasks. On success it exits with code 0 and prints `{"ok":true,"connection":"Win32","screenshot_bytes":...}`.
+
 ### Resource
 
 The `resource` section specifies which resources MaaCore should load:
@@ -367,7 +383,7 @@ platform_diff_resource = "iOS" # Non-Android resources
 user_resource = true # Whether to load user-defined resources
 ```
 
-When using a non-Simplified Chinese game client, set `global_resource` to load non-Chinese resources. When using an iOS client, set `platform_diff_resource` to `iOS`. Both are optional - leave empty to not load these resources. These are also auto-set based on your `startup` task's `client_type` and when using `PlayTools` connection. To load user-defined resources, set `user_resource` to `true`, which loads resources from `$MAA_CONFIG_DIR/resource`.
+When using a non-Simplified Chinese game client, set `global_resource` to load non-Chinese resources. When using an iOS client, set `platform_diff_resource` to `iOS`. Both are optional - leave empty to not load these resources. These are also auto-set based on your `startup` task's `client_type`, `PlayTools` connections load `iOS`, and `Win32` connections load `PC`. To load user-defined resources, set `user_resource` to `true`, which loads resources from `$MAA_CONFIG_DIR/resource`.
 
 ### Static options
 

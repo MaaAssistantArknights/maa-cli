@@ -333,6 +333,22 @@ address = "127.0.0.1:7777" # 필요 시 사전 설정된 주소를 재정의할 
 
 - `Waydroid`는 Linux에서 `Waydroid`를 통해 Android 앱을 실행하는 데 사용됩니다。이 경우 MaaCore의 장치 연결에 `adb_path`를 지정해야 합니다。maa-cli는 `waydroid status`를 사용하여 세션이 이미 실행 중인지 감지하고, 필요 시 세션을 시작한 다음 `waydroid adb connect`를 통해 ADB 연결을 설정합니다。자세한 내용은 [Waydroid 지원 문서][waydroid-doc]을 참조하세요。
 
+- `Win32`는 ADB 없이 명일방주 공식 Windows PC 클라이언트 창에 MaaCore를 연결하며 Windows에서만 사용할 수 있습니다.
+
+   `window_title`은 필수이며 표시 중인 최상위 창 제목과 정확히 일치해야 합니다. 동일한 제목의 창이 둘 이상이면 `window_process_id` 또는 정규화된 경로로 비교되는 `window_executable`을 지정해야 합니다. 기본 제어 방식은 `screencap_method = 2`(`FramePool`), `mouse_method = 32`(`SendMessageWithCursorPos`), `keyboard_method = 2`(`SendMessage`)입니다.
+
+   `MaaWin32ControlUnit.dll`이 `MaaCore.dll`과 같은 디렉터리에 있어야 하며 `PC` 플랫폼 리소스는 자동으로 로드됩니다. maa-cli는 PC 클라이언트를 직접 실행하지 않고 이 프리셋에서는 `StartUp.start_game_enabled`를 비활성화하므로, 작업 실행 전에 선택한 클라이언트를 시작해야 합니다.
+
+```toml
+[connection]
+preset = "Win32"
+window_title = "Arknights"
+window_process_id = 1234 # 선택 사항
+window_executable = "C:\\Games\\Arknights.exe" # 선택 사항
+```
+
+작업을 실행하지 않고 창 연결과 스크린샷을 검증하려면 `maa connection test --profile <이름> --screencap --json`을 사용하세요. 성공하면 종료 코드 0과 `{"ok":true,"connection":"Win32","screenshot_bytes":...}`를 출력합니다.
+
 ### 리소스 설정
 
 `[resource]` 관련 필드는 MaaCore가 로드하는 리소스를 지정하는 데 사용됩니다:
@@ -344,7 +360,7 @@ platform_diff_resource = "iOS" # 비 안드로이드 버전의 리소스
 user_resource = true # 사용자 정의 리소스를 로드할지 여부
 ```
 
-비 중국어 게임 클라이언트를 사용할 때, MaaCore는 기본적으로 간체 중국어 리소스를 로드하기 때문에 `global_resource` 필드를 지정하여 비중문 버전의 리소스를 로드해야 합니다. iOS 버전의 게임 클라이언트를 사용할 때는 `platform_diff_resource` 필드를 지정하여 iOS 버전의 리소스를 로드해야 합니다. 이 두 필드는 선택 사항이며, 리소스를 로드할 필요가 없는 경우 두 필드를 비워둘 수 있습니다. 또한, `startup` 작업에서 `client_type` 필드를 지정한 경우 `global_resource`는 해당 클라이언트의 리소스로 설정되며, `PlayTools` 연결을 사용하는 경우 `platform_diff_resource`는 iOS로 설정됩니다. 마지막으로 사용자 정의 리소스를 로드하려는 경우 `user_resource` 필드를 `true`로 설정해야 합니다.
+비 중국어 게임 클라이언트를 사용할 때, MaaCore는 기본적으로 간체 중국어 리소스를 로드하기 때문에 `global_resource` 필드를 지정하여 비중문 버전의 리소스를 로드해야 합니다. iOS 버전의 게임 클라이언트를 사용할 때는 `platform_diff_resource` 필드를 지정하여 iOS 버전의 리소스를 로드해야 합니다. 이 두 필드는 선택 사항이며, 리소스를 로드할 필요가 없는 경우 두 필드를 비워둘 수 있습니다. 또한, `startup` 작업에서 `client_type` 필드를 지정한 경우 `global_resource`는 해당 클라이언트의 리소스로 설정되며, `PlayTools` 연결은 `iOS`, `Win32` 연결은 `PC` 플랫폼 리소스를 자동으로 설정합니다. 마지막으로 사용자 정의 리소스를 로드하려는 경우 `user_resource` 필드를 `true`로 설정해야 합니다.
 
 ### 정적 옵션
 

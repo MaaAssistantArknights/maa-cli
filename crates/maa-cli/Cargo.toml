@@ -44,6 +44,11 @@ ureq = { workspace = true, features = ["json", "platform-verifier"] }
 yaml_serde = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true, features = [
+  "Win32_Foundation",
+  "Win32_System_Threading",
+  "Win32_UI_WindowsAndMessaging",
+] }
 winreg = { workspace = true }
 
 [dev-dependencies]
