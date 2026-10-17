@@ -70,10 +70,10 @@ pub(crate) enum Command {
     SelfC(SelfCommand),
     /// Hot update for resource
     ///
-    /// This command will update hot updateable resource by fetch git repository MaaResource.
+    /// Update MaaResource using Git or the configured MirrorChyan snapshot source.
     /// Note: the basic resource installed with maa-core will not be updated.
     ///
-    /// The remote of can be configured in the config file of maa-cli.
+    /// Configure the resource source and credentials in cli.toml.
     HotUpdate,
     /// Print path of maa directories
     ///

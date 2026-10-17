@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+#[cfg(feature = "git2")]
 use maa_dirs::expand_tilde;
 use serde::Deserialize;
 
@@ -7,19 +8,46 @@ use super::secret::Secret;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Default, Clone)]
+#[serde(try_from = "RawResourceConfig")]
 pub struct Config {
-    /// Automatically update resource every time
+    auto_update: bool,
+    warn_on_update_failure: bool,
+    source: ResourceSource,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawResourceConfig {
     #[serde(default)]
     auto_update: bool,
-    /// Warn on update failure instead of exiting
     #[serde(default)]
     warn_on_update_failure: bool,
-    /// Backend to use for resource update
-    #[serde(default)]
-    backend: GitBackend,
-    /// Remote configuration for resource update
-    #[serde(default)]
-    remote: Remote,
+    backend: Option<GitBackend>,
+    remote: Option<Remote>,
+    source: Option<ResourceSource>,
+}
+
+impl TryFrom<RawResourceConfig> for Config {
+    type Error = &'static str;
+
+    fn try_from(raw: RawResourceConfig) -> Result<Self, Self::Error> {
+        if raw.source.is_some() && (raw.backend.is_some() || raw.remote.is_some()) {
+            return Err(
+                "resource.source cannot be mixed with legacy resource.backend/resource.remote",
+            );
+        }
+        let source = raw.source.unwrap_or_else(|| {
+            ResourceSource::Git(GitConfig {
+                backend: raw.backend.unwrap_or_default(),
+                remote: raw.remote.unwrap_or_default(),
+            })
+        });
+        Ok(Self {
+            auto_update: raw.auto_update,
+            warn_on_update_failure: raw.warn_on_update_failure,
+            source,
+        })
+    }
 }
 
 impl Config {
@@ -31,13 +59,44 @@ impl Config {
         self.warn_on_update_failure
     }
 
-    pub fn backend(&self) -> GitBackend {
-        self.backend
+    pub fn source(&self) -> &ResourceSource {
+        &self.source
     }
+}
 
-    pub fn remote(&self) -> &Remote {
-        &self.remote
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Deserialize, Clone)]
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum ResourceSource {
+    Git(GitConfig),
+    MirrorChyan(MirrorChyanConfig),
+}
+
+impl Default for ResourceSource {
+    fn default() -> Self {
+        Self::Git(GitConfig::default())
     }
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Deserialize, Default, Clone)]
+pub struct GitConfig {
+    #[serde(default)]
+    pub backend: GitBackend,
+    #[serde(flatten)]
+    pub remote: Remote,
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Deserialize, Clone)]
+pub struct MirrorChyanConfig {
+    pub cdk: Secret,
+    #[serde(default = "default_mirror_check_interval")]
+    pub check_interval: u64,
+}
+
+fn default_mirror_check_interval() -> u64 {
+    600
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -166,47 +225,129 @@ impl Remote {
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub mod tests {
     use super::*;
-    #[cfg(feature = "git2")]
     pub fn example_config() -> Config {
         Config {
             auto_update: true,
             warn_on_update_failure: true,
-            backend: GitBackend::Libgit2,
-            remote: Remote {
-                url: String::from("https://github.com/MaaAssistantArknights/MaaResource.git"),
-                branch: Some(String::from("main")),
-                certificate: Some(Certificate::SshKey {
-                    path: PathBuf::from("~/.ssh/id_ed25519"),
-                    passphrase: Secret::Plain(String::from("password")),
-                }),
-            },
+            source: ResourceSource::Git(GitConfig {
+                backend: GitBackend::Git,
+                remote: Remote {
+                    url: String::from("https://github.com/MaaAssistantArknights/MaaResource.git"),
+                    branch: Some(String::from("main")),
+                    certificate: Some(Certificate::SshKey {
+                        path: PathBuf::from("~/.ssh/id_ed25519"),
+                        passphrase: Secret::Plain(String::from("password")),
+                    }),
+                },
+            }),
+        }
+    }
+
+    // Fixture parsing unwraps assert known test inputs, not user configuration.
+    fn git(config: &Config) -> &GitConfig {
+        match config.source() {
+            ResourceSource::Git(git) => git,
+            ResourceSource::MirrorChyan(_) => panic!("expected Git backend"),
         }
     }
 
     #[test]
     fn default() {
-        let config = Config::default();
-        assert_eq!(config, Config {
-            auto_update: false,
-            warn_on_update_failure: false,
-            backend: GitBackend::Git,
-            remote: Remote {
-                url: default_url(),
-                branch: None,
-                certificate: None,
-            }
+        let config: Config = toml::from_str("").unwrap();
+        assert_eq!(config, Config::default());
+        assert!(!config.auto_update());
+        assert!(!config.warn_on_update_failure());
+        assert_eq!(git(&config).backend, GitBackend::Git);
+        assert_eq!(git(&config).remote, Remote::default());
+        assert_eq!(
+            toml::from_str::<Config>("[source]\ntype = 'git'").unwrap(),
+            config
+        );
+    }
+
+    #[test]
+    fn mirrorchyan_source() {
+        let config: Config = toml::from_str("[source]\ntype = 'mirrorchyan'\ncdk = false").unwrap();
+        let ResourceSource::MirrorChyan(mirror) = config.source() else {
+            panic!("expected MirrorChyan source")
+        };
+        assert_eq!(mirror.cdk, Secret::None);
+        assert_eq!(mirror.check_interval, 600);
+        let config: Config = toml::from_str(
+            r#"[source]
+            type = "mirrorchyan"
+            cdk = false
+            check_interval = 0"#,
+        )
+        .unwrap();
+        assert!(
+            matches!(config.source(), ResourceSource::MirrorChyan(mirror) if mirror.check_interval == 0)
+        );
+    }
+
+    #[test]
+    fn legacy_and_new_git_preserve_remote_and_authentication() {
+        let remote = r#"
+            url = "git@example.org:custom/resources.git"
+            branch = "custom"
+            ssh_key = "~/.ssh/test-key"
+            passphrase = "secret"
+        "#;
+        let legacy: Config =
+            toml::from_str(&format!("backend = 'git'\n[remote]\n{remote}")).unwrap();
+        let new: Config = toml::from_str(&format!(
+            "[source]\ntype = 'git'\nbackend = 'git'\n{remote}"
+        ))
+        .unwrap();
+        assert_eq!(new, legacy);
+        assert_eq!(git(&new).remote, Remote {
+            url: "git@example.org:custom/resources.git".into(),
+            branch: Some("custom".into()),
+            certificate: Some(Certificate::SshKey {
+                path: "~/.ssh/test-key".into(),
+                passphrase: Secret::Plain("secret".into()),
+            }),
         });
     }
 
     #[test]
-    fn getter() {
-        let config = Config::default();
-        assert!(!config.auto_update());
-        assert!(!config.warn_on_update_failure());
-        assert_eq!(config.backend(), GitBackend::Git);
-        assert_eq!(config.remote().url(), default_url());
-        assert_eq!(config.remote().branch(), None);
-        assert_eq!(config.remote().certificate(), None);
+    fn source_conflicts_with_explicit_legacy_fields() {
+        for source in ["type = 'git'", "type = 'mirrorchyan'\ncdk = false"] {
+            for legacy in ["backend = 'git'\n", "[remote]\n"] {
+                let error =
+                    toml::from_str::<Config>(&format!("{legacy}[source]\n{source}")).unwrap_err();
+                assert!(error.to_string().contains("cannot be mixed"));
+            }
+        }
+        for source in ["", "type = 'unknown'", "type = 'mirrorchyan'"] {
+            assert!(toml::from_str::<Config>(&format!("[source]\n{source}")).is_err());
+        }
+    }
+
+    #[test]
+    fn shared_options_apply_to_both_sources_and_legacy_format() {
+        for source in [
+            "",
+            "[source]\ntype = 'git'",
+            "[source]\ntype = 'mirrorchyan'\ncdk = false",
+        ] {
+            let config: Config = toml::from_str(&format!(
+                "auto_update = true\nwarn_on_update_failure = true\n{source}"
+            ))
+            .unwrap();
+            assert!(config.auto_update());
+            assert!(config.warn_on_update_failure());
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "git2")]
+    fn legacy_and_new_libgit2_are_identical() {
+        let old: Config = toml::from_str("backend = 'libgit2'\n[remote]\nbranch = 'main'").unwrap();
+        let new: Config =
+            toml::from_str("[source]\ntype = 'git'\nbackend = 'libgit2'\nbranch = 'main'").unwrap();
+        assert_eq!(old, new);
+        assert_eq!(git(&new).backend, GitBackend::Libgit2);
     }
 
     mod serde {
@@ -349,15 +490,19 @@ pub mod tests {
                 &Config {
                     auto_update: true,
                     warn_on_update_failure: true,
-                    backend: GitBackend::Git,
-                    remote: Remote {
-                        url: String::from("git@github.com:MaaAssistantArknights/MaaResource.git"),
-                        branch: Some(String::from("main")),
-                        certificate: Some(Certificate::SshKey {
-                            path: PathBuf::from("~/.ssh/id_ed25519"),
-                            passphrase: Secret::Plain(String::from("password")),
-                        }),
-                    },
+                    source: ResourceSource::Git(GitConfig {
+                        backend: GitBackend::Git,
+                        remote: Remote {
+                            url: String::from(
+                                "git@github.com:MaaAssistantArknights/MaaResource.git",
+                            ),
+                            branch: Some(String::from("main")),
+                            certificate: Some(Certificate::SshKey {
+                                path: PathBuf::from("~/.ssh/id_ed25519"),
+                                passphrase: Secret::Plain(String::from("password")),
+                            }),
+                        },
+                    }),
                 },
                 &[
                     Token::Map { len: Some(4) },
@@ -366,8 +511,10 @@ pub mod tests {
                     Token::Str("warn_on_update_failure"),
                     Token::Bool(true),
                     Token::Str("backend"),
+                    Token::Some,
                     GitBackend::Git.to_token(),
                     Token::Str("remote"),
+                    Token::Some,
                     Token::Map { len: Some(3) },
                     Token::Str("url"),
                     Token::Str("git@github.com:MaaAssistantArknights/MaaResource.git"),

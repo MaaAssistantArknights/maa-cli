@@ -34,10 +34,43 @@
     },
     "resource": {
       "type": "object",
+      "additionalProperties": false,
+      "not": {
+        "anyOf": [
+          { "required": ["source", "backend"] },
+          { "required": ["source", "remote"] }
+        ]
+      },
       "properties": {
         "auto_update": { "type": "boolean" },
         "warn_on_update_failure": { "type": "boolean" },
-        "backend": { "type": "string", "enum": ["git", "libgit2"] },
+        "backend": { "type": "string", "enum": ["git", "libgit2"], "description": "Legacy Git implementation; cannot be combined with source" },
+        "source": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["type"],
+              "properties": {
+                "type": { "const": "git" },
+                "backend": { "type": "string", "enum": ["git", "libgit2"], "default": "git" },
+                "branch": { "type": "string" },
+                "url": { "type": "string" },
+                "use_ssh_agent": { "type": "boolean" },
+                "ssh_key": { "type": "string" },
+                "passphrase": { "$ref": "#/definitions/passphrase" }
+              }
+            },
+            {
+              "type": "object",
+              "required": ["type", "cdk"],
+              "properties": {
+                "type": { "const": "mirrorchyan" },
+                "cdk": { "$ref": "#/definitions/passphrase" },
+                "check_interval": { "type": "integer", "minimum": 0, "default": 600 }
+              }
+            }
+          ]
+        },
         "remote": {
           "type": "object",
           "properties": {
@@ -66,12 +99,16 @@
         { "type": "boolean" },
         {
           "type": "object",
+          "required": ["env"],
+          "additionalProperties": false,
           "properties": {
             "env": { "type": "string" }
           }
         },
         {
           "type": "object",
+          "required": ["cmd"],
+          "additionalProperties": false,
           "properties": {
             "cmd": {
               "type": "array",
