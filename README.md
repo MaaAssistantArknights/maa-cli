@@ -37,6 +37,7 @@
 - [使用](crates/maa-cli/docs/zh-CN/usage.md)
 - [配置](crates/maa-cli/docs/zh-CN/config.md)
 - [常见问题](crates/maa-cli/docs/zh-CN/faq.md)
+- [Agent 技能](skills/maa-cli/SKILL.md)
 
 [maa-home]: https://github.com/MaaAssistantArknights/MaaAssistantArknights/
 
