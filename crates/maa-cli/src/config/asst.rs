@@ -10,6 +10,8 @@ use maa_core::Assistant;
 use maa_types::{InstanceOptionKey, StaticOptionKey, TouchMode};
 use serde::Deserialize;
 
+use super::extras::ExtraConnectionConfig;
+
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Default, Clone)]
 pub struct AsstConfig {
@@ -28,10 +30,18 @@ impl AsstConfig {
         mut instance_options: InstanceOptions,
         behavior: BehaviorConfig,
     ) -> Self {
-        if matches!(connection.preset, Preset::PlayCover) {
-            info!("Detected connection with PlayTools");
-            instance_options.force_playtools();
-            resource.use_platform_diff_resource("iOS");
+        match connection.preset {
+            Preset::PlayCover => {
+                info!("Detected connection with PlayTools");
+                instance_options.force_playtools();
+                resource.use_platform_diff_resource("iOS");
+            }
+            Preset::LinuxGamescope => {
+                info!("Detected connection with Gamescope");
+                instance_options.force_gamescope();
+                resource.use_platform_diff_resource("PC");
+            }
+            _ => {}
         }
 
         Self {
@@ -104,38 +114,44 @@ impl ConnectionConfig {
             .as_deref()
             .map(|s| Cow::Owned(s.to_owned()))
             .unwrap_or_else(|| self.preset.default_adb_path());
+
+        let address = match self.preset {
+            Preset::Waydroid => {
+                if let Some(config_address) = self.address.as_deref() {
+                    warn!(
+                        "Ignoring configured address {config_address}. Using Waydroid runtime-managed address instead."
+                    );
+                }
+                Cow::Borrowed("waydroid")
+            }
+            Preset::LinuxGamescope => {
+                if let Some(config_address) = self.address.as_deref() {
+                    warn!(
+                        "Ignoring configured address {config_address}. Linux gamescope connection don't use it."
+                    );
+                }
+                Cow::Borrowed("gamescope")
+            }
+            _ => self
+                .address
+                .as_deref()
+                .map(Cow::Borrowed)
+                .unwrap_or_else(|| self.preset.default_address(adb_path.as_ref())),
+        };
+
         let config = self
             .config
             .as_deref()
             .unwrap_or_else(|| self.preset.default_config());
 
-        let address = if matches!(self.preset, Preset::Waydroid) {
-            if let Some(config_address) = self.address.as_deref() {
-                warn!(
-                    "Ignoring configured address {config_address}. Using Waydroid runtime-managed address instead."
-                );
-            }
-            debug!(
-                "Waydroid preset: using runtime-managed ADB address; user-configured address will be ignored."
-            );
-            Cow::Borrowed("waydroid")
-        } else {
-            self.address
-                .as_deref()
-                .map(Cow::Borrowed)
-                .unwrap_or_else(|| self.preset.default_address(adb_path.as_ref()))
-        };
-
-        debug!(
-            "Connecting to {address} with config {config} via {}",
-            if matches!(self.preset, Preset::PlayCover) {
-                "PlayTools"
-            } else {
-                adb_path.as_ref()
-            }
-        );
-
         (adb_path, address, config)
+    }
+
+    pub fn get_extra_connection_config(&self) -> Result<Option<ExtraConnectionConfig>> {
+        Ok(match self.preset {
+            Preset::LinuxGamescope => Some(ExtraConnectionConfig::get_for_gamescope()?),
+            _ => None,
+        })
     }
 }
 
@@ -145,6 +161,7 @@ pub enum Preset {
     MuMuPro,
     PlayCover,
     Waydroid,
+    LinuxGamescope,
     Androws,
     #[default]
     Adb,
@@ -174,6 +191,7 @@ impl<'de> Deserialize<'de> for Preset {
                     "ADB" | "Adb" | "adb" => Ok(Preset::Adb),
                     "Waydroid" | "waydroid" => Ok(Preset::Waydroid),
                     "Androws" | "androws" => Ok(Preset::Androws),
+                    "Gamescope" | "gamescope" => Ok(Preset::LinuxGamescope),
                     _ => {
                         warn!("Unknown connection preset: {value}, ignoring");
                         Ok(Preset::Adb)
@@ -192,7 +210,7 @@ impl Preset {
             Preset::MuMuPro => Cow::Borrowed(
                 "/Applications/MuMuPlayer.app/Contents/MacOS/MuMuEmulator.app/Contents/MacOS/tools/adb",
             ),
-            Preset::PlayCover => Cow::Borrowed(""),
+            Preset::PlayCover | Preset::LinuxGamescope => Cow::Borrowed(""),
             Preset::Waydroid | Preset::Adb => Cow::Borrowed("adb"),
             Preset::Androws => {
                 #[cfg(windows)]
@@ -206,10 +224,10 @@ impl Preset {
 
     fn default_address(self, adb_path: &str) -> Cow<'static, str> {
         match self {
+            Preset::Waydroid | Preset::LinuxGamescope => "".into(),
             Preset::MuMuPro => "127.0.0.1:16384".into(),
             Preset::PlayCover => "127.0.0.1:1717".into(),
             Preset::Androws => "127.0.0.1:5555".into(),
-            Preset::Waydroid => "waydroid".into(),
             Preset::Adb => std::process::Command::new(adb_path)
                 .arg("devices")
                 .output()
@@ -226,6 +244,7 @@ impl Preset {
 
     fn default_config(self) -> &'static str {
         match self {
+            Preset::LinuxGamescope => "PC",
             Preset::Waydroid => "Waydroid",
             Preset::Androws => "Androws",
             // May be preset specific in the future
@@ -583,6 +602,22 @@ impl InstanceOptions {
             None => {
                 info!("Connect with PlayTools set touch mode to MacPlayTools automatically");
                 self.touch_mode = Some(TouchMode::MacPlayTools);
+            }
+            _ => {}
+        }
+
+        self
+    }
+
+    fn force_gamescope(&mut self) -> &mut Self {
+        match self.touch_mode {
+            Some(touch_mode) if !matches!(touch_mode, TouchMode::MaaFw) => {
+                warn!("Connect with Gamescope force touch mode to MaaFw");
+                self.touch_mode = Some(TouchMode::MaaFw);
+            }
+            None => {
+                info!("Connect with Gamescope set touch mode to MaaFw automatically");
+                self.touch_mode = Some(TouchMode::MaaFw);
             }
             _ => {}
         }
