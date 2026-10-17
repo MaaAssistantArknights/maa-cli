@@ -173,6 +173,8 @@ pub fn convert(file: &Path, out: Option<&Path>, ft: Option<Filetype>) -> Result<
 
 pub mod import;
 
+pub mod migrate;
+
 pub mod asst;
 
 pub mod cli;
