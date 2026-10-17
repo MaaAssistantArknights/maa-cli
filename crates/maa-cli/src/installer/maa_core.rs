@@ -25,7 +25,39 @@ use crate::{
 
 struct CoreManifest(VersionManifest<core::Details>);
 
-struct CoreAsset<'a>(&'a core::Asset);
+/// GitHub Release 的下载前缀，用于拼接不在 version API 里的资产地址。
+const CORE_RELEASE_DOWNLOAD_BASE: &str =
+    "https://github.com/MaaAssistantArknights/MaaAssistantArknights/releases/download";
+
+/// 单个版本的 core 组件包。
+///
+/// 桌面平台的包在 MAA 的 version API 里有条目（带镜像与尺寸）；Android 组件包只发在
+/// GitHub Release 上，只能按命名规则拼地址，因此这里区分两种情况。
+struct CoreAsset<'a> {
+    /// 清单里列出的资产；按命名规则合成时为 None。
+    listed: Option<&'a core::Asset>,
+    name: String,
+    url: String,
+}
+
+impl<'a> CoreAsset<'a> {
+    fn from_listed(asset: &'a core::Asset) -> Self {
+        Self {
+            listed: Some(asset),
+            name: asset.name.clone(),
+            url: asset.browser_download_url.clone(),
+        }
+    }
+
+    fn synthesized(version: &Version, name: String) -> Self {
+        let url = format!("{CORE_RELEASE_DOWNLOAD_BASE}/v{version}/{name}");
+        Self {
+            listed: None,
+            name,
+            url,
+        }
+    }
+}
 
 impl CoreManifest {
     fn from_reader(file: std::fs::File) -> maa_installer::error::Result<Self> {
@@ -42,12 +74,18 @@ impl CoreManifest {
 
     fn get_asset(&self, os: &str, arch: &str) -> Option<CoreAsset<'_>> {
         let asset_name = asset_name(self.version(), os, arch);
-        self.0
+        if let Some(asset) = self
+            .0
             .details
             .assets
             .iter()
             .find(|asset| asset.name == asset_name)
-            .map(CoreAsset)
+        {
+            return Some(CoreAsset::from_listed(asset));
+        }
+        // Android 组件包只发布在 GitHub Release，version API 的资产列表里没有条目，
+        // 按命名规则拼出地址即可；镜像与尺寸校验这两项在合成资产上不适用。
+        (os == "android").then(|| CoreAsset::synthesized(self.version(), asset_name))
     }
 }
 
@@ -67,14 +105,14 @@ impl Manifest for CoreManifest {
 }
 
 impl Asset for CoreAsset<'_> {
-    type Verifier = SizeVerifier;
+    type Verifier = Option<SizeVerifier>;
 
     fn name(&self) -> &str {
-        &self.0.name
+        &self.name
     }
 
     fn url(&self) -> std::borrow::Cow<'_, str> {
-        std::borrow::Cow::Borrowed(&self.0.browser_download_url)
+        std::borrow::Cow::Borrowed(&self.url)
     }
 
     fn mirror_opts(
@@ -82,17 +120,19 @@ impl Asset for CoreAsset<'_> {
     ) -> Option<
         maa_installer::manifest::MirrorOptions<'_, impl Iterator<Item = std::borrow::Cow<'_, str>>>,
     > {
+        let listed = self.listed?;
         Some(maa_installer::manifest::MirrorOptions::new(
-            self.0
+            listed
                 .mirrors
                 .iter()
                 .map(|m| std::borrow::Cow::Borrowed(m.as_str())),
-            self.0.size / 10,
+            listed.size / 10,
         ))
     }
 
     fn verifier(&self) -> maa_installer::error::Result<Self::Verifier> {
-        Ok(SizeVerifier::new(self.0.size))
+        // 合成资产拿不到官方尺寸，只能不做校验；下载完整性由解包阶段的格式检查兜住。
+        Ok(self.listed.map(|asset| SizeVerifier::new(asset.size)))
     }
 }
 
@@ -120,9 +160,24 @@ fn asset_name(version: &Version, os: &str, arch: &str) -> String {
             "aarch64" => format!("MAA-v{version}-win-arm64.zip"),
             _ => panic!("Unsupported architecture: {arch}"),
         },
+        // Android 组件包用 arm64 / x64 命名，与 Rust 的 aarch64 / x86_64 不同名
+        "android" => match arch {
+            "aarch64" => format!("MAAComponent-v{version}-android-arm64.tar.gz"),
+            "x86_64" => format!("MAAComponent-v{version}-android-x64.tar.gz"),
+            _ => panic!("Unsupported architecture: {arch}"),
+        },
         _ => panic!("Unsupported OS: {os}"),
     }
 }
+
+/// Android 组件包里随附、但命令行侧用不到的库。
+///
+/// - `libMaaAndroidNativeControlUnit.so`：Android 原生控制单元，maa-cli 通过 adb 连接游戏，走不到它
+/// - `libfastdeploy_ppocr.so`：桌面 OCR 后端，Android 用 ncnn 权重（由包内 ncnn overlay 提供）
+const SKIPPED_LIBS: [&str; 2] = [
+    "libMaaAndroidNativeControlUnit.so",
+    "libfastdeploy_ppocr.so",
+];
 
 fn extract_mapper(
     src: &Path,
@@ -131,6 +186,13 @@ fn extract_mapper(
     config: &Components,
 ) -> Option<PathBuf> {
     // debug!("Extracting file: {}", src.display());
+    if src
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| SKIPPED_LIBS.contains(&name))
+    {
+        return None;
+    }
     let mut path_components = src.components();
     for c in path_components.by_ref() {
         match c {
@@ -188,6 +250,15 @@ fn create_and_exec_installer(args: &CommonArgs, current_version: Option<&Version
         installer
     };
 
+    // Android 的 OCR 走 ncnn，而 MAA 分发的 resource 只带 onnx；权重由打包阶段预转好随包分发，
+    // 装完资源后叠加上去，否则识别直接不可用。
+    #[cfg(target_os = "android")]
+    let installer = if components.resource {
+        installer.with_post_install_hook(|| apply_ncnn_overlay(resource_dir))
+    } else {
+        installer
+    };
+
     installer
         .exec(
             maa_dirs::cache().ensure()?,
@@ -195,6 +266,74 @@ fn create_and_exec_installer(args: &CommonArgs, current_version: Option<&Version
         )
         .context("Failed to install MaaCore")?;
 
+    Ok(())
+}
+
+/// 随包分发的 ncnn 权重目录，与 resource 平级。
+#[cfg(any(target_os = "android", test))]
+const NCNN_OVERLAY_DIR: &str = "ncnn-overlay";
+
+/// 把 resource 目录 `version.json` 里的 `last_updated` 当作这份资源的身份戳。
+///
+/// MAA 的 resource 不写版本号，只在 `version.json` 里记活动与 `last_updated`；
+/// ncnn 权重必须与生成它的那份 onnx 同源，所以用这个时间戳做配对依据。
+#[cfg(any(target_os = "android", test))]
+fn read_resource_stamp(dir: &Path) -> std::io::Result<Option<String>> {
+    let path = dir.join("version.json");
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let text = std::fs::read_to_string(path)?;
+    let value: serde_json::Value = serde_json::from_str(&text).map_err(std::io::Error::other)?;
+    Ok(value
+        .get("last_updated")
+        .and_then(|updated| updated.as_str())
+        .map(str::to_owned))
+}
+
+/// 只叠加 ncnn 权重（`<name>.ncnn.param` / `<name>.ncnn.bin`），overlay 里的其余文件（含 `version.json`）不落地。
+#[cfg(any(target_os = "android", test))]
+fn copy_ncnn_weights(src_root: &Path, dst_root: &Path) -> std::io::Result<()> {
+    for entry in std::fs::read_dir(src_root)? {
+        let entry = entry?;
+        let from = entry.path();
+        let to = dst_root.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            std::fs::create_dir_all(&to)?;
+            copy_ncnn_weights(&from, &to)?;
+        } else if entry
+            .file_name()
+            .to_str()
+            .is_some_and(|name| name.contains(".ncnn."))
+        {
+            std::fs::copy(&from, &to)?;
+        }
+    }
+    Ok(())
+}
+
+/// Android 专用：把随包分发的 ncnn OCR 权重叠加到已安装的 resource 上。
+///
+/// 两份资源的 `last_updated` 不一致说明 overlay 与当前 resource 不同源（例如用户刚更新过 core），
+/// 此时跳过并提示，宁可不套权重也不把错配的 ncnn 盖到新的 onnx 上。
+#[cfg(any(target_os = "android", test))]
+fn apply_ncnn_overlay(resource_dir: &Path) -> maa_installer::error::Result<()> {
+    let overlay_dir = resource_dir.with_file_name(NCNN_OVERLAY_DIR);
+    if !overlay_dir.is_dir() {
+        return Ok(());
+    }
+
+    let overlay_stamp = read_resource_stamp(&overlay_dir)?;
+    let resource_stamp = read_resource_stamp(resource_dir)?;
+    if overlay_stamp.is_none() || overlay_stamp != resource_stamp {
+        eprintln!(
+            "Skip ncnn overlay: resource mismatch (overlay {overlay_stamp:?}, installed {resource_stamp:?}).\n\
+             OCR needs matching ncnn weights; reinstall the matching maa-cli package to restore it."
+        );
+        return Ok(());
+    }
+
+    copy_ncnn_weights(&overlay_dir, resource_dir)?;
     Ok(())
 }
 
@@ -218,6 +357,15 @@ pub fn update(args: &CommonArgs) -> Result<()> {
     // Check if any component is specified
     if !(components.library || components.resource) {
         bail!("No component specified, aborting");
+    }
+    // Android 的 OCR 依赖随包发布的 ncnn 权重，更新 resource 会让权重与新的 onnx 脱配，
+    // 因此只更新 core 时要显式加 --no-resource。
+    #[cfg(target_os = "android")]
+    if components.resource {
+        eprintln!(
+            "Warning: updating resource replaces the bundled ncnn OCR weights; \
+             pass --no-resource to update MaaCore only."
+        );
     }
     // Check if MaaCore is installed and installed by maa
     let lib_dir = maa_dirs::library();
@@ -277,6 +425,65 @@ mod tests {
             extract_mapper(Path::new("misc"), lib_dir, resource_dir, &config),
             None
         );
+
+        // Android 组件包里用不到的库不能落进 lib
+        for skipped in SKIPPED_LIBS {
+            assert_eq!(
+                extract_mapper(Path::new(skipped), lib_dir, resource_dir, &config),
+                None,
+                "{skipped} should be skipped"
+            );
+        }
+    }
+
+    #[test]
+    fn test_apply_ncnn_overlay() {
+        let root = tempfile::tempdir().unwrap();
+        let resource_dir = root.path().join("resource");
+        let overlay_dir = root.path().join(NCNN_OVERLAY_DIR);
+        let stamp = r#"{"last_updated": "2026-10-16 11:38:15.000"}"#;
+
+        std::fs::create_dir_all(resource_dir.join("ocr/det")).unwrap();
+        std::fs::write(resource_dir.join("version.json"), stamp).unwrap();
+        std::fs::create_dir_all(overlay_dir.join("ocr/det")).unwrap();
+        std::fs::write(overlay_dir.join("version.json"), stamp).unwrap();
+        std::fs::write(overlay_dir.join("ocr/det/det.ncnn.param"), b"param").unwrap();
+        std::fs::write(overlay_dir.join("ocr/det/det.ncnn.bin"), b"bin").unwrap();
+
+        apply_ncnn_overlay(&resource_dir).unwrap();
+
+        assert!(resource_dir.join("ocr/det/det.ncnn.param").is_file());
+        assert!(resource_dir.join("ocr/det/det.ncnn.bin").is_file());
+        // 只有权重落地，overlay 自身的 version.json 不能混进 resource
+        assert_eq!(
+            std::fs::read_to_string(resource_dir.join("version.json")).unwrap(),
+            stamp
+        );
+    }
+
+    #[test]
+    fn test_apply_ncnn_overlay_skips_mismatched_resource() {
+        let root = tempfile::tempdir().unwrap();
+        let resource_dir = root.path().join("resource");
+        let overlay_dir = root.path().join(NCNN_OVERLAY_DIR);
+
+        std::fs::create_dir_all(&resource_dir).unwrap();
+        std::fs::write(
+            resource_dir.join("version.json"),
+            r#"{"last_updated": "2026-10-17 00:00:00.000"}"#,
+        )
+        .unwrap();
+        std::fs::create_dir_all(&overlay_dir).unwrap();
+        std::fs::write(
+            overlay_dir.join("version.json"),
+            r#"{"last_updated": "2026-10-16 11:38:15.000"}"#,
+        )
+        .unwrap();
+        std::fs::write(overlay_dir.join("det.ncnn.param"), b"param").unwrap();
+
+        apply_ncnn_overlay(&resource_dir).unwrap();
+
+        assert!(!resource_dir.join("det.ncnn.param").exists());
     }
 
     mod asset_name_tests {
@@ -333,6 +540,26 @@ mod tests {
         fn test_windows_unsupported_arch() {
             let version = Version::new(1, 2, 3);
             asset_name(&version, "windows", "i686");
+        }
+
+        #[test]
+        fn test_android() {
+            let version = Version::new(1, 2, 3);
+            assert_eq!(
+                asset_name(&version, "android", "aarch64"),
+                "MAAComponent-v1.2.3-android-arm64.tar.gz"
+            );
+            assert_eq!(
+                asset_name(&version, "android", "x86_64"),
+                "MAAComponent-v1.2.3-android-x64.tar.gz"
+            );
+        }
+
+        #[test]
+        #[should_panic(expected = "Unsupported architecture")]
+        fn test_android_unsupported_arch() {
+            let version = Version::new(1, 2, 3);
+            asset_name(&version, "android", "armv7");
         }
 
         #[test]

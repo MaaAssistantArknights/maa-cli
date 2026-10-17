@@ -254,19 +254,15 @@ jobs:
           test -n "$(find core/resource -name 'rec.ncnn.param' | head -1)"
           echo "det / rec 权重均已生成"
 
-      - name: Install patchelf
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq patchelf
-          patchelf --version
-
       - name: Assemble package
         env:
           VERSION: ${{ needs.meta.outputs.cli_version }}
         run: |
           set -euo pipefail
 
-          mkdir -p stage/bin stage/lib stage/share/maa
+          # 包里只放 CLI 与 Android 专用的 ncnn OCR 权重。MaaCore 由用户在运行时用
+          # `maa install` / `maa update` 获取，core 才能跟上上游发版，不必等 maa-cli 重新打包。
+          mkdir -p stage/bin stage/share/maa/ncnn-overlay
 
           tar -xf "cli/${{ matrix.target }}.tar" -C stage/bin
           test -f stage/bin/maa
@@ -276,42 +272,28 @@ jobs:
           chmod +x stage/maa-android-connect.sh
           bash -n stage/maa-android-connect.sh
 
-          echo "=== 官方组件包内容 ==="
-          find core -type f -name '*.so*' | sort
+          test -d core/resource
+          test -f core/resource/version.json
 
-          for so in $(find core -type f -name '*.so*' \
-                      ! -name 'libMaaAndroidNativeControlUnit.so' \
-                      ! -name 'libfastdeploy_ppocr.so'); do
-            cp "$so" stage/lib/
-          done
+          echo "=== 收集 ncnn 权重 ==="
+          while IFS= read -r -d '' weight; do
+            rel="${weight#core/resource/}"
+            mkdir -p "stage/share/maa/ncnn-overlay/$(dirname "$rel")"
+            cp "$weight" "stage/share/maa/ncnn-overlay/$rel"
+          done < <(find core/resource \( -name '*.ncnn.param' -o -name '*.ncnn.bin' \) -print0)
 
-          if [ -d core/resource ]; then
-            cp -r core/resource stage/share/maa/
-            echo "resource 条目数: $(find stage/share/maa/resource -type f | wc -l)"
-          else
-            echo "::error::官方组件包内未找到 resource 目录"
+          # 与权重同源的资源身份戳，安装时用它判断 overlay 是否还匹配当前 resource
+          cp core/resource/version.json stage/share/maa/ncnn-overlay/version.json
+
+          weight_count="$(find stage/share/maa/ncnn-overlay -name '*.ncnn.param' | wc -l)"
+          echo "ncnn 权重条目: $weight_count"
+          test "$weight_count" -gt 0
+          test -f stage/share/maa/ncnn-overlay/version.json
+
+          if find stage -name 'libMaaCore.so' | grep -q .; then
+            echo "::error::包里不应包含 MaaCore 二进制，它应由 maa install 在运行时安装"
             exit 1
           fi
-
-          test -f stage/lib/libMaaCore.so
-          test -f stage/share/maa/resource/version.json
-
-          for so in stage/lib/*.so; do
-            patchelf --set-rpath '$ORIGIN' "$so"
-          done
-          patchelf --set-rpath '$ORIGIN/../lib' stage/bin/maa
-
-          echo "=== RPATH 校验 ==="
-          patchelf --print-rpath stage/lib/libMaaCore.so
-          patchelf --print-rpath stage/bin/maa
-          case "$(patchelf --print-rpath stage/lib/libMaaCore.so)" in
-            *'$ORIGIN'*) echo "lib 的 RPATH 正确" ;;
-            *) echo "::error::libMaaCore.so 的 RPATH 未设置成功"; exit 1 ;;
-          esac
-          case "$(patchelf --print-rpath stage/bin/maa)" in
-            *'$ORIGIN/../lib'*) echo "maa 的 RPATH 正确" ;;
-            *) echo "::error::bin/maa 的 RPATH 未设置成功"; exit 1 ;;
-          esac
 
           archive="maa_cli-v${VERSION}-${{ matrix.target }}.tar.gz"
           tar czf "$archive" -C stage .

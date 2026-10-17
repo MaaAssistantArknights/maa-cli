@@ -83,19 +83,22 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/MaaAssistantArknights/
 
 ## Android (Termux)
 
-Android 用户可以在 [Termux](https://termux.dev/) 中使用预编译的包。包内包含交叉编译的 maa-cli、官方 Android 版 MaaCore 及资源。下载对应架构（`aarch64-linux-android` 或 `x86_64-linux-android`）的压缩包解压后，按以下步骤安装：
+Android 用户可以在 [Termux](https://termux.dev/) 中使用预编译的包。包内只包含交叉编译的 maa-cli、连接脚本和 Android 专用的 ncnn OCR 权重；MaaCore 与资源在安装后用 `maa install` 从官方 Release 获取，因此 core 的发版不必等 maa-cli 重新打包。下载对应架构（`aarch64-linux-android` 或 `x86_64-linux-android`）的压缩包解压后，按以下步骤安装：
 
 ```bash
 # 依赖：adb，MaaCore 通过它连接游戏
 pkg install -y android-tools
 
-# 解压到 maa-cli 的标准位置
-mkdir -p ~/.local/share/maa/lib ~/.local/bin
-cp bin/maa ~/.local/bin/ && chmod +x ~/.local/bin/maa
-cp lib/*.so ~/.local/share/maa/lib/
-cp -r share/maa/resource ~/.local/share/maa/
+# maa-cli 在 Android 上走不通系统的目录约定，用环境变量指定数据目录
+echo 'export MAA_DATA_DIR=$HOME/.local/share' >> ~/.bashrc
+. ~/.bashrc
 
-maa version
+mkdir -p ~/.local/bin "$MAA_DATA_DIR"
+cp bin/maa ~/.local/bin/ && chmod +x ~/.local/bin/maa
+cp -r share/maa/ncnn-overlay "$MAA_DATA_DIR"/
+
+# 安装 MaaCore 与资源；装完会把包内的 ncnn OCR 权重叠加进资源目录
+maa install
 ```
 
 如果 `~/.local/bin` 不在 `PATH` 中：
@@ -104,9 +107,15 @@ maa version
 echo 'export PATH=$HOME/.local/bin:$PATH' >> ~/.bashrc && . ~/.bashrc
 ```
 
-::: warning
+::: tip 更新 MaaCore
 
-不要设置 `LD_LIBRARY_PATH`。包内的库都已设好 `RPATH`（`lib` 下为 `$ORIGIN`，`bin/maa` 为 `$ORIGIN/../lib`），maa-cli 能自行找到同目录的 MaaCore 及其依赖。把 `LD_LIBRARY_PATH` 指向包的 `lib` 目录会让该变量传递给子进程，导致 MaaCore 调用的 `adb` 误加载包内的 `libc++_shared.so`（NDK 版），报 `CANNOT LINK EXECUTABLE "adb": cannot locate symbol`，表现为连接失败。
+Android 上更新 core 时加 `--no-resource`，只换 core 不动资源：
+
+```bash
+maa update --no-resource
+```
+
+包内的 ncnn 权重是数据的预处理产物，无法在设备上生成，只与打包时那份资源同源。更新资源会让权重与新的 onnx 脱配，届时 maa-cli 检测到版本戳不一致会跳过叠加并给出提示，OCR 随之不可用，需要等带新权重的 maa-cli 包。确实要更新资源时直接跑 `maa update`。
 
 :::
 
@@ -139,12 +148,6 @@ adb connect 127.0.0.1:<调试端口>
 su -c 'setprop service.adb.tcp.port 5555; setprop ctl.restart adbd'
 adb connect 127.0.0.1:5555
 ```
-
-::: warning
-
-包内已包含转换后的 ncnn 格式 OCR 模型，而官方分发的资源只含 onnx 格式，在 Android 上无法加载。因此不要在 Android 上执行 `maa install` 或 `maa update` 更新 MaaCore 及资源，否则会覆盖包内的资源导致 OCR 失败。
-
-:::
 
 ## 编译安装
 
