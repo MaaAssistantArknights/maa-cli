@@ -448,6 +448,14 @@ passphrase = "password" # Passphrase for SSH key
 # passphrase = { env = "MAA_SSH_PASSPHRASE" }
 # 3. Use a command output (useful with password managers)
 # passphrase = { cmd = ["pass", "show", "ssh/id_ed25519"] }
+
+# Activity and API resource file hot update configurations
+[hot_update]
+auto_update = true # Whether to update these files before running tasks
+# API URL for activity and hot update resource files
+api_url = "https://api.maa.plus/MaaAssistantArknights/api"
+# Cache lifetime in seconds; 0 means always download
+check_interval = 600
 ```
 
 **NOTE**:

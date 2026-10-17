@@ -437,6 +437,14 @@ passphrase = "password"       # ssh 密钥的密码
 # ssh-agent 会将你的密钥保存在内存中，这样你就不需要每次输入密码
 # 注意，你需要确保 ssh-agent 已经启动并且已经添加了你的密钥，同时 SSH_AUTH_SOCK 环境变量已经设置
 # use_ssh_agent = true # 使用 ssh-agent 进行身份验证，如果设置为 true，将忽略 ssh_key 和 passphrase 字段
+
+# 活动数据和 API 资源文件热更新相关配置
+[hot_update]
+auto_update = true # 是否在运行任务前更新这些文件
+# 活动数据和热更新资源文件的 API 地址
+api_url = "https://api.maa.plus/MaaAssistantArknights/api"
+# 缓存有效期，单位为秒；设置为 0 表示每次都下载
+check_interval = 600
 ```
 
 **注意事项**：
