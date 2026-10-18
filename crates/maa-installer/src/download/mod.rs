@@ -16,6 +16,7 @@ use crate::{
 
 pub struct DownloadOptions<'a, I: Iterator<Item = Cow<'a, str>>> {
     url: Cow<'a, str>,
+    display_url: Option<Cow<'a, str>>,
     test_duration: u64,
     mirror_opts: Option<MirrorOptions<'a, I>>,
 }
@@ -28,9 +29,16 @@ impl<'a, I: Iterator<Item = Cow<'a, str>>> DownloadOptions<'a, I> {
     ) -> Self {
         Self {
             url,
+            display_url: None,
             test_duration,
             mirror_opts,
         }
+    }
+
+    /// Use a label instead of displaying a potentially credential-bearing URL.
+    pub fn with_display_url(mut self, label: impl Into<Cow<'a, str>>) -> Self {
+        self.display_url = Some(label.into());
+        self
     }
 }
 
@@ -71,7 +79,8 @@ pub fn download<'a, V: Verifier>(
         }
     };
 
-    download_main_ui.set_message(format!("Downloading: {chosen_url}"));
+    let display_url = opts.display_url.as_deref().unwrap_or(chosen_url.as_ref());
+    download_main_ui.set_message(format!("Downloading: {display_url}"));
 
     let download_progress_ui = style.init_bar();
     ui.add(download_progress_ui.clone());

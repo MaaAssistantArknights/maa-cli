@@ -156,7 +156,6 @@ mod tests {
             ],
         );
 
-        #[cfg(feature = "git2")]
         assert_de_tokens(
             &CLIConfig {
                 resource: resource::tests::example_config(),
@@ -171,8 +170,10 @@ mod tests {
                 Token::Str("warn_on_update_failure"),
                 Token::Bool(true),
                 Token::Str("backend"),
-                GitBackend::Libgit2.to_token(),
+                Token::Some,
+                GitBackend::Git.to_token(),
                 Token::Str("remote"),
+                Token::Some,
                 Token::Map { len: Some(5) },
                 Token::Str("branch"),
                 Token::Some,
@@ -192,7 +193,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "git2")]
     fn deserialize_example() {
         let config: CLIConfig =
             toml::from_str(&std::fs::read_to_string("./config_examples/cli.toml").unwrap())
