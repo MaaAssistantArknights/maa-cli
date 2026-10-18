@@ -11,7 +11,14 @@ use x_lib::{
 
 use crate::{CoverageMode, TestOptions};
 
-const LLVM_COV_ARGS: &[&str] = &["+nightly", "llvm-cov"];
+/// Coverage runs on nightly unless `MAA_LLVM_COV_NIGHTLY=false`, e.g. in the Nix dev shell.
+fn llvm_cov_args(nightly: Option<OsString>) -> &'static [&'static str] {
+    if nightly.is_some_and(|value| value == "false") {
+        &["llvm-cov"]
+    } else {
+        &["+nightly", "llvm-cov"]
+    }
+}
 
 /// Run tests with optional core installation and coverage.
 pub fn run_tests(opts: TestOptions) -> Result<()> {
@@ -35,6 +42,7 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
     });
 
     let package_flags = opts.package_flags();
+    let llvm_cov_args = llvm_cov_args(env::var_os("MAA_LLVM_COV_NIGHTLY"));
 
     if env::var_os("CI").is_some() {
         Group::new("Update Stable Toolchain")
@@ -54,7 +62,7 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
         Group::new("Install MaaCore").run(|| {
             let mut cmd = cargo();
             if coverage.coverage_run() {
-                cmd.args(LLVM_COV_ARGS);
+                cmd.args(llvm_cov_args);
                 cmd.arg("--no-report");
             }
             cmd.args(["run", "--package", "maa-cli", "--"]);
@@ -110,7 +118,7 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
     Group::new("Tests").run(|| {
         let mut cmd = cargo();
         if coverage.coverage_test() {
-            cmd.args(LLVM_COV_ARGS);
+            cmd.args(llvm_cov_args);
             cmd.arg("--no-report");
         }
         cmd.args(["test", "--locked", "--no-fail-fast"]);
@@ -130,7 +138,7 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
     if coverage.report() {
         Group::new("Coverage").run(|| {
             cargo()
-                .args(LLVM_COV_ARGS)
+                .args(llvm_cov_args)
                 .args(["report", "--codecov", "--output-path", "codecov.json"])
                 .run()
         })?;
@@ -167,4 +175,16 @@ fn join_runtime_library_path(core_dir: &Path, current: Option<OsString>) -> Resu
 
     let joined = env::join_paths(paths).context("Failed to join runtime library path")?;
     Ok(joined.to_string_lossy().into_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn llvm_cov_uses_nightly_unless_disabled() {
+        assert_eq!(llvm_cov_args(None), ["+nightly", "llvm-cov"]);
+        assert_eq!(llvm_cov_args(Some("true".into())), ["+nightly", "llvm-cov"]);
+        assert_eq!(llvm_cov_args(Some("false".into())), ["llvm-cov"]);
+    }
 }
