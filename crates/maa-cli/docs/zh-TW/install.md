@@ -69,16 +69,14 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/MaaAssistantArknights/
 - Tier 2：每个 PR 都会构建并测试，但不运行依赖 MaaCore 的测试；
 - Tier 3：仅在发布时构建，不保证测试通过。
 
-| 平台                | Target                      | 等级   |
-| ------------------- | --------------------------- | ------ |
-| Linux x86_64        | `x86_64-unknown-linux-gnu`  | Tier 1 |
-| Linux aarch64       | `aarch64-unknown-linux-gnu` | Tier 1 |
-| macOS Apple Silicon | `aarch64-apple-darwin`      | Tier 1 |
-| Windows x86_64      | `x86_64-pc-windows-msvc`    | Tier 1 |
-| Windows ARM64       | `aarch64-pc-windows-msvc`   | Tier 2 |
-| macOS Intel         | `x86_64-apple-darwin`       | Tier 3 |
-
-自 0.8 起，官方 Linux 預編譯套件統一在 Ubuntu 24.04 上建置和測試，不再保證相容使用較舊 glibc 的發行版。
+| 平台                         | Target                      | 等级   |
+| ---------------------------- | --------------------------- | ------ |
+| Linux x86_64 (glibc ≥ 2.39)  | `x86_64-unknown-linux-gnu`  | Tier 1 |
+| Linux aarch64 (glibc ≥ 2.39) | `aarch64-unknown-linux-gnu` | Tier 1 |
+| macOS Apple Silicon          | `aarch64-apple-darwin`      | Tier 1 |
+| Windows x86_64               | `x86_64-pc-windows-msvc`    | Tier 1 |
+| Windows ARM64                | `aarch64-pc-windows-msvc`   | Tier 2 |
+| macOS Intel                  | `x86_64-apple-darwin`       | Tier 3 |
 
 ## 编译安装
 

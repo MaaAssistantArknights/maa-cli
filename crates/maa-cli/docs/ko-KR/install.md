@@ -69,16 +69,14 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/MaaAssistantArknights/
 - Tier 2: 모든 PR에서 빌드 및 테스트되지만, MaaCore가 필요한 테스트는 실행하지 않습니다;
 - Tier 3: 릴리스 시에만 빌드되며, 테스트 통과를 보장하지 않습니다.
 
-| 플랫폼              | Target                      | 등급   |
-| ------------------- | --------------------------- | ------ |
-| Linux x86_64        | `x86_64-unknown-linux-gnu`  | Tier 1 |
-| Linux aarch64       | `aarch64-unknown-linux-gnu` | Tier 1 |
-| macOS Apple Silicon | `aarch64-apple-darwin`      | Tier 1 |
-| Windows x86_64      | `x86_64-pc-windows-msvc`    | Tier 1 |
-| Windows ARM64       | `aarch64-pc-windows-msvc`   | Tier 2 |
-| macOS Intel         | `x86_64-apple-darwin`       | Tier 3 |
-
-0.8부터 공식 Linux 사전 컴파일 바이너리는 Ubuntu 24.04에서 빌드 및 테스트되며, 이전 glibc 버전을 사용하는 배포판과의 호환성은 보장하지 않습니다.
+| 플랫폼                       | Target                      | 등급   |
+| ---------------------------- | --------------------------- | ------ |
+| Linux x86_64 (glibc ≥ 2.39)  | `x86_64-unknown-linux-gnu`  | Tier 1 |
+| Linux aarch64 (glibc ≥ 2.39) | `aarch64-unknown-linux-gnu` | Tier 1 |
+| macOS Apple Silicon          | `aarch64-apple-darwin`      | Tier 1 |
+| Windows x86_64               | `x86_64-pc-windows-msvc`    | Tier 1 |
+| Windows ARM64                | `aarch64-pc-windows-msvc`   | Tier 2 |
+| macOS Intel                  | `x86_64-apple-darwin`       | Tier 3 |
 
 ## 컴파일 설치
 
