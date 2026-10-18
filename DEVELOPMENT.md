@@ -39,7 +39,7 @@
 
 ### Nix（可选）
 
-仓库提供了 `flake.nix`，`nix develop` 会进入包含 rustup、cargo-deny、cargo-llvm-cov、typos、markdownlint-cli2 以及 OpenSSL 的开发环境。Rust 工具链仍由 rustup 管理，因此 `cargo +nightly fmt` 等命令与 CI 保持一致。已有 Rust 环境时，也可以用 `nix profile add .` 只安装这几个工具。
+仓库提供了 `flake.nix`，`nix develop` 会进入不依赖 rustup 的开发环境，包含 stable Rust（含 clippy 和 llvm-tools）、nightly rustfmt、cargo-deny、cargo-llvm-cov、typos、markdownlint-cli2 以及 OpenSSL。环境中没有 `+nightly` 工具链，格式化直接运行 `cargo fmt` 即可（会使用 nightly rustfmt）；环境变量 `MAA_LLVM_COV_NIGHTLY` 被设为 `false`，`cargo x test --coverage` 因此在 stable 上运行覆盖率。已有 Rust 环境时，也可以用 `nix profile add .` 只安装 cargo-deny 等工具。
 
 ### 构建项目
 
