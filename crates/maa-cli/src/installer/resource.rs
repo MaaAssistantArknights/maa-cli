@@ -58,6 +58,14 @@ pub fn update(is_auto: bool) -> Result<()> {
 
             #[cfg(not(feature = "git2"))]
             {
+                // Android 上通常没有 git，而资源已随 core 组件一起安装；仓库更新属于可选增强，
+                // 这里跳过即可，不必让整条 install/update 以失败告终。
+                #[cfg(target_os = "android")]
+                {
+                    warn!("git is unavailable; skipping the resource repository update");
+                    return Ok(());
+                }
+                #[cfg(not(target_os = "android"))]
                 bail!("Failed to execute git, please check your `git` installation");
             }
         }

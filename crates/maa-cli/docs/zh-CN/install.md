@@ -98,6 +98,74 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/MaaAssistantArknights/
 | Windows ARM64       | `aarch64-pc-windows-msvc`   | Tier 2 |
 | macOS Intel         | `x86_64-apple-darwin`       | Tier 3 |
 
+## Android (Termux)
+
+Android 用户可以在 [Termux](https://termux.dev/) 中使用预编译的包。包内只包含交叉编译的 maa-cli、连接脚本和 Android 专用的 ncnn OCR 权重；MaaCore 与资源在安装后用 `maa install` 从官方 Release 获取，因此 core 的发版不必等 maa-cli 重新打包。下载对应架构（`aarch64-linux-android` 或 `x86_64-linux-android`）的压缩包解压后，按以下步骤安装：
+
+```bash
+# 依赖：adb，MaaCore 通过它连接游戏
+pkg install -y android-tools
+
+# maa-cli 在 Android 上走不通系统的目录约定，用环境变量指定数据目录
+echo 'export MAA_DATA_DIR=$HOME/.local/share' >> ~/.bashrc
+. ~/.bashrc
+
+mkdir -p ~/.local/bin "$MAA_DATA_DIR"
+cp bin/maa ~/.local/bin/ && chmod +x ~/.local/bin/maa
+cp -r share/maa/ncnn-overlay "$MAA_DATA_DIR"/
+
+# 安装 MaaCore 与资源；装完会把包内的 ncnn OCR 权重叠加进资源目录
+maa install
+```
+
+如果 `~/.local/bin` 不在 `PATH` 中：
+
+```bash
+echo 'export PATH=$HOME/.local/bin:$PATH' >> ~/.bashrc && . ~/.bashrc
+```
+
+::: tip 更新 MaaCore
+
+Android 上更新 core 时加 `--no-resource`，只换 core 不动资源：
+
+```bash
+maa update --no-resource
+```
+
+包内的 ncnn 权重是数据的预处理产物，无法在设备上生成，只与打包时那份资源同源。更新资源会让权重与新的 onnx 脱配，届时 maa-cli 检测到版本戳不一致会跳过叠加并给出提示，OCR 随之不可用，需要等带新权重的 maa-cli 包。确实要更新资源时直接跑 `maa update`。
+
+:::
+
+### 在 Android 上连接游戏
+
+Termux 无法使用 Android 原生控制，只能通过 adb 连接游戏，原因见[常见问题](faq.md)。
+
+包内附带的 `maa-android-connect.sh` 会按成功率从高到低依次尝试 mDNS 发现、root 设固定端口和扫描常见端口：
+
+```bash
+./maa-android-connect.sh
+```
+
+也可以只尝试其中一种方式：
+
+```bash
+./maa-android-connect.sh --root      # 只试 root 方式
+./maa-android-connect.sh --mdns      # 只试 mDNS
+./maa-android-connect.sh --verbose   # 查看详细过程
+```
+
+全部失败时脚本会提示查看包内 `README.md` 中的手动步骤，其内容为：
+
+```bash
+# 无 root：使用系统「无线调试」（需要配对码）
+adb pair 127.0.0.1:<配对端口>
+adb connect 127.0.0.1:<调试端口>
+
+# 有 root：直接设置固定端口，无需配对
+su -c 'setprop service.adb.tcp.port 5555; setprop ctl.restart adbd'
+adb connect 127.0.0.1:5555
+```
+
 ## 编译安装
 
 Rust 开发者可以通过 `cargo` 自行编译安装 maa-cli：

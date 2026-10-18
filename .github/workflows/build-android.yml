@@ -1,0 +1,344 @@
+name: Build Android
+
+
+on:
+  workflow_dispatch:
+    inputs:
+      maa_version:
+        description: MAACore/MAAComponent 版本（如 v6.18.0），留空则取最新正式版
+        required: false
+        default: ""
+      maa_cli_version:
+        description: 覆盖 maa-cli 版本号（写入二进制与包名），留空则用 Cargo.toml 的版本
+        required: false
+        default: ""
+  schedule:
+    - cron: "0 4 * * 1"
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+
+jobs:
+  meta:
+    name: Meta
+    runs-on: ubuntu-latest
+    outputs:
+      maa_version: ${{ steps.resolve.outputs.maa_version }}
+      cli_version: ${{ steps.resolve.outputs.cli_version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Resolve versions
+        id: resolve
+        env:
+          INPUT_MAA: ${{ inputs.maa_version }}
+          INPUT_CLI: ${{ inputs.maa_cli_version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          maa_version="$INPUT_MAA"
+          if [ -z "$maa_version" ]; then
+            maa_version="$(gh api \
+              repos/MaaAssistantArknights/MaaAssistantArknights/releases/latest \
+              --jq .tag_name)"
+            echo "未指定 MAA 版本，取最新正式版：$maa_version"
+          fi
+          case "$maa_version" in
+            v*) ;;
+            *) maa_version="v$maa_version" ;;
+          esac
+
+          available="$(gh api \
+            "repos/MaaAssistantArknights/MaaAssistantArknights/releases/tags/$maa_version" \
+            --jq '.assets[].name' | grep -c 'android' || true)"
+          if [ "$available" -eq 0 ]; then
+            echo "::error::$maa_version 没有 Android 组件包（MAAComponent-*-android-*.tar.gz）"
+            echo "该版本可能早于 native android 支持（见 MAA PR #16179），请换一个版本。"
+            exit 1
+          fi
+          echo "确认 $maa_version 有 $available 个 android 资产"
+
+          cli_version="$INPUT_CLI"
+          if [ -z "$cli_version" ]; then
+            cli_version="$(grep -m1 '^version' crates/maa-cli/Cargo.toml \
+              | sed -E 's/.*"(.*)".*/\1/')"
+          fi
+          cli_version="${cli_version#v}"
+
+          echo "maa_version=$maa_version" >> "$GITHUB_OUTPUT"
+          echo "cli_version=$cli_version" >> "$GITHUB_OUTPUT"
+          echo "MAAComponent 版本: $maa_version / maa-cli 版本: $cli_version"
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install shellcheck
+        run: |
+          shellcheck --version || { sudo apt-get update -qq && sudo apt-get install -y shellcheck; }
+
+      - name: Shellcheck
+        run: |
+          shellcheck --version
+          shellcheck -s bash android/maa-android-connect.sh
+
+      - name: Actionlint
+        run: |
+          bash <(curl -sSf https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color
+
+  build-cli:
+    name: Build maa-cli (${{ matrix.abi }})
+    needs: [meta, lint]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - abi: arm64
+            target: aarch64-linux-android
+            clang: aarch64-linux-android24-clang
+          - abi: x64
+            target: x86_64-linux-android
+            clang: x86_64-linux-android24-clang
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Rust target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Setup Android NDK
+        id: setup-ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r29
+          add-to-path: false
+
+      - name: Configure cross compiler
+        env:
+          NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          set -euo pipefail
+          tool="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          sysroot="$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
+          upper="$(echo "${{ matrix.target }}" | tr 'a-z-' 'A-Z_')"
+          under="$(echo "${{ matrix.target }}" | tr '-' '_')"
+
+          {
+            echo "CARGO_TARGET_${upper}_LINKER=$tool/clang"
+            echo "CARGO_TARGET_${upper}_RUSTFLAGS=-Clink-arg=--target=${{ matrix.target }}24 -Clink-arg=--sysroot=$sysroot"
+            echo "CC_${under}=$tool/${{ matrix.clang }}"
+            echo "AR_${under}=$tool/llvm-ar"
+            echo "RANLIB_${under}=$tool/llvm-ranlib"
+          } >> "$GITHUB_ENV"
+
+      - name: Setup Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: android-${{ matrix.abi }}
+
+      - name: Build
+        env:
+          MAA_VERSION: ${{ needs.meta.outputs.cli_version }}
+        run: |
+          set -euo pipefail
+          cargo build --release --locked \
+            --target ${{ matrix.target }} \
+            --package maa-cli \
+            --no-default-features --features core_installer
+
+          binary="target/${{ matrix.target }}/release/maa"
+          test -f "$binary"
+
+          file "$binary"
+          file "$binary" | grep -qE "$( [ '${{ matrix.abi }}' = 'arm64' ] && echo aarch64 || echo 'x86-64' )"
+
+          if ! grep -aqF "$MAA_VERSION" "$binary"; then
+            echo "::error::二进制中未找到版本号 $MAA_VERSION，MAA_VERSION 可能未生效"
+            exit 1
+          fi
+          echo "版本号 $MAA_VERSION 已嵌入产物"
+
+          tar -cf "${{ matrix.target }}.tar" -C "$(dirname "$binary")" maa
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: maa_cli-${{ matrix.target }}
+          path: ${{ matrix.target }}.tar
+          retention-days: 1
+          if-no-files-found: error
+
+  package:
+    name: Package (${{ matrix.abi }})
+    needs: [meta, build-cli]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - abi: arm64
+            target: aarch64-linux-android
+          - abi: x64
+            target: x86_64-linux-android
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: android
+          sparse-checkout-cone-mode: false
+
+      - name: Download maa-cli artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: maa_cli-${{ matrix.target }}
+          path: cli
+
+      - name: Download MaaCore component
+        env:
+          MAA_VERSION: ${{ needs.meta.outputs.maa_version }}
+          ABI: ${{ matrix.abi }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p core
+          gh release download "$MAA_VERSION" \
+            --repo MaaAssistantArknights/MaaAssistantArknights \
+            --pattern "MAAComponent-${MAA_VERSION}-android-${ABI}.tar.gz" \
+            --dir core \
+            --clobber
+          ls -lh core/
+          tar xzf "core/MAAComponent-${MAA_VERSION}-android-${ABI}.tar.gz" -C core
+          test -d core/resource
+          test -f core/libMaaCore.so
+
+      - name: Checkout MAA-Meow conversion script
+        uses: actions/checkout@v7
+        with:
+          repository: Aliothmoon/MAA-Meow
+          ref: v0.22.0
+          sparse-checkout: scripts
+          sparse-checkout-cone-mode: false
+          path: meow
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pnnx
+        run: |
+          set -euo pipefail
+          pip install -r meow/scripts/requirements.txt
+          pnnx --version || true
+
+      - name: Convert OCR models to ncnn
+        run: |
+          set -euo pipefail
+          python meow/scripts/convert_ocr_ncnn.py --resource core/resource
+
+          echo "=== 转换产物 ==="
+          find core/resource -name '*.ncnn.param' | sort
+          echo "=== 自检 ==="
+          test -n "$(find core/resource -name 'det.ncnn.param' | head -1)"
+          test -n "$(find core/resource -name 'rec.ncnn.param' | head -1)"
+          echo "det / rec 权重均已生成"
+
+      - name: Assemble package
+        env:
+          VERSION: ${{ needs.meta.outputs.cli_version }}
+        run: |
+          set -euo pipefail
+
+          # 包里只放 CLI 与 Android 专用的 ncnn OCR 权重。MaaCore 由用户在运行时用
+          # `maa install` / `maa update` 获取，core 才能跟上上游发版，不必等 maa-cli 重新打包。
+          mkdir -p stage/bin stage/share/maa/ncnn-overlay
+
+          tar -xf "cli/${{ matrix.target }}.tar" -C stage/bin
+          test -f stage/bin/maa
+          chmod +x stage/bin/maa
+
+          cp android/maa-android-connect.sh stage/
+          chmod +x stage/maa-android-connect.sh
+          bash -n stage/maa-android-connect.sh
+
+          test -d core/resource
+          test -f core/resource/version.json
+
+          echo "=== 收集 ncnn 权重 ==="
+          while IFS= read -r -d '' weight; do
+            rel="${weight#core/resource/}"
+            mkdir -p "stage/share/maa/ncnn-overlay/$(dirname "$rel")"
+            cp "$weight" "stage/share/maa/ncnn-overlay/$rel"
+          done < <(find core/resource \( -name '*.ncnn.param' -o -name '*.ncnn.bin' \) -print0)
+
+          # 与权重同源的资源身份戳，安装时用它判断 overlay 是否还匹配当前 resource
+          cp core/resource/version.json stage/share/maa/ncnn-overlay/version.json
+
+          weight_count="$(find stage/share/maa/ncnn-overlay -name '*.ncnn.param' | wc -l)"
+          echo "ncnn 权重条目: $weight_count"
+          test "$weight_count" -gt 0
+          test -f stage/share/maa/ncnn-overlay/version.json
+
+          if find stage -name 'libMaaCore.so' | grep -q .; then
+            echo "::error::包里不应包含 MaaCore 二进制，它应由 maa install 在运行时安装"
+            exit 1
+          fi
+
+          archive="maa_cli-v${VERSION}-${{ matrix.target }}.tar.gz"
+          tar czf "$archive" -C stage .
+          echo "=== 产物 ==="
+          ls -lh "$archive"
+          # 先落盘再 head：直接 `tar tzf | head` 会因 head 提前退出让 tar 收到 SIGPIPE，
+          # 在 pipefail 下表现为写 stdout 失败
+          tar tzf "$archive" > /tmp/archive-list.txt
+          head -20 /tmp/archive-list.txt
+
+          sha256sum "$archive" > "$archive.sha256"
+
+      - name: Upload package
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-package-${{ matrix.abi }}
+          path: |
+            maa_cli-v*-${{ matrix.target }}.tar.gz
+            maa_cli-v*-${{ matrix.target }}.tar.gz.sha256
+          if-no-files-found: error
+
+  summary:
+    name: Summary
+    needs: [meta, package]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all packages
+        uses: actions/download-artifact@v8
+        with:
+          pattern: android-package-*
+          merge-multiple: true
+
+      - name: Show artifacts
+        run: |
+          {
+            echo "## Android 构建产物（maa-cli v${{ needs.meta.outputs.cli_version }}）"
+            echo ""
+            echo "MaaCore 版本：${{ needs.meta.outputs.maa_version }}"
+            echo ""
+            echo "| 文件 | 大小 |"
+            echo "|------|------|"
+            for f in ./*.tar.gz; do
+              printf '| %s | %s |\n' "$f" "$(du -h "$f" | cut -f1)"
+            done
+            echo ""
+            echo "从本次 run 的 Artifacts 下载。"
+          } >> "$GITHUB_STEP_SUMMARY"
+          ls -lh
