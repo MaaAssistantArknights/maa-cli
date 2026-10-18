@@ -74,6 +74,8 @@ Precompiled binaries are grouped into three tiers by how thoroughly they are tes
 | Windows ARM64       | `aarch64-pc-windows-msvc`   | Tier 2 |
 | macOS Intel         | `x86_64-apple-darwin`       | Tier 3 |
 
+Starting with 0.8, official Linux precompiled binaries are built and tested on Ubuntu 24.04; compatibility with distributions using older glibc versions is no longer guaranteed.
+
 ## Build from Source
 
 Rust developers can compile and install maa-cli themselves via `cargo`:

@@ -78,6 +78,8 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/MaaAssistantArknights/
 | Windows ARM64       | `aarch64-pc-windows-msvc`   | Tier 2 |
 | macOS Intel         | `x86_64-apple-darwin`       | Tier 3 |
 
+自 0.8 起，官方 Linux 預編譯套件統一在 Ubuntu 24.04 上建置和測試，不再保證相容使用較舊 glibc 的發行版。
+
 ## 编译安装
 
 Rust 开发者可以通过 `cargo` 自行编译安装 maa-cli：

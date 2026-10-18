@@ -78,6 +78,8 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/MaaAssistantArknights/
 | Windows ARM64       | `aarch64-pc-windows-msvc`   | Tier 2 |
 | macOS Intel         | `x86_64-apple-darwin`       | Tier 3 |
 
+0.8부터 공식 Linux 사전 컴파일 바이너리는 Ubuntu 24.04에서 빌드 및 테스트되며, 이전 glibc 버전을 사용하는 배포판과의 호환성은 보장하지 않습니다.
+
 ## 컴파일 설치
 
 Rust 개발자는 `cargo`를 통해 maa-cli를 직접 컴파일하여 설치할 수 있습니다:
