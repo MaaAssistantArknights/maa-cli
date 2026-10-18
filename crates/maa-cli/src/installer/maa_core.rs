@@ -174,14 +174,18 @@ fn asset_name(version: &Version, os: &str, arch: &str) -> String {
 ///
 /// - `libMaaAndroidNativeControlUnit.so`：Android 原生控制单元，maa-cli 通过 adb 连接游戏，走不到它
 /// - `libfastdeploy_ppocr.so`：桌面 OCR 后端，Android 用 ncnn 权重（由包内 ncnn overlay 提供）
-///
-/// 只在 Android 上跳过：桌面平台的 MaaCore 依赖 `libfastdeploy_ppocr.so` 做 OCR，
-/// 少装它会让内核连加载都失败。
-#[cfg(target_os = "android")]
 const SKIPPED_LIBS: [&str; 2] = [
     "libMaaAndroidNativeControlUnit.so",
     "libfastdeploy_ppocr.so",
 ];
+
+/// 是否跳过这个库。
+///
+/// 只在 Android 上跳过：桌面平台的 MaaCore 依赖 `libfastdeploy_ppocr.so` 做 OCR，
+/// 少装它会让内核连加载都失败。
+fn should_skip_lib(name: &str) -> bool {
+    cfg!(target_os = "android") && SKIPPED_LIBS.contains(&name)
+}
 
 fn extract_mapper(
     src: &Path,
@@ -190,11 +194,10 @@ fn extract_mapper(
     config: &Components,
 ) -> Option<PathBuf> {
     // debug!("Extracting file: {}", src.display());
-    #[cfg(target_os = "android")]
     if src
         .file_name()
         .and_then(|name| name.to_str())
-        .is_some_and(|name| SKIPPED_LIBS.contains(&name))
+        .is_some_and(should_skip_lib)
     {
         return None;
     }
@@ -432,24 +435,26 @@ mod tests {
             None
         );
 
-        // Android 上跳过组件包里用不到的库；桌面平台必须保留 fastdeploy，否则 MaaCore 加载失败
-        #[cfg(target_os = "android")]
-        for skipped in SKIPPED_LIBS {
-            assert_eq!(
-                extract_mapper(Path::new(skipped), lib_dir, resource_dir, &config),
-                None,
-                "{skipped} should be skipped"
-            );
+        // 桌面必须照装 fastdeploy（MaaCore 靠它做 OCR），只有 Android 才跳过
+        let desktop_ocr = format!("{DLL_PREFIX}fastdeploy_ppocr{DLL_SUFFIX}");
+        let expected = if should_skip_lib("libfastdeploy_ppocr.so") {
+            None
+        } else {
+            Some(lib_dir.join(&desktop_ocr))
+        };
+        assert_eq!(
+            extract_mapper(Path::new(&desktop_ocr), lib_dir, resource_dir, &config),
+            expected
+        );
+    }
+
+    #[test]
+    fn test_should_skip_lib() {
+        let on_android = cfg!(target_os = "android");
+        for name in SKIPPED_LIBS {
+            assert_eq!(should_skip_lib(name), on_android, "{name}");
         }
-        #[cfg(not(target_os = "android"))]
-        {
-            // 桌面平台的 fastdeploy 必须照装；名字按当前平台的库前后缀构造
-            let desktop_ocr = format!("{DLL_PREFIX}fastdeploy_ppocr{DLL_SUFFIX}");
-            assert_eq!(
-                extract_mapper(Path::new(&desktop_ocr), lib_dir, resource_dir, &config),
-                Some(lib_dir.join(&desktop_ocr))
-            );
-        }
+        assert!(!should_skip_lib(MAA_CORE_LIB));
     }
 
     #[test]
@@ -633,6 +638,22 @@ mod tests {
                 asset.url(),
                 "https://github.com/MaaAssistantArknights/MaaAssistantArknights/releases/download/v4.26.1/MAA-v4.26.1-linux-x86_64.tar.gz"
             );
+        }
+
+        #[test]
+        fn test_android_asset_is_synthesized() {
+            // version API 不收录 Android 组件包，只能按命名规则拼 GitHub Release 地址
+            let asset = MANIFEST
+                .get_asset("android", "x86_64")
+                .expect("android asset");
+            assert_eq!(asset.name(), "MAAComponent-v4.26.1-android-x64.tar.gz");
+            assert_eq!(
+                asset.url(),
+                "https://github.com/MaaAssistantArknights/MaaAssistantArknights/releases/download/v4.26.1/MAAComponent-v4.26.1-android-x64.tar.gz"
+            );
+            // 合成资产没有镜像，也拿不到官方尺寸
+            assert!(asset.mirror_opts().is_none());
+            assert!(asset.verifier().expect("verifier").is_none());
         }
 
         #[test]
