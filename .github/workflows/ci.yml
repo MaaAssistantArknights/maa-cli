@@ -117,6 +117,40 @@ jobs:
         run: |
           cargo x test --clippy  --install-core
 
+  build-android:
+    name: Build (Android, ${{ matrix.arch }})
+    needs: [changes, build]
+    if: needs.changes.outputs.code == 'true' && github.event_name != 'merge_group'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - aarch64
+          - x86_64
+    env:
+      TARGET: ${{ matrix.arch }}-linux-android
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup Rust target
+        run: rustup target add "$TARGET"
+      - name: Setup Android NDK
+        id: ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r29
+      - name: Install cargo-ndk
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-ndk@4.1.2
+      - name: Build
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
+        run: |
+          cargo ndk --target "$TARGET" --platform 24 build --locked --package maa-cli \
+            --features 'git2?/vendored-libgit2,git2?/vendored-openssl'
+
   build-windows:
     name: Build and Test (Windows, ${{ matrix.runner }})
     needs: changes
@@ -282,6 +316,7 @@ jobs:
       - format
       - deny
       - build
+      - build-android
       - build-windows
       - build-read-only-home
       - build-tier2
@@ -300,6 +335,7 @@ jobs:
           FORMAT_RESULT: ${{ needs.format.result }}
           DENY_RESULT: ${{ needs.deny.result }}
           BUILD_RESULT: ${{ needs.build.result }}
+          BUILD_ANDROID_RESULT: ${{ needs.build-android.result }}
           BUILD_WINDOWS_RESULT: ${{ needs.build-windows.result }}
           BUILD_READ_ONLY_HOME_RESULT: ${{ needs.build-read-only-home.result }}
           BUILD_TIER2_RESULT: ${{ needs.build-tier2.result }}
@@ -333,9 +369,10 @@ jobs:
             fi
           done
 
-          # The merge queue skips Tier 2 and coverage: PR CI already ran them.
+          # The merge queue skips Android, Tier 2 and coverage: PR CI already ran them.
           if [[ "$EVENT_NAME" != "merge_group" ]]; then
             for result in \
+              "$BUILD_ANDROID_RESULT" \
               "$BUILD_TIER2_RESULT" \
               "$COVERAGE_RESULT" \
               "$COVERAGE_WINDOWS_RESULT"; do
