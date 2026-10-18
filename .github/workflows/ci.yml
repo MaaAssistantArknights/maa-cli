@@ -116,19 +116,6 @@ jobs:
       - name: Test
         run: |
           cargo x test --clippy  --install-core
-      - name: Test with read-only home
-        if: matrix.runner == 'ubuntu-22.04'
-        run: |
-          cargo_home="${CARGO_HOME:-$HOME/.cargo}"
-          rustup_home="${RUSTUP_HOME:-$HOME/.rustup}"
-          test_home="$(mktemp -d)"
-          trap 'chmod 700 "$test_home"' EXIT
-          chmod 555 "$test_home"
-
-          unset MAA_CONFIG_DIR MAA_CACHE_DIR MAA_DATA_DIR MAA_STATE_DIR MAA_RESOURCE
-          unset XDG_CONFIG_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
-          env HOME="$test_home" CARGO_HOME="$cargo_home" RUSTUP_HOME="$rustup_home" \
-            cargo test --locked --workspace --exclude x --exclude 'x-*'
 
   build-windows:
     name: Build and Test (Windows, ${{ matrix.runner }})
@@ -146,6 +133,29 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: Test
         run: cargo x test --clippy --install-core
+
+  build-read-only-home:
+    name: Build and Test (read-only home)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Test with read-only home
+        run: |
+          cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+          rustup_home="${RUSTUP_HOME:-$HOME/.rustup}"
+          test_home="$(mktemp -d)"
+          trap 'chmod 700 "$test_home"' EXIT
+          chmod 555 "$test_home"
+
+          unset MAA_CONFIG_DIR MAA_CACHE_DIR MAA_DATA_DIR MAA_STATE_DIR MAA_RESOURCE
+          unset XDG_CONFIG_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
+          env HOME="$test_home" CARGO_HOME="$cargo_home" RUSTUP_HOME="$rustup_home" \
+            cargo test --locked --workspace --exclude x --exclude 'x-*'
 
   build-tier2:
     name: Build and Test (Tier 2, ${{ matrix.runner }})
@@ -273,6 +283,7 @@ jobs:
       - deny
       - build
       - build-windows
+      - build-read-only-home
       - build-tier2
       - build-no-default-features
       - build-core
@@ -290,6 +301,7 @@ jobs:
           DENY_RESULT: ${{ needs.deny.result }}
           BUILD_RESULT: ${{ needs.build.result }}
           BUILD_WINDOWS_RESULT: ${{ needs.build-windows.result }}
+          BUILD_READ_ONLY_HOME_RESULT: ${{ needs.build-read-only-home.result }}
           BUILD_TIER2_RESULT: ${{ needs.build-tier2.result }}
           BUILD_FEATURES_RESULT: ${{ needs.build-no-default-features.result }}
           BUILD_CORE_RESULT: ${{ needs.build-core.result }}
@@ -312,6 +324,7 @@ jobs:
             "$DENY_RESULT" \
             "$BUILD_RESULT" \
             "$BUILD_WINDOWS_RESULT" \
+            "$BUILD_READ_ONLY_HOME_RESULT" \
             "$BUILD_FEATURES_RESULT" \
             "$BUILD_CORE_RESULT"; do
             if [[ "$result" != "success" ]]; then
