@@ -1,5 +1,27 @@
 # Release Notes
 
+## Release 0.7.7
+
+### Features
+
+- 支持通过 Mirror酱 CDK 热更新 MaaResource by [@TrivialHe](https://github.com/TrivialHe) in [#584](https://github.com/MaaAssistantArknights/maa-cli/pull/584)
+- Add TLS configuration and CI build checks for Android by [@wangl-cc](https://github.com/wangl-cc) in [#624](https://github.com/MaaAssistantArknights/maa-cli/pull/624)
+
+### Bug Fixes
+
+- Bump zip to 9 for RUSTSEC-2026-0367/0368/0369 by [@wangl-cc](https://github.com/wangl-cc) in [#620](https://github.com/MaaAssistantArknights/maa-cli/pull/620)
+- Validate maa-cli before installation and self-update by [@wangl-cc](https://github.com/wangl-cc) in [#623](https://github.com/MaaAssistantArknights/maa-cli/pull/623)
+
+### Testing
+
+- Isolate Copilot tests from user cache and config by [@wangl-cc](https://github.com/wangl-cc) in [#621](https://github.com/MaaAssistantArknights/maa-cli/pull/621)
+
+### Miscellaneous
+
+- Add Nix flake development shell by [@wangl-cc](https://github.com/wangl-cc) in [#619](https://github.com/MaaAssistantArknights/maa-cli/pull/619)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.7.6...v0.7.7>
+
 ## Release 0.7.6
 
 ### Features
