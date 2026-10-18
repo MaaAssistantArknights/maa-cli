@@ -12,11 +12,11 @@ use x_lib::{
 use crate::{CoverageMode, TestOptions};
 
 /// Coverage runs on nightly unless `MAA_LLVM_COV_NIGHTLY=false`, e.g. in the Nix dev shell.
-fn llvm_cov_args(nightly: Option<OsString>) -> &'static [&'static str] {
-    if nightly.is_some_and(|value| value == "false") {
-        &["llvm-cov"]
-    } else {
+fn llvm_cov_args(nightly: bool) -> &'static [&'static str] {
+    if nightly {
         &["+nightly", "llvm-cov"]
+    } else {
+        &["llvm-cov"]
     }
 }
 
@@ -42,7 +42,7 @@ pub fn run_tests(opts: TestOptions) -> Result<()> {
     });
 
     let package_flags = opts.package_flags();
-    let llvm_cov_args = llvm_cov_args(env::var_os("MAA_LLVM_COV_NIGHTLY"));
+    let llvm_cov_args = llvm_cov_args(x_lib::env::read_or("MAA_LLVM_COV_NIGHTLY", true)?);
 
     if env::var_os("CI").is_some() {
         Group::new("Update Stable Toolchain")
@@ -183,8 +183,7 @@ mod tests {
 
     #[test]
     fn llvm_cov_uses_nightly_unless_disabled() {
-        assert_eq!(llvm_cov_args(None), ["+nightly", "llvm-cov"]);
-        assert_eq!(llvm_cov_args(Some("true".into())), ["+nightly", "llvm-cov"]);
-        assert_eq!(llvm_cov_args(Some("false".into())), ["llvm-cov"]);
+        assert_eq!(llvm_cov_args(true), ["+nightly", "llvm-cov"]);
+        assert_eq!(llvm_cov_args(false), ["llvm-cov"]);
     }
 }

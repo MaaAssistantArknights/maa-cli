@@ -35,6 +35,26 @@ pub fn read<T: FromStr>(name: &str) -> Result<T, Error<T::Err>> {
     parse(name, &value)
 }
 
+/// Read an optional variable, using `default` only when it is unset.
+pub fn read_or<T: FromStr>(name: &str, default: T) -> Result<T, Error<T::Err>> {
+    value_or(name, env::var(name), default)
+}
+
+fn value_or<T: FromStr>(
+    name: &str,
+    value: Result<String, env::VarError>,
+    default: T,
+) -> Result<T, Error<T::Err>> {
+    match value {
+        Ok(value) => parse(name, &value),
+        Err(env::VarError::NotPresent) => Ok(default),
+        Err(source) => Err(Error::Read {
+            name: name.to_owned(),
+            source,
+        }),
+    }
+}
+
 fn parse<T: FromStr>(name: &str, value: &str) -> Result<T, Error<T::Err>> {
     value.parse().map_err(|source| Error::Parse {
         name: name.to_owned(),
@@ -63,6 +83,27 @@ mod tests {
         assert!(matches!(
             parse::<Value>("VALUE", "invalid"),
             Err(Error::Parse { name, source: ParseError(42) }) if name == "VALUE"
+        ));
+    }
+
+    #[test]
+    fn optional_values_default_only_when_unset() {
+        let _ = read_or::<bool>;
+        assert!(matches!(
+            value_or("VALUE", Err(env::VarError::NotPresent), true),
+            Ok(true)
+        ));
+        assert!(matches!(
+            value_or("VALUE", Ok("false".to_owned()), true),
+            Ok(false)
+        ));
+        assert!(matches!(
+            value_or("VALUE", Ok("off".to_owned()), true),
+            Err(Error::Parse { .. })
+        ));
+        assert!(matches!(
+            value_or("VALUE", Err(env::VarError::NotUnicode("x".into())), true),
+            Err(Error::Read { .. })
         ));
     }
 
