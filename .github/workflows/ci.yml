@@ -119,7 +119,7 @@ jobs:
 
   build-android:
     name: Build (Android, ${{ matrix.arch }})
-    needs: changes
+    needs: [changes, build]
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     strategy:
