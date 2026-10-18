@@ -118,42 +118,42 @@ jobs:
           cargo x test --clippy  --install-core
 
   build-android:
-    name: Build (Android, ${{ matrix.target }})
+    name: Build (Android, ${{ matrix.arch }})
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        target:
-          - aarch64-linux-android
-          - x86_64-linux-android
+        arch:
+          - aarch64
+          - x86_64
+    env:
+      TARGET: ${{ matrix.arch }}-linux-android
     steps:
       - name: Checkout
         uses: actions/checkout@v7
       - name: Setup Rust target
-        run: rustup target add '${{ matrix.target }}'
-      - name: Configure Android NDK
-        env:
-          TARGET: ${{ matrix.target }}
-        run: |
-          toolchain="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          target_upper="${TARGET^^}"
-          target_upper="${target_upper//-/_}"
-          target_under="${TARGET//-/_}"
-          {
-            echo "CARGO_TARGET_${target_upper}_LINKER=$toolchain/${TARGET}24-clang"
-            echo "CC_${target_under}=$toolchain/${TARGET}24-clang"
-            echo "AR_${target_under}=$toolchain/llvm-ar"
-          } >> "$GITHUB_ENV"
+        run: rustup target add "$TARGET"
+      - name: Setup Android NDK
+        id: ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r29
+      - name: Install cargo-ndk
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-ndk@4.1.2
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
         with:
-          key: android-${{ matrix.target }}
+          key: android-${{ matrix.arch }}
       - name: Build
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
         run: |
-          cargo build --locked --package maa-cli --target '${{ matrix.target }}' \
-            --no-default-features --features cli_installer,core_installer
+          cargo ndk --target "$TARGET" --platform 24 build --locked --package maa-cli \
+            --features 'git2?/vendored-libgit2,git2?/vendored-openssl'
 
   build-windows:
     name: Build and Test (Windows, ${{ matrix.runner }})
