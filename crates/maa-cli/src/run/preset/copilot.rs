@@ -1449,8 +1449,7 @@ found"}"#,
                 let cache = tempfile::tempdir()?;
 
                 let error = parse(["maa", "ssscopilot", "maa://40051"], cache.path())
-                    .err()
-                    .context("Expected a non-SSS copilot error")?;
+                    .expect_err("non-SSS copilot should be rejected");
 
                 assert_eq!(
                     error.to_string(),
@@ -1498,8 +1497,7 @@ found"}"#,
                 let cache = tempfile::tempdir()?;
 
                 let error = parse(["maa", "ssscopilot", "maa://23125s"], cache.path())
-                    .err()
-                    .context("Expected a task set error")?;
+                    .expect_err("SSS copilot task sets should be rejected");
 
                 assert_eq!(error.to_string(), "SSS Copilot don't support task set");
                 Ok(())
@@ -1514,8 +1512,7 @@ found"}"#,
                     ["maa", "ssscopilot", "maa://40451", "--loop-times", "0"],
                     cache.path(),
                 )
-                .err()
-                .context("Expected an invalid loop_times error")?;
+                .expect_err("invalid loop_times should be rejected");
 
                 assert_eq!(error.to_string(), "loop_times must be greater than 0");
                 Ok(())
