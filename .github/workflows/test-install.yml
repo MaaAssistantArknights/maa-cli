@@ -1,0 +1,36 @@
+name: Test install script
+
+on:
+  push:
+    branches: ["main", "dev-*"]
+    paths:
+      - "install.sh"
+      - ".github/tests/install.sh"
+      - ".github/workflows/test-install.yml"
+  pull_request:
+    branches: ["main", "dev-*"]
+    paths:
+      - "install.sh"
+      - ".github/tests/install.sh"
+      - ".github/workflows/test-install.yml"
+  merge_group:
+    branches: ["main", "dev-*"]
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, macos-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Check shell syntax
+        run: bash -n install.sh && bash -n .github/tests/install.sh
+      - name: Test installation
+        run: bash .github/tests/install.sh

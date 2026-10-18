@@ -75,6 +75,8 @@ Homebrew 用户可以通过非官方的 [tap](https://github.com/MaaAssistantArk
 curl -fsSL https://raw.githubusercontent.com/MaaAssistantArknights/maa-cli/main/install.sh | bash
 ```
 
+安装脚本会先检查下载的程序能否启动；若检查失败，会显示错误并中止安装，不覆盖已有安装。
+
 **Windows (PowerShell)：**
 
 ```powershell

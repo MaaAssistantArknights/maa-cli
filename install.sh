@@ -178,6 +178,11 @@ main() {
         error "Binary not found in extracted archive"
     fi
 
+    chmod 755 "$binary_path"
+    if ! "$binary_path" --version > /dev/null; then
+        error "Downloaded maa-cli could not run on this system. Installation aborted; existing installation was not changed."
+    fi
+
     # Install binary
     mkdir -p "$INSTALL_DIR"
     install -m 755 "$binary_path" "${INSTALL_DIR}/maa"

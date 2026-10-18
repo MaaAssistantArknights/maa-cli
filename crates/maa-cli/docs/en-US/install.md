@@ -51,6 +51,8 @@ If package managers are not available on your system or you prefer not to use th
 curl -fsSL https://raw.githubusercontent.com/MaaAssistantArknights/maa-cli/main/install.sh | bash
 ```
 
+The install script checks whether the downloaded program can start before installing it. If the check fails, it reports the error and aborts without replacing an existing installation.
+
 **Windows (PowerShell):**
 
 ```powershell
