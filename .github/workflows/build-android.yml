@@ -299,7 +299,10 @@ jobs:
           tar czf "$archive" -C stage .
           echo "=== 产物 ==="
           ls -lh "$archive"
-          tar tzf "$archive" | head -20
+          # 先落盘再 head：直接 `tar tzf | head` 会因 head 提前退出让 tar 收到 SIGPIPE，
+          # 在 pipefail 下表现为写 stdout 失败
+          tar tzf "$archive" > /tmp/archive-list.txt
+          head -20 /tmp/archive-list.txt
 
           sha256sum "$archive" > "$archive.sha256"
 
@@ -325,15 +328,17 @@ jobs:
 
       - name: Show artifacts
         run: |
-          echo "## Android 构建产物（maa-cli v${{ needs.meta.outputs.cli_version }}）" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "MaaCore 版本：${{ needs.meta.outputs.maa_version }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "| 文件 | 大小 |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|------|------|" >> "$GITHUB_STEP_SUMMARY"
-          for f in *.tar.gz; do
-            printf '| `%s` | %s |\n' "$f" "$(du -h "$f" | cut -f1)" >> "$GITHUB_STEP_SUMMARY"
-          done
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "从本次 run 的 Artifacts 下载。" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "## Android 构建产物（maa-cli v${{ needs.meta.outputs.cli_version }}）"
+            echo ""
+            echo "MaaCore 版本：${{ needs.meta.outputs.maa_version }}"
+            echo ""
+            echo "| 文件 | 大小 |"
+            echo "|------|------|"
+            for f in ./*.tar.gz; do
+              printf '| %s | %s |\n' "$f" "$(du -h "$f" | cut -f1)"
+            done
+            echo ""
+            echo "从本次 run 的 Artifacts 下载。"
+          } >> "$GITHUB_STEP_SUMMARY"
           ls -lh
