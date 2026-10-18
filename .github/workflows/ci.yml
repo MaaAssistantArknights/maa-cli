@@ -116,6 +116,19 @@ jobs:
       - name: Test
         run: |
           cargo x test --clippy  --install-core
+      - name: Test with read-only home
+        if: matrix.runner == 'ubuntu-22.04'
+        run: |
+          cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+          rustup_home="${RUSTUP_HOME:-$HOME/.rustup}"
+          test_home="$(mktemp -d)"
+          trap 'chmod 700 "$test_home"' EXIT
+          chmod 555 "$test_home"
+
+          unset MAA_CONFIG_DIR MAA_CACHE_DIR MAA_DATA_DIR MAA_STATE_DIR MAA_RESOURCE
+          unset XDG_CONFIG_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME
+          env HOME="$test_home" CARGO_HOME="$cargo_home" RUSTUP_HOME="$rustup_home" \
+            cargo test --locked --workspace --exclude x --exclude 'x-*'
 
   build-windows:
     name: Build and Test (Windows, ${{ matrix.runner }})
