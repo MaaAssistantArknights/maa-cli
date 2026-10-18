@@ -84,22 +84,6 @@ impl Asset for AssetWithBaseUrl<'_> {
     }
 }
 
-fn check_binary(binary: &Path) -> maa_installer::error::Result<()> {
-    let output = Command::new(binary)
-        .arg("--version")
-        .stdout(Stdio::null())
-        .output()
-        .with_desc("Failed to run downloaded maa-cli; current installation was not changed")?;
-    if !output.status.success() {
-        let status = output.status;
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(Error::new(ErrorKind::Other).with_desc(format!(
-            "Downloaded maa-cli failed its startup check ({status}); current installation was not changed.\n{stderr}"
-        )));
-    }
-    Ok(())
-}
-
 pub fn update(args: &CommonArgs, force: bool) -> Result<()> {
     let config = CLI_CONFIG.cli_config().with_args(args);
 
@@ -153,6 +137,22 @@ pub fn update(args: &CommonArgs, force: bool) -> Result<()> {
         )
         .context("Failed to install maa-cli")?;
 
+    Ok(())
+}
+
+fn check_binary(binary: &Path) -> maa_installer::error::Result<()> {
+    let output = Command::new(binary)
+        .arg("--version")
+        .stdout(Stdio::null())
+        .output()
+        .with_desc("Failed to run downloaded maa-cli; current installation was not changed")?;
+    if !output.status.success() {
+        let status = output.status;
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(Error::new(ErrorKind::Other).with_desc(format!(
+            "Downloaded maa-cli failed its startup check ({status}); current installation was not changed.\n{stderr}"
+        )));
+    }
     Ok(())
 }
 
