@@ -37,7 +37,7 @@ Stable/Beta 使用 tag 对应提交中的 workflow、源码和工具。Nightly �
 
 Prepare 不发布任何版本。重新运行会从当次 main 重建准备分支，覆盖尚未合入 main 的手工修改；需要保留的修改应重新应用。Prepare 合并后应完成打 tag，再准备下一版。
 
-Stable 的 GitHub Release 说明直接读取 tag 对应提交的 changelog 段落；缺少该段落时发布失败。准备之后合入的其他提交不会自动出现在说明中，需要在发布前补入。读取 Stable 说明只需当前提交，无需完整 Git 历史。
+Stable 的 GitHub Release 说明读取 tag 对应提交的 changelog 段落；缺少该段落时发布失败。准备之后合入的其他提交不会自动出现在说明中，需要在发布前补入。读取 Stable 说明只需当前提交，无需完整 Git 历史。所有渠道的说明在预览和发布前统一将用户链接和本仓库的 PR/issue 链接简化为 `@username`、`#123`，changelog 文件保留完整链接。
 
 Prepare 使用内置 `GITHUB_TOKEN`。仓库需要启用 Settings → Actions → General → `Allow GitHub Actions to create and approve pull requests`；自动创建 PR 的 workflow runs 由具有 write 权限的维护者批准。合并和打 tag 由维护者完成。
 
