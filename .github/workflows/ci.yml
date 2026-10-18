@@ -117,6 +117,44 @@ jobs:
         run: |
           cargo x test --clippy  --install-core
 
+  build-android:
+    name: Build (Android, ${{ matrix.target }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - aarch64-linux-android
+          - x86_64-linux-android
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup Rust target
+        run: rustup target add '${{ matrix.target }}'
+      - name: Configure Android NDK
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          toolchain="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          target_upper="${TARGET^^}"
+          target_upper="${target_upper//-/_}"
+          target_under="${TARGET//-/_}"
+          {
+            echo "CARGO_TARGET_${target_upper}_LINKER=$toolchain/${TARGET}24-clang"
+            echo "CC_${target_under}=$toolchain/${TARGET}24-clang"
+            echo "AR_${target_under}=$toolchain/llvm-ar"
+          } >> "$GITHUB_ENV"
+      - name: Setup Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: android-${{ matrix.target }}
+      - name: Build
+        run: |
+          cargo build --locked --package maa-cli --target '${{ matrix.target }}' \
+            --no-default-features --features cli_installer,core_installer
+
   build-windows:
     name: Build and Test (Windows, ${{ matrix.runner }})
     needs: changes
@@ -282,6 +320,7 @@ jobs:
       - format
       - deny
       - build
+      - build-android
       - build-windows
       - build-read-only-home
       - build-tier2
@@ -300,6 +339,7 @@ jobs:
           FORMAT_RESULT: ${{ needs.format.result }}
           DENY_RESULT: ${{ needs.deny.result }}
           BUILD_RESULT: ${{ needs.build.result }}
+          BUILD_ANDROID_RESULT: ${{ needs.build-android.result }}
           BUILD_WINDOWS_RESULT: ${{ needs.build-windows.result }}
           BUILD_READ_ONLY_HOME_RESULT: ${{ needs.build-read-only-home.result }}
           BUILD_TIER2_RESULT: ${{ needs.build-tier2.result }}
@@ -323,6 +363,7 @@ jobs:
             "$FORMAT_RESULT" \
             "$DENY_RESULT" \
             "$BUILD_RESULT" \
+            "$BUILD_ANDROID_RESULT" \
             "$BUILD_WINDOWS_RESULT" \
             "$BUILD_READ_ONLY_HOME_RESULT" \
             "$BUILD_FEATURES_RESULT" \
