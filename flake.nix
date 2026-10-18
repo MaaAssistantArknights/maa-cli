@@ -2,7 +2,7 @@
   description = "maa-cli development environment";
 
   inputs = {
-    nixpkgs.url = "https://channels.nixos.org/nixpkgs-unstable/nixexprs.tar.xz";
+    nixpkgs.url = "git+https://github.com/NixOS/nixpkgs?ref=nixpkgs-unstable&shallow=1";
     rust-overlay = {
       url = "git+https://github.com/oxalica/rust-overlay?shallow=1";
       inputs.nixpkgs.follows = "nixpkgs";
