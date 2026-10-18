@@ -174,6 +174,10 @@ fn asset_name(version: &Version, os: &str, arch: &str) -> String {
 ///
 /// - `libMaaAndroidNativeControlUnit.so`：Android 原生控制单元，maa-cli 通过 adb 连接游戏，走不到它
 /// - `libfastdeploy_ppocr.so`：桌面 OCR 后端，Android 用 ncnn 权重（由包内 ncnn overlay 提供）
+///
+/// 只在 Android 上跳过：桌面平台的 MaaCore 依赖 `libfastdeploy_ppocr.so` 做 OCR，
+/// 少装它会让内核连加载都失败。
+#[cfg(target_os = "android")]
 const SKIPPED_LIBS: [&str; 2] = [
     "libMaaAndroidNativeControlUnit.so",
     "libfastdeploy_ppocr.so",
@@ -186,6 +190,7 @@ fn extract_mapper(
     config: &Components,
 ) -> Option<PathBuf> {
     // debug!("Extracting file: {}", src.display());
+    #[cfg(target_os = "android")]
     if src
         .file_name()
         .and_then(|name| name.to_str())
@@ -291,7 +296,8 @@ fn read_resource_stamp(dir: &Path) -> std::io::Result<Option<String>> {
         .map(str::to_owned))
 }
 
-/// 只叠加 ncnn 权重（`<name>.ncnn.param` / `<name>.ncnn.bin`），overlay 里的其余文件（含 `version.json`）不落地。
+/// 只叠加 ncnn 权重（`<name>.ncnn.param` / `<name>.ncnn.bin`），overlay 里的其余文件（含
+/// `version.json`）不落地。
 #[cfg(any(target_os = "android", test))]
 fn copy_ncnn_weights(src_root: &Path, dst_root: &Path) -> std::io::Result<()> {
     for entry in std::fs::read_dir(src_root)? {
@@ -426,12 +432,22 @@ mod tests {
             None
         );
 
-        // Android 组件包里用不到的库不能落进 lib
+        // Android 上跳过组件包里用不到的库；桌面平台必须保留 fastdeploy，否则 MaaCore 加载失败
+        #[cfg(target_os = "android")]
         for skipped in SKIPPED_LIBS {
             assert_eq!(
                 extract_mapper(Path::new(skipped), lib_dir, resource_dir, &config),
                 None,
                 "{skipped} should be skipped"
+            );
+        }
+        #[cfg(not(target_os = "android"))]
+        {
+            // 桌面平台的 fastdeploy 必须照装；名字按当前平台的库前后缀构造
+            let desktop_ocr = format!("{DLL_PREFIX}fastdeploy_ppocr{DLL_SUFFIX}");
+            assert_eq!(
+                extract_mapper(Path::new(&desktop_ocr), lib_dir, resource_dir, &config),
+                Some(lib_dir.join(&desktop_ocr))
             );
         }
     }
