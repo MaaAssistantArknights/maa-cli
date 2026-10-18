@@ -120,7 +120,7 @@ jobs:
   build-android:
     name: Build (Android, ${{ matrix.arch }})
     needs: [changes, build]
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -144,10 +144,6 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-ndk@4.1.2
-      - name: Setup Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: android-${{ matrix.arch }}
       - name: Build
         env:
           ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
@@ -363,7 +359,6 @@ jobs:
             "$FORMAT_RESULT" \
             "$DENY_RESULT" \
             "$BUILD_RESULT" \
-            "$BUILD_ANDROID_RESULT" \
             "$BUILD_WINDOWS_RESULT" \
             "$BUILD_READ_ONLY_HOME_RESULT" \
             "$BUILD_FEATURES_RESULT" \
@@ -374,9 +369,10 @@ jobs:
             fi
           done
 
-          # The merge queue skips Tier 2 and coverage: PR CI already ran them.
+          # The merge queue skips Android, Tier 2 and coverage: PR CI already ran them.
           if [[ "$EVENT_NAME" != "merge_group" ]]; then
             for result in \
+              "$BUILD_ANDROID_RESULT" \
               "$BUILD_TIER2_RESULT" \
               "$COVERAGE_RESULT" \
               "$COVERAGE_WINDOWS_RESULT"; do
