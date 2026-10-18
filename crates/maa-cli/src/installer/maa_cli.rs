@@ -1,7 +1,12 @@
+use std::{
+    path::Path,
+    process::{Command, Stdio},
+};
+
 use anyhow::{Context, Result};
 use maa_dirs::{Ensure, MAA_CLI_EXE};
 use maa_installer::{
-    error::WithDesc,
+    error::{Error, ErrorKind, WithDesc},
     manifest::{Asset, Manifest},
     verify::{SizeVerifier, digest::DigestVerifier},
 };
@@ -120,6 +125,7 @@ pub fn update(args: &CommonArgs, force: bool) -> Result<()> {
     .with_current_version(&CLI_VERSION)
     .with_allow_downgrade(force)
     .with_post_install_hook(|| {
+        check_binary(&tmp_exe)?;
         // Perform self-replacement
         self_replace::self_replace(&tmp_exe).with_desc("Failed to replace maa-cli binary")
     });
@@ -131,6 +137,22 @@ pub fn update(args: &CommonArgs, force: bool) -> Result<()> {
         )
         .context("Failed to install maa-cli")?;
 
+    Ok(())
+}
+
+fn check_binary(binary: &Path) -> maa_installer::error::Result<()> {
+    let output = Command::new(binary)
+        .arg("--version")
+        .stdout(Stdio::null())
+        .output()
+        .with_desc("Failed to run downloaded maa-cli; current installation was not changed")?;
+    if !output.status.success() {
+        let status = output.status;
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(Error::new(ErrorKind::Other).with_desc(format!(
+            "Downloaded maa-cli failed its startup check ({status}); current installation was not changed.\n{stderr}"
+        )));
+    }
     Ok(())
 }
 
@@ -151,6 +173,48 @@ mod tests {
             url: BASE_URL,
         }
     });
+
+    #[test]
+    fn check_binary_propagates_launch_error() -> Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let error = check_binary(&tmp.path().join(MAA_CLI_EXE))
+            .expect_err("the test binary does not exist");
+        assert_eq!(error.kind(), ErrorKind::Io);
+        assert!(std::error::Error::source(&error).is_some());
+        assert!(
+            error
+                .to_string()
+                .contains("current installation was not changed")
+        );
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn check_binary_checks_version_exit_status() -> Result<()> {
+        use std::{fs, os::unix::fs::PermissionsExt};
+
+        let tmp = tempfile::tempdir()?;
+        let binary = tmp.path().join(MAA_CLI_EXE);
+        fs::write(
+            &binary,
+            "#!/bin/sh\n[ \"$#\" -eq 1 ] && [ \"$1\" = --version ]\n",
+        )?;
+        fs::set_permissions(&binary, fs::Permissions::from_mode(0o755))?;
+        check_binary(&binary)?;
+
+        fs::write(
+            &binary,
+            "#!/bin/sh\nprintf 'missing GLIBC_2.39\n' >&2\nexit 42\n",
+        )?;
+        let error = check_binary(&binary).expect_err("the test binary exits with status 42");
+        assert_eq!(error.kind(), ErrorKind::Other);
+        let message = error.to_string();
+        assert!(message.contains("42"));
+        assert!(message.contains("missing GLIBC_2.39"));
+        assert!(message.contains("current installation was not changed"));
+        Ok(())
+    }
 
     #[test]
     fn test_manifest() {
