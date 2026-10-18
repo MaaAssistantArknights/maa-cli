@@ -136,7 +136,7 @@ jobs:
 
   build-read-only-home:
     name: Build and Test (read-only home)
-    needs: changes
+    needs: [changes, build]
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-22.04
     steps:
