@@ -1,5 +1,34 @@
 # Release Notes
 
+## Release 0.7.6
+
+### Features
+
+- Support GitHub proxy for release downloads via ureq middleware by [@lingdiansr](https://github.com/lingdiansr) in [#541](https://github.com/MaaAssistantArknights/maa-cli/pull/541)
+- Support new PRTS copilot URI format by [@wangl-cc](https://github.com/wangl-cc) in [#569](https://github.com/MaaAssistantArknights/maa-cli/pull/569)
+- Separate maa-cli channels from MaaCore channels by [@wangl-cc](https://github.com/wangl-cc) in [#591](https://github.com/MaaAssistantArknights/maa-cli/pull/591)
+
+### Bug Fixes
+
+- Prefer open by path over bundle id on macOS by [@0x414E4F4E](https://github.com/0x414E4F4E) in [#552](https://github.com/MaaAssistantArknights/maa-cli/pull/552)
+- Use case sensitive YoStar by [@Constrat](https://github.com/Constrat) in [#558](https://github.com/MaaAssistantArknights/maa-cli/pull/558)
+- Treat empty directory environment variables as unset by [@JIAFALSEDREAM](https://github.com/JIAFALSEDREAM) in [#563](https://github.com/MaaAssistantArknights/maa-cli/pull/563)
+- Make file replacements atomic by [@wangl-cc](https://github.com/wangl-cc) in [#568](https://github.com/MaaAssistantArknights/maa-cli/pull/568)
+- Cap ureq log level at debug to avoid dumping raw HTTP traffic by [@wangl-cc](https://github.com/wangl-cc) in [#588](https://github.com/MaaAssistantArknights/maa-cli/pull/588)
+- Only update to a newer version unless downgrade is allowed by [@wangl-cc](https://github.com/wangl-cc) in [#603](https://github.com/MaaAssistantArknights/maa-cli/pull/603)
+
+### Documentation
+
+- Remove obsolete NUR installation instructions by [@wangl-cc](https://github.com/wangl-cc) in [#565](https://github.com/MaaAssistantArknights/maa-cli/pull/565)
+- Fix cargo install commands by [@JIAFALSEDREAM](https://github.com/JIAFALSEDREAM) in [#562](https://github.com/MaaAssistantArknights/maa-cli/pull/562)
+- Add PR template and contribution guidelines by [@wangl-cc](https://github.com/wangl-cc) in [#600](https://github.com/MaaAssistantArknights/maa-cli/pull/600)
+
+### Testing
+
+- Add end-to-end smoke tests for the maa binary by [@wangl-cc](https://github.com/wangl-cc) in [#598](https://github.com/MaaAssistantArknights/maa-cli/pull/598)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.7.5...v0.7.6>
+
 ## Release 0.7.5
 
 ### Features

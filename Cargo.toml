@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/*", "xtask", "xtask/x"]
+members = ["crates/*", "xtask/x-lib", "xtask/x-cmd/*"]
 default-members = ["crates/maa-cli"]
 
 [workspace.package]
@@ -30,6 +30,7 @@ indexmap = "2.13.1"
 indicatif = "0.18"
 libloading = "0.9"
 log = "0.4.20"
+maa-atomic-fs = { path = "crates/maa-atomic-fs", version = "0.1" }
 maa-core = { path = "crates/maa-core", version = "0.1", default-features = false }
 maa-dirs = { path = "crates/maa-dirs", version = "0.3" }
 maa-ffi-string = { path = "crates/maa-ffi-string", version = "0.1" }
@@ -52,7 +53,6 @@ semver = { version = "1.0.19", features = ["serde"] }
 serde = "1"
 serde_json = "1"
 serde_test = "1"
-serde_yaml = "0.9.25"
 sha2 = "0.11"
 signal-hook = "0.4"
 syn = "2"
@@ -66,7 +66,10 @@ windows-result = "0.4.0"
 windows-strings = "0.5.0"
 windows-sys = "0.61.0"
 winreg = "0.56"
-zip = { version = "8", default-features = false, features = ["deflate-flate2"] }
+x-lib = { path = "xtask/x-lib" }
+xflags = "0.3.2"
+yaml_serde = "0.10.7"
+zip = { version = "9", default-features = false, features = ["deflate-flate2"] }
 
 [workspace.lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [

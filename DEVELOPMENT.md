@@ -24,7 +24,8 @@
 
 - 避免直接向主分支提交代码，始终通过 PR 进行贡献。
 - 提交 PR 前，确保自己的分支已经与主分支同步，避免合并冲突。
-- 对于较大或影响范围广的变更，建议先在 Issue 中充分讨论方案。
+- 新功能、新命令、新配置项或影响范围广的变更，请先在 Issue 中讨论方案。
+- PR 的范围和使用 AI 工具的要求见 [贡献指南](CONTRIBUTING.md)。
 - 如对现有代码有任何疑问，可以在 Issue 中提出，以获得帮助和反馈。
 - 欢迎任何形式的贡献，包括文档、测试、CI 配置等。
 
@@ -88,10 +89,16 @@ graph TD
 
     subgraph Utils
         STREXT["maa-str-ext"]
+        ATOMICFS["maa-atomic-fs"]
     end
     
     subgraph Xtask
-        XTASK["xtask"]
+        XLIB["x-lib"]
+        BUILD["x-build"]
+        TEST["x-test"]
+        CHANNEL["x-channel"]
+        PACKAGE["x-package"]
+        TAG["x-tag"]
         X["x"]
     end
 
@@ -102,6 +109,7 @@ graph TD
     CLI --> VALUE
     CLI --> VALMACRO
     CLI --> VERSION
+    CLI --> ATOMICFS
 
     CORE --> SYS
     CORE --> TYPES
@@ -114,10 +122,20 @@ graph TD
     FFISTR --> STREXT
     VALUE --> STREXT
     VALUE --> VALMACRO
+    INSTALLER --> ATOMICFS
     
-    XTASK --> DIRS
-    XTASK --> VERSION
-    X -.shells out to.-> XTASK
+    BUILD --> XLIB
+    TEST --> XLIB
+    CHANNEL --> XLIB
+    PACKAGE --> XLIB
+    TAG --> XLIB
+    TEST --> DIRS
+    PACKAGE --> VERSION
+    X -.shells out to.-> BUILD
+    X -.shells out to.-> TEST
+    X -.shells out to.-> CHANNEL
+    X -.shells out to.-> PACKAGE
+    X -.shells out to.-> TAG
 ```
 
 ### 各 crate 的职责
@@ -129,13 +147,19 @@ graph TD
 - `maa-ffi-types`：最底层的 FFI primitive aliases，如 `AsstBool`、`AsstId`、`AsstSize` 等。
 - `maa-ffi-string`：面向 MaaCore FFI 的字符串转换层，把 Rust 字符串安全地转成 `CString`。
 - `maa-str-ext`：通用 UTF-8 / `OsStr` / `Path` 字符串工具 crate，属于基础工具层。
+- `maa-atomic-fs`：单文件原子替换工具（同目录暂存、fsync 后 rename），供 CLI、安装器和 xtask 写入配置、缓存与发布元数据。
 - `maa-value`：配置值模型，支持条件参数、用户输入和动态合并，主要服务于任务参数与配置系统。
 - `maa-value-macro`：`maa-value` 的 proc-macro 辅助 crate，用于更方便地在代码中构造复杂值。
 - `maa-dirs`：路径定位层，负责配置目录、缓存目录、资源目录、MaaCore 库目录等平台相关路径逻辑。
 - `maa-installer`：下载、解压、校验、安装等通用能力，主要服务于 CLI 的安装与更新流程。
 - `maa-version`：版本号与 manifest 解析、比较逻辑。
-- `xtask`：仓库内部自动化工具，负责 build/test/release/CI 辅助流程。
-- `x`：极薄的启动器，用来把 `cargo x ...` 转发到 `cargo run -p xtask -- ...`。
+- `x-lib`：共享的环境变量、命令执行、日志分组和工作区路径工具。
+- `x-build`：构建二进制并生成许可证到指定目录。
+- `x-test`：运行测试、准备 MaaCore 环境及收集覆盖率；默认 workspace 测试通过 `--exclude x --exclude 'x-*'` 排除全部工具包，仍可用 `--package <包名>` 单独指定。
+- `x-channel`：通过 SemVer 比较选择发布索引渠道。
+- `x-package`：打包发布产物并生成版本清单。
+- `x-tag`：为 Stable 或 Beta 推送下一个版本 tag。
+- `x`：零依赖的启动器，将 `cargo x <command>` 转发到 `cargo run -p x-<command> -- ...`。GitHub Actions 中直接输出编译分组标记，各命令在入口调用 `x_lib::group::finish_prepare()` 结束该分组。
 
 ## 代码规范
 

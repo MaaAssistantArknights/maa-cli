@@ -208,6 +208,7 @@ pub(crate) enum Command {
     /// Clearing the caches of maa-cli and maa core
     Cleanup {
         /// Specify the path for deletion
+        #[arg(default_values = ["cli-cache", "core-cache", "debug"])]
         targets: Vec<cleanup::CleanupTarget>,
     },
     /// List all available tasks
@@ -257,6 +258,14 @@ pub(crate) enum SelfCommand {
     Update {
         #[command(flatten)]
         common: config::cli::maa_cli::CommonArgs,
+        /// Install the version of the selected channel even if it is older
+        ///
+        /// By default, maa-cli is only updated when the channel has a newer version.
+        /// With this flag, an older version is installed as well (downgrade),
+        /// e.g. to switch from nightly back to stable.
+        /// Nothing is done if the versions are the same.
+        #[arg(long)]
+        force: bool,
     },
 }
 
@@ -305,7 +314,6 @@ mod test {
     use std::path::Path;
 
     use super::*;
-    use crate::config::cli::Channel;
 
     #[macro_export]
     macro_rules! assert_matches {
@@ -332,7 +340,7 @@ mod test {
             parse_from(["maa", "install", "beta"]).command,
             Command::Install {
                 common: config::cli::maa_core::CommonArgs {
-                    channel: Some(Channel::Beta),
+                    channel: Some(config::cli::maa_core::Channel::Beta),
                     ..
                 },
                 ..
@@ -409,9 +417,37 @@ mod test {
             parse_from(["maa", "self", "update", "beta"]).command,
             Command::SelfC(SelfCommand::Update {
                 common: config::cli::maa_cli::CommonArgs {
-                    channel: Some(Channel::Beta),
+                    channel: Some(config::cli::maa_cli::Channel::Beta),
                     ..
                 },
+                ..
+            })
+        );
+
+        assert_matches!(
+            parse_from(["maa", "self", "update", "alpha"]).command,
+            Command::SelfC(SelfCommand::Update {
+                common: config::cli::maa_cli::CommonArgs {
+                    channel: Some(config::cli::maa_cli::Channel::Nightly),
+                    ..
+                },
+                ..
+            })
+        );
+
+        assert_matches!(
+            parse_from(["maa", "self", "update"]).command,
+            Command::SelfC(SelfCommand::Update { force: false, .. })
+        );
+
+        assert_matches!(
+            parse_from(["maa", "self", "update", "stable", "--force"]).command,
+            Command::SelfC(SelfCommand::Update {
+                common: config::cli::maa_cli::CommonArgs {
+                    channel: Some(config::cli::maa_cli::Channel::Stable),
+                    ..
+                },
+                force: true,
             })
         );
 
@@ -422,7 +458,8 @@ mod test {
                     common: config::cli::maa_cli::CommonArgs {
                         api_url: Some(url),
                         ..
-                    }
+                    },
+                    ..
                 }
             ) if url == "url"
         );
@@ -619,7 +656,7 @@ mod test {
         use cleanup::CleanupTarget::*;
         assert_matches!(
             parse_from(["maa", "cleanup"]).command,
-            Command::Cleanup { .. }
+            Command::Cleanup { targets } if targets == vec![CliCache, CoreCache, Debug]
         );
 
         assert_matches!(

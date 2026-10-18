@@ -4,3 +4,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # Workflows reference actions by major tag (e.g. `@v2`), which already
+    # tracks minor and patch releases; only propose major bumps.
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"

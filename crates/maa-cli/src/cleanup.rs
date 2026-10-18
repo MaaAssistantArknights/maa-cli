@@ -109,12 +109,15 @@ pub fn cleanup<T>(targets: &[T]) -> Result<()>
 where
     T: PathProvider,
 {
-    // If no targets are specified, clean up all
-    if targets.is_empty() {
-        return cleanup(&[CliCache, CoreCache, Debug]);
-    }
+    remove(collect(targets))
+}
 
-    let target_paths: Vec<PathBuf> = targets
+/// Collect entries in the target directories that should be deleted
+fn collect<T>(targets: &[T]) -> Vec<PathBuf>
+where
+    T: PathProvider,
+{
+    targets
         .iter()
         .flat_map(|target| {
             let target_dir = target.target_dir();
@@ -132,8 +135,11 @@ where
                 Vec::new()
             }
         })
-        .collect();
+        .collect()
+}
 
+/// List the paths, ask for confirmation and delete them
+fn remove(target_paths: Vec<PathBuf>) -> Result<()> {
     if target_paths.is_empty() {
         println!("No files or directories to clean up.");
         return Ok(());
@@ -286,6 +292,17 @@ mod tests {
             assert_should_keep!(CliCache, "copilot/", false);
 
             #[cfg(feature = "core_installer")]
+            {
+                use semver::Version;
+
+                use crate::installer::maa_core::this_asset_name;
+
+                // No real MaaCore release has this version, so it is never the installed one
+                let stale = this_asset_name(&Version::new(0, 0, 1));
+                assert_should_keep!(CliCache, &stale, false);
+            }
+
+            #[cfg(feature = "core_installer")]
             if var_os("SKIP_CORE_TEST").is_none() {
                 let version = crate::state::CORE_VERSION.as_ref().unwrap();
                 let name = crate::installer::maa_core::this_asset_name(version);
@@ -381,6 +398,18 @@ mod tests {
         cleanup(&[All]).unwrap();
 
         std::fs::remove_dir(&test_root).unwrap();
+
+        // A missing target directory leaves nothing to clean up
+        struct Missing(PathBuf);
+
+        impl PathProvider for Missing {
+            fn target_dir(&self) -> Cow<'_, Path> {
+                self.0.as_path().into()
+            }
+        }
+
+        let missing_root = tempfile::tempdir().unwrap();
+        cleanup(&[Missing(join!(missing_root.path(), "missing"))]).unwrap();
     }
 
     #[test]
@@ -400,50 +429,5 @@ mod tests {
         assert!(!test_dir.exists());
 
         std::fs::remove_dir(&test_root).unwrap();
-    }
-
-    #[test]
-    #[ignore = "Need installed MaaCore and write to user directories"]
-    fn test_cleanup_real_files() {
-        // Create some files for testing
-        cache().ensure().unwrap();
-        state().ensure().unwrap();
-        log().ensure().unwrap();
-
-        std::fs::File::create(join!(cache(), "test.tar.gz")).unwrap();
-
-        #[cfg(feature = "core_installer")]
-        {
-            use semver::Version;
-
-            use crate::installer::maa_core::this_asset_name;
-
-            std::fs::File::create(cache().join(this_asset_name(&Version::new(5, 16, 1)))).unwrap();
-
-            if var_os("SKIP_CORE_TEST").is_none() {
-                let version = crate::state::CORE_VERSION.as_ref().unwrap();
-                let name = this_asset_name(version);
-                std::fs::File::create(join!(cache(), &name)).unwrap();
-            }
-        }
-
-        let core_cache = join!(state(), "cache");
-        core_cache.ensure().unwrap();
-
-        std::fs::create_dir_all(join!(&core_cache, "avatars")).unwrap();
-        std::fs::create_dir_all(join!(log(), "2024")).unwrap();
-        std::fs::File::create(join!(log(), "asst.log")).unwrap();
-        std::fs::File::create(join!(log(), "asst.bak.log")).unwrap();
-
-        let target: Vec<CleanupTarget> = Vec::new();
-        cleanup(&target).unwrap();
-
-        assert!(!join!(cache(), "test.tar.gz").exists());
-        assert!(!join!(core_cache, "avatars").exists());
-        assert!(!join!(log(), "2024").exists());
-        assert!(!join!(log(), "asst.log").exists());
-        assert!(!join!(log(), "asst.bak.log").exists());
-
-        cleanup(&target).unwrap(); // Cleanup again to test no files left
     }
 }

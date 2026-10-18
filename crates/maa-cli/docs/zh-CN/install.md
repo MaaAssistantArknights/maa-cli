@@ -81,6 +81,23 @@ curl -fsSL https://raw.githubusercontent.com/MaaAssistantArknights/maa-cli/main/
 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/MaaAssistantArknights/maa-cli/main/install.ps1" -OutFile install.ps1; .\install.ps1
 ```
 
+### 支持平台
+
+预编译二进制文件按测试程度分为三个等级：
+
+- Tier 1：每个 PR 都会构建并运行完整测试，包括依赖 MaaCore 的测试；
+- Tier 2：每个 PR 都会构建并测试，但不运行依赖 MaaCore 的测试；
+- Tier 3：仅在发布时构建，不保证测试通过。
+
+| 平台                | Target                      | 等级   |
+| ------------------- | --------------------------- | ------ |
+| Linux x86_64        | `x86_64-unknown-linux-gnu`  | Tier 1 |
+| Linux aarch64       | `aarch64-unknown-linux-gnu` | Tier 1 |
+| macOS Apple Silicon | `aarch64-apple-darwin`      | Tier 1 |
+| Windows x86_64      | `x86_64-pc-windows-msvc`    | Tier 1 |
+| Windows ARM64       | `aarch64-pc-windows-msvc`   | Tier 2 |
+| macOS Intel         | `x86_64-apple-darwin`       | Tier 3 |
+
 ## Android (Termux)
 
 Android 用户可以在 [Termux](https://termux.dev/) 中使用预编译的包。包内只包含交叉编译的 maa-cli、连接脚本和 Android 专用的 ncnn OCR 权重；MaaCore 与资源在安装后用 `maa install` 从官方 Release 获取，因此 core 的发版不必等 maa-cli 重新打包。下载对应架构（`aarch64-linux-android` 或 `x86_64-linux-android`）的压缩包解压后，按以下步骤安装：
