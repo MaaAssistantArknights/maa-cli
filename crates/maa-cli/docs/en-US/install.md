@@ -65,14 +65,14 @@ Precompiled binaries are grouped into three tiers by how thoroughly they are tes
 - Tier 2: built and tested on every PR, but without tests that require MaaCore;
 - Tier 3: only built for releases, tests are not guaranteed to pass.
 
-| Platform            | Target                      | Tier   |
-| ------------------- | --------------------------- | ------ |
-| Linux x86_64        | `x86_64-unknown-linux-gnu`  | Tier 1 |
-| Linux aarch64       | `aarch64-unknown-linux-gnu` | Tier 1 |
-| macOS Apple Silicon | `aarch64-apple-darwin`      | Tier 1 |
-| Windows x86_64      | `x86_64-pc-windows-msvc`    | Tier 1 |
-| Windows ARM64       | `aarch64-pc-windows-msvc`   | Tier 2 |
-| macOS Intel         | `x86_64-apple-darwin`       | Tier 3 |
+| Platform                     | Target                      | Tier   |
+| ---------------------------- | --------------------------- | ------ |
+| Linux x86_64 (glibc ≥ 2.39)  | `x86_64-unknown-linux-gnu`  | Tier 1 |
+| Linux aarch64 (glibc ≥ 2.39) | `aarch64-unknown-linux-gnu` | Tier 1 |
+| macOS Apple Silicon          | `aarch64-apple-darwin`      | Tier 1 |
+| Windows x86_64               | `x86_64-pc-windows-msvc`    | Tier 1 |
+| Windows ARM64                | `aarch64-pc-windows-msvc`   | Tier 2 |
+| macOS Intel                  | `x86_64-apple-darwin`       | Tier 3 |
 
 ## Build from Source
 
