@@ -55,8 +55,6 @@ Homebrew 사용자는 비공식 [tap](https://github.com/MaaAssistantArknights/h
 curl -fsSL https://raw.githubusercontent.com/MaaAssistantArknights/maa-cli/main/install.sh | bash
 ```
 
-설치 스크립트는 다운로드한 프로그램이 실행되는지 먼저 확인합니다. 확인에 실패하면 오류를 표시하고 설치를 중단하며, 기존 설치를 덮어쓰지 않습니다.
-
 **Windows (PowerShell):**
 
 ```powershell
