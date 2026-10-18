@@ -13,10 +13,9 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterato
 use ureq::http::StatusCode;
 
 use super::{IntoParameters, TaskContext, ToTaskType};
-use crate::{
-    dirs::{self, Ensure},
-    state::AGENT,
-};
+use crate::dirs::{self, Ensure};
+#[cfg(not(test))]
+use crate::state::AGENT;
 
 #[cfg(not(test))]
 const COPILOT_API: &str = "https://prts.maa.plus/copilot/get/";
@@ -27,6 +26,10 @@ const COPILOT_SET_API: &str = "https://prts.maa.plus/set/get?id=";
 const COPILOT_API: &str = "http://127.0.0.1:18080/copilot/get/";
 #[cfg(test)]
 const COPILOT_SET_API: &str = "http://127.0.0.1:18080/set/get?id=";
+
+#[cfg(test)]
+static AGENT: std::sync::LazyLock<ureq::Agent> =
+    std::sync::LazyLock::new(ureq::Agent::new_with_defaults);
 
 static LEGACY_URI_WARNING: Once = Once::new();
 
@@ -206,7 +209,7 @@ impl IntoParameters for CopilotParams {
         let loop_times = validate_loop_times(loop_times)?;
         let base_dirs = context.config.resource.base_dirs();
 
-        let copilot_files = resolve_copilot_uris(self.uri_list)?;
+        let copilot_files = resolve_copilot_uris(self.uri_list, dirs::copilot())?;
 
         let is_task_list = copilot_files.len() > 1;
         let formation = self.formation || is_task_list || default.get_or("formation", false);
@@ -317,7 +320,13 @@ impl ToTaskType for SSSCopilotParams {
 
 impl IntoParameters for SSSCopilotParams {
     fn into_parameters_no_context(self) -> Result<MAAValue> {
-        let copilot_dir = dirs::copilot().ensure()?;
+        self.into_parameters_with_cache(dirs::copilot())
+    }
+}
+
+impl SSSCopilotParams {
+    fn into_parameters_with_cache(self, copilot_dir: &Path) -> Result<MAAValue> {
+        let copilot_dir = copilot_dir.ensure()?;
         let loop_times = validate_loop_times(self.loop_times)?;
 
         let copilot_file = CopilotFile::from_uri(&self.uri)?;
@@ -609,8 +618,11 @@ fn operator_table(task: &CopilotTask) -> Result<Table> {
 /// This function handles downloading remote files, expanding task sets,
 /// and resolving local file paths. The returned list is sorted by the
 /// original URI index to preserve order.
-fn resolve_copilot_uris(uri_list: Vec<String>) -> Result<Vec<(usize, PathBuf, CopilotTask)>> {
-    let copilot_dir = dirs::copilot().ensure()?;
+fn resolve_copilot_uris(
+    uri_list: Vec<String>,
+    copilot_dir: &Path,
+) -> Result<Vec<(usize, PathBuf, CopilotTask)>> {
+    let copilot_dir = copilot_dir.ensure()?;
 
     let mut copilot_files = uri_list
         .into_par_iter()
@@ -652,7 +664,13 @@ impl ToTaskType for ParadoxCopilotParams {
 
 impl IntoParameters for ParadoxCopilotParams {
     fn into_parameters_no_context(self) -> Result<MAAValue> {
-        let copilot_files = resolve_copilot_uris(self.uri_list)?;
+        self.into_parameters_with_cache(dirs::copilot())
+    }
+}
+
+impl ParadoxCopilotParams {
+    fn into_parameters_with_cache(self, copilot_dir: &Path) -> Result<MAAValue> {
+        let copilot_files = resolve_copilot_uris(self.uri_list, copilot_dir)?;
 
         let file_paths: Vec<PathBuf> = copilot_files.into_iter().map(|(_, file, _)| file).collect();
 
@@ -1411,7 +1429,7 @@ found"}"#,
         mod into_parameters {
             use super::*;
 
-            fn parse<I, T>(args: I) -> Result<MAAValue>
+            fn parse<I, T>(args: I, copilot_dir: &Path) -> Result<MAAValue>
             where
                 I: IntoIterator<Item = T>,
                 T: Into<std::ffi::OsString> + Clone,
@@ -1419,75 +1437,85 @@ found"}"#,
                 let command = crate::command::parse_from(args).command;
                 match command {
                     crate::Command::SSSCopilot { params, .. } => {
-                        params.into_parameters_no_context()
+                        params.into_parameters_with_cache(copilot_dir)
                     }
                     _ => panic!("Not a SSSCopilot command"),
                 }
             }
 
             #[test]
-            fn rejects_non_sss_copilot() {
+            fn rejects_non_sss_copilot() -> Result<()> {
                 ensure_test_server();
+                let cache = tempfile::tempdir()?;
 
-                let result = parse(["maa", "ssscopilot", "maa://40051"]);
+                let error = parse(["maa", "ssscopilot", "maa://40051"], cache.path())
+                    .expect_err("non-SSS copilot should be rejected");
 
-                assert!(result.is_err());
-                println!("Error: {:?}", result);
+                assert_eq!(
+                    error.to_string(),
+                    "The given copilot file is not a SSS copilot file"
+                );
+                Ok(())
             }
 
             #[test]
-            fn default_loop_times() {
+            fn default_loop_times() -> Result<()> {
                 ensure_test_server();
+                let cache = tempfile::tempdir()?;
+                let copilot_dir = cache.path().join("copilot");
 
-                let params = parse(["maa", "ssscopilot", "maa://40451"]).unwrap();
+                let params = parse(["maa", "ssscopilot", "maa://40451"], &copilot_dir)?;
 
                 assert_eq!(
                     params,
-                    object!("filename" => path_from_cache_dir("40451.json"), "loop_times" => 1)
+                    object!("filename" => copilot_dir.join("40451.json")?, "loop_times" => 1)
                 );
+                assert!(copilot_dir.join("40451.json").is_file());
+                Ok(())
             }
 
             #[test]
-            fn custom_loop_times() {
+            fn custom_loop_times() -> Result<()> {
                 ensure_test_server();
+                let cache = tempfile::tempdir()?;
 
-                let params =
-                    parse(["maa", "ssscopilot", "maa://40451", "--loop-times", "2"]).unwrap();
+                let params = parse(
+                    ["maa", "ssscopilot", "maa://40451", "--loop-times", "2"],
+                    cache.path(),
+                )?;
 
                 assert_eq!(
                     params,
-                    object!("filename" => path_from_cache_dir("40451.json"), "loop_times" => 2)
+                    object!("filename" => cache.path().join("40451.json")?, "loop_times" => 2)
                 );
+                Ok(())
             }
 
             #[test]
-            fn rejects_task_set() {
+            fn rejects_task_set() -> Result<()> {
                 ensure_test_server();
+                let cache = tempfile::tempdir()?;
 
-                let result = parse(["maa", "ssscopilot", "maa://23125s"]);
+                let error = parse(["maa", "ssscopilot", "maa://23125s"], cache.path())
+                    .expect_err("SSS copilot task sets should be rejected");
 
-                assert!(result.is_err());
-                assert!(
-                    result
-                        .unwrap_err()
-                        .to_string()
-                        .contains("don't support task set")
-                );
+                assert_eq!(error.to_string(), "SSS Copilot don't support task set");
+                Ok(())
             }
 
             #[test]
-            fn rejects_invalid_loop_times() {
+            fn rejects_invalid_loop_times() -> Result<()> {
                 ensure_test_server();
+                let cache = tempfile::tempdir()?;
 
-                let result = parse(["maa", "ssscopilot", "maa://40451", "--loop-times", "0"]);
+                let error = parse(
+                    ["maa", "ssscopilot", "maa://40451", "--loop-times", "0"],
+                    cache.path(),
+                )
+                .expect_err("invalid loop_times should be rejected");
 
-                assert!(result.is_err());
-                assert!(
-                    result
-                        .unwrap_err()
-                        .to_string()
-                        .contains("loop_times must be greater than 0")
-                );
+                assert_eq!(error.to_string(), "loop_times must be greater than 0");
+                Ok(())
             }
         }
     }
@@ -1914,7 +1942,7 @@ found"}"#,
         mod into_parameters {
             use super::*;
 
-            fn parse<I, T>(args: I) -> Result<MAAValue>
+            fn parse<I, T>(args: I, copilot_dir: &Path) -> Result<MAAValue>
             where
                 I: IntoIterator<Item = T>,
                 T: Into<std::ffi::OsString> + Clone,
@@ -1922,22 +1950,26 @@ found"}"#,
                 let command = crate::command::parse_from(args).command;
                 match command {
                     crate::Command::ParadoxCopilot { params, .. } => {
-                        params.into_parameters_no_context()
+                        params.into_parameters_with_cache(copilot_dir)
                     }
                     _ => panic!("Not a ParadoxCopilot command"),
                 }
             }
 
             #[test]
-            fn single_file() {
+            fn single_file() -> Result<()> {
                 ensure_test_server();
+                let cache = tempfile::tempdir()?;
+                let copilot_dir = cache.path().join("copilot");
 
-                let params = parse(["maa", "paradoxcopilot", "maa://63896"]).unwrap();
+                let params = parse(["maa", "paradoxcopilot", "maa://63896"], &copilot_dir)?;
 
                 assert_eq!(
                     params,
-                    object!("list" => [path_from_cache_dir("63896.json")])
+                    object!("list" => vec![copilot_dir.join("63896.json")]?)
                 );
+                assert!(copilot_dir.join("63896.json").is_file());
+                Ok(())
             }
         }
     }
