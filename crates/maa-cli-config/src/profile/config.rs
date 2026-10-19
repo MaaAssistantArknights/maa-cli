@@ -198,7 +198,7 @@ auto_reconnect = true
     fn deserialize_playcover_profile_from_yaml() {
         use crate::profile::connection::{PlayCoverConnectionConfig, ScreencapMode};
 
-        let profile: ProfileConfig = serde_yaml::from_str(
+        let profile: ProfileConfig = yaml_serde::from_str(
             r#"
 version: 2
 connection:

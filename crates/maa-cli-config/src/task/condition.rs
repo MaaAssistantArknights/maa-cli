@@ -434,16 +434,16 @@ mod tests {
 
         #[test]
         fn simple_condition() {
-            let condition: Condition = serde_yaml::from_str("Always").unwrap();
+            let condition: Condition = yaml_serde::from_str("Always").unwrap();
             assert_eq!(condition, Condition::Always);
 
-            let condition: Condition = serde_yaml::from_str("OnSideStory").unwrap();
+            let condition: Condition = yaml_serde::from_str("OnSideStory").unwrap();
             assert_eq!(condition, Condition::OnSideStory);
         }
 
         #[test]
         fn reject_empty_time_condition() {
-            let err = serde_yaml::from_str::<TimeRange<NaiveTime>>("{}").unwrap_err();
+            let err = yaml_serde::from_str::<TimeRange<NaiveTime>>("{}").unwrap_err();
             assert!(
                 err.to_string()
                     .contains("`time_range.from` or `time_range.until`")
@@ -452,13 +452,13 @@ mod tests {
 
         #[test]
         fn reject_empty_weekdays() {
-            let err = serde_yaml::from_str::<NonEmptyVec<Weekday>>("[]").unwrap_err();
+            let err = yaml_serde::from_str::<NonEmptyVec<Weekday>>("[]").unwrap_err();
             assert!(err.to_string().contains("invalid length 0"));
         }
 
         #[test]
         fn reject_conflicting_primary_fields() {
-            let err = serde_yaml::from_str::<Condition>(
+            let err = yaml_serde::from_str::<Condition>(
                 "weekdays: [Mon]\nall:\n  - Always\ntimezone: Local\n",
             )
             .unwrap_err();
@@ -472,29 +472,29 @@ mod tests {
         #[test]
         fn time_offset() {
             assert_eq!(
-                serde_yaml::from_str::<TimeZone>("Local").unwrap(),
+                yaml_serde::from_str::<TimeZone>("Local").unwrap(),
                 TimeZone::Local
             );
             assert_eq!(
-                serde_yaml::from_str::<TimeZone>("Official").unwrap(),
+                yaml_serde::from_str::<TimeZone>("Official").unwrap(),
                 TimeZone::Client(maa_types::ClientType::Official)
             );
             assert_eq!(
-                serde_yaml::from_str::<TimeZone>("8").unwrap(),
+                yaml_serde::from_str::<TimeZone>("8").unwrap(),
                 TimeZone::FixedOffset(crate::task::time::UtcOffsetHours::try_from(8).unwrap())
             );
         }
 
         #[test]
         fn reject_invalid_time_offset() {
-            let err = serde_yaml::from_str::<TimeZone>("15").unwrap_err();
+            let err = yaml_serde::from_str::<TimeZone>("15").unwrap_err();
             assert!(err.to_string().contains("unsupported UTC offset"));
         }
 
         #[test]
         fn reject_zero_day_mod_divisor() {
             let err =
-                serde_yaml::from_str::<Condition>("divisor: 0\nremainder: 0\ntimezone: Local\n")
+                yaml_serde::from_str::<Condition>("divisor: 0\nremainder: 0\ntimezone: Local\n")
                     .unwrap_err();
             assert!(err.to_string().contains("nonzero"));
         }

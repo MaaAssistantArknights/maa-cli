@@ -39,7 +39,7 @@ impl_resolve_for_panic_resolver!(
 fn on_side_story_boundary_at_from_is_inclusive() {
     // Test that OnSideStory is active at exactly the from boundary [from, until)
     let task_config: TaskConfigTemplate =
-        serde_yaml::from_str(include_str!("../fixtures/task/placeholders.yaml")).unwrap();
+        yaml_serde::from_str(include_str!("../fixtures/task/placeholders.yaml")).unwrap();
     let session = &task_config.sessions[0];
 
     let from = chrono::DateTime::<Utc>::UNIX_EPOCH;
@@ -72,7 +72,7 @@ fn on_side_story_boundary_at_from_is_inclusive() {
 fn on_side_story_boundary_at_until_is_exclusive() {
     // Test that OnSideStory is inactive at exactly the until boundary [from, until)
     let task_config: TaskConfigTemplate =
-        serde_yaml::from_str(include_str!("../fixtures/task/placeholders.yaml")).unwrap();
+        yaml_serde::from_str(include_str!("../fixtures/task/placeholders.yaml")).unwrap();
     let session = &task_config.sessions[0];
 
     let from = chrono::DateTime::<Utc>::UNIX_EPOCH;
@@ -104,7 +104,7 @@ fn on_side_story_boundary_at_until_is_exclusive() {
 #[test]
 fn inactive_task_does_not_resolve_params() {
     let task_config: TaskConfigTemplate =
-        serde_yaml::from_str(include_str!("../fixtures/task/placeholders.yaml")).unwrap();
+        yaml_serde::from_str(include_str!("../fixtures/task/placeholders.yaml")).unwrap();
     let session = &task_config.sessions[0];
 
     let context = ConditionContext {

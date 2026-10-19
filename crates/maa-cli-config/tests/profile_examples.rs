@@ -16,7 +16,7 @@ fn deserialize_profile_from_toml_fixture() {
 #[test]
 fn deserialize_profile_from_yaml_fixture() {
     let profile: ProfileConfig =
-        serde_yaml::from_str(include_str!("../fixtures/profile/playcover.yaml")).unwrap();
+        yaml_serde::from_str(include_str!("../fixtures/profile/playcover.yaml")).unwrap();
 
     assert!(matches!(
         profile.connection,
@@ -39,7 +39,7 @@ fn deserialize_profile_from_json_fixture() {
 #[test]
 fn deserialize_profile_from_waydroid_yaml_fixture() {
     let profile: ProfileConfig =
-        serde_yaml::from_str(include_str!("../fixtures/profile/waydroid.yaml")).unwrap();
+        yaml_serde::from_str(include_str!("../fixtures/profile/waydroid.yaml")).unwrap();
 
     assert!(matches!(
         profile.connection,
@@ -62,7 +62,7 @@ fn deserialize_profile_from_avd_toml_fixture() {
 #[test]
 fn deserialize_profile_with_inherits_fixture() {
     let profile: ProfileConfig =
-        serde_yaml::from_str(include_str!("../fixtures/profile/inherit.yaml")).unwrap();
+        yaml_serde::from_str(include_str!("../fixtures/profile/inherit.yaml")).unwrap();
 
     assert_eq!(profile.inherits.as_deref(), Some("cn-android"));
     assert_eq!(profile.client_type, Some(ClientType::Official));
