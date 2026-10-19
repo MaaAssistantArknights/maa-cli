@@ -1,0 +1,22 @@
+version: 2
+# Side story boundaries for testing [from, until) semantics:
+# - At exactly from (inclusive): OnSideStory should be active
+# - At exactly until (exclusive): OnSideStory should be inactive
+side_story_start: 1970-01-01T00:00:00Z
+side_story_end: 1970-01-01T01:00:00Z
+tasks:
+  - type: Fight
+    params:
+      stage: ${stage}
+      note: farm ${stage}
+    override_strategy: first
+    overrides:
+      - if: OnSideStory
+        params:
+          note: side ${stage}
+
+  - type: Fight
+    if:
+      weekdays: [Mon]
+    params:
+      stage: ignored

@@ -1,0 +1,40 @@
+version: 2
+tasks:
+  - type: Fight
+    if:
+      divisor: 2
+      remainder: 1
+      timezone: 8
+    params:
+      stage: AP-5
+
+  - type: Fight
+    if:
+      time_range:
+        from: 08:00:00
+        until: 12:00:00
+      timezone: Local
+    params:
+      stage: LS-6
+
+  - type: Fight
+    if:
+      date_range:
+        from: 2026-04-01T00:00:00
+        until: 2026-04-30T23:59:59
+      timezone: Official
+    params:
+      stage: SL-8
+
+  - type: Fight
+    if:
+      all:
+        - weekdays: [Mon]
+        - not: OnSideStory
+    params:
+      stage: 1-7
+
+  - type: Fight
+    if: Always
+    params:
+      stage: CE-6

@@ -1117,6 +1117,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "maa-cli-config"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "maa-question",
+ "maa-types",
+ "maa-value",
+ "nonempty-vec",
+ "schemars",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.19",
+ "toml",
+ "yaml_serde",
+]
+
+[[package]]
 name = "maa-core"
 version = "0.1.0"
 dependencies = [
@@ -1679,6 +1696,7 @@ version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2b42f36aa1cd011945615b92222f6bf73c599a102a300334cd7f8dbeec726cc"
 dependencies = [
+ "chrono",
  "dyn-clone",
  "indexmap",
  "ref-cast",

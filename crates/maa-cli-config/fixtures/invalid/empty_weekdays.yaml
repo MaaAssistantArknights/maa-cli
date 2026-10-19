@@ -1,0 +1,7 @@
+version: 2
+tasks:
+  - type: Fight
+    if:
+      weekdays: []
+    params:
+      stage: 1-7

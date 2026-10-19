@@ -1,0 +1,6 @@
+version: 2
+connection:
+  type: Waydroid
+  adb_path: adb
+  touch_mode: MaaTouch
+  adb_lite: true
