@@ -41,13 +41,18 @@ impl WpfConfig {
         &self,
         summary: &mut MigrationSummary,
         custom_schedule: Option<&Path>,
+        schedule_base: Option<&Path>,
     ) -> Result<Option<CliConfig>> {
         let mut tasks = Vec::new();
         let mut schedule_applied = false;
         for task in &self.task_queue {
-            if let Some(item) =
-                task.migrate_task(&self.gui, summary, custom_schedule, &mut schedule_applied)?
-            {
+            if let Some(item) = task.migrate_task(
+                &self.gui,
+                summary,
+                custom_schedule,
+                &mut schedule_applied,
+                schedule_base,
+            )? {
                 tasks.push(item);
             }
         }
@@ -68,7 +73,7 @@ enum WpfTask {
     RecruitTask(recruit::WpfRecruitTask),
     MallTask(mall::WpfMallTask),
     AwardTask(award::WpfAwardTask),
-    RoguelikeTask(roguelike::WpfRoguelikeTask),
+    RoguelikeTask(Box<roguelike::WpfRoguelikeTask>),
     ReclamationTask(reclamation::WpfReclamationTask),
     /// Unknown `$type` values are skipped during migration.
     Unsupported {
@@ -101,7 +106,7 @@ pub(crate) fn wpf(
         profile.config_version
     );
     let configuration = select_configuration(profile, profile_name)?;
-    let (value, summary) = migrate(configuration, custom_schedule)?;
+    let (value, summary) = migrate_with_base(configuration, custom_schedule, file.parent())?;
 
     let mut temp_path = Default::default();
     let out = out.unwrap_or_else(|| {
@@ -167,13 +172,22 @@ fn resolve_configuration_name(
 }
 
 /// Migrate a GUI configuration into maa-cli task config shape.
+#[cfg(test)]
 pub(super) fn migrate(
     config: WpfConfig,
     custom_schedule: Option<&Path>,
 ) -> Result<(CliConfig, MigrationSummary)> {
+    migrate_with_base(config, custom_schedule, None)
+}
+
+pub(super) fn migrate_with_base(
+    config: WpfConfig,
+    custom_schedule: Option<&Path>,
+    schedule_base: Option<&Path>,
+) -> Result<(CliConfig, MigrationSummary)> {
     let mut summary = MigrationSummary::default();
     let value = config
-        .migrate_tasks(&mut summary, custom_schedule)?
+        .migrate_tasks(&mut summary, custom_schedule, schedule_base)?
         .context("GUI configuration produced no CLI config")?;
     Ok((value, summary))
 }
@@ -253,7 +267,9 @@ fn parse_wpf_task(value: Value) -> Result<WpfTask> {
         "RecruitTask" => Ok(WpfTask::RecruitTask(serde_json::from_value(value)?)),
         "MallTask" => Ok(WpfTask::MallTask(serde_json::from_value(value)?)),
         "AwardTask" => Ok(WpfTask::AwardTask(serde_json::from_value(value)?)),
-        "RoguelikeTask" => Ok(WpfTask::RoguelikeTask(serde_json::from_value(value)?)),
+        "RoguelikeTask" => Ok(WpfTask::RoguelikeTask(Box::new(serde_json::from_value(
+            value,
+        )?))),
         "ReclamationTask" => Ok(WpfTask::ReclamationTask(serde_json::from_value(value)?)),
         other => Ok(WpfTask::Unsupported {
             type_tag: other.to_string(),
@@ -269,6 +285,7 @@ impl WpfTask {
         summary: &mut MigrationSummary,
         custom_schedule: Option<&Path>,
         schedule_applied: &mut bool,
+        schedule_base: Option<&Path>,
     ) -> Result<Option<Value>> {
         match self {
             Self::StartUpTask(start_up) => {
@@ -285,6 +302,7 @@ impl WpfTask {
                     summary,
                     custom_schedule,
                     schedule_applied,
+                    schedule_base,
                 )?)?))
             }
             Self::RecruitTask(task) => {
@@ -301,7 +319,7 @@ impl WpfTask {
             }
             Self::RoguelikeTask(task) => {
                 task.report_to(summary);
-                Ok(Some(Value::try_from(task)?))
+                Ok(Some(Value::try_from(task.as_ref())?))
             }
             Self::ReclamationTask(task) => {
                 task.report_to(summary);

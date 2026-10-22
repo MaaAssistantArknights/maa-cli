@@ -98,7 +98,7 @@ facility = [
     "Processing",
     "Training",
 ]
-filename = "/Users/nan/Library/Application Support/com.loong.maa/config/tasks/一图流-153-一天两换-MAA.json"
+filename = "一图流-153-一天两换-MAA.json"
 mode = 10000
 reception_clue_exchange = true
 reception_message_board = true
