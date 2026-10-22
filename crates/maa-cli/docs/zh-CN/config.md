@@ -393,7 +393,7 @@ resource = true # 是否安装 MaaCore 的资源，默认为 true
 
 # CLI 更新相关配置
 [cli]
-channel = "Stable" # 更新通道，可选值为 "Alpha"，"Beta" "Stable"，默认为 "Stable"
+channel = "Stable" # 更新通道，可选值为 "Nightly"，"Beta" "Stable"，默认为 "Stable"
 # 查询 maa-cli 最新版本的 api 地址，留空表示使用默认地址
 api_url = "https://github.com/MaaAssistantArknights/maa-cli/raw/version/"
 # 下载预编译二进制文件的地址，留空表示使用默认地址
@@ -407,10 +407,11 @@ binary = true # 是否安装 maa-cli 的二进制文件，默认为 true
 [resource]
 auto_update = true  # 是否在每次运行任务时自动更新资源，默认为 false
 warn_on_update_failure = true # 是否在更新失败时发出警告而不是直接报错
-backend = "libgit2" # 资源热更新后端，可选值为 "git" 或者 "libgit2"，默认为 "git"
 
 # 资源热更新远程仓库相关配置
-[resource.remote]
+[resource.source]
+type = "git" # 资源来源，可选 "git" 或 "mirrorchyan"；省略来源配置时使用 Git
+backend = "libgit2" # Git 实现，可选值为 "git" 或者 "libgit2"，默认为 "git"
 branch = "main" # 远程仓库的分支，默认为 "main"
 # 远程资源仓库的 URL，留空以使用默认 URL
 # GitHub 仓库支持 HTTPS 和 SSH 两种协议访问，建议使用 HTTPS 协议，因为通常情况下不需要额外配置
@@ -437,17 +438,82 @@ passphrase = "password"       # ssh 密钥的密码
 # ssh-agent 会将你的密钥保存在内存中，这样你就不需要每次输入密码
 # 注意，你需要确保 ssh-agent 已经启动并且已经添加了你的密钥，同时 SSH_AUTH_SOCK 环境变量已经设置
 # use_ssh_agent = true # 使用 ssh-agent 进行身份验证，如果设置为 true，将忽略 ssh_key 和 passphrase 字段
+
+# 使用 Mirror酱时，将整个 [resource.source] 块替换为以下配置
+# [resource.source]
+# type = "mirrorchyan"
+# cdk = { env = "MIRRORCHYAN_CDK" }
+# check_interval = 600 # 自动检查间隔（秒），默认 600；0 表示每次检查
+# 也可从密码管理器读取 CDK：
+# cdk = { cmd = ["pass", "show", "mirrorchyan/cdk"] }
 ```
 
 **注意事项**：
 
 - MaaCore 的更新通道中 `Alpha` 只在 Windows 上可用；
-- 由于 CLI 默认的 API 链接和下载链接都是 GitHub 的链接，因此在国内可能会有一些问题，你可以通过配置 `api_url` 和 `download_url` 来使用镜像。
+- 由于 CLI 默认的 API 链接和下载链接都是 GitHub 的链接，因此在国内可能会有一些问题，你可以通过配置 `api_url` 和 `download_url` 来使用镜像。资源热更新也可以配置 [Mirror酱](https://mirrorchyan.com/zh/projects?rid=MAA) CDK，通过高速 CDN 下载 MaaResource，具体配置见下方说明。
 - 即使启动了资源热更新，你依然需要安装 MaaCore 的资源，因为资源热更新并不包含所有的资源文件，只是包含部分可更新的资源文件，基础资源文件仍然需要安装。
-- 资源热更新是通过 Git 来拉取远程仓库，如果后端设置为 `git` 那么 `git` 命令行工具必须可用。
-- 如果你想要使用 SSH 协议来拉取远程仓库，你必须配置 `ssh_key` 字段，这个字段应该是一个路径，指向你的 SSH 私钥。
+- 资源热更新是通过 Git 来拉取远程仓库，如果后端 `resource.source.backend` 设置为 `git` 那么 `git` 命令行工具必须可用。
+- 如果你想要使用 SSH 协议来拉取远程仓库，你必须配置 `resource.source.ssh_key` 字段，这个字段应该是一个路径，指向你的 SSH 私钥。
 - 如果你的 SSH 私钥是受密码保护的，你需要提供密码来解密私钥，或者使用 ssh-agent 来管理你的密钥。
-- 远程仓库的 `url` 设置目前只对首次安装资源有效，如果你想要更改远程仓库的地址，你需要通过 `git` 命令行工具手动更改，或者删除对应的仓库。仓库所在位置可以通过 `maa dir hot-update` 获取。
+- 远程仓库的 `resource.source.url` 设置目前只对首次安装资源有效，如果你想要更改远程仓库的地址，你需要通过 `git` 命令行工具手动更改，或者删除对应的仓库。仓库所在位置可以通过 `maa dir hot-update` 获取。
+
+### Mirror酱使用说明
+
+下载需要有效的 Mirror酱 CDK。切换来源时替换整个 `[resource.source]` 块，只保留所选来源的选项。
+
+在运行 maa-cli 的终端中设置环境变量。Bash、Zsh 示例：
+
+```bash
+export MIRRORCHYAN_CDK="你的Mirror酱CDK"
+maa hot-update
+```
+
+PowerShell 示例：
+
+```powershell
+$env:MIRRORCHYAN_CDK = "你的Mirror酱CDK"
+maa hot-update
+```
+
+使用定时任务或服务运行 maa-cli 时，也要在对应的运行环境中设置这个变量。使用密码管理器时，可将 `cdk` 改为读取命令输出，例如 `cdk = { cmd = ["pass", "show", "mirrorchyan/cdk"] }`。也支持直接填写字符串或设置 `cdk = true` 在运行时输入；无人值守运行时使用环境变量或读取命令。
+
+`check_interval` 是自动检查资源更新的间隔，单位为秒，默认 `600`；设为 `0` 时每次都检查。手动执行 `maa hot-update` 会立即检查，不受这个间隔限制。无需更新时不会下载资源包。
+
+选择 Mirror酱后，资源从 Mirror酱下载，已有 Git 仓库不参与资源叠加。活动信息和 JSON 任务补丁仍通过 `hot_update.api_url` 下载，任务补丁会叠加到所选来源的资源上。更新失败时会报告错误；如果设置了 `warn_on_update_failure = true`，且已有可用的 Mirror酱资源，则发出警告并继续使用本地资源。首次下载失败、没有可用资源时仍会报错。
+
+要切回 Git，将整个 `[resource.source]` 配置块替换为大代码框中的 Git 配置，然后执行 `maa hot-update`。切换来源不会删除已有的另一来源的资源。
+
+### 从旧配置迁移
+
+旧版的 `resource.backend` 和 `[resource.remote]` 仍然支持，可以继续使用。需要迁移时，保留 `[resource]` 中的公共选项，将 `backend` 和原 `remote` 中的仓库、认证配置一起移入 `[resource.source]`，并添加 `type = "git"`。
+
+迁移前：
+
+```toml
+[resource]
+auto_update = true
+backend = "libgit2"
+
+[resource.remote]
+url = "https://github.com/MaaAssistantArknights/MaaResource.git"
+branch = "main"
+```
+
+迁移后：
+
+```toml
+[resource]
+auto_update = true
+
+[resource.source]
+type = "git"
+backend = "libgit2"
+url = "https://github.com/MaaAssistantArknights/MaaResource.git"
+branch = "main"
+```
+
+迁移后删除旧的 `resource.backend` 和整个 `[resource.remote]` 块，即使该块为空也要删除。新旧格式混用会报配置错误。若要直接切换到 Mirror酱，同样先删除旧 Git 配置，再填写 Mirror酱示例中的来源块；已有的 `auto_update` 和 `warn_on_update_failure` 可保留。
 
 ## 参考配置
 

@@ -24,8 +24,8 @@ resource = true  # Whether to install resources of MaaCore
 
 # Configurations for maa-cli self update
 [cli]
-# Update channel of maa-cli, can be "Alpha", "Beta" or "Stable".
-channel = "Alpha"
+# Update channel of maa-cli, can be "Nightly", "Beta" or "Stable"
+channel = "Nightly"
 # URL of the maa-cli version API, used to get the latest version of maa-cli.
 api_url = "https://cdn.jsdelivr.net/gh/MaaAssistantArknights/maa-cli@vversion/"
 # URL to download latest version of maa-cli, leave it empty to use the default URL.
@@ -42,10 +42,10 @@ binary = false  # Whether to install binary of maa-cli
 [resource]
 auto_update = true  # Whether to auto update resource each time run maa task
 warn_on_update_failure = true  # Whether to warn on update failure instead of panic
-backend = "libgit2"  # Backend to manipulate repository, can be `git` or `libgit2`
-
-# Configurations for remote git repository of resource
-[resource.remote]
+# Configurations for the resource source
+[resource.source]
+type = "git"
+backend = "git"  # Git implementation, can be `git` or `libgit2`
 branch = "main"  # Branch of remote resource repository
 # URL of remote resource repository, leave it empty to use the default URL
 url = "https://github.com/MaaAssistantArknights/MaaResource.git"

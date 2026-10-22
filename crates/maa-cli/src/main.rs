@@ -5,7 +5,6 @@ use maa_dirs as dirs;
 #[macro_use(join)]
 extern crate maa_dirs;
 
-mod atomic_fs;
 mod log;
 mod state;
 
@@ -50,7 +49,9 @@ fn main() -> Result<()> {
         }
         #[cfg(feature = "cli_installer")]
         Command::SelfC(self_c) => match self_c {
-            command::SelfCommand::Update { common } => installer::maa_cli::update(&common)?,
+            command::SelfCommand::Update { common, force } => {
+                installer::maa_cli::update(&common, force)?
+            }
         },
         Command::HotUpdate => {
             installer::hot_update::update()?;

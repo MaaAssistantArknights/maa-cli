@@ -412,7 +412,7 @@ resource = true # Whether to install MaaCore resources
 
 # CLI update configurations
 [cli]
-channel = "Stable" # Update channel: "Alpha", "Beta", or "Stable" (default)
+channel = "Stable" # Update channel: "Nightly", "Beta", or "Stable" (default)
 # API URL to query latest maa-cli version; leave empty for default
 api_url = "https://github.com/MaaAssistantArknights/maa-cli/raw/version/"
 # URL to download prebuilt binaries; leave empty for default
@@ -425,10 +425,11 @@ binary = true # Whether to install maa-cli binary
 [resource]
 auto_update = true # Whether to auto-update resources before running tasks
 warn_on_update_failure = true # Whether to warn instead of error on update failure
-backend = "libgit2" # Hot update backend: "git" or "libgit2"
 
 # Remote repository configuration
-[resource.remote]
+[resource.source]
+type = "git" # Resource source: "git" or "mirrorchyan"; Git is used if omitted
+backend = "libgit2" # Git implementation: "git" or "libgit2"
 branch = "main" # Branch of remote repository
 # Repository URL; leave empty for default
 # GitHub repositories support both HTTPS and SSH; HTTPS recommended
@@ -448,6 +449,14 @@ passphrase = "password" # Passphrase for SSH key
 # passphrase = { env = "MAA_SSH_PASSPHRASE" }
 # 3. Use a command output (useful with password managers)
 # passphrase = { cmd = ["pass", "show", "ssh/id_ed25519"] }
+
+# To use MirrorChyan, replace the entire [resource.source] block with:
+# [resource.source]
+# type = "mirrorchyan"
+# cdk = { env = "MIRRORCHYAN_CDK" }
+# check_interval = 600 # Automatic check interval in seconds; default: 600; 0 checks every time
+# Alternatively, read the CDK from a password manager:
+# cdk = { cmd = ["pass", "show", "mirrorchyan/cdk"] }
 ```
 
 **NOTE**:
@@ -455,8 +464,67 @@ passphrase = "password" # Passphrase for SSH key
 - The `Alpha` channel for MaaCore is only available on Windows
 - Hot update resources require the basic resources installed with MaaCore
 - Using the `git` backend requires the `git` command to be available
-- SSH authentication requires either `ssh_key` configuration or `ssh-agent`
-- The `resource.remote.url` only affects first installation; to change it later, modify it manually or delete and reinstall resources. Get the repository location with `maa dir hot-update`.
+- SSH authentication requires either `resource.source.ssh_key` configuration or `ssh-agent`
+- The `resource.source.url` only affects first installation; to change it later, modify it manually or delete and reinstall resources. Get the repository location with `maa dir hot-update`.
+
+- If the default GitHub API and download URLs are slow or unavailable, set `api_url` and `download_url` to use mirrors. For MaaResource updates, you can also configure a [MirrorChyan](https://mirrorchyan.com/zh/projects?rid=MAA) CDK to download through its high-speed CDN; see the configuration instructions below.
+
+### Using MirrorChyan
+
+Downloads require a valid MirrorChyan CDK. When switching sources, replace the entire `[resource.source]` block and keep only the selected source's options.
+
+Set the environment variable in the terminal used to run maa-cli. For Bash or Zsh:
+
+```bash
+export MIRRORCHYAN_CDK="your MirrorChyan CDK"
+maa hot-update
+```
+
+For PowerShell:
+
+```powershell
+$env:MIRRORCHYAN_CDK = "your MirrorChyan CDK"
+maa hot-update
+```
+
+For scheduled tasks or services, set the variable in that process's environment too. To use a password manager, set `cdk` to read command output, for example `cdk = { cmd = ["pass", "show", "mirrorchyan/cdk"] }`. A literal string or `cdk = true` to prompt at runtime is also supported. Use an environment variable or command for unattended runs.
+
+`check_interval` controls automatic resource update checks in seconds and defaults to `600`. Set it to `0` to check every time. Running `maa hot-update` checks immediately, regardless of this interval. Resource packages are downloaded only when an update is needed.
+
+With MirrorChyan selected, resources are downloaded from MirrorChyan; the existing Git checkout is not overlaid. Activity metadata and JSON task patches still use `hot_update.api_url`, and task patches are overlaid on resources from the selected source. Update failures report an error. With `warn_on_update_failure = true` and usable local MirrorChyan resources, maa-cli warns and continues using them. A failed first download still returns an error if no usable resources exist.
+
+To switch back to Git, replace the entire `[resource.source]` block with the Git configuration in the main code block, then run `maa hot-update`. Switching sources preserves the resources previously downloaded from the other source.
+
+### Migrating an existing configuration
+
+The legacy `resource.backend` and `[resource.remote]` settings remain supported. To migrate, keep the shared options under `[resource]`, move `backend` and all repository and authentication options from `remote` into `[resource.source]`, and add `type = "git"`.
+
+Before:
+
+```toml
+[resource]
+auto_update = true
+backend = "libgit2"
+
+[resource.remote]
+url = "https://github.com/MaaAssistantArknights/MaaResource.git"
+branch = "main"
+```
+
+After:
+
+```toml
+[resource]
+auto_update = true
+
+[resource.source]
+type = "git"
+backend = "libgit2"
+url = "https://github.com/MaaAssistantArknights/MaaResource.git"
+branch = "main"
+```
+
+Remove the old `resource.backend` and the entire `[resource.remote]` block, even if the block is empty. Mixing the two formats causes a configuration error. To switch directly to MirrorChyan, remove the old Git settings and use the MirrorChyan source block instead. Keep any existing `auto_update` and `warn_on_update_failure` options.
 
 ## Example Configuration Files
 

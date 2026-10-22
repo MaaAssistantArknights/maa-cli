@@ -33,10 +33,16 @@ graph TD
 
     subgraph Utils
         STREXT["maa-str-ext"]
+        ATOMICFS["maa-atomic-fs"]
     end
     
     subgraph Xtask
-        XTASK["xtask"]
+        XLIB["x-lib"]
+        BUILD["x-build"]
+        TEST["x-test"]
+        CHANNEL["x-channel"]
+        PACKAGE["x-package"]
+        TAG["x-tag"]
         X["x"]
     end
 
@@ -47,6 +53,7 @@ graph TD
     CLI --> VALUE
     CLI --> VALMACRO
     CLI --> VERSION
+    CLI --> ATOMICFS
 
     CORE --> SYS
     CORE --> TYPES
@@ -59,10 +66,20 @@ graph TD
     FFISTR --> STREXT
     VALUE --> STREXT
     VALUE --> VALMACRO
+    INSTALLER --> ATOMICFS
     
-    XTASK --> DIRS
-    XTASK --> VERSION
-    X -.shells out to.-> XTASK
+    BUILD --> XLIB
+    TEST --> XLIB
+    CHANNEL --> XLIB
+    PACKAGE --> XLIB
+    TAG --> XLIB
+    TEST --> DIRS
+    PACKAGE --> VERSION
+    X -.shells out to.-> BUILD
+    X -.shells out to.-> TEST
+    X -.shells out to.-> CHANNEL
+    X -.shells out to.-> PACKAGE
+    X -.shells out to.-> TAG
 ```
 
 **Application Layer:**
@@ -88,17 +105,24 @@ graph TD
 **Utils Layer:**
 
 - `maa-str-ext`: UTF-8 conversion for `OsStr`/`Path`/bytes. **Use when**: Dealing with strings that might not be UTF-8. This is a generic utility crate, not a MaaCore-specific abstraction.
+- `maa-atomic-fs`: Atomic single-file replacement (same-directory staging, fsync, rename). **Use when**: Writing or replacing a file that must never be left partially written, such as configs, caches, or release metadata.
 
 **Tooling Layer:**
 
-- `xtask`: Build/test/release automation. **Use when**: Changing CI/local automation, release scripting, or workspace test orchestration.
-- `x`: Thin launcher for `xtask`. **Use when**: Adjusting `cargo x ...` forwarding behavior.
+- `x-lib`: Shared environment, command, log grouping, and workspace path helpers.
+- `x-build`: Build automation. **Use when**: Changing builds or license generation.
+- `x-test`: Test automation. **Use when**: Changing workspace test orchestration.
+- `x-channel`: Release index channel selection using SemVer. **Use when**: Changing channel promotion rules.
+- `x-package`: Release artifact packaging and manifest generation. **Use when**: Changing release archives or manifests.
+- `x-tag`: Pushes the next Stable or Beta version tag. **Use when**: Changing how maintainers create release tags.
+- `x`: Dependency-free launcher for the xtask crates. **Use when**: Adjusting `cargo x ...` forwarding behavior.
 
 ## Critical Patterns
 
 - **Paths**: Always use `maa-dirs` for directory resolution. Never hardcode paths like `/usr/local/share` or `C:\Program Files`. The crate handles platform differences and environment overrides (`MAA_CONFIG_DIR`, etc.).
 - **FFI Boundary**: Keep `unsafe` confined to `maa-sys`. `maa-core` is the safe wrapper layer. Other crates should never call MaaCore directly.
 - **Error Handling**: `maa-cli` uses `anyhow::Result` for application errors. Libraries use `thiserror` for structured errors. Never use `unwrap()` without a safety comment.
+- **File Replacement**: Use `maa-atomic-fs` instead of `fs::write`/`File::create` when overwriting configs, caches, or other files that readers rely on. It does not lock or coordinate multiple files.
 - **String Conversions**: Use `maa-str-ext` for `OsStr`/`Path` ↔ UTF-8, and `maa-ffi-string` for MaaCore FFI `CString` conversion. Handle non-UTF-8 gracefully.
 - **String Formatting**: When using `format!` and related macros (`write!`, `log::info!`, `bail!`, etc.), always inline variables into `{}` placeholders. Example: use `format!("Error: {error}")` instead of `format!("Error: {}", error)`.
 
@@ -123,6 +147,18 @@ graph TD
 - Primary language is Simplified Chinese; add English when practical.
 - One paragraph per line; use `<br>` for line breaks only when needed; no trailing spaces.
 - Markdown is linted by `markdownlint-cli2`.
+
+## Contributing on Behalf of a Human (Follow This)
+
+If you are an agent helping someone prepare a PR, follow [CONTRIBUTING.md](CONTRIBUTING.md). In particular:
+
+- **Check for an agreed design first.** For a new feature, command, config option, config format change, or anything likely to exceed about 500 lines, confirm there is an issue where a maintainer agreed on the approach. If there is none, stop and tell your human to open one instead of implementing.
+- **Stay in scope.** Implement only what the task needs. Do not add unrequested flags, subcommands, options or refactors. Report unrelated problems to your human instead of fixing them in the same PR.
+- **Keep the diff lean.** No explanatory comment blocks, no speculative defensive code, no design notes or conversation summaries committed to the repo.
+- **Follow existing patterns.** Look for how the codebase already solves a problem (tests included) before inventing a new mechanism.
+- **Your human reviews before anything is published.** Do not open or push a PR until your human has read the whole diff. Never tick the self-review checkbox in the PR template for them.
+- **Write the PR description from the template.** Keep it short, fill in the AI assistance section honestly, and do not paste long generated summaries.
+- **Do not ghost-write review replies.** Help your human understand review feedback; the reply on GitHub should be in their own words.
 
 ## MISC
 

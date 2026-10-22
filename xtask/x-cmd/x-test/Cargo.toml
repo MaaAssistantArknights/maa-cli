@@ -1,0 +1,19 @@
+[package]
+name = "x-test"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+anyhow.workspace = true
+tempfile.workspace = true
+x-lib.workspace = true
+xflags.workspace = true
+maa-dirs.workspace = true
+
+[lints]
+workspace = true

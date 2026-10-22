@@ -57,7 +57,7 @@ impl Filetype {
         use Filetype::*;
         Ok(match self {
             Json => serde_json::from_reader(File::open(path)?)?,
-            Yaml => serde_yaml::from_reader(File::open(path)?)?,
+            Yaml => yaml_serde::from_reader(File::open(path)?)?,
             Toml => toml::from_str(&fs::read_to_string(path)?)?,
         })
     }
@@ -66,7 +66,7 @@ impl Filetype {
     where
         T: serde::Serialize,
     {
-        crate::atomic_fs::write_with(path, |temp| self.write_to(temp, value))
+        maa_atomic_fs::write_with(path, |file| self.write_to(file, value))
     }
 
     fn write_to<W, T>(&self, mut writer: W, value: &T) -> Result<()>
@@ -77,7 +77,7 @@ impl Filetype {
         use Filetype::*;
         match self {
             Json => serde_json::to_writer_pretty(writer, value)?,
-            Yaml => serde_yaml::to_writer(writer, value)?,
+            Yaml => yaml_serde::to_writer(writer, value)?,
             Toml => writer.write_all(toml::to_string_pretty(value)?.as_bytes())?,
         }
         Ok(())
@@ -229,6 +229,32 @@ mod tests {
             let test_toml = test_file.with_extension("toml");
             Toml.write(&test_toml, &value).unwrap();
             assert_eq!(MAAValue::from_file(&test_toml).unwrap(), value);
+        }
+
+        #[test]
+        fn yaml_errors() {
+            struct FailingWriter;
+
+            impl std::io::Write for FailingWriter {
+                fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+                    Err(std::io::Error::other("write failed"))
+                }
+
+                fn flush(&mut self) -> std::io::Result<()> {
+                    Ok(())
+                }
+            }
+
+            let dir = tempfile::tempdir().unwrap();
+            let missing = dir.path().join("missing.yaml");
+            assert!(Filetype::Yaml.read::<MAAValue>(&missing).is_err());
+
+            let invalid = dir.path().join("invalid.yaml");
+            fs::write(&invalid, "a: [unclosed").unwrap();
+            assert!(Filetype::Yaml.read::<MAAValue>(&invalid).is_err());
+
+            let value = object!("a" => 1);
+            assert!(Filetype::Yaml.write_to(FailingWriter, &value).is_err());
         }
     }
 

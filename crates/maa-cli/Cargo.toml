@@ -1,6 +1,6 @@
 [package]
 name = "maa-cli"
-version = "0.7.5"
+version = "0.7.7"
 edition.workspace = true
 description = "A simple CLI for MAA (MaaAssistantArknights)"
 repository.workspace = true
@@ -19,28 +19,37 @@ clap_mangen = { workspace = true }
 color-print = { workspace = true }
 dunce = { workspace = true }
 env_logger = { workspace = true, features = ["auto-color"] }
+fs2 = { workspace = true }
 git2 = { workspace = true, optional = true }
 indicatif = { workspace = true }
 log = { workspace = true }
+maa-atomic-fs = { workspace = true }
+maa-core = { workspace = true, features = ["runtime"] }
 maa-dirs = { workspace = true }
 maa-installer = { workspace = true }
 maa-str-ext = { workspace = true }
-maa-core = { workspace = true, features = ["runtime"] }
 maa-types = { workspace = true, features = ["serde"] }
 maa-value = { workspace = true }
-maa-version = { workspace = true, optional = true }
+maa-version = { workspace = true, features = ["clap"], optional = true }
 prettytable = { workspace = true }
 rayon = { workspace = true }
 self-replace = { workspace = true }
 semver = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-serde_yaml = { workspace = true }
 sha2 = { workspace = true, optional = true }
 signal-hook = { workspace = true }
 tempfile = { workspace = true }
 toml = { workspace = true }
-ureq = { workspace = true, features = ["json", "platform-verifier"] }
+ureq = { workspace = true, features = ["json"] }
+yaml_serde = { workspace = true }
+zip = { workspace = true }
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+ureq = { workspace = true, features = ["platform-verifier"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+ureq = { workspace = true, features = ["rustls-webpki-roots"] }
 
 [target.'cfg(windows)'.dependencies]
 winreg = { workspace = true }

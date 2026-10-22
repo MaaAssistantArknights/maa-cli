@@ -1,7 +1,8 @@
 use clap::Args;
+pub use maa_version::cli::Channel;
 use serde::Deserialize;
 
-use super::{Channel, normalize_url, return_true};
+use super::{normalize_url, return_true};
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Clone)]
@@ -38,7 +39,9 @@ impl Config {
     }
 
     pub fn api_url(&self) -> String {
-        format!("{}/{}.json", normalize_url(&self.api_url), self.channel())
+        let api_url = normalize_url(&self.api_url);
+        let index_file = self.channel().index_file();
+        format!("{api_url}/{index_file}")
     }
 
     pub fn set_api_url(&mut self, api_url: impl ToString) -> &mut Self {
@@ -78,8 +81,7 @@ impl Config {
 pub struct CommonArgs {
     /// Channel to download prebuilt CLI binary
     ///
-    /// There are two channels of maa-cli prebuilt binary,
-    /// stable and alpha (which means nightly).
+    /// There are three channels of maa-cli prebuilt binary: stable, beta and nightly.
     pub channel: Option<Channel>,
     /// Url of api to get version information
     ///
@@ -123,7 +125,7 @@ pub mod tests {
 
     pub fn example_config() -> Config {
         Config {
-            channel: Channel::Alpha,
+            channel: Channel::Nightly,
             api_url: "https://cdn.jsdelivr.net/gh/MaaAssistantArknights/maa-cli@vversion/"
                 .to_string(),
             download_url: "https://github.com/MaaAssistantArknights/maa-cli/releases/download/"
@@ -155,7 +157,7 @@ pub mod tests {
         fn deserialize_config() {
             assert_de_tokens(
                 &Config {
-                    channel: Channel::Alpha,
+                    channel: Channel::Nightly,
                     api_url: "https://foo.bar/api/".to_owned(),
                     download_url: "https://foo.bar/download/".to_owned(),
                     components: CLIComponents { binary: false },
@@ -163,7 +165,10 @@ pub mod tests {
                 &[
                     Token::Map { len: Some(4) },
                     Token::Str("channel"),
-                    Channel::Alpha.to_token(),
+                    Token::UnitVariant {
+                        name: "Channel",
+                        variant: "Nightly",
+                    },
                     Token::Str("api_url"),
                     Token::Str("https://foo.bar/api/"),
                     Token::Str("download_url"),
@@ -191,8 +196,8 @@ pub mod tests {
         fn channel() {
             assert_eq!(Config::default().channel(), Default::default());
             assert_eq!(
-                Config::default().set_channel(Channel::Alpha).channel(),
-                Channel::Alpha,
+                Config::default().set_channel(Channel::Nightly).channel(),
+                Channel::Nightly,
             );
         }
 
@@ -212,12 +217,12 @@ pub mod tests {
 
             assert_eq!(
                 Config {
-                    channel: Channel::Alpha,
+                    channel: Channel::Nightly,
                     api_url: "https://foo.bar/cli/".to_string(),
                     ..Default::default()
                 }
                 .api_url(),
-                "https://foo.bar/cli/alpha.json",
+                "https://foo.bar/cli/nightly.json",
             );
         }
 
@@ -265,12 +270,12 @@ pub mod tests {
 
             assert_eq!(
                 Config::default().with_args(&CommonArgs {
-                    channel: Some(Channel::Alpha),
+                    channel: Some(Channel::Nightly),
                     api_url: Some("https://foo.bar/api/".to_string()),
                     download_url: Some("https://foo.bar/download/".to_string()),
                 }),
                 Config {
-                    channel: Channel::Alpha,
+                    channel: Channel::Nightly,
                     api_url: "https://foo.bar/api/".to_string(),
                     download_url: "https://foo.bar/download/".to_string(),
                     ..Default::default()

@@ -368,8 +368,9 @@ fn default_resource_base_dirs() -> Vec<PathBuf> {
         warn!("Resource directory not found!")
     }
 
-    resource_dirs.push_if_exists(join!(maa_dirs::maa_resource(), "resource"));
-    resource_dirs.push_if_exists(maa_dirs::hot_update_resource().to_path_buf());
+    for path in crate::installer::resource::resource_dirs() {
+        resource_dirs.push_if_exists(path);
+    }
 
     resource_dirs
 }
@@ -497,7 +498,7 @@ fn migrate_legacy_tasks_json(resource_dir: &Path, hot_update_root: &Path) -> Res
         bail!("Expected {} to be a directory", new_dir.display());
     }
 
-    crate::atomic_fs::copy(&old, &new)
+    maa_atomic_fs::copy(&old, &new)
         .with_context(|| format!("Failed to copy {} to {}", old.display(), new.display()))?;
 
     Ok(())
@@ -644,6 +645,73 @@ mod tests {
 
     use super::*;
     use crate::assert_matches;
+
+    #[test]
+    fn selected_source_loads_hot_update_overlay() {
+        // These unwraps construct isolated test fixtures, not user paths.
+        if std::env::var_os("MAA_MIRROR_DIRS_CHILD").is_some() {
+            let dirs = default_resource_base_dirs();
+            let git = std::env::var_os("MAA_EXPECT_GIT_DIRS").is_some();
+            let git_dir = maa_dirs::maa_resource().join("resource");
+            let patch_dir = maa_dirs::hot_update_resource().to_path_buf();
+            assert_eq!(
+                dirs.contains(
+                    &maa_dirs::data()
+                        .join("MirrorChyan")
+                        .join("MaaResource")
+                        .join("resource")
+                ),
+                !git
+            );
+            assert_eq!(dirs.contains(&git_dir), git);
+            assert!(dirs.contains(&patch_dir));
+            let selected = if git {
+                git_dir
+            } else {
+                maa_dirs::data().join("MirrorChyan/MaaResource/resource")
+            };
+            assert!(
+                dirs.iter().position(|path| path == &selected).unwrap()
+                    < dirs.iter().position(|path| path == &patch_dir).unwrap()
+            );
+            return;
+        }
+        for (config, git) in [
+            (
+                "[resource.source]\ntype = 'mirrorchyan'\ncdk = false\n",
+                false,
+            ),
+            ("[resource.source]\ntype = 'git'\n", true),
+        ] {
+            let tmp = tempfile::tempdir().unwrap();
+            std::fs::write(tmp.path().join("cli.toml"), config).unwrap();
+            for path in [
+                "data/MaaResource/resource",
+                "data/MirrorChyan/MaaResource/resource",
+                "cache/resource",
+            ] {
+                std::fs::create_dir_all(tmp.path().join(path)).unwrap();
+            }
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "config::asst::tests::selected_source_loads_hot_update_overlay",
+                    "--nocapture",
+                ])
+                .env("MAA_MIRROR_DIRS_CHILD", "1")
+                .envs(git.then_some(("MAA_EXPECT_GIT_DIRS", "1")))
+                .env("MAA_CONFIG_DIR", tmp.path())
+                .env("MAA_DATA_DIR", tmp.path().join("data"))
+                .env("MAA_CACHE_DIR", tmp.path().join("cache"))
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+    }
 
     static USER_RESOURCE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
         let user_resource_dir = maa_dirs::config().join("resource");
