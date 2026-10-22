@@ -15,6 +15,13 @@ const HANDLED: &[&str] = &[
     "ShoppingIgnoreBlackListWhenFull",
     "OnlyBuyDiscount",
     "ReserveMaxCredit",
+    // GUI bookkeeping. MaaCore mall params have no matching fields.
+    "CreditFightLastTime",
+    "CreditFightOnceADay",
+    "VisitFriendsLastTime",
+    "VisitFriendsOnceADay",
+    "IsCreditFightAvailable",
+    "IsVisitFriendsAvailable",
 ];
 
 #[derive(Debug, Serialize)]
@@ -149,14 +156,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(
-            summary
-                .skipped_fields
-                .iter()
-                .map(|f| f.field.as_str())
-                .collect::<Vec<_>>(),
-            ["CreditFightLastTime"]
-        );
+        assert!(summary.is_empty());
         assert_eq!(
             serde_json::to_value(config).unwrap(),
             json!({
