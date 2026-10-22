@@ -34,6 +34,7 @@ maa migrate wpf gui.new.json --custom-schedule ~/一图流-153-一天两换-MAA.
 GUI 里 `IsEnable = false` 的任务仍会写出，但会带上 `params.enable = false`，因此默认不会执行；需要时再手动改回 `true` 或删掉该字段。
 
 示例输入与输出可以参考仓库中的 [`config_examples/wpf`](../../config_examples/wpf)。
+示例输出里的排班 `filename` 仍是相对名，方便对照；实际迁移会写成输入 JSON 所在目录下的绝对路径。
 
 ## 任务映射说明
 
@@ -77,6 +78,7 @@ params = { stage = "LS-6" }
 ```
 
 这里的 `medicine_expire_days` 对应 GUI 的 `MedicineExpireDays`（在 `UseExpiringMedicine = true` 时写入），表示使用多少天内将过期的理智药。
+`IsDrGrandet` 为 true 时写成 `DrGrandet`。
 活动关卡的 `start` 和 `end` 来自迁移时本地的 `StageActivityV2.json`，之后不会随热更新自动刷新；活动换档后需重新迁移或手动改条件。
 若同时启用 `UseWeeklySchedule`，周计划会与关卡开放条件用 `And` 组合。
 
@@ -91,6 +93,7 @@ params = { stage = "LS-6" }
 - `ExtraTagMode` → `extra_tags_mode`
 - `LevelNChoose` / `LevelNTime` → `select` / `confirm` / `recruitment_time`
 - 偏好标签、保留标签 → `first_tags` / `preserve_tags`
+- `Level3RecruitmentPermitReserve` 在开关打开且数量大于 0 时写成 `level3_recruitment_permit_reserve`
 
 以下行为需要特别注意：
 
@@ -104,16 +107,19 @@ params = { stage = "LS-6" }
 
 - 读到 `plans` 且各班有 `period`、GUI 为时间轮换（`PlanSelect = -1`）时，写出 `mode = 10000`、`filename`，以及按时段（跨天时加上 `DayMod`）选择 `plan_index` 的变体。
 - 读到排班但没有可用时段（或 GUI 选了固定班次）时，写出自定义模式并带上 `plan_index`。
-- `Filename` 里的 `~` 会展开为用户主目录；写出的 `filename` 是展开后的绝对路径。
+- `Filename` 里的 `~` 会展开为用户主目录。相对路径按输入 JSON 所在目录解析。写出的 `filename` 是展开后的绝对路径。
+- 示例输入旁的 `一图流-153-一天两换-MAA.json` 是一份只含时段和菲亚梅塔的排班，供上面的 `gui.new.json` 引用。
+- `FiammettaTarget1/2/3` 写成 `fiammetta_targets`。`FiammettaRecoveryEnabled` 为 true 时写成 `fiammetta_recovery_enabled`。集成文档规定这两项只在 `mode = 0` 时生效；自定义排班里的菲亚梅塔仍由排班文件自己描述，MaaCore 读取该文件。
 - 可用 `--custom-schedule <json>` 覆盖 GUI 中的排班文件路径；仅当 GUI 已是自定义排班时有效，否则报错退出。覆盖后若文件读失败，也会报错退出，而不会回退到默认基建。
 - 未指定 `--custom-schedule` 时，文件不存在、无法解析或没有 `plans` 会跳过 `Mode` / `Filename`，按默认基建模式（`mode = 0`）写出其余参数，并在迁移摘要中说明。
 
 ### 其他任务
 
 - `Mall`：信用商店、信用作战、访问好友、黑白名单等会映射到对应参数。
-- `Award`：日常奖励、邮件、源石锭等；GUI 的 `FreeGacha` 对应 `recruit`。
-- `Roguelike` / `Reclamation`：主题、模式与常见选项会迁移；无法识别的模式字段会记入跳过摘要。
-- 较新的 GUI 用 `StartingOpers` 代替 `CoreChar` / `UseSupport` 时，会取列表首项映射为 `core_char` 与 `use_support`；多余开局干员会记入跳过摘要。
+- `Award`：日常奖励、邮件、源石锭等；GUI 的 `FreeGacha` 对应 `recruit`，`SignInEvent` 对应 `signinevent`。
+- `Roguelike` / `Reclamation`：主题、模式与协议里有对应项的参数会迁移，包括黑流树海的开局模式、培育目标和结局策略。无法识别的模式或取值会记入跳过摘要。
+- 较新的 GUI 用 `StartingOpers` 代替 `CoreChar` / `UseSupport` 时，整份列表写成 `core_char_list`，第一项同时保留为 `core_char` 与 `use_support`。
+- `UserDataUpdate`（仓库识别、干员 box）没有对应的 maa-cli 任务，整项跳过。
 - 未识别的 `$type` 会整项跳过，并出现在迁移摘要的「跳过任务」列表中。
 
 各任务类型的完整参数含义请参考 [MAA 集成文档][task-types]。迁移后若要继续用条件变体精细控制执行逻辑，请参阅 [任务条件](config.md#任务条件)。
