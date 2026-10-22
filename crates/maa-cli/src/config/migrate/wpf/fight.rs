@@ -27,6 +27,7 @@ const HANDLED: &[&str] = &[
     "Series",
     "UseExpiringMedicine",
     "MedicineExpireDays",
+    "IsDrGrandet",
 ];
 
 /// maa-cli Fight task shape written by migration.
@@ -63,6 +64,8 @@ struct CliFightParams {
     medicine_expire_days: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     stage: Option<String>,
+    #[serde(rename = "DrGrandet", skip_serializing_if = "Option::is_none")]
+    dr_grandet: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     enable: Option<bool>,
 }
@@ -76,6 +79,7 @@ impl CliFightParams {
             && self.series == i32::default()
             && self.medicine_expire_days.is_none()
             && self.stage.is_none()
+            && self.dr_grandet.is_none()
             && self.enable.is_none()
     }
 
@@ -123,6 +127,8 @@ pub(super) struct WpfFightTask {
     series: i32,
     use_expiring_medicine: bool,
     medicine_expire_days: i32,
+    #[serde(default)]
+    is_dr_grandet: bool,
 
     #[serde(flatten)]
     #[allow(dead_code)]
@@ -315,6 +321,7 @@ impl From<&WpfFightTask> for CliFightParams {
                 .use_expiring_medicine
                 .then_some(task.medicine_expire_days),
             stage: None,
+            dr_grandet: task.is_dr_grandet.then_some(true),
             enable: None,
         }
     }

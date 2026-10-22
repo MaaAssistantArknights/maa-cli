@@ -23,6 +23,8 @@ const HANDLED: &[&str] = &[
     "Level3PreferTags",
     "PreserveTagEnabled",
     "PreserveTagList",
+    "Level3RecruitmentPermitReserveEnabled",
+    "Level3RecruitmentPermitReserve",
 ];
 
 #[derive(Debug, Serialize)]
@@ -52,6 +54,8 @@ struct CliRecruitParams {
     first_tags: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     preserve_tags: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    level3_recruitment_permit_reserve: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     enable: Option<bool>,
 }
@@ -84,6 +88,10 @@ pub(super) struct WpfRecruitTask {
     preserve_tag_enabled: bool,
     #[serde(default)]
     preserve_tag_list: Vec<String>,
+    #[serde(default)]
+    level3_recruitment_permit_reserve_enabled: bool,
+    #[serde(default)]
+    level3_recruitment_permit_reserve: i32,
     #[serde(flatten)]
     unknown: Map<String, Value>,
 }
@@ -164,6 +172,9 @@ impl TryFrom<&WpfRecruitTask> for CliRecruitTask {
                 recruitment_time: (!recruitment_time.is_empty()).then_some(recruitment_time),
                 first_tags,
                 preserve_tags,
+                level3_recruitment_permit_reserve: (task.level3_recruitment_permit_reserve_enabled
+                    && task.level3_recruitment_permit_reserve > 0)
+                    .then_some(task.level3_recruitment_permit_reserve),
                 enable: (!task.is_enable).then_some(false),
             },
         })

@@ -12,6 +12,7 @@ const HANDLED: &[&str] = &[
     "Roles",
     "CoreChar",
     "StartingOpers",
+    "UseAdditionalStartingOpers",
     "StartCount",
     "Difficulty",
     "Investment",
@@ -25,6 +26,25 @@ const HANDLED: &[&str] = &[
     "RefreshTraderWithDice",
     "StartWithEliteTwo",
     "StartWithEliteTwoOnly",
+    "SquadCollectible",
+    "CollectibleStartAwards",
+    "CollectibleShopping",
+    "ExpectedCollapsalParadigms",
+    "MonthlySquadAutoIterate",
+    "MonthlySquadCheckComms",
+    "DeepExplorationAutoIterate",
+    "FindPlaytimeTarget",
+    "BlackFlowCultivationTarget",
+    "BlackFlowEnding",
+    "BlackFlowStartAnimal1",
+    "BlackFlowStartAnimal2",
+    "BlackFlowStartRewards",
+    "SamiFirstFloorFoldartal",
+    "SamiFirstFloorFoldartals",
+    "SamiNewSquad2StartingFoldartal",
+    "SamiNewSquad2StartingFoldartals",
+    "StartWithSeed",
+    "Seed",
 ];
 
 #[derive(Debug, Serialize)]
@@ -75,11 +95,51 @@ struct CliRoguelikeParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     only_start_with_elite_two: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    core_char_list: Option<Vec<CliStartingOper>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    collectible_mode_squad: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    collectible_mode_shopping: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    collectible_mode_start_list: Option<Map<String, Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    monthly_squad_auto_iterate: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    monthly_squad_check_comms: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    deep_exploration_auto_iterate: Option<bool>,
+    #[serde(
+        rename = "find_playTime_target",
+        skip_serializing_if = "Option::is_none"
+    )]
+    find_play_time_target: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    blackflow_strategy: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    blackflow_cultivation_target: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    blackflow_start_animals: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    expected_collapsal_paradigms: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    first_floor_foldartal: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    start_foldartal_list: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    start_with_seed: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     enable: Option<bool>,
 }
 
+#[derive(Debug, Serialize)]
+struct CliStartingOper {
+    name: String,
+    use_support: bool,
+}
+
 /// Newer GUI exports list starting operators here instead of flat `CoreChar` /
-/// `UseSupport`. Only the first entry maps to maa-cli / MaaCore params.
+/// `UseSupport`. The full list maps to `core_char_list`; the first entry also
+/// maps to `core_char` and `use_support`.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 struct WpfStartingOper {
@@ -118,6 +178,44 @@ pub(super) struct WpfRoguelikeTask {
     refresh_trader_with_dice: bool,
     start_with_elite_two: bool,
     start_with_elite_two_only: bool,
+    #[serde(default)]
+    squad_collectible: String,
+    #[serde(default)]
+    collectible_start_awards: String,
+    #[serde(default)]
+    collectible_shopping: bool,
+    #[serde(default)]
+    expected_collapsal_paradigms: String,
+    #[serde(default)]
+    monthly_squad_auto_iterate: bool,
+    #[serde(default)]
+    monthly_squad_check_comms: bool,
+    #[serde(default)]
+    deep_exploration_auto_iterate: bool,
+    #[serde(default)]
+    find_playtime_target: String,
+    #[serde(default)]
+    black_flow_cultivation_target: String,
+    #[serde(default)]
+    black_flow_ending: String,
+    #[serde(default)]
+    black_flow_start_animal1: String,
+    #[serde(default)]
+    black_flow_start_animal2: String,
+    #[serde(default)]
+    black_flow_start_rewards: String,
+    #[serde(default)]
+    sami_first_floor_foldartal: bool,
+    #[serde(default)]
+    sami_first_floor_foldartals: String,
+    #[serde(default)]
+    sami_new_squad2_starting_foldartal: bool,
+    #[serde(default)]
+    sami_new_squad2_starting_foldartals: String,
+    #[serde(default)]
+    start_with_seed: bool,
+    #[serde(default)]
+    seed: String,
     #[serde(flatten)]
     unknown: Map<String, Value>,
 }
@@ -131,6 +229,8 @@ impl WpfRoguelikeTask {
             "CollapsalParadigms" => Some(5),
             "MonthlySquad" => Some(6),
             "DeepExploration" => Some(7),
+            "FindPlaytime" => Some(20001),
+            "BlackFlowStartRun" => Some(30003),
             _ => None,
         }
     }
@@ -150,6 +250,89 @@ impl WpfRoguelikeTask {
         )
     }
 
+    fn named_or_skip(
+        &self,
+        summary: &mut MigrationSummary,
+        field: &str,
+        raw: &str,
+        mapped: Option<String>,
+    ) {
+        if !raw.is_empty() && raw != "None" && mapped.is_none() {
+            summary.skip_field("RoguelikeTask", Some(self.name.clone()), field);
+        }
+    }
+
+    fn report_unmapped(&self, summary: &mut MigrationSummary) {
+        self.named_or_skip(
+            summary,
+            "FindPlaytimeTarget",
+            &self.find_playtime_target,
+            playtime_target(&self.find_playtime_target).map(|n| n.to_string()),
+        );
+        self.named_or_skip(
+            summary,
+            "BlackFlowCultivationTarget",
+            &self.black_flow_cultivation_target,
+            swaddled(&self.black_flow_cultivation_target).map(str::to_string),
+        );
+        self.named_or_skip(
+            summary,
+            "BlackFlowEnding",
+            &self.black_flow_ending,
+            ending_strategy(&self.black_flow_ending).map(str::to_string),
+        );
+        for (field, raw) in [
+            (
+                "BlackFlowStartAnimal1",
+                self.black_flow_start_animal1.as_str(),
+            ),
+            (
+                "BlackFlowStartAnimal2",
+                self.black_flow_start_animal2.as_str(),
+            ),
+        ] {
+            self.named_or_skip(summary, field, raw, swaddled(raw).map(str::to_string));
+        }
+        if !self.black_flow_start_rewards.is_empty() && self.black_flow_start_rewards != "None" {
+            summary.skip_field(
+                "RoguelikeTask",
+                Some(self.name.clone()),
+                "BlackFlowStartRewards",
+            );
+        }
+        self.named_or_skip(
+            summary,
+            "CollectibleStartAwards",
+            &self.collectible_start_awards,
+            award_key(&self.collectible_start_awards).map(str::to_string),
+        );
+    }
+
+    fn core_char_list(&self) -> Option<Vec<CliStartingOper>> {
+        let list: Vec<CliStartingOper> = self
+            .starting_opers
+            .iter()
+            .filter(|oper| !oper.name.is_empty())
+            .map(|oper| CliStartingOper {
+                name: oper.name.clone(),
+                use_support: oper.use_support,
+            })
+            .collect();
+        (!list.is_empty()).then_some(list)
+    }
+
+    fn start_animals(&self) -> Option<Vec<String>> {
+        let animals: Vec<String> = [
+            &self.black_flow_start_animal1,
+            &self.black_flow_start_animal2,
+        ]
+        .into_iter()
+        .filter_map(|name| swaddled(name))
+        .map(str::to_string)
+        .collect();
+        (!animals.is_empty()).then_some(animals)
+    }
+
     pub(super) fn report_to(&self, summary: &mut MigrationSummary) {
         if !self.is_enable {
             summary.disable_task("RoguelikeTask", Some(self.name.clone()));
@@ -157,9 +340,7 @@ impl WpfRoguelikeTask {
         if self.mapped_mode().is_none() {
             summary.skip_field("RoguelikeTask", Some(self.name.clone()), "Mode");
         }
-        if self.starting_opers.len() > 1 {
-            summary.skip_field("RoguelikeTask", Some(self.name.clone()), "StartingOpers");
-        }
+        self.report_unmapped(summary);
         report_unknown_fields(
             summary,
             "RoguelikeTask",
@@ -205,10 +386,88 @@ impl TryFrom<&WpfRoguelikeTask> for CliRoguelikeTask {
                 refresh_trader_with_dice: Some(task.refresh_trader_with_dice),
                 start_with_elite_two: Some(task.start_with_elite_two),
                 only_start_with_elite_two: Some(task.start_with_elite_two_only),
+                core_char_list: task.core_char_list(),
+                collectible_mode_squad: (!task.squad_collectible.is_empty())
+                    .then(|| task.squad_collectible.clone()),
+                collectible_mode_shopping: task.collectible_shopping.then_some(true),
+                collectible_mode_start_list: award_key(&task.collectible_start_awards).map(|key| {
+                    let mut list = Map::new();
+                    list.insert(key.to_string(), Value::Bool(true));
+                    list
+                }),
+                monthly_squad_auto_iterate: task.monthly_squad_auto_iterate.then_some(true),
+                monthly_squad_check_comms: task.monthly_squad_check_comms.then_some(true),
+                deep_exploration_auto_iterate: task.deep_exploration_auto_iterate.then_some(true),
+                find_play_time_target: playtime_target(&task.find_playtime_target),
+                blackflow_strategy: ending_strategy(&task.black_flow_ending).map(str::to_string),
+                blackflow_cultivation_target: swaddled(&task.black_flow_cultivation_target)
+                    .map(str::to_string),
+                blackflow_start_animals: task.start_animals(),
+                expected_collapsal_paradigms: split_list(&task.expected_collapsal_paradigms),
+                first_floor_foldartal: (task.sami_first_floor_foldartal
+                    && !task.sami_first_floor_foldartals.is_empty())
+                .then(|| task.sami_first_floor_foldartals.clone()),
+                start_foldartal_list: (task.sami_new_squad2_starting_foldartal)
+                    .then(|| split_list(&task.sami_new_squad2_starting_foldartals))
+                    .flatten(),
+                start_with_seed: (task.start_with_seed && !task.seed.is_empty())
+                    .then(|| task.seed.clone()),
                 enable: (!task.is_enable).then_some(false),
             },
         })
     }
+}
+
+fn playtime_target(name: &str) -> Option<i32> {
+    match name {
+        "Ling" => Some(1),
+        "Shu" => Some(2),
+        "Nian" => Some(3),
+        _ => None,
+    }
+}
+
+fn swaddled(name: &str) -> Option<&'static str> {
+    match name {
+        "Cat" => Some("swaddled_cat"),
+        "Dog" => Some("swaddled_dog"),
+        "Cerberus" => Some("swaddled_cerberus"),
+        "FeatheredSerpent" => Some("swaddled_feathered_serpent"),
+        _ => None,
+    }
+}
+
+fn ending_strategy(name: &str) -> Option<&'static str> {
+    match name {
+        "Ending1" => Some("ending1"),
+        "Ending2" => Some("ending2"),
+        "Ending3" => Some("ending3"),
+        _ => None,
+    }
+}
+
+fn award_key(name: &str) -> Option<&'static str> {
+    match name {
+        "HotWater" => Some("hot_water"),
+        "Shield" => Some("shield"),
+        "Ingot" => Some("ingot"),
+        "Hope" => Some("hope"),
+        "Random" => Some("random"),
+        "Key" => Some("key"),
+        "Dice" => Some("dice"),
+        "Ideas" | "Idea" => Some("ideas"),
+        _ => None,
+    }
+}
+
+fn split_list(raw: &str) -> Option<Vec<String>> {
+    let items: Vec<String> = raw
+        .split([';', ',', '；'])
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .map(str::to_string)
+        .collect();
+    (!items.is_empty()).then_some(items)
 }
 
 #[cfg(test)]
@@ -325,13 +584,13 @@ mod tests {
         )
         .unwrap();
 
+        assert!(summary.skipped_fields.is_empty());
         assert_eq!(
-            summary
-                .skipped_fields
-                .iter()
-                .map(|f| f.field.as_str())
-                .collect::<Vec<_>>(),
-            ["StartingOpers"]
+            config.tasks[0].pointer("/params/core_char_list"),
+            Some(&json!([
+                { "name": "机械师", "use_support": true },
+                { "name": "额外干员", "use_support": false },
+            ]))
         );
         assert_eq!(
             config.tasks[0].pointer("/params/core_char"),
@@ -377,6 +636,8 @@ mod tests {
             ("CollapsalParadigms", 5),
             ("MonthlySquad", 6),
             ("DeepExploration", 7),
+            ("FindPlaytime", 20001),
+            ("BlackFlowStartRun", 30003),
         ] {
             let (config, summary) = migrate(
                 serde_json::from_value(json!({
@@ -399,6 +660,73 @@ mod tests {
                 "{mode}"
             );
         }
+    }
+
+    #[test]
+    fn maps_blackflow_protocol_fields() {
+        let mut task = roguelike_task("BlackFlowStartRun", i32::MAX, true);
+        let obj = task.as_object_mut().unwrap();
+        obj.insert("Theme".into(), json!("BlackFlow"));
+        obj.insert("SquadCollectible".into(), json!("指挥分队"));
+        obj.insert("CollectibleStartAwards".into(), json!("HotWater"));
+        obj.insert("FindPlaytimeTarget".into(), json!("Ling"));
+        obj.insert("BlackFlowCultivationTarget".into(), json!("Cerberus"));
+        obj.insert("BlackFlowEnding".into(), json!("Ending1"));
+        obj.insert("BlackFlowStartAnimal1".into(), json!("Cerberus"));
+        obj.insert("BlackFlowStartAnimal2".into(), json!("None"));
+        obj.insert("BlackFlowStartRewards".into(), json!("None"));
+        obj.insert("MonthlySquadAutoIterate".into(), json!(true));
+        obj.remove("CoreChar");
+        obj.insert(
+            "StartingOpers".into(),
+            json!([{ "Name": "机械师", "UseSupport": false }]),
+        );
+
+        let (config, summary) = migrate(
+            serde_json::from_value(json!({
+                "TaskQueue": [task],
+                "Gui": {},
+            }))
+            .unwrap(),
+            None,
+        )
+        .unwrap();
+
+        assert!(summary.skipped_fields.is_empty());
+        assert_eq!(config.tasks[0].pointer("/params/mode"), Some(&json!(30003)));
+        assert!(config.tasks[0].pointer("/params/difficulty").is_none());
+        assert_eq!(
+            config.tasks[0].pointer("/params/blackflow_start_animals"),
+            Some(&json!(["swaddled_cerberus"]))
+        );
+        assert_eq!(
+            config.tasks[0].pointer("/params/blackflow_cultivation_target"),
+            Some(&json!("swaddled_cerberus"))
+        );
+        assert_eq!(
+            config.tasks[0].pointer("/params/blackflow_strategy"),
+            Some(&json!("ending1"))
+        );
+        assert_eq!(
+            config.tasks[0].pointer("/params/find_playTime_target"),
+            Some(&json!(1))
+        );
+        assert_eq!(
+            config.tasks[0].pointer("/params/collectible_mode_squad"),
+            Some(&json!("指挥分队"))
+        );
+        assert_eq!(
+            config.tasks[0].pointer("/params/collectible_mode_start_list/hot_water"),
+            Some(&json!(true))
+        );
+        assert_eq!(
+            config.tasks[0].pointer("/params/monthly_squad_auto_iterate"),
+            Some(&json!(true))
+        );
+        assert_eq!(
+            config.tasks[0].pointer("/params/core_char_list/0/name"),
+            Some(&json!("机械师"))
+        );
     }
 
     #[test]

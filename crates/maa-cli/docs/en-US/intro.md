@@ -13,6 +13,7 @@ A simple CLI for [MAA][maa-home] written in Rust.
 - [Installation and Compilation](install.md)
 - [Usage](usage.md)
 - [Configuration](config.md)
+- [Migrate a WPF GUI profile](wpf.md)
 - [FAQ](faq.md)
 
 [maa-home]: https://github.com/MaaAssistantArknights/MaaAssistantArknights

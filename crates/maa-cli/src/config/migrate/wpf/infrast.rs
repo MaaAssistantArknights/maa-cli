@@ -29,6 +29,14 @@ const HANDLED: &[&str] = &[
     "CustomFileType",
     "Filename",
     "PlanSelect",
+    "FiammettaTarget1",
+    "FiammettaTarget2",
+    "FiammettaTarget3",
+    "FiammettaRecoveryEnabled",
+    "UsePinusSylvestris",
+    "UsePerceptionInformation",
+    "UseWorldlyPlight",
+    "UseAbyssalHunter",
 ];
 
 const MINUTES_PER_DAY: u32 = 24 * 60;
@@ -80,6 +88,18 @@ struct CliInfrastParams {
     reception_send_clue: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     continue_training: Option<bool>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    fiammetta_targets: Vec<String>,
+    #[serde(skip_serializing_if = "is_false")]
+    fiammetta_recovery_enabled: bool,
+    #[serde(skip_serializing_if = "is_false")]
+    use_pinus_sylvestris: bool,
+    #[serde(skip_serializing_if = "is_false")]
+    use_perception_information: bool,
+    #[serde(skip_serializing_if = "is_false")]
+    use_worldly_plight: bool,
+    #[serde(skip_serializing_if = "is_false")]
+    use_abyssal_hunter: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     filename: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -116,12 +136,32 @@ pub(super) struct WpfInfrastTask {
     reception_message_board: bool,
     reception_clue_exchange: bool,
     send_clue: bool,
+    #[serde(default)]
+    fiammetta_target1: String,
+    #[serde(default)]
+    fiammetta_target2: String,
+    #[serde(default)]
+    fiammetta_target3: String,
+    #[serde(default)]
+    fiammetta_recovery_enabled: bool,
+    #[serde(default)]
+    use_pinus_sylvestris: bool,
+    #[serde(default)]
+    use_perception_information: bool,
+    #[serde(default)]
+    use_worldly_plight: bool,
+    #[serde(default)]
+    use_abyssal_hunter: bool,
     #[serde(flatten)]
     unknown: Map<String, Value>,
 }
 
 fn default_plan_select() -> i32 {
     -1
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 #[derive(Debug, Deserialize)]
@@ -177,16 +217,17 @@ impl WpfInfrastTask {
         summary: &mut MigrationSummary,
         custom_schedule: Option<&Path>,
         schedule_applied: &mut bool,
+        schedule_base: Option<&Path>,
     ) -> Result<impl Serialize> {
         if let Some(path) = custom_schedule
             && self.wants_custom()
         {
             *schedule_applied = true;
-            return self.try_custom_task(&path.to_string_lossy());
+            return self.try_custom_task(&path.to_string_lossy(), None);
         }
 
         if self.wants_custom() {
-            match self.try_custom_task(&self.filename) {
+            match self.try_custom_task(&self.filename, schedule_base) {
                 Ok(task) => return Ok(task),
                 Err(err) => {
                     warn!(
@@ -236,15 +277,37 @@ impl WpfInfrastTask {
             reception_clue_exchange: Some(self.reception_clue_exchange),
             reception_send_clue: Some(self.send_clue),
             continue_training: Some(self.continue_training),
+            fiammetta_targets: self.fiammetta_targets(),
+            fiammetta_recovery_enabled: self.fiammetta_recovery_enabled,
+            use_pinus_sylvestris: self.use_pinus_sylvestris,
+            use_perception_information: self.use_perception_information,
+            use_worldly_plight: self.use_worldly_plight,
+            use_abyssal_hunter: self.use_abyssal_hunter,
             filename,
             plan_index,
             enable: (!self.is_enable).then_some(false),
         }
     }
 
-    fn try_custom_task(&self, filename: &str) -> Result<CliInfrastTask> {
+    fn fiammetta_targets(&self) -> Vec<String> {
+        [
+            &self.fiammetta_target1,
+            &self.fiammetta_target2,
+            &self.fiammetta_target3,
+        ]
+        .into_iter()
+        .filter(|name| !name.is_empty())
+        .cloned()
+        .collect()
+    }
+
+    fn try_custom_task(
+        &self,
+        filename: &str,
+        schedule_base: Option<&Path>,
+    ) -> Result<CliInfrastTask> {
         ensure!(!filename.is_empty(), "custom mode has empty Filename");
-        let filename = resolve_infrast_filename(filename);
+        let filename = resolve_infrast_filename(filename, schedule_base);
         let schedule = load_custom_schedule(&filename)?;
         let n_plans =
             i32::try_from(schedule.plans.len()).context("too many plans in custom infrast file")?;
@@ -320,8 +383,15 @@ impl WpfInfrastTask {
     }
 }
 
-fn resolve_infrast_filename(path: &str) -> PathBuf {
-    expand_tilde(Path::new(path)).into_owned()
+fn resolve_infrast_filename(path: &str, schedule_base: Option<&Path>) -> PathBuf {
+    let expanded = expand_tilde(Path::new(path));
+    if expanded.is_absolute() {
+        return expanded.into_owned();
+    }
+    match schedule_base {
+        Some(dir) => dir.join(expanded),
+        None => expanded.into_owned(),
+    }
 }
 
 fn load_custom_schedule(path: &Path) -> Result<CustomInfrastFile> {
@@ -538,7 +608,7 @@ fn span_condition(span: MergedSpan, days: u32, remainder: u32) -> Condition {
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::{
-        super::{WpfConfig, migrate},
+        super::{WpfConfig, migrate, migrate_with_base},
         *,
     };
     use crate::config::migrate::MigrationSummary;
@@ -571,7 +641,7 @@ mod tests {
     }
 
     fn to_json(task: &WpfInfrastTask, summary: &mut MigrationSummary) -> serde_json::Value {
-        serde_json::to_value(task.to_cli_task(summary, None, &mut false).unwrap()).unwrap()
+        serde_json::to_value(task.to_cli_task(summary, None, &mut false, None).unwrap()).unwrap()
     }
 
     fn infrast_profile(mode: &str, filename: &str) -> WpfConfig {
@@ -623,8 +693,65 @@ mod tests {
     }
 
     #[test]
+    fn relative_filename_resolves_beside_the_profile() {
+        let dir = tempfile::tempdir().unwrap();
+        let schedule_path = dir.path().join("plan.json");
+        std::fs::write(
+            &schedule_path,
+            r#"{"plans":[{"period":[["09:00","21:00"]]}]}"#,
+        )
+        .unwrap();
+        let (value, summary) = migrate_with_base(
+            infrast_profile("Custom", "plan.json"),
+            None,
+            Some(dir.path()),
+        )
+        .unwrap();
+        assert!(summary.is_empty());
+        let json = serde_json::to_value(value).unwrap();
+        assert_eq!(
+            json["tasks"][0]["params"]["filename"],
+            schedule_path.to_str().unwrap()
+        );
+    }
+
+    #[test]
+    fn keeps_fiammetta_targets_for_default_mode() {
+        let task = serde_json::from_value(serde_json::json!({
+            "Name": "",
+            "IsEnable": true,
+            "Mode": "Normal",
+            "Filename": "",
+            "PlanSelect": -1,
+            "ContinueTraining": false,
+            "RoomList": [{"Room": "Dorm"}],
+            "UsesOfDrones": "_NotUse",
+            "DormThreshold": 30,
+            "OriginiumShardAutoReplenishment": false,
+            "DormFilterNotStationed": false,
+            "DormTrustEnabled": false,
+            "ReceptionMessageBoard": false,
+            "ReceptionClueExchange": false,
+            "SendClue": false,
+            "FiammettaTarget1": "清流",
+            "FiammettaTarget2": "可露希尔",
+            "FiammettaTarget3": "但书",
+            "FiammettaRecoveryEnabled": true,
+        }))
+        .unwrap();
+        let mut summary = MigrationSummary::default();
+        let json = to_json(&task, &mut summary);
+        assert!(summary.is_empty());
+        assert_eq!(
+            json["params"]["fiammetta_targets"],
+            serde_json::json!(["清流", "可露希尔", "但书"])
+        );
+        assert_eq!(json["params"]["fiammetta_recovery_enabled"], true);
+    }
+
+    #[test]
     fn tilde_in_filename_expands_to_home() {
-        let expanded = resolve_infrast_filename("~/一图流-153-一天两换-MAA.json");
+        let expanded = resolve_infrast_filename("~/一图流-153-一天两换-MAA.json", None);
         assert_eq!(
             expanded,
             expand_tilde(Path::new("~/一图流-153-一天两换-MAA.json")).into_owned()
@@ -721,7 +848,7 @@ mod tests {
         assert_eq!(task["params"]["mode"], CUSTOM_MODE);
         assert_eq!(
             task["params"]["filename"],
-            resolve_infrast_filename(file.path().to_str().unwrap())
+            resolve_infrast_filename(file.path().to_str().unwrap(), None)
                 .to_string_lossy()
                 .as_ref()
         );

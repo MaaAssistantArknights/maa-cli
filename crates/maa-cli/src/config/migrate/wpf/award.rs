@@ -12,6 +12,7 @@ const HANDLED: &[&str] = &[
     "Orundum",
     "Mining",
     "SpecialAccess",
+    "SignInEvent",
 ];
 
 #[derive(Debug, Serialize)]
@@ -38,6 +39,8 @@ struct CliAwardParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     specialaccess: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    signinevent: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     enable: Option<bool>,
 }
 
@@ -53,6 +56,8 @@ pub(super) struct WpfAwardTask {
     orundum: bool,
     mining: bool,
     special_access: bool,
+    #[serde(default)]
+    sign_in_event: bool,
     #[serde(flatten)]
     unknown: Map<String, Value>,
 }
@@ -94,6 +99,7 @@ impl TryFrom<&WpfAwardTask> for CliAwardTask {
                 orundum: Some(task.orundum),
                 mining: Some(task.mining),
                 specialaccess: Some(task.special_access),
+                signinevent: task.sign_in_event.then_some(true),
                 enable: (!task.is_enable).then_some(false),
             },
         })
