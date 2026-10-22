@@ -17,6 +17,7 @@ This page is outdated and maybe still in Simplified Chinese. Translation is need
 - [安装及编译](install.md)
 - [使用](usage.md)
 - [配置](config.md)
+- [從 WPF GUI 遷移設定](wpf.md)
 - [常见问题](faq.md)
 
 [maa-home]: https://github.com/MaaAssistantArknights/MaaAssistantArknights/

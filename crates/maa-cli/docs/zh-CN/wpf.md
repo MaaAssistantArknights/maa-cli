@@ -1,68 +1,80 @@
 # 从 WPF GUI 迁移配置
 
-`maa migrate wpf` 可以把 MAA Windows WPF GUI 导出的配置文件，转换为 maa-cli 的自定义任务配置。
-迁移是有损的：不支持的任务类型与字段会被跳过，并在结束后输出摘要；转换完成后，你通常还需要对照 [配置文档](config.md) 做一次检查与微调。
+`maa migrate wpf` 把 MAA Windows 图形界面导出的 JSON 转成 maa-cli 任务文件。
+不支持的任务和设置会被跳过。
+结束时，命令把摘要写到标准错误。
+转完后对照 [配置](config.md) 检查一遍，再用于日常任务。
 
-## 使用方法
+## 迁移一份配置
 
-输入一般是 GUI 导出的 JSON 配置文件（包含 `Configurations` / `TaskQueue`）。
+输入是图形界面导出的 JSON 文件。
 
 ```bash
-# 输出默认写到与输入同名的 .toml 文件
-maa migrate wpf gui.new.json
+# 默认写到与输入同名的 .toml
+maa migrate wpf gui.json
 
-# 指定输出路径与格式（由扩展名决定，支持 toml / yaml / json）
-maa migrate wpf gui.new.json tasks/daily.toml
+# 扩展名决定格式。可以是 toml、yaml 或 json
+maa migrate wpf gui.json tasks/daily.toml
 
-# 多配置导出时，用 --profile-name 选择配置名
-maa migrate wpf gui.new.json --profile-name Default
+# 导出里有多份配置时，用名字选一份
+maa migrate wpf gui.json --profile-name Default
 
-# GUI 是自定义排班时，用本机排班 JSON 覆盖其中的 Filename
-maa migrate wpf gui.new.json --custom-schedule ~/一图流-153-一天两换-MAA.json
+# 图形界面里已经是自定义排班时，改用你给出的排班文件
+maa migrate wpf gui.json --custom-schedule ~/base-schedule.json
 ```
 
-如果导出文件里只有一个配置，会自动选择该配置；有多个配置且未指定 `--profile-name` 时，会交互式提示你选择。
+导出里只有一份配置时，命令直接用它。
+有多份，并且没有 `--profile-name` 时，命令会让你选。
 
-`--custom-schedule` 只在 GUI 基建任务已经是自定义排班（`Mode = Custom` 或填写了 `Filename`）时生效，用来覆盖排班文件路径。若 GUI 不是自定义排班，传入该选项会报错退出。
+`--custom-schedule` 只在图形界面里这份基建已经是自定义排班时有效。
+还不是自定义排班时，加上这个选项会报错退出。
 
-迁移完成后，把生成的任务文件放到 `$MAA_CONFIG_DIR/tasks` 中，即可通过 `maa run <task>` 运行。配置目录可用 `maa dir config` 查看。
+把生成的文件放到 `$MAA_CONFIG_DIR/tasks`，再用 `maa run <task>` 运行。
+配置目录用 `maa dir config` 查看。
 
-## 迁移结果
+## 配置文档里已经有的设置
 
-输出是一份 maa-cli 自定义任务文件，结构与 [自定义任务](config.md#自定义任务) 相同：顶层是 `[[tasks]]` 列表，每个任务包含 `type`、`name`、`params`，必要时还有 `variants`。
+输出和 [自定义任务](config.md#自定义任务) 的结构相同。
+顶层是 `[[tasks]]`。
+每个任务有 `type`、`name` 和 `params`。
+需要按条件切换时还有 `variants`。
+条件的写法见 [任务条件](config.md#任务条件)。
 
-GUI 里 `IsEnable = false` 的任务仍会写出，但会带上 `params.enable = false`，因此默认不会执行；需要时再手动改回 `true` 或删掉该字段。
+下面只说明配置文档里已经出现过的名字。
+配置文档没写、运行时直接交给 MaaCore 的名字，在下一节。
 
-示例输入与输出可以参考仓库中的 [`config_examples/wpf`](../../config_examples/wpf)。
-示例输出里的排班 `filename` 仍是相对名，方便对照；实际迁移会写成输入 JSON 所在目录下的绝对路径。
+### 开始唤醒
 
-## 任务映射说明
+`client_type` 和 `start_game_enabled` 就是配置文档启动示例里的那两个。
+图形界面没有可识别的客户端时，`client_type` 会变成运行时再选的输入。
+写法见配置文档的用户输入。
+开了切换账号但没有账号名时，这项不写入。
+摘要里会有一行跳过的字段。
 
-### 开始唤醒（StartUp）
+### 理智作战
 
-`client_type` 与 `start_game_enabled` 来自 GUI 的 `Gui.RuntimeSettings`，而不是 `StartUpTask` 本体。
-如果 GUI 未填写可识别的客户端类型，迁移结果会把 `client_type` 写成交互式选项，运行任务时再选择。
-若开启了账号切换但未填写账号名，该字段会被跳过并给出警告。
+每个要打的关卡是一个变体。
+关卡名写在 `stage`。
 
-### 理智作战（Fight）
+条件按关卡种类写。
 
-药品、源石、次数、掉落、连战、过期理智药等共享参数写在任务级 `params` 中；关卡相关内容写在变体里。
+- 资源本或芯片本用 `Weekday`，时区是官服。
+- 活动关能在本机热更新的活动表里查到时，用 `DateTime`。里面有开始时间、结束时间和时区。查不到则用 `Always`，并告警。
+- 主线、剿灭和 `LS-6` 这类常驻关用 `Always`。
 
-当 GUI 开启 `UseOptionalStage` 时，`StagePlan` 中的每个关卡会生成一个变体，并按关卡开放规则附上条件：
+`DateTime`、`Weekday` 和 `DayMod` 在配置文档的任务条件里。
+`Always` 也是 maa-cli 的条件，表示不看时间，这个变体总是可以执行。
+活动关的 `start` 和 `end` 取自迁移当时本机的活动表。
+活动换档后不会自动更新。
+需要重新迁移，或手改条件。
+图形界面里还有一份每周计划时，周计划和关卡条件用 `And` 合在一起。
 
-- 资源本 / 芯片本：`Weekday`（官服服务器时区）
-- 永久关卡（如主线、剿灭、`LS-6`）：`Always`
-- 活动关卡：若能在热更新资源 `StageActivityV2.json` 中查到对应活动，则写入 `DateTime`（使用该活动的开始时间、截止时间与时区）；查不到则回退为 `Always` 并告警
-
-例如 GUI 中同时启用过期理智药与多关卡备选时，迁移结果类似：
+下面是多个备选关卡时的结果。
 
 ```toml
 [[tasks]]
 name = "理智作战"
 type = "Fight"
-
-[tasks.params]
-medicine_expire_days = 2
 
 [[tasks.variants]]
 condition = { type = "DateTime", start = "2026-08-08T16:00:00", end = "2026-08-22T03:59:59", timezone = 8 }
@@ -77,69 +89,204 @@ condition = { type = "Always" }
 params = { stage = "LS-6" }
 ```
 
-这里的 `medicine_expire_days` 对应 GUI 的 `MedicineExpireDays`（在 `UseExpiringMedicine = true` 时写入），表示使用多少天内将过期的理智药。
-`IsDrGrandet` 为 true 时写成 `DrGrandet`。
-活动关卡的 `start` 和 `end` 来自迁移时本地的 `StageActivityV2.json`，之后不会随热更新自动刷新；活动换档后需重新迁移或手动改条件。
-若同时启用 `UseWeeklySchedule`，周计划会与关卡开放条件用 `And` 组合。
+如果结果里会使用源石，命令会警告。
+这个设置可能消耗源石。
+理智药、源石、次数和过期药的参数名不在配置文档里，见下一节。
 
-**注意**：启用源石（`UseStone`）时会发出警告，因为这可能消耗源石。
+### 基建换班
 
-### 公开招募（Recruit）
+设施顺序写在 `facility`。
+宿舍是否填入信赖未满的干员写在 `dorm_trust_enabled`。
+这两个名字在配置文档的基建例子里。
 
-常见字段会映射为 maa-cli / MaaCore 参数，例如：
+图形界面按时间自动换班，并且排班里每个班次都有时段时，`mode` 是 `10000`。
+变体按时间段选择 `plan_index`。
+跨天时段会加上 `DayMod`。
+这和配置文档里的基建例子是同一套。
+排班没有可用时段，或图形界面选了固定班次时，结果仍是自定义基建，并带上 `plan_index`。
 
-- `MaxTimes` → `times`
-- `RefreshLevel3` → `refresh`
-- `ExtraTagMode` → `extra_tags_mode`
-- `LevelNChoose` / `LevelNTime` → `select` / `confirm` / `recruitment_time`
-- 偏好标签、保留标签 → `first_tags` / `preserve_tags`
-- `Level3RecruitmentPermitReserve` 在开关打开且数量大于 0 时写成 `level3_recruitment_permit_reserve`
+写出的 `filename` 是绝对路径。
+排班路径里的 `~` 展开成你的主目录。
+相对路径按你传给命令的那份 JSON 所在目录解析。
+配置文档说明，这份排班 JSON 由 MaaCore 读取，不由 maa-cli 读取。
+排班文件里的菲亚梅塔也留在那个文件里，不抄进任务参数。
 
-以下行为需要特别注意：
+要换成另一份排班，用 `--custom-schedule` 给出那份 JSON 的路径。
+图形界面还不是自定义排班时，命令报错退出。
+指定的文件读失败时也报错退出，不会退回默认基建。
 
-- GUI 的 `ForceRefresh` **不是** MaaCore 的 `expedite`，maa-cli 也不支持该功能。迁移时不会写出对应参数；若 GUI 中为开启状态，会记入跳过字段并警告，该设置无效。
-- 若 `Level6Choose = true`，会警告即将自动确认 6 星干员，这是危险行为。
+没有这个选项，并且排班不存在、无法解析或没有班次时，`mode` 写成 `0`。
+摘要里会说明跳过了排班。
 
-### 基建换班（Infrast）
+无人机、心情阈值、菲亚梅塔名单这些名字不在配置文档里，见下一节。
 
-普通模式（`Normal` / `Rotation`）会迁移设施顺序、无人机用途、宿舍阈值等常见参数。
-自定义基建计划（`Mode = Custom` 或填写了 `Filename`）会尝试读取排班 JSON：
+## 交给 MaaCore 的参数
 
-- 读到 `plans` 且各班有 `period`、GUI 为时间轮换（`PlanSelect = -1`）时，写出 `mode = 10000`、`filename`，以及按时段（跨天时加上 `DayMod`）选择 `plan_index` 的变体。
-- 读到排班但没有可用时段（或 GUI 选了固定班次）时，写出自定义模式并带上 `plan_index`。
-- `Filename` 里的 `~` 会展开为用户主目录。相对路径按输入 JSON 所在目录解析。写出的 `filename` 是展开后的绝对路径。
-- 示例输入旁的 `一图流-153-一天两换-MAA.json` 是一份只含时段和菲亚梅塔的排班，供上面的 `gui.new.json` 引用。
-- `FiammettaTarget1/2/3` 写成 `fiammetta_targets`。`FiammettaRecoveryEnabled` 为 true 时写成 `fiammetta_recovery_enabled`。集成文档规定这两项只在 `mode = 0` 时生效；自定义排班里的菲亚梅塔仍由排班文件自己描述，MaaCore 读取该文件。
-- 可用 `--custom-schedule <json>` 覆盖 GUI 中的排班文件路径；仅当 GUI 已是自定义排班时有效，否则报错退出。覆盖后若文件读失败，也会报错退出，而不会回退到默认基建。
-- 未指定 `--custom-schedule` 时，文件不存在、无法解析或没有 `plans` 会跳过 `Mode` / `Filename`，按默认基建模式（`mode = 0`）写出其余参数，并在迁移摘要中说明。
+[配置](config.md#基本结构) 写明，任务 `params` 里的具体名字以 MAA 集成文档为准。
+maa-cli 不检查这些名字对不对。
+运行时由 MaaCore 读取。
+下面这些就是迁移会写进 `params`、但配置文档没有解释的名字。
+要改数值，改这些名字。
+每个名字的全部可选取值见 [MAA 集成文档][task-types]。
 
-### 其他任务
+### 是否执行
 
-- `Mall`：信用商店、信用作战、访问好友、黑白名单等会映射到对应参数。
-- `Award`：日常奖励、邮件、源石锭等；GUI 的 `FreeGacha` 对应 `recruit`，`SignInEvent` 对应 `signinevent`。
-- `Roguelike` / `Reclamation`：主题、模式与协议里有对应项的参数会迁移，包括黑流树海的开局模式、培育目标和结局策略。无法识别的模式或取值会记入跳过摘要。
-- 较新的 GUI 用 `StartingOpers` 代替 `CoreChar` / `UseSupport` 时，整份列表写成 `core_char_list`，第一项同时保留为 `core_char` 与 `use_support`。
-- `UserDataUpdate`（仓库识别、干员 box）没有对应的 maa-cli 任务，整项跳过。
-- 未识别的 `$type` 会整项跳过，并出现在迁移摘要的「跳过任务」列表中。
+`enable` 为 `false` 时，这个任务不执行。
+图形界面里关掉的任务仍会写进文件，并带上 `enable = false`。
+要让它跑，把该字段改成 `true`，或删掉它。
 
-各任务类型的完整参数含义请参考 [MAA 集成文档][task-types]。迁移后若要继续用条件变体精细控制执行逻辑，请参阅 [任务条件](config.md#任务条件)。
+### 理智作战参数
+
+- `medicine` 是理智药个数。配置文档只在用户输入的例子里出现过这个名字，没有说明它是理智药。
+- `stone` 是源石个数。
+- `times` 是次数上限。
+- `series` 是连战次数。
+- `drops` 是目标掉落。
+- `medicine_expire_days` 是使用多少天内将过期的理智药。配置文档示例里的 `expiring_medicine` 是另一个名字，迁移不会写成那个名字。
+- `DrGrandet` 为 `true` 时，在使用源石的确认界面等到回复 1 点理智，再立刻使用。
+
+### 公开招募
+
+- `times` 是招募次数。
+- `refresh` 表示是否刷新三星标签。
+- `extra_tags_mode` 是额外标签的处理方式。数字的含义见集成文档。
+- `select` 和 `confirm` 是要自动选择、自动确认的星级，例如 `3`、`4`、`5`。
+- `recruitment_time` 是各星级的招募分钟数。
+- `first_tags` 是优先标签。
+- `preserve_tags` 是要保留的标签。
+- `level3_recruitment_permit_reserve` 是三星招募许可要保留的数量。这项没开，或数量不大于 0 时，不写这个名字。
+
+图形界面里的立即刷新不会写入。
+它开着时，摘要里会有一行跳过的字段，并警告。
+开了自动确认六星时，命令会警告。
+
+### 基建换班参数
+
+- `drones` 是无人机用途。
+- `threshold` 是宿舍心情阈值，范围是 0 到 1。图形界面里的百分比会换成这个小数。
+- `replenish` 表示贸易站的源石碎片是否自动补货。
+- `dorm_notstationed_enabled` 表示宿舍是否启用「未进驻」。
+- `reception_message_board`、`reception_clue_exchange` 和 `reception_send_clue` 是会客室的留言板、线索交流和送出线索。
+- `continue_training` 表示训练室是否继续训练。
+- `fiammetta_targets` 是菲亚梅塔要换心情的干员名单。
+- `fiammetta_recovery_enabled` 表示是否用菲亚梅塔恢复心情。
+- `use_pinus_sylvestris`、`use_perception_information`、`use_worldly_plight` 和 `use_abyssal_hunter` 是红松、感知、尘世和深海这四组跨设施组合。为 `false` 时不写。
+
+`fiammetta_targets` 只在 `mode` 为 0 且 `fiammetta_recovery_enabled` 为 true 时生效。
+`fiammetta_recovery_enabled` 和上面四组组合只在 `mode` 为 0 时生效。
+
+### 信用商店
+
+- `shopping` 表示是否购买信用商品。
+- `credit_fight` 表示是否进行信用作战。
+- `formation_index` 是信用作战使用的编队。
+- `visit_friends` 表示是否访问好友。
+- `buy_first` 是优先购买的商品。
+- `blacklist` 是不购买的商品。
+- `force_shopping_if_credit_full` 表示信用满了是否仍按黑名单以外的商品购买。
+- `only_buy_discount` 表示是否只买折扣商品。
+- `reserve_max_credit` 表示是否把信用留到上限附近。
+
+信用作战和访问好友的上次时间、今天是否还能做，是图形界面自己的记录。
+这些不写入结果。
+
+### 领奖
+
+- `award` 是领取每日或每周任务奖励。
+- `mail` 是领取邮件奖励。
+- `recruit` 是领取限定池赠送的每日免费单抽。
+- `orundum` 是领取幸运墙的合成玉。
+- `mining` 是领取限时开采许可的合成玉。
+- `specialaccess` 是领取五周年赠送的月卡。
+- `signinevent` 是领取限时签到奖励。
+
+### 肉鸽
+
+这些配置未经实机验证。
+相关参数的作用见 [MAA 集成文档][task-types]。
+
+这些名字只在对应的主题和模式里有用。
+写进去是为了留下你在图形界面里选过的内容。
+MaaCore 在用不到的模式下会忽略它们。
+
+- `theme` 是主题。
+- `mode` 是模式编号。刷分是 `0`，刷源石锭是 `1`，凹开局是 `4`，坍缩范式是 `5`，月度小队是 `6`，深入调查是 `7`，刷常乐节点是 `20001`，黑流树海刷开局是 `30003`。认不出的模式不写 `mode`，并记入摘要。
+- `squad` 是开局分队。`roles` 是开局职业组合。
+- `core_char` 是第一名开局干员。`core_char_list` 是全部开局干员，每项有 `name` 和 `use_support`。
+- `use_support` 表示第一名是否使用助战。`use_nonfriend_support` 表示是否使用非好友助战。
+- `starts_count` 是开始次数。`difficulty` 是难度。难度如果是一个占位用的极大数字，则不写。
+- `investment_enabled` 表示是否投资。`investments_count` 是投资次数。`investment_with_more_score` 表示是否用更高分数投资。`stop_when_investment_full` 表示存满后是否停止。
+- `stop_at_final_boss` 表示是否在结局前停止。`stop_at_max_level` 表示等级满了是否停止。
+- `start_with_elite_two` 和 `only_start_with_elite_two` 是精二开局。
+- `refresh_trader_with_dice` 表示是否用骰子刷新商店。
+- `collectible_mode_squad` 是凹开局或黑流树海准备局使用的分队。`collectible_mode_shopping` 表示凹开局是否购物。`collectible_mode_start_list` 是希望碰到的开局奖励，例如 `hot_water`。
+- `monthly_squad_auto_iterate` 表示月度小队是否自动切换。`monthly_squad_check_comms` 表示切换时是否看通信。
+- `deep_exploration_auto_iterate` 表示深入调查是否自动切换。
+- `find_playTime_target` 是常乐节点。`1` 是令，`2` 是黍，`3` 是年。
+- `blackflow_strategy` 是黑流树海的结局策略，例如 `ending1`。`blackflow_cultivation_target` 是要培育的襁褓动物。`blackflow_start_animals` 是准备局要凑齐的襁褓动物。
+- `expected_collapsal_paradigms` 是希望碰到的坍缩范式。
+- `first_floor_foldartal` 和 `start_foldartal_list` 是密文板。
+- `start_with_seed` 是固定种子。
+
+黑流树海的开局奖励位组合，以及快速飞行，没有写入。
+图形界面里这两项不是关闭或「无」时，摘要里会各有一行跳过的字段。
+
+### 生息演算
+
+这些配置未经实机验证。
+相关参数的作用见 [MAA 集成文档][task-types]。
+
+- `theme` 是主题。
+- `mode` 为 `0` 是不存档的繁荣，为 `1` 是写入存档的繁荣。认不出的模式不写，并记入摘要。
+- `tools_to_craft` 是要制作的工具。
+- `increment_mode` 是增量模式。
+- `num_craft_batches` 是每轮制作批数。
+
+仓库识别和干员 box 不会写成任务。
+不认识的任务也不会写成任务。
+这两类只出现在摘要里。
 
 ## 迁移摘要
 
-迁移结束时，若存在有损处理，会在 stderr 打印摘要，例如：
+有跳过或关掉的任务时，摘要写到标准错误。
+没有任何损失时，什么都不打印。
+命令打印的是英文。
+下面三项不一定同时出现。
 
-- 跳过的任务（不支持的 `$type`）
-- 已禁用但仍写出的任务（`params.enable = false`）
-- 跳过的字段（无法映射或 maa-cli 不支持）
+```text
+Migration summary (lossy):
+  Skipped tasks (unsupported type):
+    - UserDataUpdateTask "同步数据"
+  Disabled tasks (kept with params.enable=false; will not run):
+    - FightTask "剿灭"
+  Skipped fields (not migrated):
+    - RecruitTask "公开招募": ForceRefresh
+```
 
-请根据摘要检查输出文件，确认行为符合预期后再用于日常任务。
+第一行表示这次转换丢掉了一部分内容。
+
+`Skipped tasks` 是整项没有写进文件的任务。
+引号里是图形界面里该任务的名字。
+`UserDataUpdateTask` 是仓库识别和干员 box。
+
+`Disabled tasks` 是已经写进文件、但默认不执行的任务。
+括号里的 `params.enable=false` 就是上一节的 `enable`。
+引号里是任务名。
+`FightTask` 是作战，`RecruitTask` 是公开招募，`InfrastTask` 是基建。
+
+`Skipped fields` 是某个任务里没写进去的一项设置。
+引号里是任务名。
+冒号后面是图形界面导出文件里的原字段名。
+你不需要认识这个名字。
+它只表示这项设置被丢掉了。
+公开招募打开了立即刷新时，就会看到上面最后一行。
+
+先看摘要，再把输出文件用于日常任务。
 
 ## 参考
 
 - [配置](config.md)
 - [使用](usage.md)
-- [示例：WPF 迁移][wpf-example]
-- [MAA 集成文档：任务类型][task-types]
+- [MAA 集成文档里的任务类型][task-types]
 
-[wpf-example]: ../../config_examples/wpf
 [task-types]: https://maa.plus/docs/zh-cn/protocol/integration.html#任务类型一览
