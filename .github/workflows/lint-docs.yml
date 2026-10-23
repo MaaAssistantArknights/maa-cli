@@ -107,7 +107,9 @@ jobs:
             --verbose --no-progress --cache --max-cache-age 1d
             -- .
       - name: Comment on Pull Request if Dead Links Found
-        if: failure() && github.event_name == 'pull_request'
+        if: >-
+          failure() && github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository
         uses: marocchino/sticky-pull-request-comment@v3
         with:
           message: |

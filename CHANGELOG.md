@@ -527,7 +527,7 @@
 - Improve usage guide about running tasks by [@wangl-cc](https://github.com/wangl-cc)
 - Fix the link document in the generated docs by [@wangl-cc](https://github.com/wangl-cc)
 - Change link target of configuration document by [@wangl-cc](https://github.com/wangl-cc)
-- 采用新的文档地址 by [@Alan-Charred](https://github.com/Alan-Charred) in [#289](https://github.com/MaaAssistantArknights/maa-cli/pull/289)
+- 采用新的文档地址 by [@WeiyouWang](https://github.com/WeiyouWang) in [#289](https://github.com/MaaAssistantArknights/maa-cli/pull/289)
 - Fix dead link by [@Cryolitia](https://github.com/Cryolitia)
 
 ### Miscellaneous
