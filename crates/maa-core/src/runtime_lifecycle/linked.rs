@@ -19,14 +19,10 @@ impl Assistant {
     }
 }
 
-pub(crate) struct PendingAssistantRegistration;
+pub(crate) struct Guard;
 
-impl PendingAssistantRegistration {
-    pub(crate) fn begin() -> Result<Self> {
+impl Guard {
+    pub(crate) fn acquire() -> Result<Self> {
         Ok(Self)
     }
-
-    pub(crate) fn commit(self) {}
 }
-
-pub(crate) fn unregister_assistant() {}

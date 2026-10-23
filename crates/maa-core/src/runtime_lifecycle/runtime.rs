@@ -7,7 +7,7 @@ use crate::{Assistant, Error, Result};
 
 const RUNTIME_LOCKED: usize = 1usize << (usize::BITS - 1);
 const RUNTIME_LOADED: usize = 1usize << (usize::BITS - 2);
-const ASSISTANT_COUNT_MASK: usize = RUNTIME_LOADED - 1;
+const USE_COUNT_MASK: usize = RUNTIME_LOADED - 1;
 
 static RUNTIME_STATE: AtomicUsize = AtomicUsize::new(0);
 
@@ -19,8 +19,8 @@ fn is_loaded(state: usize) -> bool {
     state & RUNTIME_LOADED != 0
 }
 
-fn assistant_count(state: usize) -> usize {
-    state & ASSISTANT_COUNT_MASK
+fn use_count(state: usize) -> usize {
+    state & USE_COUNT_MASK
 }
 
 enum StableState {
@@ -62,7 +62,7 @@ impl RuntimeChange {
             }
 
             let locked_state = RUNTIME_STATE.load(Ordering::Acquire);
-            if assistant_count(locked_state) > 0 {
+            if use_count(locked_state) > 0 {
                 RUNTIME_STATE.fetch_and(!RUNTIME_LOCKED, Ordering::AcqRel);
                 return Err(Error::ActiveAssistants);
             }
@@ -89,7 +89,7 @@ impl Assistant {
     /// Load the shared library of the MaaCore
     ///
     /// Must be called before any other method.
-    /// Fails if any assistant instances are alive.
+    /// Fails if any assistant instances are alive or a version query is in progress.
     pub fn load(path: impl AsRef<Path>) -> Result<()> {
         let path = path.as_ref();
         let runtime_change = RuntimeChange::begin()?;
@@ -117,7 +117,7 @@ impl Assistant {
     /// Unload the shared library of the MaaCore.
     ///
     /// Must be called after all assistant instances are destroyed.
-    /// Fails if any assistant instances are alive.
+    /// Fails if any assistant instances are alive or a version query is in progress.
     pub fn unload() -> Result<()> {
         let runtime_change = RuntimeChange::begin()?;
         maa_sys::binding::unload();
@@ -131,12 +131,11 @@ impl Assistant {
     }
 }
 
-pub(crate) struct PendingAssistantRegistration {
-    committed: bool,
-}
+/// Prevents runtime changes until the guarded operation or instance is finished.
+pub(crate) struct Guard;
 
-impl PendingAssistantRegistration {
-    pub(crate) fn begin() -> Result<Self> {
+impl Guard {
+    pub(crate) fn acquire() -> Result<Self> {
         loop {
             let state = RUNTIME_STATE.load(Ordering::Acquire);
             if is_locked(state) {
@@ -147,38 +146,28 @@ impl PendingAssistantRegistration {
                 return Err(Error::RuntimeNotLoaded);
             }
 
-            let count = assistant_count(state);
+            let count = use_count(state);
             let next_count = count
                 .checked_add(1)
-                .filter(|count| *count <= ASSISTANT_COUNT_MASK)
+                .filter(|count| *count <= USE_COUNT_MASK)
                 .ok_or(Error::TooManyAssistants)?;
-            let next = (state & !ASSISTANT_COUNT_MASK) | next_count;
+            let next = (state & !USE_COUNT_MASK) | next_count;
             if RUNTIME_STATE
                 .compare_exchange(state, next, Ordering::AcqRel, Ordering::Acquire)
                 .is_ok()
             {
-                return Ok(Self { committed: false });
+                return Ok(Self);
             }
         }
     }
-
-    pub(crate) fn commit(mut self) {
-        self.committed = true;
-    }
 }
 
-impl Drop for PendingAssistantRegistration {
+impl Drop for Guard {
     fn drop(&mut self) {
-        if !self.committed {
-            unregister_assistant();
-        }
+        let previous = RUNTIME_STATE.fetch_sub(1, Ordering::AcqRel);
+        debug_assert!(is_loaded(previous));
+        debug_assert!(use_count(previous) > 0);
     }
-}
-
-pub(crate) fn unregister_assistant() {
-    let previous = RUNTIME_STATE.fetch_sub(1, Ordering::AcqRel);
-    debug_assert!(is_loaded(previous));
-    debug_assert!(assistant_count(previous) > 0);
 }
 
 #[cfg(test)]
@@ -192,29 +181,35 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn runtime_change_rejects_active_assistants() {
+    fn guard_blocks_load_and_unload_on_other_threads() {
         let _state_lock = RUNTIME_STATE_TEST_LOCK.lock().unwrap();
         reset_runtime_state_for_test(RUNTIME_LOADED);
 
-        let _registration = PendingAssistantRegistration::begin().unwrap();
-
-        assert!(matches!(
-            RuntimeChange::begin(),
-            Err(Error::ActiveAssistants)
-        ));
+        let guard = Guard::acquire().unwrap();
+        std::thread::scope(|scope| {
+            scope
+                .spawn(|| {
+                    assert!(matches!(
+                        Assistant::load("/this/library/does_not_exist.so"),
+                        Err(Error::ActiveAssistants)
+                    ));
+                    assert!(matches!(Assistant::unload(), Err(Error::ActiveAssistants)));
+                })
+                .join()
+                .unwrap();
+        });
+        drop(guard);
+        assert!(RuntimeChange::begin().is_ok());
     }
 
     #[test]
-    fn assistant_registration_rejects_runtime_changes() {
+    fn guard_rejects_runtime_changes() {
         let _state_lock = RUNTIME_STATE_TEST_LOCK.lock().unwrap();
         reset_runtime_state_for_test(0);
 
         let _runtime_change = RuntimeChange::begin().unwrap();
 
-        assert!(matches!(
-            PendingAssistantRegistration::begin(),
-            Err(Error::RuntimeChanging)
-        ));
+        assert!(matches!(Guard::acquire(), Err(Error::RuntimeChanging)));
     }
 
     #[test]
@@ -242,28 +237,22 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn assistant_registration_rejects_unloaded_runtime() {
+    fn guard_rejects_unloaded_runtime() {
         let _state_lock = RUNTIME_STATE_TEST_LOCK.lock().unwrap();
         reset_runtime_state_for_test(0);
 
-        assert!(matches!(
-            PendingAssistantRegistration::begin(),
-            Err(Error::RuntimeNotLoaded)
-        ));
+        assert!(matches!(Guard::acquire(), Err(Error::RuntimeNotLoaded)));
     }
 
     #[test]
-    fn assistant_registration_rejects_count_overflow() {
+    fn guard_rejects_count_overflow() {
         let _state_lock = RUNTIME_STATE_TEST_LOCK.lock().unwrap();
-        reset_runtime_state_for_test(RUNTIME_LOADED | ASSISTANT_COUNT_MASK);
+        reset_runtime_state_for_test(RUNTIME_LOADED | USE_COUNT_MASK);
 
-        assert!(matches!(
-            PendingAssistantRegistration::begin(),
-            Err(Error::TooManyAssistants)
-        ));
+        assert!(matches!(Guard::acquire(), Err(Error::TooManyAssistants)));
         assert_eq!(
             RUNTIME_STATE.load(Ordering::Acquire),
-            RUNTIME_LOADED | ASSISTANT_COUNT_MASK
+            RUNTIME_LOADED | USE_COUNT_MASK
         );
     }
 
@@ -300,35 +289,49 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn runtime_lock_preserves_assistant_count_changes() {
+    fn runtime_lock_preserves_use_count_changes() {
         let _state_lock = RUNTIME_STATE_TEST_LOCK.lock().unwrap();
-        reset_runtime_state_for_test(RUNTIME_LOCKED | RUNTIME_LOADED | 1);
+        reset_runtime_state_for_test(RUNTIME_LOADED);
+        let guard = Guard::acquire().unwrap();
 
-        unregister_assistant();
+        RUNTIME_STATE.fetch_or(RUNTIME_LOCKED, Ordering::AcqRel);
+        drop(guard);
+        assert_eq!(
+            RUNTIME_STATE.load(Ordering::Acquire),
+            RUNTIME_LOCKED | RUNTIME_LOADED
+        );
         RUNTIME_STATE.fetch_and(!RUNTIME_LOCKED, Ordering::AcqRel);
 
         assert_eq!(RUNTIME_STATE.load(Ordering::Acquire), RUNTIME_LOADED);
     }
 
     #[test]
-    fn assistant_registration_rolls_back_without_commit() {
+    fn guard_releases_count_on_drop() {
         let _state_lock = RUNTIME_STATE_TEST_LOCK.lock().unwrap();
         reset_runtime_state_for_test(RUNTIME_LOADED);
 
-        drop(PendingAssistantRegistration::begin().unwrap());
+        drop(Guard::acquire().unwrap());
 
         assert_eq!(RUNTIME_STATE.load(Ordering::Acquire), RUNTIME_LOADED);
     }
 
     #[test]
-    fn assistant_registration_commit_keeps_count() {
+    fn runtime_guards_keep_count_until_last_drop() {
         let _state_lock = RUNTIME_STATE_TEST_LOCK.lock().unwrap();
         reset_runtime_state_for_test(RUNTIME_LOADED);
 
-        PendingAssistantRegistration::begin().unwrap().commit();
+        let first = Guard::acquire().unwrap();
+        let second = Guard::acquire().unwrap();
 
+        assert_eq!(RUNTIME_STATE.load(Ordering::Acquire), RUNTIME_LOADED | 2);
+        drop(first);
         assert_eq!(RUNTIME_STATE.load(Ordering::Acquire), RUNTIME_LOADED | 1);
-        unregister_assistant();
+        assert!(matches!(
+            RuntimeChange::begin(),
+            Err(Error::ActiveAssistants)
+        ));
+        drop(second);
+        assert_eq!(RUNTIME_STATE.load(Ordering::Acquire), RUNTIME_LOADED);
     }
 
     #[test]
@@ -339,5 +342,21 @@ pub(crate) mod tests {
         assert!(Assistant::load("/this/library/does_not_exist.so").is_err());
 
         assert_eq!(RUNTIME_STATE.load(Ordering::Acquire), RUNTIME_LOADED);
+    }
+
+    #[test]
+    fn version_query_rejects_unloaded_or_changing_runtime_before_ffi() {
+        let _state_lock = RUNTIME_STATE_TEST_LOCK.lock().unwrap();
+        reset_runtime_state_for_test(0);
+        assert!(matches!(
+            Assistant::get_version(),
+            Err(Error::RuntimeNotLoaded)
+        ));
+
+        reset_runtime_state_for_test(RUNTIME_LOCKED);
+        assert!(matches!(
+            Assistant::get_version(),
+            Err(Error::RuntimeChanging)
+        ));
     }
 }

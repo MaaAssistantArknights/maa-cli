@@ -11,16 +11,16 @@ pub enum Error {
     #[error("The content returned by MaaCore is too large (length > {0})")]
     ContentTooLarge(usize),
     #[cfg(feature = "runtime")]
-    #[error("Cannot load or unload MaaCore runtime while Assistant instances are alive")]
+    #[error("Cannot load or unload MaaCore runtime while it is in use")]
     ActiveAssistants,
     #[cfg(feature = "runtime")]
     #[error("Cannot perform this operation while MaaCore runtime is loading or unloading")]
     RuntimeChanging,
     #[cfg(feature = "runtime")]
-    #[error("Cannot create Assistant before MaaCore runtime is loaded")]
+    #[error("Cannot use MaaCore before its runtime is loaded")]
     RuntimeNotLoaded,
     #[cfg(feature = "runtime")]
-    #[error("Cannot create Assistant because too many Assistant instances are alive")]
+    #[error("Cannot acquire MaaCore runtime because too many uses are active")]
     TooManyAssistants,
     #[error("Input argument contains invalid bytes")]
     InvalidArgument(#[from] maa_ffi_string::Error),

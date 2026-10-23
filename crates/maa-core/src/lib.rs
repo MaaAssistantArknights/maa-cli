@@ -39,16 +39,15 @@ pub(crate) fn get_log_path() -> std::path::PathBuf {
 pub struct Assistant {
     handle: maa_sys::binding::AsstHandle,
     _callback: Option<Box<dyn Callback>>,
+    _guard: runtime_lifecycle::Guard,
 }
 
 impl Drop for Assistant {
     fn drop(&mut self) {
         // Destroy the handle before the callback is dropped to make sure the callback is not used
-        // after the Box is freed. The active-assistant count is decremented after this call so a
-        // concurrent runtime load or unload still sees this instance as alive during destruction.
+        // after the Box is freed. The runtime guard is released after this call,
+        // keeping concurrent runtime changes blocked during destruction.
         unsafe { maa_sys::binding::AsstDestroy(self.handle) };
-
-        runtime_lifecycle::unregister_assistant();
     }
 }
 
@@ -85,10 +84,12 @@ impl Assistant {
     }
 
     /// Get the version string of MaaCore.
+    ///
+    /// In runtime mode, returns an error if MaaCore is not loaded or is changing.
     pub fn get_version() -> Result<String> {
-        // Safety: AsstGetVersion returns a pointer into the loaded library's
-        // read-only data segment, valid only while the library remains loaded.
-        // `to_owned` copies the bytes before any unload can occur.
+        let _guard = runtime_lifecycle::Guard::acquire()?;
+        // Safety: MaaCore returns a valid, NUL-terminated string. The runtime
+        // guard prevents load or unload until the string has been copied.
         let version =
             unsafe { std::ffi::CStr::from_ptr(maa_sys::binding::AsstGetVersion()).to_owned() };
         Ok(String::from_utf8(version.into_bytes())?)
@@ -115,18 +116,17 @@ impl Assistant {
 impl Assistant {
     /// Create a new assistant instance without a callback.
     pub fn new() -> Result<Self> {
-        let registration = runtime_lifecycle::PendingAssistantRegistration::begin()?;
+        let guard = runtime_lifecycle::Guard::acquire()?;
 
         let handle = unsafe { maa_sys::binding::AsstCreate() };
         if handle.is_null() {
             return Err(Error::NullHandle);
         }
 
-        registration.commit();
-
         Ok(Self {
             handle,
             _callback: None,
+            _guard: guard,
         })
     }
 
@@ -138,18 +138,17 @@ impl Assistant {
         let boxed = Box::new(callback);
         let raw = &raw const *boxed as *mut c_void;
 
-        let registration = runtime_lifecycle::PendingAssistantRegistration::begin()?;
+        let guard = runtime_lifecycle::Guard::acquire()?;
 
         let handle = unsafe { maa_sys::binding::AsstCreateEx(Some(trampoline::<C>), raw) };
         if handle.is_null() {
             return Err(Error::NullHandle);
         }
 
-        registration.commit();
-
         Ok(Self {
             handle,
             _callback: Some(boxed as Box<dyn Callback>),
+            _guard: guard,
         })
     }
 
