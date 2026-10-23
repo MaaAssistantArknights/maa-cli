@@ -5,8 +5,7 @@ mod condition;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use condition::Condition;
-pub use condition::{TimeOffset, remainder_of_day_mod};
+pub use condition::{Condition, TimeOffset, remainder_of_day_mod};
 use maa_types::TaskType;
 use maa_value::prelude::*;
 use serde::Deserialize;
