@@ -19,10 +19,13 @@ pub enum TouchMode {
     /// A MaaFramework-based ADB controller that enables emulator-specific fast screencap support,
     /// such as Android Emulator AVD extras.
     MaaFwAdb,
+
+    // Universal MaaFramework-based controller
+    MaaFw,
 }
 
 impl TouchMode {
-    impl_enum_utils!(TouchMode, 5, TouchMode::Adb);
+    impl_enum_utils!(TouchMode, 6, TouchMode::Adb);
 
     impl_from_str_opt!();
 
@@ -34,6 +37,7 @@ impl TouchMode {
             TouchMode::MaaTouch => "maatouch",
             TouchMode::MacPlayTools => "MacPlayTools",
             TouchMode::MaaFwAdb => "MaaFwAdb",
+            TouchMode::MaaFw => "MaaFw",
         }
     }
 }
@@ -75,6 +79,8 @@ mod tests {
         assert_eq!("MacPlayTools".parse(), Ok(TouchMode::MacPlayTools));
         assert_eq!("maafwadb".parse(), Ok(TouchMode::MaaFwAdb));
         assert_eq!("MaaFwAdb".parse(), Ok(TouchMode::MaaFwAdb));
+        assert_eq!("maafw".parse(), Ok(TouchMode::MaaFw));
+        assert_eq!("MaaFw".parse(), Ok(TouchMode::MaaFw));
 
         assert_eq!(
             "Unknown".parse::<TouchMode>(),
@@ -82,7 +88,7 @@ mod tests {
         );
         assert_eq!(
             UnknownTouchModeError("Unknown".to_owned()).to_string(),
-            "unknown touch mode `Unknown`, expected one of `adb`, `minitouch`, `maatouch`, `MacPlayTools`, `MaaFwAdb`",
+            "unknown touch mode `Unknown`, expected one of `adb`, `minitouch`, `maatouch`, `MacPlayTools`, `MaaFwAdb`, `MaaFw`",
         );
     }
 
@@ -100,6 +106,7 @@ mod tests {
                 TouchMode::MaaTouch,
                 TouchMode::MacPlayTools,
                 TouchMode::MaaFwAdb,
+                TouchMode::MaaFw,
             ];
 
             // Test deserializing from string
@@ -110,6 +117,7 @@ mod tests {
                 Token::Str("maatouch"),
                 Token::Str("MacPlayTools"),
                 Token::Str("MaaFwAdb"),
+                Token::Str("MaaFw"),
                 Token::SeqEnd,
             ]);
         }
@@ -119,7 +127,7 @@ mod tests {
             assert_de_tokens_error::<TouchMode>(
                 &[Token::Str("Unknown")],
                 "unknown variant `Unknown`, expected one of \
-                `adb`, `minitouch`, `maatouch`, `MacPlayTools`, `MaaFwAdb`",
+                `adb`, `minitouch`, `maatouch`, `MacPlayTools`, `MaaFwAdb`, `MaaFw`",
             );
 
             assert_de_tokens_error::<TouchMode>(
@@ -135,6 +143,7 @@ mod tests {
             assert_ser_tokens(&TouchMode::MaaTouch, &[Token::Str("maatouch")]);
             assert_ser_tokens(&TouchMode::MacPlayTools, &[Token::Str("MacPlayTools")]);
             assert_ser_tokens(&TouchMode::MaaFwAdb, &[Token::Str("MaaFwAdb")]);
+            assert_ser_tokens(&TouchMode::MaaFw, &[Token::Str("MaaFw")]);
         }
     }
 
@@ -145,6 +154,7 @@ mod tests {
         assert_eq!(TouchMode::MaaTouch.to_str(), "maatouch");
         assert_eq!(TouchMode::MacPlayTools.to_str(), "MacPlayTools");
         assert_eq!(TouchMode::MaaFwAdb.to_str(), "MaaFwAdb");
+        assert_eq!(TouchMode::MaaFw.to_str(), "MaaFw");
     }
 
     #[cfg(feature = "ffi")]
