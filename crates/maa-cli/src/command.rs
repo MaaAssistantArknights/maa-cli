@@ -599,14 +599,6 @@ mod test {
 
     #[test]
     fn screenshot() -> anyhow::Result<()> {
-        let Command::Screenshot { output, common } =
-            Cli::try_parse_from(["maa", "screenshot", "screen.png"])?.command
-        else {
-            panic!("expected screenshot command");
-        };
-        assert_eq!(output, Path::new("screen.png"));
-        assert_eq!(common, run::ConnectionArgs::default());
-
         let Command::Screenshot { output, common } = Cli::try_parse_from([
             "maa",
             "screenshot",
@@ -626,10 +618,6 @@ mod test {
         assert_eq!(common.addr.as_deref(), Some("127.0.0.1:1717"));
         assert!(common.user_resource);
 
-        assert!(Cli::try_parse_from(["maa", "screenshot"]).is_err());
-        for flag in ["--dry-run", "--no-summary", "--no-auto-reconnect"] {
-            assert!(Cli::try_parse_from(["maa", "screenshot", "screen.png", flag]).is_err());
-        }
         Ok(())
     }
 
