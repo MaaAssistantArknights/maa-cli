@@ -84,6 +84,18 @@ maa-cli는 기본적으로 표준 오류(stderr)에 로그를 출력합니다. `
 
 기본적으로 모든 출력 로그는 타임스탬프와 로그 레벨의 접두사를 포함합니다. `MAA_LOG_PREFIX` 환경 변수를 통해 이 동작을 변경할 수 있습니다. `Always`로 설정하면 항상 접두사를 포함하고, `Auto`로 설정하면 로그 파일 출력 시에만 접두사를 포함하며, 표준 오류 출력 시에는 포함하지 않습니다. `Never`로 설정하면 로그 파일 출력 시에도 접두사를 포함하지 않습니다.
 
+### 스크린샷
+
+`maa screenshot <output>` 명령어로 연결된 기기의 현재 화면을 PNG 파일로 저장할 수 있습니다. 출력 경로는 필수이며, 상위 디렉토리는 미리 존재해야 합니다. 같은 이름의 파일이 있으면 덮어씁니다.
+
+```bash
+maa screenshot screen.png
+maa screenshot screen.png --profile playcover
+maa screenshot screen.png --addr emulator-5554
+```
+
+이 명령어는 작업과 동일한 연결 설정을 사용하며 `--profile`, `--addr`, `--user-resource`를 지원합니다. 게임을 시작하거나 종료하지 않으며 작업 큐도 실행하지 않습니다. PlayCover 또는 Waydroid를 사용하는 경우 게임 또는 실행 환경을 미리 시작해 주세요.
+
 ### 기타 하위 명령어
 
 위 명령어 외에도 maa-cli는 다음과 같은 하위 명령어를 제공합니다:

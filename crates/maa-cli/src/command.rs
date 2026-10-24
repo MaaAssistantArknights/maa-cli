@@ -109,6 +109,13 @@ pub(crate) enum Command {
         #[command(flatten)]
         common: run::CommonArgs,
     },
+    /// Take a screenshot of the connected device
+    Screenshot {
+        /// Output PNG file path (replaces an existing file)
+        output: PathBuf,
+        #[command(flatten)]
+        common: run::ConnectionArgs,
+    },
     /// Startup Game and Enter Main Screen
     #[command(name = "startup")]
     StartUp {
@@ -550,7 +557,10 @@ mod test {
             Command::Run {
                 task,
                 common: run::CommonArgs {
-                    addr: Some(addr),
+                    connection: run::ConnectionArgs {
+                        addr: Some(addr),
+                        ..
+                    },
                     ..
                 },
                 ..
@@ -561,7 +571,10 @@ mod test {
             Command::Run {
                 task,
                 common: run::CommonArgs {
-                    addr: Some(addr),
+                    connection: run::ConnectionArgs {
+                        addr: Some(addr),
+                        ..
+                    },
                     ..
                 },
                 ..
@@ -573,12 +586,51 @@ mod test {
             Command::Run {
                 task,
                 common: run::CommonArgs {
-                    user_resource: true,
+                    connection: run::ConnectionArgs {
+                        user_resource: true,
+                        ..
+                    },
                     ..
                 },
                 ..
             } if task == "task"
         ));
+    }
+
+    #[test]
+    fn screenshot() -> anyhow::Result<()> {
+        let Command::Screenshot { output, common } =
+            Cli::try_parse_from(["maa", "screenshot", "screen.png"])?.command
+        else {
+            panic!("expected screenshot command");
+        };
+        assert_eq!(output, Path::new("screen.png"));
+        assert_eq!(common, run::ConnectionArgs::default());
+
+        let Command::Screenshot { output, common } = Cli::try_parse_from([
+            "maa",
+            "screenshot",
+            "capture.png",
+            "-p",
+            "playcover",
+            "-a",
+            "127.0.0.1:1717",
+            "--user-resource",
+        ])?
+        .command
+        else {
+            panic!("expected screenshot command");
+        };
+        assert_eq!(output, Path::new("capture.png"));
+        assert_eq!(common.profile.as_deref(), Some("playcover"));
+        assert_eq!(common.addr.as_deref(), Some("127.0.0.1:1717"));
+        assert!(common.user_resource);
+
+        assert!(Cli::try_parse_from(["maa", "screenshot"]).is_err());
+        for flag in ["--dry-run", "--no-summary", "--no-auto-reconnect"] {
+            assert!(Cli::try_parse_from(["maa", "screenshot", "screen.png", flag]).is_err());
+        }
+        Ok(())
     }
 
     #[test]

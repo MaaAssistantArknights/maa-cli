@@ -84,6 +84,18 @@ By default, logs go to standard error (stderr). The `--log-file` option can redi
 
 All logs normally include a timestamp and level prefix. The `MAA_LOG_PREFIX` environment variable controls this behavior: `Always` always includes prefixes, `Auto` includes prefixes in log files but not in stderr output, and `Never` omits prefixes even in log files.
 
+### Screenshots
+
+Use `maa screenshot <output>` to capture the connected device's current screen as a PNG file. The output path is required and its parent directory must exist. An existing output file is replaced.
+
+```bash
+maa screenshot screen.png
+maa screenshot screen.png --profile playcover
+maa screenshot screen.png --addr emulator-5554
+```
+
+This command shares task connection settings and accepts `--profile`, `--addr`, and `--user-resource`. It does not start or close the game or run a task queue. For PlayCover or Waydroid, start the game or environment beforehand.
+
 ### Other Subcommands
 
 Besides the above commands, maa-cli provides additional subcommands:

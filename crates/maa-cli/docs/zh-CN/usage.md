@@ -91,6 +91,18 @@ maa-cli 默认会向标准误 (stderr) 输出日志。`--log-file` 选项可以�
 
 默认情况下，所有输出的日志会包含时间戳和日志级别的前缀。你可以通过环境变量 `MAA_LOG_PREFIX` 来改变这个行为。设置为 `Always` 时，总是会包含前缀，设置为 `Auto` 时输出到日志文件时会包含前缀，而输出到 stderr 时不会包含前缀，而设置为 `Never` 时即使是写入日志文件时也不会包含前缀。
 
+### 截图
+
+使用 `maa screenshot <output>` 截取已连接设备的当前画面，保存为 PNG 文件。输出路径必须指定，父目录需要已存在；如果文件已存在，则覆盖。
+
+```bash
+maa screenshot screen.png
+maa screenshot screen.png --profile playcover
+maa screenshot screen.png --addr emulator-5554
+```
+
+此命令复用任务的连接配置，支持 `--profile`、`--addr` 和 `--user-resource`，但不会启动或关闭游戏，也不会执行任务队列。使用 PlayCover 或 Waydroid 时，请先启动相应的游戏或环境。
+
 ### 其他子命令
 
 除了上述的命令外，maa-cli 还提供了其他一些子命令：

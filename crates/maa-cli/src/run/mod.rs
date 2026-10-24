@@ -5,6 +5,7 @@ mod external;
 
 pub mod preset;
 
+mod screenshot;
 use std::{
     path::Path,
     sync::{Arc, atomic},
@@ -13,23 +14,24 @@ use std::{
 use anyhow::{Context, Result, bail};
 use clap::Args;
 use log::{debug, warn};
-use maa_core::Assistant;
+use maa_core::{Assistant, Callback};
 use maa_dirs::{self as dirs, Ensure, MAA_CORE_LIB};
 use maa_types::InstanceOptionKey;
+pub use screenshot::screenshot;
 use signal_hook::consts::TERM_SIGNALS;
 
 use crate::{
     config::{
         FindFile,
         asst::AsstConfig,
-        task::{TaskConfig, TaskConfigTemplate},
+        task::{ClientType, TaskConfig, TaskConfigTemplate},
     },
     installer,
 };
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Args, Default)]
-pub struct CommonArgs {
+pub struct ConnectionArgs {
     /// ADB serial number of device or MaaTools address set in PlayCover
     ///
     /// By default, MaaCore connects to game with ADB,
@@ -69,6 +71,25 @@ pub struct CommonArgs {
     /// Use at your own risk!
     #[arg(long, verbatim_doc_comment)]
     pub user_resource: bool,
+}
+
+impl ConnectionArgs {
+    pub fn apply_to(&self, config: &mut AsstConfig) {
+        if let Some(addr) = self.addr.as_ref() {
+            config.connection.set_address(addr);
+        }
+
+        if self.user_resource {
+            config.resource.use_user_resource();
+        }
+    }
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Args, Default)]
+pub struct CommonArgs {
+    #[command(flatten)]
+    pub connection: ConnectionArgs,
     /// Parse the your config but do not connect to the game
     ///
     /// This option is useful when you want to check your config file.
@@ -92,18 +113,6 @@ pub struct CommonArgs {
     pub no_auto_reconnect: bool,
 }
 
-impl CommonArgs {
-    pub fn apply_to(&self, config: &mut AsstConfig) {
-        if let Some(addr) = self.addr.as_ref() {
-            config.connection.set_address(addr);
-        }
-
-        if self.user_resource {
-            config.resource.use_user_resource();
-        }
-    }
-}
-
 fn find_profile(root: impl AsRef<Path>, profile: Option<&str>) -> Result<AsstConfig> {
     let root = root.as_ref();
     if let Some(profile) = profile {
@@ -122,6 +131,65 @@ fn find_profile(root: impl AsRef<Path>, profile: Option<&str>) -> Result<AsstCon
     }
 }
 
+fn load_config(args: &ConnectionArgs) -> Result<AsstConfig> {
+    let mut asst_config = find_profile(dirs::config(), args.profile.as_deref())?;
+
+    args.apply_to(&mut asst_config);
+
+    Ok(asst_config)
+}
+
+fn create_assistant(config: &AsstConfig, callback: impl Callback + 'static) -> Result<Assistant> {
+    load_core()?;
+    setup_core(config)?;
+
+    let asst = Assistant::new_with_callback(callback)
+        .context("Failed to create Assistant: resources may not be loaded")?;
+    config.instance_options.apply_to(&asst)?;
+
+    Ok(asst)
+}
+
+fn with_connection(
+    asst: &Assistant,
+    config: &AsstConfig,
+    _client_type: ClientType,
+    start_app: bool,
+    close_app: bool,
+    operation: impl FnOnce() -> Result<()>,
+) -> Result<()> {
+    let (adb_path, address, connection_config) = config.connection.connect_args();
+
+    let app: Option<Box<dyn external::ExternalApp>> = match config.connection.preset() {
+        #[cfg(target_os = "macos")]
+        crate::config::asst::Preset::PlayCover => Some(Box::new(external::PlayCoverApp::new(
+            _client_type,
+            address.as_ref(),
+        ))),
+        #[cfg(target_os = "linux")]
+        crate::config::asst::Preset::Waydroid => Some(Box::new(external::WaydroidApp::new())),
+        _ => None,
+    };
+
+    let runtime_address = app
+        .as_deref()
+        .map(|app| app.open(start_app))
+        .transpose()?
+        .flatten();
+    let address = runtime_address.as_deref().unwrap_or(&address);
+
+    asst.async_connect(adb_path.as_ref(), address, connection_config, true)?;
+
+    operation()?;
+
+    if let (Some(app), true) = (app.as_deref(), close_app) {
+        debug!("Closing external app...");
+        app.close().context("Failed to close external app")?;
+    }
+
+    Ok(())
+}
+
 fn run_core<F>(f: F, args: CommonArgs) -> Result<()>
 where
     F: FnOnce(&AsstConfig) -> Result<TaskConfig>,
@@ -130,19 +198,16 @@ where
     installer::hot_update::update()?;
     installer::resource::update(true)?;
 
-    // Load asst config
-    let mut asst_config = find_profile(dirs::config(), args.profile.as_deref())?;
-
-    args.apply_to(&mut asst_config);
+    let mut asst_config = load_config(&args.connection)?;
 
     let task_config = f(&asst_config)?;
     if let Some(resource) = task_config.client_type.resource() {
         asst_config.resource.use_global_resource(resource);
     }
 
-    // Load and setup MaaCore
-    load_core().context("Failed to load MaaCore!")?;
-    setup_core(&asst_config)?;
+    let auto_reconnect = asst_config.behavior.auto_reconnect && !args.no_auto_reconnect;
+    let (maa_callback, offline_stop) = callback::MaaCallback::new(auto_reconnect);
+    let asst = create_assistant(&asst_config, maa_callback)?;
 
     // Register signal handlers
     let stop_bool = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -153,12 +218,6 @@ where
             .context("Failed to register signal handler!")?;
     }
 
-    // Create and setup Assistant
-    let auto_reconnect = asst_config.behavior.auto_reconnect && !args.no_auto_reconnect;
-    let (maa_callback, offline_stop) = callback::MaaCallback::new(auto_reconnect);
-    let asst = Assistant::new_with_callback(maa_callback)
-        .context("Failed to create Assistant: resources may not be loaded")?;
-    asst_config.instance_options.apply_to(&asst)?;
     debug!("Setting client type to {}", task_config.client_type);
     asst.set_instance_option(
         InstanceOptionKey::ClientType,
@@ -193,54 +252,32 @@ where
     }
 
     if !args.dry_run {
-        // Prepare connection
-        let (adb_path, address, config) = asst_config.connection.connect_args();
+        with_connection(
+            &asst,
+            &asst_config,
+            task_config.client_type,
+            task_config.start_app,
+            task_config.close_app,
+            || {
+                debug!("Starting MAA...");
+                asst.start()?;
 
-        // Launch external apps
-        let app: Option<Box<dyn external::ExternalApp>> = match asst_config.connection.preset() {
-            #[cfg(target_os = "macos")]
-            crate::config::asst::Preset::PlayCover => Some(Box::new(external::PlayCoverApp::new(
-                task_config.client_type,
-                address.as_ref(),
-            ))),
-            #[cfg(target_os = "linux")]
-            crate::config::asst::Preset::Waydroid => Some(Box::new(external::WaydroidApp::new())),
-            _ => None,
-        };
+                while asst.running() {
+                    if stop_bool.load(atomic::Ordering::Relaxed) {
+                        bail!("Interrupted by user!");
+                    }
+                    if offline_stop.load(atomic::Ordering::Relaxed) {
+                        break;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
 
-        // Startup external app or query its runtime address if available
-        let runtime_address = app
-            .as_deref()
-            .map(|app| app.open(task_config.start_app))
-            .transpose()?
-            .flatten();
+                debug!("Stopping MAA...");
+                asst.stop()?;
 
-        let address = runtime_address.as_deref().unwrap_or(&address);
-
-        // Connect to game or emulator
-        asst.async_connect(adb_path.as_ref(), address, config, true)?;
-
-        debug!("Starting MAA...");
-        asst.start()?;
-
-        while asst.running() {
-            if stop_bool.load(atomic::Ordering::Relaxed) {
-                bail!("Interrupted by user!");
-            }
-            if offline_stop.load(atomic::Ordering::Relaxed) {
-                break;
-            }
-            std::thread::sleep(std::time::Duration::from_millis(100));
-        }
-
-        debug!("Stopping MAA...");
-        asst.stop()?;
-
-        // Close external app
-        if let (Some(app), true) = (app.as_deref(), task_config.close_app) {
-            debug!("Closing external app...");
-            app.close().context("Failed to close external app")?;
-        }
+                Ok(())
+            },
+        )?;
     }
 
     // TODO: Better ways to restore signal handlers?
