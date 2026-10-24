@@ -337,6 +337,22 @@ address = "127.0.0.1:7777" # 如果你需要的话，你可以覆盖预设的地
 - `Waydroid`用于在 Linux 上连接直接通过 `Waydroid` 原生运行的游戏客户端。这种情况下仍需要指定 `adb_path` 供 MaaCore 连接设备使用。maa-cli 会自动管理会话：通过 `waydroid status` 检测会话是否已在运行，必要时启动会话，然后通过 `waydroid adb connect` 建立 ADB 连接。
   具体使用参见 [Waydroid 支持文档][waydroid-doc].
 
+- `Win32` 不通过 ADB，而是让 MaaCore 附加到明日方舟官方 Windows PC 客户端窗口；该预设仅支持 Windows。
+
+  `window_title` 为必填项，且必须与可见顶层窗口的标题完全一致。如果多个窗口标题相同，可使用 `window_process_id` 或按规范化路径匹配的 `window_executable` 来消除歧义。默认控制方式为 `screencap_method = 2`（`FramePool`）、`mouse_method = 32`（`SendMessageWithCursorPos`）和 `keyboard_method = 2`（`SendMessage`）。
+
+  `MaaWin32ControlUnit.dll` 必须与 `MaaCore.dll` 位于同一目录，`PC` 平台资源会自动加载。maa-cli 不负责启动 PC 客户端，并会在该预设下禁用 `StartUp.start_game_enabled`，因此运行任务前需要先启动所选客户端。
+
+```toml
+[connection]
+preset = "Win32"
+window_title = "Arknights"
+window_process_id = 1234 # 可选
+window_executable = "C:\\Games\\Arknights.exe" # 可选
+```
+
+可使用 `maa connection test --profile <名称> --screencap --json` 在不运行任务的情况下附加窗口并验证截图非空。成功时退出码为 0，并输出 `{"ok":true,"connection":"Win32","screenshot_bytes":...}`。
+
 ### 资源配置
 
 `[resource]` 相关字段用于指定 MaaCore 加载的资源：
@@ -348,7 +364,7 @@ platform_diff_resource = "iOS" # 非安卓版本的资源
 user_resource = true # 是否加载用户自定义的资源
 ```
 
-当使用非简体中文游戏客户端时，由于 MaaCore 默认加载的资源是简体中文的，你需要指定 `global_resource` 字段来加载非中文版本的资源。当使用 iOS 版本的游戏客户端时，你需要指定 `platform_diff_resource` 字段来加载 iOS 版本的资源。这两者都是可选的，如果你不需要加载这些资源，你可以将这两个字段设置为空。其次，这两者也会被自动设置，如果你的 `startup` 任务中指定了 `client_type` 字段，那么 `global_resource` 将会被设置为对应客户端的资源，而当你使用 `PlayTools` 连接时，`platform_diff_resource` 将会被设置为 `iOS`。最后，当你想要加载用户自定义的资源时，你需要将 `user_resource` 字段设置为 `true`。
+当使用非简体中文游戏客户端时，由于 MaaCore 默认加载的资源是简体中文的，你需要指定 `global_resource` 字段来加载非中文版本的资源。当使用 iOS 版本的游戏客户端时，你需要指定 `platform_diff_resource` 字段来加载 iOS 版本的资源。这两者都是可选的，如果你不需要加载这些资源，你可以将这两个字段设置为空。其次，这两者也会被自动设置，如果你的 `startup` 任务中指定了 `client_type` 字段，那么 `global_resource` 将会被设置为对应客户端的资源；`PlayTools` 连接会加载 `iOS`，`Win32` 连接会加载 `PC` 平台资源。最后，当你想要加载用户自定义的资源时，你需要将 `user_resource` 字段设置为 `true`。
 
 ### 静态选项
 
