@@ -1,10 +1,7 @@
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::Arc;
 
-use maa_ffi_types::{AsstAsyncCallId, AsstMsgId};
+use maa_ffi_types::AsstMsgId;
 use maa_types::MessageKind;
-use serde::Deserialize;
-
-use crate::{Error, Result, get_log_path};
 
 /// Trait for receiving MaaCore callback messages.
 ///
@@ -62,10 +59,6 @@ pub trait Callback: Send + Sync {
     ///
     /// See the [MaaCore callback schema] for details. Always handle `None` gracefully.
     ///
-    /// Messages are delivered serially. Return without waiting for
-    /// [`Assistant::get_fresh_image`](crate::Assistant::get_fresh_image) on the same assistant:
-    /// that method waits for a completion message on this callback thread.
-    ///
     /// # Panics
     ///
     /// If this method panics, MaaCore's internal thread will **abort** the
@@ -87,80 +80,6 @@ where
 impl<C: Callback> Callback for Arc<C> {
     fn on_message(&self, kind: MessageKind, msg: Option<&str>) {
         (**self).on_message(kind, msg)
-    }
-}
-
-pub(crate) struct CallbackHandler<C> {
-    pub(crate) callback: C,
-    pub(crate) async_calls: Arc<AsyncCallState>,
-}
-
-impl<C: Callback> Callback for CallbackHandler<C> {
-    fn on_message(&self, kind: MessageKind, msg: Option<&str>) {
-        if kind == MessageKind::AsyncCallInfo {
-            self.async_calls.complete(msg);
-        }
-        self.callback.on_message(kind, msg);
-    }
-}
-
-#[derive(Default)]
-pub(crate) struct AsyncCallState {
-    pending: Mutex<Option<PendingCall>>,
-    ready: Condvar,
-}
-
-struct PendingCall {
-    id: AsstAsyncCallId,
-    result: Option<Result<bool>>,
-}
-
-#[derive(Deserialize)]
-struct AsyncCallInfo {
-    async_call_id: AsstAsyncCallId,
-    details: AsyncCallDetails,
-}
-
-#[derive(Deserialize)]
-struct AsyncCallDetails {
-    ret: bool,
-}
-
-impl AsyncCallState {
-    pub(crate) fn wait_for(
-        &self,
-        submit: impl FnOnce() -> Result<AsstAsyncCallId>,
-    ) -> Result<bool> {
-        // Nonblocking submission cannot wait for this mutex; keep it until the ID is registered.
-        let mut pending = self.pending.lock().expect("Async call mutex poisoned");
-        let id = submit()?;
-        *pending = Some(PendingCall { id, result: None });
-
-        loop {
-            if let Some(result) = pending.as_mut().and_then(|call| call.result.take()) {
-                *pending = None;
-                return result;
-            }
-            // No user callback runs while this mutex is held, so poisoning is an internal bug.
-            pending = self.ready.wait(pending).expect("Async call mutex poisoned");
-        }
-    }
-
-    fn complete(&self, msg: Option<&str>) {
-        // Only internal state changes run under this mutex; user callbacks run after it is
-        // released.
-        let mut pending = self.pending.lock().expect("Async call mutex poisoned");
-        let Some(call) = pending.as_mut() else {
-            return;
-        };
-
-        let result = match msg.and_then(|msg| serde_json::from_str::<AsyncCallInfo>(msg).ok()) {
-            Some(info) if info.async_call_id != call.id => return,
-            Some(info) => Ok(info.details.ret),
-            None => Err(Error::MAAError(get_log_path())),
-        };
-        call.result = Some(result);
-        self.ready.notify_one();
     }
 }
 
@@ -197,7 +116,7 @@ pub(crate) unsafe extern "C" fn trampoline<C: Callback>(
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
-    use std::sync::{Arc, Mutex, TryLockError, mpsc};
+    use std::sync::{Arc, Mutex};
 
     use maa_types::MessageKind;
 
@@ -221,88 +140,6 @@ mod tests {
 
         fn entries(&self) -> Vec<(MessageKind, Option<String>)> {
             self.0.lock().unwrap().clone()
-        }
-    }
-
-    #[test]
-    fn async_result_during_submission_is_matched_and_forwarded() -> Result<()> {
-        let state = Arc::new(AsyncCallState::default());
-        let recorder = Arc::new(Recorder::new());
-        let callback = CallbackHandler {
-            callback: Arc::clone(&recorder),
-            async_calls: Arc::clone(&state),
-        };
-        let (started, submitting) = mpsc::sync_channel(0);
-
-        std::thread::scope(|scope| -> Result<()> {
-            let success = state.wait_for(|| {
-                scope.spawn(|| {
-                    // Force callback entry before submission returns its ID.
-                    assert!(matches!(
-                        state.pending.try_lock(),
-                        Err(TryLockError::WouldBlock)
-                    ));
-                    started
-                        .send(())
-                        .expect("submission must receive the signal");
-                    callback.on_message(
-                        MessageKind::AsyncCallInfo,
-                        Some(r#"{"async_call_id":1,"details":{"ret":false}}"#),
-                    );
-                    callback.on_message(
-                        MessageKind::AsyncCallInfo,
-                        Some(r#"{"async_call_id":2,"details":{"ret":true}}"#),
-                    );
-                });
-                // The callback worker must reach the submission handshake without panicking.
-                submitting.recv().expect("callback worker failed");
-                Ok(2)
-            })?;
-            assert!(success);
-            Ok(())
-        })?;
-
-        assert_eq!(recorder.entries().len(), 2);
-        Ok(())
-    }
-
-    #[test]
-    fn failed_async_result_is_forwarded() -> Result<()> {
-        let state = Arc::new(AsyncCallState::default());
-        let recorder = Arc::new(Recorder::new());
-        let callback = CallbackHandler {
-            callback: Arc::clone(&recorder),
-            async_calls: Arc::clone(&state),
-        };
-        let msg = r#"{"async_call_id":2,"details":{"ret":false}}"#;
-
-        std::thread::scope(|scope| -> Result<()> {
-            let success = state.wait_for(|| {
-                scope.spawn(|| callback.on_message(MessageKind::AsyncCallInfo, Some(msg)));
-                Ok(2)
-            })?;
-            assert!(!success);
-            Ok(())
-        })?;
-
-        assert_eq!(recorder.entries(), [(
-            MessageKind::AsyncCallInfo,
-            Some(msg.into())
-        )]);
-        Ok(())
-    }
-
-    #[test]
-    fn invalid_async_result_wakes_waiter() {
-        for msg in [None, Some("invalid json")] {
-            let state = AsyncCallState::default();
-            std::thread::scope(|scope| {
-                let result = state.wait_for(|| {
-                    scope.spawn(|| state.complete(msg));
-                    Ok(2)
-                });
-                assert!(matches!(result, Err(Error::MAAError(_))));
-            });
         }
     }
 

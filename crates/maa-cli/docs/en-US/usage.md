@@ -86,15 +86,18 @@ All logs normally include a timestamp and level prefix. The `MAA_LOG_PREFIX` env
 
 ### Screenshots
 
-Use `maa screenshot <output>` to capture the connected device's current screen as a PNG file. The output path is required and its parent directory must exist. An existing output file is replaced.
+Use `maa screenshot [output]` to request a screenshot of the connected device. Without an output path, raw PNG bytes are written to stdout and logs go to stderr by default, so the image can be redirected or piped. With a path, the image is saved as a PNG file; its parent directory must exist and an existing file is replaced.
 
 ```bash
+maa screenshot > screen.png
 maa screenshot screen.png
 maa screenshot screen.png --profile playcover
 maa screenshot screen.png --addr emulator-5554
 ```
 
 This command shares task connection settings and accepts `--profile`, `--addr`, and `--user-resource`. It does not start or close the game or run a task queue. For PlayCover or Waydroid, start the game or environment beforehand.
+
+Capture can fail if the connection is interrupted or image acquisition fails. The command waits for the capture call to finish and then reads the cache, without checking its execution result. A successful exit may therefore output an older cached frame. Connection failure, no available image, or an output write failure still causes an error.
 
 ### Other Subcommands
 

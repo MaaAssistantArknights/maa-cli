@@ -110,9 +110,12 @@ pub(crate) enum Command {
         common: run::CommonArgs,
     },
     /// Take a screenshot of the connected device
+    ///
+    /// If capture fails, a previously cached frame may be written instead.
+    /// A successful exit does not guarantee a fresh frame.
     Screenshot {
-        /// Output PNG file path (replaces an existing file)
-        output: PathBuf,
+        /// Output PNG file path (replaces an existing file); defaults to stdout
+        output: Option<PathBuf>,
         #[command(flatten)]
         common: run::ConnectionArgs,
     },
@@ -599,6 +602,11 @@ mod test {
 
     #[test]
     fn screenshot() -> anyhow::Result<()> {
+        assert_matches!(
+            parse_from(["maa", "screenshot"]).command,
+            Command::Screenshot { output: None, .. }
+        );
+
         let Command::Screenshot { output, common } = Cli::try_parse_from([
             "maa",
             "screenshot",
@@ -613,7 +621,7 @@ mod test {
         else {
             panic!("expected screenshot command");
         };
-        assert_eq!(output, Path::new("capture.png"));
+        assert_eq!(output.as_deref(), Some(Path::new("capture.png")));
         assert_eq!(common.profile.as_deref(), Some("playcover"));
         assert_eq!(common.addr.as_deref(), Some("127.0.0.1:1717"));
         assert!(common.user_resource);

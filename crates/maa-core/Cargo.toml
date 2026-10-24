@@ -13,8 +13,6 @@ maa-ffi-string = { workspace = true }
 maa-ffi-types = { workspace = true }
 maa-sys = { workspace = true }
 maa-types = { workspace = true, features = ["ffi"] }
-serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
 thiserror = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]

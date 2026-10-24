@@ -76,7 +76,7 @@ asst.stop()?;
 
 ### Screenshots
 
-`get_image()` reads the cached PNG. `get_fresh_image()` waits for a new screenshot to succeed and returns an error if capture fails, rather than returning an old cached image. It returns `None` when the device is not connected. Both constructors install an internal handler for completion results; user callbacks still receive the original messages. Callbacks are delivered serially and must return without waiting for `get_fresh_image()` on the same assistant, so the completion message can be processed.
+`get_image()` reads the cached PNG. `get_fresh_image()` requests a screenshot, waits for execution to finish, and then reads the cache. It does not inspect the capture's execution result: capture may fail, so `Ok(Some(image))` can contain a previous frame. It returns `None` if no image is cached and propagates submission or image retrieval errors. `async_screencap()` returns a call ID; even with `block = true`, capture success or failure is only reported separately through `AsyncCallInfo`.
 
 ## Features
 

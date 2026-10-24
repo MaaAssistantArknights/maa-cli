@@ -93,15 +93,18 @@ maa-cli 默认会向标准误 (stderr) 输出日志。`--log-file` 选项可以�
 
 ### 截图
 
-使用 `maa screenshot <output>` 截取已连接设备的当前画面，保存为 PNG 文件。输出路径必须指定，父目录需要已存在；如果文件已存在，则覆盖。
+使用 `maa screenshot [output]` 尝试获取已连接设备的画面。省略输出路径时，PNG 原始字节会写入标准输出，日志默认写入标准错误，可通过重定向或管道接收图片。指定路径时保存为 PNG 文件，父目录需要已存在；如果文件已存在，则覆盖。
 
 ```bash
+maa screenshot > screen.png
 maa screenshot screen.png
 maa screenshot screen.png --profile playcover
 maa screenshot screen.png --addr emulator-5554
 ```
 
 此命令复用任务的连接配置，支持 `--profile`、`--addr` 和 `--user-resource`，但不会启动或关闭游戏，也不会执行任务队列。使用 PlayCover 或 Waydroid 时，请先启动相应的游戏或环境。
+
+截图刷新可能因连接中断或图像获取异常而失败。此命令等待截图调用结束后读取缓存，不检查本次刷新的执行结果，因此成功退出也可能输出之前的缓存帧；连接失败、没有可用图片或输出写入失败时仍会报错。
 
 ### 其他子命令
 

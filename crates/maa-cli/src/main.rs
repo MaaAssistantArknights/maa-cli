@@ -96,7 +96,7 @@ fn main() -> Result<()> {
             }
         }
         Command::Run { task, common } => run::run_custom(task, common)?,
-        Command::Screenshot { output, common } => run::screenshot(&output, common)?,
+        Command::Screenshot { output, common } => run::screenshot(output.as_deref(), common)?,
         Command::StartUp { params, common } => run::run_preset(params, common)?,
         Command::CloseDown { params, common } => run::run_preset(params, common)?,
         Command::Fight { params, common } => run::run_preset(params, common)?,

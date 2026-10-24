@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{io::Write, path::Path};
 
 use anyhow::{Context, Result};
 
@@ -7,7 +7,7 @@ use super::{
 };
 use crate::config::task::ClientType;
 
-pub fn screenshot(output: &Path, args: ConnectionArgs) -> Result<()> {
+pub fn screenshot(output: Option<&Path>, args: ConnectionArgs) -> Result<()> {
     let config = load_config(&args)?;
     let (callback, _) = MaaCallback::new(false);
     let asst = create_assistant(&config, callback)?;
@@ -16,14 +16,23 @@ pub fn screenshot(output: &Path, args: ConnectionArgs) -> Result<()> {
         let image = asst
             .get_fresh_image()
             .context("Failed to take screenshot")?;
-        save_image(output, image.as_deref())
+        write_image(output, image.as_deref())
     })
 }
 
-fn save_image(output: &Path, image: Option<&[u8]>) -> Result<()> {
+fn write_image(output: Option<&Path>, image: Option<&[u8]>) -> Result<()> {
     let image = image.context("No screenshot returned by MaaCore")?;
-    maa_atomic_fs::write(output, image)
-        .with_context(|| format!("Failed to save screenshot to {}", output.display()))
+    match output {
+        Some(output) => maa_atomic_fs::write(output, image)
+            .with_context(|| format!("Failed to save screenshot to {}", output.display())),
+        None => {
+            let mut stdout = std::io::stdout().lock();
+            stdout
+                .write_all(image)
+                .and_then(|()| stdout.flush())
+                .context("Failed to write screenshot to stdout")
+        }
+    }
 }
 
 #[cfg(test)]
@@ -39,7 +48,7 @@ mod tests {
         let output = dir.path().join("screen.png");
 
         fs::write(&output, "previous image")?;
-        assert!(save_image(&output, None).is_err());
+        assert!(write_image(Some(&output), None).is_err());
         assert_eq!(fs::read_to_string(output)?, "previous image");
         Ok(())
     }

@@ -1123,8 +1123,6 @@ dependencies = [
  "maa-ffi-types",
  "maa-sys",
  "maa-types",
- "serde",
- "serde_json",
  "thiserror 2.0.19",
  "windows-result",
  "windows-strings",
