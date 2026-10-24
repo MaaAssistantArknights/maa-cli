@@ -11,7 +11,7 @@ use std::{
     sync::{Arc, atomic},
 };
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, bail, ensure};
 use clap::Args;
 use log::{debug, warn};
 use maa_core::{Assistant, Callback};
@@ -179,6 +179,7 @@ fn with_connection(
     let address = runtime_address.as_deref().unwrap_or(&address);
 
     asst.async_connect(adb_path.as_ref(), address, connection_config, true)?;
+    ensure!(asst.connected(), "Failed to connect to device");
 
     operation()?;
 

@@ -2,7 +2,7 @@
 
 use std::{
     ffi::{c_char, c_void},
-    sync::RwLock,
+    sync::{Arc, RwLock},
 };
 
 use maa_ffi_string::ToCString;
@@ -11,7 +11,7 @@ use maa_types::{InstanceOptionKey, StaticOptionKey};
 
 mod callback;
 pub use callback::Callback;
-use callback::trampoline;
+use callback::{AsyncCallState, CallbackHandler, trampoline};
 
 mod error;
 use error::{AsstResult, BufferTooSmall};
@@ -32,13 +32,14 @@ pub(crate) fn get_log_path() -> std::path::PathBuf {
 
 /// A safe and convenient wrapper of MaaCore Assistant API.
 ///
-/// The optional callback is heap-allocated (`Box<dyn Callback>`) and its
+/// The internal callback handler is heap-allocated (`Box<dyn Callback>`) and its
 /// raw pointer is passed to MaaCore. `AsstDestroy` is called in `Drop` before
 /// the `Box` is released, guaranteeing the pointee outlives every callback
 /// invocation.
 pub struct Assistant {
     handle: maa_sys::binding::AsstHandle,
-    _callback: Option<Box<dyn Callback>>,
+    _callback: Box<dyn Callback>,
+    async_calls: Arc<AsyncCallState>,
     _guard: runtime_lifecycle::Guard,
 }
 
@@ -114,20 +115,9 @@ impl Assistant {
 
 // Instance Methods
 impl Assistant {
-    /// Create a new assistant instance without a callback.
+    /// Create a new assistant instance without a user callback.
     pub fn new() -> Result<Self> {
-        let guard = runtime_lifecycle::Guard::acquire()?;
-
-        let handle = unsafe { maa_sys::binding::AsstCreate() };
-        if handle.is_null() {
-            return Err(Error::NullHandle);
-        }
-
-        Ok(Self {
-            handle,
-            _callback: None,
-            _guard: guard,
-        })
+        Self::new_with_callback(|_: maa_types::MessageKind, _: Option<&str>| {})
     }
 
     /// Create a new assistant instance with a callback.
@@ -135,19 +125,26 @@ impl Assistant {
     /// Accepts any `C: Callback + 'static`, including plain functions, closures, or `Arc<C>`
     /// for sharing state with the caller (via the blanket impl on `Arc`).
     pub fn new_with_callback<C: Callback + 'static>(callback: C) -> Result<Self> {
-        let boxed = Box::new(callback);
+        let async_calls = Arc::new(AsyncCallState::default());
+        let boxed = Box::new(CallbackHandler {
+            callback,
+            async_calls: Arc::clone(&async_calls),
+        });
         let raw = &raw const *boxed as *mut c_void;
 
         let guard = runtime_lifecycle::Guard::acquire()?;
 
-        let handle = unsafe { maa_sys::binding::AsstCreateEx(Some(trampoline::<C>), raw) };
+        // Safety: the boxed handler and runtime guard outlive the handle, including destruction.
+        let handle =
+            unsafe { maa_sys::binding::AsstCreateEx(Some(trampoline::<CallbackHandler<C>>), raw) };
         if handle.is_null() {
             return Err(Error::NullHandle);
         }
 
         Ok(Self {
             handle,
-            _callback: Some(boxed as Box<dyn Callback>),
+            _callback: boxed,
+            async_calls,
             _guard: guard,
         })
     }
@@ -295,8 +292,14 @@ impl Assistant {
     /// Take a fresh screenshot and return it as a PNG-encoded `Vec<u8>`.
     ///
     /// Returns `None` if the device is not connected.
+    /// Returns an error if the screenshot fails, without returning a previously cached image.
+    /// User callbacks must keep returning while this method waits for its completion message.
     pub fn get_fresh_image(&self) -> Result<Option<Vec<u8>>> {
-        self.async_screencap(true)?;
+        let success = self.async_calls.wait_for(|| self.async_screencap(false))?;
+        if !success && !self.connected() {
+            return Ok(None);
+        }
+        u8::from(success).to_maa_result()?;
         self.get_image()
     }
 

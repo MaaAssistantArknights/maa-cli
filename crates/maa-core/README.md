@@ -74,6 +74,10 @@ while asst.running() {
 asst.stop()?;
 ```
 
+### Screenshots
+
+`get_image()` reads the cached PNG. `get_fresh_image()` waits for a new screenshot to succeed and returns an error if capture fails, rather than returning an old cached image. It returns `None` when the device is not connected. Both constructors install an internal handler for completion results; user callbacks still receive the original messages. Callbacks are delivered serially and must return without waiting for `get_fresh_image()` on the same assistant, so the completion message can be processed.
+
 ## Features
 
 The `runtime` feature mirrors the one in `maa-sys`: when enabled, MaaCore is
