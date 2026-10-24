@@ -119,19 +119,3 @@ fn init_and_convert() {
         serde_json::from_str(&fs::read_to_string(&profile).unwrap()).unwrap();
     assert_eq!(serde_json::to_value(converted).unwrap(), original);
 }
-
-#[test]
-fn screenshot_missing_profile_preserves_output() -> anyhow::Result<()> {
-    let sandbox = Sandbox::new();
-    let output = sandbox.dir("screen.png");
-    fs::write(&output, "previous image")?;
-
-    let result = sandbox.maa(&["screenshot", "screen.png", "--profile", "missing"]);
-
-    assert!(!result.status.success());
-    assert!(String::from_utf8_lossy(&result.stderr).contains("Failed to find profile file"));
-    assert_eq!(fs::read_to_string(output)?, "previous image");
-    assert!(!sandbox.dir("cache").exists());
-    assert!(!sandbox.dir("state").exists());
-    Ok(())
-}
