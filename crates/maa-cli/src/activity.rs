@@ -194,7 +194,8 @@ where
     D: serde::de::Deserializer<'de>,
 {
     let tz = i32::deserialize(deserializer)?;
-    FixedOffset::east_opt(tz * 3600)
+    tz.checked_mul(3600)
+        .and_then(FixedOffset::east_opt)
         .ok_or_else(|| serde::de::Error::custom(format!("Timezone offset {tz} out of range")))
 }
 
