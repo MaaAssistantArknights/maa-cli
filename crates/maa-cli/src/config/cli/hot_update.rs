@@ -5,6 +5,8 @@ use serde::Deserialize;
 
 use crate::config::cli::normalize_url;
 
+pub(crate) const DEFAULT_API_URL: &str = "https://api.maa.plus/MaaAssistantArknights/api";
+
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Deserialize, Clone)]
 pub struct Config {
@@ -25,7 +27,7 @@ impl Default for Config {
 }
 
 fn default_api_url() -> String {
-    "https://api.maa.plus/MaaAssistantArknights/api".to_string()
+    DEFAULT_API_URL.to_string()
 }
 
 fn default_check_interval() -> u64 {

@@ -379,6 +379,8 @@ kill_adb_on_exit = false # 是否在退出时杀死 adb
 
 ## CLI 相关配置
 
+活動資訊與 JSON 任務補丁使用 `hot_update.api_url`。使用預設官方 API 時，主來源請求失敗會嘗試 `https://api2.maa.plus/MaaAssistantArknights/api`；每次請求的總逾時為 15 秒。自訂 API 位址只使用指定來源。兩個來源皆失敗時回報錯誤並保留現有檔案；僅在快取仍處於檢查間隔內或主來源回傳 304 時使用快取。備援回應不沿用主來源的 ETag，後續請求會重新檢查主來源。
+
 CLI 相关的配置需要放在 `$MAA_CONFIG_DIR/cli.toml` 中。目前其包含的配置如下：
 
 ```toml

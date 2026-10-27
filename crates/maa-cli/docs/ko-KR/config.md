@@ -372,6 +372,8 @@ kill_adb_on_exit = false # 종료 시 adb를 종료할지 여부
 
 ## CLI 관련 설정
 
+활동 정보와 JSON 작업 패치는 `hot_update.api_url`을 사용합니다. 기본 공식 API 요청이 실패하면 `https://api2.maa.plus/MaaAssistantArknights/api`를 시도하며, 각 요청의 전체 제한 시간은 15초입니다. 사용자 지정 API URL은 지정된 주소만 사용합니다. 두 API가 모두 실패하면 기존 파일을 보존하고 오류를 반환합니다. 캐시는 확인 간격 내에 있거나 기본 API가 304를 반환한 경우에 사용합니다. 보조 API 응답에는 기본 API의 ETag를 재사용하지 않으며, 다음 요청에서 기본 API를 다시 확인합니다.
+
 CLI 관련 설정은 `$MAA_CONFIG_DIR/cli.toml`에 있어야 합니다. 현재 포함된 설정은 다음과 같습니다:
 
 ```toml
