@@ -10,18 +10,21 @@ license.workspace = true
 base16ct = { workspace = true, features = ["alloc"] }
 digest = { workspace = true, optional = true }
 flate2 = { workspace = true, optional = true }
+fs2 = { workspace = true }
 indicatif = { workspace = true }
 log = { workspace = true }
 maa-atomic-fs = { workspace = true }
 semver = { workspace = true }
+serde_json = { workspace = true }
 tar = { workspace = true, optional = true }
 thiserror = { workspace = true }
-ureq = { workspace = true }
+ureq = { workspace = true, features = ["json"] }
 zip = { workspace = true, optional = true }
 
 [dev-dependencies]
 sha2 = { workspace = true }
 tempfile = { workspace = true }
+tiny_http = { workspace = true }
 
 [features]
 default = ["digest", "gz", "tar", "zip"]
