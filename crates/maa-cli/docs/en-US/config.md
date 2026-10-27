@@ -395,8 +395,6 @@ Note: When using `PlayTools` connection, `touch_mode` is forced to `MacPlayTools
 
 ## CLI Related Configurations
 
-Activity metadata and JSON task patches use `hot_update.api_url`. With the default official API, a failed primary request tries `https://api2.maa.plus/MaaAssistantArknights/api`; each request has a 15-second total timeout. Custom API URLs use only the configured source. If both sources fail, the update reports an error and keeps the existing files. Cached data is reused only within the check interval or after a primary 304 response. Backup responses do not reuse the primary ETag, so later requests check the primary again.
-
 CLI-related configurations should be in `$MAA_CONFIG_DIR/cli.toml`. Current configurations include:
 
 ```toml
