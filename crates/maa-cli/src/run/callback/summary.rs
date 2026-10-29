@@ -29,6 +29,14 @@ pub(crate) fn display() -> Option<()> {
     with_summary(|summary| print!("{summary}"))
 }
 
+/// Write the summary to stderr instead of stdout.
+///
+/// Used by `--emit-json` mode so the summary does not pollute the JSONL stream
+/// on stdout while still remaining visible to a human watching stderr.
+pub(crate) fn display_to_stderr() -> Option<()> {
+    with_summary(|summary| eprint!("{summary}"))
+}
+
 pub(super) fn start_task(id: AsstTaskId) -> Option<()> {
     with_summary_mut(|summary| summary.start_task(id)).flatten()
 }

@@ -34,6 +34,8 @@ fn main() -> Result<()> {
         maa_value::userinput::enable_batch_mode()
     }
 
+    let emit_json = cli.emit_json;
+
     match cli.command {
         #[cfg(feature = "core_installer")]
         Command::Install { force, common } => {
@@ -95,15 +97,15 @@ fn main() -> Result<()> {
                 _ => {}
             }
         }
-        Command::Run { task, common } => run::run_custom(task, common)?,
-        Command::StartUp { params, common } => run::run_preset(params, common)?,
-        Command::CloseDown { params, common } => run::run_preset(params, common)?,
-        Command::Fight { params, common } => run::run_preset(params, common)?,
-        Command::Roguelike { params, common } => run::run_preset(params, common)?,
-        Command::Copilot { params, common } => run::run_preset(params, common)?,
-        Command::SSSCopilot { params, common } => run::run_preset(params, common)?,
-        Command::ParadoxCopilot { params, common } => run::run_preset(params, common)?,
-        Command::Reclamation { params, common } => run::run_preset(params, common)?,
+        Command::Run { task, common } => run::run_custom(task, common, emit_json)?,
+        Command::StartUp { params, common } => run::run_preset(params, common, emit_json)?,
+        Command::CloseDown { params, common } => run::run_preset(params, common, emit_json)?,
+        Command::Fight { params, common } => run::run_preset(params, common, emit_json)?,
+        Command::Roguelike { params, common } => run::run_preset(params, common, emit_json)?,
+        Command::Copilot { params, common } => run::run_preset(params, common, emit_json)?,
+        Command::SSSCopilot { params, common } => run::run_preset(params, common, emit_json)?,
+        Command::ParadoxCopilot { params, common } => run::run_preset(params, common, emit_json)?,
+        Command::Reclamation { params, common } => run::run_preset(params, common, emit_json)?,
         Command::Convert {
             input,
             output,
