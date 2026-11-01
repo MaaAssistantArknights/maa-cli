@@ -215,6 +215,12 @@ fn restore_interrupted_swap(dir: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Undo a killed swap before install or update inspects the install.
+fn recover_install(lib_dir: &Path, resource_dir: &Path) -> std::io::Result<()> {
+    restore_interrupted_swap(lib_dir)?;
+    restore_interrupted_swap(resource_dir)
+}
+
 fn prepare_staging(dir: &Path) -> std::io::Result<()> {
     remove_dir_if_exists(&backup_dir(dir))?;
     staging_dir(dir).as_path().ensure_clean()?;
@@ -269,10 +275,6 @@ fn create_and_exec_installer(args: &CommonArgs, current_version: Option<&Version
     .filter_map(|(selected, dir)| selected.then_some(dir))
     .collect();
 
-    for dir in [lib_dir, resource_dir] {
-        restore_interrupted_swap(dir)?;
-    }
-
     let installer = maa_installer::installer::Installer::new(
         crate::state::AGENT.clone(),
         config.api_url(),
@@ -311,6 +313,8 @@ fn create_and_exec_installer(args: &CommonArgs, current_version: Option<&Version
 }
 
 pub fn install(force: bool, args: &CommonArgs) -> Result<()> {
+    recover_install(maa_dirs::library(), maa_dirs::resource())?;
+
     let lib_dir = maa_dirs::library();
     let lib_name = MAA_CORE_LIB;
 
@@ -324,6 +328,8 @@ pub fn install(force: bool, args: &CommonArgs) -> Result<()> {
 }
 
 pub fn update(args: &CommonArgs) -> Result<()> {
+    recover_install(maa_dirs::library(), maa_dirs::resource())?;
+
     let config = CLI_CONFIG.core_config().apply_args(args);
 
     let components = config.components();
@@ -448,6 +454,43 @@ mod tests {
 
             assert_eq!(marker(&lib)?, "new");
             assert_eq!(marker(&backup_dir(&lib))?, "old");
+            Ok(())
+        }
+
+        #[test]
+        fn test_recover_install_restores_backups_without_live_dirs() -> Result<()> {
+            let tmp = tempfile::tempdir()?;
+            let lib = tmp.path().join("lib");
+            let resource = tmp.path().join("resource");
+            for dir in [&lib, &resource] {
+                make_dir(&backup_dir(dir), "old")?;
+            }
+
+            recover_install(&lib, &resource)?;
+
+            for dir in [&lib, &resource] {
+                assert_eq!(marker(dir)?, "old");
+                assert!(!backup_dir(dir).exists());
+            }
+            Ok(())
+        }
+
+        #[test]
+        fn test_recover_install_keeps_live_dirs() -> Result<()> {
+            let tmp = tempfile::tempdir()?;
+            let lib = tmp.path().join("lib");
+            let resource = tmp.path().join("resource");
+            for dir in [&lib, &resource] {
+                make_dir(dir, "new")?;
+                make_dir(&backup_dir(dir), "old")?;
+            }
+
+            recover_install(&lib, &resource)?;
+
+            for dir in [&lib, &resource] {
+                assert_eq!(marker(dir)?, "new");
+                assert_eq!(marker(&backup_dir(dir))?, "old");
+            }
             Ok(())
         }
 
