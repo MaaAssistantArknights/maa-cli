@@ -762,7 +762,9 @@ mod tests {
                 // Windows may refuse to replace the file while it is open as the source
                 let result = import_to(opts2, &config_dir);
 
-                assert!(cfg!(windows) || result.is_ok());
+                if cfg!(unix) {
+                    result.unwrap();
+                }
                 assert_eq!(fs::read_to_string(dest).unwrap(), "{}");
             }
 
