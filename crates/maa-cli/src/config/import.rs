@@ -160,14 +160,14 @@ impl ConfigType {
 
     fn clear_duplicate(self, filename: &Path) -> std::io::Result<()> {
         if self.read_by_cli() {
+            let target = fs::canonicalize(filename)?;
             for ext in SUPPORTED_EXTENSION {
                 let path = filename.with_extension(ext);
-                if path.exists() {
+                // `x.JSON` and `x.json` can be the same file
+                if path.exists() && fs::canonicalize(&path)? != target {
                     fs::remove_file(path)?;
                 }
             }
-        } else if filename.exists() {
-            fs::remove_file(filename)?;
         }
         Ok(())
     }
@@ -273,13 +273,13 @@ fn import_to(opts: ImportOptions, dir: &Path) -> Result<()> {
         );
     }
 
+    // Copy the file
+    source.copy_to(&dest)?;
+
     // Clear duplicates if force is enabled
     if force {
         config_type.clear_duplicate(&dest)?;
     }
-
-    // Copy the file
-    source.copy_to(&dest)?;
 
     Ok(())
 }
@@ -511,7 +511,7 @@ mod tests {
             use super::*;
 
             #[test]
-            fn removes_file_and_all_extensions_for_cli_read_types() {
+            fn removes_other_extensions_for_cli_read_types() {
                 let tmp_dir = tempfile::tempdir().unwrap();
                 let json_file = tmp_dir.path().join("test.json");
                 let toml_file = tmp_dir.path().join("test.toml");
@@ -523,13 +523,13 @@ mod tests {
 
                 ConfigType::Task.clear_duplicate(&json_file).unwrap();
 
-                assert!(!json_file.exists());
+                assert!(json_file.exists()); // Should not be deleted
                 assert!(!toml_file.exists());
                 assert!(!yml_file.exists());
             }
 
             #[test]
-            fn removes_only_exact_file_for_non_cli_read_types() {
+            fn removes_nothing_for_non_cli_read_types() {
                 let tmp_dir = tempfile::tempdir().unwrap();
                 let json_file = tmp_dir.path().join("plan.json");
                 let toml_file = tmp_dir.path().join("plan.toml");
@@ -539,7 +539,7 @@ mod tests {
 
                 ConfigType::Infrast.clear_duplicate(&json_file).unwrap();
 
-                assert!(!json_file.exists());
+                assert!(json_file.exists());
                 assert!(toml_file.exists()); // Should not be deleted
             }
         }
@@ -710,6 +710,88 @@ mod tests {
 
                 assert!(config_dir.join("tasks").join("test.yml").exists());
                 assert!(!config_dir.join("tasks").join("test.json").exists());
+            }
+
+            #[test]
+            fn failed_force_keeps_existing_file() {
+                let (tmp_dir, config_dir) = setup();
+
+                let opts1 = ImportOptions {
+                    src: tmp_dir.path().join("test.json").to_utf8_string().unwrap(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Task,
+                };
+                import_to(opts1, &config_dir).unwrap();
+
+                let opts2 = ImportOptions {
+                    src: tmp_dir
+                        .path()
+                        .join("nonexistent.json")
+                        .to_utf8_string()
+                        .unwrap(),
+                    name: Some("test.json".to_string()),
+                    force: true,
+                    config_type: ConfigType::Task,
+                };
+                assert!(import_to(opts2, &config_dir).is_err());
+
+                let dest = config_dir.join("tasks").join("test.json");
+                assert_eq!(fs::read_to_string(dest).unwrap(), "{}");
+            }
+
+            #[test]
+            fn force_onto_itself_keeps_content() {
+                let (tmp_dir, config_dir) = setup();
+
+                let opts1 = ImportOptions {
+                    src: tmp_dir.path().join("test.json").to_utf8_string().unwrap(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Task,
+                };
+                import_to(opts1, &config_dir).unwrap();
+
+                let dest = config_dir.join("tasks").join("test.json");
+                let opts2 = ImportOptions {
+                    src: dest.as_path().to_utf8_string().unwrap(),
+                    name: None,
+                    force: true,
+                    config_type: ConfigType::Task,
+                };
+                // Windows may refuse to replace the file while it is open as the source
+                let result = import_to(opts2, &config_dir);
+
+                assert!(cfg!(windows) || result.is_ok());
+                assert_eq!(fs::read_to_string(dest).unwrap(), "{}");
+            }
+
+            #[test]
+            fn force_with_other_case_leaves_one_file() {
+                let (tmp_dir, config_dir) = setup();
+
+                let opts1 = ImportOptions {
+                    src: tmp_dir.path().join("test.json").to_utf8_string().unwrap(),
+                    name: None,
+                    force: false,
+                    config_type: ConfigType::Task,
+                };
+                import_to(opts1, &config_dir).unwrap();
+
+                let opts2 = ImportOptions {
+                    src: tmp_dir.path().join("test.json").to_utf8_string().unwrap(),
+                    name: Some("test.JSON".to_string()),
+                    force: true,
+                    config_type: ConfigType::Task,
+                };
+                import_to(opts2, &config_dir).unwrap();
+
+                let tasks_dir = config_dir.join("tasks");
+                assert_eq!(fs::read_dir(&tasks_dir).unwrap().count(), 1);
+                assert_eq!(
+                    fs::read_to_string(tasks_dir.join("test.JSON")).unwrap(),
+                    "{}"
+                );
             }
 
             #[test]
