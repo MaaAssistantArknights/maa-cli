@@ -24,14 +24,14 @@ series = 0
 [[tasks.variants]]
 
 [tasks.variants.condition]
-end = "2026-10-23T03:59:59"
-start = "2026-10-09T12:00:00"
+end = "2026-11-22T03:59:59"
+start = "2026-11-01T12:00:00"
 timezone = 8
 type = "DateTime"
 
 [tasks.variants.params]
 series = 0
-stage = "YW-8"
+stage = "TL-9"
 
 [[tasks.variants]]
 
@@ -98,7 +98,12 @@ facility = [
     "Processing",
     "Training",
 ]
-filename = "一图流-153-一天两换-MAA.json"
+fiammetta_targets = [
+    "清流",
+    "可露希尔",
+    "但书",
+]
+filename = "crates/maa-cli/config_examples/wpf/一图流-153-一天两换-MAA.json"
 mode = 10000
 reception_clue_exchange = true
 reception_message_board = true
