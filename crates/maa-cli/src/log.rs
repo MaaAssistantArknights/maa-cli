@@ -24,7 +24,7 @@ pub struct Args {
     /// Redirect log to file instead of stderr
     ///
     /// If no log file is specified, the log will be written to
-    /// `$(maa dir log)/YYYY/MM/DD/HH:MM:SS.log`.
+    /// `$(maa dir log)/YYYY/MM/DD/HH-MM-SS.log`.
     #[arg(long, global = true, require_equals = true, value_name = "PATH")]
     log_file: Option<Option<PathBuf>>,
 }
@@ -102,7 +102,7 @@ fn log_path(path: Option<Option<PathBuf>>) -> Option<PathBuf> {
                 .join(now.format("%m").to_string())
                 .join(now.format("%d").to_string());
 
-            dir.join(format!("{}.log", now.format("%H:%M:%S")))
+            dir.join(format!("{}.log", now.format("%H-%M-%S")))
         })
     })
 }
@@ -284,6 +284,10 @@ mod tests {
             let path = log_file(&["maa", "list", "--log-file"]).expect("default log path");
             let after = chrono::Local::now();
             assert!(path.starts_with(day_dir(before)) || path.starts_with(day_dir(after)));
+            let name = path.file_name().expect("default log file name");
+            assert!(!name.to_string_lossy().contains(':'));
+            let dir = tempfile::tempdir().expect("create temp dir");
+            open_log_file(&dir.path().join(name)).expect("open default log file name");
             assert!(
                 log_file(&["maa", "list", "--log-file=path"])
                     .is_some_and(|x| x == Path::new("path"))
