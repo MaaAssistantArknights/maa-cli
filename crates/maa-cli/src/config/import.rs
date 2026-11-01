@@ -212,7 +212,10 @@ fn validate_filename(filename: &str) -> Result<()> {
     if matches!(filename, "." | "..") {
         bail!("Invalid filename: '.' and '..' are not allowed.");
     }
-    if filename.contains('/') || filename.contains('\\') {
+    if filename.contains('/')
+        || filename.contains('\\')
+        || (cfg!(windows) && filename.contains(':'))
+    {
         bail!(
             "Invalid filename: path components are not allowed in '{}'; use a plain filename.",
             filename
@@ -1284,6 +1287,13 @@ mod tests {
             assert!(validate_filename("path/to/file.json").is_err());
             assert!(validate_filename("/abs/path/file.json").is_err());
             assert!(validate_filename("path\\to\\file.json").is_err());
+        }
+
+        #[test]
+        #[cfg(windows)]
+        fn rejects_colons() {
+            assert!(validate_filename("C:evil.json").is_err());
+            assert!(validate_filename("a.json:b.json").is_err());
         }
     }
 }
