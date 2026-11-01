@@ -214,7 +214,7 @@ GUI에서 고른 내용을 남기려고 씁니다.
 - `squad`는 시작 분대입니다. `roles`는 시작 직업 조합입니다.
 - `core_char`는 첫 시작 오퍼레이터입니다. `core_char_list`는 시작 오퍼레이터 전체이며 각 항목에 `name`과 `use_support`가 있습니다.
 - `use_support`는 첫 오퍼레이터를 서포트로 쓸지입니다. `use_nonfriend_support`는 친구가 아닌 서포트를 쓸지입니다.
-- `starts_count`는 시작 횟수입니다. `difficulty`는 난이도입니다. 난이도가 자리 표시용인 매우 큰 수이면 쓰지 않습니다.
+- `starts_count`는 시작 횟수입니다. `difficulty`는 난이도입니다. `-1`은 난이도를 지정하지 않는다는 뜻이며 `-1` 그대로 씁니다. 자리 표시용인 매우 큰 수는 쓰지 않습니다.
 - `investment_enabled`는 투자할지입니다. `investments_count`는 투자 횟수입니다. `investment_with_more_score`는 더 높은 점수로 투자할지입니다. `stop_when_investment_full`은 예금이 가득 차면 멈출지입니다.
 - `stop_at_final_boss`는 엔딩 전에 멈출지입니다. `stop_at_max_level`은 레벨이 최대이면 멈출지입니다.
 - `start_with_elite_two`와 `only_start_with_elite_two`는 정예 2 시작입니다.
@@ -224,6 +224,7 @@ GUI에서 고른 내용을 남기려고 씁니다.
 - `deep_exploration_auto_iterate`는 심층 조사를 자동으로 바꿀지입니다.
 - `find_playTime_target`은 상락 노드입니다. `1`은 링, `2`는 슈, `3`은 니엔입니다.
 - `blackflow_strategy`는 흑류수해 엔딩 전략이며 예는 `ending1`입니다. `blackflow_cultivation_target`은 키울 강보 동물입니다. `blackflow_start_animals`는 준비 판에서 모을 강보 동물입니다.
+- `blackflow_start_utopia`는 1층이 实托邦가 될 때까지 다시 시작할지입니다. 참일 때만 씁니다. `blackflow_start_reward_priority`는 그때 시작 보상을 고르는 순서이며 예는 `pegasus`입니다. 목록에 알아보지 못한 이름이 있으면 순서 전체를 쓰지 않고 요약에 기록합니다.
 - `expected_collapsal_paradigms`는 원하는 붕괴 패러다임입니다.
 - `first_floor_foldartal`과 `start_foldartal_list`는 밀문판입니다.
 - `start_with_seed`는 고정 시드입니다.

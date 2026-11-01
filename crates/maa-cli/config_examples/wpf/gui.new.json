@@ -57,7 +57,7 @@
           "TimesLimit": 2147483647,
           "Series": 0,
           "StagePlan": [
-            "YW-8",
+            "TL-9",
             "CE-6",
             "LS-6"
           ],
@@ -319,24 +319,42 @@
         "AchievementPopupAutoClose": false
       },
       "Toolbox": {
-        "OperBoxExportFormat": "Json",
-        "GachaShowDisclaimerNoMore": false,
-        "PeepTargetFps": 20,
-        "ChooseLevel3": true,
-        "ChooseLevel3Time": 540,
-        "ChooseLevel4": true,
-        "ChooseLevel4Time": 540,
-        "ChooseLevel5": true,
-        "ChooseLevel6": true,
-        "AutoSetTime": true,
-        "ShowPotential": true,
-        "OperBoxAvatarMode": true,
-        "EventShopBlackListDataSupplementInstrument": false,
-        "EventShopBlackListDataSupplementStick": false,
-        "EventShopBlackListLmd": false,
-        "EventShopBlackListFurniturePart": false,
-        "EventShopBlackListOther": true,
-        "EventShopBlackList": ""
+        "Recruitment": {
+          "ChooseLevel3": true,
+          "ChooseLevel3Time": 540,
+          "ChooseLevel4": true,
+          "ChooseLevel4Time": 540,
+          "ChooseLevel5": true,
+          "ChooseLevel6": true,
+          "AutoSetTime": true,
+          "ShowPotential": true
+        },
+        "OperBox": {
+          "OperBoxExportFormat": "Json",
+          "OperBoxAvatarMode": true
+        },
+        "Gacha": {
+          "GachaShowDisclaimerNoMore": false
+        },
+        "Peep": {
+          "PeepTargetFps": 20
+        },
+        "MiniGame": {
+          "EventShopBlackList": "",
+          "EventShopBlackListDataSupplementInstrument": false,
+          "EventShopBlackListDataSupplementStick": false,
+          "EventShopBlackListLmd": false,
+          "EventShopBlackListFurniturePart": false,
+          "EventShopBlackListOther": true,
+          "Reclamation": {
+            "Theme": "Tales",
+            "Mode": "ProsperityInSave",
+            "ToolToCraft": "",
+            "IncrementMode": 0,
+            "MaxCraftCountPerRound": 16,
+            "ClearStore": true
+          }
+        }
       },
       "Copilot": {
         "TaskList": [
@@ -372,7 +390,7 @@
         {
           "$type": "RoguelikeTask",
           "Theme": "BlackFlow",
-          "Difficulty": 5,
+          "Difficulty": -1,
           "Mode": "Investment",
           "Squad": "特勤分队",
           "SquadCollectible": "指挥分队",
@@ -404,6 +422,21 @@
           "BlackFlowStartAnimal2": "None",
           "BlackFlowStartRewards": "None",
           "BlackFlowStartRunFastFlight": false,
+          "BlackFlowStartUtopia": false,
+          "BlackFlowStartRewardPriority": [
+            "Pegasus",
+            "SpaceLease",
+            "ForestRide",
+            "UnnumberedItem",
+            "RegressionCompensation",
+            "SurveyAdvance",
+            "NestParasitism",
+            "Hippogriff",
+            "Dragon",
+            "Hydra",
+            "BaiZe",
+            "GoldenCrow"
+          ],
           "UseSupportNonFriend": false,
           "RefreshTraderWithDice": false,
           "SquadIsFoldartal": false,
@@ -455,6 +488,21 @@
           "BlackFlowStartAnimal2": "None",
           "BlackFlowStartRewards": "None",
           "BlackFlowStartRunFastFlight": false,
+          "BlackFlowStartUtopia": false,
+          "BlackFlowStartRewardPriority": [
+            "Pegasus",
+            "SpaceLease",
+            "ForestRide",
+            "UnnumberedItem",
+            "RegressionCompensation",
+            "SurveyAdvance",
+            "NestParasitism",
+            "Hippogriff",
+            "Dragon",
+            "Hydra",
+            "BaiZe",
+            "GoldenCrow"
+          ],
           "UseSupportNonFriend": false,
           "RefreshTraderWithDice": false,
           "SquadIsFoldartal": false,
@@ -468,7 +516,7 @@
           "StartWithSeed": false,
           "Seed": "",
           "Name": "黑流树海-刷襁褓",
-          "IsEnable": true,
+          "IsEnable": false,
           "TaskType": "Roguelike"
         },
         {
@@ -597,154 +645,45 @@
         "AchievementPopupAutoClose": false
       },
       "Toolbox": {
-        "OperBoxExportFormat": "Json",
-        "GachaShowDisclaimerNoMore": false,
-        "PeepTargetFps": 20,
-        "ChooseLevel3": true,
-        "ChooseLevel3Time": 540,
-        "ChooseLevel4": true,
-        "ChooseLevel4Time": 540,
-        "ChooseLevel5": true,
-        "ChooseLevel6": true,
-        "AutoSetTime": true,
-        "ShowPotential": true,
-        "OperBoxAvatarMode": false,
-        "EventShopBlackListDataSupplementInstrument": false,
-        "EventShopBlackListDataSupplementStick": false,
-        "EventShopBlackListLmd": false,
-        "EventShopBlackListFurniturePart": false,
-        "EventShopBlackListOther": true,
-        "EventShopBlackList": ""
+        "Recruitment": {
+          "ChooseLevel3": true,
+          "ChooseLevel3Time": 540,
+          "ChooseLevel4": true,
+          "ChooseLevel4Time": 540,
+          "ChooseLevel5": true,
+          "ChooseLevel6": true,
+          "AutoSetTime": true,
+          "ShowPotential": true
+        },
+        "OperBox": {
+          "OperBoxExportFormat": "Json",
+          "OperBoxAvatarMode": false
+        },
+        "Gacha": {
+          "GachaShowDisclaimerNoMore": false
+        },
+        "Peep": {
+          "PeepTargetFps": 20
+        },
+        "MiniGame": {
+          "EventShopBlackList": "",
+          "EventShopBlackListDataSupplementInstrument": false,
+          "EventShopBlackListDataSupplementStick": false,
+          "EventShopBlackListLmd": false,
+          "EventShopBlackListFurniturePart": false,
+          "EventShopBlackListOther": true,
+          "Reclamation": {
+            "Theme": "Tales",
+            "Mode": "ProsperityInSave",
+            "ToolToCraft": "",
+            "IncrementMode": 0,
+            "MaxCraftCountPerRound": 16,
+            "ClearStore": true
+          }
+        }
       },
       "Copilot": {
-        "TaskList": [
-          {
-            "Name": "TO-EX-1",
-            "IsNavNameOverride": false,
-            "FilePath": "config\\copilot\\TO-EX-1.json",
-            "CopilotId": 99410,
-            "IsRaid": false,
-            "IsChecked": false,
-            "Index": 0
-          },
-          {
-            "Name": "TO-EX-1",
-            "IsNavNameOverride": false,
-            "FilePath": "config\\copilot\\TO-EX-1.json",
-            "CopilotId": 99410,
-            "IsRaid": true,
-            "IsChecked": false,
-            "Index": 1
-          },
-          {
-            "Name": "TO-EX-2",
-            "IsNavNameOverride": false,
-            "FilePath": "config\\copilot\\TO-EX-2.json",
-            "CopilotId": 99425,
-            "IsRaid": false,
-            "IsChecked": true,
-            "Index": 2
-          },
-          {
-            "Name": "TO-EX-2",
-            "IsNavNameOverride": false,
-            "FilePath": "config\\copilot\\TO-EX-2.json",
-            "CopilotId": 99425,
-            "IsRaid": true,
-            "IsChecked": true,
-            "Index": 3
-          },
-          {
-            "Name": "TO-EX-3",
-            "IsNavNameOverride": false,
-            "FilePath": "config\\copilot\\TO-EX-3.json",
-            "CopilotId": 99448,
-            "IsRaid": false,
-            "IsChecked": true,
-            "Index": 4
-          },
-          {
-            "Name": "TO-EX-3",
-            "IsNavNameOverride": false,
-            "FilePath": "config\\copilot\\TO-EX-3.json",
-            "CopilotId": 99448,
-            "IsRaid": true,
-            "IsChecked": true,
-            "Index": 5
-          },
-          {
-            "Name": "TO-EX-4",
-            "IsNavNameOverride": false,
-            "FilePath": "config\\copilot\\TO-EX-4.json",
-            "CopilotId": 99485,
-            "IsRaid": false,
-            "IsChecked": true,
-            "Index": 6
-          },
-          {
-            "Name": "TO-EX-4",
-            "IsNavNameOverride": false,
-            "FilePath": "config\\copilot\\TO-EX-4.json",
-            "CopilotId": 99485,
-            "IsRaid": true,
-            "IsChecked": true,
-            "Index": 7
-          },
-          {
-            "Name": "TO-EX-5",
-            "IsNavNameOverride": false,
-            "FilePath": "config\\copilot\\TO-EX-5.json",
-            "CopilotId": 99487,
-            "IsRaid": false,
-            "IsChecked": true,
-            "Index": 8
-          },
-          {
-            "Name": "TO-EX-5",
-            "IsNavNameOverride": false,
-            "FilePath": "config\\copilot\\TO-EX-5.json",
-            "CopilotId": 99487,
-            "IsRaid": true,
-            "IsChecked": true,
-            "Index": 9
-          },
-          {
-            "Name": "TO-EX-6",
-            "IsNavNameOverride": false,
-            "FilePath": "config\\copilot\\TO-EX-6.json",
-            "CopilotId": 99491,
-            "IsRaid": false,
-            "IsChecked": true,
-            "Index": 10
-          },
-          {
-            "Name": "TO-EX-6",
-            "IsNavNameOverride": false,
-            "FilePath": "config\\copilot\\TO-EX-6.json",
-            "CopilotId": 99491,
-            "IsRaid": true,
-            "IsChecked": true,
-            "Index": 11
-          },
-          {
-            "Name": "TO-EX-7",
-            "IsNavNameOverride": false,
-            "FilePath": "config\\copilot\\TO-EX-7.json",
-            "CopilotId": 99505,
-            "IsRaid": false,
-            "IsChecked": true,
-            "Index": 12
-          },
-          {
-            "Name": "TO-EX-7",
-            "IsNavNameOverride": false,
-            "FilePath": "config\\copilot\\TO-EX-7.json",
-            "CopilotId": 99505,
-            "IsRaid": true,
-            "IsChecked": true,
-            "Index": 13
-          }
-        ],
+        "TaskList": [],
         "EnableUserAdditional": false,
         "UserAdditional": [],
         "SupportMode": "Random",
@@ -752,7 +691,7 @@
         "SelectFormation": 1,
         "LoopTimes": 1
       },
-      "TaskSelectedIndex": 2
+      "TaskSelectedIndex": 1
     }
   },
   "Timers": {
@@ -822,9 +761,9 @@
     ]
   },
   "ConfigVersion": 1,
-  "Current": "肉鸽",
+  "Current": "Default",
   "Update": {
-    "Name": "v6.20.1",
+    "Name": "v6.21.1",
     "UpdatePackage": "",
     "IsFirstBoot": false,
     "DoNotShowUpdate": false,
@@ -875,15 +814,15 @@
         "Y": -1
       },
       "NormalPosition": {
-        "Left": -2916,
-        "Top": 397,
-        "Right": -1476,
-        "Bottom": 1497
+        "Left": 752,
+        "Top": 237,
+        "Right": 2192,
+        "Bottom": 1337
       }
     },
     "LoadWindowPlacement": true,
     "SaveWindowPlacement": true,
-    "AddTaskMenuSeenVersion": "",
+    "AddTaskMenuSeenVersion": "v6.20.1",
     "InverseClearMode": "Clear",
     "TransitionSpeed": "Normal",
     "TaskQueueInverseMode": false,
@@ -934,7 +873,7 @@
     },
     "Performance": {
       "UseGpu": true,
-      "GpuDescription": "",
+      "GpuDescription": "NVIDIA GeForce RTX 3050 Laptop GPU",
       "GpuInstancePath": "",
       "AllowDeprecatedGpu": false,
       "IgnoreBadModulesAndUseSoftwareRendering": false

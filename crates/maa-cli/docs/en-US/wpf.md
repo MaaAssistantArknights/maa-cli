@@ -213,7 +213,7 @@ MaaCore ignores them in a mode that does not use them.
 - `squad` is the starting squad. `roles` is the starting role set.
 - `core_char` is the first starting operator. `core_char_list` is every starting operator. Each item has `name` and `use_support`.
 - `use_support` is whether the first operator is a support operator. `use_nonfriend_support` is whether a non-friend support operator is allowed.
-- `starts_count` is how many runs to start. `difficulty` is the difficulty. A placeholder that is a very large number is not written.
+- `starts_count` is how many runs to start. `difficulty` is the difficulty. `-1` means no preference and is written as `-1`. A placeholder that is a very large number is not written.
 - `investment_enabled` is whether to invest. `investments_count` is how many investments to make. `investment_with_more_score` is whether to invest for a higher score. `stop_when_investment_full` is whether to stop when the deposit is full.
 - `stop_at_final_boss` is whether to stop before the ending. `stop_at_max_level` is whether to stop at max level.
 - `start_with_elite_two` and `only_start_with_elite_two` are elite-2 starts.
@@ -223,6 +223,7 @@ MaaCore ignores them in a mode that does not use them.
 - `deep_exploration_auto_iterate` is whether deep exploration switches automatically.
 - `find_playTime_target` is the Playtime node. `1` is Ling, `2` is Shu, and `3` is Nian.
 - `blackflow_strategy` is the BlackFlow ending strategy, such as `ending1`. `blackflow_cultivation_target` is the swaddled animal to raise. `blackflow_start_animals` is the swaddled animals the preparation run must collect.
+- `blackflow_start_utopia` keeps rerolling until floor 1 is 实托邦. It is written only when true. `blackflow_start_reward_priority` is the order used to pick a start reward in that case, such as `pegasus`. If any name in the list is unrecognized, the whole order is omitted and recorded in the summary.
 - `expected_collapsal_paradigms` is the collapsal paradigms to look for.
 - `first_floor_foldartal` and `start_foldartal_list` are foldartal.
 - `start_with_seed` is a fixed seed.

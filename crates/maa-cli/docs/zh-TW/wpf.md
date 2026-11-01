@@ -214,7 +214,7 @@ MaaCore 在用不到的模式下會忽略它們。
 - `squad` 是開局分隊。`roles` 是開局職業組合。
 - `core_char` 是第一名開局幹員。`core_char_list` 是全部開局幹員，每項有 `name` 和 `use_support`。
 - `use_support` 表示第一名是否使用助戰。`use_nonfriend_support` 表示是否使用非好友助戰。
-- `starts_count` 是開始次數。`difficulty` 是難度。難度如果是一個佔位用的極大數字，則不寫。
+- `starts_count` 是開始次數。`difficulty` 是難度。`-1` 表示不指定難度，會原樣寫入。佔位用的極大數字則不寫。
 - `investment_enabled` 表示是否投資。`investments_count` 是投資次數。`investment_with_more_score` 表示是否用更高分數投資。`stop_when_investment_full` 表示存滿後是否停止。
 - `stop_at_final_boss` 表示是否在結局前停止。`stop_at_max_level` 表示等級滿了是否停止。
 - `start_with_elite_two` 和 `only_start_with_elite_two` 是精二開局。
@@ -224,6 +224,7 @@ MaaCore 在用不到的模式下會忽略它們。
 - `deep_exploration_auto_iterate` 表示深入調查是否自動切換。
 - `find_playTime_target` 是常樂節點。`1` 是令，`2` 是黍，`3` 是年。
 - `blackflow_strategy` 是黑流樹海的結局策略，例如 `ending1`。`blackflow_cultivation_target` 是要培育的襁褓動物。`blackflow_start_animals` 是準備局要湊齊的襁褓動物。
+- `blackflow_start_utopia` 表示是否一直重開，直到第一層是實托邦。為真時才寫。`blackflow_start_reward_priority` 是這時挑選開局獎勵的順序，例如 `pegasus`。名單裡有認不出的名字時，整份順序不寫，並記入摘要。
 - `expected_collapsal_paradigms` 是希望碰到的坍縮範式。
 - `first_floor_foldartal` 和 `start_foldartal_list` 是密文板。
 - `start_with_seed` 是固定種子。

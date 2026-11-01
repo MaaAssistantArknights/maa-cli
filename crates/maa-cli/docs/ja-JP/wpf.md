@@ -214,7 +214,7 @@ GUI で選んだ内容を残すために書き込みます。
 - `squad` は開始分隊です。`roles` は開始の職分の組み合わせです。
 - `core_char` は最初の開始オペレーターです。`core_char_list` は開始オペレーター全員で、各項目に `name` と `use_support` があります。
 - `use_support` は最初の 1 人をサポートにするかどうかです。`use_nonfriend_support` はフレンド以外のサポートを使うかどうかです。
-- `starts_count` は開始回数です。`difficulty` は難易度です。難易度がプレースホルダの非常に大きい数なら書きません。
+- `starts_count` は開始回数です。`difficulty` は難易度です。`-1` は難易度を指定しない意味で、`-1` のまま書きます。プレースホルダの非常に大きい数は書きません。
 - `investment_enabled` は投資するかどうかです。`investments_count` は投資回数です。`investment_with_more_score` はより高いスコアで投資するかどうかです。`stop_when_investment_full` は預金が満杯なら止めるかどうかです。
 - `stop_at_final_boss` は結末の前で止めるかどうかです。`stop_at_max_level` はレベルが最大なら止めるかどうかです。
 - `start_with_elite_two` と `only_start_with_elite_two` はエリート 2 での開始です。
@@ -224,6 +224,7 @@ GUI で選んだ内容を残すために書き込みます。
 - `deep_exploration_auto_iterate` は深層調査を自動で切り替えるかどうかです。
 - `find_playTime_target` は常楽ノードです。`1` はリィン、`2` はシュー、`3` はニェンです。
 - `blackflow_strategy` は黒流樹海の結末方針で、例は `ending1` です。`blackflow_cultivation_target` は育てる襁褓の動物です。`blackflow_start_animals` は準備局で揃える襁褓の動物です。
+- `blackflow_start_utopia` は 1 層が实托邦になるまで開き直すかどうかです。真のときだけ書きます。`blackflow_start_reward_priority` はそのとき開始報酬を選ぶ順序で、例は `pegasus` です。リストに判別できない名前があると、順序全体を書かず要約に記録します。
 - `expected_collapsal_paradigms` は欲しい崩壊パラダイムです。
 - `first_floor_foldartal` と `start_foldartal_list` は密文板です。
 - `start_with_seed` は固定シードです。

@@ -120,6 +120,10 @@ struct CliRoguelikeParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     blackflow_start_animals: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    blackflow_start_utopia: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    blackflow_start_reward_priority: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     expected_collapsal_paradigms: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     first_floor_foldartal: Option<String>,
@@ -204,6 +208,10 @@ pub(super) struct WpfRoguelikeTask {
     black_flow_start_animal2: String,
     #[serde(default)]
     black_flow_start_rewards: String,
+    #[serde(default)]
+    black_flow_start_utopia: bool,
+    #[serde(default)]
+    black_flow_start_reward_priority: Vec<String>,
     #[serde(default)]
     sami_first_floor_foldartal: bool,
     #[serde(default)]
@@ -300,6 +308,15 @@ impl WpfRoguelikeTask {
                 "BlackFlowStartRewards",
             );
         }
+        if !self.black_flow_start_reward_priority.is_empty()
+            && self.mapped_reward_priority().is_none()
+        {
+            summary.skip_field(
+                "RoguelikeTask",
+                Some(self.name.clone()),
+                "BlackFlowStartRewardPriority",
+            );
+        }
         self.named_or_skip(
             summary,
             "CollectibleStartAwards",
@@ -331,6 +348,16 @@ impl WpfRoguelikeTask {
         .map(str::to_string)
         .collect();
         (!animals.is_empty()).then_some(animals)
+    }
+
+    fn mapped_reward_priority(&self) -> Option<Vec<String>> {
+        if self.black_flow_start_reward_priority.is_empty() {
+            return None;
+        }
+        self.black_flow_start_reward_priority
+            .iter()
+            .map(|name| start_reward(name).map(str::to_string))
+            .collect()
     }
 
     pub(super) fn report_to(&self, summary: &mut MigrationSummary) {
@@ -403,6 +430,8 @@ impl TryFrom<&WpfRoguelikeTask> for CliRoguelikeTask {
                 blackflow_cultivation_target: swaddled(&task.black_flow_cultivation_target)
                     .map(str::to_string),
                 blackflow_start_animals: task.start_animals(),
+                blackflow_start_utopia: task.black_flow_start_utopia.then_some(true),
+                blackflow_start_reward_priority: task.mapped_reward_priority(),
                 expected_collapsal_paradigms: split_list(&task.expected_collapsal_paradigms),
                 first_floor_foldartal: (task.sami_first_floor_foldartal
                     && !task.sami_first_floor_foldartals.is_empty())
@@ -442,6 +471,24 @@ fn ending_strategy(name: &str) -> Option<&'static str> {
         "Ending1" => Some("ending1"),
         "Ending2" => Some("ending2"),
         "Ending3" => Some("ending3"),
+        _ => None,
+    }
+}
+
+fn start_reward(name: &str) -> Option<&'static str> {
+    match name {
+        "UnnumberedItem" => Some("unnumbered_item"),
+        "SurveyAdvance" => Some("survey_advance"),
+        "SpaceLease" => Some("space_lease"),
+        "RegressionCompensation" => Some("regression_compensation"),
+        "ForestRide" => Some("forest_ride"),
+        "NestParasitism" => Some("nest_parasitism"),
+        "Pegasus" => Some("pegasus"),
+        "Hippogriff" => Some("hippogriff"),
+        "Dragon" => Some("dragon"),
+        "Hydra" => Some("hydra"),
+        "BaiZe" => Some("bai_ze"),
+        "GoldenCrow" => Some("golden_crow"),
         _ => None,
     }
 }
@@ -726,6 +773,79 @@ mod tests {
         assert_eq!(
             config.tasks[0].pointer("/params/core_char_list/0/name"),
             Some(&json!("机械师"))
+        );
+    }
+
+    #[test]
+    fn maps_blackflow_utopia_reward_priority_and_keeps_negative_difficulty() {
+        let mut task = roguelike_task("BlackFlowStartRun", -1, true);
+        let obj = task.as_object_mut().unwrap();
+        obj.insert("Theme".into(), json!("BlackFlow"));
+        obj.insert("BlackFlowStartUtopia".into(), json!(true));
+        obj.insert(
+            "BlackFlowStartRewardPriority".into(),
+            json!(["Pegasus", "SpaceLease", "GoldenCrow"]),
+        );
+
+        let (config, summary) = migrate(
+            serde_json::from_value(json!({
+                "TaskQueue": [task],
+                "Gui": {},
+            }))
+            .unwrap(),
+            None,
+        )
+        .unwrap();
+
+        assert!(summary.skipped_fields.is_empty());
+        assert_eq!(
+            config.tasks[0].pointer("/params/difficulty"),
+            Some(&json!(-1))
+        );
+        assert_eq!(
+            config.tasks[0].pointer("/params/blackflow_start_utopia"),
+            Some(&json!(true))
+        );
+        assert_eq!(
+            config.tasks[0].pointer("/params/blackflow_start_reward_priority"),
+            Some(&json!(["pegasus", "space_lease", "golden_crow"]))
+        );
+    }
+
+    #[test]
+    fn unknown_reward_priority_is_skipped_whole() {
+        let mut task = roguelike_task("Investment", 0, true);
+        task.as_object_mut().unwrap().insert(
+            "BlackFlowStartRewardPriority".into(),
+            json!(["Pegasus", "NotAReward"]),
+        );
+        let (config, summary) = migrate(
+            serde_json::from_value(json!({
+                "TaskQueue": [task],
+                "Gui": {},
+            }))
+            .unwrap(),
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(
+            summary
+                .skipped_fields
+                .iter()
+                .map(|f| f.field.as_str())
+                .collect::<Vec<_>>(),
+            ["BlackFlowStartRewardPriority"]
+        );
+        assert!(
+            config.tasks[0]
+                .pointer("/params/blackflow_start_reward_priority")
+                .is_none()
+        );
+        assert!(
+            config.tasks[0]
+                .pointer("/params/blackflow_start_utopia")
+                .is_none()
         );
     }
 
