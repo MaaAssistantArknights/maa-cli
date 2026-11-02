@@ -25,6 +25,24 @@ params = { client_type = "Official", start_game_enabled = true } # The parameter
 
 The specific task types and parameters can be found in the [MAA Integration Document][task-types]. Note that maa-cli does not validate parameter names and values, and no error message will be generated even if an error occurs unless MaaCore detects an error at runtime.
 
+For example, use `SwitchTheme` to randomly select a candidate theme, or `OperProgress` to develop operators according to a plan:
+
+```toml
+[[tasks]]
+type = "SwitchTheme"
+params = { themes = ["夜间", "银凇"] }
+
+[[tasks]]
+type = "OperProgress"
+
+[[tasks.params.plans]]
+role = "Warrior"
+name = "陈"
+elite = 2
+skill_level = 7
+skill_mastery = [0, 0, 3]
+```
+
 ### Task variants and conditions
 
 In some cases, you may want to run a task with different parameters in different conditions. You can define multiple variants for a task, and use the `condition` field to determine whether the variant should be used. For example, you may want to use a different infrastructure plan at different periods of the day:
