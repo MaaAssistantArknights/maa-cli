@@ -172,8 +172,8 @@ GUI の即時更新は書き込まれません。
 - `fiammetta_recovery_enabled` は、フィアメッタで気分を回復するかどうかです。
 - `use_pinus_sylvestris`、`use_perception_information`、`use_worldly_plight`、`use_abyssal_hunter` は、レッドパイン、知覚、塵世、アビサルの 4 つの施設組み合わせです。`false` のときは書きません。
 
-`fiammetta_targets` が効くのは、`mode` が 0 かつ `fiammetta_recovery_enabled` が true のときだけです。
-`fiammetta_recovery_enabled` と上の 4 つの組み合わせが効くのは、`mode` が 0 のときだけです。
+`fiammetta_targets` を書くのは、`mode` が 0 かつ `fiammetta_recovery_enabled` が true のときだけです。
+`fiammetta_recovery_enabled` と上の 4 つの組み合わせを書くのは、`mode` が 0 のときだけです。
 
 ### 信用交換
 

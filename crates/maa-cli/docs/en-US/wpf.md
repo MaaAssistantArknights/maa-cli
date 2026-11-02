@@ -171,8 +171,8 @@ If automatic confirmation of a 6-star operator is on, the command warns.
 - `fiammetta_recovery_enabled` is whether to use Fiammetta to restore mood.
 - `use_pinus_sylvestris`, `use_perception_information`, `use_worldly_plight`, and `use_abyssal_hunter` are the Pinus Sylvestris, Perception Information, Worldly Plight, and Abyssal Hunter facility sets. A value of `false` is not written.
 
-`fiammetta_targets` applies only when `mode` is 0 and `fiammetta_recovery_enabled` is true.
-`fiammetta_recovery_enabled` and those four facility sets apply only when `mode` is 0.
+`fiammetta_targets` is written only when `mode` is 0 and `fiammetta_recovery_enabled` is true.
+`fiammetta_recovery_enabled` and those four facility sets are written only when `mode` is 0.
 
 ### Credit store
 

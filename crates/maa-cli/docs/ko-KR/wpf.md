@@ -172,8 +172,8 @@ GUI의 즉시 새로고침은 쓰지 않습니다.
 - `fiammetta_recovery_enabled`는 피아메타로 기분을 회복할지입니다.
 - `use_pinus_sylvestris`, `use_perception_information`, `use_worldly_plight`, `use_abyssal_hunter`는 홍송, 지각, 진세, 심해 네 가지 시설 조합입니다. `false`이면 쓰지 않습니다.
 
-`fiammetta_targets`는 `mode`가 0이고 `fiammetta_recovery_enabled`가 true일 때만 적용됩니다.
-`fiammetta_recovery_enabled`와 위 네 조합은 `mode`가 0일 때만 적용됩니다.
+`fiammetta_targets`는 `mode`가 0이고 `fiammetta_recovery_enabled`가 true일 때만 씁니다.
+`fiammetta_recovery_enabled`와 위 네 조합은 `mode`가 0일 때만 씁니다.
 
 ### 크레딧 상점
 

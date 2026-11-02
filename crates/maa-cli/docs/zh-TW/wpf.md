@@ -172,8 +172,8 @@ maa-cli 不檢查這些名字對不對。
 - `fiammetta_recovery_enabled` 表示是否用菲亞梅塔恢復心情。
 - `use_pinus_sylvestris`、`use_perception_information`、`use_worldly_plight` 和 `use_abyssal_hunter` 是紅松、感知、塵世和深海這四組跨設施組合。為 `false` 時不寫。
 
-`fiammetta_targets` 只在 `mode` 為 0 且 `fiammetta_recovery_enabled` 為 true 時生效。
-`fiammetta_recovery_enabled` 和上面四組組合只在 `mode` 為 0 時生效。
+`fiammetta_targets` 只在 `mode` 為 0 且 `fiammetta_recovery_enabled` 為 true 時寫入。
+`fiammetta_recovery_enabled` 和上面四組組合只在 `mode` 為 0 時寫入。
 
 ### 信用商店
 

@@ -264,6 +264,8 @@ impl WpfInfrastTask {
         plan_index: Option<i32>,
     ) -> CliInfrastParams {
         let custom = mode == Some(CUSTOM_MODE);
+        let default_shift = mode == Some(0);
+        let fiammetta = default_shift && self.fiammetta_recovery_enabled;
         CliInfrastParams {
             mode,
             facility: self.room_list.iter().map(|r| r.room.clone()).collect(),
@@ -277,12 +279,14 @@ impl WpfInfrastTask {
             reception_clue_exchange: Some(self.reception_clue_exchange),
             reception_send_clue: Some(self.send_clue),
             continue_training: Some(self.continue_training),
-            fiammetta_targets: self.fiammetta_targets(),
-            fiammetta_recovery_enabled: self.fiammetta_recovery_enabled,
-            use_pinus_sylvestris: self.use_pinus_sylvestris,
-            use_perception_information: self.use_perception_information,
-            use_worldly_plight: self.use_worldly_plight,
-            use_abyssal_hunter: self.use_abyssal_hunter,
+            fiammetta_targets: fiammetta
+                .then(|| self.fiammetta_targets())
+                .unwrap_or_default(),
+            fiammetta_recovery_enabled: fiammetta,
+            use_pinus_sylvestris: default_shift && self.use_pinus_sylvestris,
+            use_perception_information: default_shift && self.use_perception_information,
+            use_worldly_plight: default_shift && self.use_worldly_plight,
+            use_abyssal_hunter: default_shift && self.use_abyssal_hunter,
             filename,
             plan_index,
             enable: (!self.is_enable).then_some(false),
@@ -747,6 +751,55 @@ mod tests {
             serde_json::json!(["清流", "可露希尔", "但书"])
         );
         assert_eq!(json["params"]["fiammetta_recovery_enabled"], true);
+        assert_eq!(json["params"]["mode"], 0);
+    }
+
+    #[test]
+    fn omits_fiammetta_targets_outside_default_mode() {
+        let file = write_schedule(r#"{"plans":[{"period":[["09:00","21:00"]]}]}"#);
+        let task = serde_json::from_value(serde_json::json!({
+            "Name": "",
+            "IsEnable": true,
+            "Mode": "Custom",
+            "Filename": file.path(),
+            "PlanSelect": -1,
+            "ContinueTraining": true,
+            "RoomList": [{"Room": "Dorm"}],
+            "UsesOfDrones": "Money",
+            "DormThreshold": 30,
+            "OriginiumShardAutoReplenishment": false,
+            "DormFilterNotStationed": false,
+            "DormTrustEnabled": false,
+            "ReceptionMessageBoard": false,
+            "ReceptionClueExchange": false,
+            "SendClue": false,
+            "FiammettaTarget1": "清流",
+            "FiammettaTarget2": "可露希尔",
+            "FiammettaTarget3": "但书",
+            "FiammettaRecoveryEnabled": true,
+            "UsePinusSylvestris": true,
+        }))
+        .unwrap();
+        let mut summary = MigrationSummary::default();
+        let json = to_json(&task, &mut summary);
+        assert!(summary.is_empty());
+        assert_eq!(json["params"]["mode"], CUSTOM_MODE);
+        assert!(json["params"].get("fiammetta_targets").is_none());
+        assert!(json["params"].get("fiammetta_recovery_enabled").is_none());
+        assert!(json["params"].get("use_pinus_sylvestris").is_none());
+    }
+
+    #[test]
+    fn omits_fiammetta_targets_when_recovery_is_off() {
+        let mut task = sample_task("Normal", "", -1);
+        task.fiammetta_target1 = "清流".to_string();
+        task.fiammetta_recovery_enabled = false;
+        let mut summary = MigrationSummary::default();
+        let json = to_json(&task, &mut summary);
+        assert!(summary.is_empty());
+        assert_eq!(json["params"]["mode"], 0);
+        assert!(json["params"].get("fiammetta_targets").is_none());
+        assert!(json["params"].get("fiammetta_recovery_enabled").is_none());
     }
 
     #[test]

@@ -98,11 +98,6 @@ facility = [
     "Processing",
     "Training",
 ]
-fiammetta_targets = [
-    "清流",
-    "可露希尔",
-    "但书",
-]
 filename = "crates/maa-cli/config_examples/wpf/一图流-153-一天两换-MAA.json"
 mode = 10000
 reception_clue_exchange = true
