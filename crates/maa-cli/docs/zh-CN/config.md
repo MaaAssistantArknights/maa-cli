@@ -25,24 +25,6 @@ params = { client_type = "Official", start_game_enabled = true } # 对应任务�
 
 具体的任务类型和参数可以在 [MAA 集成文档][task-types] 中找到。注意，目前 maa-cli 并不会验证参数名和参数值是否正确，即使出错也不会产生任何错误信息，除非 MaaCore 在运行时检测到错误。
 
-例如，可以使用 `SwitchTheme` 从候选主题中随机选择一个进行切换，或者使用 `OperProgress` 按培养计划提升干员：
-
-```toml
-[[tasks]]
-type = "SwitchTheme"
-params = { themes = ["夜间", "银凇"] }
-
-[[tasks]]
-type = "OperProgress"
-
-[[tasks.params.plans]]
-role = "Warrior"
-name = "陈"
-elite = 2
-skill_level = 7
-skill_mastery = [0, 0, 3]
-```
-
 ### 任务条件
 
 如果你想要根据一些条件运行不同参数的任务，你可以定义多个任务的变体：
