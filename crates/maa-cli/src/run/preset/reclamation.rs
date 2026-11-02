@@ -55,8 +55,13 @@ pub struct ReclamationParams {
     ///
     /// 0: increase the number by clicking the button.
     /// 1: increase the number by holding the button.
-    #[arg(long, default_value = "0", verbatim_doc_comment)]
-    increase_mode: i32,
+    #[arg(
+        long,
+        alias = "increase-mode",
+        default_value = "0",
+        verbatim_doc_comment
+    )]
+    increment_mode: i32,
     /// Number of batches in each game run, with each batch containing 99 items
     #[arg(long, default_value = "16")]
     num_craft_batches: i32,
@@ -79,7 +84,7 @@ impl super::IntoParameters for ReclamationParams {
             insert!(
                 value,
                 "tools_to_craft" => self.tools_to_craft?,
-                "increase_mode" => self.increase_mode,
+                "increment_mode" => self.increment_mode,
                 "num_craft_batches" => self.num_craft_batches,
             );
         }
@@ -141,13 +146,33 @@ mod tests {
             parse(["maa", "reclamation", "Tales"]),
             base_params.join(object!(
                 "tools_to_craft" => ["荧光棒"],
-                "increase_mode" => 0,
+                "increment_mode" => 0,
                 "num_craft_batches" => 16,
             )),
         );
         assert_eq!(
             parse(["maa", "reclamation", "Tales", "-m0"]),
             base_params.join(object!("mode" => 0)),
+        );
+
+        let custom_params = base_params.join(object!(
+            "mode" => 1,
+            "tools_to_craft" => ["Foo", "Bar"],
+            "increment_mode" => 1,
+            "num_craft_batches" => 32,
+        ));
+        assert_eq!(
+            parse([
+                "maa",
+                "reclamation",
+                "Tales",
+                "-m1",
+                "-CFoo",
+                "-CBar",
+                "--increment-mode=1",
+                "--num-craft-batches=32"
+            ]),
+            custom_params,
         );
         assert_eq!(
             parse([
@@ -160,12 +185,7 @@ mod tests {
                 "--increase-mode=1",
                 "--num-craft-batches=32"
             ]),
-            base_params.join(object!(
-                "mode" => 1,
-                "tools_to_craft" => ["Foo", "Bar"],
-                "increase_mode" => 1,
-                "num_craft_batches" => 32,
-            )),
+            custom_params,
         );
     }
 }

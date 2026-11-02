@@ -28,7 +28,8 @@
             "weekdays": ["Sun"]
           },
           "params": {
-            "expiring_medicine": 5
+            "medicine": 5,
+            "medicine_expire_days": 1
           }
         },
         {

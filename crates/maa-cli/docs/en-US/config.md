@@ -194,9 +194,9 @@ The strategy for matching variants can be changed with the `strategy` field:
 type = "Fight"
 strategy = "merge" # or "first" (default)
 
-# use all expiring medicine on Sunday night
+# use all medicine expiring within one day on Sunday night
 [[tasks.variants]]
-params = { expiring_medicine = 1000 }
+params = { medicine = 1000, medicine_expire_days = 1 }
 [tasks.variants.condition]
 type = "And"
 conditions = [
@@ -219,7 +219,7 @@ params = { stage = "SL-8" }
 condition = { type = "DateTime", start = "2023-08-01T16:00:00", end = "2023-08-21T03:59:59" }
 ```
 
-This example will yield the same stage selection as the previous one, but will additionally use expiring medicine on Sunday night.
+This example will yield the same stage selection as the previous one, but will additionally use all medicine expiring within one day on Sunday night. The `medicine` parameter limits the maximum number used, while `medicine_expire_days` limits medicine by its expiration time.
 With the `merge` strategy, if multiple variants are matched, the parameters of all matched variants will be merged. If multiple variants have the same parameter keys, the later ones will override earlier ones.
 
 If no variant is matched, the task will not be executed,

@@ -49,10 +49,10 @@ pub struct RoguelikeParams {
     ///
     /// 0: mode for score;
     /// 1: mode for ingots;
-    /// 2: combination of 0 and 1, deprecated;
-    /// 3: mode for pass, not implemented yet;
-    /// 4: mode that exist after 3rd floor;
-    /// 5: mode for collapsal paradigms, only for Sami, use with `expected_collapsal_paradigms`
+    /// 4: mode for starting with specified rewards;
+    /// 5: mode for collapsal paradigms, only for Sami, use with `expected_collapsal_paradigms`;
+    /// 6: mode for monthly squad rewards;
+    /// 7: mode for deep exploration rewards
     #[arg(long, default_value = "0")]
     mode: i32,
 
@@ -136,9 +136,9 @@ pub struct RoguelikeParams {
     expected_collapsal_paradigms: Vec<String>,
 
     // Sarkaz specific parameters
-    /// Whether to start with seed, only available in Sarkaz theme and mode 1
+    /// Fixed seed for investment mode, only available in Sarkaz theme and mode 1
     #[arg(long)]
-    start_with_seed: bool,
+    start_with_seed: Option<String>,
 }
 
 impl super::ToTaskType for RoguelikeParams {
@@ -156,8 +156,11 @@ impl super::IntoParameters for RoguelikeParams {
             5 if !matches!(theme, Theme::Sami) => {
                 bail!("Mode 5 is only available in Sami theme");
             }
-            0..=5 => {}
-            _ => bail!("Mode must be in range between 0 and 5"),
+            0 | 1 | 4 | 6 | 7 => {}
+            2 => bail!("Mode 2 has been removed"),
+            3 => bail!("Mode 3 is not available"),
+            5 => {}
+            _ => bail!("Mode must be one of 0, 1, 4, 5, 6, or 7"),
         }
 
         let mut value = object!(
@@ -236,7 +239,7 @@ impl super::IntoParameters for RoguelikeParams {
                 }
             }
             Theme::Sarkaz if mode == 1 => {
-                insert!(value, "start_with_seed" => self.start_with_seed);
+                insert!(value, "start_with_seed" =>? self.start_with_seed);
             }
             _ => {}
         }
@@ -331,7 +334,18 @@ mod tests {
             default_params.join(object!("theme" => "Phantom")),
         );
         assert!(parse(["maa", "roguelike", "Phantom", "--mode", "5"]).is_err());
-        assert!(parse(["maa", "roguelike", "Phantom", "--mode", "7"]).is_err());
+        for mode in ["2", "3", "8"] {
+            assert!(parse(["maa", "roguelike", "Phantom", "--mode", mode]).is_err());
+        }
+        for mode in ["6", "7"] {
+            assert_eq!(
+                parse(["maa", "roguelike", "Phantom", "--mode", mode]).unwrap(),
+                default_params.join(object!(
+                    "theme" => "Phantom",
+                    "mode" => mode.parse::<i32>().unwrap(),
+                )),
+            );
+        }
 
         // Difficulty is ignored for Phantom theme
         assert_eq!(
@@ -479,14 +493,24 @@ mod tests {
                 "roguelike",
                 "Sarkaz",
                 "--mode=1",
-                "--start-with-seed",
+                "--start-with-seed=test-seed",
             ])
             .unwrap(),
             default_params.join(object!(
                 "theme" => "Sarkaz",
                 "mode" => 1,
-                "start_with_seed" => true,
+                "start_with_seed" => "test-seed",
             )),
+        );
+        assert!(
+            <crate::command::Cli as clap::Parser>::try_parse_from([
+                "maa",
+                "roguelike",
+                "Sarkaz",
+                "--mode=1",
+                "--start-with-seed",
+            ])
+            .is_err()
         );
     }
 }
