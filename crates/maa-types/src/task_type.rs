@@ -20,10 +20,12 @@ pub enum TaskType {
     Custom,
     SingleStep,
     VideoRecognition,
+    SwitchTheme,
+    OperProgress,
 }
 
 impl TaskType {
-    impl_enum_utils!(TaskType, 17, Self::StartUp);
+    impl_enum_utils!(TaskType, 19, Self::StartUp);
 
     impl_from_str_opt!();
 
@@ -46,6 +48,8 @@ impl TaskType {
             Self::Custom => "Custom",
             Self::SingleStep => "SingleStep",
             Self::VideoRecognition => "VideoRecognition",
+            Self::SwitchTheme => "SwitchTheme",
+            Self::OperProgress => "OperProgress",
         }
     }
 }
@@ -92,6 +96,8 @@ mod tests {
         assert_eq!("Custom".parse(), Ok(TaskType::Custom));
         assert_eq!("SingleStep".parse(), Ok(TaskType::SingleStep));
         assert_eq!("VideoRecognition".parse(), Ok(TaskType::VideoRecognition));
+        assert_eq!("SwitchTheme".parse(), Ok(TaskType::SwitchTheme));
+        assert_eq!("OperProgress".parse(), Ok(TaskType::OperProgress));
         assert_eq!(
             "Unknown".parse::<TaskType>(),
             Err(UnknownTaskType("Unknown".to_owned()))
@@ -100,7 +106,8 @@ mod tests {
             UnknownTaskType("Unknown".to_owned()).to_string(),
             "unknown task type `Unknown`, expected one of `StartUp`, `CloseDown`, `Fight`, \
             `Recruit`, `Infrast`, `Mall`, `Award`, `Roguelike`, `Copilot`, `SSSCopilot`, \
-            `ParadoxCopilot`, `Depot`, `OperBox`, `Reclamation`, `Custom`, `SingleStep`, `VideoRecognition`",
+            `ParadoxCopilot`, `Depot`, `OperBox`, `Reclamation`, `Custom`, `SingleStep`, \
+            `VideoRecognition`, `SwitchTheme`, `OperProgress`",
         );
     }
 
@@ -112,12 +119,19 @@ mod tests {
 
         #[test]
         fn deserialize() {
-            let types: [TaskType; 2] = [TaskType::StartUp, TaskType::CloseDown];
+            let types: [TaskType; 4] = [
+                TaskType::StartUp,
+                TaskType::CloseDown,
+                TaskType::SwitchTheme,
+                TaskType::OperProgress,
+            ];
 
             assert_de_tokens(&types, &[
-                Token::Seq { len: Some(2) },
+                Token::Seq { len: Some(4) },
                 Token::Str("StartUp"),
                 Token::Str("CloseDown"),
+                Token::Str("SwitchTheme"),
+                Token::Str("OperProgress"),
                 Token::SeqEnd,
             ]);
         }
@@ -128,7 +142,8 @@ mod tests {
                 &[Token::Str("Unknown")],
                 "unknown variant `Unknown`, expected one of `StartUp`, `CloseDown`, `Fight`, \
                 `Recruit`, `Infrast`, `Mall`, `Award`, `Roguelike`, `Copilot`, `SSSCopilot`, \
-                `ParadoxCopilot`, `Depot`, `OperBox`, `Reclamation`, `Custom`, `SingleStep`, `VideoRecognition`",
+                `ParadoxCopilot`, `Depot`, `OperBox`, `Reclamation`, `Custom`, `SingleStep`, \
+                `VideoRecognition`, `SwitchTheme`, `OperProgress`",
             );
 
             assert_de_tokens_error::<TaskType>(
@@ -158,6 +173,8 @@ mod tests {
             assert_ser_tokens(&TaskType::VideoRecognition, &[Token::Str(
                 "VideoRecognition",
             )]);
+            assert_ser_tokens(&TaskType::SwitchTheme, &[Token::Str("SwitchTheme")]);
+            assert_ser_tokens(&TaskType::OperProgress, &[Token::Str("OperProgress")]);
         }
     }
 
@@ -180,6 +197,8 @@ mod tests {
         assert_eq!(TaskType::Custom.to_str(), "Custom");
         assert_eq!(TaskType::SingleStep.to_str(), "SingleStep");
         assert_eq!(TaskType::VideoRecognition.to_str(), "VideoRecognition");
+        assert_eq!(TaskType::SwitchTheme.to_str(), "SwitchTheme");
+        assert_eq!(TaskType::OperProgress.to_str(), "OperProgress");
     }
 
     #[cfg(feature = "ffi")]
@@ -188,6 +207,11 @@ mod tests {
         use maa_ffi_string::ToCString;
         assert_eq!(TaskType::StartUp.to_cstring().unwrap(), c"StartUp");
         assert_eq!(TaskType::CloseDown.to_cstring().unwrap(), c"CloseDown");
+        assert_eq!(TaskType::SwitchTheme.to_cstring().unwrap(), c"SwitchTheme");
+        assert_eq!(
+            TaskType::OperProgress.to_cstring().unwrap(),
+            c"OperProgress"
+        );
     }
 
     #[test]
