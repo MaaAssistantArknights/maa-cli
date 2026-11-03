@@ -2,12 +2,14 @@
 
 use std::{
     env::consts::{ARCH, DLL_PREFIX, DLL_SUFFIX, OS},
+    fs,
     path::{self, Path, PathBuf},
 };
 
 use anyhow::{Context, Result, bail};
 use maa_dirs::{self, Ensure, MAA_CORE_LIB};
 use maa_installer::{
+    error::WithDesc,
     manifest::{Asset, Manifest},
     verify::SizeVerifier,
 };
@@ -159,28 +161,135 @@ fn extract_mapper(
     None
 }
 
+fn staging_dir(dir: &Path) -> PathBuf {
+    dir.with_extension("new")
+}
+
+fn backup_dir(dir: &Path) -> PathBuf {
+    dir.with_extension("old")
+}
+
+fn rename_dir(from: &Path, to: &Path) -> std::io::Result<()> {
+    let mut ret = fs::rename(from, to);
+    for i in 1..=3 {
+        match &ret {
+            Err(err) if err.kind() != std::io::ErrorKind::NotFound => {
+                log::warn!(
+                    "Failed to rename {} due to {err}, retry {i} times",
+                    from.display()
+                );
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                ret = fs::rename(from, to);
+            }
+            _ => break,
+        }
+    }
+    ret
+}
+
+fn rename_if_exists(from: &Path, to: &Path) -> std::io::Result<()> {
+    match rename_dir(from, to) {
+        Err(err) if err.kind() != std::io::ErrorKind::NotFound => Err(err),
+        _ => Ok(()),
+    }
+}
+
+fn remove_dir_if_exists(dir: &Path) -> std::io::Result<()> {
+    match fs::remove_dir_all(dir) {
+        Err(err) if err.kind() != std::io::ErrorKind::NotFound => Err(err),
+        _ => Ok(()),
+    }
+}
+
+fn remove_leftover_dir(dir: &Path) {
+    if let Err(err) = remove_dir_if_exists(dir) {
+        log::warn!("Failed to remove {} due to {err}", dir.display());
+    }
+}
+
+/// An interrupted swap leaves the only good copy in the backup.
+fn restore_interrupted_swap(dir: &Path) -> std::io::Result<()> {
+    if fs::symlink_metadata(dir).is_err() {
+        rename_if_exists(&backup_dir(dir), dir)?;
+    }
+    Ok(())
+}
+
+/// Undo a killed swap before install or update inspects the install.
+fn recover_install(lib_dir: &Path, resource_dir: &Path) -> std::io::Result<()> {
+    restore_interrupted_swap(lib_dir)?;
+    restore_interrupted_swap(resource_dir)
+}
+
+fn prepare_staging(dir: &Path) -> std::io::Result<()> {
+    remove_dir_if_exists(&backup_dir(dir))?;
+    staging_dir(dir).as_path().ensure_clean()?;
+    Ok(())
+}
+
+fn swap_dir(dir: &Path) -> std::io::Result<()> {
+    rename_if_exists(dir, &backup_dir(dir))?;
+    rename_dir(&staging_dir(dir), dir).inspect_err(|_| {
+        if let Err(err) = rename_if_exists(&backup_dir(dir), dir) {
+            log::warn!("Failed to restore {} due to {err}", dir.display());
+        }
+    })
+}
+
+fn undo_swap(dir: &Path) -> std::io::Result<()> {
+    rename_dir(dir, &staging_dir(dir))?;
+    rename_if_exists(&backup_dir(dir), dir)
+}
+
+fn swap_dirs(dirs: &[&Path]) -> maa_installer::error::Result<()> {
+    for (i, dir) in dirs.iter().enumerate() {
+        if let Err(err) = swap_dir(dir) {
+            for swapped in dirs[..i].iter().rev() {
+                if let Err(err) = undo_swap(swapped) {
+                    log::warn!("Failed to restore {} due to {err}", swapped.display());
+                }
+            }
+            return Err(err).then_with_desc(|| format!("Failed to replace {}", dir.display()));
+        }
+    }
+
+    for dir in dirs {
+        remove_leftover_dir(&backup_dir(dir));
+    }
+    Ok(())
+}
+
 fn create_and_exec_installer(args: &CommonArgs, current_version: Option<&Version>) -> Result<()> {
     let config = CLI_CONFIG.core_config().apply_args(args);
     let lib_dir = maa_dirs::library();
     let resource_dir = maa_dirs::resource();
     let components = config.components();
+    let lib_staging = staging_dir(lib_dir);
+    let resource_staging = staging_dir(resource_dir);
+    // The library goes last because its version decides whether the next update reruns
+    let dirs: Vec<&Path> = [
+        (components.resource, resource_dir),
+        (components.library, lib_dir),
+    ]
+    .into_iter()
+    .filter_map(|(selected, dir)| selected.then_some(dir))
+    .collect();
 
     let installer = maa_installer::installer::Installer::new(
         crate::state::AGENT.clone(),
         config.api_url(),
         CoreManifest::from_reader,
-        |src| extract_mapper(src, lib_dir, resource_dir, components),
+        |src| extract_mapper(src, &lib_staging, &resource_staging, components),
     )
     .with_test_duration(config.test_time())
-    .with_pre_install_hook(move || {
-        if components.library {
-            lib_dir.ensure_clean()?;
-        }
-        if components.resource {
-            resource_dir.ensure_clean()?;
+    .with_pre_install_hook(|| {
+        for dir in &dirs {
+            prepare_staging(dir)
+                .then_with_desc(|| format!("Failed to prepare {}", dir.display()))?;
         }
         Ok(())
-    });
+    })
+    .with_post_install_hook(|| swap_dirs(&dirs));
 
     let installer = if let Some(version) = current_version {
         installer.with_current_version(version)
@@ -193,12 +302,19 @@ fn create_and_exec_installer(args: &CommonArgs, current_version: Option<&Version
             maa_dirs::cache().ensure()?,
             &format!("core-manifest-{}.json", config.channel()),
         )
-        .context("Failed to install MaaCore")?;
+        .context("Failed to install MaaCore")
+        .inspect_err(|_| {
+            for dir in &dirs {
+                remove_leftover_dir(&staging_dir(dir));
+            }
+        })?;
 
     Ok(())
 }
 
 pub fn install(force: bool, args: &CommonArgs) -> Result<()> {
+    recover_install(maa_dirs::library(), maa_dirs::resource())?;
+
     let lib_dir = maa_dirs::library();
     let lib_name = MAA_CORE_LIB;
 
@@ -212,6 +328,8 @@ pub fn install(force: bool, args: &CommonArgs) -> Result<()> {
 }
 
 pub fn update(args: &CommonArgs) -> Result<()> {
+    recover_install(maa_dirs::library(), maa_dirs::resource())?;
+
     let config = CLI_CONFIG.core_config().apply_args(args);
 
     let components = config.components();
@@ -277,6 +395,266 @@ mod tests {
             extract_mapper(Path::new("misc"), lib_dir, resource_dir, &config),
             None
         );
+    }
+
+    mod swap {
+        use super::*;
+
+        fn make_dir(dir: &Path, content: &str) -> Result<()> {
+            fs::create_dir_all(dir)?;
+            fs::write(dir.join("marker"), content)?;
+            Ok(())
+        }
+
+        fn marker(dir: &Path) -> Result<String> {
+            Ok(fs::read_to_string(dir.join("marker"))?)
+        }
+
+        fn is_empty(dir: &Path) -> Result<bool> {
+            Ok(fs::read_dir(dir)?.next().is_none())
+        }
+
+        #[test]
+        fn test_prepare_staging_keeps_live_dir() -> Result<()> {
+            let tmp = tempfile::tempdir()?;
+            let lib = tmp.path().join("lib");
+            make_dir(&lib, "old")?;
+            make_dir(&staging_dir(&lib), "stale")?;
+            make_dir(&backup_dir(&lib), "stale")?;
+
+            prepare_staging(&lib)?;
+
+            assert_eq!(marker(&lib)?, "old");
+            assert!(is_empty(&staging_dir(&lib))?);
+            assert!(!backup_dir(&lib).exists());
+            Ok(())
+        }
+
+        #[test]
+        fn test_restore_interrupted_swap_uses_backup_without_live_dir() -> Result<()> {
+            let tmp = tempfile::tempdir()?;
+            let lib = tmp.path().join("lib");
+            make_dir(&backup_dir(&lib), "old")?;
+
+            restore_interrupted_swap(&lib)?;
+
+            assert_eq!(marker(&lib)?, "old");
+            assert!(!backup_dir(&lib).exists());
+            Ok(())
+        }
+
+        #[test]
+        fn test_restore_interrupted_swap_keeps_live_dir() -> Result<()> {
+            let tmp = tempfile::tempdir()?;
+            let lib = tmp.path().join("lib");
+            make_dir(&lib, "new")?;
+            make_dir(&backup_dir(&lib), "old")?;
+
+            restore_interrupted_swap(&lib)?;
+
+            assert_eq!(marker(&lib)?, "new");
+            assert_eq!(marker(&backup_dir(&lib))?, "old");
+            Ok(())
+        }
+
+        #[test]
+        fn test_recover_install_restores_backups_without_live_dirs() -> Result<()> {
+            let tmp = tempfile::tempdir()?;
+            let lib = tmp.path().join("lib");
+            let resource = tmp.path().join("resource");
+            for dir in [&lib, &resource] {
+                make_dir(&backup_dir(dir), "old")?;
+            }
+
+            recover_install(&lib, &resource)?;
+
+            for dir in [&lib, &resource] {
+                assert_eq!(marker(dir)?, "old");
+                assert!(!backup_dir(dir).exists());
+            }
+            Ok(())
+        }
+
+        #[test]
+        fn test_recover_install_keeps_live_dirs() -> Result<()> {
+            let tmp = tempfile::tempdir()?;
+            let lib = tmp.path().join("lib");
+            let resource = tmp.path().join("resource");
+            for dir in [&lib, &resource] {
+                make_dir(dir, "new")?;
+                make_dir(&backup_dir(dir), "old")?;
+            }
+
+            recover_install(&lib, &resource)?;
+
+            for dir in [&lib, &resource] {
+                assert_eq!(marker(dir)?, "new");
+                assert_eq!(marker(&backup_dir(dir))?, "old");
+            }
+            Ok(())
+        }
+
+        #[test]
+        fn test_prepare_staging_first_install() -> Result<()> {
+            let tmp = tempfile::tempdir()?;
+            let lib = tmp.path().join("data").join("lib");
+
+            prepare_staging(&lib)?;
+
+            assert!(!lib.exists());
+            assert!(is_empty(&staging_dir(&lib))?);
+            assert!(!backup_dir(&lib).exists());
+            Ok(())
+        }
+
+        #[test]
+        fn test_swap_dirs_replaces_existing_dirs() -> Result<()> {
+            let tmp = tempfile::tempdir()?;
+            let resource = tmp.path().join("resource");
+            let lib = tmp.path().join("lib");
+            for dir in [&resource, &lib] {
+                make_dir(dir, "old")?;
+                make_dir(&staging_dir(dir), "new")?;
+            }
+
+            swap_dirs(&[&resource, &lib])?;
+
+            for dir in [&resource, &lib] {
+                assert_eq!(marker(dir)?, "new");
+                assert!(!staging_dir(dir).exists());
+                assert!(!backup_dir(dir).exists());
+            }
+            Ok(())
+        }
+
+        #[test]
+        fn test_swap_dirs_first_install() -> Result<()> {
+            let tmp = tempfile::tempdir()?;
+            let lib = tmp.path().join("lib");
+            make_dir(&staging_dir(&lib), "new")?;
+
+            swap_dirs(&[&lib])?;
+
+            assert_eq!(marker(&lib)?, "new");
+            assert!(!staging_dir(&lib).exists());
+            Ok(())
+        }
+
+        #[test]
+        fn test_swap_dirs_keeps_live_dir_without_staging() -> Result<()> {
+            let tmp = tempfile::tempdir()?;
+            let lib = tmp.path().join("lib");
+            make_dir(&lib, "old")?;
+
+            assert!(swap_dirs(&[&lib]).is_err());
+
+            assert_eq!(marker(&lib)?, "old");
+            assert!(!backup_dir(&lib).exists());
+            Ok(())
+        }
+
+        #[test]
+        fn test_swap_dirs_rolls_back_when_second_staging_is_missing() -> Result<()> {
+            let tmp = tempfile::tempdir()?;
+            let resource = tmp.path().join("resource");
+            let lib = tmp.path().join("lib");
+            make_dir(&resource, "old")?;
+            make_dir(&lib, "old")?;
+            make_dir(&staging_dir(&resource), "new")?;
+
+            assert!(swap_dirs(&[&resource, &lib]).is_err());
+
+            assert_eq!(marker(&resource)?, "old");
+            assert_eq!(marker(&lib)?, "old");
+            assert_eq!(marker(&staging_dir(&resource))?, "new");
+            assert!(!backup_dir(&resource).exists());
+            assert!(!backup_dir(&lib).exists());
+            Ok(())
+        }
+
+        #[test]
+        fn test_swap_dirs_rolls_back_when_second_backup_is_blocked() -> Result<()> {
+            let tmp = tempfile::tempdir()?;
+            let resource = tmp.path().join("resource");
+            let lib = tmp.path().join("lib");
+            for dir in [&resource, &lib] {
+                make_dir(dir, "old")?;
+                make_dir(&staging_dir(dir), "new")?;
+            }
+            make_dir(&backup_dir(&lib), "blocker")?;
+
+            assert!(swap_dirs(&[&resource, &lib]).is_err());
+
+            assert_eq!(marker(&resource)?, "old");
+            assert_eq!(marker(&lib)?, "old");
+            assert_eq!(marker(&staging_dir(&lib))?, "new");
+            assert!(!backup_dir(&resource).exists());
+            Ok(())
+        }
+
+        #[test]
+        fn test_swap_dirs_rolls_back_first_install() -> Result<()> {
+            let tmp = tempfile::tempdir()?;
+            let resource = tmp.path().join("resource");
+            let lib = tmp.path().join("lib");
+            make_dir(&staging_dir(&resource), "new")?;
+
+            assert!(swap_dirs(&[&resource, &lib]).is_err());
+
+            assert!(!resource.exists());
+            assert_eq!(marker(&staging_dir(&resource))?, "new");
+            Ok(())
+        }
+
+        #[test]
+        #[cfg(windows)]
+        fn test_swap_dirs_rolls_back_when_file_is_held() -> Result<()> {
+            use std::os::windows::fs::OpenOptionsExt;
+
+            const FILE_SHARE_READ: u32 = 1;
+
+            let tmp = tempfile::tempdir()?;
+            let resource = tmp.path().join("resource");
+            let lib = tmp.path().join("lib");
+            for dir in [&resource, &lib] {
+                make_dir(dir, "old")?;
+                make_dir(&staging_dir(dir), "new")?;
+            }
+            let held = fs::OpenOptions::new()
+                .read(true)
+                .share_mode(FILE_SHARE_READ)
+                .open(lib.join("marker"))?;
+
+            assert!(swap_dirs(&[&resource, &lib]).is_err());
+
+            drop(held);
+            for dir in [&resource, &lib] {
+                assert_eq!(marker(dir)?, "old");
+                assert_eq!(marker(&staging_dir(dir))?, "new");
+                assert!(!backup_dir(dir).exists());
+            }
+            Ok(())
+        }
+
+        #[test]
+        #[cfg(unix)]
+        fn test_swap_dirs_keeps_symlink_target() -> Result<()> {
+            let tmp = tempfile::tempdir()?;
+            let target = tmp.path().join("target");
+            let lib = tmp.path().join("lib");
+            make_dir(&target, "old")?;
+            std::os::unix::fs::symlink(&target, &lib)?;
+
+            prepare_staging(&lib)?;
+            fs::write(staging_dir(&lib).join("marker"), "new")?;
+            swap_dirs(&[&lib])?;
+
+            assert!(!fs::symlink_metadata(&lib)?.is_symlink());
+            assert_eq!(marker(&lib)?, "new");
+            assert_eq!(marker(&target)?, "old");
+            assert!(fs::symlink_metadata(backup_dir(&lib)).is_err());
+            Ok(())
+        }
     }
 
     mod asset_name_tests {
