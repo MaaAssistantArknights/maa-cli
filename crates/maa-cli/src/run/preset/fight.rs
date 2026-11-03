@@ -13,7 +13,7 @@ pub struct FightParams {
     #[clap(long, conflicts_with = "expiring_medicine")]
     /// Use medicine expiring within the given number of days, 0 disables expiring medicine
     medicine_expire_days: Option<i32>,
-    #[clap(long)]
+    #[clap(long, hide = true)]
     /// Deprecated: number of expiring medicine used to fight, default to 0
     expiring_medicine: Option<i32>,
     #[clap(long)]
@@ -71,6 +71,12 @@ impl super::ToTaskType for FightParams {
 
 impl super::IntoParameters for FightParams {
     fn into_parameters_no_context(self) -> anyhow::Result<MAAValue> {
+        if self.expiring_medicine.is_some() {
+            log::warn!(
+                "--expiring-medicine is deprecated; use --medicine together with --medicine-expire-days instead"
+            );
+        }
+
         let mut params = object!(
             "stage" => self.stage.unwrap_or_default(),
             "DrGrandet" => self.dr_grandet
@@ -270,5 +276,15 @@ mod tests {
             .is_err()
         );
         assert!(parse(["maa", "fight", "1-7", "-D30012=100", "-D30011"]).is_err());
+    }
+
+    #[test]
+    fn expiring_medicine_is_hidden_from_help() {
+        let mut command = <crate::command::Cli as clap::CommandFactory>::command();
+        let fight = command.find_subcommand_mut("fight").unwrap();
+        let help = fight.render_help().to_string();
+
+        assert!(!help.contains("--expiring-medicine"));
+        assert!(help.contains("--medicine-expire-days"));
     }
 }
