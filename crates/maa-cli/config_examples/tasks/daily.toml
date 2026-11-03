@@ -16,10 +16,10 @@ name = "Fight Daily"
 type = "Fight"
 strategy = "merge"
 
-# use expiring medicine on Sunday
+# use up to 5 medicines expiring within one day on Sunday
 [[tasks.variants]]
 condition = { type = "Weekday", weekdays = ["Sun"] }
-params = { expiring_medicine = 5 }
+params = { medicine = 5, medicine_expire_days = 1 }
 
 # fight 1-7 by default
 [[tasks.variants]]
