@@ -1,5 +1,25 @@
 # Release Notes
 
+## Release 0.7.8
+
+### Features
+
+- Support SwitchTheme and OperProgress tasks by [@wangl-cc](https://github.com/wangl-cc) in [#643](https://github.com/MaaAssistantArknights/maa-cli/pull/643)
+
+### Bug Fixes
+
+- Resolve WebPKI security advisories by [@wangl-cc](https://github.com/wangl-cc) in [#628](https://github.com/MaaAssistantArknights/maa-cli/pull/628)
+- Guard runtime use during version queries by [@wangl-cc](https://github.com/wangl-cc) in [#627](https://github.com/MaaAssistantArknights/maa-cli/pull/627)
+- Update libz-sys and pulldown-cmark by [@wangl-cc](https://github.com/wangl-cc) in [#641](https://github.com/MaaAssistantArknights/maa-cli/pull/641)
+- Update outdated MAA Core task parameters by [@wangl-cc](https://github.com/wangl-cc) in [#644](https://github.com/MaaAssistantArknights/maa-cli/pull/644)
+- Use a Windows-safe default log file name by [@zephyr-zdz](https://github.com/zephyr-zdz) in [#638](https://github.com/MaaAssistantArknights/maa-cli/pull/638)
+
+### Testing
+
+- Read version fixtures without a symlink by [@zephyr-zdz](https://github.com/zephyr-zdz) in [#635](https://github.com/MaaAssistantArknights/maa-cli/pull/635)
+
+**Full Changelog**: <https://github.com/MaaAssistantArknights/maa-cli/compare/v0.7.7...v0.7.8>
+
 ## Release 0.7.7
 
 ### Features
