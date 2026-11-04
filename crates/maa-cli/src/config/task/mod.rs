@@ -572,7 +572,7 @@ mod tests {
                                     weekdays: vec![Weekday::Sun],
                                     timezone: TimeOffset::Local,
                                 },
-                                params: template!("expiring_medicine" => 5),
+                                params: template!("medicine" => 5, "medicine_expire_days" => 1),
                             },
                             TaskVariant {
                                 condition: Condition::Always,

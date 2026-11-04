@@ -80,7 +80,7 @@ If you don't want task summaries, disable them with the `--no-summary` parameter
 
 maa-cli outputs logs with the following levels (low to high): `Error`, `Warn`, `Info`, `Debug`, and `Trace`. The default level is `Warn`. Set the log level via the `MAA_LOG` environment variable (e.g., `MAA_LOG=debug`) or use `-v` to increase and `-q` to decrease the level.
 
-By default, logs go to standard error (stderr). The `--log-file` option can redirect logs to a file at `$(maa dir log)/YYYY/MM/DD/HH:MM:SS.log`, where `$(maa dir log)` is the log directory obtainable via `maa dir log`. You can also specify a custom log path with `--log-file=path/to/log`.
+By default, logs go to standard error (stderr). The `--log-file` option can redirect logs to a file at `$(maa dir log)/YYYY/MM/DD/HH-MM-SS.log`, where `$(maa dir log)` is the log directory obtainable via `maa dir log`. You can also specify a custom log path with `--log-file=path/to/log`.
 
 All logs normally include a timestamp and level prefix. The `MAA_LOG_PREFIX` environment variable controls this behavior: `Always` always includes prefixes, `Auto` includes prefixes in log files but not in stderr output, and `Never` omits prefixes even in log files.
 

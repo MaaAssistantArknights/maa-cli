@@ -105,6 +105,7 @@ jobs:
         with:
           args: >
             --verbose --no-progress --cache --max-cache-age 1d
+            --exclude 'https://deepwiki\.com/MaaAssistantArknights/maa-cli'
             -- .
       - name: Comment on Pull Request if Dead Links Found
         if: >-

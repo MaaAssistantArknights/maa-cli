@@ -8,10 +8,13 @@ pub struct FightParams {
     /// Stage to fight, e.g. 1-7, leave empty to fight current/last stage
     stage: Option<String>,
     #[clap(short, long)]
-    /// Number of medicine (Sanity Potion) used to fight, default to 0
+    /// Maximum number of medicine (Sanity Potion) used to fight, default to 0
     medicine: Option<i32>,
-    #[clap(long)]
-    /// Number of expiring medicine (Sanity Potion) used to fight, default to 0
+    #[clap(long, conflicts_with = "expiring_medicine")]
+    /// Use medicine expiring within the given number of days, 0 disables expiring medicine
+    medicine_expire_days: Option<i32>,
+    #[clap(long, hide = true)]
+    /// Deprecated: number of expiring medicine used to fight, default to 0
     expiring_medicine: Option<i32>,
     #[clap(long)]
     /// Number of stone (Originite Prime) used to fight, default to 0
@@ -28,12 +31,14 @@ pub struct FightParams {
     /// e.g. `-D30012=100 -D30011=100` to exit after get 100 Orirock or 100 Orirock Cube.
     drops: Vec<String>,
     #[clap(long)]
-    /// Repeat times of single proxy combat (-1 ~ 6), default to 1
+    /// Repeat times of single proxy combat (-1 ~ 10), default to 1
     ///
     /// - -1: disable switching series,
     /// - 0: automatically switch to the maximum number of series currently available, if the
-    ///   current sanity is less than 6 times, select the minimum number of times available,
-    /// - 1 ~ 6: uee the specified number of times (default to 1).
+    ///   current sanity is less than the maximum, select the minimum number of times available,
+    /// - 1 ~ 10: use the specified number of times (default to 1).
+    ///
+    /// Clients with older resources only accept -1 ~ 6.
     series: Option<i32>,
     #[clap(long)]
     /// Whether report drops to the Penguin Statistics
@@ -66,6 +71,12 @@ impl super::ToTaskType for FightParams {
 
 impl super::IntoParameters for FightParams {
     fn into_parameters_no_context(self) -> anyhow::Result<MAAValue> {
+        if self.expiring_medicine.is_some() {
+            log::warn!(
+                "--expiring-medicine is deprecated; use --medicine together with --medicine-expire-days instead"
+            );
+        }
+
         let mut params = object!(
             "stage" => self.stage.unwrap_or_default(),
             "DrGrandet" => self.dr_grandet
@@ -74,6 +85,7 @@ impl super::IntoParameters for FightParams {
         // Fight conditions - optional parameters
         insert!(params,
             "medicine" =>? self.medicine,
+            "medicine_expire_days" =>? self.medicine_expire_days,
             "expiring_medicine" =>? self.expiring_medicine,
             "stone" =>? self.stone,
             "times" =>? self.times,
@@ -236,6 +248,43 @@ mod tests {
             )
         );
 
+        assert_eq!(
+            parse([
+                "maa",
+                "fight",
+                "1-7",
+                "--medicine=5",
+                "--medicine-expire-days=2",
+                "--series=10",
+            ])
+            .unwrap(),
+            default_params.join(object!(
+                "stage" => "1-7",
+                "medicine" => 5,
+                "medicine_expire_days" => 2,
+                "series" => 10,
+            ))
+        );
+
+        assert!(
+            <crate::command::Cli as clap::Parser>::try_parse_from([
+                "maa",
+                "fight",
+                "--expiring-medicine=5",
+                "--medicine-expire-days=2",
+            ])
+            .is_err()
+        );
         assert!(parse(["maa", "fight", "1-7", "-D30012=100", "-D30011"]).is_err());
+    }
+
+    #[test]
+    fn expiring_medicine_is_hidden_from_help() {
+        let mut command = <crate::command::Cli as clap::CommandFactory>::command();
+        let fight = command.find_subcommand_mut("fight").unwrap();
+        let help = fight.render_help().to_string();
+
+        assert!(!help.contains("--expiring-medicine"));
+        assert!(help.contains("--medicine-expire-days"));
     }
 }

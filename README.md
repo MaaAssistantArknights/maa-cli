@@ -38,6 +38,8 @@
 - [配置](crates/maa-cli/docs/zh-CN/config.md)
 - [常见问题](crates/maa-cli/docs/zh-CN/faq.md)
 
+[![Ask DeepWiki](https://img.shields.io/badge/-Ask_DeepWiki-blue?logo=readthedocs&logoColor=white&labelColor=black)](https://deepwiki.com/MaaAssistantArknights/maa-cli)
+
 [maa-home]: https://github.com/MaaAssistantArknights/MaaAssistantArknights/
 
 ## 开发文档
