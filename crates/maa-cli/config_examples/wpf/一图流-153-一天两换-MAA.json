@@ -1,0 +1,38 @@
+{
+  "title": "一图流排班表-153两换",
+  "description": "示例排班，只保留时段和菲亚梅塔，供 maa migrate wpf 读取。",
+  "plans": [
+    {
+      "name": "B班",
+      "period": [
+        [
+          "09:00",
+          "21:00"
+        ]
+      ],
+      "Fiammetta": {
+        "enable": true,
+        "target": "但书",
+        "order": "pre"
+      }
+    },
+    {
+      "name": "A班",
+      "period": [
+        [
+          "21:00",
+          "23:59"
+        ],
+        [
+          "00:00",
+          "09:00"
+        ]
+      ],
+      "Fiammetta": {
+        "enable": true,
+        "target": "但书",
+        "order": "pre"
+      }
+    }
+  ]
+}

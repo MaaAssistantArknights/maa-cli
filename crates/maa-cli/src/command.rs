@@ -171,12 +171,14 @@ pub(crate) enum Command {
     },
     /// Convert file format between TOML, YAML and JSON
     ///
-    /// This command will convert a file from TOML, YAML or JSON format to another format.
+    /// This command keeps the data structure unchanged and only converts serialization
+    /// format between TOML, YAML and JSON.
     /// This is useful when you want to write your infrastructure configuration
     /// in TOML or YAML format, and use it in MaaCore, which only supports JSON format.
     ///
-    /// It may also be useful when you want to migrate your cli configuration from
-    /// one format to another format.
+    /// To migrate from an external configuration model (e.g. MAA WPF GUI), use
+    /// `maa migrate` instead. To install an existing maa-cli config into the config
+    /// directory, use `maa import`.
     Convert {
         /// Path of the input file
         input: PathBuf,
@@ -189,6 +191,14 @@ pub(crate) enum Command {
         #[arg(short, long)]
         format: Option<config::Filetype>,
     },
+    /// Migrate configuration from an external model into maa-cli config
+    ///
+    /// Unlike `convert` (same data structure, different format) and `import`
+    /// (install an existing maa-cli config into the config directory), `migrate`
+    /// remaps an external configuration model into maa-cli's config model.
+    /// The migration may be lossy; skipped tasks and fields are summarized afterward.
+    #[command(subcommand)]
+    Migrate(MigrateCommand),
     /// Show stage activity of given client
     Activity {
         #[arg(default_value_t = config::task::ClientType::Official)]
@@ -244,6 +254,32 @@ pub(crate) enum Command {
         /// Path of the output file
         #[arg(long)]
         path: PathBuf,
+    },
+}
+
+#[derive(Subcommand)]
+pub(crate) enum MigrateCommand {
+    /// Migrate a MAA WPF GUI profile TaskQueue into maa-cli task config
+    ///
+    /// The input is typically a GUI-exported JSON profile. When multiple
+    /// configurations exist, use `--profile-name` to select one.
+    /// Disabled GUI tasks are kept with `params.enable = false` so they will
+    /// not run until re-enabled manually.
+    Wpf {
+        /// Path of the input GUI profile
+        input: PathBuf,
+        /// Path of the output file; defaults to the input path with its extension replaced by
+        /// .toml
+        output: Option<PathBuf>,
+        /// Select a named configuration when migrating a multi-profile GUI export
+        #[arg(long = "profile-name")]
+        profile_name: Option<String>,
+        /// Override the custom infrastructure schedule JSON path in the WPF profile
+        ///
+        /// The WPF InfrastTask must already use custom scheduling (`Mode = Custom`
+        /// or a non-empty `Filename`). Otherwise the command exits with an error.
+        #[arg(long, value_name = "JSON")]
+        custom_schedule: Option<PathBuf>,
     },
 }
 
@@ -616,6 +652,70 @@ mod test {
                 ..
             } if output == Path::new("output.json")
         );
+    }
+
+    #[test]
+    fn migrate() {
+        assert_matches!(
+            parse_from(["maa", "migrate", "wpf", "profile.json"]).command,
+            Command::Migrate(MigrateCommand::Wpf {
+                input,
+                output: None,
+                profile_name: None,
+                custom_schedule: None,
+            }) if input == Path::new("profile.json")
+        );
+
+        assert_matches!(
+            parse_from([
+                "maa",
+                "migrate",
+                "wpf",
+                "profile.json",
+                "tasks.toml",
+                "--profile-name",
+                "Default"
+            ])
+            .command,
+            Command::Migrate(MigrateCommand::Wpf {
+                input,
+                output: Some(output),
+                profile_name: Some(config),
+                custom_schedule: None,
+            }) if input == Path::new("profile.json")
+                && output == Path::new("tasks.toml")
+                && config == "Default"
+        );
+
+        assert_matches!(
+            parse_from([
+                "maa",
+                "migrate",
+                "wpf",
+                "profile.json",
+                "--custom-schedule",
+                "plan.json"
+            ])
+            .command,
+            Command::Migrate(MigrateCommand::Wpf {
+                custom_schedule: Some(schedule),
+                ..
+            }) if schedule == Path::new("plan.json")
+        );
+    }
+
+    #[test]
+    fn migrate_wpf_help_describes_default_output_path() {
+        let help = match Cli::try_parse_from(["maa", "migrate", "wpf", "--help"]) {
+            Err(error) => {
+                assert_eq!(error.kind(), clap::error::ErrorKind::DisplayHelp);
+                error.to_string()
+            }
+            Ok(_) => panic!("--help should stop argument parsing"),
+        };
+
+        assert!(help.contains("defaults to the input path"), "{help}");
+        assert!(!help.contains("printed to stdout"), "{help}");
     }
 
     #[test]
