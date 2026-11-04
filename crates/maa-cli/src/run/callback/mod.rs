@@ -1,6 +1,7 @@
 pub mod summary;
 use std::{
     fmt::Write,
+    io::Write as _,
     sync::{Arc, atomic::AtomicBool},
 };
 
@@ -18,16 +19,79 @@ fn json_pretty(value: &impl serde::Serialize) -> String {
     serde_json::to_string_pretty(value).unwrap_or_else(|e| format!("<serialization error: {e}>"))
 }
 
+/// One line of the `--emit-json` stream.
+///
+/// A struct rather than `serde_json::json!` because the field order below is
+/// the emitted key order (a `serde_json::Map` without `preserve_order` sorts
+/// its keys), and reading a line as "what happened, when, with what payload"
+/// is worth keeping.
+#[derive(serde::Serialize)]
+struct Event<'a> {
+    kind: &'a str,
+    time: String,
+    message: &'a Value,
+}
+
+/// Render an event as a single line of JSON for `--emit-json` mode.
+///
+/// The shape is `{"kind": "<Kind>", "time": "<RFC 3339>", "message": <payload>}`.
+/// The caller supplies the kind as a string so the same helper can emit both
+/// MaaCore callbacks (whose `MessageKind` is stringified via its `Debug` repr,
+/// e.g. `"TaskChainStart"`, `"Unknown(9999)"`) and synthetic events such as
+/// `"TaskRegistered"`. MaaCore payloads carry no time of their own, so `time`
+/// is taken from the caller's clock; it is passed in rather than read here so
+/// tests can assert on a fixed value. Returns `None` if the event fails to
+/// serialize (should not happen in practice — `message` is a `Value` we just
+/// built).
+pub(crate) fn format_event_line(
+    kind: &str,
+    time: chrono::DateTime<chrono::Local>,
+    message: &Value,
+) -> Option<String> {
+    let event = Event {
+        kind,
+        // RFC 3339 with millisecond precision and a local UTC offset, which
+        // parses unambiguously in every consumer. It records an approximate
+        // emission time, not an ordering key: callbacks arriving within the
+        // same millisecond share a timestamp, and a wall-clock adjustment can
+        // make successive events tie or move backwards.
+        time: time.to_rfc3339_opts(chrono::SecondsFormat::Millis, false),
+        message,
+    };
+    serde_json::to_string(&event).ok()
+}
+
+/// Write one JSONL event to stdout under `--emit-json`, silently dropping the
+/// line on write failure (e.g. broken pipe). Locks stdout for the duration.
+///
+/// The event is timestamped here, at the moment it is emitted, from the same
+/// clock the human-readable log uses, so the two streams stay consistent.
+pub(crate) fn emit_json_event(kind: &str, message: &Value) {
+    if let Some(line) = format_event_line(kind, chrono::Local::now(), message) {
+        let mut out = std::io::stdout().lock();
+        // Ignore write errors: if stdout is closed (broken pipe), we silently
+        // drop the line rather than propagate an error up through a MaaCore
+        // callback thread or the task-registration loop.
+        let _ = writeln!(out, "{line}");
+        // `Stdout` is only documented to be line-buffered when connected to a
+        // terminal, so on a pipe the flush is what actually gets the event out
+        // now rather than whenever the buffer happens to fill.
+        let _ = out.flush();
+    }
+}
+
 pub struct MaaCallback {
     auto_reconnect: bool,
+    emit_json: bool,
     offline_stop_requested: Arc<AtomicBool>,
 }
 
 impl MaaCallback {
-    pub fn new(auto_reconnect: bool) -> (Self, Arc<AtomicBool>) {
+    pub fn new(auto_reconnect: bool, emit_json: bool) -> (Self, Arc<AtomicBool>) {
         let offline_stop_requested = Arc::new(AtomicBool::new(false));
         let cb = Self {
             auto_reconnect,
+            emit_json,
             offline_stop_requested: Arc::clone(&offline_stop_requested),
         };
         (cb, offline_stop_requested)
@@ -44,6 +108,17 @@ impl Callback for MaaCallback {
             log::warn!("Failed to parse message for {kind:?}: {message}");
             return;
         };
+
+        // Emit structured event on stdout for programmatic consumers before
+        // running the human-facing processor. `process_message` is always
+        // invoked afterwards because it carries side effects a driver still
+        // needs — `MAA_CORE_ERRORED` for the exit status, the `summary::`
+        // state for `--no-summary`, and the outbound `ReportRequest` HTTP
+        // send in `process_report`.
+        if self.emit_json {
+            emit_json_event(&format!("{kind:?}"), &message);
+        }
+
         self.process_message(kind, message);
     }
 }
@@ -629,15 +704,148 @@ mod tests {
 
     #[test]
     fn offline_confirm_stops_when_auto_reconnect_disabled() {
-        let (cb, offline_stop) = MaaCallback::new(false);
+        let (cb, offline_stop) = MaaCallback::new(false, false);
         cb.on_message(MessageKind::SubTaskStart, Some(offline_confirm_msg()));
         assert!(offline_stop.load(std::sync::atomic::Ordering::Relaxed));
     }
 
     #[test]
     fn offline_confirm_does_not_stop_when_auto_reconnect_enabled() {
-        let (cb, offline_stop) = MaaCallback::new(true);
+        let (cb, offline_stop) = MaaCallback::new(true, false);
         cb.on_message(MessageKind::SubTaskStart, Some(offline_confirm_msg()));
         assert!(!offline_stop.load(std::sync::atomic::Ordering::Relaxed));
+    }
+
+    /// A fixed instant, so assertions on the emitted `time` field do not depend
+    /// on when the test runs. It is rendered in the machine's local offset, so
+    /// assertions compare instants rather than the literal string.
+    fn fixed_time() -> chrono::DateTime<chrono::Local> {
+        use chrono::{TimeZone as _, Timelike as _};
+
+        chrono::FixedOffset::east_opt(8 * 3600)
+            .unwrap()
+            .with_ymd_and_hms(2026, 8, 7, 2, 15, 51)
+            .unwrap()
+            .with_nanosecond(123_000_000)
+            .unwrap()
+            .into()
+    }
+
+    #[test]
+    fn format_event_line_known_kind() {
+        let kind = MessageKind::TaskChainStart;
+        let message: Value = serde_json::from_str(r#"{"taskchain":"Fight","taskid":42}"#).unwrap();
+        let line = format_event_line(&format!("{kind:?}"), fixed_time(), &message).unwrap();
+        let parsed: Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(
+            parsed.get("kind").and_then(Value::as_str),
+            Some("TaskChainStart")
+        );
+        assert_eq!(
+            parsed
+                .get("message")
+                .and_then(|m| m.get("taskchain"))
+                .and_then(Value::as_str),
+            Some("Fight"),
+        );
+        assert_eq!(
+            parsed
+                .get("message")
+                .and_then(|m| m.get("taskid"))
+                .and_then(Value::as_i64),
+            Some(42),
+        );
+        // The whole event is a single JSON line, no embedded newlines.
+        assert!(!line.contains('\n'));
+    }
+
+    #[test]
+    fn format_event_line_carries_timestamp() {
+        let message: Value = serde_json::from_str(r#"{"taskchain":"Fight"}"#).unwrap();
+        let line = format_event_line("TaskChainStart", fixed_time(), &message).unwrap();
+        let parsed: Value = serde_json::from_str(&line).unwrap();
+
+        let time = parsed.get("time").and_then(Value::as_str).unwrap();
+        // RFC 3339 with a UTC offset, so consumers parse it unambiguously.
+        assert_eq!(
+            chrono::DateTime::parse_from_rfc3339(time).unwrap(),
+            fixed_time(),
+        );
+        // Millisecond precision, so events within the same second stay ordered.
+        assert!(time.contains(".123"), "{time} lacks millisecond precision");
+    }
+
+    #[test]
+    fn format_event_line_envelope_key_order() {
+        let message: Value = serde_json::from_str("{}").unwrap();
+        let line = format_event_line("TaskChainStart", fixed_time(), &message).unwrap();
+
+        // The envelope reads as "what happened, when, with what payload".
+        let kind_at = line.find(r#""kind""#).unwrap();
+        let time_at = line.find(r#""time""#).unwrap();
+        let message_at = line.find(r#""message""#).unwrap();
+        assert!(kind_at < time_at && time_at < message_at, "{line}");
+    }
+
+    #[test]
+    fn format_event_line_unknown_kind() {
+        let kind = MessageKind::Unknown(9999);
+        let message: Value = serde_json::from_str("{}").unwrap();
+        let line = format_event_line(&format!("{kind:?}"), fixed_time(), &message).unwrap();
+        let parsed: Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(
+            parsed.get("kind").and_then(Value::as_str),
+            Some("Unknown(9999)"),
+        );
+    }
+
+    #[test]
+    fn format_event_line_task_registered() {
+        // Synthetic event emitted by `run_core` for each task registered with
+        // MaaCore. Shape mirrors the JSON built in `run/mod.rs`.
+        let message = serde_json::json!({
+            "id": 42,
+            "name": "Daily Fight",
+            "task_type": "Fight",
+            "params": { "stage": "1-7" },
+        });
+        let line = format_event_line("TaskRegistered", fixed_time(), &message).unwrap();
+        let parsed: Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(
+            parsed.get("kind").and_then(Value::as_str),
+            Some("TaskRegistered"),
+        );
+        // The task id MaaCore assigned at registration; consumers match it
+        // against the `taskid` carried by `TaskChainStart`.
+        assert_eq!(
+            parsed
+                .get("message")
+                .and_then(|m| m.get("id"))
+                .and_then(Value::as_i64),
+            Some(42),
+        );
+        assert_eq!(
+            parsed
+                .get("message")
+                .and_then(|m| m.get("name"))
+                .and_then(Value::as_str),
+            Some("Daily Fight"),
+        );
+        assert_eq!(
+            parsed
+                .get("message")
+                .and_then(|m| m.get("task_type"))
+                .and_then(Value::as_str),
+            Some("Fight"),
+        );
+        assert_eq!(
+            parsed
+                .get("message")
+                .and_then(|m| m.get("params"))
+                .and_then(|p| p.get("stage"))
+                .and_then(Value::as_str),
+            Some("1-7"),
+        );
+        assert!(!line.contains('\n'));
     }
 }
