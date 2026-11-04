@@ -8,7 +8,7 @@
       "properties": {
         "preset": {
           "type": "string",
-          "enum": ["ADB", "PlayCover", "MuMuPro", "Waydroid"],
+          "enum": ["ADB", "PlayCover", "MuMuPro", "Waydroid", "Win32"],
           "default": "ADB"
         },
         "adb_path": {
@@ -17,8 +17,23 @@
           "default": "adb"
         },
         "address": { "type": "string" },
-        "config": { "type": "string" }
-      }
+        "config": { "type": "string" },
+        "window_title": { "type": "string", "minLength": 1 },
+        "window_process_id": { "type": "integer", "minimum": 1 },
+        "window_executable": { "type": "string", "format": "path" },
+        "screencap_method": { "type": "integer", "minimum": 0, "default": 2 },
+        "mouse_method": { "type": "integer", "minimum": 0, "default": 32 },
+        "keyboard_method": { "type": "integer", "minimum": 0, "default": 2 }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "preset": { "const": "Win32" } },
+            "required": ["preset"]
+          },
+          "then": { "required": ["window_title"] }
+        }
+      ]
     },
     "resource": {
       "type": "object",

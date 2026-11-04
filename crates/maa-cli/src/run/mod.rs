@@ -3,6 +3,11 @@ use callback::summary;
 
 mod external;
 
+mod window;
+
+#[cfg(test)]
+mod window_tests;
+
 pub mod preset;
 
 use std::{
@@ -92,6 +97,20 @@ pub struct CommonArgs {
     pub no_auto_reconnect: bool,
 }
 
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Args, Default)]
+pub struct ConnectionTestArgs {
+    /// Profile (asst config file) name
+    #[arg(short, long)]
+    pub profile: Option<String>,
+    /// Take one fresh screenshot after connecting
+    #[arg(long)]
+    pub screencap: bool,
+    /// Print a machine-readable JSON result
+    #[arg(long)]
+    pub json: bool,
+}
+
 impl CommonArgs {
     pub fn apply_to(&self, config: &mut AsstConfig) {
         if let Some(addr) = self.addr.as_ref() {
@@ -122,6 +141,104 @@ fn find_profile(root: impl AsRef<Path>, profile: Option<&str>) -> Result<AsstCon
     }
 }
 
+fn ensure_connection_supported(_connection: &crate::config::asst::ConnectionConfig) -> Result<()> {
+    #[cfg(not(windows))]
+    if matches!(_connection.preset(), crate::config::asst::Preset::Win32) {
+        bail!("Win32 connection is only supported on Windows");
+    }
+    Ok(())
+}
+
+fn connect_assistant(
+    asst: &Assistant,
+    connection: &crate::config::asst::ConnectionConfig,
+    address_override: Option<&str>,
+) -> Result<()> {
+    match connection.connection_args()? {
+        crate::config::asst::ConnectionArgs::Win32(args) => {
+            #[cfg(windows)]
+            {
+                let library = dirs::find_library();
+                window::validate_win32_control_unit_at(library.as_deref())?;
+                let hwnd = window::resolve_window(&args.selector)?;
+                asst.async_attach_window(
+                    hwnd,
+                    args.screencap_method,
+                    args.mouse_method,
+                    args.keyboard_method,
+                    true,
+                )?;
+                Ok(())
+            }
+            #[cfg(not(windows))]
+            {
+                window::resolve_window(&args.selector)?;
+                Ok(())
+            }
+        }
+        crate::config::asst::ConnectionArgs::Adb {
+            adb_path,
+            address,
+            config,
+        } => {
+            let address = address_override.unwrap_or(address.as_ref());
+            asst.async_connect(adb_path.as_ref(), address, config, true)?;
+            Ok(())
+        }
+    }
+}
+
+fn require_screenshot_bytes(image: Option<Vec<u8>>) -> Result<usize> {
+    let image = image.context("Connection succeeded but MaaCore returned no screenshot")?;
+    if image.is_empty() {
+        bail!("Connection succeeded but MaaCore returned an empty screenshot");
+    }
+    Ok(image.len())
+}
+
+fn connection_label(preset: crate::config::asst::Preset) -> &'static str {
+    use crate::config::asst::Preset;
+
+    match preset {
+        Preset::Adb => "ADB",
+        Preset::MuMuPro => "MuMuPro",
+        Preset::PlayCover => "PlayCover",
+        Preset::Waydroid => "Waydroid",
+        Preset::Androws => "Androws",
+        Preset::Win32 => "Win32",
+    }
+}
+
+pub fn test_connection(args: ConnectionTestArgs) -> Result<()> {
+    let asst_config = find_profile(dirs::config(), args.profile.as_deref())?;
+    ensure_connection_supported(&asst_config.connection)?;
+    load_core().context("Failed to load MaaCore!")?;
+    setup_core(&asst_config)?;
+
+    let asst = Assistant::new().context("Failed to create Assistant")?;
+    asst_config.instance_options.apply_to(&asst)?;
+    connect_assistant(&asst, &asst_config.connection, None)?;
+    let screenshot_bytes = if args.screencap {
+        require_screenshot_bytes(asst.get_fresh_image()?)?
+    } else {
+        0
+    };
+    let connection = connection_label(asst_config.connection.preset());
+    if args.json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "ok": true,
+                "connection": connection,
+                "screenshot_bytes": screenshot_bytes,
+            })
+        );
+    } else {
+        println!("Connection test succeeded ({connection}, screenshot bytes: {screenshot_bytes})");
+    }
+    Ok(())
+}
+
 fn run_core<F>(f: F, args: CommonArgs) -> Result<()>
 where
     F: FnOnce(&AsstConfig) -> Result<TaskConfig>,
@@ -134,8 +251,15 @@ where
     let mut asst_config = find_profile(dirs::config(), args.profile.as_deref())?;
 
     args.apply_to(&mut asst_config);
+    ensure_connection_supported(&asst_config.connection)?;
 
-    let task_config = f(&asst_config)?;
+    let mut task_config = f(&asst_config)?;
+    if matches!(
+        asst_config.connection.preset(),
+        crate::config::asst::Preset::Win32
+    ) {
+        task_config.prepare_for_win32();
+    }
     if let Some(resource) = task_config.client_type.resource() {
         asst_config.resource.use_global_resource(resource);
     }
@@ -193,15 +317,21 @@ where
     }
 
     if !args.dry_run {
-        // Prepare connection
-        let (adb_path, address, config) = asst_config.connection.connect_args();
+        #[cfg(target_os = "macos")]
+        let playcover_address = matches!(
+            asst_config.connection.preset(),
+            crate::config::asst::Preset::PlayCover
+        )
+        .then(|| asst_config.connection.connect_args().1.into_owned());
 
         // Launch external apps
         let app: Option<Box<dyn external::ExternalApp>> = match asst_config.connection.preset() {
             #[cfg(target_os = "macos")]
             crate::config::asst::Preset::PlayCover => Some(Box::new(external::PlayCoverApp::new(
                 task_config.client_type,
-                address.as_ref(),
+                playcover_address
+                    .as_deref()
+                    .context("PlayCover address is unavailable")?,
             ))),
             #[cfg(target_os = "linux")]
             crate::config::asst::Preset::Waydroid => Some(Box::new(external::WaydroidApp::new())),
@@ -215,10 +345,8 @@ where
             .transpose()?
             .flatten();
 
-        let address = runtime_address.as_deref().unwrap_or(&address);
-
         // Connect to game or emulator
-        asst.async_connect(adb_path.as_ref(), address, config, true)?;
+        connect_assistant(&asst, &asst_config.connection, runtime_address.as_deref())?;
 
         debug!("Starting MAA...");
         asst.start()?;
@@ -333,6 +461,44 @@ mod tests {
     use std::env::{self, temp_dir};
 
     use super::*;
+
+    #[test]
+    fn screenshot_probe_requires_a_non_empty_image() {
+        assert!(require_screenshot_bytes(None).is_err());
+        assert!(require_screenshot_bytes(Some(Vec::new())).is_err());
+        assert_eq!(require_screenshot_bytes(Some(vec![1, 2, 3])).unwrap(), 3);
+    }
+
+    #[test]
+    fn connection_probe_reports_the_configured_preset() {
+        use crate::config::asst::Preset;
+
+        assert_eq!(connection_label(Preset::Adb), "ADB");
+        assert_eq!(connection_label(Preset::MuMuPro), "MuMuPro");
+        assert_eq!(connection_label(Preset::PlayCover), "PlayCover");
+        assert_eq!(connection_label(Preset::Waydroid), "Waydroid");
+        assert_eq!(connection_label(Preset::Androws), "Androws");
+        assert_eq!(connection_label(Preset::Win32), "Win32");
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn win32_is_rejected_before_loading_core_on_non_windows() {
+        let config: crate::config::asst::ConnectionConfig = toml::from_str(
+            r#"
+                preset = "Win32"
+                window_title = "Arknights"
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            ensure_connection_supported(&config)
+                .unwrap_err()
+                .to_string(),
+            "Win32 connection is only supported on Windows"
+        );
+    }
 
     #[test]
     #[ignore = "need installed MaaCore"]

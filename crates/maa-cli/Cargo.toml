@@ -52,6 +52,11 @@ ureq = { workspace = true, features = ["platform-verifier"] }
 ureq = { workspace = true, features = ["rustls-webpki-roots"] }
 
 [target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true, features = [
+  "Win32_Foundation",
+  "Win32_System_Threading",
+  "Win32_UI_WindowsAndMessaging",
+] }
 winreg = { workspace = true }
 
 [dev-dependencies]
