@@ -1,0 +1,5 @@
+[files]
+extend-exclude = ["CHANGELOG.md"]
+
+[default.extend-identifiers]
+eis_socket_path = "eis_socket_path"
