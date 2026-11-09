@@ -279,9 +279,11 @@ impl WpfInfrastTask {
             reception_clue_exchange: Some(self.reception_clue_exchange),
             reception_send_clue: Some(self.send_clue),
             continue_training: Some(self.continue_training),
-            fiammetta_targets: fiammetta
-                .then(|| self.fiammetta_targets())
-                .unwrap_or_default(),
+            fiammetta_targets: if fiammetta {
+                self.fiammetta_targets()
+            } else {
+                Default::default()
+            },
             fiammetta_recovery_enabled: fiammetta,
             use_pinus_sylvestris: default_shift && self.use_pinus_sylvestris,
             use_perception_information: default_shift && self.use_perception_information,
