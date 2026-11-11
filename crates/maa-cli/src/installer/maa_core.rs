@@ -264,6 +264,17 @@ mod tests {
             Some(lib_dir.join(MAA_CORE_LIB))
         );
 
+        #[cfg(windows)]
+        assert_eq!(
+            extract_mapper(
+                Path::new("MaaWin32ControlUnit.dll"),
+                lib_dir,
+                resource_dir,
+                &config
+            ),
+            Some(lib_dir.join("MaaWin32ControlUnit.dll"))
+        );
+
         assert_eq!(
             extract_mapper(
                 &Path::new("resource").join("config.json"),
