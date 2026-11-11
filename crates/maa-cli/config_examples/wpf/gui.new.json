@@ -4,8 +4,8 @@
       "TaskQueue": [
         {
           "$type": "StartUpTask",
-          "AccountName": "",
-          "AccountSwitchEnabled": false,
+          "AccountName": "0827",
+          "AccountSwitchEnabled": true,
           "Name": "",
           "IsEnable": true,
           "TaskType": "StartUp"
@@ -293,7 +293,7 @@
         },
         "ThirdParty": {
           "ReportToPenguin": true,
-          "PenguinId": "",
+          "PenguinId": "482853894",
           "ReportToYituliu": true,
           "YituliuOpenApiToken": "",
           "OperBoxUseYituliuApi": false,
@@ -375,7 +375,7 @@
         "SelectFormation": 1,
         "LoopTimes": 1
       },
-      "TaskSelectedIndex": 2
+      "TaskSelectedIndex": 0
     },
     "肉鸽": {
       "TaskQueue": [
@@ -683,10 +683,47 @@
         }
       },
       "Copilot": {
-        "TaskList": [],
+        "TaskList": [
+          {
+            "Name": "TL-EX-7",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TL-EX-7.json",
+            "CopilotId": 0,
+            "IsRaid": false,
+            "IsChecked": false,
+            "Index": 0
+          },
+          {
+            "Name": "TL-EX-7",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TL-EX-7.json",
+            "CopilotId": 0,
+            "IsRaid": true,
+            "IsChecked": false,
+            "Index": 1
+          },
+          {
+            "Name": "TL-EX-8",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TL-EX-8.json",
+            "CopilotId": 109583,
+            "IsRaid": false,
+            "IsChecked": false,
+            "Index": 2
+          },
+          {
+            "Name": "TL-EX-8",
+            "IsNavNameOverride": false,
+            "FilePath": "config\\copilot\\TL-EX-8.json",
+            "CopilotId": 109583,
+            "IsRaid": true,
+            "IsChecked": false,
+            "Index": 3
+          }
+        ],
         "EnableUserAdditional": false,
         "UserAdditional": [],
-        "SupportMode": "Random",
+        "SupportMode": "WhenNeeded",
         "UseFormation": false,
         "SelectFormation": 1,
         "LoopTimes": 1
@@ -763,7 +800,7 @@
   "ConfigVersion": 1,
   "Current": "Default",
   "Update": {
-    "Name": "v6.21.1",
+    "Name": "v6.22.0",
     "UpdatePackage": "",
     "IsFirstBoot": false,
     "DoNotShowUpdate": false,
@@ -771,12 +808,12 @@
     "AllowNightlyUpdates": false,
     "HasAcknowledgedNightlyWarning": false,
     "UpdateSource": "GitHub",
-    "ForceGithubGlobalSource": false,
+    "GitHubToken": "我去，差点泄露了",
     "MirrorChyanCdk": "",
     "MirrorChyanCdkExpiredTime": 0,
     "CheckOnStartup": true,
     "CheckOnSchedule": false,
-    "Proxy": "",
+    "Proxy": "http://127.0.0.1:7897",
     "ProxyType": "Http",
     "AutoDownloadUpdatePackage": true,
     "AutoInstallUpdatePackage": true,
@@ -814,10 +851,10 @@
         "Y": -1
       },
       "NormalPosition": {
-        "Left": 752,
-        "Top": 237,
-        "Right": 2192,
-        "Bottom": 1337
+        "Left": 484,
+        "Top": 278,
+        "Right": 1867,
+        "Bottom": 1378
       }
     },
     "LoadWindowPlacement": true,
@@ -837,22 +874,23 @@
       "Hwnd": 0
     },
     "SettingOrders": [
-      "SwitchConfiguration",
       "ScheduleSettings",
-      "PerformanceSettings",
       "GameSettings",
       "ConnectionSettings",
       "StartupSettings",
-      "RemoteControlSettings",
       "UiSettings",
       "NotificationSettings",
-      "HotKeySettings",
       "UpdateSettings",
       "AchievementSettings",
       "IssueReport",
       "AboutUs",
+      "SwitchConfiguration",
+      "PerformanceSettings",
+      "RemoteControlSettings",
+      "HotKeySettings",
       "ThirdPartyServiceSettings"
     ],
+    "ShowAdvancedSettings": true,
     "CollapesStates": [],
     "HotKeys": {
       "ShowGui": {
@@ -865,6 +903,9 @@
       }
     },
     "GuideStep": 7,
+    "GuideTutorialVersion": 2,
+    "DailyReportRetention": "Unlimited",
+    "DailyReportChartCollapsed": false,
     "Background": {
       "ImagePath": "background/background.png",
       "StretchMode": "Fill",
@@ -876,7 +917,8 @@
       "GpuDescription": "NVIDIA GeForce RTX 3050 Laptop GPU",
       "GpuInstancePath": "",
       "AllowDeprecatedGpu": false,
-      "IgnoreBadModulesAndUseSoftwareRendering": false
+      "IgnoreBadModulesAndUseSoftwareRendering": false,
+      "Backend": "Auto"
     },
     "BackgroundMonetEnabled": false,
     "BackgroundMonetMode": "Auto",

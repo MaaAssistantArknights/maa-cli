@@ -223,7 +223,21 @@ impl WpfInfrastTask {
             && self.wants_custom()
         {
             *schedule_applied = true;
+            warn_infrast_schedule_path();
             return self.try_custom_task(&path.to_string_lossy(), None);
+        }
+
+        if self.wants_custom() && !self.filename.is_empty() {
+            warn_infrast_schedule_path();
+            return match self.try_custom_task(&self.filename, schedule_base) {
+                Ok(task) => Ok(task),
+                Err(err) => {
+                    warn!(
+                        "InfrastTask custom schedule could not be read ({err}); copying the original filename"
+                    );
+                    Ok(self.custom_task_with_original_filename())
+                }
+            };
         }
 
         if self.wants_custom() {
@@ -234,13 +248,20 @@ impl WpfInfrastTask {
                         "InfrastTask custom schedule skipped ({err}); writing default infrast mode"
                     );
                     summary.skip_field("InfrastTask", Some(self.name.clone()), "Mode");
-                    if !self.filename.is_empty() {
-                        summary.skip_field("InfrastTask", Some(self.name.clone()), "Filename");
-                    }
                 }
             }
         }
         Ok(self.default_task())
+    }
+
+    fn custom_task_with_original_filename(&self) -> CliInfrastTask {
+        let plan_index = (self.plan_select >= 0).then_some(self.plan_select);
+        CliInfrastTask {
+            task_type: TaskType::Infrast,
+            name: self.name.clone(),
+            params: self.shared_params(Some(CUSTOM_MODE), Some(self.filename.clone()), plan_index),
+            variants: Vec::new(),
+        }
     }
 
     fn default_task(&self) -> CliInfrastTask {
@@ -313,6 +334,7 @@ impl WpfInfrastTask {
         schedule_base: Option<&Path>,
     ) -> Result<CliInfrastTask> {
         ensure!(!filename.is_empty(), "custom mode has empty Filename");
+        let written = filename.to_owned();
         let filename = resolve_infrast_filename(filename, schedule_base);
         let schedule = load_custom_schedule(&filename)?;
         let n_plans =
@@ -379,14 +401,14 @@ impl WpfInfrastTask {
         Ok(CliInfrastTask {
             task_type: TaskType::Infrast,
             name: self.name.clone(),
-            params: self.shared_params(
-                Some(CUSTOM_MODE),
-                Some(filename.to_string_lossy().into_owned()),
-                plan_index,
-            ),
+            params: self.shared_params(Some(CUSTOM_MODE), Some(written), plan_index),
             variants,
         })
     }
+}
+
+fn warn_infrast_schedule_path() {
+    warn!("检测到基建任务启用换班配置文件，建议手动检查文件路径是否合法");
 }
 
 fn resolve_infrast_filename(path: &str, schedule_base: Option<&Path>) -> PathBuf {
@@ -613,11 +635,44 @@ fn span_condition(span: MergedSpan, days: u32, remainder: u32) -> Condition {
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
+    use std::sync::{Mutex, OnceLock};
+
     use super::{
         super::{WpfConfig, migrate, migrate_with_base},
         *,
     };
     use crate::config::migrate::MigrationSummary;
+
+    static WARNS: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
+    static LOGGER: WarnCapture = WarnCapture;
+
+    struct WarnCapture;
+
+    impl log::Log for WarnCapture {
+        fn enabled(&self, metadata: &log::Metadata) -> bool {
+            metadata.level() <= log::Level::Warn
+        }
+
+        fn log(&self, record: &log::Record) {
+            if self.enabled(record.metadata())
+                && let Some(warns) = WARNS.get()
+            {
+                warns.lock().unwrap().push(record.args().to_string());
+            }
+        }
+
+        fn flush(&self) {}
+    }
+
+    fn install_warn_capture() {
+        WARNS.get_or_init(|| Mutex::new(Vec::new()));
+        let _ = log::set_logger(&LOGGER);
+        log::set_max_level(log::LevelFilter::Warn);
+    }
+
+    fn captured_warns() -> Vec<String> {
+        WARNS.get().unwrap().lock().unwrap().clone()
+    }
 
     fn sample_task(mode: &str, filename: &str, plan_select: i32) -> WpfInfrastTask {
         serde_json::from_value(serde_json::json!({
@@ -688,18 +743,35 @@ mod tests {
     }
 
     #[test]
-    fn missing_custom_file_falls_back_to_default() {
+    fn missing_custom_file_copies_original_filename() {
         let task = sample_task("Custom", "/no/such/infrast-plan.json", -1);
         let mut summary = MigrationSummary::default();
         let json = to_json(&task, &mut summary);
-        assert_eq!(json["params"]["mode"], 0);
-        assert!(json["params"].get("filename").is_none());
-        assert!(summary.skipped_fields.iter().any(|f| f.field == "Filename"));
-        assert!(summary.skipped_fields.iter().any(|f| f.field == "Mode"));
+        assert!(summary.is_empty());
+        assert_eq!(json["params"]["mode"], CUSTOM_MODE);
+        assert_eq!(json["params"]["filename"], "/no/such/infrast-plan.json");
+        assert!(json["params"].get("plan_index").is_none());
+        assert!(json.get("variants").is_none() || json["variants"].as_array().unwrap().is_empty());
+
+        let fixed = sample_task("Custom", "/no/such/infrast-plan.json", 2);
+        let json = to_json(&fixed, &mut summary);
+        assert_eq!(json["params"]["plan_index"], 2);
+        assert_eq!(json["params"]["filename"], "/no/such/infrast-plan.json");
     }
 
     #[test]
-    fn relative_filename_resolves_beside_the_profile() {
+    fn warns_to_check_custom_schedule_path() {
+        install_warn_capture();
+        let mut summary = MigrationSummary::default();
+        let before = captured_warns().len();
+        let _ = to_json(&sample_task("Custom", "plan.json", -1), &mut summary);
+        assert!(captured_warns()[before..].iter().any(|message| {
+            message == "检测到基建任务启用换班配置文件，建议手动检查文件路径是否合法"
+        }));
+    }
+
+    #[test]
+    fn relative_filename_is_copied_as_written() {
         let dir = tempfile::tempdir().unwrap();
         let schedule_path = dir.path().join("plan.json");
         std::fs::write(
@@ -715,10 +787,9 @@ mod tests {
         .unwrap();
         assert!(summary.is_empty());
         let json = serde_json::to_value(value).unwrap();
-        assert_eq!(
-            json["tasks"][0]["params"]["filename"],
-            schedule_path.to_str().unwrap()
-        );
+        assert_eq!(json["tasks"][0]["params"]["filename"], "plan.json");
+        assert_eq!(json["tasks"][0]["params"]["mode"], CUSTOM_MODE);
+        assert_eq!(json["tasks"][0]["variants"][0]["params"]["plan_index"], 0);
     }
 
     #[test]
@@ -802,6 +873,15 @@ mod tests {
         assert_eq!(json["params"]["mode"], 0);
         assert!(json["params"].get("fiammetta_targets").is_none());
         assert!(json["params"].get("fiammetta_recovery_enabled").is_none());
+    }
+
+    #[test]
+    fn tilde_filename_is_copied_as_written() {
+        let task = sample_task("Custom", "~/一图流-153-一天两换-MAA.json", -1);
+        let mut summary = MigrationSummary::default();
+        let json = to_json(&task, &mut summary);
+        assert_eq!(json["params"]["filename"], "~/一图流-153-一天两换-MAA.json");
+        assert_eq!(json["params"]["mode"], CUSTOM_MODE);
     }
 
     #[test]
@@ -901,12 +981,7 @@ mod tests {
         let json = serde_json::to_value(value).unwrap();
         let task = &json["tasks"][0];
         assert_eq!(task["params"]["mode"], CUSTOM_MODE);
-        assert_eq!(
-            task["params"]["filename"],
-            resolve_infrast_filename(file.path().to_str().unwrap(), None)
-                .to_string_lossy()
-                .as_ref()
-        );
+        assert_eq!(task["params"]["filename"], file.path().to_str().unwrap());
         assert_eq!(task["variants"].as_array().unwrap().len(), 2);
     }
 

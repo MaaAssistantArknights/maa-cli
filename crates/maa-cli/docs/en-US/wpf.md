@@ -104,9 +104,10 @@ A shift that crosses midnight also gets `DayMod`.
 That is the same arrangement as the infrast example in the configuration docs.
 When the schedule has no usable period, or the GUI selects a fixed shift, the result stays a custom base plan and includes `plan_index`.
 
-The written `filename` is absolute.
-`~` in the schedule path expands to your home directory.
-A relative path is resolved from the directory that contains the JSON you passed to the command.
+The written `filename` is the path from the GUI, unchanged.
+`~` is not expanded, and a relative path is not rewritten from the JSON's directory.
+A path passed with `--custom-schedule` is written the same way.
+When an infrast task has a shift schedule file, the command warns you to check that the path is valid.
 The configuration docs say MaaCore reads that schedule JSON, not maa-cli.
 Fiammetta inside the schedule file stays in that file. It is not copied into the task parameters.
 
@@ -114,8 +115,9 @@ To use a different schedule, pass its JSON path with `--custom-schedule`.
 If the GUI profile is not already a custom schedule, the command exits with an error.
 If that file cannot be read, the command also exits with an error. It does not fall back to the default base plan.
 
-Without that option, a missing file, a file that cannot be parsed, or a file with no shifts writes `mode` as `0`.
-The summary says the schedule was skipped.
+Without that option, a non-empty path that cannot be read still writes the original `filename` and `mode` `10000`.
+No time variants are generated in that case.
+An empty path writes `mode` as `0`, and the summary says the schedule was skipped.
 
 Drone use, the mood threshold, and the Fiammetta list use names that are not in the configuration docs. Those names are in the next section.
 
