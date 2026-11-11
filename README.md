@@ -37,6 +37,7 @@
 - [使用](crates/maa-cli/docs/zh-CN/usage.md)
 - [配置](crates/maa-cli/docs/zh-CN/config.md)
 - [常见问题](crates/maa-cli/docs/zh-CN/faq.md)
+- [Agent 技能](skills/maa-cli/SKILL.md)
 
 [![Ask DeepWiki](https://img.shields.io/badge/-Ask_DeepWiki-blue?logo=readthedocs&logoColor=white&labelColor=black)](https://deepwiki.com/MaaAssistantArknights/maa-cli)
 
