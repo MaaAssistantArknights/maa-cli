@@ -1,4 +1,9 @@
-use std::io::{BufRead, BufReader};
+use std::{
+    io::{BufRead, BufReader},
+    sync::mpsc,
+    thread,
+    time::{Duration, Instant},
+};
 
 use anyhow::{Context, Result, anyhow, bail};
 use log::{info, trace};
@@ -52,6 +57,46 @@ fn parse_status(output: &str) -> (bool, Option<String>) {
     (running, address)
 }
 
+const ADB_CONNECTION_TIMEOUT: Duration = Duration::from_secs(60);
+
+enum AdbWait {
+    Connected,
+    Closed(String),
+}
+
+fn wait_for_adb_connection(
+    line_rx: &mpsc::Receiver<std::io::Result<String>>,
+    timeout: Duration,
+) -> Result<AdbWait> {
+    let deadline = Instant::now() + timeout;
+    let timeout_secs = timeout.as_secs();
+    let mut last_line = String::new();
+
+    loop {
+        if Instant::now() >= deadline {
+            bail!(
+                "Waydroid did not establish an ADB connection within {timeout_secs}s \
+                 (last line: {last_line:?})"
+            );
+        }
+
+        let wait = deadline.saturating_duration_since(Instant::now());
+        match line_rx.recv_timeout(wait) {
+            Ok(Ok(line)) => {
+                last_line.clear();
+                last_line.push_str(line.trim_end());
+                trace!("[waydroid] {}", line.trim_end());
+                if line.contains("Established ADB connection") {
+                    return Ok(AdbWait::Connected);
+                }
+            }
+            Ok(Err(err)) => return Err(err).context("Failed to read waydroid stderr"),
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => return Ok(AdbWait::Closed(last_line)),
+        }
+    }
+}
+
 fn start_waydroid_session() -> Result<()> {
     let mut child = std::process::Command::new("waydroid")
         .args(["session", "start"])
@@ -64,45 +109,33 @@ fn start_waydroid_session() -> Result<()> {
         .stderr
         .take()
         .context("Failed to capture waydroid stderr")?;
-    let mut reader = BufReader::new(stderr);
-    let mut line = String::new();
 
-    loop {
-        line.clear();
-        if reader
-            .read_line(&mut line)
-            .context("Failed to read waydroid stderr")?
-            == 0
-        {
-            bail!("waydroid session start exited without establishing ADB");
-        }
-
-        trace!("[waydroid] {}", line.trim_end());
-        if line.contains("Established ADB connection") {
-            return Ok(());
-        }
-
-        if let Some(status) = child
-            .try_wait()
-            .context("Failed to query Waydroid process status")?
-        {
-            if !status.success() {
-                bail!("`waydroid session start` exited with {status}");
+    let (line_tx, line_rx) = mpsc::channel();
+    thread::spawn(move || {
+        for line in BufReader::new(stderr).lines() {
+            if line_tx.send(line).is_err() {
+                break;
             }
-            break;
         }
-    }
+    });
 
-    let status = child
-        .wait()
-        .context("Failed to wait for `waydroid session start`")?;
-    if !status.success() {
-        bail!("`waydroid session start` exited with {status}");
+    let AdbWait::Closed(last_line) = wait_for_adb_connection(&line_rx, ADB_CONNECTION_TIMEOUT)?
+    else {
+        return Ok(());
+    };
+
+    if let Some(status) = child
+        .try_wait()
+        .context("Failed to query Waydroid process status")?
+    {
+        if !status.success() {
+            bail!("`waydroid session start` exited with {status}");
+        }
     }
 
     let (running, _) = parse_status(&run_waydroid(&["status"])?);
     if !running {
-        bail!("Waydroid session did not become ready. Last read line: {line}");
+        bail!("Waydroid session did not become ready. Last read line: {last_line}");
     }
     Ok(())
 }
@@ -202,5 +235,52 @@ mod tests {
             "Session:        RUNNING\nIP address:     192.168.240.112\nContainer:      RUNNING\n",
         );
         assert_eq!(address, Some("192.168.240.112".to_string()));
+    }
+
+    #[test]
+    fn wait_for_adb_connection_established() {
+        let (line_tx, line_rx) = mpsc::channel();
+        line_tx
+            .send(Ok(
+                "Established ADB connection to Waydroid device at 192.168.240.112.".to_string(),
+            ))
+            .unwrap();
+
+        assert!(matches!(
+            wait_for_adb_connection(&line_rx, Duration::from_secs(1)),
+            Ok(AdbWait::Connected)
+        ));
+    }
+
+    #[test]
+    fn wait_for_adb_connection_times_out_with_last_line() {
+        let (line_tx, line_rx) = mpsc::channel();
+        line_tx
+            .send(Ok("Android with user 0 is ready".to_string()))
+            .unwrap();
+
+        let err = match wait_for_adb_connection(&line_rx, Duration::from_millis(50)) {
+            Err(err) => err,
+            Ok(_) => panic!("expected a timeout"),
+        };
+        let message = err.to_string();
+        assert!(
+            message.contains("Android with user 0 is ready"),
+            "{message}"
+        );
+    }
+
+    #[test]
+    fn wait_for_adb_connection_closed() {
+        let (line_tx, line_rx) = mpsc::channel();
+        line_tx
+            .send(Ok("Android with user 0 is ready".to_string()))
+            .unwrap();
+        drop(line_tx);
+
+        match wait_for_adb_connection(&line_rx, Duration::from_secs(1)) {
+            Ok(AdbWait::Closed(line)) => assert_eq!(line, "Android with user 0 is ready"),
+            _ => panic!("expected the closed outcome"),
+        }
     }
 }
