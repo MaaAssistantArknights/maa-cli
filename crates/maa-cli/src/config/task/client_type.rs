@@ -1,9 +1,8 @@
 use clap::ValueEnum;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[repr(u8)]
-#[cfg_attr(test, derive(Debug))]
-#[derive(Clone, Copy, Default, ValueEnum, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, ValueEnum, PartialEq)]
 #[clap(rename_all = "verbatim")]
 pub enum ClientType {
     #[default]
@@ -37,6 +36,10 @@ impl ClientType {
         }
         variants
     };
+
+    pub(crate) const fn is_official(&self) -> bool {
+        matches!(self, Official)
+    }
 
     pub const fn to_str(self) -> &'static str {
         match self {
@@ -121,6 +124,12 @@ impl<'de> Deserialize<'de> for ClientType {
         }
 
         deserializer.deserialize_str(ClientTypeVisitor)
+    }
+}
+
+impl Serialize for ClientType {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.to_str())
     }
 }
 

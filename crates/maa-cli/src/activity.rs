@@ -19,6 +19,31 @@ pub fn has_side_story_open(client: ClientType) -> bool {
         .unwrap_or(false)
 }
 
+/// Load a side-story stage schedule directly from disk (bypasses the process cache).
+///
+/// Used by WPF migration so a missing/unreadable file surfaces as an error instead of
+/// silently falling back, and so a hot-update refresh can be re-read in the same process.
+pub fn load_side_story_stage_schedule(
+    client: ClientType,
+    stage: &str,
+) -> Result<Option<SideStorySchedule>> {
+    let path = maa_dirs::activity();
+    let stage_activity = load_stage_activity(path)
+        .with_context(|| format!("Failed to read activity resource {}", path.display()))?;
+    Ok(stage_activity
+        .get_stage_activity(client)
+        .and_then(|content| content.side_story_schedule_for(stage)))
+}
+
+/// Schedule window copied from a side-story activity entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SideStorySchedule {
+    pub start: NaiveDateTime,
+    pub end: NaiveDateTime,
+    /// Hours east of UTC (e.g. `8` for CN official).
+    pub timezone: i8,
+}
+
 pub fn display_stage_activity(client: ClientType) -> std::io::Result<()> {
     if let Some(stage_activity) = STAGE_ACTIVITY.as_ref() {
         stage_activity.display(std::io::stdout(), client)?;
@@ -116,6 +141,33 @@ impl StageActivityContent {
             .values()
             .any(|activity| activity.activity.is_active())
     }
+
+    /// Look up the open window for a fight stage code.
+    ///
+    /// Prefers `Value` when present, otherwise falls back to `Display`.
+    /// If the stage appears in multiple activities, keeps the latest expire time.
+    fn side_story_schedule_for(&self, stage: &str) -> Option<SideStorySchedule> {
+        let mut best: Option<SideStorySchedule> = None;
+        for activity in self.side_story_stage.values() {
+            let matched = activity.stages.iter().any(|s| {
+                let code = if s.value.is_empty() {
+                    s.display.as_str()
+                } else {
+                    s.value.as_str()
+                };
+                code == stage
+            });
+            if !matched {
+                continue;
+            }
+            let schedule = activity.activity.time_info.to_schedule()?;
+            best = Some(match best {
+                Some(prev) if prev.end >= schedule.end => prev,
+                _ => schedule,
+            });
+        }
+        best
+    }
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq, Clone))]
@@ -147,7 +199,8 @@ impl ActivityInfo {
 #[serde(rename_all = "PascalCase")]
 struct StageInfo {
     display: String,
-    // value: String,
+    #[serde(default)]
+    value: String,
     drop: String,
 }
 
@@ -206,6 +259,16 @@ impl TimeInfo {
     pub fn is_active_at(&self, time: DateTime<Utc>) -> bool {
         let time = time.with_timezone(&self.time_zone).naive_local();
         self.utc_start_time < time && time < self.utc_expire_time
+    }
+
+    fn to_schedule(&self) -> Option<SideStorySchedule> {
+        let hours = self.time_zone.local_minus_utc() / 3600;
+        let timezone = i8::try_from(hours).ok()?;
+        Some(SideStorySchedule {
+            start: self.utc_start_time,
+            end: self.utc_expire_time,
+            timezone,
+        })
     }
 }
 
@@ -577,6 +640,25 @@ mod tests {
             };
 
             assert!(!content.has_side_story_open());
+        }
+
+        #[test]
+        fn test_side_story_schedule_for_from_fixture() {
+            let json_str = include_str!("../fixtures/activity.json");
+            let stage_activity: StageActivityJson = serde_json::from_str(json_str).unwrap();
+            let official = stage_activity
+                .get_stage_activity(ClientType::Official)
+                .unwrap();
+
+            let ep8 = official.side_story_schedule_for("EP-8").unwrap();
+            assert_eq!(ep8.start, naive_dt(2025, 12, 19, 16, 0, 0));
+            assert_eq!(ep8.end, naive_dt(2026, 1, 2, 3, 59, 59));
+            assert_eq!(ep8.timezone, 8);
+
+            let ur8 = official.side_story_schedule_for("UR-8").unwrap();
+            assert_eq!(ur8.end, naive_dt(2025, 12, 19, 3, 59, 59));
+
+            assert!(official.side_story_schedule_for("CE-6").is_none());
         }
     }
 
