@@ -328,6 +328,18 @@ fn normalize_task_params(task_type: TaskType, params: &mut MAAValue) -> Result<(
         }
     }
 
+    // MaaCore throws if Tales mode 1 omits tools_to_craft, and that aborts across FFI.
+    if task_type == TaskType::Reclamation {
+        let theme = params.get_typed::<&str>("theme").unwrap_or("Tales");
+        let mode = params.get_or("mode", 0);
+        if theme == "Tales" && mode == 1 && params.get("tools_to_craft").is_none() {
+            log::warn!(
+                "Reclamation mode 1 is missing tools_to_craft; defaulting to \"荧光棒\" so MaaCore does not abort"
+            );
+            params.insert("tools_to_craft", MAAValue::from(["荧光棒"]));
+        }
+    }
+
     Ok(())
 }
 
@@ -1175,6 +1187,50 @@ mod tests {
             }
 
             assert_new_task_config(StartUp, object!(), ClientType::Official, false, false);
+
+            let reclamation = TaskConfig::new_with_task(Task::new(
+                Reclamation,
+                object!(
+                    "enable" => false,
+                    "theme" => "Tales",
+                    "mode" => 1,
+                    "increment_mode" => 0,
+                    "num_craft_batches" => 16,
+                ),
+            ))
+            .unwrap();
+            assert_eq!(
+                reclamation.tasks[0].params.get("tools_to_craft"),
+                Some(&MAAValue::from(["荧光棒"]))
+            );
+
+            let no_theme =
+                TaskConfig::new_with_task(Task::new(Reclamation, object!("mode" => 1))).unwrap();
+            assert_eq!(
+                no_theme.tasks[0].params.get("tools_to_craft"),
+                Some(&MAAValue::from(["荧光棒"]))
+            );
+
+            let mode_zero = TaskConfig::new_with_task(Task::new(
+                Reclamation,
+                object!("theme" => "Tales", "mode" => 0),
+            ))
+            .unwrap();
+            assert!(mode_zero.tasks[0].params.get("tools_to_craft").is_none());
+
+            let explicit_tools = TaskConfig::new_with_task(Task::new(
+                Reclamation,
+                object!(
+                    "theme" => "Tales",
+                    "mode" => 1,
+                    "tools_to_craft" => ["手电钻"],
+                ),
+            ))
+            .unwrap();
+            assert_eq!(
+                explicit_tools.tasks[0].params.get("tools_to_craft"),
+                Some(&MAAValue::from(["手电钻"]))
+            );
 
             assert_new_task_config(
                 StartUp,
