@@ -22,10 +22,11 @@ pub enum TaskType {
     VideoRecognition,
     SwitchTheme,
     OperProgress,
+    StrongholdProtocol,
 }
 
 impl TaskType {
-    impl_enum_utils!(TaskType, 19, Self::StartUp);
+    impl_enum_utils!(TaskType, 20, Self::StartUp);
 
     impl_from_str_opt!();
 
@@ -50,6 +51,7 @@ impl TaskType {
             Self::VideoRecognition => "VideoRecognition",
             Self::SwitchTheme => "SwitchTheme",
             Self::OperProgress => "OperProgress",
+            Self::StrongholdProtocol => "StrongholdProtocol",
         }
     }
 }
@@ -99,6 +101,10 @@ mod tests {
         assert_eq!("SwitchTheme".parse(), Ok(TaskType::SwitchTheme));
         assert_eq!("OperProgress".parse(), Ok(TaskType::OperProgress));
         assert_eq!(
+            "StrongholdProtocol".parse(),
+            Ok(TaskType::StrongholdProtocol)
+        );
+        assert_eq!(
             "Unknown".parse::<TaskType>(),
             Err(UnknownTaskType("Unknown".to_owned()))
         );
@@ -107,7 +113,7 @@ mod tests {
             "unknown task type `Unknown`, expected one of `StartUp`, `CloseDown`, `Fight`, \
             `Recruit`, `Infrast`, `Mall`, `Award`, `Roguelike`, `Copilot`, `SSSCopilot`, \
             `ParadoxCopilot`, `Depot`, `OperBox`, `Reclamation`, `Custom`, `SingleStep`, \
-            `VideoRecognition`, `SwitchTheme`, `OperProgress`",
+            `VideoRecognition`, `SwitchTheme`, `OperProgress`, `StrongholdProtocol`",
         );
     }
 
@@ -119,19 +125,21 @@ mod tests {
 
         #[test]
         fn deserialize() {
-            let types: [TaskType; 4] = [
+            let types: [TaskType; 5] = [
                 TaskType::StartUp,
                 TaskType::CloseDown,
                 TaskType::SwitchTheme,
                 TaskType::OperProgress,
+                TaskType::StrongholdProtocol,
             ];
 
             assert_de_tokens(&types, &[
-                Token::Seq { len: Some(4) },
+                Token::Seq { len: Some(5) },
                 Token::Str("StartUp"),
                 Token::Str("CloseDown"),
                 Token::Str("SwitchTheme"),
                 Token::Str("OperProgress"),
+                Token::Str("StrongholdProtocol"),
                 Token::SeqEnd,
             ]);
         }
@@ -143,7 +151,7 @@ mod tests {
                 "unknown variant `Unknown`, expected one of `StartUp`, `CloseDown`, `Fight`, \
                 `Recruit`, `Infrast`, `Mall`, `Award`, `Roguelike`, `Copilot`, `SSSCopilot`, \
                 `ParadoxCopilot`, `Depot`, `OperBox`, `Reclamation`, `Custom`, `SingleStep`, \
-                `VideoRecognition`, `SwitchTheme`, `OperProgress`",
+                `VideoRecognition`, `SwitchTheme`, `OperProgress`, `StrongholdProtocol`",
             );
 
             assert_de_tokens_error::<TaskType>(
@@ -175,6 +183,9 @@ mod tests {
             )]);
             assert_ser_tokens(&TaskType::SwitchTheme, &[Token::Str("SwitchTheme")]);
             assert_ser_tokens(&TaskType::OperProgress, &[Token::Str("OperProgress")]);
+            assert_ser_tokens(&TaskType::StrongholdProtocol, &[Token::Str(
+                "StrongholdProtocol",
+            )]);
         }
     }
 
@@ -199,6 +210,7 @@ mod tests {
         assert_eq!(TaskType::VideoRecognition.to_str(), "VideoRecognition");
         assert_eq!(TaskType::SwitchTheme.to_str(), "SwitchTheme");
         assert_eq!(TaskType::OperProgress.to_str(), "OperProgress");
+        assert_eq!(TaskType::StrongholdProtocol.to_str(), "StrongholdProtocol");
     }
 
     #[cfg(feature = "ffi")]
@@ -211,6 +223,10 @@ mod tests {
         assert_eq!(
             TaskType::OperProgress.to_cstring().unwrap(),
             c"OperProgress"
+        );
+        assert_eq!(
+            TaskType::StrongholdProtocol.to_cstring().unwrap(),
+            c"StrongholdProtocol"
         );
     }
 

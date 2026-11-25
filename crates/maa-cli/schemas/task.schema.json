@@ -76,7 +76,8 @@
             "SingleStep",
             "VideoRecognition",
             "SwitchTheme",
-            "OperProgress"
+            "OperProgress",
+            "StrongholdProtocol"
           ]
         },
         "strategy": {
